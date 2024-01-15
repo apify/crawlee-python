@@ -1,0 +1,150 @@
+[project]
+name = "crawlee"
+version = "0.0.1"
+description = "Crawlee for Python"
+readme = "README.md"
+license = { text = "Apache Software License" }
+authors = [{ name = "Apify Technologies s.r.o.", email = "support@apify.com" }]
+keywords = ["apify", "automation", "chrome", "crawler", "headless", "scraper", "scraping"]
+
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries",
+]
+
+requires-python = ">=3.8"
+
+# We use inclusive ordered comparison clause for non-Apify packages intentionally in order to enhance the Apify SDK's
+# compatibility with a wide range of external packages. This decision was discussed in detail in the following PR:
+# https://github.com/apify/apify-sdk-python/pull/154
+dependencies = ["httpx >= 0.24.1", "typing-extensions >= 4.1.0"]
+
+[project.optional-dependencies]
+dev = [
+    "build ~= 1.0.3",
+    "filelock ~= 3.12.4",
+    "mypy ~= 1.7.1",
+    "pre-commit ~= 3.4.0",
+    "pydoc-markdown ~= 4.8.2",
+    "pytest ~= 7.4.2",
+    "pytest-asyncio ~= 0.21.0",
+    "pytest-cov ~= 4.1.0",
+    "pytest-only ~= 2.0.0",
+    "pytest-timeout ~= 2.2.0",
+    "pytest-xdist ~= 3.3.1",
+    "respx ~= 0.20.1",
+    "ruff ~= 0.1.13",
+    "twine ~= 4.0.2",
+]
+
+[project.urls]
+"Homepage" = "https://todo.com/"
+"Documentation" = "https://todo.com/"
+"Source" = "https://github.com/apify/crawlee-py"
+"Issue tracker" = "https://github.com/apify/crawlee-py/issues"
+"Changelog" = "https://github.com/apify/crawlee-py/blob/master/CHANGELOG.md"
+"Apify Homepage" = "https://apify.com"
+
+[build-system]
+requires = ["setuptools>=64.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["crawlee*"]
+
+[tool.setuptools.package-data]
+crawlee = ["py.typed"]
+
+[tool.ruff]
+line-length = 120
+select = ["ALL"]
+ignore = [
+    "ANN401",  # Dynamically typed expressions (typing.Any) are disallowed in {filename}
+    "BLE001",  # Do not catch blind exception
+    "C901",    # `{name}` is too complex
+    "COM812",  # This rule may cause conflicts when used with the formatter
+    "D100",    # Missing docstring in public module
+    "D104",    # Missing docstring in public package
+    "EM",      # flake8-errmsg
+    "G004",    # Logging statement uses f-string
+    "ISC001",  # This rule may cause conflicts when used with the formatter
+    "FIX",     # flake8-fixme
+    "PGH003",  # Use specific rule codes when ignoring type issues
+    "PLR0911", # Too many return statements
+    "PLR0913", # Too many arguments in function definition
+    "PLR0915", # Too many statements
+    "PTH",     # flake8-use-pathlib
+    "PYI034",  # `__aenter__` methods in classes like `{name}` usually return `self` at runtime
+    "PYI036",  # The second argument in `__aexit__` should be annotated with `object` or `BaseException | None`
+    "S102",    # Use of `exec` detected
+    "S105",    # Possible hardcoded password assigned to
+    "S106",    # Possible hardcoded password assigned to argument: "{name}"
+    "S301",    # `pickle` and modules that wrap it can be unsafe when used to deserialize untrusted data, possible security issue
+    "S303",    # Use of insecure MD2, MD4, MD5, or SHA1 hash function
+    "S311",    # Standard pseudo-random generators are not suitable for cryptographic purposes
+    "TD002",   # Missing author in TODO; try: `# TODO(<author_name>): ...` or `# TODO @<author_name>: ...
+    "TRY003",  # Avoid specifying long messages outside the exception class
+]
+
+[tool.ruff.format]
+quote-style = "single"
+indent-style = "space"
+
+[tool.ruff.lint.per-file-ignores]
+"**/__init__.py" = [
+    "F401", # Unused imports
+]
+"**/{scripts}/*" = [
+    "D",       # Everything from the pydocstyle
+    "INP001",  # File {filename} is part of an implicit namespace package, add an __init__.py
+    "PLR2004", # Magic value used in comparison, consider replacing {value} with a constant variable
+    "T20",     # flake8-print
+]
+"**/{tests}/*" = [
+    "D",       # Everything from the pydocstyle
+    "INP001",  # File {filename} is part of an implicit namespace package, add an __init__.py
+    "PLR2004", # Magic value used in comparison, consider replacing {value} with a constant variable
+    "S101",    # Use of assert detected
+    "T20",     # flake8-print
+    "TRY301",  # Abstract `raise` to an inner function
+]
+
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
+inline-quotes = "single"
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.pytest]
+asyncio_mode = "auto"
+timeout = 1200
+
+[tool.mypy]
+python_version = "3.8"
+files = ["scripts", "src", "tests"]
+check_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_calls = true
+disallow_untyped_decorators = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_return_any = true
+warn_unreachable = true
+warn_unused_ignores = true
+
+[tool.mypy-scrapy]
+ignore_missing_imports = true
+
+[tool.mypy-sortedcollections]
+ignore_missing_imports = true

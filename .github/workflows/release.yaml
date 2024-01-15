@@ -1,0 +1,143 @@
+name: Check & Release
+
+on:
+  # Push to master will publish a beta version
+  push:
+    branches:
+      - master
+    tags-ignore:
+      - "**"
+  # A release via GitHub releases will publish a stable version
+  release:
+    types: [published]
+  # Workflow dispatch will publish whatever you choose
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: Release type
+        required: true
+        type: choice
+        default: alpha
+        options:
+          - alpha
+          - beta
+          - final
+
+jobs:
+  should_release:
+    name: Check whether to release
+    if: (!startsWith(github.event.head_commit.message, 'docs:') || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dummy step
+        run: true
+
+  lint_and_type_checks:
+    name: Run lint and type_checks
+    needs: [should_release]
+    uses: ./.github/workflows/lint_and_type_checks.yaml
+
+  unit_tests:
+    name: Run unit tests
+    needs: [should_release]
+    uses: ./.github/workflows/unit_tests.yaml
+
+  integration_tests:
+    name: Run integration tests
+    needs: [should_release]
+    uses: ./.github/workflows/integration_tests.yaml
+    secrets: inherit
+
+  publish_to_pypi:
+    name: Publish to PyPI
+    needs: [should_release, lint_and_type_checks, unit_tests, integration_tests]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    environment:
+      name: pypi
+      url: https://pypi.org/p/apify
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.8
+
+      - name: Install dependencies
+        run: make install-dev
+
+      - # Determine if this is a prerelease or latest release
+        name: Determine release type
+        id: get-release-type
+        run: |
+          if [ ${{ github.event_name }} = release ]; then
+            release_type="final"
+          elif [ ${{ github.event_name }} = push ]; then
+            release_type="beta"
+          elif [ ${{ github.event_name }} = workflow_dispatch ]; then
+            release_type=${{ github.event.inputs.release_type }}
+          fi
+
+          if [ ${release_type} = final ]; then
+            docker_image_tag="latest"
+          elif [ ${release_type} = beta ]; then
+            docker_image_tag="beta"
+          else
+            docker_image_tag=""
+          fi
+
+          echo "release_type=${release_type}" >> $GITHUB_OUTPUT
+          echo "docker_image_tag=${docker_image_tag}" >> $GITHUB_OUTPUT
+
+      - # Check whether the released version is listed in CHANGELOG.md
+        name: Check whether the released version is listed in the changelog
+        if: steps.get-release-type.outputs.release_type != 'alpha'
+        run: make check-changelog-entry
+
+      - # Check version consistency and increment pre-release version number for prereleases (must be the last step before build)
+        name: Bump pre-release version
+        if: steps.get-release-type.outputs.release_type != 'final'
+        run: python ./scripts/update_version_for_prerelease.py ${{ steps.get-release-type.outputs.release_type }}
+
+      - # Build a source distribution and a python3-only wheel
+        name: Build distribution files
+        run: make build
+
+      - # Check whether the package description will render correctly on PyPI
+        name: Check package rendering on PyPI
+        run: make twine-check
+
+      - # Publish package to PyPI using their official GitHub action
+        name: Publish package to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+      - # Tag the current commit with the version tag if this is not made from the release event (releases are tagged with the release process)
+        name: Tag Version
+        if: github.event_name != 'release'
+        run: |
+          git_tag=v`python ./scripts/print_current_package_version.py`
+          git tag $git_tag
+          git push origin $git_tag
+
+      - # Upload the build artifacts to the release
+        name: Upload the build artifacts to release
+        if: github.event_name == 'release'
+        run: gh release upload ${{ github.ref_name }} dist/*
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - # Trigger building the Python Docker images in apify/apify-actor-docker repo
+        name: Trigger Docker image build
+        run: |
+          PACKAGE_VERSION=`python ./scripts/print_current_package_version.py`
+          gh api -X POST "/repos/apify/apify-actor-docker/dispatches" \
+            -F event_type=build-python-images \
+            -F client_payload[release_tag]=${{ steps.get-release-type.outputs.docker_image_tag }} \
+            -F client_payload[apify_version]=$PACKAGE_VERSION
+        env:
+          GH_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
