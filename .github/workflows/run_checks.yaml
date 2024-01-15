@@ -1,0 +1,49 @@
+name: Code quality checks
+
+on:
+  pull_request_target:
+
+jobs:
+  check_version_availability:
+    name: Check version availability
+    uses: ./.github/workflows/check_version_availability.yaml
+
+  lint_and_type_checks:
+    name: Run lint and type checks
+    uses: ./.github/workflows/lint_and_type_checks.yaml
+
+  unit_tests:
+    name: Run unit tests
+    needs: [lint_and_type_checks]
+    uses: ./.github/workflows/unit_tests.yaml
+
+  # If the PR comes from the main repo, run integration tests directly
+  integration_tests:
+    if: github.event.pull_request.head.repo.owner.login == 'apify'
+    name: Run integration tests
+    needs: [lint_and_type_checks, unit_tests]
+    uses: ./.github/workflows/integration_tests.yaml
+    secrets: inherit
+
+  # If the PR comes from a fork,
+  # we need to approve running the workflow first before allowing it to run,
+  # so that we can check for any unauthorized access to our secrets.
+  # We need two workflow jobs for that,
+  # because jobs calling reusable workflows can't use an environment.
+  # The first job is a dummy job that just asks for approval to use the `fork-worklows` environment.
+  integration_tests_fork_approve:
+    if: github.event.pull_request.head.repo.owner.login != 'apify'
+    name: Approve integration tests from fork
+    needs: [lint_and_type_checks, unit_tests]
+    environment: fork-pr-integration-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dummy step
+        run: true
+
+  # The second job is the actual integration tests job.
+  integration_tests_fork:
+    name: Run integration tests from fork
+    needs: [integration_tests_fork_approve]
+    uses: ./.github/workflows/integration_tests.yaml
+    secrets: inherit

@@ -1,0 +1,8 @@
+default: true
+line-length:
+  line_length: 120
+MD007:
+  indent: 4
+MD004:
+  style: dash
+no-inline-html: false
