@@ -31,7 +31,7 @@ dependencies = ["httpx >= 0.24.1", "typing-extensions >= 4.1.0"]
 dev = [
     "build ~= 1.0.3",
     "filelock ~= 3.12.4",
-    "mypy ~= 1.7.1",
+    "mypy ~=1.8.0",
     "pre-commit ~= 3.4.0",
     "pydoc-markdown ~= 4.8.2",
     "pytest ~= 7.4.2",
