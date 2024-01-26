@@ -17,8 +17,8 @@ logger = getLogger(__name__)
 
 
 @dataclass
-class ClientInfo:
-    """Represents information about the client."""
+class LoadRatioInfo:
+    """Represents the load ratio of a resource."""
 
     is_overloaded: bool
     limit_ratio: float
@@ -30,10 +30,10 @@ class SystemInfo:
     """Represents the current status of the system."""
 
     is_system_idle: bool  # Indicates whether the system is currently idle or overloaded
-    mem_info: ClientInfo
-    event_loop_info: ClientInfo
-    cpu_info: ClientInfo
-    client_info: ClientInfo
+    mem_info: LoadRatioInfo
+    event_loop_info: LoadRatioInfo
+    cpu_info: LoadRatioInfo
+    client_info: LoadRatioInfo
     mem_current_bytes: int | None = None  # Platform only property
     cpu_current_usage: int | None = None  # Platform only property
     is_cpu_overloaded: bool | None = None  # Platform only property
@@ -158,7 +158,7 @@ class SystemStatus:
             client_info=client_info,
         )
 
-    def _is_memory_overloaded(self: SystemStatus, sample_duration_millis: int | None = None) -> ClientInfo:
+    def _is_memory_overloaded(self: SystemStatus, sample_duration_millis: int | None = None) -> LoadRatioInfo:
         """Determine if memory has been overloaded within a specified time duration.
 
         Args:
@@ -171,7 +171,7 @@ class SystemStatus:
         sample = self.snapshotter.get_memory_sample(sample_duration_millis)
         return self._is_sample_overloaded(sample, self.max_memory_overloaded_ratio)
 
-    def _is_event_loop_overloaded(self: SystemStatus, sample_duration_millis: int | None = None) -> ClientInfo:
+    def _is_event_loop_overloaded(self: SystemStatus, sample_duration_millis: int | None = None) -> LoadRatioInfo:
         """Determine if the event loop has been overloaded within a specified time duration.
 
         Args:
@@ -184,7 +184,7 @@ class SystemStatus:
         sample = self.snapshotter.get_event_loop_sample(sample_duration_millis)
         return self._is_sample_overloaded(sample, self.max_event_loop_overloaded_ratio)
 
-    def _is_cpu_overloaded(self: SystemStatus, sample_duration_millis: int | None = None) -> ClientInfo:
+    def _is_cpu_overloaded(self: SystemStatus, sample_duration_millis: int | None = None) -> LoadRatioInfo:
         """Determine if the CPU has been overloaded within a specified time duration.
 
         Args:
@@ -197,7 +197,7 @@ class SystemStatus:
         sample = self.snapshotter.get_cpu_sample(sample_duration_millis)
         return self._is_sample_overloaded(sample, self.max_cpu_overloaded_ratio)
 
-    def _is_client_overloaded(self: SystemStatus, sample_duration_millis: int | None = None) -> ClientInfo:
+    def _is_client_overloaded(self: SystemStatus, sample_duration_millis: int | None = None) -> LoadRatioInfo:
         """Determine if the client has been overloaded within a specified time duration.
 
         Args:
@@ -210,7 +210,7 @@ class SystemStatus:
         sample = self.snapshotter.get_client_sample(sample_duration_millis)
         return self._is_sample_overloaded(sample, self.max_client_overloaded_ratio)
 
-    def _is_sample_overloaded(self: SystemStatus, sample: Sequence[Snapshot], ratio: float) -> ClientInfo:
+    def _is_sample_overloaded(self: SystemStatus, sample: Sequence[Snapshot], ratio: float) -> LoadRatioInfo:
         """Determine if a sample of snapshot data is overloaded based on a specified ratio.
 
         Args:
@@ -222,7 +222,7 @@ class SystemStatus:
             on the specified ratio. Otherwise, `is_overloaded` is set to `False`.
         """
         if not sample:
-            return ClientInfo(is_overloaded=False, limit_ratio=ratio, actual_ratio=0)
+            return LoadRatioInfo(is_overloaded=False, limit_ratio=ratio, actual_ratio=0)
 
         weights, values = [], []
 
@@ -233,7 +233,7 @@ class SystemStatus:
 
         w_avg = values[0] if len(sample) == 1 else weighted_avg(values, weights)
 
-        return ClientInfo(
+        return LoadRatioInfo(
             is_overloaded=w_avg > ratio,
             limit_ratio=ratio,
             actual_ratio=round(w_avg, 3),
