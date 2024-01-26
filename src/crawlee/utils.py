@@ -14,7 +14,7 @@ def weighted_avg(values: list[float], weights: list[float]) -> float:
     Returns:
         float: Weighted average.
     """
-    result = sum(value * weight for value, weight in zip(values, weights))
+    result = sum(value * weight for value, weight in zip(values, weights, strict=True))
     total_weight = sum(weights)
 
     if total_weight == 0:
