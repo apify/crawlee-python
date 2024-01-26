@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from itertools import pairwise
 from logging import getLogger
 from typing import TYPE_CHECKING, Sequence
+
+from more_itertools import pairwise
 
 from crawlee.utils import weighted_avg
 
@@ -226,7 +227,7 @@ class SystemStatus:
         weights, values = [], []
 
         for previous, current in pairwise(sample):
-            weight = (current.created_at - previous.created_at).total_seconds() or 0.001    # Avoid zero
+            weight = (current.created_at - previous.created_at).total_seconds() or 0.001  # Avoid zero
             weights.append(weight)
             values.append(float(current.is_overloaded))
 
