@@ -226,7 +226,7 @@ class SystemStatus:
         weights, values = [], []
 
         for previous, current in pairwise(sample):
-            weight = (current.created_at - previous.created_at).total_seconds() or 1
+            weight = (current.created_at - previous.created_at).total_seconds() or 0.001    # Avoid zero
             weights.append(weight)
             values.append(float(current.is_overloaded))
 
