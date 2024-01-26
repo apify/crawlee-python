@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from itertools import pairwise
 from logging import getLogger
 from typing import TYPE_CHECKING, Sequence
 
@@ -224,8 +225,7 @@ class SystemStatus:
 
         weights, values = [], []
 
-        for i in range(1, len(sample)):
-            previous, current = sample[i - 1], sample[i]
+        for previous, current in pairwise(sample):
             weight = (current.created_at - previous.created_at).total_seconds() or 1
             weights.append(weight)
             values.append(float(current.is_overloaded))
