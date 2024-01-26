@@ -109,23 +109,22 @@ class SystemStatus:
     def get_current_status(self: SystemStatus) -> SystemInfo:
         """Get the current system status.
 
-        Returns a `SystemInfo` object where the `is_system_idle` property is `False`
-        if the system has been overloaded in the last `current_history_secs` seconds, and `True` otherwise.
+        Returns a `SystemInfo` object where the `is_system_idle` property is `False` if the system has been overloaded
+        in the last `current_history_secs` seconds, and `True` otherwise.
 
         Returns:
-            A `SystemInfo` object representing the current system status.
+            An object representing the current system status.
         """
         return self._is_system_idle(self.current_history_secs)
 
     def get_historical_status(self: SystemStatus) -> SystemInfo:
         """Get the historical system status.
 
-        Returns a `SystemInfo` where the `is_system_idle` property is set to `False`
-        if the system has been overloaded in the full history of the `Snapshotter` (which is configurable
-        in the `Snapshotter`, and `True` otherwise.
+        Returns a `SystemInfo` where the `is_system_idle` property is set to `False` if the system has been overloaded
+        in the full history of the `Snapshotter` (which is configurable in the `Snapshotter`, and `True` otherwise.
 
         Returns:
-            A `SystemInfo` object representing the historical system status.
+            An object representing the historical system status.
         """
         return self._is_system_idle()
 
@@ -136,8 +135,8 @@ class SystemStatus:
             sample_duration_millis: The duration (in milliseconds) within which to analyze system status.
 
         Returns:
-            SystemInfo: An object representing the system status with an `is_system_idle` property set to `True`
-            if the system has not been overloaded within the specified time duration, and `False` otherwise.
+            An object representing the system status with an `is_system_idle` property set to `True` if the system
+            has not been overloaded within the specified time duration, and `False` otherwise.
         """
         mem_info = self._is_memory_overloaded(sample_duration_millis)
         event_loop_info = self._is_event_loop_overloaded(sample_duration_millis)
@@ -164,8 +163,8 @@ class SystemStatus:
             sample_duration_millis: The duration (in milliseconds) within which to analyze memory snapshots.
 
         Returns:
-            ClientInfo: An object with an `is_overloaded` property set to `True` if memory has been
-            overloaded within the specified time duration. Otherwise, `is_overloaded` is set to `False`.
+            An object with an `is_overloaded` property set to `True` if memory has been overloaded within the specified
+            time duration. Otherwise, `is_overloaded` is set to `False`.
         """
         sample = self.snapshotter.get_memory_sample(sample_duration_millis)
         return self._is_sample_overloaded(sample, self.max_memory_overloaded_ratio)
@@ -177,8 +176,8 @@ class SystemStatus:
             sample_duration_millis: The duration (in milliseconds) within which to analyze event loop snapshots.
 
         Returns:
-            ClientInfo: An object with an `is_overloaded` property set to `True` if the event loop has been
-            overloaded within the specified time duration. Otherwise, `is_overloaded` is set to `False`.
+            An object with an `is_overloaded` property set to `True` if the event loop has been overloaded within
+            the specified time duration. Otherwise, `is_overloaded` is set to `False`.
         """
         sample = self.snapshotter.get_event_loop_sample(sample_duration_millis)
         return self._is_sample_overloaded(sample, self.max_event_loop_overloaded_ratio)
@@ -190,8 +189,8 @@ class SystemStatus:
             sample_duration_millis: The duration (in milliseconds) within which to analyze CPU snapshots.
 
         Returns:
-            ClientInfo: An object with an `is_overloaded` property set to `True` if the CPU has been
-            overloaded within the specified time duration. Otherwise, `is_overloaded` is set to `False`.
+            An object with an `is_overloaded` property set to `True` if the CPU has been overloaded within
+            the specified time duration. Otherwise, `is_overloaded` is set to `False`.
         """
         sample = self.snapshotter.get_cpu_sample(sample_duration_millis)
         return self._is_sample_overloaded(sample, self.max_cpu_overloaded_ratio)
@@ -203,8 +202,8 @@ class SystemStatus:
             sample_duration_millis: The duration (in milliseconds) within which to analyze client snapshots.
 
         Returns:
-            ClientInfo: An object with an `is_overloaded` property set to `True` if the client has been
-            overloaded within the specified time duration. Otherwise, `is_overloaded` is set to `False`.
+            An object with an `is_overloaded` property set to `True` if the client has been overloaded within
+            the specified time duration. Otherwise, `is_overloaded` is set to `False`.
         """
         sample = self.snapshotter.get_client_sample(sample_duration_millis)
         return self._is_sample_overloaded(sample, self.max_client_overloaded_ratio)
@@ -217,8 +216,8 @@ class SystemStatus:
             ratio: The ratio threshold to consider the sample as overloaded.
 
         Returns:
-            ClientInfo: An object with an `is_overloaded` property set to `True` if the sample is considered
-            overloaded based on the specified ratio. Otherwise, `is_overloaded` is set to `False`.
+            An object with an `is_overloaded` property set to `True` if the sample is considered overloaded based
+            on the specified ratio. Otherwise, `is_overloaded` is set to `False`.
         """
         if not sample:
             return ClientInfo(is_overloaded=False, limit_ratio=ratio, actual_ratio=0)
