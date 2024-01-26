@@ -25,7 +25,11 @@ requires-python = ">=3.8"
 # We use inclusive ordered comparison clause for non-Apify packages intentionally in order to enhance the Apify SDK's
 # compatibility with a wide range of external packages. This decision was discussed in detail in the following PR:
 # https://github.com/apify/apify-sdk-python/pull/154
-dependencies = ["httpx >= 0.24.1", "typing-extensions >= 4.1.0"]
+dependencies = [
+    "colorama >= 0.4.6",
+    "httpx >= 0.24.1",
+    "typing-extensions >= 4.1.0",
+]
 
 [project.optional-dependencies]
 dev = [
@@ -43,6 +47,7 @@ dev = [
     "respx ~= 0.20.1",
     "ruff ~= 0.1.13",
     "twine ~= 4.0.2",
+    "types-colorama ~= 0.4.15.20240106",
 ]
 
 [project.urls]
