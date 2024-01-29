@@ -73,7 +73,10 @@ class EventManager:
 
         async def outer_wrapper(*args: Any, **kwargs: Any) -> None:
             logger.debug('Calling LocalEventManager.outer_wrapper()...')
-            listener_task = asyncio.create_task(inner_wrapper(*args, **kwargs))
+            listener_task = asyncio.create_task(
+                inner_wrapper(*args, **kwargs),
+                name=f'Task-{event.value}-{listener.__name__}',
+            )
             self._listener_tasks.add(listener_task)
 
             try:
@@ -141,7 +144,18 @@ class EventManager:
                     )
 
         with suppress(asyncio.CancelledError):
-            _, pending = await asyncio.wait([asyncio.create_task(_wait_for_listeners())], timeout=timeout_secs)
+            _, pending = await asyncio.wait(
+                [
+                    asyncio.create_task(
+                        coro=_wait_for_listeners(),
+                        name=f'Task-{_wait_for_listeners.__name__}',
+                    )
+                ],
+                timeout=timeout_secs,
+            )
+
+            ts = asyncio.all_tasks()
+            logger.info(f'ts={ts}')
 
             if pending:
                 logger.warning(
