@@ -1,2 +1,0 @@
-class BasicCrawler:
-    """BasicCrawler class."""

@@ -27,6 +27,7 @@ requires-python = ">=3.8"
 # https://github.com/apify/apify-sdk-python/pull/154
 dependencies = [
     "colorama >= 0.4.6",
+    "more_itertools >= 10.2.0",
     "typing-extensions >= 4.1.0",
 ]
 
