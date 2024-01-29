@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 from collections import defaultdict
 from contextlib import suppress
 from functools import wraps
@@ -69,30 +70,32 @@ class EventManager:
         async def listener_wrapper(*args: Any, **kwargs: Any) -> None:
             logger.debug('Calling LocalEventManager.on.listener_wrapper()...')
 
+            # If the listener is a coroutine function, just call it
             if iscoroutinefunction(listener):
                 logger.debug('LocalEventManager.on.listener_wrapper(): Listener is a coroutine function...')
-
-                listener_task = asyncio.create_task(
-                    listener(*args, **kwargs),
-                    name=f'Task-{event.value}-{listener.__name__}',
-                )
-                self._listener_tasks.add(listener_task)
-
-                try:
-                    await listener_task
-                except Exception:
-                    # We need to swallow the exception and just log it here, otherwise it could break the event emitter
-                    logger.exception(
-                        'Exception in the event listener',
-                        extra={'event_name': event.value, 'listener_name': listener.__name__},
-                    )
-                finally:
-                    logger.debug('LocalEventManager.on.listener_wrapper(): Removing listener task from the set...')
-                    self._listener_tasks.remove(listener_task)
-
+                coroutine = listener(*args, **kwargs)
+            # Otherwise, run it in a separate thread to avoid blocking the event loop
             else:
-                logger.debug('LocalEventManager.on.listener_wrapper(): Listener is a regular function...')
-                listener(*args, **kwargs)
+                coroutine = (
+                    asyncio.to_thread(listener, *args, **kwargs)
+                    if sys.version_info >= (3, 9)
+                    else asyncio.get_running_loop().run_in_executor(None, listener, *args, **kwargs)
+                )
+
+            listener_task = asyncio.create_task(coroutine, name=f'Task-{event.value}-{listener.__name__}')
+            self._listener_tasks.add(listener_task)
+
+            try:
+                await listener_task
+            except Exception:
+                # We need to swallow the exception and just log it here, otherwise it could break the event emitter
+                logger.exception(
+                    'Exception in the event listener',
+                    extra={'event_name': event.value, 'listener_name': listener.__name__},
+                )
+            finally:
+                logger.debug('LocalEventManager.on.listener_wrapper(): Removing listener task from the set...')
+                self._listener_tasks.remove(listener_task)
 
         self._listeners_to_wrappers[event][listener].append(listener_wrapper)
         self._event_emitter.add_listener(event.value, listener_wrapper)
@@ -154,9 +157,6 @@ class EventManager:
                 ],
                 timeout=timeout_secs,
             )
-
-            ts = asyncio.all_tasks()
-            logger.info(f'ts={ts}')
 
             if pending:
                 logger.warning(
