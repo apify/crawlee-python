@@ -135,7 +135,7 @@ class EventManager:
             logger.debug('LocalEventManager.wait_for_all_listeners_to_complete(): inner _wait_for_listeners() called')
             results = await asyncio.gather(*self._listener_tasks, return_exceptions=True)
             for result in results:
-                if result is Exception:
+                if isinstance(result, Exception):
                     logger.exception(
                         'Event manager encountered an exception in one of the event listeners', exc_info=result
                     )
