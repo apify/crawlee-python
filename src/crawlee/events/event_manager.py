@@ -140,13 +140,13 @@ class EventManager:
                         'Event manager encountered an exception in one of the event listeners', exc_info=result
                     )
 
-        _, pending = await asyncio.wait([asyncio.create_task(_wait_for_listeners())], timeout=timeout_secs)
+        with suppress(asyncio.CancelledError):
+            _, pending = await asyncio.wait([asyncio.create_task(_wait_for_listeners())], timeout=timeout_secs)
 
-        if pending:
-            logger.warning(
-                'Timed out waiting for event listeners to complete, unfinished event listeners will be canceled'
-            )
-            for pending_task in pending:
-                pending_task.cancel()
-                with suppress(asyncio.CancelledError):
+            if pending:
+                logger.warning(
+                    'Timed out waiting for event listeners to complete, unfinished event listeners will be canceled'
+                )
+                for pending_task in pending:
+                    pending_task.cancel()
                     await pending_task
