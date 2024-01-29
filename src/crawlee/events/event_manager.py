@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-import inspect
 from collections import defaultdict
 from contextlib import suppress
+from inspect import iscoroutinefunction
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
@@ -66,7 +66,7 @@ class EventManager:
 
         async def inner_wrapper(*args: Any, **kwargs: Any) -> None:
             logger.debug('Calling LocalEventManager.inner_wrapper()...')
-            if inspect.iscoroutinefunction(listener):
+            if iscoroutinefunction(listener):
                 await listener(*args, **kwargs)
             else:
                 listener(*args, **kwargs)
