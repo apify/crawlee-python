@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING, Any
 from pyee.asyncio import AsyncIOEventEmitter
 
 if TYPE_CHECKING:
+    from datetime import timedelta
+
     from crawlee.events.types import Event, Listener, WrappedListener
 
 logger = getLogger(__name__)
@@ -45,16 +47,16 @@ class EventManager:
             lambda: defaultdict(list),
         )
 
-    async def close(self: EventManager, *, timeout_secs: int | None = None) -> None:
+    async def close(self: EventManager, *, timeout: timedelta | None = None) -> None:
         """Close the event manager.
 
         This will stop listening for the events, and it will wait for all the event listeners to finish.
 
         Args:
-            timeout_secs: Optional timeout after which the pending event listeners are canceled.
+            timeout: Optional timeout after which the pending event listeners are canceled.
         """
         logger.debug('Calling LocalEventManager.close()...')
-        await self.wait_for_all_listeners_to_complete(timeout_secs=timeout_secs)
+        await self.wait_for_all_listeners_to_complete(timeout=timeout)
         self._event_emitter.remove_all_listeners()
 
     def on(self: EventManager, *, event: Event, listener: Listener) -> None:
@@ -77,7 +79,7 @@ class EventManager:
             # Otherwise, run it in a separate thread to avoid blocking the event loop
             else:
                 coroutine = (
-                    asyncio.to_thread(listener, *args, **kwargs)
+                    asyncio.to_thread(listener, *args, **kwargs)  # type: ignore
                     if sys.version_info >= (3, 9)
                     else asyncio.get_running_loop().run_in_executor(None, listener, *args, **kwargs)
                 )
@@ -129,33 +131,28 @@ class EventManager:
         logger.debug('Calling LocalEventManager.emit()...')
         self._event_emitter.emit(event.value, *args, **kwargs)
 
-    async def wait_for_all_listeners_to_complete(self: EventManager, *, timeout_secs: float | None = None) -> None:
-        """Wait for all event listeners which are currently being executed to complete.
+    async def wait_for_all_listeners_to_complete(self: EventManager, *, timeout: timedelta | None = None) -> None:
+        """Wait for all currently executing event listeners to complete.
 
         Args:
-            timeout_secs: Timeout for the wait. If the event listeners don't finish until the timeout,
-                they will be canceled.
+            timeout: The maximum time to wait for the event listeners to finish. If they do not complete within
+                the specified timeout, they will be canceled.
         """
         logger.debug('Calling LocalEventManager.wait_for_all_listeners_to_complete()...')
 
-        async def _wait_for_listeners() -> None:
-            logger.debug('LocalEventManager.wait_for_all_listeners_to_complete(): inner _wait_for_listeners() called')
+        async def wait_for_listeners() -> None:
             results = await asyncio.gather(*self._listener_tasks, return_exceptions=True)
             for result in results:
                 if isinstance(result, Exception):
                     logger.exception(
-                        'Event manager encountered an exception in one of the event listeners', exc_info=result
+                        'Event manager encountered an exception in one of the event listeners',
+                        exc_info=result,
                     )
 
         with suppress(asyncio.CancelledError):
             _, pending = await asyncio.wait(
-                [
-                    asyncio.create_task(
-                        coro=_wait_for_listeners(),
-                        name=f'Task-{_wait_for_listeners.__name__}',
-                    )
-                ],
-                timeout=timeout_secs,
+                [asyncio.create_task(wait_for_listeners(), name=f'Task-{wait_for_listeners.__name__}')],
+                timeout=timeout.total_seconds() if timeout else None,
             )
 
             if pending:
