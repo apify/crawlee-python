@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections import defaultdict
 from contextlib import suppress
+from functools import wraps
 from inspect import iscoroutinefunction
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
@@ -64,37 +65,37 @@ class EventManager:
         """
         logger.debug('Calling LocalEventManager.on()...')
 
-        async def inner_wrapper(*args: Any, **kwargs: Any) -> None:
-            logger.debug('Calling LocalEventManager.inner_wrapper()...')
+        @wraps(listener)
+        async def listener_wrapper(*args: Any, **kwargs: Any) -> None:
+            logger.debug('Calling LocalEventManager.on.listener_wrapper()...')
+
             if iscoroutinefunction(listener):
-                await listener(*args, **kwargs)
+                logger.debug('LocalEventManager.on.listener_wrapper(): Listener is a coroutine function...')
+
+                listener_task = asyncio.create_task(
+                    listener(*args, **kwargs),
+                    name=f'Task-{event.value}-{listener.__name__}',
+                )
+                self._listener_tasks.add(listener_task)
+
+                try:
+                    await listener_task
+                except Exception:
+                    # We need to swallow the exception and just log it here, otherwise it could break the event emitter
+                    logger.exception(
+                        'Exception in the event listener',
+                        extra={'event_name': event.value, 'listener_name': listener.__name__},
+                    )
+                finally:
+                    logger.debug('LocalEventManager.on.listener_wrapper(): Removing listener task from the set...')
+                    self._listener_tasks.remove(listener_task)
+
             else:
+                logger.debug('LocalEventManager.on.listener_wrapper(): Listener is a regular function...')
                 listener(*args, **kwargs)
 
-        async def outer_wrapper(*args: Any, **kwargs: Any) -> None:
-            logger.debug('Calling LocalEventManager.outer_wrapper()...')
-            listener_task = asyncio.create_task(
-                inner_wrapper(*args, **kwargs),
-                name=f'Task-{event.value}-{listener.__name__}',
-            )
-            self._listener_tasks.add(listener_task)
-
-            try:
-                logger.debug('LocalEventManager.outer_wrapper: Awaiting listener_task')
-                await listener_task
-            except Exception:
-                logger.debug('LocalEventManager.outer_wrapper: Listener task raised an exception')
-                # We need to swallow the exception and just log it here, otherwise it could break the event emitter
-                logger.exception(
-                    'Exception in the event listener',
-                    extra={'event_name': event.value, 'listener_name': listener.__name__},
-                )
-            finally:
-                logger.debug('LocalEventManager.outer_wrapper: Listener task finished')
-                self._listener_tasks.remove(listener_task)
-
-        self._listeners_to_wrappers[event][listener].append(outer_wrapper)
-        self._event_emitter.add_listener(event.value, outer_wrapper)
+        self._listeners_to_wrappers[event][listener].append(listener_wrapper)
+        self._event_emitter.add_listener(event.value, listener_wrapper)
 
     def off(self: EventManager, *, event: Event, listener: Listener | None = None) -> None:
         """Remove a listener, or all listeners, from an Actor event.
@@ -132,7 +133,7 @@ class EventManager:
             timeout_secs: Timeout for the wait. If the event listeners don't finish until the timeout,
                 they will be canceled.
         """
-        logger.debug('Calling LocalEventManager._wait_for_all_listeners_to_complete()...')
+        logger.debug('Calling LocalEventManager.wait_for_all_listeners_to_complete()...')
 
         async def _wait_for_listeners() -> None:
             logger.debug('LocalEventManager.wait_for_all_listeners_to_complete(): inner _wait_for_listeners() called')
