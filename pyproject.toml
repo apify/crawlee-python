@@ -79,6 +79,7 @@ ignore = [
     "COM812",  # This rule may cause conflicts when used with the formatter
     "D100",    # Missing docstring in public module
     "D104",    # Missing docstring in public package
+    "D107",    # Missing docstring in `__init__`
     "EM",      # flake8-errmsg
     "G004",    # Logging statement uses f-string
     "ISC001",  # This rule may cause conflicts when used with the formatter

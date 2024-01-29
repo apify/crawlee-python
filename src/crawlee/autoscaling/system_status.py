@@ -70,6 +70,23 @@ class SystemStatus:
 
     `SystemStatus.get_historical_status` returns a boolean that represents the long-term status of the system. It
     considers the full snapshot history available in the `Snapshotter` instance.
+
+    Attributes:
+        snapshotter: The `Snapshotter` instance to be queried for `SystemStatus`.
+
+        current_history_secs: Defines max age of snapshots used in the `SystemStatus.get_current_status` measurement.
+
+        max_memory_overloaded_ratio: Sets the maximum ratio of overloaded snapshots in a memory sample.
+            If the sample exceeds this ratio, the system will be overloaded.
+
+        max_event_loop_overloaded_ratio: Sets the maximum ratio of overloaded snapshots in an event loop sample.
+            If the sample exceeds this ratio, the system will be overloaded.
+
+        max_cpu_overloaded_ratio: Sets the maximum ratio of overloaded snapshots in a CPU sample. If the sample
+            exceeds this ratio, the system will be overloaded.
+
+        max_client_overloaded_ratio: Sets the maximum ratio of overloaded snapshots in a Client sample.
+            If the sample exceeds this ratio, the system will be overloaded.
     """
 
     def __init__(
@@ -81,26 +98,6 @@ class SystemStatus:
         max_cpu_overloaded_ratio: float = 0.4,
         max_client_overloaded_ratio: float = 0.3,
     ) -> None:
-        """Create a new instance.
-
-        Args:
-            snapshotter: The `Snapshotter` instance to be queried for `SystemStatus`.
-
-            current_history_secs: Defines max age of snapshots used in the `SystemStatus.get_current_status`
-                measurement. Defaults to 5.
-
-            max_memory_overloaded_ratio: Sets the maximum ratio of overloaded snapshots in a memory sample.
-                If the sample exceeds this ratio, the system will be overloaded. Defaults to 0.2.
-
-            max_event_loop_overloaded_ratio: Sets the maximum ratio of overloaded snapshots in an event loop sample.
-                If the sample exceeds this ratio, the system will be overloaded. Defaults to 0.6.
-
-            max_cpu_overloaded_ratio: Sets the maximum ratio of overloaded snapshots in a CPU sample. If the sample
-                exceeds this ratio, the system will be overloaded. Defaults to 0.4.
-
-            max_client_overloaded_ratio: Sets the maximum ratio of overloaded snapshots in a Client sample.
-                If the sample exceeds this ratio, the system will be overloaded. Defaults to 0.3.
-        """
         self.snapshotter = snapshotter
         self.current_history_secs = current_history_secs
         self.max_memory_overloaded_ratio = max_memory_overloaded_ratio

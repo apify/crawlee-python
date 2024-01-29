@@ -20,10 +20,17 @@ class EventManager:
 
     Event manager allows you to register event listeners, emit events, and wait for event listeners to complete
     their execution. It is built on top of the `pyee.asyncio.AsyncIOEventEmitter` class.
+
+    Attributes:
+        _event_emitter: The event emitter which is used to emit events and call the event listeners.
+
+        _listener_tasks: The set of asyncio tasks which are currently executing the event listeners.
+
+        _listeners_to_wrappers: The mapping between events and listeners, and the wrapped listeners which are
+            registered with the event emitter.
     """
 
     def __init__(self: EventManager) -> None:
-        """Create a new instance."""
         logger.debug('Calling LocalEventManager.__init__()...')
         self._event_emitter = AsyncIOEventEmitter()
 
