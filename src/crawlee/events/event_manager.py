@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 from collections import defaultdict
 from contextlib import suppress
 from functools import wraps
@@ -72,17 +71,13 @@ class EventManager:
         async def listener_wrapper(*args: Any, **kwargs: Any) -> None:
             logger.debug('Calling LocalEventManager.on.listener_wrapper()...')
 
-            # If the listener is a coroutine function, just call it
-            if iscoroutinefunction(listener):
-                logger.debug('LocalEventManager.on.listener_wrapper(): Listener is a coroutine function...')
-                coroutine = listener(*args, **kwargs)
-            # Otherwise, run it in a separate thread to avoid blocking the event loop
-            else:
-                coroutine = (
-                    asyncio.to_thread(listener, *args, **kwargs)  # type: ignore
-                    if sys.version_info >= (3, 9)
-                    else asyncio.get_running_loop().run_in_executor(None, listener, *args, **kwargs)
-                )
+            # If the listener is a coroutine function, just call it, otherwise, run it in a separate thread
+            # to avoid blocking the event loop
+            coroutine = (
+                listener(*args, **kwargs)
+                if iscoroutinefunction(listener)
+                else asyncio.to_thread(listener, *args, **kwargs)
+            )
 
             listener_task = asyncio.create_task(coroutine, name=f'Task-{event.value}-{listener.__name__}')
             self._listener_tasks.add(listener_task)
