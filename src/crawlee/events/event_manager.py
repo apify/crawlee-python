@@ -6,14 +6,14 @@ from contextlib import suppress
 from functools import wraps
 from inspect import iscoroutinefunction
 from logging import getLogger
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from pyee.asyncio import AsyncIOEventEmitter
 
 if TYPE_CHECKING:
     from datetime import timedelta
 
-    from crawlee.events.types import Event, Listener, WrappedListener
+    from crawlee.events.types import Event, EventData, Listener, WrappedListener
 
 logger = getLogger(__name__)
 
@@ -68,15 +68,15 @@ class EventManager:
         logger.debug('Calling LocalEventManager.on()...')
 
         @wraps(listener)
-        async def listener_wrapper(*args: Any, **kwargs: Any) -> None:
+        async def listener_wrapper(event_data: EventData) -> None:
             logger.debug('Calling LocalEventManager.on.listener_wrapper()...')
 
             # If the listener is a coroutine function, just call it, otherwise, run it in a separate thread
             # to avoid blocking the event loop
             coroutine = (
-                listener(*args, **kwargs)
+                listener(event_data)
                 if iscoroutinefunction(listener)
-                else asyncio.to_thread(listener, *args, **kwargs)
+                else asyncio.to_thread(listener, event_data)
             )
 
             listener_task = asyncio.create_task(coroutine, name=f'Task-{event.value}-{listener.__name__}')
@@ -115,16 +115,15 @@ class EventManager:
             self._listeners_to_wrappers[event] = defaultdict(list)
             self._event_emitter.remove_all_listeners(event.value)
 
-    def emit(self: EventManager, event: Event, *args: Any, **kwargs: Any) -> None:
+    def emit(self: EventManager, *, event: Event, event_data: EventData) -> None:
         """Emit an event.
 
         Args:
             event: The event which will be emitted.
-            *args: The positional arguments which will be passed to the event listeners.
-            **kwargs: The keyword arguments which will be passed to the event listeners.
+            event_data: The data which will be passed to the event listeners.
         """
         logger.debug('Calling LocalEventManager.emit()...')
-        self._event_emitter.emit(event.value, *args, **kwargs)
+        self._event_emitter.emit(event.value, event_data)
 
     async def wait_for_all_listeners_to_complete(self: EventManager, *, timeout: timedelta | None = None) -> None:
         """Wait for all currently executing event listeners to complete.
