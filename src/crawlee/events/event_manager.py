@@ -73,11 +73,8 @@ class EventManager:
 
             # If the listener is a coroutine function, just call it, otherwise, run it in a separate thread
             # to avoid blocking the event loop
-            coroutine = (
-                listener(event_data) if iscoroutinefunction(listener) else asyncio.to_thread(listener, event_data)
-            )
-
-            listener_task = asyncio.create_task(coroutine, name=f'Task-{event.value}-{listener.__name__}')
+            coro = listener(event_data) if iscoroutinefunction(listener) else asyncio.to_thread(listener, event_data)
+            listener_task = asyncio.create_task(coro, name=f'Task-{event.value}-{listener.__name__}')
             self._listener_tasks.add(listener_task)
 
             try:
