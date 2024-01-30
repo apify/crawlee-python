@@ -65,7 +65,41 @@ Docusaurus and published to GitHub pages.
 
 ## Release process
 
-Publishing new versions to [PyPI](https://pypi.org/project/apify) happens automatically through GitHub Actions.
+Currently, releases to [PyPI](https://pypi.org/project/crawlee) are published manually.
+To release a new version, follow these steps:
+
+At first, update the version number under `tool.poetry.version` in `pyproject.toml`.
+
+```toml
+[tool.poetry]
+name = "crawlee"
+version = "x.z.y"
+```
+
+Generate the distribution archives for the package using Poetry.
+
+```shell
+poetry build
+```
+
+Set up the PyPI API token for authentication. Replace `YOUR_API_TOKEN` with the actual PyPI token.
+
+```shell
+poetry config pypi-token.pypi YOUR_API_TOKEN
+```
+
+Upload the package to the PyPI.
+
+```shell
+poetry publish
+```
+
+<!--
+TODO: update this section once publishing via CI is supported
+
+Original text:
+
+Publishing new versions to [PyPI](https://pypi.org/project/crawlee) happens automatically through GitHub Actions.
 
 On each commit to the `master` branch, a new beta release is published, taking the version number from `pyproject.toml`
 and automatically incrementing the beta version suffix by 1 from the last beta release published to PyPI.
@@ -77,6 +111,7 @@ If there is already a stable version with the same version number as in `pyproje
 process fails, so don't forget to update the version number before releasing a new version. The release process also
 fails when the released version is not described in `CHANGELOG.md`, so don't forget to describe the changes in
 the new version there.
+-->
 
 ### Beta release checklist
 

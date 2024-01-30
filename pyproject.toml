@@ -1,12 +1,15 @@
-[project]
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
 name = "crawlee"
 version = "0.0.1"
 description = "Crawlee for Python"
+authors = ["Apify Technologies s.r.o. <support@apify.com>"]
+license = "Apache-2.0"
 readme = "README.md"
-license = { text = "Apache Software License" }
-authors = [{ name = "Apify Technologies s.r.o.", email = "support@apify.com" }]
-keywords = ["apify", "automation", "chrome", "crawler", "headless", "scraper", "scraping"]
-
+packages = [{ include = "crawlee", from = "src" }]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
     "Intended Audience :: Developers",
@@ -18,56 +21,51 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Libraries",
 ]
-
-requires-python = ">=3.9"
-
-# We use inclusive ordered comparison clause for non-Apify packages intentionally in order to enhance the Apify SDK's
-# compatibility with a wide range of external packages. This decision was discussed in detail in the following PR:
-# https://github.com/apify/apify-sdk-python/pull/154
-dependencies = [
-    "colorama >= 0.4.6",
-    "more_itertools >= 10.2.0",
-    "pyee >= 11.1.0",
-    "typing-extensions >= 4.1.0",
+keywords = [
+    "apify",
+    "automation",
+    "chrome",
+    "crawlee",
+    "crawler",
+    "headless",
+    "scraper",
+    "scraping",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "build ~= 1.0.3",
-    "filelock ~= 3.13.1",
-    "mypy ~= 1.8.0",
-    "pre-commit ~= 3.4.0",
-    "pydoc-markdown ~= 4.8.2",
-    "pytest ~= 7.4.4",
-    "pytest-asyncio ~= 0.23.4",
-    "pytest-cov ~= 4.1.0",
-    "pytest-only ~= 2.0.0",
-    "pytest-timeout ~= 2.2.0",
-    "pytest-xdist ~= 3.5.0",
-    "respx ~= 0.20.1",
-    "ruff ~= 0.1.13",
-    "twine ~= 4.0.2",
-    "types-colorama ~= 0.4.15.20240106",
-]
-
-[project.urls]
+[tool.poetry.urls]
 "Homepage" = "https://todo.com/"
-"Documentation" = "https://todo.com/"
-"Source" = "https://github.com/apify/crawlee-py"
-"Issue tracker" = "https://github.com/apify/crawlee-py/issues"
-"Changelog" = "https://github.com/apify/crawlee-py/blob/master/CHANGELOG.md"
 "Apify Homepage" = "https://apify.com"
+"Changelog" = "https://github.com/apify/crawlee-py/blob/master/CHANGELOG.md"
+"Documentation" = "https://todo.com/"
+"Issue Tracker" = "https://github.com/apify/crawlee-py/issues"
+"Repository" = "https://github.com/apify/crawlee-py"
 
-[build-system]
-requires = ["setuptools>=64.0.0", "wheel"]
-build-backend = "setuptools.build_meta"
+# We use inclusive ordered comparison clauses for external packages intentionally in order to enhance Crawlee's
+# compatibility with external packages. This decision was discussed in detail in the following PR:
+# https://github.com/apify/apify-sdk-python/pull/154.
+[tool.poetry.dependencies]
+python = "^3.9"
+colorama = "^0.4.6"
+more_itertools = "^10.2.0"
+pyee = "^11.1.0"
+typing-extensions = "^4.1.0"
 
-[tool.setuptools.packages.find]
-where = ["src"]
-include = ["crawlee*"]
-
-[tool.setuptools.package-data]
-crawlee = ["py.typed"]
+[tool.poetry.group.dev.dependencies]
+build = "~1.0.3"
+filelock = "~3.13.1"
+mypy = "~1.8.0"
+pre-commit = "~3.4.0"
+pydoc-markdown = "~4.8.2"
+pytest = "~7.4.4"
+pytest-asyncio = "~0.23.4"
+pytest-cov = "~4.1.0"
+pytest-only = "~2.0.0"
+pytest-timeout = "~2.2.0"
+pytest-xdist = "~3.5.0"
+respx = "~0.20.1"
+ruff = "~0.1.13"
+twine = "~4.0.2"
+types-colorama = "~0.4.15.20240106"
 
 [tool.ruff]
 line-length = 120
