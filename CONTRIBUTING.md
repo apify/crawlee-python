@@ -2,7 +2,7 @@
 
 ## Environment
 
-For local development, it is required to have Python 3.8 (or a later version) installed.
+For local development, it is required to have Python 3.9 (or a later version) installed.
 
 It is recommended to set up a virtual environment while developing this package to isolate your development environment,
 however, due to the many varied ways Python can be installed and virtual environments can be set up, this is left up to

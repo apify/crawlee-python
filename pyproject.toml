@@ -12,7 +12,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -20,7 +19,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
 ]
 
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 
 # We use inclusive ordered comparison clause for non-Apify packages intentionally in order to enhance the Apify SDK's
 # compatibility with a wide range of external packages. This decision was discussed in detail in the following PR:
@@ -28,6 +27,7 @@ requires-python = ">=3.8"
 dependencies = [
     "colorama >= 0.4.6",
     "more_itertools >= 10.2.0",
+    "pyee >= 11.1.0",
     "typing-extensions >= 4.1.0",
 ]
 
@@ -38,7 +38,7 @@ dev = [
     "mypy ~= 1.8.0",
     "pre-commit ~= 3.4.0",
     "pydoc-markdown ~= 4.8.2",
-    "pytest ~= 8.0.0",
+    "pytest ~= 7.4.4",
     "pytest-asyncio ~= 0.23.4",
     "pytest-cov ~= 4.1.0",
     "pytest-only ~= 2.0.0",
@@ -79,6 +79,7 @@ ignore = [
     "COM812",  # This rule may cause conflicts when used with the formatter
     "D100",    # Missing docstring in public module
     "D104",    # Missing docstring in public package
+    "D107",    # Missing docstring in `__init__`
     "EM",      # flake8-errmsg
     "G004",    # Logging statement uses f-string
     "ISC001",  # This rule may cause conflicts when used with the formatter
@@ -135,7 +136,7 @@ asyncio_mode = "auto"
 timeout = 1200
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.9"
 files = ["scripts", "src", "tests"]
 check_untyped_defs = true
 disallow_incomplete_defs = true
