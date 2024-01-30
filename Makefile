@@ -1,4 +1,4 @@
-.PHONY: clean install-dev build publish twine-check lint unit-tests integration-tests type-check check-code format check-version-availability check-changelog-entry
+.PHONY: clean install-dev lint type-check unit-tests unit-tests-cov integration-tests check-code format check-version-availability check-changelog-entry
 
 DIRS_WITH_CODE = src tests scripts
 
@@ -6,24 +6,17 @@ DIRS_WITH_CODE = src tests scripts
 INTEGRATION_TESTS_CONCURRENCY = 1
 
 clean:
-	rm -rf build dist .mypy_cache .pytest_cache src/*.egg-info __pycache__
+	rm -rf .mypy_cache .pytest_cache .ruff_cache build dist htmlcov .coverage
 
 install-dev:
-	python3 -m pip install --upgrade pip
-	pip install --no-cache-dir -e ".[dev]"
-	pre-commit install
-
-build:
-	python3 -m build
-
-publish:
-	python3 -m twine upload dist/*
-
-twine-check:
-	python3 -m twine check dist/*
+	poetry install
+	source .venv/bin/activate && pre-commit install
 
 lint:
 	python3 -m ruff check $(DIRS_WITH_CODE)
+
+type-check:
+	python3 -m mypy $(DIRS_WITH_CODE)
 
 unit-tests:
 	python3 -m pytest -n auto -ra tests/unit --cov=src/crawlee
@@ -33,9 +26,6 @@ unit-tests-cov:
 
 integration-tests:
 	python3 -m pytest -n $(INTEGRATION_TESTS_CONCURRENCY) -ra tests/integration
-
-type-check:
-	python3 -m mypy $(DIRS_WITH_CODE)
 
 check-code: lint type-check unit-tests
 
