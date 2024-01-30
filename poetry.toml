@@ -1,4 +1,0 @@
-cache-dir = "/tmp/.poetry-cache"
-
-[virtualenvs]
-in-project = true
