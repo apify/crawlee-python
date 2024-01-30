@@ -74,9 +74,7 @@ class EventManager:
             # If the listener is a coroutine function, just call it, otherwise, run it in a separate thread
             # to avoid blocking the event loop
             coroutine = (
-                listener(event_data)
-                if iscoroutinefunction(listener)
-                else asyncio.to_thread(listener, event_data)
+                listener(event_data) if iscoroutinefunction(listener) else asyncio.to_thread(listener, event_data)
             )
 
             listener_task = asyncio.create_task(coroutine, name=f'Task-{event.value}-{listener.__name__}')
@@ -135,24 +133,25 @@ class EventManager:
         logger.debug('Calling LocalEventManager.wait_for_all_listeners_to_complete()...')
 
         async def wait_for_listeners() -> None:
+            """Gathers all listener tasks and awaits their completion, logging any exceptions encountered."""
             results = await asyncio.gather(*self._listener_tasks, return_exceptions=True)
             for result in results:
                 if isinstance(result, Exception):
-                    logger.exception(
-                        'Event manager encountered an exception in one of the event listeners',
-                        exc_info=result,
-                    )
+                    logger.exception('Event listener raised an exception.', exc_info=result)
 
-        with suppress(asyncio.CancelledError):
-            _, pending = await asyncio.wait(
-                [asyncio.create_task(wait_for_listeners(), name=f'Task-{wait_for_listeners.__name__}')],
-                timeout=timeout.total_seconds() if timeout else None,
-            )
+        tasks = [asyncio.create_task(wait_for_listeners(), name=f'Task-{wait_for_listeners.__name__}')]
+        timeout_secs = timeout.total_seconds() if timeout else None
 
+        try:
+            _, pending = await asyncio.wait(tasks, timeout=timeout_secs)
             if pending:
-                logger.warning(
-                    'Timed out waiting for event listeners to complete, unfinished event listeners will be canceled'
-                )
-                for pending_task in pending:
-                    pending_task.cancel()
-                    await pending_task
+                logger.warning('Waiting timeout reached; canceling unfinished event listeners.')
+        except asyncio.CancelledError:
+            logger.warning('Asyncio wait was cancelled; canceling unfinished event listeners.')
+            raise
+        finally:
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await task
