@@ -40,7 +40,7 @@ keywords = [
 "Issue Tracker" = "https://github.com/apify/crawlee-py/issues"
 "Repository" = "https://github.com/apify/crawlee-py"
 
-# We use inclusive ordered comparison clause for external packages intentionally in order to enhance the Crawlee's
+# We use inclusive ordered comparison clauses for external packages intentionally in order to enhance Crawlee's
 # compatibility with external packages. This decision was discussed in detail in the following PR:
 # https://github.com/apify/apify-sdk-python/pull/154.
 [tool.poetry.dependencies]
