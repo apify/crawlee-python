@@ -9,20 +9,20 @@ on:
 jobs:
   run_linting:
     name: Run linting
-    uses: ./.github/workflows/workflow_calls/linting.yaml
+    uses: ./.github/workflows/_linting.yaml
 
   run_type_checking:
     name: Run type checking
-    uses: ./.github/workflows/workflow_calls/type_checking.yaml
+    uses: ./.github/workflows/_type_checking.yaml
 
   run_unit_tests:
     name: Run unit tests
-    uses: ./.github/workflows/workflow_calls/unit_tests.yaml
+    uses: ./.github/workflows/_unit_tests.yaml
 
   check_changelog_entry:
     name: Check changelog entry
-    uses: ./.github/workflows/workflow_calls/check_changelog_entry.yaml
+    uses: ./.github/workflows/_check_changelog_entry.yaml
 
   check_version_conflict:
     name: Check version conflict
-    uses: ./.github/workflows/workflow_calls/check_version_conflict.yaml
+    uses: ./.github/workflows/_check_version_conflict.yaml
