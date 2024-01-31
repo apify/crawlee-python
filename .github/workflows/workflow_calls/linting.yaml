@@ -1,13 +1,15 @@
-name: Check package version availability
+name: Linting
 
 on:
   workflow_call:
 
 jobs:
-  check_version_availability:
-    name: Check version availability
+  linting:
+    name: Linting
     runs-on: ubuntu-latest
-    if: (!startsWith(github.event.pull_request.title, 'docs:'))
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
 
     steps:
       # We need to check out the head commit in case of PRs, and the default ref otherwise (during release).
@@ -16,13 +18,13 @@ jobs:
         with:
           ref: "${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}"
 
-      - name: Set up Python
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: "3.9"
+          python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: make install-dev
 
-      - name: Check version availability
-        run: make check-version-availability
+      - name: Run linting
+        run: make lint

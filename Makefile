@@ -1,4 +1,4 @@
-.PHONY: clean install-dev lint type-check unit-tests unit-tests-cov integration-tests check-code format check-version-availability check-changelog-entry
+.PHONY: clean install-dev lint type-check unit-tests unit-tests-cov integration-tests check-code format check-version-conflict check-changelog-entry
 
 DIRS_WITH_CODE = src tests scripts
 
@@ -34,8 +34,8 @@ format:
 	python3 -m ruff check --fix $(DIRS_WITH_CODE)
 	python3 -m ruff format $(DIRS_WITH_CODE)
 
-check-version-availability:
-	python3 scripts/check_version_availability.py
+check-version-conflict:
+	python3 scripts/check_version_conflict.py
 
 check-changelog-entry:
-	python3 scripts/check_version_in_changelog.py
+	python3 scripts/check_changelog_entry.py

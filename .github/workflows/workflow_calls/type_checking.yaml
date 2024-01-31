@@ -1,20 +1,18 @@
-name: Unit tests
+name: Type checking
 
 on:
   workflow_call:
 
 jobs:
-  unit_tests:
-    name: Run unit tests
+  type_checking:
+    name: Type checking
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
         python-version: ["3.9", "3.10", "3.11", "3.12"]
-    runs-on: ${{ matrix.os }}
 
     steps:
-      # We need to check out the head commit in case of PRs,
-      # and the default ref otherwise (during release).
+      # We need to check out the head commit in case of PRs, and the default ref otherwise (during release).
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -28,5 +26,5 @@ jobs:
       - name: Install dependencies
         run: make install-dev
 
-      - name: Run unit tests
-        run: make unit-tests
+      - name: Run type checking
+        run: make type-check

@@ -1,14 +1,19 @@
 name: Update new issue
+
 on:
   issues:
     types:
       - opened
+
 jobs:
   label_issues:
+    name: Label issues
     runs-on: ubuntu-latest
     permissions:
       issues: write
+
     steps:
+      # Add the "t-tooling" label to all new issues
       - uses: actions/github-script@v7
         with:
           script: |

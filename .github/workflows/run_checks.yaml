@@ -1,18 +1,28 @@
-name: Code quality checks
+name: Run code quality checks
 
 on:
   pull_request_target:
+  push:
+    branches:
+      - master
 
 jobs:
-  check_version_availability:
-    name: Check version availability
-    uses: ./.github/workflows/check_version_availability.yaml
+  run_linting:
+    name: Run linting
+    uses: ./.github/workflows/workflow_calls/linting.yaml
 
-  lint_and_type_checks:
-    name: Run lint and type checks
-    uses: ./.github/workflows/lint_and_type_checks.yaml
+  run_type_checking:
+    name: Run type checking
+    uses: ./.github/workflows/workflow_calls/type_checking.yaml
 
-  unit_tests:
+  run_unit_tests:
     name: Run unit tests
-    needs: [lint_and_type_checks]
-    uses: ./.github/workflows/unit_tests.yaml
+    uses: ./.github/workflows/workflow_calls/unit_tests.yaml
+
+  check_changelog_entry:
+    name: Check changelog entry
+    uses: ./.github/workflows/workflow_calls/check_changelog_entry.yaml
+
+  check_version_conflict:
+    name: Check version conflict
+    uses: ./.github/workflows/workflow_calls/check_version_conflict.yaml
