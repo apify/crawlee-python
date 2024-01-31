@@ -1,0 +1,28 @@
+name: Run code checks
+
+on:
+  pull_request_target:
+  push:
+    branches:
+      - master
+
+jobs:
+  run_linting:
+    name: Run linting
+    uses: ./.github/workflows/_linting.yaml
+
+  run_type_checking:
+    name: Run type checking
+    uses: ./.github/workflows/_type_checking.yaml
+
+  run_unit_tests:
+    name: Run unit tests
+    uses: ./.github/workflows/_unit_tests.yaml
+
+  check_changelog_entry:
+    name: Check changelog entry
+    uses: ./.github/workflows/_check_changelog_entry.yaml
+
+  check_version_conflict:
+    name: Check version conflict
+    uses: ./.github/workflows/_check_version_conflict.yaml
