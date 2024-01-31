@@ -129,6 +129,9 @@ inline-quotes = "single"
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
+[tool.ruff.lint.isort]
+known-local-folder = ["crawlee"]
+
 [tool.pytest]
 asyncio_mode = "auto"
 timeout = 1200

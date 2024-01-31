@@ -14,7 +14,11 @@ def weighted_avg(values: list[float], weights: list[float]) -> float:
     Returns:
         float: Weighted average.
     """
-    result = sum(value * weight for value, weight in zip(values, weights, strict=True))
+    if len(values) != len(weights):
+        raise ValueError('Values and weights must be of equal length')
+
+    # zip(..., strict=True) can be used once support for Python 3.9 is dropped
+    result = sum(value * weight for value, weight in zip(values, weights))
     total_weight = sum(weights)
 
     if total_weight == 0:
