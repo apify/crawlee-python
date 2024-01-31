@@ -9,6 +9,7 @@ clean:
 	rm -rf .mypy_cache .pytest_cache .ruff_cache build dist htmlcov .coverage
 
 install-dev:
+	python3 -m pip install --upgrade pip poetry
 	poetry install
 	source .venv/bin/activate && pre-commit install
 

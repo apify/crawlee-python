@@ -2,25 +2,25 @@ repos:
   - repo: local
     hooks:
       - id: lint
-        name: Lint codebase
+        name: Linting
         entry: make lint
         language: system
         pass_filenames: false
 
       - id: type-check
-        name: Type-check codebase
+        name: Type checking
         entry: make type-check
         language: system
         pass_filenames: false
 
       - id: unit-tests
-        name: Run unit tests
+        name: Unit tests
         entry: make unit-tests
         language: system
         pass_filenames: false
 
       - id: check-changelog
-        name: Check whether current version is mentioned in changelog
+        name: Changelog validation
         entry: make check-changelog-entry
         language: system
         pass_filenames: false
