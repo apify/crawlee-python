@@ -19,10 +19,10 @@ type-check:
 	python3 -m mypy $(DIRS_WITH_CODE)
 
 unit-tests:
-	python3 -m pytest -n auto -ra tests/unit --cov=src/crawlee
+	python3 -m pytest -n auto -ra -v tests/unit --cov=src/crawlee
 
 unit-tests-cov:
-	python3 -m pytest -n auto -ra tests/unit --cov=src/crawlee --cov-report=html
+	python3 -m pytest -n auto -ra -v tests/unit --cov=src/crawlee --cov-report=html
 
 integration-tests:
 	python3 -m pytest -n $(INTEGRATION_TESTS_CONCURRENCY) -ra tests/integration

@@ -74,7 +74,7 @@ class Snapshotter:
     typically received from the request queue, exceed the set limit within the set interval.
     """
 
-    def get_memory_sample(
+    def get_memory_sample(  # type: ignore
         self: Snapshotter,
         sample_duration_millis: float | None = None,
     ) -> Sequence[MemorySnapshot]:
@@ -88,7 +88,7 @@ class Snapshotter:
             A sample of memory snapshots.
         """
 
-    def get_event_loop_sample(
+    def get_event_loop_sample(  # type: ignore
         self: Snapshotter,
         sample_duration_millis: float | None = None,
     ) -> Sequence[EventLoopSnapshot]:
@@ -102,7 +102,7 @@ class Snapshotter:
             A sample of event loop snapshots.
         """
 
-    def get_cpu_sample(
+    def get_cpu_sample(  # type: ignore
         self: Snapshotter,
         sample_duration_millis: float | None = None,
     ) -> Sequence[CpuSnapshot]:
@@ -116,7 +116,7 @@ class Snapshotter:
             A sample of CPU snapshots.
         """
 
-    def get_client_sample(
+    def get_client_sample(  # type: ignore
         self: Snapshotter,
         sample_duration_millis: float | None = None,
     ) -> Sequence[ClientSnapshot]:
