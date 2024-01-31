@@ -1,4 +1,4 @@
-.PHONY: clean install-dev lint type-check unit-tests unit-tests-cov integration-tests check-code format check-version-availability check-changelog-entry
+.PHONY: clean install-dev lint type-check unit-tests unit-tests-cov integration-tests check-code format check-version-conflict check-changelog-entry
 
 DIRS_WITH_CODE = src tests scripts
 
@@ -11,31 +11,33 @@ clean:
 install-dev:
 	python3 -m pip install --upgrade pip poetry
 	poetry install
-	source .venv/bin/activate && pre-commit install
+	poetry run pre-commit install
 
 lint:
-	python3 -m ruff check $(DIRS_WITH_CODE)
+	poetry run ruff check $(DIRS_WITH_CODE)
 
 type-check:
-	python3 -m mypy $(DIRS_WITH_CODE)
+	poetry run mypy $(DIRS_WITH_CODE)
 
 unit-tests:
-	python3 -m pytest -n auto -ra -v tests/unit --cov=src/crawlee
+	poetry run pytest -n auto -ra -v tests/unit --cov=src/crawlee
 
 unit-tests-cov:
-	python3 -m pytest -n auto -ra -v tests/unit --cov=src/crawlee --cov-report=html
+	poetry run pytest -n auto -ra -v tests/unit --cov=src/crawlee --cov-report=html
 
 integration-tests:
-	python3 -m pytest -n $(INTEGRATION_TESTS_CONCURRENCY) -ra tests/integration
-
-check-code: lint type-check unit-tests
+	poetry run pytest -n $(INTEGRATION_TESTS_CONCURRENCY) -ra tests/integration
 
 format:
-	python3 -m ruff check --fix $(DIRS_WITH_CODE)
-	python3 -m ruff format $(DIRS_WITH_CODE)
+	poetry run ruff check --fix $(DIRS_WITH_CODE)
+	poetry run ruff format $(DIRS_WITH_CODE)
 
-check-version-availability:
-	python3 scripts/check_version_availability.py
+check-version-conflict:
+	python3 scripts/check_version_conflict.py
 
 check-changelog-entry:
-	python3 scripts/check_version_in_changelog.py
+	python3 scripts/check_changelog_entry.py
+
+# The check-code target runs a series of checks equivalent to those performed by pre-commit hooks
+# and the run_checks.yaml GitHub Actions workflow.
+check-code: lint type-check unit-tests check-version-conflict check-changelog-entry
