@@ -9,7 +9,7 @@ clean:
 	rm -rf .mypy_cache .pytest_cache .ruff_cache build dist htmlcov .coverage
 
 install-dev:
-	poetry run pip install --upgrade pip poetry
+	python3 -m pip install --upgrade pip poetry
 	poetry install
 	poetry run pre-commit install
 
