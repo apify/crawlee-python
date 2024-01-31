@@ -1,7 +1,10 @@
 name: Type checking
 
 on:
-  workflow_call:
+  pull_request_target:
+  push:
+    branches:
+      - master
 
 jobs:
   type_checking:

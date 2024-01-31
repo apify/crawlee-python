@@ -1,7 +1,10 @@
 name: Check version conflict
 
 on:
-  workflow_call:
+  pull_request_target:
+  push:
+    branches:
+      - master
 
 jobs:
   check_version_conflict:
