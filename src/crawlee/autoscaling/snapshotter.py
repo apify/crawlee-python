@@ -2,54 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from logging import getLogger
-from typing import TYPE_CHECKING, Sequence, Union
+from typing import TYPE_CHECKING, Sequence
 
 if TYPE_CHECKING:
-    from datetime import datetime, timedelta
+    from datetime import timedelta
+
+    from crawlee.autoscaling.types import ClientSnapshot, CpuSnapshot, EventLoopSnapshot, MemorySnapshot
 
 logger = getLogger(__name__)
-
-
-@dataclass
-class MemorySnapshot:
-    """A snapshot of memory usage."""
-
-    created_at: datetime
-    is_overloaded: bool
-    used_bytes: int | None
-
-
-@dataclass
-class CpuSnapshot:
-    """A snapshot of CPU usage."""
-
-    created_at: datetime
-    is_overloaded: bool
-    used_ratio: float
-    ticks: dict | None = None
-
-
-@dataclass
-class EventLoopSnapshot:
-    """A snapshot of event loop usage."""
-
-    created_at: datetime
-    is_overloaded: bool
-    exceeded: timedelta
-
-
-@dataclass
-class ClientSnapshot:
-    """A snapshot of client usage."""
-
-    created_at: datetime
-    is_overloaded: bool
-    rate_limit_error_count: int
-
-
-Snapshot = Union[MemorySnapshot, CpuSnapshot, EventLoopSnapshot, ClientSnapshot]
 
 
 class Snapshotter:

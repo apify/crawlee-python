@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
-    from datetime import datetime
+    from datetime import datetime, timedelta
 
 
 @dataclass
@@ -45,3 +45,43 @@ class FinalStatistics:
     request_total_duration_millis: float
     requests_total: int
     crawler_runtime_millis: float
+
+
+@dataclass
+class MemorySnapshot:
+    """A snapshot of memory usage."""
+
+    created_at: datetime
+    is_overloaded: bool
+    used_bytes: int | None
+
+
+@dataclass
+class CpuSnapshot:
+    """A snapshot of CPU usage."""
+
+    created_at: datetime
+    is_overloaded: bool
+    used_ratio: float
+    ticks: dict | None = None
+
+
+@dataclass
+class EventLoopSnapshot:
+    """A snapshot of event loop usage."""
+
+    created_at: datetime
+    is_overloaded: bool
+    exceeded: timedelta
+
+
+@dataclass
+class ClientSnapshot:
+    """A snapshot of client usage."""
+
+    created_at: datetime
+    is_overloaded: bool
+    rate_limit_error_count: int
+
+
+Snapshot = Union[MemorySnapshot, CpuSnapshot, EventLoopSnapshot, ClientSnapshot]
