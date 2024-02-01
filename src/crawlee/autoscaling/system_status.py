@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Sequence
 
 from more_itertools import pairwise
 
+from crawlee._utils.math import weighted_avg
 from crawlee.autoscaling.types import LoadRatioInfo, SystemInfo
-from crawlee.utils import weighted_avg
 
 if TYPE_CHECKING:
     from crawlee.autoscaling.snapshotter import Snapshot, Snapshotter
