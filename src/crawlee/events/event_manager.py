@@ -34,7 +34,7 @@ class EventManager:
     """
 
     def __init__(self: EventManager) -> None:
-        logger.debug('Calling LocalEventManager.__init__()...')
+        logger.debug('Calling EventManager.__init__()...')
         self._event_emitter = AsyncIOEventEmitter()
 
         # Listeners are wrapped in a asyncio.Task, store their references here so that we can wait for them to finish
@@ -54,7 +54,7 @@ class EventManager:
         Args:
             timeout: Optional timeout after which the pending event listeners are canceled.
         """
-        logger.debug('Calling LocalEventManager.close()...')
+        logger.debug('Calling EventManager.close()...')
         await self.wait_for_all_listeners_to_complete(timeout=timeout)
         self._event_emitter.remove_all_listeners()
 
@@ -65,11 +65,11 @@ class EventManager:
             event: The Actor event for which to listen to.
             listener: The function (sync or async) which is to be called when the event is emitted.
         """
-        logger.debug('Calling LocalEventManager.on()...')
+        logger.debug('Calling EventManager.on()...')
 
         @wraps(listener)
         async def listener_wrapper(event_data: EventData) -> None:
-            logger.debug('Calling LocalEventManager.on.listener_wrapper()...')
+            logger.debug('Calling EventManager.on.listener_wrapper()...')
 
             # If the listener is a coroutine function, just call it, otherwise, run it in a separate thread
             # to avoid blocking the event loop
@@ -100,7 +100,7 @@ class EventManager:
             listener: The listener which is supposed to be removed. If not passed, all listeners of this event
                 are removed.
         """
-        logger.debug('Calling LocalEventManager.off()...')
+        logger.debug('Calling EventManager.off()...')
 
         if listener:
             for listener_wrapper in self._listeners_to_wrappers[event][listener]:
@@ -117,7 +117,7 @@ class EventManager:
             event: The event which will be emitted.
             event_data: The data which will be passed to the event listeners.
         """
-        logger.debug('Calling LocalEventManager.emit()...')
+        logger.debug('Calling EventManager.emit()...')
         self._event_emitter.emit(event.value, event_data)
 
     async def wait_for_all_listeners_to_complete(self: EventManager, *, timeout: timedelta | None = None) -> None:
@@ -127,7 +127,7 @@ class EventManager:
             timeout: The maximum time to wait for the event listeners to finish. If they do not complete within
                 the specified timeout, they will be canceled.
         """
-        logger.debug('Calling LocalEventManager.wait_for_all_listeners_to_complete()...')
+        logger.debug('Calling EventManager.wait_for_all_listeners_to_complete()...')
 
         async def wait_for_listeners() -> None:
             """Gathers all listener tasks and awaits their completion, logging any exceptions encountered."""
