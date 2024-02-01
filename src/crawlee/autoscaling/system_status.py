@@ -1,3 +1,5 @@
+# Inspiration: https://github.com/apify/crawlee/blob/v3.7.3/packages/core/src/autoscaling/system_status.ts
+
 from __future__ import annotations
 
 from dataclasses import dataclass

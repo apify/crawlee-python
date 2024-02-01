@@ -1,3 +1,5 @@
+# Inspiration: https://github.com/apify/crawlee/blob/v3.7.3/packages/core/src/events/event_manager.ts
+
 from __future__ import annotations
 
 import asyncio
