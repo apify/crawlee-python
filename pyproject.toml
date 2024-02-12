@@ -64,7 +64,7 @@ pytest-timeout = "~2.2.0"
 pytest-xdist = "~3.5.0"
 respx = "~0.20.1"
 ruff = "~0.1.13"
-twine = "~4.0.2"
+twine = "~5.0.0"
 types-colorama = "~0.4.15.20240106"
 
 [tool.ruff]
