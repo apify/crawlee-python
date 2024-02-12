@@ -69,6 +69,8 @@ types-colorama = "~0.4.15.20240106"
 
 [tool.ruff]
 line-length = 120
+
+[tool.ruff.lint]
 select = ["ALL"]
 ignore = [
     "ANN401",  # Dynamically typed expressions (typing.Any) are disallowed in {filename}
