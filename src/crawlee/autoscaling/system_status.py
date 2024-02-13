@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Sequence
 
@@ -104,12 +104,7 @@ class SystemStatus:
         client_info = self._is_client_overloaded(sample_duration)
 
         return SystemInfo(
-            is_system_idle=(
-                not mem_info.is_overloaded
-                and not event_loop_info.is_overloaded
-                and not cpu_info.is_overloaded
-                and not client_info.is_overloaded
-            ),
+            created_at=datetime.now(tz=timezone.utc),
             mem_info=mem_info,
             event_loop_info=event_loop_info,
             cpu_info=cpu_info,
@@ -180,7 +175,7 @@ class SystemStatus:
             on the specified ratio. Otherwise, `is_overloaded` is set to `False`.
         """
         if not sample:
-            return LoadRatioInfo(is_overloaded=False, limit_ratio=ratio, actual_ratio=0)
+            return LoadRatioInfo(limit_ratio=ratio, actual_ratio=0)
 
         weights, values = [], []
 
@@ -192,7 +187,6 @@ class SystemStatus:
         w_avg = values[0] if len(sample) == 1 else weighted_avg(values, weights)
 
         return LoadRatioInfo(
-            is_overloaded=w_avg > ratio,
             limit_ratio=ratio,
             actual_ratio=round(w_avg, 3),
         )

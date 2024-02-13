@@ -57,7 +57,7 @@ class EventManager:
             timeout: Optional timeout after which the pending event listeners are canceled.
         """
         logger.debug('Calling EventManager.close()...')
-        await self.wait_for_all_listeners_to_complete(timeout=timeout)
+        await self._wait_for_all_listeners_to_complete(timeout=timeout)
         self._event_emitter.remove_all_listeners()
 
     def on(self: EventManager, *, event: Event, listener: Listener) -> None:
@@ -122,7 +122,7 @@ class EventManager:
         logger.debug('Calling EventManager.emit()...')
         self._event_emitter.emit(event.value, event_data)
 
-    async def wait_for_all_listeners_to_complete(self: EventManager, *, timeout: timedelta | None = None) -> None:
+    async def _wait_for_all_listeners_to_complete(self: EventManager, *, timeout: timedelta | None = None) -> None:
         """Wait for all currently executing event listeners to complete.
 
         Args:

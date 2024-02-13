@@ -11,24 +11,38 @@ if TYPE_CHECKING:
 class LoadRatioInfo:
     """Represents the load ratio of a resource."""
 
-    is_overloaded: bool
     limit_ratio: float
     actual_ratio: float
+
+    @property
+    def is_overloaded(self: LoadRatioInfo) -> bool:
+        """Returns whether the resource is overloaded."""
+        return self.actual_ratio > self.limit_ratio
 
 
 @dataclass
 class SystemInfo:
     """Represents the current status of the system."""
 
-    is_system_idle: bool  # Indicates whether the system is currently idle or overloaded
-    mem_info: LoadRatioInfo
-    event_loop_info: LoadRatioInfo
-    cpu_info: LoadRatioInfo
-    client_info: LoadRatioInfo
-    mem_current_bytes: int | None = None  # Platform only property
-    cpu_current_usage: int | None = None  # Platform only property
-    is_cpu_overloaded: bool | None = None  # Platform only property
-    created_at: datetime | None = None
+    created_at: datetime
+    cpu_info: LoadRatioInfo | None = None
+    mem_info: LoadRatioInfo | None = None
+    event_loop_info: LoadRatioInfo | None = None
+    client_info: LoadRatioInfo | None = None
+    mem_current_bytes: int | None = None
+
+    @property
+    def is_system_idle(self: SystemInfo) -> bool:
+        """Indicates whether the system is currently idle or overloaded."""
+        if self.mem_info is None or self.event_loop_info is None or self.cpu_info is None or self.client_info is None:
+            raise ValueError('SystemInfo is missing some load ratio info.')
+
+        return (
+            not self.cpu_info.is_overloaded
+            and not self.mem_info.is_overloaded
+            and not self.event_loop_info.is_overloaded
+            and not self.client_info.is_overloaded
+        )
 
 
 @dataclass
