@@ -49,14 +49,14 @@ class CrawleeLogFormatter(logging.Formatter):
 
     def __init__(
         self: CrawleeLogFormatter,
-        include_logger_name: bool = False,  # noqa: FBT001, FBT002
+        include_logger_name: bool = True,  # noqa: FBT001, FBT002
         *args: Any,
         **kwargs: Any,
     ) -> None:
         """Create a new instance.
 
         Args:
-            include_logger_name: Include logger name at the beginning of the log line. Defaults to False.
+            include_logger_name: Include logger name at the beginning of the log line.
             args: Arguments passed to the parent class.
             kwargs: Keyword arguments passed to the parent class.
         """
