@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import logging
 import sys
-from typing import Any
 
 import pytest
 
 from crawlee.log_config import CrawleeLogFormatter
 
 
-def get_log_record(level: int, msg: str, exc_info: Any = None) -> logging.LogRecord:
+def get_log_record(level: int, msg: str, exc_info: logging._SysExcInfoType | None = None) -> logging.LogRecord:
     return logging.LogRecord(
         name='test',
         level=level,
@@ -32,14 +31,14 @@ def get_log_record(level: int, msg: str, exc_info: Any = None) -> logging.LogRec
     ids=['debug', 'info', 'warning', 'error'],
 )
 def test__log_formatter__msg(level: int, msg: str, expected: str) -> None:
-    formatter = CrawleeLogFormatter(include_logger_name=True)
+    formatter = CrawleeLogFormatter()
     record = get_log_record(level, msg)
     formatted_message = formatter.format(record)
     assert formatted_message == expected
 
 
 def test__log_formatter__with_exception() -> None:
-    formatter = CrawleeLogFormatter(include_logger_name=True)
+    formatter = CrawleeLogFormatter()
     try:
         raise ValueError('This is a test exception')
 
@@ -50,7 +49,6 @@ def test__log_formatter__with_exception() -> None:
 
         assert '\x1b[90m[test]\x1b[0m \x1b[31mERROR\x1b[0m Exception occurred' in formatted_message
         assert 'ValueError: This is a test exception' in formatted_message
-
 
 
 def test__log_formatter__without_name() -> None:
