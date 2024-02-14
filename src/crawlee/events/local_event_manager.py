@@ -27,6 +27,11 @@ class LocalEventManager(EventManager):
     def __init__(self: LocalEventManager, config: Config) -> None:
         self.config = config
         self._initialized = False
+        self._emit_system_info_event_rec_task = RecurringTask(
+            func=self._emit_system_info_event,
+            delay=self.config.system_info_interval,
+        )
+
         super().__init__()
 
     async def init(self: LocalEventManager) -> None:
@@ -36,10 +41,6 @@ class LocalEventManager(EventManager):
         if self._initialized:
             raise RuntimeError('LocalEventManager is already initialized.')
 
-        self._emit_system_info_event_rec_task = RecurringTask(
-            func=self._emit_system_info_event,
-            delay=self.config.system_info_interval,
-        )
         self._emit_system_info_event_rec_task.start()
         self._initialized = True
 
