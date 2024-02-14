@@ -17,53 +17,66 @@ from crawlee.events.event_manager import EventManager
 from crawlee.events.types import Event, EventSystemInfoData
 
 if TYPE_CHECKING:
+    from types import TracebackType
+
     from crawlee import Config
 
 logger = getLogger(__name__)
 
 
 class LocalEventManager(EventManager):
-    """Local event manager for emitting system info events."""
+    """Local event manager for emitting system info events.
 
-    def __init__(self: LocalEventManager, config: Config) -> None:
+    Attributes:
+        config: The crawlee configuration.
+
+        timeout: The timeout for closing the event manager.
+
+        _emit_system_info_event_rec_task: The recurring task for emitting system info events.
+    """
+
+    def __init__(self: LocalEventManager, config: Config, timeout: timedelta | None = None) -> None:
         self.config = config
-        self._initialized = False
+        self.timeout = timeout
         self._emit_system_info_event_rec_task = RecurringTask(
             func=self._emit_system_info_event,
             delay=self.config.system_info_interval,
         )
-
         super().__init__()
 
-    async def init(self: LocalEventManager) -> None:
-        """Initializes the local event manager."""
-        logger.debug('Calling LocalEventManager.init()...')
-
-        if self._initialized:
-            raise RuntimeError('LocalEventManager is already initialized.')
-
+    async def __aenter__(self: LocalEventManager) -> LocalEventManager:
+        """Initializes the local event manager upon entering the async context."""
+        logger.debug('Calling LocalEventManager.__aenter__()...')
         self._emit_system_info_event_rec_task.start()
-        self._initialized = True
+        return self
 
-    async def close(self: LocalEventManager, *, timeout: timedelta | None = None) -> None:
-        """Closes the local event manager."""
-        logger.debug('Calling LocalEventManager.close()...')
+    async def __aexit__(
+        self: LocalEventManager,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        exc_traceback: TracebackType | None,
+    ) -> None:
+        """Closes the local event manager upon exiting the async context."""
+        logger.debug('Calling LocalEventManager.__aexit__()...')
 
-        if not self._initialized:
-            raise RuntimeError('LocalEventManager is not initialized.')
+        if exc_value:
+            logger.error('An error occurred while exiting the async context: %s', exc_value)
 
         await self._emit_system_info_event_rec_task.stop()
-        await super().close(timeout=timeout)
-        self._initialized = False
+        await super().close(timeout=self.timeout)
 
     async def _emit_system_info_event(self: LocalEventManager) -> None:
-        """Periodically emits system info events."""
-        system_info = await self._create_system_info()
+        """Emits a system info event with the current CPU and memory usage."""
+        system_info = await self._get_system_info()
         event_data = EventSystemInfoData(system_info=system_info)
         self.emit(event=Event.SYSTEM_INFO, event_data=event_data)
 
-    async def _create_system_info(self: LocalEventManager) -> SystemInfo:
-        """Gathers system info from various metrics."""
+    async def _get_system_info(self: LocalEventManager) -> SystemInfo:
+        """Gathers system info about the CPU and memory usage.
+
+        Returns:
+            The system info.
+        """
         cpu_info = await self._get_cpu_info()
         mem_usage = self._get_current_mem_usage()
 
@@ -74,11 +87,24 @@ class LocalEventManager(EventManager):
         )
 
     async def _get_cpu_info(self: LocalEventManager) -> LoadRatioInfo:
+        """Retrieves the current CPU usage and calculates the load ratio.
+
+        It utilizes the `psutil` library. Funciton `psutil.cpu_percent()` returns a float representing the current
+        system-wide CPU utilization as a percentage.
+
+        Returns:
+            The load ratio info.
+        """
         cpu_percent = await asyncio.to_thread(psutil.cpu_percent, interval=0.1)
         cpu_ratio = cpu_percent / 100
         return LoadRatioInfo(limit_ratio=self.config.max_used_cpu_ratio, actual_ratio=cpu_ratio)
 
     def _get_current_mem_usage(self: LocalEventManager) -> int:
+        """Retrieves the current memory usage of the process and its children.
+
+        Returns:
+            The current memory usage in bytes.
+        """
         current_process = psutil.Process(os.getpid())
 
         # Retrieve the Resident Set Size (RSS) of the current process. RSS is the portion of memory
