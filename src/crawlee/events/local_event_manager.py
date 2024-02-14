@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
@@ -63,7 +64,7 @@ class LocalEventManager(EventManager):
 
     async def _create_system_info(self: LocalEventManager) -> SystemInfo:
         """Gathers system info from various metrics."""
-        cpu_info = self._get_cpu_info()
+        cpu_info = await self._get_cpu_info()
         mem_usage = self._get_current_mem_usage()
 
         return SystemInfo(
@@ -72,12 +73,10 @@ class LocalEventManager(EventManager):
             mem_current_bytes=mem_usage,
         )
 
-    def _get_cpu_info(self: LocalEventManager) -> LoadRatioInfo:
-        cpu_actual_ratio = psutil.cpu_percent() / 100
-        return LoadRatioInfo(
-            limit_ratio=self.config.max_used_cpu_ratio,
-            actual_ratio=cpu_actual_ratio,
-        )
+    async def _get_cpu_info(self: LocalEventManager) -> LoadRatioInfo:
+        cpu_percent = await asyncio.to_thread(psutil.cpu_percent, interval=0.1)
+        cpu_ratio = cpu_percent / 100
+        return LoadRatioInfo(limit_ratio=self.config.max_used_cpu_ratio, actual_ratio=cpu_ratio)
 
     def _get_current_mem_usage(self: LocalEventManager) -> int:
         current_process = psutil.Process(os.getpid())
