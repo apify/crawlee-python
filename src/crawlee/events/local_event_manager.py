@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import os
 from contextlib import suppress
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import psutil
 
@@ -44,7 +44,7 @@ class LocalEventManager(EventManager):
         self._emit_system_info_event_rec_task.start()
         self._initialized = True
 
-    async def close(self: LocalEventManager, *args: Any, **kwargs: Any) -> None:
+    async def close(self: LocalEventManager, *, timeout: timedelta | None = None) -> None:
         """Closes the local event manager."""
         logger.debug('Calling LocalEventManager.close()...')
 
@@ -52,7 +52,7 @@ class LocalEventManager(EventManager):
             raise RuntimeError('LocalEventManager is not initialized.')
 
         await self._emit_system_info_event_rec_task.stop()
-        await super().close(*args, **kwargs)
+        await super().close(timeout=timeout)
         self._initialized = False
 
     async def _emit_system_info_event(self: LocalEventManager) -> None:
