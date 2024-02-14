@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import timedelta
 
 
+@dataclass
 class Config:
-    """Configuration class for Crawlee.
+    """Configuration data class for Crawlee.
 
     Attributes:
         system_info_interval: Defines the interval of emitting the `SystemInfo` event.
@@ -22,16 +24,8 @@ class Config:
             is higher than the provided number, the client is considered overloaded.
     """
 
-    def __init__(
-        self: Config,
-        system_info_interval: timedelta = timedelta(seconds=60),
-        max_used_cpu_ratio: float = 0.95,
-        max_used_memory_ratio: float = 0.7,
-        max_event_loop_delay: timedelta = timedelta(milliseconds=50),
-        max_client_errors: int = 1,
-    ) -> None:
-        self.system_info_interval = system_info_interval
-        self.max_used_cpu_ratio = max_used_cpu_ratio
-        self.max_used_memory_ratio = max_used_memory_ratio
-        self.max_event_loop_delay = max_event_loop_delay
-        self.max_client_errors = max_client_errors
+    system_info_interval: timedelta = timedelta(seconds=60)
+    max_used_cpu_ratio: float = 0.95
+    max_used_memory_ratio: float = 0.7
+    max_event_loop_delay: timedelta = timedelta(milliseconds=50)
+    max_client_errors: int = 1
