@@ -33,7 +33,7 @@ class RecurringTask:
 
     def start(self: RecurringTask) -> None:
         """Start the recurring task execution."""
-        self.task = asyncio.create_task(self._wrapper(), name=f'Task-{self._wrapper.__name__}')
+        self.task = asyncio.create_task(self._wrapper(), name=f'Task-recurring-{self.func.__name__}')
 
     async def stop(self: RecurringTask) -> None:
         """Stop the recurring task execution."""
