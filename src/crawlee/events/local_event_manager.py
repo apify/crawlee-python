@@ -89,7 +89,7 @@ class LocalEventManager(EventManager):
     async def _get_cpu_info(self: LocalEventManager) -> LoadRatioInfo:
         """Retrieves the current CPU usage and calculates the load ratio.
 
-        It utilizes the `psutil` library. Funciton `psutil.cpu_percent()` returns a float representing the current
+        It utilizes the `psutil` library. Function `psutil.cpu_percent()` returns a float representing the current
         system-wide CPU utilization as a percentage.
 
         Returns:
