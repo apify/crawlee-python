@@ -11,7 +11,9 @@ from crawlee._utils.recurring_task import RecurringTask
 
 @pytest.fixture()
 def function() -> AsyncMock:
-    return AsyncMock()
+    mock_function = AsyncMock()
+    mock_function.__name__ = 'mocked_function'  # To avoid issues with the function name in RecurringTask
+    return mock_function
 
 
 @pytest.fixture()
