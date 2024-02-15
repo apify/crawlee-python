@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from logging import getLogger
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING
 
 from more_itertools import pairwise
 
@@ -12,6 +12,8 @@ from crawlee._utils.math import weighted_avg
 from crawlee.autoscaling.types import LoadRatioInfo, Snapshot, SystemInfo
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from crawlee.autoscaling.snapshotter import Snapshotter
 
 logger = getLogger(__name__)

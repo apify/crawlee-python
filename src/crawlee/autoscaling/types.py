@@ -30,7 +30,9 @@ class SystemInfo:
     mem_info: LoadRatioInfo | None = None
     event_loop_info: LoadRatioInfo | None = None
     client_info: LoadRatioInfo | None = None
-    mem_current_bytes: int | None = None
+    mem_current_bytes: int | None = None  # Platform only property
+    cpu_current_usage: int | None = None  # Platform only property
+    is_cpu_overloaded: bool | None = None  # Platform only property
 
     @property
     def is_system_idle(self) -> bool:

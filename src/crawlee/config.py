@@ -22,6 +22,9 @@ class Config:
 
         max_client_errors: Sets the maximum number of client errors (HTTP 429). When the number of client errors
             is higher than the provided number, the client is considered overloaded.
+
+        memory_mbytes: Sets the amount of system memory in megabytes to be used by the `AutoscaledPool`.
+            By default, the maximum memory is set to one quarter of total system memory.
     """
 
     system_info_interval: timedelta = timedelta(seconds=60)
@@ -29,3 +32,4 @@ class Config:
     max_used_memory_ratio: float = 0.7
     max_event_loop_delay: timedelta = timedelta(milliseconds=50)
     max_client_errors: int = 1
+    memory_mbytes: int = 0
