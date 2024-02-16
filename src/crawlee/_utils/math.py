@@ -14,6 +14,9 @@ def weighted_avg(values: list[float], weights: list[float]) -> float:
     Returns:
         float: Weighted average.
     """
+    if not values or not weights:
+        raise ValueError('Values and weights lists must not be empty')
+
     if len(values) != len(weights):
         raise ValueError('Values and weights must be of equal length')
 
