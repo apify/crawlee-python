@@ -122,6 +122,7 @@ indent-style = "space"
     "INP001",  # File {filename} is part of an implicit namespace package, add an __init__.py
     "PLR2004", # Magic value used in comparison, consider replacing {value} with a constant variable
     "S101",    # Use of assert detected
+    "SLF001",  # Private member accessed: {name}
     "T20",     # flake8-print
     "TRY301",  # Abstract `raise` to an inner function
 ]

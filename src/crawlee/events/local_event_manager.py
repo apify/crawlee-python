@@ -38,15 +38,16 @@ class LocalEventManager(EventManager):
     def __init__(self: LocalEventManager, config: Config, timeout: timedelta | None = None) -> None:
         self.config = config
         self.timeout = timeout
-        self._emit_system_info_event_rec_task = RecurringTask(
-            func=self._emit_system_info_event,
-            delay=self.config.system_info_interval,
-        )
+        self._emit_system_info_event_rec_task: RecurringTask | None = None
         super().__init__()
 
     async def __aenter__(self: LocalEventManager) -> LocalEventManager:
         """Initializes the local event manager upon entering the async context."""
         logger.debug('Calling LocalEventManager.__aenter__()...')
+        self._emit_system_info_event_rec_task = RecurringTask(
+            func=self._emit_system_info_event,
+            delay=self.config.system_info_interval,
+        )
         self._emit_system_info_event_rec_task.start()
         return self
 
@@ -62,7 +63,9 @@ class LocalEventManager(EventManager):
         if exc_value:
             logger.error('An error occurred while exiting the async context: %s', exc_value)
 
-        await self._emit_system_info_event_rec_task.stop()
+        if isinstance(self._emit_system_info_event_rec_task, RecurringTask):
+            await self._emit_system_info_event_rec_task.stop()
+
         await super().close(timeout=self.timeout)
 
     async def _emit_system_info_event(self: LocalEventManager) -> None:
