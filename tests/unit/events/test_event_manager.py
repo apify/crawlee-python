@@ -71,13 +71,19 @@ async def test_emit_invokes_both_sync_and_async_listeners(
 
 
 @pytest.mark.asyncio()
-async def test_emit_event_with_no_listeners_does_not_fail(
+async def test_emit_event_with_no_listeners(
     event_manager: EventManager,
     event_system_info_data: EventSystemInfoData,
+    async_listener: AsyncMock,
 ) -> None:
-    # Attempt to emit an event for which no listeners are registered.
+    # Register a listener for a different event
+    event_manager.on(event=Event.ABORTING, listener=async_listener)
+
+    # Attempt to emit an event for which no listeners are registered, it should not fail
     event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_system_info_data)
-    assert len(event_manager._listener_tasks) == 0
+
+    # Ensure the listener for the other event was not called
+    assert async_listener.call_count == 0
 
 
 @pytest.mark.asyncio()
