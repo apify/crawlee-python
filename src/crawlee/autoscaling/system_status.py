@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING, Sequence
 
@@ -104,7 +104,6 @@ class SystemStatus:
         client_info = self._is_client_overloaded(sample_duration)
 
         return SystemInfo(
-            created_at=datetime.now(tz=timezone.utc),
             mem_info=mem_info,
             event_loop_info=event_loop_info,
             cpu_info=cpu_info,

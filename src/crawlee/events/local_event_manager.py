@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import os
 from contextlib import suppress
-from datetime import datetime, timedelta, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING
 
@@ -17,6 +16,7 @@ from crawlee.events.event_manager import EventManager
 from crawlee.events.types import Event, EventSystemInfoData
 
 if TYPE_CHECKING:
+    from datetime import timedelta
     from types import TracebackType
 
     from crawlee import Config
@@ -81,7 +81,6 @@ class LocalEventManager(EventManager):
         mem_usage = self._get_current_mem_usage()
 
         return SystemInfo(
-            created_at=datetime.now(tz=timezone.utc),
             cpu_info=cpu_info,
             mem_current_bytes=mem_usage,
         )
