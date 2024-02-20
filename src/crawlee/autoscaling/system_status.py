@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING, Sequence
 
