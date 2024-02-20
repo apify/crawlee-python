@@ -124,7 +124,6 @@ indent-style = "space"
     "S101",    # Use of assert detected
     "T20",     # flake8-print
     "TRY301",  # Abstract `raise` to an inner function
-    "SLF001",  # Private member accessed: {value}
 ]
 
 [tool.ruff.lint.flake8-quotes]
