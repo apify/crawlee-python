@@ -42,7 +42,10 @@ class LocalEventManager(EventManager):
         super().__init__()
 
     async def __aenter__(self: LocalEventManager) -> LocalEventManager:
-        """Initializes the local event manager upon entering the async context."""
+        """Initializes the local event manager upon entering the async context.
+
+        It starts emitting system info events at regular intervals.
+        """
         logger.debug('Calling LocalEventManager.__aenter__()...')
         self._emit_system_info_event_rec_task = RecurringTask(
             func=self._emit_system_info_event,
@@ -57,7 +60,10 @@ class LocalEventManager(EventManager):
         exc_value: BaseException | None,
         exc_traceback: TracebackType | None,
     ) -> None:
-        """Closes the local event manager upon exiting the async context."""
+        """Closes the local event manager upon exiting the async context.
+
+        It stops emitting system info events and closes the event manager.
+        """
         logger.debug('Calling LocalEventManager.__aexit__()...')
 
         if exc_value:
