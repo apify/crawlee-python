@@ -30,14 +30,14 @@ def get_log_record(level: int, msg: str, exc_info: logging._SysExcInfoType | Non
     ],
     ids=['debug', 'info', 'warning', 'error'],
 )
-def test__log_formatter__msg(level: int, msg: str, expected: str) -> None:
+def test_formatted_message(level: int, msg: str, expected: str) -> None:
     formatter = CrawleeLogFormatter()
     record = get_log_record(level, msg)
     formatted_message = formatter.format(record)
     assert formatted_message == expected
 
 
-def test__log_formatter__with_exception() -> None:
+def test_formatting_with_exception() -> None:
     formatter = CrawleeLogFormatter()
     try:
         raise ValueError('This is a test exception')
@@ -51,7 +51,7 @@ def test__log_formatter__with_exception() -> None:
         assert 'ValueError: This is a test exception' in formatted_message
 
 
-def test__log_formatter__without_name() -> None:
+def test_formatter_without_name() -> None:
     formatter = CrawleeLogFormatter(include_logger_name=False)
     record = get_log_record(logging.INFO, 'Info message without name')
     formatted_message = formatter.format(record)
