@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
-    from datetime import datetime, timedelta
+    from datetime import timedelta
 
 
 @dataclass
@@ -24,7 +25,7 @@ class LoadRatioInfo:
 class SystemInfo:
     """Represents the current status of the system."""
 
-    created_at: datetime
+    created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
     cpu_info: LoadRatioInfo | None = None
     mem_info: LoadRatioInfo | None = None
     event_loop_info: LoadRatioInfo | None = None

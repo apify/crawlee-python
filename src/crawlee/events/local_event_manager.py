@@ -81,7 +81,6 @@ class LocalEventManager(EventManager):
         mem_usage = self._get_current_mem_usage()
 
         return SystemInfo(
-            created_at=datetime.now(tz=timezone.utc),
             cpu_info=cpu_info,
             mem_current_bytes=mem_usage,
         )

@@ -17,7 +17,7 @@ def event_manager() -> EventManager:
 
 @pytest.fixture()
 def event_system_info_data() -> EventSystemInfoData:
-    system_info = MagicMock(spec=SystemInfo)
+    system_info = SystemInfo()
     return EventSystemInfoData(system_info)
 
 

@@ -104,7 +104,6 @@ class SystemStatus:
         client_info = self._is_client_overloaded(sample_duration)
 
         return SystemInfo(
-            created_at=datetime.now(tz=timezone.utc),
             mem_info=mem_info,
             event_loop_info=event_loop_info,
             cpu_info=cpu_info,
