@@ -38,15 +38,19 @@ class LocalEventManager(EventManager):
     def __init__(self: LocalEventManager, config: Config, timeout: timedelta | None = None) -> None:
         self.config = config
         self.timeout = timeout
+        self._emit_system_info_event_rec_task: RecurringTask | None = None
+        super().__init__()
+
+    async def __aenter__(self: LocalEventManager) -> LocalEventManager:
+        """Initializes the local event manager upon entering the async context.
+
+        It starts emitting system info events at regular intervals.
+        """
+        logger.debug('Calling LocalEventManager.__aenter__()...')
         self._emit_system_info_event_rec_task = RecurringTask(
             func=self._emit_system_info_event,
             delay=self.config.system_info_interval,
         )
-        super().__init__()
-
-    async def __aenter__(self: LocalEventManager) -> LocalEventManager:
-        """Initializes the local event manager upon entering the async context."""
-        logger.debug('Calling LocalEventManager.__aenter__()...')
         self._emit_system_info_event_rec_task.start()
         return self
 
@@ -56,17 +60,23 @@ class LocalEventManager(EventManager):
         exc_value: BaseException | None,
         exc_traceback: TracebackType | None,
     ) -> None:
-        """Closes the local event manager upon exiting the async context."""
+        """Closes the local event manager upon exiting the async context.
+
+        It stops emitting system info events and closes the event manager.
+        """
         logger.debug('Calling LocalEventManager.__aexit__()...')
 
         if exc_value:
             logger.error('An error occurred while exiting the async context: %s', exc_value)
 
-        await self._emit_system_info_event_rec_task.stop()
+        if self._emit_system_info_event_rec_task is not None:
+            await self._emit_system_info_event_rec_task.stop()
+
         await super().close(timeout=self.timeout)
 
     async def _emit_system_info_event(self: LocalEventManager) -> None:
         """Emits a system info event with the current CPU and memory usage."""
+        logger.debug('Calling LocalEventManager._emit_system_info_event()...')
         system_info = await self._get_system_info()
         event_data = EventSystemInfoData(system_info=system_info)
         self.emit(event=Event.SYSTEM_INFO, event_data=event_data)
@@ -77,6 +87,7 @@ class LocalEventManager(EventManager):
         Returns:
             The system info.
         """
+        logger.debug('Calling LocalEventManager._get_system_info()...')
         cpu_info = await self._get_cpu_info()
         mem_usage = self._get_current_mem_usage()
 
@@ -94,6 +105,7 @@ class LocalEventManager(EventManager):
         Returns:
             The load ratio info.
         """
+        logger.debug('Calling LocalEventManager._get_cpu_info()...')
         cpu_percent = await asyncio.to_thread(psutil.cpu_percent, interval=0.1)
         cpu_ratio = cpu_percent / 100
         return LoadRatioInfo(limit_ratio=self.config.max_used_cpu_ratio, actual_ratio=cpu_ratio)
@@ -104,6 +116,7 @@ class LocalEventManager(EventManager):
         Returns:
             The current memory usage in bytes.
         """
+        logger.debug('Calling LocalEventManager._get_current_mem_usage()...')
         current_process = psutil.Process(os.getpid())
 
         # Retrieve the Resident Set Size (RSS) of the current process. RSS is the portion of memory
