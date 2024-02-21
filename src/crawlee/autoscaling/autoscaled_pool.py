@@ -80,34 +80,39 @@ class AutoscaledPool:
         self._autoscale()
         self._autoscale_task.start()
 
-        while not self._is_finished_function():
-            wait_for_workers_update = asyncio.create_task(
-                self._worker_tasks_updated.wait(), name='wait for worker tasks update'
-            )
-            wait_for_worker_tasks = asyncio.create_task(
-                asyncio.wait(self._worker_tasks, return_when=asyncio.FIRST_EXCEPTION),
-                name='wait for worker tasks to complete',
-            )
-
-            self._worker_tasks_updated.clear()
-
-            try:
-                await asyncio.wait(
-                    [wait_for_workers_update, wait_for_worker_tasks],
-                    return_when=asyncio.FIRST_COMPLETED,
+        try:
+            while not self._is_finished_function():
+                wait_for_workers_update = asyncio.create_task(
+                    self._worker_tasks_updated.wait(), name='wait for worker tasks update'
                 )
-            finally:
-                if not wait_for_worker_tasks.done():
-                    wait_for_worker_tasks.cancel()
+                wait_for_worker_tasks = asyncio.create_task(
+                    asyncio.wait(self._worker_tasks, return_when=asyncio.FIRST_EXCEPTION),
+                    name='wait for worker tasks to complete',
+                )
 
-                if not wait_for_workers_update.done():
-                    wait_for_workers_update.cancel()
+                self._worker_tasks_updated.clear()
 
-                for task in self._worker_tasks:
-                    if task.done():
-                        exception = task.exception()
-                        if exception is not None:
-                            raise exception
+                try:
+                    await asyncio.wait(
+                        [wait_for_workers_update, wait_for_worker_tasks],
+                        return_when=asyncio.FIRST_COMPLETED,
+                    )
+                finally:
+                    if not wait_for_worker_tasks.done():
+                        wait_for_worker_tasks.cancel()
+
+                    if not wait_for_workers_update.done():
+                        wait_for_workers_update.cancel()
+
+                    for task in self._worker_tasks:
+                        if task.done():
+                            exception = task.exception()
+                            if exception is not None:
+                                raise exception
+        finally:
+            await self._autoscale_task.stop()
+            self._desired_concurrency = 0
+            self._autoscale()
 
     async def abort(self: AutoscaledPool) -> None:
         """Interrupt the autoscaled pool and all the tasks in progress."""
