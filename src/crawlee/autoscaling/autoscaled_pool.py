@@ -66,7 +66,7 @@ class AutoscaledPool:
         self._scale_up_step_ratio = scale_up_step_ratio
         self._scale_down_step_ratio = scale_down_step_ratio
 
-        self._max_tasks_per_minute = max_tasks_per_minute  # TODO: implement concurrency limiting
+        self._max_tasks_per_minute = max_tasks_per_minute
         self._is_paused = False
 
     async def run(self: AutoscaledPool) -> None:
@@ -159,9 +159,17 @@ class AutoscaledPool:
 
     async def _worker_task(self: AutoscaledPool) -> None:
         while not self._is_finished_function():
-            await asyncio.sleep(0)
+            if self._max_tasks_per_minute is not None:
+                delay = 60 / self._max_tasks_per_minute / self._desired_concurrency
+            else:
+                delay = 0
+
+            await asyncio.sleep(delay)
 
             if self._is_paused:
+                continue
+
+            if not self._is_task_ready_function():
                 continue
 
             await asyncio.wait_for(

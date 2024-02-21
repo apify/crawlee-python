@@ -138,3 +138,32 @@ async def test_autoscales(system_status: SystemStatus | Mock) -> None:
         pool_run_task.cancel()
         with suppress(asyncio.CancelledError):
             await pool_run_task
+
+
+async def test_max_tasks_per_minute_works(system_status: SystemStatus | Mock) -> None:
+    done_count = 0
+
+    async def run() -> None:
+        await asyncio.sleep(0.1)
+        nonlocal done_count
+        done_count += 1
+
+    pool = AutoscaledPool(
+        system_status=system_status,
+        run_task_function=run,
+        is_task_ready_function=lambda: True,
+        is_finished_function=lambda: False,
+        min_concurrency=1,
+        desired_concurrency=1,
+        max_concurrency=1,
+        max_tasks_per_minute=120,
+    )
+
+    pool_run_task = asyncio.create_task(pool.run(), name='pool run task')
+    try:
+        await asyncio.sleep(0.5)
+        assert done_count <= 1
+    finally:
+        pool_run_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await pool_run_task
