@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import math
+from contextlib import suppress
 from datetime import timedelta
 from typing import TYPE_CHECKING, Awaitable, Callable
 
@@ -29,7 +31,6 @@ class AutoscaledPool:
         autoscale_interval: timedelta = timedelta(seconds=10),
         logging_interval: timedelta = timedelta(minutes=1),
         desired_concurrency: int | None = None,
-        desired_concurrency_ratio: float = 0.9,
         min_concurrency: int = 1,
         max_concurrency: int = 200,
         scale_up_step_ratio: float = 0.05,
@@ -58,10 +59,6 @@ class AutoscaledPool:
         if max_concurrency < min_concurrency:
             raise ValueError('max_concurrency cannot be less than min_concurrency')
 
-        if desired_concurrency_ratio < 0 or desired_concurrency_ratio > 1:
-            raise ValueError('desired_concurrency_ratio must be between 0 and 1 (non-inclusive)')
-
-        self._desired_concurrency_ratio = desired_concurrency_ratio
         self._desired_concurrency = desired_concurrency if desired_concurrency is not None else min_concurrency
         self._max_concurrency = max_concurrency
         self._min_concurrency = min_concurrency
@@ -77,7 +74,7 @@ class AutoscaledPool:
 
         If there is an exception in one of the tasks, it will be re-raised.
         """
-        self._autoscale()
+        self._ensure_desired_concurrency()
         self._autoscale_task.start()
 
         try:
@@ -110,9 +107,11 @@ class AutoscaledPool:
                             if exception is not None:
                                 raise exception
         finally:
-            await self._autoscale_task.stop()
+            with suppress(asyncio.CancelledError):
+                await self._autoscale_task.stop()
+
             self._desired_concurrency = 0
-            self._autoscale()
+            self._ensure_desired_concurrency()
 
     async def abort(self: AutoscaledPool) -> None:
         """Interrupt the autoscaled pool and all the tasks in progress."""
@@ -130,17 +129,33 @@ class AutoscaledPool:
         """Resume a paused autoscaled pool so that it continues starting new tasks."""
         self._is_paused = False
 
-    def _autoscale(self: AutoscaledPool) -> None:
-        # TODO: adjust desired_concurrency based on system_status
+    @property
+    def desired_concurrency(self: AutoscaledPool) -> int:
+        """The current desired concurrency, possibly updated by the pool according to system load."""
+        return self._desired_concurrency
 
+    def _autoscale(self: AutoscaledPool) -> None:
+        status = self.system_status.get_historical_status()
+        if status.is_system_idle and self._desired_concurrency < self._max_concurrency:
+            step = math.ceil(self._scale_up_step_ratio * self._desired_concurrency)
+            self._desired_concurrency = min(self._max_concurrency, self._desired_concurrency + step)
+        elif not status.is_system_idle and self._desired_concurrency > self._min_concurrency:
+            step = math.ceil(self._scale_down_step_ratio * self._desired_concurrency)
+            self._desired_concurrency = max(self._min_concurrency, self._desired_concurrency - step)
+
+        self._ensure_desired_concurrency()
+
+    def _ensure_desired_concurrency(self: AutoscaledPool) -> None:
         if len(self._worker_tasks) > self._desired_concurrency:
             for _ in range(len(self._worker_tasks) - self._desired_concurrency):
                 self._worker_tasks.pop().cancel()
+                self._worker_tasks_updated.set()
 
         elif len(self._worker_tasks) < self._desired_concurrency:
             for i in range(len(self._worker_tasks), self._desired_concurrency):
                 task = asyncio.create_task(self._worker_task(), name=f'worker task #{i + 1}')
                 self._worker_tasks.append(task)
+                self._worker_tasks_updated.set()
 
     async def _worker_task(self: AutoscaledPool) -> None:
         while not self._is_finished_function():

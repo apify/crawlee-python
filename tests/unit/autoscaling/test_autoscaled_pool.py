@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import suppress
+from datetime import datetime, timedelta, timezone
+from typing import cast
 from unittest.mock import MagicMock, Mock
 
 import pytest
@@ -8,6 +11,9 @@ import pytest
 from crawlee._utils.measure_time import measure_time
 from crawlee.autoscaling.autoscaled_pool import AutoscaledPool
 from crawlee.autoscaling.system_status import SystemStatus
+from crawlee.autoscaling.types import LoadRatioInfo, SystemInfo
+
+pytestmark = pytest.mark.asyncio()
 
 
 @pytest.fixture()
@@ -15,7 +21,6 @@ def system_status() -> SystemStatus | Mock:
     return MagicMock(spec=SystemStatus)
 
 
-@pytest.mark.asyncio()
 async def test_runs_concurrently(system_status: SystemStatus | Mock) -> None:
     done_count = 0
 
@@ -42,7 +47,6 @@ async def test_runs_concurrently(system_status: SystemStatus | Mock) -> None:
     assert done_count >= 10
 
 
-@pytest.mark.asyncio()
 async def test_propagates_exceptions(system_status: SystemStatus | Mock) -> None:
     done_count = 0
 
@@ -67,3 +71,70 @@ async def test_propagates_exceptions(system_status: SystemStatus | Mock) -> None
         await pool.run()
 
     assert done_count < 20
+
+
+async def test_autoscales(system_status: SystemStatus | Mock) -> None:
+    done_count = 0
+
+    async def run() -> None:
+        await asyncio.sleep(0.1)
+        nonlocal done_count
+        done_count += 1
+
+    start = datetime.now(timezone.utc)
+
+    def get_historical_status() -> SystemInfo:
+        now = datetime.now(timezone.utc)
+        result = SystemInfo(
+            now,
+            cpu_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
+            mem_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
+            event_loop_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
+            client_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
+            mem_current_bytes=1024,
+        )
+
+        # 0.5 seconds after the start of the test, pretend the CPU became overloaded
+        if now - start >= timedelta(seconds=0.5):
+            result.cpu_info = LoadRatioInfo(limit_ratio=0.9, actual_ratio=1.0)
+
+        return result
+
+    cast(Mock, system_status.get_historical_status).side_effect = get_historical_status
+
+    pool = AutoscaledPool(
+        system_status=system_status,
+        run_task_function=run,
+        is_task_ready_function=lambda: True,
+        is_finished_function=lambda: False,
+        min_concurrency=1,
+        desired_concurrency=1,
+        max_concurrency=4,
+        autoscale_interval=timedelta(seconds=0.1),
+    )
+
+    pool_run_task = asyncio.create_task(pool.run(), name='pool run task')
+
+    try:
+        # After 0.2s, there should be an increase in concurrency
+        await asyncio.sleep(0.2)
+        assert pool.desired_concurrency > 1
+
+        # After 0.5s, the concurrency should reach max concurrency
+        await asyncio.sleep(0.3)
+        assert pool.desired_concurrency == 4
+
+        # The concurrency should guarantee completion of more than 10 tasks (a single worker would complete ~5)
+        assert done_count > 10
+
+        # After 0.7s, the pretend overload should have kicked in and there should be a drop in desired concurrency
+        await asyncio.sleep(0.2)
+        assert pool.desired_concurrency < 4
+
+        # After a full second, the pool should scale down all the way to 1
+        await asyncio.sleep(0.3)
+        assert pool.desired_concurrency == 1
+    finally:
+        pool_run_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await pool_run_task
