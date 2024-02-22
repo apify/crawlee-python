@@ -212,11 +212,8 @@ class AutoscaledPool:
                     timeout=self._task_timeout.total_seconds() if self._task_timeout is not None else None,
                 )
             except asyncio.TimeoutError:
-                logger.warning(
-                    f"Task timed out after {
-                        self._task_timeout.total_seconds() if self._task_timeout is not None else '*not set*'
-                    } seconds"
-                )
+                timeout_str = self._task_timeout.total_seconds() if self._task_timeout is not None else '*not set*'
+                logger.warning(f'Task timed out after {timeout_str} seconds')
             finally:
                 self._current_concurrency -= 1
 
