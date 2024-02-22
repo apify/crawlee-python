@@ -34,6 +34,7 @@ class AutoscaledPool:
         autoscale_interval: timedelta = timedelta(seconds=10),
         logging_interval: timedelta = timedelta(minutes=1),
         desired_concurrency: int | None = None,
+        desired_concurrency_ratio: float = 0.9,
         min_concurrency: int = 1,
         max_concurrency: int = 200,
         scale_up_step_ratio: float = 0.05,
@@ -65,6 +66,10 @@ class AutoscaledPool:
         if max_concurrency < min_concurrency:
             raise ValueError('max_concurrency cannot be less than min_concurrency')
 
+        if desired_concurrency_ratio < 0 or desired_concurrency_ratio > 1:
+            raise ValueError('desired_concurrency_ratio must be between 0 and 1 (non-inclusive)')
+
+        self._desired_concurrency_ratio = desired_concurrency_ratio
         self._desired_concurrency = desired_concurrency if desired_concurrency is not None else min_concurrency
         self._max_concurrency = max_concurrency
         self._min_concurrency = min_concurrency
@@ -151,7 +156,13 @@ class AutoscaledPool:
 
     def _autoscale(self: AutoscaledPool) -> None:
         status = self.system_status.get_historical_status()
-        if status.is_system_idle and self._desired_concurrency < self._max_concurrency:
+        min_current_concurrency = math.floor(self._desired_concurrency_ratio * self._current_concurrency)
+
+        if (
+            status.is_system_idle
+            and self._desired_concurrency < self._max_concurrency
+            and self._current_concurrency >= min_current_concurrency
+        ):
             step = math.ceil(self._scale_up_step_ratio * self._desired_concurrency)
             self._desired_concurrency = min(self._max_concurrency, self._desired_concurrency + step)
         elif not status.is_system_idle and self._desired_concurrency > self._min_concurrency:
