@@ -54,8 +54,11 @@ class AutoscaledPool:
 
         self._autoscale_task = RecurringTask(self._autoscale, autoscale_interval)
 
-        self._worker_tasks = list[asyncio.Task]()
+        self._worker_tasks = list[tuple[asyncio.Task, asyncio.Event]]()
+        """A list of workers tasks and events to signal that the task should terminate"""
+
         self._worker_tasks_updated = asyncio.Event()
+        self._tasks_for_cleanup = list[asyncio.Task]()
 
         if desired_concurrency is not None and desired_concurrency < 1:
             raise ValueError('desired_concurrency must be 1 or larger')
@@ -99,7 +102,7 @@ class AutoscaledPool:
                     self._worker_tasks_updated.wait(), name='wait for worker tasks update'
                 )
                 wait_for_worker_tasks = asyncio.create_task(
-                    asyncio.wait(self._worker_tasks, return_when=asyncio.FIRST_EXCEPTION),
+                    asyncio.wait([task for task, _ in self._worker_tasks], return_when=asyncio.FIRST_EXCEPTION),
                     name='wait for worker tasks to complete',
                 )
 
@@ -117,7 +120,7 @@ class AutoscaledPool:
                     if not wait_for_workers_update.done():
                         wait_for_workers_update.cancel()
 
-                    for task in self._worker_tasks:
+                    for task, _ in self._worker_tasks:
                         if task.done():
                             exception = task.exception()
                             if exception is not None:
@@ -131,6 +134,11 @@ class AutoscaledPool:
             self._desired_concurrency = 0
             self._ensure_desired_concurrency()
 
+            for task in self._tasks_for_cleanup:
+                if not task.done():
+                    with suppress(asyncio.CancelledError):
+                        await task
+
             logger.debug('Pool cleanup finished')
 
     async def abort(self: AutoscaledPool) -> None:
@@ -138,7 +146,7 @@ class AutoscaledPool:
         self._is_paused = True
         await self._autoscale_task.stop()
 
-        for task in self._worker_tasks:
+        for task, _ in self._worker_tasks:
             task.cancel()
 
     async def pause(self: AutoscaledPool) -> None:
@@ -174,14 +182,25 @@ class AutoscaledPool:
     def _ensure_desired_concurrency(self: AutoscaledPool) -> None:
         if len(self._worker_tasks) > self._desired_concurrency:
             for _ in range(len(self._worker_tasks) - self._desired_concurrency):
-                self._worker_tasks.pop().cancel()
+                task, terminate_event = self._worker_tasks.pop()
+                self._mark_task_for_cleanup(task)
+                terminate_event.set()
                 self._worker_tasks_updated.set()
 
         elif len(self._worker_tasks) < self._desired_concurrency:
             for i in range(len(self._worker_tasks), self._desired_concurrency):
-                task = asyncio.create_task(self._worker_task(), name=f'worker task #{i + 1}')
-                self._worker_tasks.append(task)
+                terminate_event = asyncio.Event()
+                task = asyncio.create_task(self._worker_task(terminate_event), name=f'worker task #{i + 1}')
+                self._worker_tasks.append((task, terminate_event))
                 self._worker_tasks_updated.set()
+
+    def _mark_task_for_cleanup(self: AutoscaledPool, task: asyncio.Task) -> None:
+        def cleanup(_: asyncio.Future) -> None:
+            task.exception()
+            self._tasks_for_cleanup.remove(task)
+
+        self._tasks_for_cleanup.append(task)
+        task.add_done_callback(cleanup)
 
     def _log_system_status(self: AutoscaledPool) -> None:
         system_status = self._system_status.get_historical_status()
@@ -192,14 +211,18 @@ class AutoscaledPool:
             f'{system_status!s}'
         )
 
-    async def _worker_task(self: AutoscaledPool) -> None:
+    async def _worker_task(self: AutoscaledPool, terminate_event: asyncio.Event) -> None:
         while not self._is_finished_function():
-            if self._max_tasks_per_minute is not None:
+            if self._max_tasks_per_minute is not None and self._desired_concurrency > 0:
                 delay = 60 / self._max_tasks_per_minute / self._desired_concurrency
             else:
                 delay = 0
 
-            await asyncio.sleep(delay)
+            with suppress(asyncio.TimeoutError):
+                await asyncio.wait_for(terminate_event.wait(), delay)
+
+            if terminate_event.is_set() or self._is_finished_function():
+                break
 
             if self._is_paused:
                 logger.debug('Paused - not executing a task')
