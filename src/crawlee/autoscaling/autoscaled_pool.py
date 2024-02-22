@@ -6,12 +6,15 @@ import asyncio
 import math
 from contextlib import suppress
 from datetime import timedelta
+from logging import getLogger
 from typing import TYPE_CHECKING, Awaitable, Callable
 
 from crawlee._utils.recurring_task import RecurringTask
 
 if TYPE_CHECKING:
     from crawlee.autoscaling.system_status import SystemStatus
+
+logger = getLogger(__name__)
 
 
 class AutoscaledPool:
@@ -44,9 +47,12 @@ class AutoscaledPool:
         self._is_finished_function = is_finished_function
 
         self._task_timeout = task_timeout
-        self._logging_interval = logging_interval  # TODO: implement logging
+
+        self._logging_interval = logging_interval
+        self._log_system_status_task = RecurringTask(self._log_system_status, logging_interval)
 
         self._autoscale_task = RecurringTask(self._autoscale, autoscale_interval)
+
         self._worker_tasks = list[asyncio.Task]()
         self._worker_tasks_updated = asyncio.Event()
 
@@ -63,6 +69,8 @@ class AutoscaledPool:
         self._max_concurrency = max_concurrency
         self._min_concurrency = min_concurrency
 
+        self._current_concurrency = 0
+
         self._scale_up_step_ratio = scale_up_step_ratio
         self._scale_down_step_ratio = scale_down_step_ratio
 
@@ -76,6 +84,9 @@ class AutoscaledPool:
         """
         self._ensure_desired_concurrency()
         self._autoscale_task.start()
+        self._log_system_status_task.start()
+
+        logger.debug('Starting the pool')
 
         try:
             while not self._is_finished_function():
@@ -109,9 +120,13 @@ class AutoscaledPool:
         finally:
             with suppress(asyncio.CancelledError):
                 await self._autoscale_task.stop()
+            with suppress(asyncio.CancelledError):
+                await self._log_system_status_task.stop()
 
             self._desired_concurrency = 0
             self._ensure_desired_concurrency()
+
+            logger.debug('Pool cleanup finished')
 
     async def abort(self: AutoscaledPool) -> None:
         """Interrupt the autoscaled pool and all the tasks in progress."""
@@ -157,6 +172,11 @@ class AutoscaledPool:
                 self._worker_tasks.append(task)
                 self._worker_tasks_updated.set()
 
+    def _log_system_status(self: AutoscaledPool) -> None:
+        logger.info(
+            f'current_concurrency = {self._current_concurrency}; desired_concurrency = {self._desired_concurrency}'
+        )
+
     async def _worker_task(self: AutoscaledPool) -> None:
         while not self._is_finished_function():
             if self._max_tasks_per_minute is not None:
@@ -167,12 +187,26 @@ class AutoscaledPool:
             await asyncio.sleep(delay)
 
             if self._is_paused:
+                logger.debug('Paused - not executing a task')
                 continue
 
             if not self._is_task_ready_function():
+                logger.debug('No task is ready yet')
                 continue
 
-            await asyncio.wait_for(
-                self._run_task_function(),
-                timeout=self._task_timeout.total_seconds() if self._task_timeout is not None else None,
-            )
+            self._current_concurrency += 1
+            try:
+                await asyncio.wait_for(
+                    self._run_task_function(),
+                    timeout=self._task_timeout.total_seconds() if self._task_timeout is not None else None,
+                )
+            except asyncio.TimeoutError:
+                logger.warning(
+                    f"Task timed out after {
+                        self._task_timeout.total_seconds() if self._task_timeout is not None else '*not set*'
+                    } seconds"
+                )
+            finally:
+                self._current_concurrency -= 1
+
+        logger.debug('Worker task finished')
