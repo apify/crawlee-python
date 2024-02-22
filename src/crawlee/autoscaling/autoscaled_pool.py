@@ -41,7 +41,7 @@ class AutoscaledPool:
         scale_down_step_ratio: float = 0.05,
         max_tasks_per_minute: int | None = None,
     ) -> None:
-        self.system_status = system_status
+        self._system_status = system_status
 
         self._run_task_function = run_task_function
         self._is_task_ready_function = is_task_ready_function
@@ -155,7 +155,7 @@ class AutoscaledPool:
         return self._desired_concurrency
 
     def _autoscale(self: AutoscaledPool) -> None:
-        status = self.system_status.get_historical_status()
+        status = self._system_status.get_historical_status()
         min_current_concurrency = math.floor(self._desired_concurrency_ratio * self._current_concurrency)
 
         if (
@@ -184,8 +184,12 @@ class AutoscaledPool:
                 self._worker_tasks_updated.set()
 
     def _log_system_status(self: AutoscaledPool) -> None:
+        system_status = self._system_status.get_historical_status()
+
         logger.info(
-            f'current_concurrency = {self._current_concurrency}; desired_concurrency = {self._desired_concurrency}'
+            f'current_concurrency = {self._current_concurrency}; '
+            f'desired_concurrency = {self._desired_concurrency}; '
+            f'{system_status!s}'
         )
 
     async def _worker_task(self: AutoscaledPool) -> None:
