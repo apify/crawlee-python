@@ -149,11 +149,11 @@ class AutoscaledPool:
         for task, _ in self._worker_tasks:
             task.cancel()
 
-    async def pause(self: AutoscaledPool) -> None:
+    def pause(self: AutoscaledPool) -> None:
         """Pause the autoscaled pool so that it does not start new tasks."""
         self._is_paused = True
 
-    async def resume(self: AutoscaledPool) -> None:
+    def resume(self: AutoscaledPool) -> None:
         """Resume a paused autoscaled pool so that it continues starting new tasks."""
         self._is_paused = False
 
