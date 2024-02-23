@@ -21,32 +21,6 @@ class AutoscaledPool:
     """Manages a pool of asynchronous resource-intensive tasks that are executed in parallel.
 
     The pool only starts new tasks if there is enough free CPU and memory available.
-
-    Args:
-        system_status: Provides data about system utilization (load).
-        run_task_function: A function that performs an asynchronous resource-intensive task.
-        is_task_ready_function: A function that indicates whether `runTaskFunction` should be called. This function
-            is called every time there is free capacity for a new task and it should indicate whether it should start
-            a new task or not by resolving to either `true` or `false`. Besides its obvious use, it is also useful for
-            task throttling to save resources. is_finished_function: A function that is called only when there are no
-            tasks to be processed. If it resolves to `true` then the pool's run finishes. Being called only when there
-            are no tasks being processed means that as long as `isTaskReadyFunction()` keeps resolving to `true`,
-            `isFinishedFunction()` will never be called. To abort a run, use the abort method.
-        task_timeout: Timeout in which the `runTaskFunction` needs to finish.
-        autoscale_interval: Defines how often the pool should attempt to adjust the desired concurrency based on
-            the latest system status. Setting it lower than 1 might have a severe impact on performance. We suggest
-            using a value from 5 to 20.
-        logging_interval: Specifies a period in which the instance logs its state, in seconds.
-        desired_concurrency: The desired number of tasks that should be running parallel on the start of the pool, if
-            there is a large enough supply of them. By default, it is `minConcurrency`.
-        desired_concurrency_ratio: Minimum level of desired concurrency to reach before more scaling up is allowed.
-        min_concurrency: The minimum number of tasks running in parallel. If you set this value too high with respect
-            to the available system memory and CPU, your code might run extremely slow or crash.
-        max_concurrency: The maximum number of tasks running in parallel.
-        scale_up_step_ratio: Defines the fractional amount of desired concurrency to be added with each scaling up.
-        scale_down_step_ratio: Defines the amount of desired concurrency to be subtracted with each scaling down.
-        max_tasks_per_minute: The maximum number of tasks per minute the pool can run. By default, this is set to
-            `Infinity`, but you can pass any positive, non-zero integer.
     """
 
     def __init__(
@@ -67,6 +41,38 @@ class AutoscaledPool:
         scale_down_step_ratio: float = 0.05,
         max_tasks_per_minute: int | None = None,
     ) -> None:
+        """Initialize the AutoscaledPool.
+
+        Args:
+        system_status: Provides data about system utilization (load).
+        run_task_function: A function that performs an asynchronous resource-intensive task.
+        is_task_ready_function: A function that indicates whether `run_task_function` should be called. This function
+            is called every time there is free capacity for a new task and it should indicate whether it should start
+            a new task or not by resolving to either `True` or `False`. Besides its obvious use, it is also useful for
+            task throttling to save resources. is_finished_function: A function that is called only when there are no
+            tasks to be processed. If it resolves to `True` then the pool's run finishes. Being called only when there
+            are no tasks being processed means that as long as `is_task_ready_function()` keeps resolving to `True`,
+            `is_finished_function()` will never be called. To abort a run, use the `abort` method.
+        is_finished_function: A function that is called only when there are no tasks to be processed. If it resolves to
+            `true` then the pool's run finishes. Being called only when there are no tasks being processed means that
+            as long as `isTaskReadyFunction()` keeps resolving to `true`, `isFinishedFunction()` will never be called.
+            To abort a run, use the `abort` method.
+        task_timeout: Timeout in which the `run_task_function` needs to finish.
+        autoscale_interval: Defines how often the pool should attempt to adjust the desired concurrency based on
+            the latest system status. Setting it lower than 1 might have a severe impact on performance. We suggest
+            using a value from 5 to 20.
+        logging_interval: Specifies a period in which the instance logs its state, in seconds.
+        desired_concurrency: The desired number of tasks that should be running parallel on the start of the pool, if
+            there is a large enough supply of them. By default, it is `min_concurrency`.
+        desired_concurrency_ratio: Minimum level of desired concurrency to reach before more scaling up is allowed.
+        min_concurrency: The minimum number of tasks running in parallel. If you set this value too high with respect
+            to the available system memory and CPU, your code might run extremely slow or crash.
+        max_concurrency: The maximum number of tasks running in parallel.
+        scale_up_step_ratio: Defines the fractional amount of desired concurrency to be added with each scaling up.
+        scale_down_step_ratio: Defines the amount of desired concurrency to be subtracted with each scaling down.
+        max_tasks_per_minute: The maximum number of tasks per minute the pool can run. By default, this is set to
+            `Infinity`, but you can pass any positive, non-zero integer.
+        """
         self._system_status = system_status
 
         self._run_task_function = run_task_function
