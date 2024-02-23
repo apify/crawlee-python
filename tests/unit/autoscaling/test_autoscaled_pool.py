@@ -84,9 +84,7 @@ async def test_autoscales(system_status: SystemStatus | Mock) -> None:
     start = datetime.now(timezone.utc)
 
     def get_historical_status() -> SystemInfo:
-        now = datetime.now(timezone.utc)
         result = SystemInfo(
-            now,
             cpu_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
             mem_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
             event_loop_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
@@ -95,7 +93,7 @@ async def test_autoscales(system_status: SystemStatus | Mock) -> None:
         )
 
         # 0.5 seconds after the start of the test, pretend the CPU became overloaded
-        if now - start >= timedelta(seconds=0.5):
+        if result.created_at - start >= timedelta(seconds=0.5):
             result.cpu_info = LoadRatioInfo(limit_ratio=0.9, actual_ratio=1.0)
 
         return result
