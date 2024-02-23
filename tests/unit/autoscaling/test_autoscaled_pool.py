@@ -67,7 +67,7 @@ async def test_propagates_exceptions(system_status: SystemStatus | Mock) -> None
         max_concurrency=10,
     )
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match='Scheduled crash'):
         await pool.run()
 
     assert done_count < 20
