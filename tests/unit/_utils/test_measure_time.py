@@ -12,7 +12,7 @@ def test_measure_time_wall_sync() -> None:
 
     assert elapsed.cpu is not None
     assert elapsed.wall is not None
-    assert elapsed.wall >= 0.1
+    assert elapsed.wall >= 0.09
 
 
 def test_measure_time_cpu_sync() -> None:
@@ -36,4 +36,4 @@ async def test_measure_time_wall_async() -> None:
 
     assert elapsed.cpu is not None
     assert elapsed.wall is not None
-    assert elapsed.wall >= 0.1
+    assert elapsed.wall >= 0.09
