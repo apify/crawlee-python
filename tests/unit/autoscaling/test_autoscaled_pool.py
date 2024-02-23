@@ -4,7 +4,7 @@ import asyncio
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 from typing import cast
-from unittest.mock import MagicMock, Mock
+from unittest.mock import Mock
 
 import pytest
 
@@ -18,7 +18,7 @@ pytestmark = pytest.mark.asyncio()
 
 @pytest.fixture()
 def system_status() -> SystemStatus | Mock:
-    return MagicMock(spec=SystemStatus)
+    return Mock(spec=SystemStatus)
 
 
 async def test_runs_concurrently(system_status: SystemStatus | Mock) -> None:
