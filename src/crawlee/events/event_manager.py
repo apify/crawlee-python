@@ -6,7 +6,6 @@ import asyncio
 from collections import defaultdict
 from contextlib import suppress
 from functools import wraps
-from inspect import iscoroutinefunction
 from logging import getLogger
 from typing import TYPE_CHECKING
 
@@ -48,18 +47,6 @@ class EventManager:
             lambda: defaultdict(list),
         )
 
-    async def close(self: EventManager, *, timeout: timedelta | None = None) -> None:
-        """Close the event manager.
-
-        This will stop listening for the events, and it will wait for all the event listeners to finish.
-
-        Args:
-            timeout: Optional timeout after which the pending event listeners are canceled.
-        """
-        logger.debug('Calling EventManager.close()...')
-        await self._wait_for_all_listeners_to_complete(timeout=timeout)
-        self._event_emitter.remove_all_listeners()
-
     def on(self: EventManager, *, event: Event, listener: Listener) -> None:
         """Add an event listener to the event manager.
 
@@ -75,12 +62,21 @@ class EventManager:
 
             # If the listener is a coroutine function, just call it, otherwise, run it in a separate thread
             # to avoid blocking the event loop
-            coro = listener(event_data) if iscoroutinefunction(listener) else asyncio.to_thread(listener, event_data)
+            coro = (
+                listener(event_data)
+                if asyncio.iscoroutinefunction(listener)
+                else asyncio.to_thread(listener, event_data)
+            )
+            # Note: use `asyncio.iscoroutinefunction` rather then `inspect.iscoroutinefunction` since it works with
+            # unittests.mock.AsyncMock. See https://github.com/python/cpython/issues/84753.
+
             listener_task = asyncio.create_task(coro, name=f'Task-{event.value}-{listener.__name__}')
             self._listener_tasks.add(listener_task)
 
             try:
+                logger.debug('LocalEventManager.on.listener_wrapper(): Awaiting listener task...')
                 await listener_task
+                logger.debug('LocalEventManager.on.listener_wrapper(): Listener task completed.')
             except Exception:
                 # We need to swallow the exception and just log it here, otherwise it could break the event emitter
                 logger.exception(
@@ -121,6 +117,20 @@ class EventManager:
         """
         logger.debug('Calling EventManager.emit()...')
         self._event_emitter.emit(event.value, event_data)
+
+    async def close(self: EventManager, *, timeout: timedelta | None = None) -> None:
+        """Close the event manager.
+
+        This will stop listening for the events, and it will wait for all the event listeners to finish.
+
+        Args:
+            timeout: Optional timeout after which the pending event listeners are canceled.
+        """
+        logger.debug('Calling EventManager.close()...')
+        await self._wait_for_all_listeners_to_complete(timeout=timeout)
+        self._event_emitter.remove_all_listeners()
+        self._listener_tasks.clear()
+        self._listeners_to_wrappers.clear()
 
     async def _wait_for_all_listeners_to_complete(self: EventManager, *, timeout: timedelta | None = None) -> None:
         """Wait for all currently executing event listeners to complete.
