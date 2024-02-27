@@ -45,6 +45,16 @@ class SystemInfo:
             and not self.client_info.is_overloaded
         )
 
+    def __str__(self: SystemInfo) -> str:
+        """Get a string representation of the system info."""
+        stats = {
+            'cpu': self.cpu_info.actual_ratio if self.cpu_info else '-',
+            'mem': self.mem_info.actual_ratio if self.mem_info else '-',
+            'event_lopp': self.event_loop_info.actual_ratio if self.event_loop_info else '-',
+            'client_info': self.client_info.actual_ratio if self.client_info else '-',
+        }
+        return ';'.join(f'{name} = {ratio}' for name, ratio in stats.items())
+
 
 @dataclass
 class FinalStatistics:
