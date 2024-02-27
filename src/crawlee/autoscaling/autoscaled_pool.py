@@ -16,6 +16,10 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
+class AbortError(Exception):
+    """Raised when an AutoscaledPool run is aborted. Not for direct use."""
+
+
 class AutoscaledPool:
     """Manages a pool of asynchronous resource-intensive tasks that are executed in parallel.
 
@@ -102,6 +106,7 @@ class AutoscaledPool:
         """A list of worker tasks currently in progress"""
 
         self._worker_tasks_updated = asyncio.Event()
+        self._cleanup_done = asyncio.Event()
         self._run_result = asyncio.Future()
 
         if desired_concurrency is not None and desired_concurrency < 1:
@@ -133,20 +138,26 @@ class AutoscaledPool:
 
         If there is an exception in one of the tasks, it will be re-raised.
         """
-        logger.debug('Starting the pool')
+        if self._is_running:
+            raise RuntimeError('The pool is already running')
 
         self._is_running = True
+        logger.debug('Starting the pool')
 
         self._autoscale_task.start()
         self._log_system_status_task.start()
 
-        result = asyncio.Future()
         orchestrator = asyncio.create_task(
-            self._worker_task_orchestrator(result), name='autoscaled pool worker task orchestrator'
+            self._worker_task_orchestrator(), name='autoscaled pool worker task orchestrator'
         )
 
         try:
-            await result
+            await self._run_result
+        except AbortError:
+            orchestrator.cancel()
+            for task in self._worker_tasks:
+                if not task.done():
+                    task.cancel()
         finally:
             with suppress(asyncio.CancelledError):
                 await self._autoscale_task.stop()
@@ -165,18 +176,16 @@ class AutoscaledPool:
                     with suppress(BaseException):
                         await task
 
+            self._run_result = asyncio.Future()
+            self._cleanup_done.set()
             self._is_running = False
+
             logger.debug('Pool cleanup finished')
 
     async def abort(self: AutoscaledPool) -> None:
         """Interrupt the autoscaled pool and all the tasks in progress."""
-        self._is_paused = True
-
-        with suppress(asyncio.CancelledError):
-            await self._autoscale_task.stop()
-
-        for task in self._worker_tasks:
-            task.cancel()
+        self._run_result.set_exception(AbortError())
+        await self._cleanup_done.wait()
 
     def pause(self: AutoscaledPool) -> None:
         """Pause the autoscaled pool so that it does not start new tasks."""
@@ -224,9 +233,9 @@ class AutoscaledPool:
             f'{system_status!s}'
         )
 
-    async def _worker_task_orchestrator(self: AutoscaledPool, result: asyncio.Future) -> None:
+    async def _worker_task_orchestrator(self: AutoscaledPool) -> None:
         try:
-            while not self._is_finished_function() and not result.done():
+            while not self._is_finished_function() and not self._run_result.done():
                 self._worker_tasks_updated.clear()
 
                 current_status = self._system_status.get_current_status()
@@ -242,7 +251,7 @@ class AutoscaledPool:
                     logger.debug('Scheduling a new task')
                     worker_task = asyncio.create_task(self._worker_task(), name='autoscaled pool worker task')
                     worker_task.add_done_callback(
-                        lambda _, worker_task=worker_task: self._reap_worker_task(worker_task, result)
+                        lambda _, worker_task=worker_task: self._reap_worker_task(worker_task)
                     )
                     self._worker_tasks.append(worker_task)
 
@@ -254,15 +263,15 @@ class AutoscaledPool:
                 with suppress(asyncio.TimeoutError):
                     await asyncio.wait_for(self._worker_tasks_updated.wait(), timeout=0.5)
         finally:
-            if not (result.done() and result.exception() is not None):
-                result.set_result(object())
+            if not (self._run_result.done() and self._run_result.exception() is not None):
+                self._run_result.set_result(object())
 
-    def _reap_worker_task(self: AutoscaledPool, task: asyncio.Task, result: asyncio.Future) -> None:
+    def _reap_worker_task(self: AutoscaledPool, task: asyncio.Task) -> None:
         self._worker_tasks_updated.set()
         self._worker_tasks.remove(task)
 
-        if not task.cancelled() and (exception := task.exception()) and not result.done():
-            result.set_exception(exception)
+        if not task.cancelled() and (exception := task.exception()) and not self._run_result.done():
+            self._run_result.set_exception(exception)
 
     async def _worker_task(self: AutoscaledPool) -> None:
         try:

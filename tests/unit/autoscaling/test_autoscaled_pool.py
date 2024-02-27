@@ -47,6 +47,31 @@ async def test_runs_concurrently(system_status: SystemStatus | Mock) -> None:
     assert done_count >= 10
 
 
+async def test_abort_works(system_status: SystemStatus | Mock) -> None:
+    async def run() -> None:
+        await asyncio.sleep(60)
+
+    pool = AutoscaledPool(
+        system_status=system_status,
+        run_task_function=run,
+        is_task_ready_function=lambda: True,
+        is_finished_function=lambda: False,
+        min_concurrency=10,
+        max_concurrency=10,
+    )
+
+    with measure_time() as elapsed:
+        run_task = asyncio.create_task(pool.run())
+        await asyncio.sleep(0.1)
+        assert pool.current_concurrency == 10
+        await pool.abort()
+        assert pool.current_concurrency == 0
+        await run_task
+
+    assert elapsed.wall is not None
+    assert elapsed.wall < 0.3
+
+
 async def test_propagates_exceptions(system_status: SystemStatus | Mock) -> None:
     done_count = 0
 
