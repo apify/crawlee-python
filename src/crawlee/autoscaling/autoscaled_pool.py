@@ -108,7 +108,7 @@ class AutoscaledPool:
 
         self._worker_tasks_updated = asyncio.Event()
         self._cleanup_done = asyncio.Event()
-        self._run_result = asyncio.Future()
+        self._run_result: asyncio.Future = asyncio.Future()
 
         if desired_concurrency is not None and desired_concurrency < 1:
             raise ValueError('desired_concurrency must be 1 or larger')
@@ -256,9 +256,7 @@ class AutoscaledPool:
                 else:
                     logger.debug('Scheduling a new task')
                     worker_task = asyncio.create_task(self._worker_task(), name='autoscaled pool worker task')
-                    worker_task.add_done_callback(
-                        lambda _, worker_task=worker_task: self._reap_worker_task(worker_task)
-                    )
+                    worker_task.add_done_callback(lambda task: self._reap_worker_task(task))
                     self._worker_tasks.append(worker_task)
 
                     if self._max_tasks_per_minute is not None:
