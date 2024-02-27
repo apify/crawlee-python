@@ -23,7 +23,8 @@ class AbortError(Exception):
 class AutoscaledPool:
     """Manages a pool of asynchronous resource-intensive tasks that are executed in parallel.
 
-    The pool only starts new tasks if there is enough free CPU and memory available.
+    The pool only starts new tasks if there is enough free CPU and memory available. If an exception is thrown in
+    any of the tasks, it is propagated and the pool is stopped.
     """
 
     def __init__(
@@ -206,6 +207,7 @@ class AutoscaledPool:
         return len(self._worker_tasks)
 
     def _autoscale(self: AutoscaledPool) -> None:
+        """Inspect system load status and adjust desired concurrency if necessary. Do not call directly."""
         status = self._system_status.get_historical_status()
 
         min_current_concurrency = math.floor(self._desired_concurrency_ratio * self.current_concurrency)
@@ -234,6 +236,10 @@ class AutoscaledPool:
         )
 
     async def _worker_task_orchestrator(self: AutoscaledPool) -> None:
+        """Launches worker tasks whenever there is free capacity and a task is ready.
+
+        Exits when `is_finished_function` returns True.
+        """
         try:
             while not self._is_finished_function() and not self._run_result.done():
                 self._worker_tasks_updated.clear()
@@ -267,6 +273,12 @@ class AutoscaledPool:
                 self._run_result.set_result(object())
 
     def _reap_worker_task(self: AutoscaledPool, task: asyncio.Task) -> None:
+        """A callback for finished worker tasks.
+
+        - It interrupts the run in case of an exception,
+        - keeps track of tasks in progress,
+        - notifies the orchestrator
+        """
         self._worker_tasks_updated.set()
         self._worker_tasks.remove(task)
 
