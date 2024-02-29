@@ -6,14 +6,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from crawlee import Config
 from crawlee.events import LocalEventManager
 from crawlee.events.types import Event, EventSystemInfoData
 
-
-@pytest.fixture()
-def config() -> Config:
-    return Config(system_info_interval=timedelta(milliseconds=50))
+pytestmark = pytest.mark.asyncio()
 
 
 @pytest.fixture()
@@ -23,9 +19,8 @@ def listener() -> AsyncMock:
     return al
 
 
-@pytest.mark.asyncio()
-async def test_emit_system_info_event(config: Config, listener: AsyncMock) -> None:
-    async with LocalEventManager(config=config) as event_manager:
+async def test_emit_system_info_event(listener: AsyncMock) -> None:
+    async with LocalEventManager(system_info_interval=timedelta(milliseconds=50)) as event_manager:
         event_manager.on(event=Event.SYSTEM_INFO, listener=listener)
         await asyncio.sleep(0.2)
 
@@ -33,15 +28,16 @@ async def test_emit_system_info_event(config: Config, listener: AsyncMock) -> No
     assert isinstance(listener.call_args[0][0], EventSystemInfoData)
 
 
-@pytest.mark.asyncio()
-async def test_get_current_mem_usage_returns_positive_integer(config: Config) -> None:
-    event_manager = LocalEventManager(config=config)
-    mem_usage = event_manager._get_current_mem_usage()  # noqa: SLF001
-    assert 0 < mem_usage < 1024 * 1024 * 1024 * 1024
+async def test_get_memory_info_returns_valid_values() -> None:
+    event_manager = LocalEventManager(system_info_interval=timedelta(milliseconds=50))
+    memory_info = event_manager._get_memory_info()  # noqa: SLF001
+
+    assert 0 < memory_info.used_bytes < memory_info.total_bytes
+    assert memory_info.available_bytes + memory_info.used_bytes < memory_info.total_bytes
+    assert memory_info.current_process_bytes + memory_info.child_processes_bytes < memory_info.used_bytes
 
 
-@pytest.mark.asyncio()
-async def test_get_cpu_info_returns_valid_load_ratio_info(config: Config) -> None:
-    event_manager = LocalEventManager(config=config)
+async def test_get_cpu_info_returns_valid_values() -> None:
+    event_manager = LocalEventManager(system_info_interval=timedelta(milliseconds=50))
     cpu_info = await event_manager._get_cpu_info()  # noqa: SLF001
-    assert 0 <= cpu_info.actual_ratio <= 1
+    assert 0 <= cpu_info.current_usage_ratio <= 1

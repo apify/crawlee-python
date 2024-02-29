@@ -6,7 +6,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Union
 
 if TYPE_CHECKING:
-    from crawlee.autoscaling.system_status import SystemInfo
+    from crawlee.autoscaling.types import CpuInfo, MemoryInfo
 
 
 class Event(Enum):
@@ -30,7 +30,8 @@ class EventPersistStateData:
 class EventSystemInfoData:
     """Data for the system info event."""
 
-    system_info: SystemInfo
+    cpu_info: CpuInfo
+    memory_info: MemoryInfo
 
 
 @dataclass

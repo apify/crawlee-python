@@ -9,6 +9,24 @@ if TYPE_CHECKING:
 
 
 @dataclass
+class CpuInfo:
+    """Describes CPU usage of the process."""
+
+    current_usage_ratio: float  # Current CPU usage ratio
+
+
+@dataclass
+class MemoryInfo:
+    """Describes memory usage of the process."""
+
+    total_bytes: int  # Total memory available in the system
+    available_bytes: int  # Amount of free memory in the system
+    used_bytes: int  # Amount of memory currently in use
+    current_process_bytes: int  # Memory usage of the main (current) Python process
+    child_processes_bytes: int  # Combined memory usage of all child processes spawned by the current Python process
+
+
+@dataclass
 class LoadRatioInfo:
     """Represents the load ratio of a resource."""
 
@@ -32,7 +50,6 @@ class SystemInfo:
     client_info: LoadRatioInfo | None = None
     mem_current_bytes: int | None = None  # Platform only property
     cpu_current_usage: int | None = None  # Platform only property
-    is_cpu_overloaded: bool | None = None  # Platform only property
 
     @property
     def is_system_idle(self) -> bool:
@@ -65,50 +82,50 @@ class FinalStatistics:
     requests_finished: int
     requests_failed: int
     retry_histogram: list[int]
-    request_avg_failed_duration_millis: float
-    request_avg_finished_duration_millis: float
+    request_avg_failed_duration: timedelta
+    request_avg_finished_duration: timedelta
     requests_finished_per_minute: float
     requests_failed_per_minute: float
-    request_total_duration_millis: float
+    request_total_duration: timedelta
     requests_total: int
-    crawler_runtime_millis: float
+    crawler_runtime: timedelta
 
 
 @dataclass
 class MemorySnapshot:
     """A snapshot of memory usage."""
 
-    created_at: datetime
     is_overloaded: bool
     used_bytes: int | None
+    created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
 
 
 @dataclass
 class CpuSnapshot:
     """A snapshot of CPU usage."""
 
-    created_at: datetime
     is_overloaded: bool
     used_ratio: float
     ticks: dict | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
 
 
 @dataclass
 class EventLoopSnapshot:
     """A snapshot of event loop usage."""
 
-    created_at: datetime
     is_overloaded: bool
     exceeded: timedelta
+    created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
 
 
 @dataclass
 class ClientSnapshot:
     """A snapshot of client usage."""
 
-    created_at: datetime
     is_overloaded: bool
     rate_limit_error_count: int
+    created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
 
 
 Snapshot = Union[MemorySnapshot, CpuSnapshot, EventLoopSnapshot, ClientSnapshot]

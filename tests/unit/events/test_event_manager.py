@@ -5,9 +5,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from crawlee.autoscaling.types import SystemInfo
 from crawlee.events.event_manager import EventManager
 from crawlee.events.types import Event, EventSystemInfoData
+
+pytestmark = pytest.mark.asyncio()
 
 
 @pytest.fixture()
@@ -17,8 +18,7 @@ def event_manager() -> EventManager:
 
 @pytest.fixture()
 def event_system_info_data() -> EventSystemInfoData:
-    system_info = SystemInfo()
-    return EventSystemInfoData(system_info)
+    return MagicMock(spec=EventSystemInfoData)
 
 
 @pytest.fixture()
@@ -35,7 +35,6 @@ def sync_listener() -> MagicMock:
     return sl
 
 
-@pytest.mark.asyncio()
 async def test_emit_invokes_registered_sync_listener(
     sync_listener: MagicMock,
     event_manager: EventManager,
@@ -50,7 +49,6 @@ async def test_emit_invokes_registered_sync_listener(
     assert sync_listener.call_args[0] == (event_system_info_data,)
 
 
-@pytest.mark.asyncio()
 async def test_emit_invokes_both_sync_and_async_listeners(
     sync_listener: MagicMock,
     async_listener: AsyncMock,
@@ -70,7 +68,6 @@ async def test_emit_invokes_both_sync_and_async_listeners(
     assert sync_listener.call_args[0] == (event_system_info_data,)
 
 
-@pytest.mark.asyncio()
 async def test_emit_event_with_no_listeners(
     event_manager: EventManager,
     event_system_info_data: EventSystemInfoData,
@@ -86,7 +83,6 @@ async def test_emit_event_with_no_listeners(
     assert async_listener.call_count == 0
 
 
-@pytest.mark.asyncio()
 async def test_remove_nonexistent_listener_does_not_fail(
     async_listener: AsyncMock,
     event_manager: EventManager,
@@ -95,7 +91,6 @@ async def test_remove_nonexistent_listener_does_not_fail(
     event_manager.off(event=Event.SYSTEM_INFO, listener=async_listener)
 
 
-@pytest.mark.asyncio()
 async def test_removed_listener_not_invoked_on_emit(
     async_listener: AsyncMock,
     event_manager: EventManager,
@@ -109,7 +104,6 @@ async def test_removed_listener_not_invoked_on_emit(
     assert async_listener.call_count == 0
 
 
-@pytest.mark.asyncio()
 async def test_close_clears_listeners_and_tasks(
     async_listener: AsyncMock,
     event_manager: EventManager,
@@ -123,7 +117,6 @@ async def test_close_clears_listeners_and_tasks(
     assert len(event_manager._listeners_to_wrappers) == 0  # noqa: SLF001
 
 
-@pytest.mark.asyncio()
 async def test_close_after_emit_processes_event(
     async_listener: AsyncMock,
     event_manager: EventManager,
