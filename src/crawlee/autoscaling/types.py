@@ -1,29 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Union
-
-if TYPE_CHECKING:
-    from datetime import timedelta
-
-
-@dataclass
-class CpuInfo:
-    """Describes CPU usage of the process."""
-
-    current_usage_ratio: float  # Current CPU usage ratio
-
-
-@dataclass
-class MemoryInfo:
-    """Describes memory usage of the process."""
-
-    total_bytes: int  # Total memory available in the system
-    available_bytes: int  # Amount of free memory in the system
-    used_bytes: int  # Amount of memory currently in use
-    current_process_bytes: int  # Memory usage of the main (current) Python process
-    child_processes_bytes: int  # Combined memory usage of all child processes spawned by the current Python process
+from datetime import datetime, timedelta, timezone
+from typing import Union
 
 
 @dataclass
@@ -96,7 +75,7 @@ class MemorySnapshot:
     """A snapshot of memory usage."""
 
     is_overloaded: bool
-    used_bytes: int | None
+    used_bytes: int
     created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
 
 
@@ -112,20 +91,36 @@ class CpuSnapshot:
 
 @dataclass
 class EventLoopSnapshot:
-    """A snapshot of event loop usage."""
+    """Snapshot of the state of the event loop.
 
-    is_overloaded: bool
-    exceeded: timedelta
+    Args:
+        max_delay: The maximum delay that is considered acceptable.
+        delay: The actual delay.
+        created_at: The time at which the snapshot was created.
+    """
+
+    max_delay: timedelta
+    delay: timedelta
     created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
+
+    @property
+    def max_delay_exceeded(self: EventLoopSnapshot) -> timedelta:
+        """Returns the amount of time by which the delay exceeds the maximum delay."""
+        return max(self.delay - self.max_delay, timedelta(seconds=0))
+
+    @property
+    def is_overloaded(self: EventLoopSnapshot) -> bool:
+        """Returns whether the event loop is overloaded."""
+        return self.delay > self.max_delay
 
 
 @dataclass
 class ClientSnapshot:
     """A snapshot of client usage."""
 
+    created_at: datetime
     is_overloaded: bool
     rate_limit_error_count: int
-    created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
 
 
 Snapshot = Union[MemorySnapshot, CpuSnapshot, EventLoopSnapshot, ClientSnapshot]

@@ -6,7 +6,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Union
 
 if TYPE_CHECKING:
-    from crawlee.autoscaling.types import CpuInfo, MemoryInfo
+    from crawlee._utils.system import CpuInfo, MemoryInfo
 
 
 class Event(Enum):

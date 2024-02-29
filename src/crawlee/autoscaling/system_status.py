@@ -77,7 +77,7 @@ class SystemStatus:
         Returns:
             An object representing the current system status.
         """
-        return self._is_system_idle(self.current_history)
+        return self._get_system_info(self.current_history)
 
     def get_historical_status(self) -> SystemInfo:
         """Get the historical system status.
@@ -88,9 +88,9 @@ class SystemStatus:
         Returns:
             An object representing the historical system status.
         """
-        return self._is_system_idle()
+        return self._get_system_info()
 
-    def _is_system_idle(self, sample_duration: timedelta | None = None) -> SystemInfo:
+    def _get_system_info(self: SystemStatus, sample_duration: timedelta | None = None) -> SystemInfo:
         """Determine if the system is currently idle or overloaded.
 
         Args:
