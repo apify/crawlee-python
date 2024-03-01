@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING
@@ -75,8 +76,8 @@ class LocalEventManager(EventManager):
         """Emits a system info event with the current CPU and memory usage."""
         logger.debug('Calling LocalEventManager._emit_system_info_event()...')
 
-        cpu_info = await get_cpu_info()
-        memory_info = get_memory_info()
+        cpu_info = await asyncio.to_thread(get_cpu_info)
+        memory_info = await asyncio.to_thread(get_memory_info)
 
         event_data = EventSystemInfoData(cpu_info=cpu_info, memory_info=memory_info)
         self.emit(event=Event.SYSTEM_INFO, event_data=event_data)

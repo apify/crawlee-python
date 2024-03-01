@@ -71,17 +71,14 @@ class FinalStatistics:
 
 
 @dataclass
-class MemorySnapshot:
-    """A snapshot of memory usage."""
-
-    is_overloaded: bool
-    used_bytes: int
-    created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
-
-
-@dataclass
 class CpuSnapshot:
-    """A snapshot of CPU usage."""
+    """A snapshot of CPU usage.
+
+    Args:
+        used_ratio: The ratio of CPU currently in use.
+        max_used_ratio: The maximum ratio of CPU that is considered acceptable.
+        created_at: The time at which the measurement was taken.
+    """
 
     used_ratio: float
     max_used_ratio: float
@@ -94,13 +91,37 @@ class CpuSnapshot:
 
 
 @dataclass
+class MemorySnapshot:
+    """A snapshot of memory usage.
+
+    Args:
+        total_bytes: Total memory available in the system.
+        current_bytes: Memory usage of the current Python process and its children.
+        max_memory_bytes: The maximum memory that can be used by `AutoscaledPool`.
+        max_used_memory_ratio: The maximum acceptable ratio of `current_bytes` to `max_memory_bytes`.
+        created_at: The time at which the measurement was taken.
+    """
+
+    total_bytes: int
+    current_bytes: int
+    max_memory_bytes: int
+    max_used_memory_ratio: float
+    created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
+
+    @property
+    def is_overloaded(self: MemorySnapshot) -> bool:
+        """Returns whether the memory is considered as overloaded."""
+        return (self.current_bytes / self.max_memory_bytes) > self.max_used_memory_ratio
+
+
+@dataclass
 class EventLoopSnapshot:
     """Snapshot of the state of the event loop.
 
     Args:
+        delay: The current delay of the event loop.
         max_delay: The maximum delay that is considered acceptable.
-        delay: The actual delay.
-        created_at: The time at which the snapshot was created.
+        created_at: The time at which the measurement was taken.
     """
 
     delay: timedelta

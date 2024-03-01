@@ -46,6 +46,8 @@ class Snapshotter:
     typically received from the request queue, exceed the set limit within the set interval.
 
     Attributes:
+        event_manager: ...
+
         event_loop_snapshot_interval: ...
 
         client_snapshot_interval: ...
@@ -62,9 +64,12 @@ class Snapshotter:
         max_client_errors: Sets the maximum number of client errors (HTTP 429). When the number of client errors
             is higher than the provided number, the client is considered overloaded.
 
+        max_memory_bytes: Sets the amount of system memory in megabytes to be used by the AutoscaledPool. It is used
+            to limit the number of concurrently running tasks. By default, the max amount of memory to be used is set
+            to one quarter of total system memory, i.e. on a system with 8192 MB of memory, the autoscaling feature
+            will only use up to 2048 MB of memory.
+
         snapshot_history: ...
-        event_manager: ...
-        max_memory_bytes: ...
         cpu_snapshots: ...
         event_loop_snapshots: ...
         memory_snapshots: ...
@@ -88,7 +93,7 @@ class Snapshotter:
         reserve_memory_ratio: float = 0.5,
         client_rate_limit_error_retry_count: int = 2,
         critical_overload_rate_limit: timedelta = timedelta(milliseconds=10000),
-        memory_max_bytes: int | None = None,
+        max_memory_bytes: int | None = None,
     ) -> None:
         self.event_manager = event_manager
 
@@ -106,16 +111,16 @@ class Snapshotter:
         self.critical_overload_rate_limit = critical_overload_rate_limit
 
         # default memory_max_bytes is 1/4 of the total system memory
-        if memory_max_bytes is None:
+        if max_memory_bytes is None:
             # TODO: available_memory_ratio
             memory_info = get_memory_info()
-            self.memory_max_bytes = int(memory_info.total_bytes * 0.25)
+            self.max_memory_bytes = int(memory_info.total_bytes * 0.25)
             logger.debug(
-                f'Setting max memory of this run to {round(self.memory_max_bytes / 1024 / 1024)} MB. '
+                f'Setting max memory of this run to {round(self.max_memory_bytes / 1024 / 1024)} MB. '
                 'Use the CRAWLEE_MEMORY_MBYTES or CRAWLEE_AVAILABLE_MEMORY_RATIO environment variable to override it.'
             )
         else:
-            self.memory_max_bytes = memory_max_bytes
+            self.max_memory_bytes = max_memory_bytes
 
         # Post initialization
 
@@ -247,13 +252,15 @@ class Snapshotter:
         Args:
             event_data: System info data from which memory usage is read.
         """
-        mem_current_bytes = event_data.memory_info.used_bytes
-        is_overloaded = (mem_current_bytes / self.memory_max_bytes) > self.max_used_memory_ratio
-        created_at = event_data.memory_info.created_at
+        snapshot = MemorySnapshot(
+            total_bytes=event_data.memory_info.total_bytes,
+            current_bytes=event_data.memory_info.current_bytes,
+            max_memory_bytes=self.max_memory_bytes,
+            max_used_memory_ratio=self.max_used_memory_ratio,
+            created_at=event_data.memory_info.created_at,
+        )
 
-        snapshot = MemorySnapshot(created_at=created_at, is_overloaded=is_overloaded, used_bytes=mem_current_bytes)
-
-        self._prune_snapshots(self.memory_snapshots, created_at)
+        self._prune_snapshots(self.memory_snapshots, snapshot.created_at)
         self.memory_snapshots.append(snapshot)
 
     def _snapshot_event_loop(self: Snapshotter) -> None:
@@ -343,8 +350,8 @@ class Snapshotter:
         ):
             return
 
-        max_desired_memory_bytes = self.max_used_memory_ratio * self.memory_max_bytes
-        reserve_memory = self.memory_max_bytes * (1 - self.max_used_memory_ratio) * self.reserve_memory_ratio
+        max_desired_memory_bytes = self.max_used_memory_ratio * self.max_memory_bytes
+        reserve_memory = self.max_memory_bytes * (1 - self.max_used_memory_ratio) * self.reserve_memory_ratio
         critical_overload_bytes = max_desired_memory_bytes + reserve_memory
 
         if mem_current_bytes is None:
@@ -353,9 +360,9 @@ class Snapshotter:
         is_critical_overload = mem_current_bytes > critical_overload_bytes
 
         if is_critical_overload:
-            used_percentage = round((mem_current_bytes / self.memory_max_bytes) * 100)
+            used_percentage = round((mem_current_bytes / self.max_memory_bytes) * 100)
 
             logger.warning(
                 f'Memory is critically overloaded. Using {to_mb(mem_current_bytes)} MB of '
-                f'{to_mb(self.memory_max_bytes)} MB ({used_percentage}%). Consider increasing available memory.'
+                f'{to_mb(self.max_memory_bytes)} MB ({used_percentage}%). Consider increasing available memory.'
             )
