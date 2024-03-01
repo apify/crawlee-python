@@ -14,9 +14,13 @@ logger = getLogger(__name__)
 
 @dataclass
 class CpuInfo:
-    """Describes CPU usage of the process."""
+    """Describes CPU usage of the process.
 
-    current_usage_ratio: float  # Current CPU usage ratio
+    Attributes:
+        used_ratio: The ratio of CPU currently in use, represented as a float between 0 and 1.
+    """
+
+    used_ratio: float
     created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
 
 
@@ -40,8 +44,7 @@ async def get_cpu_info() -> CpuInfo:
     """
     logger.debug('Calling get_cpu_info()...')
     cpu_percent = await asyncio.to_thread(psutil.cpu_percent, interval=0.1)
-    current_usage_ratio = cpu_percent / 100
-    return CpuInfo(current_usage_ratio=current_usage_ratio)
+    return CpuInfo(used_ratio=cpu_percent / 100)
 
 
 # TODO: upravit tak, aby se sbiralo info pouze co je potreba

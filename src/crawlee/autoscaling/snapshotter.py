@@ -221,29 +221,31 @@ class Snapshotter:
         return sample
 
     def _snapshot_cpu(self: Snapshotter, event_data: EventSystemInfoData) -> None:
-        """Creates a snapshot of current CPU usage using the Apify platform `systemInfo` event.
+        """Creates a snapshot of current CPU usage using the Apify platform `SystemInfo` event.
 
-        TODO: popsat, ze tohle vlastne jen cte data z event_data, coz by melo byt poskytovano event managerem
+        This method does not perform CPU usage measurement. Instead, it just reads the data received through
+        the `event_data` parameter, which is expected to be supplied by the event manager.
 
         Args:
-            event_data: System info
+            event_data: System info data from which CPU usage is read.
         """
-        created_at = event_data.cpu_info.created_at
-        used_ratio = event_data.cpu_info.current_usage_ratio
-        is_overloaded = used_ratio > self.max_used_cpu_ratio
+        snapshot = CpuSnapshot(
+            used_ratio=event_data.cpu_info.used_ratio,
+            max_used_ratio=self.max_used_cpu_ratio,
+            created_at=event_data.cpu_info.created_at,
+        )
 
-        snapshot = CpuSnapshot(created_at=created_at, is_overloaded=is_overloaded, used_ratio=used_ratio)
-
-        self._prune_snapshots(self.cpu_snapshots, created_at)
+        self._prune_snapshots(self.cpu_snapshots, event_data.cpu_info.created_at)
         self.cpu_snapshots.append(snapshot)
 
     def _snapshot_memory(self: Snapshotter, event_data: EventSystemInfoData) -> None:
-        """Creates a snapshot of current memory usage using the Apify platform `systemInfo` event.
+        """Creates a snapshot of current memory usage using the Apify platform `SystemInfo` event.
 
-        TODO: popsat, ze tohle vlastne jen cte data z event_data, coz by melo byt poskytovano event managerem
+        This method does not perform memory usage measurement. Instead, it just reads the data received through
+        the `event_data` parameter, which is expected to be supplied by the event manager.
 
         Args:
-            event_data: System info
+            event_data: System info data from which memory usage is read.
         """
         mem_current_bytes = event_data.memory_info.used_bytes
         is_overloaded = (mem_current_bytes / self.memory_max_bytes) > self.max_used_memory_ratio
@@ -257,7 +259,10 @@ class Snapshotter:
     def _snapshot_event_loop(self: Snapshotter) -> None:
         """Creates a snapshot of the current event loop state.
 
-        TODO: popsat, ze je to pocitano primo zde
+        This method assesses the event loop's responsiveness by measuring the time elapsed between the creation of
+        the last snapshot and the current moment. This delay is calculated by subtracting the time of the last snapshot
+        and the predefined snapshot interval from the current time. If this is the first snapshot or no previous
+        snapshots exist, the delay is set to zero.
         """
         snapshot = EventLoopSnapshot(max_delay=self.max_event_loop_delay, delay=timedelta(seconds=0))
         previous_snapshot = self.event_loop_snapshots[-1] if self.event_loop_snapshots else None

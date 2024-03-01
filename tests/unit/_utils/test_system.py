@@ -17,4 +17,4 @@ async def test_get_memory_info_returns_valid_values() -> None:
 
 async def test_get_cpu_info_returns_valid_values() -> None:
     cpu_info = await get_cpu_info()
-    assert 0 <= cpu_info.current_usage_ratio <= 1
+    assert 0 <= cpu_info.used_ratio <= 1

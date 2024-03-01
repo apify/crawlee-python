@@ -83,10 +83,14 @@ class MemorySnapshot:
 class CpuSnapshot:
     """A snapshot of CPU usage."""
 
-    is_overloaded: bool
     used_ratio: float
-    ticks: dict | None = None
+    max_used_ratio: float
     created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
+
+    @property
+    def is_overloaded(self: CpuSnapshot) -> bool:
+        """Returns whether the CPU is considered as overloaded."""
+        return self.used_ratio > self.max_used_ratio
 
 
 @dataclass
@@ -99,8 +103,8 @@ class EventLoopSnapshot:
         created_at: The time at which the snapshot was created.
     """
 
-    max_delay: timedelta
     delay: timedelta
+    max_delay: timedelta
     created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
 
     @property
@@ -110,7 +114,7 @@ class EventLoopSnapshot:
 
     @property
     def is_overloaded(self: EventLoopSnapshot) -> bool:
-        """Returns whether the event loop is overloaded."""
+        """Returns whether the event loop is considered as overloaded."""
         return self.delay > self.max_delay
 
 
