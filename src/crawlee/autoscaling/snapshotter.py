@@ -147,78 +147,61 @@ class Snapshotter:
         await self._snapshot_event_loop_task.stop()
         await self._snapshot_client_task.stop()
 
-    def get_memory_sample(self: Snapshotter, sample_duration: timedelta | None = None) -> Sequence[Snapshot]:
+    def get_memory_sample(self: Snapshotter, duration: timedelta | None = None) -> Sequence[Snapshot]:
         """Returns a sample of the latest memory snapshots.
 
         Args:
-            sample_duration: The size of the sample. If omitted, it returns a full snapshot history.
+            duration: The duration of the sample from the latest snapshot. If omitted, it returns a full history.
 
         Returns:
             A sample of memory snapshots.
         """
-        return self._get_sample(self._memory_snapshots, sample_duration)
+        return self._get_sample(self._memory_snapshots, duration)
 
-    def get_event_loop_sample(self: Snapshotter, sample_duration: timedelta | None = None) -> Sequence[Snapshot]:
+    def get_event_loop_sample(self: Snapshotter, duration: timedelta | None = None) -> Sequence[Snapshot]:
         """Returns a sample of the latest event loop snapshots.
 
         Args:
-            sample_duration: The size of the sample. If omitted, it returns a full snapshot history.
+            duration: The duration of the sample from the latest snapshot. If omitted, it returns a full history.
 
         Returns:
             A sample of event loop snapshots.
         """
-        return self._get_sample(self._event_loop_snapshots, sample_duration)
+        return self._get_sample(self._event_loop_snapshots, duration)
 
-    def get_cpu_sample(self: Snapshotter, sample_duration: timedelta | None = None) -> Sequence[Snapshot]:
+    def get_cpu_sample(self: Snapshotter, duration: timedelta | None = None) -> Sequence[Snapshot]:
         """Returns a sample of the latest CPU snapshots.
 
         Args:
-            sample_duration: The size of the sample. If omitted, it returns a full snapshot history.
+            duration: The duration of the sample from the latest snapshot. If omitted, it returns a full history.
 
         Returns:
             A sample of CPU snapshots.
         """
-        return self._get_sample(self._cpu_snapshots, sample_duration)
+        return self._get_sample(self._cpu_snapshots, duration)
 
-    def get_client_sample(self: Snapshotter, sample_duration: timedelta | None = None) -> Sequence[Snapshot]:
+    def get_client_sample(self: Snapshotter, duration: timedelta | None = None) -> Sequence[Snapshot]:
         """Returns a sample of the latest client snapshots.
 
         Args:
-            sample_duration: The size of the sample. If omitted, it returns a full snapshot history.
+            duration: The duration of the sample from the latest snapshot. If omitted, it returns a full history.
 
         Returns:
             A sample of client snapshots.
         """
-        return self._get_sample(self._client_snapshots, sample_duration)
+        return self._get_sample(self._client_snapshots, duration)
 
     @staticmethod
-    def _get_sample(snapshots: Sequence[Snapshot], sample_duration: timedelta | None = None) -> Sequence[Snapshot]:
-        """Finds the latest snapshots by sample_duration in the provided Sequence.
-
-        Args:
-            snapshots: Sequence of snapshots
-            sample_duration: The size of the sample. If omitted, it returns a full snapshot history.
-
-        Returns:
-            A sample of snapshots.
-        """
-        if not sample_duration:
+    def _get_sample(snapshots: Sequence[Snapshot], duration: timedelta | None = None) -> Sequence[Snapshot]:
+        """Returns a time-limited sample from snapshots or full history if duration is None."""
+        if not duration:
             return snapshots
 
-        sample: list[Snapshot] = []
-        idx = len(snapshots)
-        if not idx:
-            return sample
+        if not snapshots:
+            return []
 
-        latest_time = snapshots[idx - 1].created_at
-        while idx:
-            snapshot = snapshots[idx - 1]
-            if latest_time - snapshot.created_at <= sample_duration:
-                sample.insert(0, snapshot)
-            else:
-                break
-
-        return sample
+        latest_time = snapshots[-1].created_at
+        return [snapshot for snapshot in reversed(snapshots) if latest_time - snapshot.created_at <= duration]
 
     def _snapshot_cpu(self: Snapshotter, event_data: EventSystemInfoData) -> None:
         """Creates a snapshot of current CPU usage using the Apify platform `SystemInfo` event.
@@ -277,37 +260,18 @@ class Snapshotter:
         self._event_loop_snapshots.append(snapshot)
 
     def _snapshot_client(self: Snapshotter) -> None:
-        """Creates a snapshot of the current API state by checking for rate limit errors.
+        """Creates a snapshot of the current API state by checking for rate limit errors (HTTP 429).
 
-        Only errors produced by a 2nd retry of the API call are considered for snapshotting since
-        earlier errors may just be caused by a random spike in the number of requests and do not
-        necessarily signify API overloading.
+        Only errors produced by a 2nd retry of the API call are considered for snapshotting since earlier errors may
+        just be caused by a random spike in the number of requests and do not necessarily signify API overloading.
         """
-        now = datetime.now(tz=timezone.utc)
+        # TODO: This is just a dummy placeholder. It can be implemented once `StorageClient` is ready.
+        # https://github.com/apify/crawlee-py/issues/60
 
-        # TODO: The TypeScript implementation uses MemoryStorageClient here for getting rate limit errors, in Python
-        # implementation we do not support this yet.
+        num_of_errors = 0
 
-        all_error_counts: list = []
-
-        current_err_count = all_error_counts[self._client_rate_limit_error_retry_count] if all_error_counts else 0
-
-        snapshot = ClientSnapshot(
-            created_at=now,
-            is_overloaded=False,
-            rate_limit_error_count=current_err_count,
-        )
-
-        previous_snapshot = self._client_snapshots[-1] if self._client_snapshots else None
-
-        if previous_snapshot:
-            rate_limit_error_count = previous_snapshot.rate_limit_error_count
-            delta = current_err_count - rate_limit_error_count
-            if delta > self._max_client_errors:
-                snapshot.is_overloaded = True
-
-        self._prune_snapshots(self._client_snapshots, now)
-
+        snapshot = ClientSnapshot(num_of_errors=num_of_errors, max_num_of_errors=self._max_client_errors)
+        self._prune_snapshots(self._client_snapshots, snapshot.created_at)
         self._client_snapshots.append(snapshot)
 
     def _prune_snapshots(self: Snapshotter, snapshots: Sequence[Snapshot], now: datetime) -> None:
