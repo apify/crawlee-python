@@ -52,7 +52,7 @@ pyee = "^11.1.0"
 typing-extensions = "^4.1.0"
 
 [tool.poetry.group.dev.dependencies]
-build = "~1.0.3"
+build = "~1.1.0"
 filelock = "~3.13.1"
 mypy = "~1.8.0"
 pre-commit = "~3.6.0"
