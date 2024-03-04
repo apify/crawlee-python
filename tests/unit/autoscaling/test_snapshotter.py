@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from logging import getLogger
 from typing import cast
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -36,7 +37,7 @@ def test_get_cpu_sample(snapshotter: Snapshotter) -> None:
         for delta in range(5, 0, -1)
     ]
 
-    snapshotter._cpu_snapshots = cpu_snapshots  # type: ignore
+    snapshotter._cpu_snapshots = cpu_snapshots
 
     # When no sample duration is provided it should return all snapshots
     samples = snapshotter.get_cpu_sample()
@@ -127,6 +128,45 @@ def test_snapshot_pruning_no_prune(snapshotter: Snapshotter) -> None:
     assert len(snapshotter._cpu_snapshots) == 2
     assert snapshotter._cpu_snapshots[0].created_at == one_hour_ago
     assert snapshotter._cpu_snapshots[1].created_at == now
+
+
+def test_evaluate_memory_load_high(monkeypatch: pytest.MonkeyPatch, snapshotter: Snapshotter) -> None:
+    mock_logger_warn = MagicMock()
+    monkeypatch.setattr(getLogger('crawlee.autoscaling.snapshotter'), 'warning', mock_logger_warn)
+    snapshotter._max_memory_bytes = 8 * 1024**3  # 8 GB
+
+    high_memory_usage = int(0.9 * 8 * 1024**3)  # 90% of 8 GB
+
+    snapshotter._evaluate_memory_load(
+        current_memory_usage_bytes=high_memory_usage,
+        snapshot_timestamp=datetime.now(tz=timezone.utc),
+    )
+
+    assert mock_logger_warn.call_count == 1
+    assert 'Memory is critically overloaded' in mock_logger_warn.call_args[0][0]
+
+    # It should not log again, since the last log was short time ago
+    snapshotter._evaluate_memory_load(
+        current_memory_usage_bytes=high_memory_usage,
+        snapshot_timestamp=datetime.now(tz=timezone.utc),
+    )
+
+    assert mock_logger_warn.call_count == 1
+
+
+def test_evaluate_memory_load_low(monkeypatch: pytest.MonkeyPatch, snapshotter: Snapshotter) -> None:
+    mock_logger_warn = MagicMock()
+    monkeypatch.setattr(getLogger('crawlee.autoscaling.snapshotter'), 'warning', mock_logger_warn)
+    snapshotter._max_memory_bytes = 8 * 1024**3  # 8 GB
+
+    low_memory_usage = int(0.8 * 8 * 1024**3)  # 20% of 8 GB
+
+    snapshotter._evaluate_memory_load(
+        current_memory_usage_bytes=low_memory_usage,
+        snapshot_timestamp=datetime.now(tz=timezone.utc),
+    )
+
+    assert mock_logger_warn.call_count == 0
 
 
 #

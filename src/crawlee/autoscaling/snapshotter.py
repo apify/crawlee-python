@@ -13,7 +13,6 @@ from crawlee.autoscaling.types import ClientSnapshot, CpuSnapshot, EventLoopSnap
 from crawlee.events.types import Event, EventSystemInfoData
 
 if TYPE_CHECKING:
-    from crawlee.autoscaling.system_status import SystemInfo
     from crawlee.events import EventManager
 
 logger = getLogger(__name__)
@@ -56,8 +55,8 @@ class Snapshotter:
         max_client_errors: int = 1,
         snapshot_history: timedelta = timedelta(seconds=30),
         reserve_memory_ratio: float = 0.5,
+        memory_warning_cooldown_period: timedelta = timedelta(milliseconds=10000),
         client_rate_limit_error_retry_count: int = 2,
-        critical_overload_rate_limit: timedelta = timedelta(milliseconds=10000),
     ) -> None:
         """Initializes the Snapshotter.
 
@@ -87,36 +86,35 @@ class Snapshotter:
 
             snapshot_history: Sets the time interval for which the snapshots are kept.
 
-            reserve_memory_ratio: TODO
+            reserve_memory_ratio: Fraction of memory kept in reserve. Used to calculate critical memory overload
+                threshold.
 
-            client_rate_limit_error_retry_count: TODO
+            memory_warning_cooldown_period: Minimum time interval between logging successive critical memory overload
+                warnings.
 
-            critical_overload_rate_limit: TODO
+            client_rate_limit_error_retry_count: Number of retries for a client request before considering it a failure
+                due to rate limiting.
         """
         self._event_manager = event_manager
-
         self._event_loop_snapshot_interval = event_loop_snapshot_interval
         self._client_snapshot_interval = client_snapshot_interval
-
         self._max_event_loop_delay = max_event_loop_delay
         self._max_used_cpu_ratio = max_used_cpu_ratio
         self._max_used_memory_ratio = max_used_memory_ratio
         self._max_client_errors = max_client_errors
-
         self._snapshot_history = snapshot_history
         self._reserve_memory_ratio = reserve_memory_ratio
+        self._memory_warning_cooldown_period = memory_warning_cooldown_period
         self._client_rate_limit_error_retry_count = client_rate_limit_error_retry_count
-        self._critical_overload_rate_limit = critical_overload_rate_limit
 
         # Default `memory_max_bytes`` is 1/4 of the total system memory
         if max_memory_bytes is None:
             memory_info = get_memory_info()
             self._max_memory_bytes = int(memory_info.total_bytes * 0.25)
-            logger.debug(f'Setting max_memory_bytes of this run to {round(self._max_memory_bytes / 1024 / 1024)} MB.')
+            logger.info(f'Setting max_memory_bytes of this run to {to_mb(self._max_memory_bytes)} MB.')
         else:
             self._max_memory_bytes = max_memory_bytes
 
-        # Post initialization
         self._cpu_snapshots: list[CpuSnapshot] = []
         self._event_loop_snapshots: list[EventLoopSnapshot] = []
         self._memory_snapshots: list[MemorySnapshot] = []
@@ -124,7 +122,8 @@ class Snapshotter:
 
         self._snapshot_event_loop_task = RecurringTask(self._snapshot_event_loop, self._event_loop_snapshot_interval)
         self._snapshot_client_task = RecurringTask(self._snapshot_client, self._client_snapshot_interval)
-        self._last_logged_critical_memory_overload_at = None
+
+        self._timestamp_of_last_memory_warning: datetime = datetime.now(timezone.utc) - timedelta(hours=1)
 
     async def start(self: Snapshotter) -> None:
         """Starts capturing snapshots at configured intervals."""
@@ -244,6 +243,8 @@ class Snapshotter:
         self._prune_snapshots(snapshots, snapshot.created_at)
         self._memory_snapshots.append(snapshot)
 
+        self._evaluate_memory_load(event_data.memory_info.current_bytes, event_data.memory_info.created_at)
+
     def _snapshot_event_loop(self: Snapshotter) -> None:
         """Creates a snapshot of the current event loop state.
 
@@ -270,6 +271,7 @@ class Snapshotter:
         just be caused by a random spike in the number of requests and do not necessarily signify API overloading.
         """
         # TODO: This is just a dummy placeholder. It can be implemented once `StorageClient` is ready.
+        # Attribute `self._client_rate_limit_error_retry_count` will be used here.
         # https://github.com/apify/crawlee-py/issues/60
 
         num_of_errors = 0
@@ -304,36 +306,31 @@ class Snapshotter:
         else:
             snapshots.clear()
 
-    def _memory_overload_warning(self: Snapshotter, system_info: SystemInfo) -> None:
-        """Checks for critical memory overload and logs it to the console.
+    def _evaluate_memory_load(
+        self: Snapshotter,
+        current_memory_usage_bytes: int,
+        snapshot_timestamp: datetime,
+    ) -> None:
+        """Evaluates and logs critical memory load conditions based on the system information.
 
         Args:
-            system_info: System info
+            current_memory_usage_bytes: The current memory usage in bytes.
+            snapshot_timestamp: The time at which the memory snapshot was taken.
         """
-        # TODO
-        mem_current_bytes = system_info.mem_current_bytes
-        created_at = system_info.created_at or datetime.now(tz=timezone.utc)
-        critical_overload_rate_limit_millis = self._critical_overload_rate_limit.total_seconds() * 1000
-
-        if (
-            self._last_logged_critical_memory_overload_at
-            and created_at < self._last_logged_critical_memory_overload_at + critical_overload_rate_limit_millis
-        ):
+        # Check if the warning has been logged recently to avoid spamming
+        if snapshot_timestamp < self._timestamp_of_last_memory_warning + self._memory_warning_cooldown_period:
             return
 
-        max_desired_memory_bytes = self._max_used_memory_ratio * self._max_memory_bytes
-        reserve_memory = self._max_memory_bytes * (1 - self._max_used_memory_ratio) * self._reserve_memory_ratio
-        critical_overload_bytes = max_desired_memory_bytes + reserve_memory
+        threshold_memory_bytes = self._max_used_memory_ratio * self._max_memory_bytes
+        buffer_memory_bytes = self._max_memory_bytes * (1 - self._max_used_memory_ratio) * self._reserve_memory_ratio
+        overload_memory_threshold_bytes = threshold_memory_bytes + buffer_memory_bytes
 
-        if mem_current_bytes is None:
-            raise ValueError('mem_current_bytes is None')
-
-        is_critical_overload = mem_current_bytes > critical_overload_bytes
-
-        if is_critical_overload:
-            used_percentage = round((mem_current_bytes / self._max_memory_bytes) * 100)
-
+        # Log a warning if current memory usage exceeds the critical overload threshold
+        if current_memory_usage_bytes > overload_memory_threshold_bytes:
+            memory_usage_percentage = round((current_memory_usage_bytes / self._max_memory_bytes) * 100)
             logger.warning(
-                f'Memory is critically overloaded. Using {to_mb(mem_current_bytes)} MB of '
-                f'{to_mb(self._max_memory_bytes)} MB ({used_percentage}%). Consider increasing available memory.'
+                f'Memory is critically overloaded. Using {to_mb(current_memory_usage_bytes)} MB of '
+                f'{to_mb(self._max_memory_bytes)} MB ({memory_usage_percentage}%). '
+                'Consider increasing available memory.'
             )
+            self._timestamp_of_last_memory_warning = snapshot_timestamp
