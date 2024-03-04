@@ -4,19 +4,16 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING, cast
 
 from crawlee._utils.math import to_mb
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.system import get_memory_info
-from crawlee.autoscaling.types import ClientSnapshot, CpuSnapshot, EventLoopSnapshot, MemorySnapshot
+from crawlee.autoscaling.types import ClientSnapshot, CpuSnapshot, EventLoopSnapshot, MemorySnapshot, Snapshot
 from crawlee.events.types import Event, EventSystemInfoData
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-
     from crawlee.autoscaling.system_status import SystemInfo
-    from crawlee.autoscaling.types import Snapshot
     from crawlee.events import EventManager
 
 logger = getLogger(__name__)
@@ -147,7 +144,7 @@ class Snapshotter:
         await self._snapshot_event_loop_task.stop()
         await self._snapshot_client_task.stop()
 
-    def get_memory_sample(self: Snapshotter, duration: timedelta | None = None) -> Sequence[Snapshot]:
+    def get_memory_sample(self: Snapshotter, duration: timedelta | None = None) -> list[Snapshot]:
         """Returns a sample of the latest memory snapshots.
 
         Args:
@@ -156,9 +153,10 @@ class Snapshotter:
         Returns:
             A sample of memory snapshots.
         """
-        return self._get_sample(self._memory_snapshots, duration)
+        snapshots = cast(list[Snapshot], self._memory_snapshots)
+        return self._get_sample(snapshots, duration)
 
-    def get_event_loop_sample(self: Snapshotter, duration: timedelta | None = None) -> Sequence[Snapshot]:
+    def get_event_loop_sample(self: Snapshotter, duration: timedelta | None = None) -> list[Snapshot]:
         """Returns a sample of the latest event loop snapshots.
 
         Args:
@@ -167,9 +165,10 @@ class Snapshotter:
         Returns:
             A sample of event loop snapshots.
         """
-        return self._get_sample(self._event_loop_snapshots, duration)
+        snapshots = cast(list[Snapshot], self._event_loop_snapshots)
+        return self._get_sample(snapshots, duration)
 
-    def get_cpu_sample(self: Snapshotter, duration: timedelta | None = None) -> Sequence[Snapshot]:
+    def get_cpu_sample(self: Snapshotter, duration: timedelta | None = None) -> list[Snapshot]:
         """Returns a sample of the latest CPU snapshots.
 
         Args:
@@ -178,9 +177,10 @@ class Snapshotter:
         Returns:
             A sample of CPU snapshots.
         """
-        return self._get_sample(self._cpu_snapshots, duration)
+        snapshots = cast(list[Snapshot], self._cpu_snapshots)
+        return self._get_sample(snapshots, duration)
 
-    def get_client_sample(self: Snapshotter, duration: timedelta | None = None) -> Sequence[Snapshot]:
+    def get_client_sample(self: Snapshotter, duration: timedelta | None = None) -> list[Snapshot]:
         """Returns a sample of the latest client snapshots.
 
         Args:
@@ -189,10 +189,11 @@ class Snapshotter:
         Returns:
             A sample of client snapshots.
         """
-        return self._get_sample(self._client_snapshots, duration)
+        snapshots = cast(list[Snapshot], self._client_snapshots)
+        return self._get_sample(snapshots, duration)
 
     @staticmethod
-    def _get_sample(snapshots: Sequence[Snapshot], duration: timedelta | None = None) -> Sequence[Snapshot]:
+    def _get_sample(snapshots: list[Snapshot], duration: timedelta | None = None) -> list[Snapshot]:
         """Returns a time-limited sample from snapshots or full history if duration is None."""
         if not duration:
             return snapshots
@@ -218,7 +219,8 @@ class Snapshotter:
             created_at=event_data.cpu_info.created_at,
         )
 
-        self._prune_snapshots(self._cpu_snapshots, event_data.cpu_info.created_at)
+        snapshots = cast(list[Snapshot], self._cpu_snapshots)
+        self._prune_snapshots(snapshots, event_data.cpu_info.created_at)
         self._cpu_snapshots.append(snapshot)
 
     def _snapshot_memory(self: Snapshotter, event_data: EventSystemInfoData) -> None:
@@ -238,7 +240,8 @@ class Snapshotter:
             created_at=event_data.memory_info.created_at,
         )
 
-        self._prune_snapshots(self._memory_snapshots, snapshot.created_at)
+        snapshots = cast(list[Snapshot], self._memory_snapshots)
+        self._prune_snapshots(snapshots, snapshot.created_at)
         self._memory_snapshots.append(snapshot)
 
     def _snapshot_event_loop(self: Snapshotter) -> None:
@@ -256,7 +259,8 @@ class Snapshotter:
             event_loop_delay = snapshot.created_at - previous_snapshot.created_at - self._event_loop_snapshot_interval
             snapshot.delay = event_loop_delay
 
-        self._prune_snapshots(self._event_loop_snapshots, snapshot.created_at)
+        snapshots = cast(list[Snapshot], self._event_loop_snapshots)
+        self._prune_snapshots(snapshots, snapshot.created_at)
         self._event_loop_snapshots.append(snapshot)
 
     def _snapshot_client(self: Snapshotter) -> None:
@@ -269,28 +273,36 @@ class Snapshotter:
         # https://github.com/apify/crawlee-py/issues/60
 
         num_of_errors = 0
-
         snapshot = ClientSnapshot(num_of_errors=num_of_errors, max_num_of_errors=self._max_client_errors)
-        self._prune_snapshots(self._client_snapshots, snapshot.created_at)
+
+        snapshots = cast(list[Snapshot], self._client_snapshots)
+        self._prune_snapshots(snapshots, snapshot.created_at)
         self._client_snapshots.append(snapshot)
 
-    def _prune_snapshots(self: Snapshotter, snapshots: Sequence[Snapshot], now: datetime) -> None:
-        """Removes snapshots that are older than the `self.snapshot_history`.
+    def _prune_snapshots(self: Snapshotter, snapshots: list[Snapshot], now: datetime) -> None:
+        """Removes snapshots that are older than the `self._snapshot_history`.
+
+        This method modifies the list of snapshots in place, removing all snapshots that are older than the defined
+        snapshot history relative to the `now` parameter.
 
         Args:
-            snapshots: List of snapshots.
-            now: The current date and time.
+            snapshots: List of snapshots to be pruned in place.
+            now: The current date and time, used as the reference for pruning.
         """
-        old_count = 0
-
-        for snapshot in snapshots:
-            created_at = snapshot.created_at
-            if now - created_at > self._snapshot_history:
-                old_count += 1
-            else:
+        # Find the index where snapshots start to be within the allowed history window.
+        # We'll keep snapshots from this index onwards.
+        keep_from_index = None
+        for i, snapshot in enumerate(snapshots):
+            if now - snapshot.created_at <= self._snapshot_history:
+                keep_from_index = i
                 break
 
-        snapshots = snapshots[:old_count]
+        # If all snapshots are old, keep_from_index will remain None, so we clear the list.
+        # Otherwise, we keep only the recent snapshots.
+        if keep_from_index is not None:
+            del snapshots[:keep_from_index]
+        else:
+            snapshots.clear()
 
     def _memory_overload_warning(self: Snapshotter, system_info: SystemInfo) -> None:
         """Checks for critical memory overload and logs it to the console.

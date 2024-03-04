@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from typing import cast
 from unittest.mock import AsyncMock
 
 import pytest
 
 from crawlee.autoscaling import Snapshotter
-from crawlee.autoscaling.types import CpuSnapshot
+from crawlee.autoscaling.types import CpuSnapshot, Snapshot
 from crawlee.events import EventManager, LocalEventManager
 
 
@@ -61,6 +62,71 @@ def test_get_samples_empty(snapshotter: Snapshotter) -> None:
     assert snapshotter.get_memory_sample() == []
     assert snapshotter.get_event_loop_sample() == []
     assert snapshotter.get_client_sample() == []
+
+
+def test_snapshot_pruning(snapshotter: Snapshotter) -> None:
+    # Set the snapshot history to 2 hours
+    snapshotter._snapshot_history = timedelta(hours=2)
+
+    # Create timestamps for testing
+    now = datetime.now(tz=timezone.utc)
+    two_hours_ago = now - timedelta(hours=2)
+    three_hours_ago = now - timedelta(hours=3)
+    five_hours_ago = now - timedelta(hours=5)
+
+    # Create mock snapshots with varying creation times
+    snapshots = [
+        CpuSnapshot(used_ratio=0.5, max_used_ratio=0.95, created_at=five_hours_ago),
+        CpuSnapshot(used_ratio=0.6, max_used_ratio=0.95, created_at=three_hours_ago),
+        CpuSnapshot(used_ratio=0.7, max_used_ratio=0.95, created_at=two_hours_ago),
+        CpuSnapshot(used_ratio=0.8, max_used_ratio=0.95, created_at=now),
+    ]
+
+    # Assign these snapshots to one of the lists (e.g., CPU snapshots)
+    snapshotter._cpu_snapshots = snapshots
+
+    # Prune snapshots older than 2 hours
+    snapshots_casted = cast(list[Snapshot], snapshotter._cpu_snapshots)
+    snapshotter._prune_snapshots(snapshots_casted, now)
+
+    # Check that only the last two snapshots remain
+    assert len(snapshotter._cpu_snapshots) == 2
+    assert snapshotter._cpu_snapshots[0].created_at == two_hours_ago
+    assert snapshotter._cpu_snapshots[1].created_at == now
+
+
+def test_snapshot_pruning_empty(snapshotter: Snapshotter) -> None:
+    now = datetime.now(tz=timezone.utc)
+    snapshotter._cpu_snapshots = []
+    snapshots_casted = cast(list[Snapshot], snapshotter._cpu_snapshots)
+    snapshotter._prune_snapshots(snapshots_casted, now)
+    assert snapshotter._cpu_snapshots == []
+
+
+def test_snapshot_pruning_no_prune(snapshotter: Snapshotter) -> None:
+    snapshotter._snapshot_history = timedelta(hours=2)
+
+    # Create timestamps for testing
+    now = datetime.now(tz=timezone.utc)
+    one_hour_ago = now - timedelta(hours=1)
+
+    # Create mock snapshots with varying creation times
+    snapshots = [
+        CpuSnapshot(used_ratio=0.7, max_used_ratio=0.95, created_at=one_hour_ago),
+        CpuSnapshot(used_ratio=0.8, max_used_ratio=0.95, created_at=now),
+    ]
+
+    # Assign these snapshots to one of the lists (e.g., CPU snapshots)
+    snapshotter._cpu_snapshots = snapshots
+
+    # Prune snapshots older than 2 hours
+    snapshots_casted = cast(list[Snapshot], snapshotter._cpu_snapshots)
+    snapshotter._prune_snapshots(snapshots_casted, now)
+
+    # Check that only the last two snapshots remain
+    assert len(snapshotter._cpu_snapshots) == 2
+    assert snapshotter._cpu_snapshots[0].created_at == one_hour_ago
+    assert snapshotter._cpu_snapshots[1].created_at == now
 
 
 #
