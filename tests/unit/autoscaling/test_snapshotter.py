@@ -17,7 +17,7 @@ from crawlee.events.types import EventSystemInfoData
 @pytest.fixture()
 def snapshotter() -> Snapshotter:
     mocked_event_manager = AsyncMock(spec=EventManager)
-    return Snapshotter(event_manager=mocked_event_manager)
+    return Snapshotter(mocked_event_manager)
 
 
 @pytest.fixture()
@@ -31,7 +31,7 @@ def event_system_data_info() -> EventSystemInfoData:
 @pytest.mark.asyncio()
 async def test_start_stop() -> None:
     async with LocalEventManager() as event_manager:
-        snapshotter = Snapshotter(event_manager=event_manager)
+        snapshotter = Snapshotter(event_manager)
         await snapshotter.start()
         await snapshotter.stop()
 

@@ -12,8 +12,6 @@ from crawlee._utils.math import weighted_avg
 from crawlee.autoscaling.types import LoadRatioInfo, Snapshot, SystemInfo
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-
     from crawlee.autoscaling.snapshotter import Snapshotter
 
 logger = getLogger(__name__)
@@ -33,34 +31,37 @@ class SystemStatus:
 
     `SystemStatus.get_historical_status` returns a boolean that represents the long-term status of the system. It
     considers the full snapshot history available in the `Snapshotter` instance.
-
-    Attributes:
-        snapshotter: The `Snapshotter` instance to be queried for `SystemStatus`.
-
-        current_history: Defines max age of snapshots used in the `SystemStatus.get_current_status` measurement.
-
-        max_memory_overloaded_ratio: Sets the maximum ratio of overloaded snapshots in a memory sample.
-            If the sample exceeds this ratio, the system will be overloaded.
-
-        max_event_loop_overloaded_ratio: Sets the maximum ratio of overloaded snapshots in an event loop sample.
-            If the sample exceeds this ratio, the system will be overloaded.
-
-        max_cpu_overloaded_ratio: Sets the maximum ratio of overloaded snapshots in a CPU sample. If the sample
-            exceeds this ratio, the system will be overloaded.
-
-        max_client_overloaded_ratio: Sets the maximum ratio of overloaded snapshots in a Client sample.
-            If the sample exceeds this ratio, the system will be overloaded.
     """
 
     def __init__(
         self,
         snapshotter: Snapshotter,
+        *,
         current_history: timedelta = timedelta(seconds=5),
         max_memory_overloaded_ratio: float = 0.2,
         max_event_loop_overloaded_ratio: float = 0.6,
         max_cpu_overloaded_ratio: float = 0.4,
         max_client_overloaded_ratio: float = 0.3,
     ) -> None:
+        """Creates a new instance.
+
+        Args:
+            snapshotter: The `Snapshotter` instance to be queried for `SystemStatus`.
+
+            current_history: Defines max age of snapshots used in the `SystemStatus.get_current_status` measurement.
+
+            max_memory_overloaded_ratio: Sets the maximum ratio of overloaded snapshots in a memory sample.
+                If the sample exceeds this ratio, the system will be overloaded.
+
+            max_event_loop_overloaded_ratio: Sets the maximum ratio of overloaded snapshots in an event loop sample.
+                If the sample exceeds this ratio, the system will be overloaded.
+
+            max_cpu_overloaded_ratio: Sets the maximum ratio of overloaded snapshots in a CPU sample. If the sample
+                exceeds this ratio, the system will be overloaded.
+
+            max_client_overloaded_ratio: Sets the maximum ratio of overloaded snapshots in a Client sample.
+                If the sample exceeds this ratio, the system will be overloaded.
+        """
         self.snapshotter = snapshotter
         self.current_history = current_history
         self.max_memory_overloaded_ratio = max_memory_overloaded_ratio
@@ -164,7 +165,7 @@ class SystemStatus:
         sample = self.snapshotter.get_client_sample(sample_duration)
         return self._is_sample_overloaded(sample, self.max_client_overloaded_ratio)
 
-    def _is_sample_overloaded(self, sample: Sequence[Snapshot], ratio: float) -> LoadRatioInfo:
+    def _is_sample_overloaded(self: SystemStatus, sample: list[Snapshot], ratio: float) -> LoadRatioInfo:
         """Determine if a sample of snapshot data is overloaded based on a specified ratio.
 
         Args:

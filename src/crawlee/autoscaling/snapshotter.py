@@ -19,33 +19,18 @@ logger = getLogger(__name__)
 
 
 class Snapshotter:
-    """Creates snapshots of system resources at given intervals.
+    """Monitors and logs system resource usage at predefined intervals for performance optimization.
 
-    Creates snapshots of system resources at given intervals and marks the resource as either overloaded or not during
-    the last interval. Keeps a history of the snapshots. It tracks the following resources: Memory, EventLoop, API
-    and CPU. The class is used by the `AutoscaledPool` class.
-
-    When running on the Apify platform, the CPU and memory statistics are provided by the platform, as collected from
-    the running Docker container. When running locally, `Snapshotter` makes its own statistics by querying the OS.
-
-    CPU becomes overloaded locally when its current use exceeds the `maxUsedCpuRatio` option or when Apify platform
-    marks it as overloaded.
-
-    Memory becomes overloaded if its current use exceeds the `max_used_memory_ratio` option. It's computed using
-    the total memory available to the container when running on the Apify platform and a quarter of total system
-    memory when running locally. Max total memory when running locally may be overridden by using
-    the `CRAWLEE_MEMORY_MBYTES` environment variable.
-
-    Event loop becomes overloaded if it slows down by more than the `max_blocked` option.
-
-    Client becomes overloaded when rate limit errors (429 - Too Many Requests) exceeds the `max_client_errors` option,
-    typically received from the request queue, exceed the set limit within the set interval.
+    The class monitors and records the state of various system resources (CPU, memory, event loop, and client API)
+    at predefined intervals. This continuous monitoring helps in identifying resource overloads and ensuring optimal
+    performance of the application. It is utilized in the `AutoscaledPool` module to adjust task allocation
+    dynamically based on the current demand and system load.
     """
 
     def __init__(
         self: Snapshotter,
-        *,
         event_manager: EventManager,
+        *,
         event_loop_snapshot_interval: timedelta = timedelta(milliseconds=500),
         client_snapshot_interval: timedelta = timedelta(milliseconds=1000),
         max_used_cpu_ratio: float = 0.95,
@@ -58,7 +43,7 @@ class Snapshotter:
         memory_warning_cooldown_period: timedelta = timedelta(milliseconds=10000),
         client_rate_limit_error_retry_count: int = 2,
     ) -> None:
-        """Initializes the Snapshotter.
+        """Creates a new instance.
 
         Args:
             event_manager: The event manager used to emit system info events. From data provided by this event

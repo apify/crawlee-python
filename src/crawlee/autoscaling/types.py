@@ -22,20 +22,15 @@ class LoadRatioInfo:
 class SystemInfo:
     """Represents the current status of the system."""
 
+    cpu_info: LoadRatioInfo
+    mem_info: LoadRatioInfo
+    event_loop_info: LoadRatioInfo
+    client_info: LoadRatioInfo
     created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
-    cpu_info: LoadRatioInfo | None = None
-    mem_info: LoadRatioInfo | None = None
-    event_loop_info: LoadRatioInfo | None = None
-    client_info: LoadRatioInfo | None = None
-    mem_current_bytes: int | None = None  # Platform only property
-    cpu_current_usage: int | None = None  # Platform only property
 
     @property
     def is_system_idle(self) -> bool:
         """Indicates whether the system is currently idle or overloaded."""
-        if self.mem_info is None or self.event_loop_info is None or self.cpu_info is None or self.client_info is None:
-            raise ValueError('SystemInfo is missing some load ratio info.')
-
         return (
             not self.cpu_info.is_overloaded
             and not self.mem_info.is_overloaded
@@ -52,22 +47,6 @@ class SystemInfo:
             'client_info': self.client_info.actual_ratio if self.client_info else '-',
         }
         return ';'.join(f'{name} = {ratio}' for name, ratio in stats.items())
-
-
-@dataclass
-class FinalStatistics:
-    """Represents final statistics."""
-
-    requests_finished: int
-    requests_failed: int
-    retry_histogram: list[int]
-    request_avg_failed_duration: timedelta
-    request_avg_finished_duration: timedelta
-    requests_finished_per_minute: float
-    requests_failed_per_minute: float
-    request_total_duration: timedelta
-    requests_total: int
-    crawler_runtime: timedelta
 
 
 @dataclass

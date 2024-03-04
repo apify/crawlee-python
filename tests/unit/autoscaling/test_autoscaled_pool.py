@@ -114,7 +114,6 @@ async def test_autoscales(system_status: SystemStatus | Mock) -> None:
             mem_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
             event_loop_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
             client_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
-            mem_current_bytes=1024,
         )
 
         # 0.5 seconds after the start of the test, pretend the CPU became overloaded
