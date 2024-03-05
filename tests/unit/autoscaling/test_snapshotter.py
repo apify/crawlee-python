@@ -29,7 +29,7 @@ def event_system_data_info() -> EventSystemInfoData:
 
 
 @pytest.mark.asyncio()
-async def test_start_stop() -> None:
+async def test_start_stop_lifecycle() -> None:
     async with LocalEventManager() as event_manager:
         snapshotter = Snapshotter(event_manager)
         await snapshotter.start()
@@ -93,7 +93,7 @@ def test_get_cpu_sample(snapshotter: Snapshotter) -> None:
     assert len(samples) == len(cpu_snapshots)
 
 
-def test_get_samples_empty(snapshotter: Snapshotter) -> None:
+def test_empty_snapshot_samples_return_empty_lists(snapshotter: Snapshotter) -> None:
     # All get resource sample uses the same helper function, so testing only one of them properly (CPU) should be
     # enough. Here just call all of them returning empty list to make sure they don't crash.
     assert snapshotter.get_cpu_sample() == []
@@ -103,7 +103,7 @@ def test_get_samples_empty(snapshotter: Snapshotter) -> None:
     assert snapshotter._get_sample([], timedelta(hours=1)) == []
 
 
-def test_snapshot_pruning(snapshotter: Snapshotter) -> None:
+def test_snapshot_pruning_removes_outdated_records(snapshotter: Snapshotter) -> None:
     # Set the snapshot history to 2 hours
     snapshotter._snapshot_history = timedelta(hours=2)
 
@@ -134,7 +134,7 @@ def test_snapshot_pruning(snapshotter: Snapshotter) -> None:
     assert snapshotter._cpu_snapshots[1].created_at == now
 
 
-def test_snapshot_pruning_empty(snapshotter: Snapshotter) -> None:
+def test_pruning_empty_snapshot_list_remains_empty(snapshotter: Snapshotter) -> None:
     now = datetime.now(tz=timezone.utc)
     snapshotter._cpu_snapshots = []
     snapshots_casted = cast(list[Snapshot], snapshotter._cpu_snapshots)
@@ -142,7 +142,7 @@ def test_snapshot_pruning_empty(snapshotter: Snapshotter) -> None:
     assert snapshotter._cpu_snapshots == []
 
 
-def test_snapshot_pruning_no_prune(snapshotter: Snapshotter) -> None:
+def test_snapshot_pruning_keeps_recent_records_unaffected(snapshotter: Snapshotter) -> None:
     snapshotter._snapshot_history = timedelta(hours=2)
 
     # Create timestamps for testing
@@ -168,7 +168,10 @@ def test_snapshot_pruning_no_prune(snapshotter: Snapshotter) -> None:
     assert snapshotter._cpu_snapshots[1].created_at == now
 
 
-def test_evaluate_memory_load_high(monkeypatch: pytest.MonkeyPatch, snapshotter: Snapshotter) -> None:
+def test_memory_load_evaluation_logs_warning_on_high_usage(
+    monkeypatch: pytest.MonkeyPatch,
+    snapshotter: Snapshotter,
+) -> None:
     mock_logger_warn = MagicMock()
     monkeypatch.setattr(getLogger('crawlee.autoscaling.snapshotter'), 'warning', mock_logger_warn)
     snapshotter._max_memory_bytes = 8 * 1024**3  # 8 GB
@@ -192,7 +195,10 @@ def test_evaluate_memory_load_high(monkeypatch: pytest.MonkeyPatch, snapshotter:
     assert mock_logger_warn.call_count == 1
 
 
-def test_evaluate_memory_load_low(monkeypatch: pytest.MonkeyPatch, snapshotter: Snapshotter) -> None:
+def test_memory_load_evaluation_silent_on_acceptable_usage(
+    monkeypatch: pytest.MonkeyPatch,
+    snapshotter: Snapshotter,
+) -> None:
     mock_logger_warn = MagicMock()
     monkeypatch.setattr(getLogger('crawlee.autoscaling.snapshotter'), 'warning', mock_logger_warn)
     snapshotter._max_memory_bytes = 8 * 1024**3  # 8 GB
