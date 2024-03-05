@@ -18,18 +18,20 @@ logger = getLogger(__name__)
 
 
 class SystemStatus:
-    """Provides a simple interface to reading system status from a `Snapshotter` instance.
+    """Provides a simple interface for evaluating system resource usage from snapshots collected by `Snapshotter`.
 
-    It only exposes two functions `SystemStatus.get_current_status` and `SystemStatus.get_historical_status`.
-    The system status is calculated using a weighted average of overloaded messages in the snapshots, with the weights
-    being the time intervals between the snapshots. Each resource is calculated separately, and the system
-    is overloaded whenever at least one resource is overloaded. The class is used by the `AutoscaledPool` class.
+    This class aggregates and interprets snapshots from a Snapshotter instance to evaluate the current and historical
+    status of system resources like CPU, memory, event loop, and client API usage. It exposes two methods
+    `get_current_status` and `get_historical_status`. The system information is computed using a weighted average
+    of overloaded messages in the snapshots, with the weights being the time intervals between the snapshots.
+    Each resource is computed separately, and the system is considered as overloaded whenever at least one resource
+    is overloaded.
 
-    `SystemStatus.get_current_status` returns a boolean that represents the current status of the system. The length
-    of the current timeframe in seconds is configurable by the `currentHistorySecs` option and represents the max age
-    of snapshots to be considered for the calculation.
+    `get_current_status` returns a `SystemInfo` data structure that represents the current status
+    of the system. The length of the current timeframe in seconds is configurable by the `current_history` option
+    and represents the max age of snapshots to be considered for the computation.
 
-    `SystemStatus.get_historical_status` returns a boolean that represents the long-term status of the system. It
+    `SystemStatus.get_historical_status` returns a `SystemInfo` that represents the long-term status of the system. It
     considers the full snapshot history available in the `Snapshotter` instance.
     """
 
@@ -69,37 +71,37 @@ class SystemStatus:
         self._max_cpu_overloaded_ratio = max_cpu_overloaded_ratio
         self._max_client_overloaded_ratio = max_client_overloaded_ratio
 
-    def get_current_status(self) -> SystemInfo:
-        """Get the current system status.
+    def get_current_status(self: SystemStatus) -> SystemInfo:
+        """Retrieves and evaluates the current status of system resources.
 
-        Returns a `SystemInfo` object where the `is_system_idle` property is `False` if the system has been overloaded
-        in the last `current_history` seconds, and `True` otherwise.
+        Considers snapshots within the `_current_history` timeframe and determines if the system is currently
+        overloaded based on predefined thresholds for each resource type.
 
         Returns:
-            An object representing the current system status.
+            Instance of `SystemInfo` data class representing the current system status.
         """
         return self._get_system_info(self._current_history)
 
-    def get_historical_status(self) -> SystemInfo:
-        """Get the historical system status.
+    def get_historical_status(self: SystemStatus) -> SystemInfo:
+        """Retrieves and evaluates the historical status of system resources.
 
-        Returns a `SystemInfo` where the `is_system_idle` property is set to `False` if the system has been overloaded
-        in the full history of the `Snapshotter` (which is configurable in the `Snapshotter`, and `True` otherwise.
+        Considers the entire history of snapshots from the Snapshotter to assess long-term system performance and
+        determines if the system has been historically overloaded.
 
         Returns:
-            An object representing the historical system status.
+            Instance of `SystemInfo` data class representing the historical system status.
         """
         return self._get_system_info()
 
     def _get_system_info(self: SystemStatus, sample_duration: timedelta | None = None) -> SystemInfo:
-        """Determine if the system is currently idle or overloaded.
+        """Get system information based on the overload state of different resources within a specified duration.
 
         Args:
-            sample_duration: The duration within which to analyze system status.
+            sample_duration: Specific duration for which to evaluate the system status. If None, evaluates across
+                the entire history available in the snapshotter.
 
         Returns:
-            An object representing the system status with an `is_system_idle` property set to `True` if the system
-            has not been overloaded within the specified time duration, and `False` otherwise.
+            Aggregated system status indicating whether the system is idle or overloaded.
         """
         mem_info = self._is_memory_overloaded(sample_duration)
         event_loop_info = self._is_event_loop_overloaded(sample_duration)
@@ -117,11 +119,11 @@ class SystemStatus:
         """Determine if the CPU has been overloaded within a specified time duration.
 
         Args:
-            sample_duration: The duration within which to analyze CPU snapshots.
+            sample_duration: The duration within which to analyze CPU snapshots. If None, evaluates across
+                the entire history available in the snapshotter.
 
         Returns:
-            An object with an `is_overloaded` property set to `True` if the CPU has been overloaded within
-            the specified time duration. Otherwise, `is_overloaded` is set to `False`.
+            CPU load ratio information.
         """
         sample = self._snapshotter.get_cpu_sample(sample_duration)
         return self._is_sample_overloaded(sample, self._max_cpu_overloaded_ratio)
@@ -130,11 +132,11 @@ class SystemStatus:
         """Determine if memory has been overloaded within a specified time duration.
 
         Args:
-            sample_duration: The duration within which to analyze memory snapshots.
+            sample_duration: The duration within which to analyze memory snapshots. If None, evaluates across
+                the entire history available in the snapshotter.
 
         Returns:
-            An object with an `is_overloaded` property set to `True` if memory has been overloaded within the specified
-            time duration. Otherwise, `is_overloaded` is set to `False`.
+            Memory load ratio information.
         """
         sample = self._snapshotter.get_memory_sample(sample_duration)
         return self._is_sample_overloaded(sample, self._max_memory_overloaded_ratio)
@@ -143,11 +145,11 @@ class SystemStatus:
         """Determine if the event loop has been overloaded within a specified time duration.
 
         Args:
-            sample_duration: The duration within which to analyze event loop snapshots.
+            sample_duration: The duration within which to analyze event loop snapshots. If None, evaluates across
+                the entire history available in the snapshotter.
 
         Returns:
-            An object with an `is_overloaded` property set to `True` if the event loop has been overloaded within
-            the specified time duration. Otherwise, `is_overloaded` is set to `False`.
+            Event loop load ratio information.
         """
         sample = self._snapshotter.get_event_loop_sample(sample_duration)
         return self._is_sample_overloaded(sample, self._max_event_loop_overloaded_ratio)
@@ -156,11 +158,11 @@ class SystemStatus:
         """Determine if the client has been overloaded within a specified time duration.
 
         Args:
-            sample_duration: The duration within which to analyze client snapshots.
+            sample_duration: The duration within which to analyze client snapshots. If None, evaluates across
+                the entire history available in the snapshotter.
 
         Returns:
-            An object with an `is_overloaded` property set to `True` if the client has been overloaded within
-            the specified time duration. Otherwise, `is_overloaded` is set to `False`.
+            Client load ratio information.
         """
         sample = self._snapshotter.get_client_sample(sample_duration)
         return self._is_sample_overloaded(sample, self._max_client_overloaded_ratio)
@@ -169,7 +171,7 @@ class SystemStatus:
         """Determine if a sample of snapshot data is overloaded based on a specified ratio.
 
         Args:
-            sample: A sequence of snapshot data to analyze.
+            sample: A list of snapshot data to analyze.
             max_ratio: The ratio threshold to consider the sample as overloaded.
 
         Returns:
