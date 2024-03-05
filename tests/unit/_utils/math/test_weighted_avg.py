@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from crawlee._utils.math import weighted_avg
+from crawlee._utils.math import get_weighted_avg
 
 
 @pytest.mark.parametrize(
@@ -17,14 +17,14 @@ from crawlee._utils.math import weighted_avg
     ids=['basic', 'fractional_weights', 'zero_weight', 'all_equal_weights', 'negative_weights'],
 )
 def test__weighted_avg__basic(values: list[float], weights: list[float], expected: float) -> None:
-    assert weighted_avg(values, weights) == expected
+    assert get_weighted_avg(values, weights) == expected
 
 
 def test__weighted_avg__empty() -> None:
     values: list[float] = []
     weights: list[float] = []
     with pytest.raises(ValueError, match='Values and weights lists must not be empty'):
-        weighted_avg(values, weights)
+        get_weighted_avg(values, weights)
 
 
 @pytest.mark.parametrize(
@@ -36,11 +36,11 @@ def test__weighted_avg__empty() -> None:
 )
 def test__weighted_avg__unequal_length_lists(values: list[float], weights: list[float]) -> None:
     with pytest.raises(ValueError, match='Values and weights must be of equal length'):
-        weighted_avg(values, weights)
+        get_weighted_avg(values, weights)
 
 
 def test__weighted_avg__zero_total_weight() -> None:
     values: list[float] = [1, 2, 3]
     weights: list[float] = [0, 0, 0]
     with pytest.raises(ValueError, match='Total weight cannot be zero'):
-        weighted_avg(values, weights)
+        get_weighted_avg(values, weights)

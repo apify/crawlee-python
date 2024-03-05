@@ -7,7 +7,14 @@ from typing import Union
 
 @dataclass
 class LoadRatioInfo:
-    """Represents the load ratio of a resource."""
+    """Represents the load ratio of a resource.
+
+    Args:
+        limit_ratio: The maximum ratio of overloaded and non-overloaded samples. If the actual ratio exceeds this
+            value, the resource is considered as overloaded.
+
+        actual_ratio: The actual ratio of overloaded and non-overloaded samples.
+    """
 
     limit_ratio: float
     actual_ratio: float
@@ -20,7 +27,15 @@ class LoadRatioInfo:
 
 @dataclass
 class SystemInfo:
-    """Represents the current status of the system."""
+    """Represents the current status of the system.
+
+    Args:
+        cpu_info: The CPU load ratio.
+        mem_info: The memory load ratio.
+        event_loop_info: The event loop load ratio.
+        client_info: The client load ratio.
+        created_at: The time at which the measurement was taken.
+    """
 
     cpu_info: LoadRatioInfo
     mem_info: LoadRatioInfo
@@ -41,12 +56,12 @@ class SystemInfo:
     def __str__(self) -> str:
         """Get a string representation of the system info."""
         stats = {
-            'cpu': self.cpu_info.actual_ratio if self.cpu_info else '-',
-            'mem': self.mem_info.actual_ratio if self.mem_info else '-',
-            'event_lopp': self.event_loop_info.actual_ratio if self.event_loop_info else '-',
-            'client_info': self.client_info.actual_ratio if self.client_info else '-',
+            'cpu': self.cpu_info.actual_ratio,
+            'mem': self.mem_info.actual_ratio,
+            'event_lopp': self.event_loop_info.actual_ratio,
+            'client_info': self.client_info.actual_ratio,
         }
-        return ';'.join(f'{name} = {ratio}' for name, ratio in stats.items())
+        return '; '.join(f'{name} = {ratio}' for name, ratio in stats.items())
 
 
 @dataclass

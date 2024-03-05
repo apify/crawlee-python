@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from more_itertools import pairwise
 
-from crawlee._utils.math import weighted_avg
+from crawlee._utils.math import get_weighted_avg
 from crawlee.autoscaling.types import LoadRatioInfo, Snapshot, SystemInfo
 
 if TYPE_CHECKING:
@@ -165,30 +165,27 @@ class SystemStatus:
         sample = self.snapshotter.get_client_sample(sample_duration)
         return self._is_sample_overloaded(sample, self.max_client_overloaded_ratio)
 
-    def _is_sample_overloaded(self: SystemStatus, sample: list[Snapshot], ratio: float) -> LoadRatioInfo:
+    def _is_sample_overloaded(self: SystemStatus, sample: list[Snapshot], max_ratio: float) -> LoadRatioInfo:
         """Determine if a sample of snapshot data is overloaded based on a specified ratio.
 
         Args:
             sample: A sequence of snapshot data to analyze.
-            ratio: The ratio threshold to consider the sample as overloaded.
+            max_ratio: The ratio threshold to consider the sample as overloaded.
 
         Returns:
             An object with an `is_overloaded` property set to `True` if the sample is considered overloaded based
             on the specified ratio. Otherwise, `is_overloaded` is set to `False`.
         """
         if not sample:
-            return LoadRatioInfo(limit_ratio=ratio, actual_ratio=0)
+            return LoadRatioInfo(limit_ratio=max_ratio, actual_ratio=0)
 
         weights, values = [], []
 
         for previous, current in pairwise(sample):
             weight = (current.created_at - previous.created_at).total_seconds() or 0.001  # Avoid zero
+            value = float(current.is_overloaded)
             weights.append(weight)
-            values.append(float(current.is_overloaded))
+            values.append(value)
 
-        w_avg = values[0] if len(sample) == 1 else weighted_avg(values, weights)
-
-        return LoadRatioInfo(
-            limit_ratio=ratio,
-            actual_ratio=round(w_avg, 3),
-        )
+        weighted_avg = get_weighted_avg(values, weights)
+        return LoadRatioInfo(limit_ratio=max_ratio, actual_ratio=round(weighted_avg, 3))

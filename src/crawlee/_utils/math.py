@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 
-def weighted_avg(values: list[float], weights: list[float]) -> float:
+def get_weighted_avg(values: list[float], weights: list[float]) -> float:
     """Computes a weighted average of an array of numbers, complemented by an array of weights.
 
     Args:
@@ -19,6 +19,9 @@ def weighted_avg(values: list[float], weights: list[float]) -> float:
 
     if len(values) != len(weights):
         raise ValueError('Values and weights must be of equal length')
+
+    if len(values) == 1:
+        return values[0]
 
     # zip(..., strict=True) can be used once support for Python 3.9 is dropped
     result = sum(value * weight for value, weight in zip(values, weights))
