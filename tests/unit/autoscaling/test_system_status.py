@@ -7,7 +7,14 @@ import pytest
 import pytest_asyncio
 
 from crawlee.autoscaling import Snapshotter, SystemStatus
-from crawlee.autoscaling.types import CpuSnapshot, LoadRatioInfo
+from crawlee.autoscaling.types import (
+    ClientSnapshot,
+    CpuSnapshot,
+    EventLoopSnapshot,
+    LoadRatioInfo,
+    MemorySnapshot,
+    SystemInfo,
+)
 from crawlee.events import LocalEventManager
 
 
@@ -41,10 +48,10 @@ async def test_start_stop_lifecycle() -> None:
 def test_cpu_is_overloaded(snapshotter: Snapshotter, now: datetime) -> None:
     system_status = SystemStatus(snapshotter, max_cpu_overloaded_ratio=0.5)
     system_status._snapshotter._cpu_snapshots = [
-        CpuSnapshot(used_ratio=0.6, max_used_ratio=0.75, created_at=now - timedelta(minutes=4)),
-        CpuSnapshot(used_ratio=0.7, max_used_ratio=0.75, created_at=now - timedelta(minutes=3)),
-        CpuSnapshot(used_ratio=0.8, max_used_ratio=0.75, created_at=now - timedelta(minutes=2)),
-        CpuSnapshot(used_ratio=0.9, max_used_ratio=0.75, created_at=now - timedelta(minutes=1)),
+        CpuSnapshot(used_ratio=0.6, max_used_ratio=0.75, created_at=now - timedelta(minutes=3)),
+        CpuSnapshot(used_ratio=0.7, max_used_ratio=0.75, created_at=now - timedelta(minutes=2)),
+        CpuSnapshot(used_ratio=0.8, max_used_ratio=0.75, created_at=now - timedelta(minutes=1)),
+        CpuSnapshot(used_ratio=0.9, max_used_ratio=0.75, created_at=now),
     ]
     cpu_info = system_status._is_cpu_overloaded()
 
@@ -55,12 +62,117 @@ def test_cpu_is_overloaded(snapshotter: Snapshotter, now: datetime) -> None:
 def test_cpu_is_not_overloaded(snapshotter: Snapshotter, now: datetime) -> None:
     system_status = SystemStatus(snapshotter, max_cpu_overloaded_ratio=0.5)
     system_status._snapshotter._cpu_snapshots = [
-        CpuSnapshot(used_ratio=0.7, max_used_ratio=0.75, created_at=now - timedelta(minutes=4)),
-        CpuSnapshot(used_ratio=0.8, max_used_ratio=0.75, created_at=now - timedelta(minutes=3)),
-        CpuSnapshot(used_ratio=0.6, max_used_ratio=0.75, created_at=now - timedelta(minutes=2)),
-        CpuSnapshot(used_ratio=0.5, max_used_ratio=0.75, created_at=now - timedelta(minutes=1)),
+        CpuSnapshot(used_ratio=0.7, max_used_ratio=0.75, created_at=now - timedelta(minutes=3)),
+        CpuSnapshot(used_ratio=0.8, max_used_ratio=0.75, created_at=now - timedelta(minutes=2)),
+        CpuSnapshot(used_ratio=0.6, max_used_ratio=0.75, created_at=now - timedelta(minutes=1)),
+        CpuSnapshot(used_ratio=0.5, max_used_ratio=0.75, created_at=now),
     ]
     cpu_info = system_status._is_cpu_overloaded()
 
     assert cpu_info == LoadRatioInfo(limit_ratio=0.5, actual_ratio=0.333)
     assert cpu_info.is_overloaded is False
+
+
+def test_get_system_info(snapshotter: Snapshotter, now: datetime) -> None:
+    system_status = SystemStatus(
+        snapshotter,
+        current_history=timedelta(minutes=1),
+        max_cpu_overloaded_ratio=0.5,
+        max_memory_overloaded_ratio=0.5,
+        max_event_loop_overloaded_ratio=0.5,
+        max_client_overloaded_ratio=0.5,
+    )
+
+    # Add CPU snapshots
+    system_status._snapshotter._cpu_snapshots = [
+        CpuSnapshot(used_ratio=0.6, max_used_ratio=0.75, created_at=now - timedelta(minutes=3)),
+        CpuSnapshot(used_ratio=0.7, max_used_ratio=0.75, created_at=now - timedelta(minutes=2)),
+        CpuSnapshot(used_ratio=0.8, max_used_ratio=0.75, created_at=now - timedelta(minutes=1)),
+        CpuSnapshot(used_ratio=0.9, max_used_ratio=0.75, created_at=now),
+    ]
+
+    # Add memory snapshots
+    system_status._snapshotter._memory_snapshots = [
+        MemorySnapshot(
+            total_bytes=16 * 1024**3,
+            current_bytes=4 * 1024**3,
+            max_memory_bytes=12 * 1024**3,
+            max_used_memory_ratio=0.8,
+            created_at=now - timedelta(minutes=3),
+        ),
+        MemorySnapshot(
+            total_bytes=8 * 1024**3,
+            current_bytes=7 * 1024**3,
+            max_memory_bytes=8 * 1024**3,
+            max_used_memory_ratio=0.8,
+            created_at=now - timedelta(minutes=2),
+        ),
+        MemorySnapshot(
+            total_bytes=32 * 1024**3,
+            current_bytes=28 * 1024**3,
+            max_memory_bytes=30 * 1024**3,
+            max_used_memory_ratio=0.8,
+            created_at=now - timedelta(minutes=1),
+        ),
+        MemorySnapshot(
+            total_bytes=64 * 1024**3,
+            current_bytes=48 * 1024**3,
+            max_memory_bytes=60 * 1024**3,
+            max_used_memory_ratio=0.8,
+            created_at=now,
+        ),
+    ]
+
+    # Add event loop snapshots
+    system_status._snapshotter._event_loop_snapshots = [
+        EventLoopSnapshot(
+            delay=timedelta(milliseconds=700),
+            max_delay=timedelta(milliseconds=500),
+            created_at=now - timedelta(minutes=3),
+        ),
+        EventLoopSnapshot(
+            delay=timedelta(milliseconds=600),
+            max_delay=timedelta(milliseconds=500),
+            created_at=now - timedelta(minutes=2),
+        ),
+        EventLoopSnapshot(
+            delay=timedelta(milliseconds=200),
+            max_delay=timedelta(milliseconds=500),
+            created_at=now - timedelta(minutes=1),
+        ),
+        EventLoopSnapshot(
+            delay=timedelta(milliseconds=100),
+            max_delay=timedelta(milliseconds=500),
+            created_at=now,
+        ),
+    ]
+
+    # Add client snapshots
+    system_status._snapshotter._client_snapshots = [
+        ClientSnapshot(num_of_errors=1, max_num_of_errors=2, created_at=now - timedelta(minutes=3)),
+        ClientSnapshot(num_of_errors=1, max_num_of_errors=2, created_at=now - timedelta(minutes=2)),
+        ClientSnapshot(num_of_errors=2, max_num_of_errors=2, created_at=now - timedelta(minutes=1)),
+        ClientSnapshot(num_of_errors=0, max_num_of_errors=2, created_at=now),
+    ]
+
+    # Test current system info
+    current_system_info = system_status.get_current_status()
+    assert current_system_info == SystemInfo(
+        cpu_info=LoadRatioInfo(limit_ratio=system_status._max_cpu_overloaded_ratio, actual_ratio=1.0),
+        memory_info=LoadRatioInfo(limit_ratio=system_status._max_memory_overloaded_ratio, actual_ratio=1.0),
+        event_loop_info=LoadRatioInfo(limit_ratio=system_status._max_cpu_overloaded_ratio, actual_ratio=0),
+        client_info=LoadRatioInfo(limit_ratio=system_status._max_cpu_overloaded_ratio, actual_ratio=0),
+        created_at=current_system_info.created_at,
+    )
+    assert current_system_info.is_system_idle is False
+
+    # Test historical system info
+    historical_system_info = system_status.get_historical_status()
+    assert historical_system_info == SystemInfo(
+        cpu_info=LoadRatioInfo(limit_ratio=system_status._max_cpu_overloaded_ratio, actual_ratio=0.667),
+        memory_info=LoadRatioInfo(limit_ratio=system_status._max_memory_overloaded_ratio, actual_ratio=0.667),
+        event_loop_info=LoadRatioInfo(limit_ratio=system_status._max_cpu_overloaded_ratio, actual_ratio=0.333),
+        client_info=LoadRatioInfo(limit_ratio=system_status._max_cpu_overloaded_ratio, actual_ratio=0),
+        created_at=historical_system_info.created_at,
+    )
+    assert historical_system_info.is_system_idle is False

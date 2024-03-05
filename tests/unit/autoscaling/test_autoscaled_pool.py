@@ -111,7 +111,7 @@ async def test_autoscales(system_status: SystemStatus | Mock) -> None:
     def get_historical_status() -> SystemInfo:
         result = SystemInfo(
             cpu_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
-            mem_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
+            memory_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
             event_loop_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
             client_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
         )

@@ -31,14 +31,14 @@ class SystemInfo:
 
     Args:
         cpu_info: The CPU load ratio.
-        mem_info: The memory load ratio.
+        memory_info: The memory load ratio.
         event_loop_info: The event loop load ratio.
         client_info: The client load ratio.
         created_at: The time at which the measurement was taken.
     """
 
     cpu_info: LoadRatioInfo
-    mem_info: LoadRatioInfo
+    memory_info: LoadRatioInfo
     event_loop_info: LoadRatioInfo
     client_info: LoadRatioInfo
     created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
@@ -48,7 +48,7 @@ class SystemInfo:
         """Indicates whether the system is currently idle or overloaded."""
         return (
             not self.cpu_info.is_overloaded
-            and not self.mem_info.is_overloaded
+            and not self.memory_info.is_overloaded
             and not self.event_loop_info.is_overloaded
             and not self.client_info.is_overloaded
         )
@@ -57,7 +57,7 @@ class SystemInfo:
         """Get a string representation of the system info."""
         stats = {
             'cpu': self.cpu_info.actual_ratio,
-            'mem': self.mem_info.actual_ratio,
+            'mem': self.memory_info.actual_ratio,
             'event_lopp': self.event_loop_info.actual_ratio,
             'client_info': self.client_info.actual_ratio,
         }

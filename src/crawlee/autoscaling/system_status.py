@@ -107,7 +107,7 @@ class SystemStatus:
         client_info = self._is_client_overloaded(sample_duration)
 
         return SystemInfo(
-            mem_info=mem_info,
+            memory_info=mem_info,
             event_loop_info=event_loop_info,
             cpu_info=cpu_info,
             client_info=client_info,
@@ -176,9 +176,6 @@ class SystemStatus:
             An object with an `is_overloaded` property set to `True` if the sample is considered overloaded based
             on the specified ratio. Otherwise, `is_overloaded` is set to `False`.
         """
-        logger.debug('sample: %s; max_ratio: %s', sample, max_ratio)
-        print(f'sample: {sample}; max_ratio: {max_ratio}')
-
         if not sample:
             return LoadRatioInfo(limit_ratio=max_ratio, actual_ratio=0)
 
@@ -189,8 +186,6 @@ class SystemStatus:
             value = float(current.is_overloaded)
             weights.append(weight)
             values.append(value)
-
-        print(f'weights: {weights}; values: {values}')
 
         try:
             weighted_avg = get_weighted_avg(values, weights)
