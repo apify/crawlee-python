@@ -62,12 +62,12 @@ class SystemStatus:
             max_client_overloaded_ratio: Sets the maximum ratio of overloaded snapshots in a Client sample.
                 If the sample exceeds this ratio, the system will be overloaded.
         """
-        self.snapshotter = snapshotter
-        self.current_history = current_history
-        self.max_memory_overloaded_ratio = max_memory_overloaded_ratio
-        self.max_event_loop_overloaded_ratio = max_event_loop_overloaded_ratio
-        self.max_cpu_overloaded_ratio = max_cpu_overloaded_ratio
-        self.max_client_overloaded_ratio = max_client_overloaded_ratio
+        self._snapshotter = snapshotter
+        self._current_history = current_history
+        self._max_memory_overloaded_ratio = max_memory_overloaded_ratio
+        self._max_event_loop_overloaded_ratio = max_event_loop_overloaded_ratio
+        self._max_cpu_overloaded_ratio = max_cpu_overloaded_ratio
+        self._max_client_overloaded_ratio = max_client_overloaded_ratio
 
     def get_current_status(self) -> SystemInfo:
         """Get the current system status.
@@ -78,7 +78,7 @@ class SystemStatus:
         Returns:
             An object representing the current system status.
         """
-        return self._get_system_info(self.current_history)
+        return self._get_system_info(self._current_history)
 
     def get_historical_status(self) -> SystemInfo:
         """Get the historical system status.
@@ -113,7 +113,20 @@ class SystemStatus:
             client_info=client_info,
         )
 
-    def _is_memory_overloaded(self, sample_duration: timedelta | None = None) -> LoadRatioInfo:
+    def _is_cpu_overloaded(self: SystemStatus, sample_duration: timedelta | None = None) -> LoadRatioInfo:
+        """Determine if the CPU has been overloaded within a specified time duration.
+
+        Args:
+            sample_duration: The duration within which to analyze CPU snapshots.
+
+        Returns:
+            An object with an `is_overloaded` property set to `True` if the CPU has been overloaded within
+            the specified time duration. Otherwise, `is_overloaded` is set to `False`.
+        """
+        sample = self._snapshotter.get_cpu_sample(sample_duration)
+        return self._is_sample_overloaded(sample, self._max_cpu_overloaded_ratio)
+
+    def _is_memory_overloaded(self: SystemStatus, sample_duration: timedelta | None = None) -> LoadRatioInfo:
         """Determine if memory has been overloaded within a specified time duration.
 
         Args:
@@ -123,8 +136,8 @@ class SystemStatus:
             An object with an `is_overloaded` property set to `True` if memory has been overloaded within the specified
             time duration. Otherwise, `is_overloaded` is set to `False`.
         """
-        sample = self.snapshotter.get_memory_sample(sample_duration)
-        return self._is_sample_overloaded(sample, self.max_memory_overloaded_ratio)
+        sample = self._snapshotter.get_memory_sample(sample_duration)
+        return self._is_sample_overloaded(sample, self._max_memory_overloaded_ratio)
 
     def _is_event_loop_overloaded(self, sample_duration: timedelta | None = None) -> LoadRatioInfo:
         """Determine if the event loop has been overloaded within a specified time duration.
@@ -136,21 +149,8 @@ class SystemStatus:
             An object with an `is_overloaded` property set to `True` if the event loop has been overloaded within
             the specified time duration. Otherwise, `is_overloaded` is set to `False`.
         """
-        sample = self.snapshotter.get_event_loop_sample(sample_duration)
-        return self._is_sample_overloaded(sample, self.max_event_loop_overloaded_ratio)
-
-    def _is_cpu_overloaded(self, sample_duration: timedelta | None = None) -> LoadRatioInfo:
-        """Determine if the CPU has been overloaded within a specified time duration.
-
-        Args:
-            sample_duration: The duration within which to analyze CPU snapshots.
-
-        Returns:
-            An object with an `is_overloaded` property set to `True` if the CPU has been overloaded within
-            the specified time duration. Otherwise, `is_overloaded` is set to `False`.
-        """
-        sample = self.snapshotter.get_cpu_sample(sample_duration)
-        return self._is_sample_overloaded(sample, self.max_cpu_overloaded_ratio)
+        sample = self._snapshotter.get_event_loop_sample(sample_duration)
+        return self._is_sample_overloaded(sample, self._max_event_loop_overloaded_ratio)
 
     def _is_client_overloaded(self, sample_duration: timedelta | None = None) -> LoadRatioInfo:
         """Determine if the client has been overloaded within a specified time duration.
@@ -162,8 +162,8 @@ class SystemStatus:
             An object with an `is_overloaded` property set to `True` if the client has been overloaded within
             the specified time duration. Otherwise, `is_overloaded` is set to `False`.
         """
-        sample = self.snapshotter.get_client_sample(sample_duration)
-        return self._is_sample_overloaded(sample, self.max_client_overloaded_ratio)
+        sample = self._snapshotter.get_client_sample(sample_duration)
+        return self._is_sample_overloaded(sample, self._max_client_overloaded_ratio)
 
     def _is_sample_overloaded(self: SystemStatus, sample: list[Snapshot], max_ratio: float) -> LoadRatioInfo:
         """Determine if a sample of snapshot data is overloaded based on a specified ratio.
@@ -176,6 +176,9 @@ class SystemStatus:
             An object with an `is_overloaded` property set to `True` if the sample is considered overloaded based
             on the specified ratio. Otherwise, `is_overloaded` is set to `False`.
         """
+        logger.debug('sample: %s; max_ratio: %s', sample, max_ratio)
+        print(f'sample: {sample}; max_ratio: {max_ratio}')
+
         if not sample:
             return LoadRatioInfo(limit_ratio=max_ratio, actual_ratio=0)
 
@@ -187,5 +190,12 @@ class SystemStatus:
             weights.append(weight)
             values.append(value)
 
-        weighted_avg = get_weighted_avg(values, weights)
+        print(f'weights: {weights}; values: {values}')
+
+        try:
+            weighted_avg = get_weighted_avg(values, weights)
+        except ValueError:
+            logger.warning('Total weight cannot be zero')
+            return LoadRatioInfo(limit_ratio=max_ratio, actual_ratio=0)
+
         return LoadRatioInfo(limit_ratio=max_ratio, actual_ratio=round(weighted_avg, 3))
