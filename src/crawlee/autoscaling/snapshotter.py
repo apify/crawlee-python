@@ -28,7 +28,7 @@ class Snapshotter:
     """
 
     def __init__(
-        self: Snapshotter,
+        self,
         event_manager: EventManager,
         *,
         event_loop_snapshot_interval: timedelta = timedelta(milliseconds=500),
@@ -110,14 +110,14 @@ class Snapshotter:
 
         self._timestamp_of_last_memory_warning: datetime = datetime.now(timezone.utc) - timedelta(hours=1)
 
-    async def start(self: Snapshotter) -> None:
+    async def start(self) -> None:
         """Starts capturing snapshots at configured intervals."""
         self._event_manager.on(event=Event.SYSTEM_INFO, listener=self._snapshot_cpu)
         self._event_manager.on(event=Event.SYSTEM_INFO, listener=self._snapshot_memory)
         self._snapshot_event_loop_task.start()
         self._snapshot_client_task.start()
 
-    async def stop(self: Snapshotter) -> None:
+    async def stop(self) -> None:
         """Stops all resource capturing.
 
         This method stops capturing snapshots of system resources (CPU, memory, event loop, and client information).
@@ -128,7 +128,7 @@ class Snapshotter:
         await self._snapshot_event_loop_task.stop()
         await self._snapshot_client_task.stop()
 
-    def get_memory_sample(self: Snapshotter, duration: timedelta | None = None) -> list[Snapshot]:
+    def get_memory_sample(self, duration: timedelta | None = None) -> list[Snapshot]:
         """Returns a sample of the latest memory snapshots.
 
         Args:
@@ -140,7 +140,7 @@ class Snapshotter:
         snapshots = cast(list[Snapshot], self._memory_snapshots)
         return self._get_sample(snapshots, duration)
 
-    def get_event_loop_sample(self: Snapshotter, duration: timedelta | None = None) -> list[Snapshot]:
+    def get_event_loop_sample(self, duration: timedelta | None = None) -> list[Snapshot]:
         """Returns a sample of the latest event loop snapshots.
 
         Args:
@@ -152,7 +152,7 @@ class Snapshotter:
         snapshots = cast(list[Snapshot], self._event_loop_snapshots)
         return self._get_sample(snapshots, duration)
 
-    def get_cpu_sample(self: Snapshotter, duration: timedelta | None = None) -> list[Snapshot]:
+    def get_cpu_sample(self, duration: timedelta | None = None) -> list[Snapshot]:
         """Returns a sample of the latest CPU snapshots.
 
         Args:
@@ -164,7 +164,7 @@ class Snapshotter:
         snapshots = cast(list[Snapshot], self._cpu_snapshots)
         return self._get_sample(snapshots, duration)
 
-    def get_client_sample(self: Snapshotter, duration: timedelta | None = None) -> list[Snapshot]:
+    def get_client_sample(self, duration: timedelta | None = None) -> list[Snapshot]:
         """Returns a sample of the latest client snapshots.
 
         Args:
@@ -188,7 +188,7 @@ class Snapshotter:
         latest_time = snapshots[-1].created_at
         return [snapshot for snapshot in reversed(snapshots) if latest_time - snapshot.created_at <= duration]
 
-    def _snapshot_cpu(self: Snapshotter, event_data: EventSystemInfoData) -> None:
+    def _snapshot_cpu(self, event_data: EventSystemInfoData) -> None:
         """Creates a snapshot of current CPU usage using the Apify platform `SystemInfo` event.
 
         This method does not perform CPU usage measurement. Instead, it just reads the data received through
@@ -207,7 +207,7 @@ class Snapshotter:
         self._prune_snapshots(snapshots, event_data.cpu_info.created_at)
         self._cpu_snapshots.append(snapshot)
 
-    def _snapshot_memory(self: Snapshotter, event_data: EventSystemInfoData) -> None:
+    def _snapshot_memory(self, event_data: EventSystemInfoData) -> None:
         """Creates a snapshot of current memory usage using the Apify platform `SystemInfo` event.
 
         This method does not perform memory usage measurement. Instead, it just reads the data received through
@@ -230,7 +230,7 @@ class Snapshotter:
 
         self._evaluate_memory_load(event_data.memory_info.current_bytes, event_data.memory_info.created_at)
 
-    def _snapshot_event_loop(self: Snapshotter) -> None:
+    def _snapshot_event_loop(self) -> None:
         """Creates a snapshot of the current event loop state.
 
         This method assesses the event loop's responsiveness by measuring the time elapsed between the creation of
@@ -249,7 +249,7 @@ class Snapshotter:
         self._prune_snapshots(snapshots, snapshot.created_at)
         self._event_loop_snapshots.append(snapshot)
 
-    def _snapshot_client(self: Snapshotter) -> None:
+    def _snapshot_client(self) -> None:
         """Creates a snapshot of the current API state by checking for rate limit errors (HTTP 429).
 
         Only errors produced by a 2nd retry of the API call are considered for snapshotting since earlier errors may
@@ -266,7 +266,7 @@ class Snapshotter:
         self._prune_snapshots(snapshots, snapshot.created_at)
         self._client_snapshots.append(snapshot)
 
-    def _prune_snapshots(self: Snapshotter, snapshots: list[Snapshot], now: datetime) -> None:
+    def _prune_snapshots(self, snapshots: list[Snapshot], now: datetime) -> None:
         """Removes snapshots that are older than the `self._snapshot_history`.
 
         This method modifies the list of snapshots in place, removing all snapshots that are older than the defined
@@ -292,7 +292,7 @@ class Snapshotter:
             snapshots.clear()
 
     def _evaluate_memory_load(
-        self: Snapshotter,
+        self,
         current_memory_usage_bytes: int,
         snapshot_timestamp: datetime,
     ) -> None:

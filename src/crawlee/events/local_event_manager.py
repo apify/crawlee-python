@@ -30,7 +30,7 @@ class LocalEventManager(EventManager):
     """
 
     def __init__(
-        self: LocalEventManager,
+        self,
         system_info_interval: timedelta = timedelta(seconds=60),
         timeout: timedelta | None = None,
     ) -> None:

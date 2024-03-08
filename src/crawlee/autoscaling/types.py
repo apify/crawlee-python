@@ -79,7 +79,7 @@ class CpuSnapshot:
     created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
 
     @property
-    def is_overloaded(self: CpuSnapshot) -> bool:
+    def is_overloaded(self) -> bool:
         """Returns whether the CPU is considered as overloaded."""
         return self.used_ratio > self.max_used_ratio
 
@@ -103,7 +103,7 @@ class MemorySnapshot:
     created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
 
     @property
-    def is_overloaded(self: MemorySnapshot) -> bool:
+    def is_overloaded(self) -> bool:
         """Returns whether the memory is considered as overloaded."""
         return (self.current_bytes / self.max_memory_bytes) > self.max_used_memory_ratio
 
@@ -123,12 +123,12 @@ class EventLoopSnapshot:
     created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
 
     @property
-    def max_delay_exceeded(self: EventLoopSnapshot) -> timedelta:
+    def max_delay_exceeded(self) -> timedelta:
         """Returns the amount of time by which the delay exceeds the maximum delay."""
         return max(self.delay - self.max_delay, timedelta(seconds=0))
 
     @property
-    def is_overloaded(self: EventLoopSnapshot) -> bool:
+    def is_overloaded(self) -> bool:
         """Returns whether the event loop is considered as overloaded."""
         return self.delay > self.max_delay
 
@@ -148,7 +148,7 @@ class ClientSnapshot:
     created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
 
     @property
-    def is_overloaded(self: ClientSnapshot) -> bool:
+    def is_overloaded(self) -> bool:
         """Returns whether the client is considered as overloaded."""
         return self.num_of_errors > self.max_num_of_errors
 
