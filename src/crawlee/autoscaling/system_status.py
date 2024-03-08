@@ -51,7 +51,7 @@ class SystemStatus:
     """
 
     def __init__(
-        self: SystemStatus,
+        self,
         snapshotter: Snapshotter,
         current_history: timedelta = timedelta(seconds=5),
         max_memory_overloaded_ratio: float = 0.2,
@@ -66,7 +66,7 @@ class SystemStatus:
         self.max_cpu_overloaded_ratio = max_cpu_overloaded_ratio
         self.max_client_overloaded_ratio = max_client_overloaded_ratio
 
-    def get_current_status(self: SystemStatus) -> SystemInfo:
+    def get_current_status(self) -> SystemInfo:
         """Get the current system status.
 
         Returns a `SystemInfo` object where the `is_system_idle` property is `False` if the system has been overloaded
@@ -77,7 +77,7 @@ class SystemStatus:
         """
         return self._is_system_idle(self.current_history)
 
-    def get_historical_status(self: SystemStatus) -> SystemInfo:
+    def get_historical_status(self) -> SystemInfo:
         """Get the historical system status.
 
         Returns a `SystemInfo` where the `is_system_idle` property is set to `False` if the system has been overloaded
@@ -88,7 +88,7 @@ class SystemStatus:
         """
         return self._is_system_idle()
 
-    def _is_system_idle(self: SystemStatus, sample_duration: timedelta | None = None) -> SystemInfo:
+    def _is_system_idle(self, sample_duration: timedelta | None = None) -> SystemInfo:
         """Determine if the system is currently idle or overloaded.
 
         Args:
@@ -110,7 +110,7 @@ class SystemStatus:
             client_info=client_info,
         )
 
-    def _is_memory_overloaded(self: SystemStatus, sample_duration: timedelta | None = None) -> LoadRatioInfo:
+    def _is_memory_overloaded(self, sample_duration: timedelta | None = None) -> LoadRatioInfo:
         """Determine if memory has been overloaded within a specified time duration.
 
         Args:
@@ -123,7 +123,7 @@ class SystemStatus:
         sample = self.snapshotter.get_memory_sample(sample_duration)
         return self._is_sample_overloaded(sample, self.max_memory_overloaded_ratio)
 
-    def _is_event_loop_overloaded(self: SystemStatus, sample_duration: timedelta | None = None) -> LoadRatioInfo:
+    def _is_event_loop_overloaded(self, sample_duration: timedelta | None = None) -> LoadRatioInfo:
         """Determine if the event loop has been overloaded within a specified time duration.
 
         Args:
@@ -136,7 +136,7 @@ class SystemStatus:
         sample = self.snapshotter.get_event_loop_sample(sample_duration)
         return self._is_sample_overloaded(sample, self.max_event_loop_overloaded_ratio)
 
-    def _is_cpu_overloaded(self: SystemStatus, sample_duration: timedelta | None = None) -> LoadRatioInfo:
+    def _is_cpu_overloaded(self, sample_duration: timedelta | None = None) -> LoadRatioInfo:
         """Determine if the CPU has been overloaded within a specified time duration.
 
         Args:
@@ -149,7 +149,7 @@ class SystemStatus:
         sample = self.snapshotter.get_cpu_sample(sample_duration)
         return self._is_sample_overloaded(sample, self.max_cpu_overloaded_ratio)
 
-    def _is_client_overloaded(self: SystemStatus, sample_duration: timedelta | None = None) -> LoadRatioInfo:
+    def _is_client_overloaded(self, sample_duration: timedelta | None = None) -> LoadRatioInfo:
         """Determine if the client has been overloaded within a specified time duration.
 
         Args:
@@ -162,7 +162,7 @@ class SystemStatus:
         sample = self.snapshotter.get_client_sample(sample_duration)
         return self._is_sample_overloaded(sample, self.max_client_overloaded_ratio)
 
-    def _is_sample_overloaded(self: SystemStatus, sample: Sequence[Snapshot], ratio: float) -> LoadRatioInfo:
+    def _is_sample_overloaded(self, sample: Sequence[Snapshot], ratio: float) -> LoadRatioInfo:
         """Determine if a sample of snapshot data is overloaded based on a specified ratio.
 
         Args:

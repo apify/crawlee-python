@@ -48,7 +48,7 @@ class CrawleeLogFormatter(logging.Formatter):
     empty_record = logging.LogRecord('dummy', 0, 'dummy', 0, 'dummy', None, None)
 
     def __init__(
-        self: CrawleeLogFormatter,
+        self,
         include_logger_name: bool = True,  # noqa: FBT001, FBT002
         *args: Any,
         **kwargs: Any,
@@ -63,7 +63,7 @@ class CrawleeLogFormatter(logging.Formatter):
         super().__init__(*args, **kwargs)
         self.include_logger_name = include_logger_name
 
-    def _get_extra_fields(self: CrawleeLogFormatter, record: logging.LogRecord) -> dict[str, Any]:
+    def _get_extra_fields(self, record: logging.LogRecord) -> dict[str, Any]:
         extra_fields: dict[str, Any] = {}
         for key, value in record.__dict__.items():
             if key not in self.empty_record.__dict__:
@@ -71,7 +71,7 @@ class CrawleeLogFormatter(logging.Formatter):
 
         return extra_fields
 
-    def format(self: CrawleeLogFormatter, record: logging.LogRecord) -> str:
+    def format(self, record: logging.LogRecord) -> str:
         """Format the log record nicely.
 
         This formats the log record so that it:

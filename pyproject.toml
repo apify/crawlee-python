@@ -75,6 +75,8 @@ line-length = 120
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
+    "ANN101",  # Missing type annotation for `{name}` in method
+    "ANN102",  # Missing type annotation for `{name}` in classmethod
     "ANN401",  # Dynamically typed expressions (typing.Any) are disallowed in {filename}
     "BLE001",  # Do not catch blind exception
     "C901",    # `{name}` is too complex

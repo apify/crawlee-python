@@ -16,7 +16,7 @@ class LoadRatioInfo:
     actual_ratio: float
 
     @property
-    def is_overloaded(self: LoadRatioInfo) -> bool:
+    def is_overloaded(self) -> bool:
         """Returns whether the resource is overloaded."""
         return self.actual_ratio > self.limit_ratio
 
@@ -33,7 +33,7 @@ class SystemInfo:
     mem_current_bytes: int | None = None
 
     @property
-    def is_system_idle(self: SystemInfo) -> bool:
+    def is_system_idle(self) -> bool:
         """Indicates whether the system is currently idle or overloaded."""
         if self.mem_info is None or self.event_loop_info is None or self.cpu_info is None or self.client_info is None:
             raise ValueError('SystemInfo is missing some load ratio info.')
@@ -45,7 +45,7 @@ class SystemInfo:
             and not self.client_info.is_overloaded
         )
 
-    def __str__(self: SystemInfo) -> str:
+    def __str__(self) -> str:
         """Get a string representation of the system info."""
         stats = {
             'cpu': self.cpu_info.actual_ratio if self.cpu_info else '-',

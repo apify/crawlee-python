@@ -38,7 +38,7 @@ class Snapshotter:
     """
 
     def get_memory_sample(  # type: ignore
-        self: Snapshotter,
+        self,
         sample_duration: timedelta | None = None,
     ) -> Sequence[MemorySnapshot]:
         """Returns a sample of the latest memory snapshots.
@@ -51,7 +51,7 @@ class Snapshotter:
         """
 
     def get_event_loop_sample(  # type: ignore
-        self: Snapshotter,
+        self,
         sample_duration: timedelta | None = None,
     ) -> Sequence[EventLoopSnapshot]:
         """Returns a sample of the latest event loop snapshots.
@@ -64,7 +64,7 @@ class Snapshotter:
         """
 
     def get_cpu_sample(  # type: ignore
-        self: Snapshotter,
+        self,
         sample_duration: timedelta | None = None,
     ) -> Sequence[CpuSnapshot]:
         """Returns a sample of the latest CPU snapshots.
@@ -77,7 +77,7 @@ class Snapshotter:
         """
 
     def get_client_sample(  # type: ignore
-        self: Snapshotter,
+        self,
         sample_duration: timedelta | None = None,
     ) -> Sequence[ClientSnapshot]:
         """Returns a sample of the latest client snapshots.
