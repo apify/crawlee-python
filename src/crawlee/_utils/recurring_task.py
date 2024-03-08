@@ -19,13 +19,13 @@ class RecurringTask:
         task: The underlying task object.
     """
 
-    def __init__(self: RecurringTask, func: Callable, delay: timedelta) -> None:
+    def __init__(self, func: Callable, delay: timedelta) -> None:
         logger.debug(f'Calling RecurringTask.__init__(func={func.__name__}, delay={delay})...')
         self.func = func
         self.delay = delay
         self.task: asyncio.Task | None = None
 
-    async def _wrapper(self: RecurringTask) -> None:
+    async def _wrapper(self) -> None:
         """Internal method that repeatedly executes the provided function with the specified delay."""
         logger.debug('Calling RecurringTask._wrapper()...')
         sleep_time_secs = self.delay.total_seconds()
@@ -34,12 +34,12 @@ class RecurringTask:
             await self.func() if asyncio.iscoroutinefunction(self.func) else self.func()
             await asyncio.sleep(sleep_time_secs)
 
-    def start(self: RecurringTask) -> None:
+    def start(self) -> None:
         """Start the recurring task execution."""
         logger.debug('Calling RecurringTask.start()...')
         self.task = asyncio.create_task(self._wrapper(), name=f'Task-recurring-{self.func.__name__}')
 
-    async def stop(self: RecurringTask) -> None:
+    async def stop(self) -> None:
         """Stop the recurring task execution."""
         logger.debug('Calling RecurringTask.stop()...')
         if self.task:

@@ -29,7 +29,7 @@ class AutoscaledPool:
     """
 
     def __init__(
-        self: AutoscaledPool,
+        self,
         *,
         system_status: SystemStatus,
         run_task_function: Callable[..., Awaitable],
@@ -136,7 +136,7 @@ class AutoscaledPool:
         self._is_paused = False
         self._is_running = False
 
-    async def run(self: AutoscaledPool) -> None:
+    async def run(self) -> None:
         """Start the autoscaled pool and return when all tasks are completed and `is_finished_function` returns True.
 
         If there is an exception in one of the tasks, it will be re-raised.
@@ -185,30 +185,30 @@ class AutoscaledPool:
 
             logger.debug('Pool cleanup finished')
 
-    async def abort(self: AutoscaledPool) -> None:
+    async def abort(self) -> None:
         """Interrupt the autoscaled pool and all the tasks in progress."""
         self._run_result.set_exception(AbortError())
         await self._cleanup_done.wait()
 
-    def pause(self: AutoscaledPool) -> None:
+    def pause(self) -> None:
         """Pause the autoscaled pool so that it does not start new tasks."""
         self._is_paused = True
 
-    def resume(self: AutoscaledPool) -> None:
+    def resume(self) -> None:
         """Resume a paused autoscaled pool so that it continues starting new tasks."""
         self._is_paused = False
 
     @property
-    def desired_concurrency(self: AutoscaledPool) -> int:
+    def desired_concurrency(self) -> int:
         """The current desired concurrency, possibly updated by the pool according to system load."""
         return self._desired_concurrency
 
     @property
-    def current_concurrency(self: AutoscaledPool) -> int:
+    def current_concurrency(self) -> int:
         """The number of concurrent tasks in progress."""
         return len(self._worker_tasks)
 
-    def _autoscale(self: AutoscaledPool) -> None:
+    def _autoscale(self) -> None:
         """Inspect system load status and adjust desired concurrency if necessary. Do not call directly."""
         status = self._system_status.get_historical_status()
 
@@ -228,7 +228,7 @@ class AutoscaledPool:
             step = math.ceil(self._scale_down_step_ratio * self._desired_concurrency)
             self._desired_concurrency = max(self._min_concurrency, self._desired_concurrency - step)
 
-    def _log_system_status(self: AutoscaledPool) -> None:
+    def _log_system_status(self) -> None:
         system_status = self._system_status.get_historical_status()
 
         logger.info(
@@ -237,7 +237,7 @@ class AutoscaledPool:
             f'{system_status!s}'
         )
 
-    async def _worker_task_orchestrator(self: AutoscaledPool) -> None:
+    async def _worker_task_orchestrator(self) -> None:
         """Launches worker tasks whenever there is free capacity and a task is ready.
 
         Exits when `is_finished_function` returns True.
@@ -272,7 +272,7 @@ class AutoscaledPool:
             if not (self._run_result.done() and self._run_result.exception() is not None):
                 self._run_result.set_result(object())
 
-    def _reap_worker_task(self: AutoscaledPool, task: asyncio.Task) -> None:
+    def _reap_worker_task(self, task: asyncio.Task) -> None:
         """A callback for finished worker tasks.
 
         - It interrupts the run in case of an exception,
@@ -285,7 +285,7 @@ class AutoscaledPool:
         if not task.cancelled() and (exception := task.exception()) and not self._run_result.done():
             self._run_result.set_exception(exception)
 
-    async def _worker_task(self: AutoscaledPool) -> None:
+    async def _worker_task(self) -> None:
         try:
             await asyncio.wait_for(
                 self._run_task_function(),

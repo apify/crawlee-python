@@ -35,13 +35,13 @@ class LocalEventManager(EventManager):
         _emit_system_info_event_rec_task: The recurring task for emitting system info events.
     """
 
-    def __init__(self: LocalEventManager, config: Config, timeout: timedelta | None = None) -> None:
+    def __init__(self, config: Config, timeout: timedelta | None = None) -> None:
         self.config = config
         self.timeout = timeout
         self._emit_system_info_event_rec_task: RecurringTask | None = None
         super().__init__()
 
-    async def __aenter__(self: LocalEventManager) -> LocalEventManager:
+    async def __aenter__(self) -> LocalEventManager:
         """Initializes the local event manager upon entering the async context.
 
         It starts emitting system info events at regular intervals.
@@ -55,7 +55,7 @@ class LocalEventManager(EventManager):
         return self
 
     async def __aexit__(
-        self: LocalEventManager,
+        self,
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
         exc_traceback: TracebackType | None,
@@ -74,14 +74,14 @@ class LocalEventManager(EventManager):
 
         await super().close(timeout=self.timeout)
 
-    async def _emit_system_info_event(self: LocalEventManager) -> None:
+    async def _emit_system_info_event(self) -> None:
         """Emits a system info event with the current CPU and memory usage."""
         logger.debug('Calling LocalEventManager._emit_system_info_event()...')
         system_info = await self._get_system_info()
         event_data = EventSystemInfoData(system_info=system_info)
         self.emit(event=Event.SYSTEM_INFO, event_data=event_data)
 
-    async def _get_system_info(self: LocalEventManager) -> SystemInfo:
+    async def _get_system_info(self) -> SystemInfo:
         """Gathers system info about the CPU and memory usage.
 
         Returns:
@@ -96,7 +96,7 @@ class LocalEventManager(EventManager):
             mem_current_bytes=mem_usage,
         )
 
-    async def _get_cpu_info(self: LocalEventManager) -> LoadRatioInfo:
+    async def _get_cpu_info(self) -> LoadRatioInfo:
         """Retrieves the current CPU usage and calculates the load ratio.
 
         It utilizes the `psutil` library. Function `psutil.cpu_percent()` returns a float representing the current
@@ -110,7 +110,7 @@ class LocalEventManager(EventManager):
         cpu_ratio = cpu_percent / 100
         return LoadRatioInfo(limit_ratio=self.config.max_used_cpu_ratio, actual_ratio=cpu_ratio)
 
-    def _get_current_mem_usage(self: LocalEventManager) -> int:
+    def _get_current_mem_usage(self) -> int:
         """Retrieves the current memory usage of the process and its children.
 
         Returns:

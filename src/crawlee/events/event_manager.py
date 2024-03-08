@@ -34,7 +34,7 @@ class EventManager:
             registered with the event emitter.
     """
 
-    def __init__(self: EventManager) -> None:
+    def __init__(self) -> None:
         logger.debug('Calling EventManager.__init__()...')
         self._event_emitter = AsyncIOEventEmitter()
 
@@ -47,7 +47,7 @@ class EventManager:
             lambda: defaultdict(list),
         )
 
-    def on(self: EventManager, *, event: Event, listener: Listener) -> None:
+    def on(self, *, event: Event, listener: Listener) -> None:
         """Add an event listener to the event manager.
 
         Args:
@@ -90,7 +90,7 @@ class EventManager:
         self._listeners_to_wrappers[event][listener].append(listener_wrapper)
         self._event_emitter.add_listener(event.value, listener_wrapper)
 
-    def off(self: EventManager, *, event: Event, listener: Listener | None = None) -> None:
+    def off(self, *, event: Event, listener: Listener | None = None) -> None:
         """Remove a listener, or all listeners, from an Actor event.
 
         Args:
@@ -108,7 +108,7 @@ class EventManager:
             self._listeners_to_wrappers[event] = defaultdict(list)
             self._event_emitter.remove_all_listeners(event.value)
 
-    def emit(self: EventManager, *, event: Event, event_data: EventData) -> None:
+    def emit(self, *, event: Event, event_data: EventData) -> None:
         """Emit an event.
 
         Args:
@@ -118,7 +118,7 @@ class EventManager:
         logger.debug('Calling EventManager.emit()...')
         self._event_emitter.emit(event.value, event_data)
 
-    async def close(self: EventManager, *, timeout: timedelta | None = None) -> None:
+    async def close(self, *, timeout: timedelta | None = None) -> None:
         """Close the event manager.
 
         This will stop listening for the events, and it will wait for all the event listeners to finish.
@@ -132,7 +132,7 @@ class EventManager:
         self._listener_tasks.clear()
         self._listeners_to_wrappers.clear()
 
-    async def _wait_for_all_listeners_to_complete(self: EventManager, *, timeout: timedelta | None = None) -> None:
+    async def _wait_for_all_listeners_to_complete(self, *, timeout: timedelta | None = None) -> None:
         """Wait for all currently executing event listeners to complete.
 
         Args:
