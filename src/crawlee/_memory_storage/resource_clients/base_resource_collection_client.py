@@ -4,20 +4,17 @@ from abc import ABC, abstractmethod
 from operator import itemgetter
 from typing import TYPE_CHECKING, Generic, TypeVar, cast
 
-from apify_shared.models import ListPage
-from apify_shared.utils import ignore_docs
-
-from apify._memory_storage.file_storage_utils import update_metadata
-from apify._memory_storage.resource_clients.base_resource_client import BaseResourceClient
+from crawlee._memory_storage.resource_clients.base_resource_client import BaseResourceClient
+from crawlee._utils.file import update_metadata
+from crawlee._utils.list_page import ListPage
 
 if TYPE_CHECKING:
-    from apify._memory_storage.memory_storage_client import MemoryStorageClient
+    from crawlee._memory_storage.memory_storage_client import MemoryStorageClient
 
 
 ResourceClientType = TypeVar('ResourceClientType', bound=BaseResourceClient, contravariant=True)  # noqa: PLC0105
 
 
-@ignore_docs
 class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
     """Base class for resource collection clients."""
 
@@ -25,7 +22,7 @@ class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
     _memory_storage_client: MemoryStorageClient
 
     def __init__(
-        self: BaseResourceCollectionClient,
+        self,
         *,
         base_storage_directory: str,
         memory_storage_client: MemoryStorageClient,
@@ -35,15 +32,15 @@ class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
         self._memory_storage_client = memory_storage_client
 
     @abstractmethod
-    def _get_storage_client_cache(self: BaseResourceCollectionClient) -> list[ResourceClientType]:
+    def _get_storage_client_cache(self) -> BaseResourceClient:
         raise NotImplementedError('You must override this method in the subclass!')
 
     @abstractmethod
-    def _get_resource_client_class(self: BaseResourceCollectionClient) -> type[ResourceClientType]:
+    def _get_resource_client_class(self) -> BaseResourceClient:
         raise NotImplementedError('You must override this method in the subclass!')
 
     @abstractmethod
-    async def list(self: BaseResourceCollectionClient) -> ListPage:
+    async def list(self) -> ListPage:
         """List the available storages.
 
         Returns:
@@ -51,7 +48,7 @@ class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
         """
         storage_client_cache = self._get_storage_client_cache()
 
-        items = [storage._to_resource_info() for storage in storage_client_cache]
+        items = [storage.to_resource_info() for storage in storage_client_cache]
 
         return ListPage(
             {
@@ -66,17 +63,18 @@ class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
 
     @abstractmethod
     async def get_or_create(
-        self: BaseResourceCollectionClient,
+        self,
         *,
         name: str | None = None,
         schema: dict | None = None,
-        _id: str | None = None,
+        id_: str | None = None,
     ) -> dict:
         """Retrieve a named storage, or create a new one when it doesn't exist.
 
         Args:
-            name (str, optional): The name of the storage to retrieve or create.
-            schema (Dict, optional): The schema of the storage
+            name: The name of the storage to retrieve or create.
+            schema: The schema of the storage
+            id_: The id of the storage to retrieve or create.
 
         Returns:
             dict: The retrieved or newly-created storage.
@@ -84,31 +82,30 @@ class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
         resource_client_class = self._get_resource_client_class()
         storage_client_cache = self._get_storage_client_cache()
 
-        if name or _id:
-            found = resource_client_class._find_or_create_client_by_id_or_name(
+        if name or id_:
+            found = resource_client_class.find_or_create_client_by_id_or_name(
                 memory_storage_client=self._memory_storage_client,
                 name=name,
-                id=_id,
+                id_=id_,
             )
             if found:
-                resource_info = found._to_resource_info()
-                return cast(dict, resource_info)
+                return found.to_resource_info()
 
         new_resource = resource_client_class(
-            id=_id,
+            id=id_,
             name=name,
             base_storage_directory=self._base_storage_directory,
             memory_storage_client=self._memory_storage_client,
         )
         storage_client_cache.append(new_resource)
 
-        resource_info = new_resource._to_resource_info()
+        resource_info = new_resource.to_resource_info()
 
         # Write to the disk
         await update_metadata(
             data=resource_info,
-            entity_directory=new_resource._resource_directory,
-            write_metadata=self._memory_storage_client._write_metadata,
+            entity_directory=new_resource._resource_directory,  # noqa: SLF001
+            write_metadata=self._memory_storage_client.write_metadata,
         )
 
         return cast(dict, resource_info)

@@ -2,18 +2,16 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, AsyncIterator, NamedTuple, TypedDict, TypeVar, overload
 
+from apify._utils import wrap_internal  # TODO: remove this
 from apify_client.clients import KeyValueStoreClientAsync, KeyValueStoreCollectionClientAsync
-from apify_shared.utils import ignore_docs
 
-from apify._utils import wrap_internal
-from apify.storages.base_storage import BaseStorage
+from crawlee.storages.base_storage import BaseStorage
 
 if TYPE_CHECKING:
-    from apify_client import ApifyClientAsync
+    from apify_client import ApifyClientAsync  # TODO: remove this
 
-    from apify._memory_storage import MemoryStorageClient
-    from apify._memory_storage.resource_clients import KeyValueStoreClient, KeyValueStoreCollectionClient
-    from apify.config import Configuration
+    from crawlee._memory_storage import MemoryStorageClient
+    from crawlee._memory_storage.resource_clients import KeyValueStoreClient, KeyValueStoreCollectionClient
 
 
 T = TypeVar('T')
@@ -67,14 +65,16 @@ class KeyValueStore(BaseStorage):
     _id: str
     _name: str | None
     _key_value_store_client: KeyValueStoreClientAsync | KeyValueStoreClient
+    _api_public_base_url: str
+    _default_key_value_store_id: str
 
-    @ignore_docs
     def __init__(
-        self: KeyValueStore,
+        self,
         id: str,  # noqa: A002
         name: str | None,
         client: ApifyClientAsync | MemoryStorageClient,
-        config: Configuration,
+        api_public_base_url: str,
+        default_key_value_store_id: str,
     ) -> None:
         """Create a `KeyValueStore` instance.
 
@@ -86,7 +86,7 @@ class KeyValueStore(BaseStorage):
             client (ApifyClientAsync or MemoryStorageClient): The storage client which should be used.
             config (Configuration): The configuration which should be used.
         """
-        super().__init__(id=id, name=name, client=client, config=config)
+        super().__init__(id=id, name=name, client=client)
 
         self.get_value = wrap_internal(self._get_value_internal, self.get_value)  # type: ignore
         self.set_value = wrap_internal(self._set_value_internal, self.set_value)  # type: ignore
@@ -94,14 +94,16 @@ class KeyValueStore(BaseStorage):
         self._id = id
         self._name = name
         self._key_value_store_client = client.key_value_store(self._id)
+        self._api_public_base_url = api_public_base_url
+        self._default_key_value_store_id = default_key_value_store_id
 
     @classmethod
     def _get_human_friendly_label(cls: type[KeyValueStore]) -> str:
         return 'Key-value store'
 
     @classmethod
-    def _get_default_id(cls: type[KeyValueStore], config: Configuration) -> str:
-        return config.default_key_value_store_id
+    def _get_default_id(cls: type[KeyValueStore]) -> str:
+        return cls._default_key_value_store_id
 
     @classmethod
     def _get_single_storage_client(
@@ -120,18 +122,15 @@ class KeyValueStore(BaseStorage):
 
     @overload
     @classmethod
-    async def get_value(cls: type[KeyValueStore], key: str) -> Any:
-        ...
+    async def get_value(cls: type[KeyValueStore], key: str) -> Any: ...
 
     @overload
     @classmethod
-    async def get_value(cls: type[KeyValueStore], key: str, default_value: T) -> T:
-        ...
+    async def get_value(cls: type[KeyValueStore], key: str, default_value: T) -> T: ...
 
     @overload
     @classmethod
-    async def get_value(cls: type[KeyValueStore], key: str, default_value: T | None = None) -> T | None:
-        ...
+    async def get_value(cls: type[KeyValueStore], key: str, default_value: T | None = None) -> T | None: ...
 
     @classmethod
     async def get_value(cls: type[KeyValueStore], key: str, default_value: T | None = None) -> T | None:
@@ -147,12 +146,12 @@ class KeyValueStore(BaseStorage):
         store = await cls.open()
         return await store.get_value(key, default_value)
 
-    async def _get_value_internal(self: KeyValueStore, key: str, default_value: T | None = None) -> T | None:
+    async def _get_value_internal(self, key: str, default_value: T | None = None) -> T | None:
         record = await self._key_value_store_client.get_record(key)
         return record['value'] if record else default_value
 
     async def iterate_keys(
-        self: KeyValueStore,
+        self,
         exclusive_start_key: str | None = None,
     ) -> AsyncIterator[IterateKeysTuple]:
         """Iterate over the keys in the key-value store.
@@ -192,7 +191,7 @@ class KeyValueStore(BaseStorage):
         return await store.set_value(key, value, content_type)
 
     async def _set_value_internal(
-        self: KeyValueStore,
+        self,
         key: str,
         value: Any,
         content_type: str | None = None,
@@ -212,15 +211,13 @@ class KeyValueStore(BaseStorage):
         store = await cls.open()
         return await store.get_public_url(key)
 
-    async def _get_public_url_internal(self: KeyValueStore, key: str) -> str:
+    async def _get_public_url_internal(self, key: str) -> str:
         if not isinstance(self._key_value_store_client, KeyValueStoreClientAsync):
-            raise RuntimeError('Cannot generate a public URL for this key-value store as it is not on the Apify Platform!')  # noqa: TRY004
+            raise TypeError('Cannot generate a public URL for this key-value store as it is not on the Apify Platform!')
 
-        public_api_url = self._config.api_public_base_url
+        return f'{self._api_public_base_url}/v2/key-value-stores/{self._id}/records/{key}'
 
-        return f'{public_api_url}/v2/key-value-stores/{self._id}/records/{key}'
-
-    async def drop(self: KeyValueStore) -> None:
+    async def drop(self) -> None:
         """Remove the key-value store either from the Apify cloud storage or from the local directory."""
         await self._key_value_store_client.delete()
         self._remove_from_cache()
@@ -232,7 +229,6 @@ class KeyValueStore(BaseStorage):
         id: str | None = None,  # noqa: A002
         name: str | None = None,
         force_cloud: bool = False,
-        config: Configuration | None = None,
     ) -> KeyValueStore:
         """Open a key-value store.
 
@@ -254,4 +250,4 @@ class KeyValueStore(BaseStorage):
         Returns:
             KeyValueStore: An instance of the `KeyValueStore` class for the given ID or name.
         """
-        return await super().open(id=id, name=name, force_cloud=force_cloud, config=config)  # type: ignore
+        return await super().open(id=id, name=name, force_cloud=force_cloud)  # type: ignore

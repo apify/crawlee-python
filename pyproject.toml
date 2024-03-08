@@ -45,6 +45,8 @@ keywords = [
 # https://github.com/apify/apify-sdk-python/pull/154.
 [tool.poetry.dependencies]
 python = "^3.9"
+aiofiles = "^23.2.1"
+aioshutil = "^1.3"
 colorama = "^0.4.6"
 more_itertools = "^10.2.0"
 psutil = "^5.9.8"
@@ -66,6 +68,7 @@ pytest-xdist = "~3.5.0"
 respx = "~0.20.1"
 ruff = "~0.3.0"
 twine = "~5.0.0"
+types-aiofiles = "^23.2.0.20240106"
 types-colorama = "~0.4.15.20240106"
 types-psutil = "~5.9.5.20240205"
 
@@ -124,6 +127,7 @@ indent-style = "space"
     "INP001",  # File {filename} is part of an implicit namespace package, add an __init__.py
     "PLR2004", # Magic value used in comparison, consider replacing {value} with a constant variable
     "S101",    # Use of assert detected
+    "SLF001",  # Private member accessed: `{name}`
     "T20",     # flake8-print
     "TRY301",  # Abstract `raise` to an inner function
 ]

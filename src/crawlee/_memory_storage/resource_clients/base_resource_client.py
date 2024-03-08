@@ -5,89 +5,82 @@ import os
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
-from apify_shared.utils import ignore_docs
-
 if TYPE_CHECKING:
     from typing_extensions import Self
 
-    from apify._memory_storage.memory_storage_client import MemoryStorageClient
+    from crawlee._memory_storage.memory_storage_client import MemoryStorageClient
 
 
-@ignore_docs
 class BaseResourceClient(ABC):
     """Base class for resource clients."""
 
-    _id: str
-    _name: str | None
-    _resource_directory: str
-
-    @abstractmethod
     def __init__(
-        self: BaseResourceClient,
+        self,
         *,
         base_storage_directory: str,
         memory_storage_client: MemoryStorageClient,
-        id: str | None = None,  # noqa: A002
+        id_: str | None = None,
         name: str | None = None,
+        resource_directory: str | None = None,
     ) -> None:
-        """Initialize the BaseResourceClient."""
-        raise NotImplementedError('You must override this method in the subclass!')
+        self._base_storage_directory = base_storage_directory
+        self._memory_storage_client = memory_storage_client
+        self._id = id_
+        self._name = name
+        self._resource_directory = resource_directory
 
     @abstractmethod
-    async def get(self: BaseResourceClient) -> dict | None:
+    async def get(self) -> dict | None:
         """Retrieve the storage.
 
         Returns:
-            dict, optional: The retrieved storage, or None, if it does not exist
+            The retrieved storage, or None, if it does not exist
         """
         raise NotImplementedError('You must override this method in the subclass!')
 
-    @classmethod
     @abstractmethod
-    def _get_storages_dir(cls: type[BaseResourceClient], memory_storage_client: MemoryStorageClient) -> str:
-        raise NotImplementedError('You must override this method in the subclass!')
-
-    @classmethod
-    @abstractmethod
-    def _get_storage_client_cache(
-        cls,  # noqa: ANN102 # type annotated cls does not work with Self as a return type
-        memory_storage_client: MemoryStorageClient,
-    ) -> list[Self]:
+    def _get_storage_dir(self) -> str:
         raise NotImplementedError('You must override this method in the subclass!')
 
     @abstractmethod
-    def _to_resource_info(self: BaseResourceClient) -> dict:
+    def _get_storage_client_cache(self) -> list[Self]:
         raise NotImplementedError('You must override this method in the subclass!')
 
-    @classmethod
+    @abstractmethod
+    def to_resource_info(self) -> dict:
+        raise NotImplementedError('You must override this method in the subclass!')
+
     @abstractmethod
     def _create_from_directory(
-        cls,  # noqa: ANN102 # type annotated cls does not work with Self as a return type
+        self,
         storage_directory: str,
         memory_storage_client: MemoryStorageClient,
-        id: str | None = None,  # noqa: A002
+        id_: str | None = None,
         name: str | None = None,
     ) -> Self:
         raise NotImplementedError('You must override this method in the subclass!')
 
-    @classmethod
-    def _find_or_create_client_by_id_or_name(
-        cls,  # noqa: ANN102 # type annotated cls does not work with Self as a return type
+    def find_or_create_client_by_id_or_name(  # noqa: PLR0912
+        self,
         memory_storage_client: MemoryStorageClient,
-        id: str | None = None,  # noqa: A002
+        id_: str | None = None,
         name: str | None = None,
     ) -> Self | None:
-        assert id is not None or name is not None  # noqa: S101
+        if not (isinstance(id_, str) and id_) and not (isinstance(name, str) and name):
+            raise ValueError('Either "id_" or "name" must be provided and must be a non-empty string.')
 
-        storage_client_cache = cls._get_storage_client_cache(memory_storage_client)
-        storages_dir = cls._get_storages_dir(memory_storage_client)
+        storage_client_cache = self._get_storage_client_cache(memory_storage_client)
+        storages_dir = self._get_storage_dir(memory_storage_client)
 
         # First check memory cache
         found = next(
             (
                 storage_client
                 for storage_client in storage_client_cache
-                if storage_client._id == id or (storage_client._name and name and storage_client._name.lower() == name.lower())
+                if (
+                    storage_client._id == id_  # noqa: SLF001
+                    or (storage_client._name and name and storage_client._name.lower() == name.lower())  # noqa: SLF001
+                )
             ),
             None,
         )
@@ -113,29 +106,28 @@ class BaseResourceClient(ABC):
                     continue
                 with open(metadata_path, encoding='utf-8') as metadata_file:
                     metadata = json.load(metadata_file)
-                if id and id == metadata.get('id'):
+                if id_ and id_ == metadata.get('id'):
                     storage_path = entry.path
                     name = metadata.get(name)
                     break
                 if name and name == metadata.get('name'):
                     storage_path = entry.path
-                    id = metadata.get(id)  # noqa: A001
+                    id_ = metadata.get(id_)
                     break
 
         # As a last resort, try to check if the accessed storage is the default one,
         # and the folder has no metadata
         # TODO: make this respect the APIFY_DEFAULT_XXX_ID env var
         # https://github.com/apify/apify-sdk-python/issues/149
-        if id == 'default':
-            possible_storage_path = os.path.join(storages_dir, id)
+        if id_ == 'default':
+            possible_storage_path = os.path.join(storages_dir, id_)
             if os.access(possible_storage_path, os.F_OK):
                 storage_path = possible_storage_path
 
         if not storage_path:
             return None
 
-        resource_client = cls._create_from_directory(storage_path, memory_storage_client, id, name)
-
+        resource_client = self._create_from_directory(storage_path, memory_storage_client, id_, name)
         storage_client_cache.append(resource_client)
 
         return resource_client
