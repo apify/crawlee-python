@@ -87,7 +87,8 @@ class BaseResourceClient(ABC):
             (
                 storage_client
                 for storage_client in storage_client_cache
-                if storage_client._id == id or (storage_client._name and name and storage_client._name.lower() == name.lower())
+                if storage_client._id == id
+                or (storage_client._name and name and storage_client._name.lower() == name.lower())
             ),
             None,
         )

@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 import pytest
+import pytest_asyncio
 
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.file import json_dumps, maybe_parse_body
@@ -26,13 +27,14 @@ TINY_DATA = {'a': 'b'}
 TINY_TEXT = 'abcd'
 
 
-@pytest.fixture()
+@pytest_asyncio.fixture()
 async def key_value_store_client(memory_storage_client: MemoryStorageClient) -> KeyValueStoreClient:
     key_value_stores_client = memory_storage_client.key_value_stores()
     kvs_info = await key_value_stores_client.get_or_create(name='test')
     return memory_storage_client.key_value_store(kvs_info['id'])
 
 
+@pytest.mark.asyncio()
 async def test_nonexistent(memory_storage_client: MemoryStorageClient) -> None:
     kvs_client = memory_storage_client.key_value_store(key_value_store_id='nonexistent-id')
     assert await kvs_client.get() is None
@@ -58,11 +60,13 @@ async def test_nonexistent(memory_storage_client: MemoryStorageClient) -> None:
     await kvs_client.delete()
 
 
+@pytest.mark.asyncio()
 async def test_not_implemented(key_value_store_client: KeyValueStoreClient) -> None:
     with pytest.raises(NotImplementedError, match='This method is not supported in local memory storage.'):
         await key_value_store_client.stream_record('test')
 
 
+@pytest.mark.asyncio()
 async def test_get(key_value_store_client: KeyValueStoreClient) -> None:
     await asyncio.sleep(0.1)
     info = await key_value_store_client.get()
@@ -71,6 +75,7 @@ async def test_get(key_value_store_client: KeyValueStoreClient) -> None:
     assert info['accessedAt'] != info['createdAt']
 
 
+@pytest.mark.asyncio()
 async def test_update(key_value_store_client: KeyValueStoreClient) -> None:
     new_kvs_name = 'test-update'
     await key_value_store_client.set_record('test', {'abc': 123})
@@ -99,6 +104,7 @@ async def test_update(key_value_store_client: KeyValueStoreClient) -> None:
         await key_value_store_client.update(name=new_kvs_name)
 
 
+@pytest.mark.asyncio()
 async def test_delete(key_value_store_client: KeyValueStoreClient) -> None:
     await key_value_store_client.set_record('test', {'abc': 123})
     kvs_info = await key_value_store_client.get()
@@ -113,6 +119,7 @@ async def test_delete(key_value_store_client: KeyValueStoreClient) -> None:
     await key_value_store_client.delete()
 
 
+@pytest.mark.asyncio()
 async def test_list_keys_empty(key_value_store_client: KeyValueStoreClient) -> None:
     keys = await key_value_store_client.list_keys()
     assert len(keys['items']) == 0
@@ -120,6 +127,7 @@ async def test_list_keys_empty(key_value_store_client: KeyValueStoreClient) -> N
     assert keys['isTruncated'] is False
 
 
+@pytest.mark.asyncio()
 async def test_list_keys(key_value_store_client: KeyValueStoreClient) -> None:
     record_count = 4
     used_limit = 2
@@ -149,6 +157,7 @@ async def test_list_keys(key_value_store_client: KeyValueStoreClient) -> None:
     assert keys_exclusive_start['items'][-1]['key'] == keys_exclusive_start['nextExclusiveStartKey']
 
 
+@pytest.mark.asyncio()
 async def test_get_and_set_record(tmp_path: Path, key_value_store_client: KeyValueStoreClient) -> None:
     # Test setting dict record
     dict_record_key = 'test-dict'
@@ -191,6 +200,7 @@ async def test_get_and_set_record(tmp_path: Path, key_value_store_client: KeyVal
             await key_value_store_client.set_record('file', f)
 
 
+@pytest.mark.asyncio()
 async def test_get_record_as_bytes(key_value_store_client: KeyValueStoreClient) -> None:
     record_key = 'test'
     record_value = 'testing'
@@ -200,6 +210,7 @@ async def test_get_record_as_bytes(key_value_store_client: KeyValueStoreClient) 
     assert record_info['value'] == record_value.encode('utf-8')
 
 
+@pytest.mark.asyncio()
 async def test_delete_record(key_value_store_client: KeyValueStoreClient) -> None:
     record_key = 'test'
     await key_value_store_client.set_record(record_key, 'test')
@@ -261,6 +272,7 @@ async def test_delete_record(key_value_store_client: KeyValueStoreClient) -> Non
         },
     ],
 )
+@pytest.mark.asyncio()
 async def test_writes_correct_metadata(memory_storage_client: MemoryStorageClient, test_case: dict) -> None:
     test_input = test_case['input']
     expected_output = test_case['expectedOutput']
@@ -388,6 +400,7 @@ async def test_writes_correct_metadata(memory_storage_client: MemoryStorageClien
         },
     ],
 )
+@pytest.mark.asyncio()
 async def test_reads_correct_metadata(memory_storage_client: MemoryStorageClient, test_case: dict) -> None:
     test_input = test_case['input']
     expected_output = test_case['expectedOutput']

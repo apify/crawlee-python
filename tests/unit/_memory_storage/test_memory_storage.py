@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
+@pytest.mark.asyncio()
 async def test_write_metadata(tmp_path: Path) -> None:
     dataset_name = 'test'
     dataset_no_metadata_name = 'test-no-metadata'
@@ -28,6 +29,7 @@ async def test_write_metadata(tmp_path: Path) -> None:
     )
 
 
+@pytest.mark.asyncio()
 async def test_persist_storage(tmp_path: Path) -> None:
     ms = MemoryStorageClient(local_data_directory=str(tmp_path), persist_storage=True)
     ms_no_persist = MemoryStorageClient(local_data_directory=str(tmp_path), persist_storage=False)
@@ -72,6 +74,7 @@ def test_config_via_env_vars_write_metadata(monkeypatch: pytest.MonkeyPatch, tmp
     assert ms._write_metadata is False
 
 
+@pytest.mark.asyncio()
 async def test_purge_datasets(tmp_path: Path) -> None:
     ms = MemoryStorageClient(local_data_directory=str(tmp_path), write_metadata=True)
     # Create default and non-default datasets
@@ -90,6 +93,7 @@ async def test_purge_datasets(tmp_path: Path) -> None:
     assert non_default_dataset_info['name'] in folders_after_purge
 
 
+@pytest.mark.asyncio()
 async def test_purge_key_value_stores(tmp_path: Path) -> None:
     ms = MemoryStorageClient(local_data_directory=str(tmp_path), write_metadata=True)
 
@@ -120,6 +124,7 @@ async def test_purge_key_value_stores(tmp_path: Path) -> None:
     assert 'test.json' not in default_folder_files_after_purge
 
 
+@pytest.mark.asyncio()
 async def test_purge_request_queues(tmp_path: Path) -> None:
     ms = MemoryStorageClient(local_data_directory=str(tmp_path), write_metadata=True)
     # Create default and non-default request queues
@@ -137,6 +142,7 @@ async def test_purge_request_queues(tmp_path: Path) -> None:
     assert non_default_rq_info['name'] in folders_after_purge
 
 
+@pytest.mark.asyncio()
 async def test_not_implemented_method(tmp_path: Path) -> None:
     ms = MemoryStorageClient(local_data_directory=str(tmp_path), write_metadata=True)
     ddt = ms.dataset('test')
@@ -147,6 +153,7 @@ async def test_not_implemented_method(tmp_path: Path) -> None:
         await ddt.stream_items(item_format='json')
 
 
+@pytest.mark.asyncio()
 async def test_storage_path_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv(CrawleeEnvVars.LOCAL_STORAGE_DIR)
     default_ms = MemoryStorageClient()

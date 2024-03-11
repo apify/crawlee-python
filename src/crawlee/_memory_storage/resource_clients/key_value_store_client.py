@@ -96,7 +96,9 @@ class KeyValueStoreClient(BaseResourceClient):
         Returns:
             dict, optional: The retrieved key-value store, or None if it does not exist
         """
-        found = self._find_or_create_client_by_id_or_name(memory_storage_client=self._memory_storage_client, id=self._id, name=self._name)
+        found = self._find_or_create_client_by_id_or_name(
+            memory_storage_client=self._memory_storage_client, id=self._id, name=self._name
+        )
 
         if found:
             async with found._file_operation_lock:
@@ -129,7 +131,11 @@ class KeyValueStoreClient(BaseResourceClient):
         async with existing_store_by_id._file_operation_lock:
             # Check that name is not in use already
             existing_store_by_name = next(
-                (store for store in self._memory_storage_client._key_value_stores_handled if store._name and store._name.lower() == name.lower()),
+                (
+                    store
+                    for store in self._memory_storage_client._key_value_stores_handled
+                    if store._name and store._name.lower() == name.lower()
+                ),
                 None,
             )
 
@@ -140,7 +146,9 @@ class KeyValueStoreClient(BaseResourceClient):
 
             previous_dir = existing_store_by_id._resource_directory
 
-            existing_store_by_id._resource_directory = os.path.join(self._memory_storage_client._key_value_stores_directory, name)
+            existing_store_by_id._resource_directory = os.path.join(
+                self._memory_storage_client._key_value_stores_directory, name
+            )
 
             await force_rename(previous_dir, existing_store_by_id._resource_directory)
 
@@ -151,7 +159,9 @@ class KeyValueStoreClient(BaseResourceClient):
 
     async def delete(self: KeyValueStoreClient) -> None:
         """Delete the key-value store."""
-        store = next((store for store in self._memory_storage_client._key_value_stores_handled if store._id == self._id), None)
+        store = next(
+            (store for store in self._memory_storage_client._key_value_stores_handled if store._id == self._id), None
+        )
 
         if store is not None:
             async with store._file_operation_lock:
@@ -491,7 +501,9 @@ class KeyValueStoreClient(BaseResourceClient):
             # Try checking if this file has a metadata file associated with it
             metadata = None
             if os.path.exists(os.path.join(storage_directory, entry.name + '.__metadata__.json')):
-                with open(os.path.join(storage_directory, entry.name + '.__metadata__.json'), encoding='utf-8') as metadata_file:
+                with open(
+                    os.path.join(storage_directory, entry.name + '.__metadata__.json'), encoding='utf-8'
+                ) as metadata_file:
                     try:
                         metadata = json.load(metadata_file)
                         assert metadata.get('key') is not None  # noqa: S101

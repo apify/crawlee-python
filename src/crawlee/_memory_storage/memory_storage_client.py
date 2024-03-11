@@ -65,7 +65,11 @@ class MemoryStorageClient:
         self._key_value_stores_directory = os.path.join(self._local_data_directory, 'key_value_stores')
         self._request_queues_directory = os.path.join(self._local_data_directory, 'request_queues')
         self._write_metadata = write_metadata if write_metadata is not None else '*' in os.getenv('DEBUG', '')
-        self._persist_storage = persist_storage if persist_storage is not None else maybe_parse_bool(os.getenv(ApifyEnvVars.PERSIST_STORAGE, 'true'))
+        self._persist_storage = (
+            persist_storage
+            if persist_storage is not None
+            else maybe_parse_bool(os.getenv(ApifyEnvVars.PERSIST_STORAGE, 'true'))
+        )
         self._datasets_handled = []
         self._key_value_stores_handled = []
         self._request_queues_handled = []
@@ -85,7 +89,9 @@ class MemoryStorageClient:
 
     def key_value_stores(self: MemoryStorageClient) -> KeyValueStoreCollectionClient:
         """Retrieve the sub-client for manipulating key-value stores."""
-        return KeyValueStoreCollectionClient(base_storage_directory=self._key_value_stores_directory, memory_storage_client=self)
+        return KeyValueStoreCollectionClient(
+            base_storage_directory=self._key_value_stores_directory, memory_storage_client=self
+        )
 
     def key_value_store(self: MemoryStorageClient, key_value_store_id: str) -> KeyValueStoreClient:
         """Retrieve the sub-client for manipulating a single key-value store.
@@ -93,11 +99,15 @@ class MemoryStorageClient:
         Args:
             key_value_store_id (str): ID of the key-value store to be manipulated
         """
-        return KeyValueStoreClient(base_storage_directory=self._key_value_stores_directory, memory_storage_client=self, id=key_value_store_id)
+        return KeyValueStoreClient(
+            base_storage_directory=self._key_value_stores_directory, memory_storage_client=self, id=key_value_store_id
+        )
 
     def request_queues(self: MemoryStorageClient) -> RequestQueueCollectionClient:
         """Retrieve the sub-client for manipulating request queues."""
-        return RequestQueueCollectionClient(base_storage_directory=self._request_queues_directory, memory_storage_client=self)
+        return RequestQueueCollectionClient(
+            base_storage_directory=self._request_queues_directory, memory_storage_client=self
+        )
 
     def request_queue(
         self: MemoryStorageClient,
@@ -111,7 +121,9 @@ class MemoryStorageClient:
             request_queue_id (str): ID of the request queue to be manipulated
             client_key (str): A unique identifier of the client accessing the request queue
         """
-        return RequestQueueClient(base_storage_directory=self._request_queues_directory, memory_storage_client=self, id=request_queue_id)
+        return RequestQueueClient(
+            base_storage_directory=self._request_queues_directory, memory_storage_client=self, id=request_queue_id
+        )
 
     async def _purge_on_start(self: MemoryStorageClient) -> None:
         # Optimistic, non-blocking check
@@ -138,7 +150,9 @@ class MemoryStorageClient:
         if await ospath.exists(self._key_value_stores_directory):
             key_value_store_folders = await scandir(self._key_value_stores_directory)
             for key_value_store_folder in key_value_store_folders:
-                if key_value_store_folder.name.startswith('__APIFY_TEMPORARY') or key_value_store_folder.name.startswith('__OLD'):
+                if key_value_store_folder.name.startswith(
+                    '__APIFY_TEMPORARY'
+                ) or key_value_store_folder.name.startswith('__OLD'):
                     await self._batch_remove_files(key_value_store_folder.path)
                 elif key_value_store_folder.name == 'default':
                     await self._handle_default_key_value_store(key_value_store_folder.path)
