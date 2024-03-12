@@ -37,8 +37,8 @@ async def test_start_stop_lifecycle() -> None:
         await snapshotter.start()
 
         system_status = SystemStatus(snapshotter)
-        system_status.get_current_status()
-        system_status.get_historical_status()
+        system_status.get_current_system_info()
+        system_status.get_historical_system_info()
 
         await snapshotter.stop()
 
@@ -154,7 +154,7 @@ def test_get_system_info(snapshotter: Snapshotter, now: datetime) -> None:
     ]
 
     # Test current system info
-    current_system_info = system_status.get_current_status()
+    current_system_info = system_status.get_current_system_info()
     assert current_system_info == SystemInfo(
         cpu_info=LoadRatioInfo(limit_ratio=system_status._cpu_overload_threshold, actual_ratio=1.0),
         memory_info=LoadRatioInfo(limit_ratio=system_status._memory_overload_threshold, actual_ratio=1.0),
@@ -165,7 +165,7 @@ def test_get_system_info(snapshotter: Snapshotter, now: datetime) -> None:
     assert current_system_info.is_system_idle is False
 
     # Test historical system info
-    historical_system_info = system_status.get_historical_status()
+    historical_system_info = system_status.get_historical_system_info()
     assert historical_system_info == SystemInfo(
         cpu_info=LoadRatioInfo(limit_ratio=system_status._cpu_overload_threshold, actual_ratio=0.667),
         memory_info=LoadRatioInfo(limit_ratio=system_status._memory_overload_threshold, actual_ratio=0.667),

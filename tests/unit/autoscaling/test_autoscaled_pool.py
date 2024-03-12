@@ -106,7 +106,7 @@ async def test_autoscales(system_status: SystemStatus | Mock) -> None:
 
     start = datetime.now(timezone.utc)
 
-    def get_historical_status() -> SystemInfo:
+    def get_historical_system_info() -> SystemInfo:
         result = SystemInfo(
             cpu_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
             memory_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
@@ -120,7 +120,7 @@ async def test_autoscales(system_status: SystemStatus | Mock) -> None:
 
         return result
 
-    cast(Mock, system_status.get_historical_status).side_effect = get_historical_status
+    cast(Mock, system_status.get_historical_system_info).side_effect = get_historical_system_info
 
     pool = AutoscaledPool(
         system_status=system_status,

@@ -210,7 +210,7 @@ class AutoscaledPool:
 
     def _autoscale(self) -> None:
         """Inspect system load status and adjust desired concurrency if necessary. Do not call directly."""
-        status = self._system_status.get_historical_status()
+        status = self._system_status.get_historical_system_info()
 
         min_current_concurrency = math.floor(self._desired_concurrency_ratio * self.current_concurrency)
         should_scale_up = (
@@ -229,7 +229,7 @@ class AutoscaledPool:
             self._desired_concurrency = max(self._min_concurrency, self._desired_concurrency - step)
 
     def _log_system_status(self) -> None:
-        system_status = self._system_status.get_historical_status()
+        system_status = self._system_status.get_historical_system_info()
 
         logger.info(
             f'current_concurrency = {self.current_concurrency}; '
@@ -246,7 +246,7 @@ class AutoscaledPool:
             while not self._is_finished_function() and not self._run_result.done():
                 self._worker_tasks_updated.clear()
 
-                current_status = self._system_status.get_current_status()
+                current_status = self._system_status.get_current_system_info()
                 if not current_status.is_system_idle:
                     logger.debug('Not scheduling new tasks - system is overloaded')
                 elif self._is_paused:

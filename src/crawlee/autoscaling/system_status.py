@@ -22,17 +22,17 @@ class SystemStatus:
 
     This class aggregates and interprets snapshots from a Snapshotter instance to evaluate the current and historical
     status of system resources like CPU, memory, event loop, and client API usage. It exposes two methods
-    `get_current_status` and `get_historical_status`. The system information is computed using a weighted average
-    of overloaded messages in the snapshots, with the weights being the time intervals between the snapshots.
+    `get_current_system_info` and `get_historical_system_info`. The system information is computed using a weighted
+    average of overloaded messages in the snapshots, with the weights being the time intervals between the snapshots.
     Each resource is computed separately, and the system is considered as overloaded whenever at least one resource
     is overloaded.
 
-    `get_current_status` returns a `SystemInfo` data structure that represents the current status
+    `get_current_system_info` returns a `SystemInfo` data structure that represents the current status
     of the system. The length of the current timeframe in seconds is configurable by the `max_snapshot_age` option
     and represents the max age of snapshots to be considered for the computation.
 
-    `SystemStatus.get_historical_status` returns a `SystemInfo` that represents the long-term status of the system. It
-    considers the full snapshot history available in the `Snapshotter` instance.
+    `SystemStatus.get_historical_system_info` returns a `SystemInfo` that represents the long-term status of the system.
+    It considers the full snapshot history available in the `Snapshotter` instance.
     """
 
     def __init__(
@@ -50,7 +50,8 @@ class SystemStatus:
         Args:
             snapshotter: The `Snapshotter` instance to be queried for `SystemStatus`.
 
-            max_snapshot_age: Defines max age of snapshots used in the `SystemStatus.get_current_status` measurement.
+            max_snapshot_age: Defines max age of snapshots used in the `SystemStatus.get_current_system_info`
+                measurement.
 
             cpu_overload_threshold: Sets the threshold of overloaded snapshots in the CPU sample.
                 If the sample exceeds this threshold, the system will be considered overloaded.
@@ -71,7 +72,7 @@ class SystemStatus:
         self._event_loop_overload_threshold = event_loop_overload_threshold
         self._client_overload_threshold = client_overload_threshold
 
-    def get_current_status(self) -> SystemInfo:
+    def get_current_system_info(self) -> SystemInfo:
         """Retrieves and evaluates the current status of system resources.
 
         Considers snapshots within the `_max_snapshot_age` timeframe and determines if the system is currently
@@ -82,7 +83,7 @@ class SystemStatus:
         """
         return self._get_system_info(self._max_snapshot_age)
 
-    def get_historical_status(self) -> SystemInfo:
+    def get_historical_system_info(self) -> SystemInfo:
         """Retrieves and evaluates the historical status of system resources.
 
         Considers the entire history of snapshots from the Snapshotter to assess long-term system performance and
