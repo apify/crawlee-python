@@ -13,8 +13,6 @@ from crawlee.autoscaling.autoscaled_pool import AutoscaledPool
 from crawlee.autoscaling.system_status import SystemStatus
 from crawlee.autoscaling.types import LoadRatioInfo, SystemInfo
 
-pytestmark = pytest.mark.asyncio()
-
 
 @pytest.fixture()
 def system_status() -> SystemStatus | Mock:
