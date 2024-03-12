@@ -78,7 +78,7 @@ class SystemStatus:
         overloaded based on predefined thresholds for each resource type.
 
         Returns:
-            Instance of `SystemInfo` data class representing the current system status.
+            An object representing the current system status.
         """
         return self._get_system_info(self._current_history)
 
@@ -89,7 +89,7 @@ class SystemStatus:
         determines if the system has been historically overloaded.
 
         Returns:
-            Instance of `SystemInfo` data class representing the historical system status.
+            An object representing the historical system status.
         """
         return self._get_system_info()
 
