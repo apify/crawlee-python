@@ -139,6 +139,7 @@ convention = "google"
 known-local-folder = ["crawlee"]
 
 [tool.pytest.ini_options]
+addopts = "-ra"
 asyncio_mode = "auto"
 timeout = 1200
 
