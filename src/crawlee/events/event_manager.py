@@ -24,24 +24,18 @@ class EventManager:
 
     Event manager allows you to register event listeners, emit events, and wait for event listeners to complete
     their execution. It is built on top of the `pyee.asyncio.AsyncIOEventEmitter` class.
-
-    Attributes:
-        _event_emitter: The event emitter which is used to emit events and call the event listeners.
-
-        _listener_tasks: The set of asyncio tasks which are currently executing the event listeners.
-
-        _listeners_to_wrappers: The mapping between events and listeners, and the wrapped listeners which are
-            registered with the event emitter.
     """
 
     def __init__(self) -> None:
         logger.debug('Calling EventManager.__init__()...')
+
+        # Asynchronous event emitter for handle events and invoke the event listeners.
         self._event_emitter = AsyncIOEventEmitter()
 
-        # Listeners are wrapped in a asyncio.Task, store their references here so that we can wait for them to finish
+        # Listeners are wrapped inside asyncio.Task. Store their references here so that we can wait for them to finish.
         self._listener_tasks: set[asyncio.Task] = set()
 
-        # Store the mapping between events and listeners like this:
+        # Store the mapping between events, listeners and their wrappers in the following way:
         #   event -> listener -> [wrapped_listener_1, wrapped_listener_2, ...]
         self._listeners_to_wrappers: dict[Event, dict[Listener, list[WrappedListener]]] = defaultdict(
             lambda: defaultdict(list),

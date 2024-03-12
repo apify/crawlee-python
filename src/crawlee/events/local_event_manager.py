@@ -19,24 +19,28 @@ logger = getLogger(__name__)
 
 
 class LocalEventManager(EventManager):
-    """Local event manager for emitting system info events.
-
-    Attributes:
-        system_info_interval: Interval at which `SystemInfo` events are emitted.
-
-        timeout: Optional timeout for closing the event manager.
-
-        _emit_system_info_event_rec_task: Recurring task for emitting system info events.
-    """
+    """Local event manager for emitting system info events."""
 
     def __init__(
         self,
+        *,
         system_info_interval: timedelta = timedelta(seconds=60),
-        timeout: timedelta | None = None,
+        close_timeout: timedelta | None = None,
     ) -> None:
-        self.system_info_interval = system_info_interval
-        self.timeout = timeout
+        """Create a new instance.
+
+        Args:
+            system_info_interval: Interval at which `SystemInfo` events are emitted.
+            close_timeout: Optional timeout for closing the event manager.
+        """
+        logger.debug('Calling LocalEventManager.__init__()...')
+
+        self._system_info_interval = system_info_interval
+        self._close_timeout = close_timeout
+
+        # Recurring task for emitting system info events.
         self._emit_system_info_event_rec_task: RecurringTask | None = None
+
         super().__init__()
 
     async def __aenter__(self) -> LocalEventManager:
@@ -47,7 +51,7 @@ class LocalEventManager(EventManager):
         logger.debug('Calling LocalEventManager.__aenter__()...')
         self._emit_system_info_event_rec_task = RecurringTask(
             func=self._emit_system_info_event,
-            delay=self.system_info_interval,
+            delay=self._system_info_interval,
         )
         self._emit_system_info_event_rec_task.start()
         return self
@@ -70,7 +74,7 @@ class LocalEventManager(EventManager):
         if self._emit_system_info_event_rec_task is not None:
             await self._emit_system_info_event_rec_task.stop()
 
-        await super().close(timeout=self.timeout)
+        await super().close(timeout=self._close_timeout)
 
     async def _emit_system_info_event(self) -> None:
         """Emits a system info event with the current CPU and memory usage."""
