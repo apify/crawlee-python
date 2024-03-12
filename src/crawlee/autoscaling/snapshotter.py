@@ -6,9 +6,10 @@ from datetime import datetime, timedelta, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, cast
 
+import psutil
+
 from crawlee._utils.math import to_mb
 from crawlee._utils.recurring_task import RecurringTask
-from crawlee._utils.system import get_memory_info
 from crawlee.autoscaling.types import ClientSnapshot, CpuSnapshot, EventLoopSnapshot, MemorySnapshot, Snapshot
 from crawlee.events.types import Event, EventSystemInfoData
 
@@ -92,11 +93,8 @@ class Snapshotter:
         self._memory_warning_cooldown_period = memory_warning_cooldown_period
         self._client_rate_limit_error_retry_count = client_rate_limit_error_retry_count
 
-        # Default `memory_max_bytes`` is 1/4 of the total system memory
         if max_memory_bytes is None:
-            memory_info = get_memory_info()
-            self._max_memory_bytes = int(memory_info.total_bytes * 0.25)
-            logger.info(f'Setting max_memory_bytes of this run to {to_mb(self._max_memory_bytes)} MB.')
+            self._max_memory_bytes = self._get_default_max_memory_bytes()
         else:
             self._max_memory_bytes = max_memory_bytes
 
@@ -109,6 +107,13 @@ class Snapshotter:
         self._snapshot_client_task = RecurringTask(self._snapshot_client, self._client_snapshot_interval)
 
         self._timestamp_of_last_memory_warning: datetime = datetime.now(timezone.utc) - timedelta(hours=1)
+
+    @staticmethod
+    def _get_default_max_memory_bytes() -> int:
+        """Default `memory_max_bytes` is 1/4 of the total system memory."""
+        max_memory_bytes = int(psutil.virtual_memory().total * 0.25)
+        logger.info(f'Setting max_memory_bytes of this run to {to_mb(max_memory_bytes)} MB.')
+        return max_memory_bytes
 
     async def start(self) -> None:
         """Starts capturing snapshots at configured intervals."""
