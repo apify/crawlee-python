@@ -233,10 +233,10 @@ class Snapshotter:
     def _snapshot_event_loop(self) -> None:
         """Captures a snapshot of the current event loop usage.
 
-        This method assesses the event loop's responsiveness by measuring the time elapsed between the creation of
-        the last snapshot and the current moment. This delay is calculated by subtracting the time of the last snapshot
-        and the predefined snapshot interval from the current time. If this is the first snapshot or no previous
-        snapshots exist, the delay is set to zero.
+        This method evaluates the event loop's latency by comparing the expected time between snapshots to the actual
+        time elapsed since the last snapshot. The delay in the snapshot reflects the time deviation due to event loop
+        overhead - it's calculated by subtracting the expected interval between snapshots from the actual time elapsed
+        since the last snapshot. If there's no previous snapshot, the delay is considered zero.
         """
         snapshot = EventLoopSnapshot(max_delay=self._max_event_loop_delay, delay=timedelta(seconds=0))
         previous_snapshot = self._event_loop_snapshots[-1] if self._event_loop_snapshots else None
