@@ -3,42 +3,44 @@
 from __future__ import annotations
 
 import asyncio
-import os
-from contextlib import suppress
+from datetime import timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING
 
-import psutil
-
 from crawlee._utils.recurring_task import RecurringTask
-from crawlee.autoscaling.types import LoadRatioInfo, SystemInfo
+from crawlee._utils.system import get_cpu_info, get_memory_info
 from crawlee.events.event_manager import EventManager
 from crawlee.events.types import Event, EventSystemInfoData
 
 if TYPE_CHECKING:
-    from datetime import timedelta
     from types import TracebackType
-
-    from crawlee import Config
 
 logger = getLogger(__name__)
 
 
 class LocalEventManager(EventManager):
-    """Local event manager for emitting system info events.
+    """Local event manager for emitting system info events."""
 
-    Attributes:
-        config: The crawlee configuration.
+    def __init__(
+        self,
+        *,
+        system_info_interval: timedelta = timedelta(seconds=60),
+        close_timeout: timedelta | None = None,
+    ) -> None:
+        """Create a new instance.
 
-        timeout: The timeout for closing the event manager.
+        Args:
+            system_info_interval: Interval at which `SystemInfo` events are emitted.
+            close_timeout: Optional timeout for closing the event manager.
+        """
+        logger.debug('Calling LocalEventManager.__init__()...')
 
-        _emit_system_info_event_rec_task: The recurring task for emitting system info events.
-    """
+        self._system_info_interval = system_info_interval
+        self._close_timeout = close_timeout
 
-    def __init__(self, config: Config, timeout: timedelta | None = None) -> None:
-        self.config = config
-        self.timeout = timeout
+        # Recurring task for emitting system info events.
         self._emit_system_info_event_rec_task: RecurringTask | None = None
+
         super().__init__()
 
     async def __aenter__(self) -> LocalEventManager:
@@ -49,7 +51,7 @@ class LocalEventManager(EventManager):
         logger.debug('Calling LocalEventManager.__aenter__()...')
         self._emit_system_info_event_rec_task = RecurringTask(
             func=self._emit_system_info_event,
-            delay=self.config.system_info_interval,
+            delay=self._system_info_interval,
         )
         self._emit_system_info_event_rec_task.start()
         return self
@@ -72,61 +74,14 @@ class LocalEventManager(EventManager):
         if self._emit_system_info_event_rec_task is not None:
             await self._emit_system_info_event_rec_task.stop()
 
-        await super().close(timeout=self.timeout)
+        await super().close(timeout=self._close_timeout)
 
     async def _emit_system_info_event(self) -> None:
         """Emits a system info event with the current CPU and memory usage."""
         logger.debug('Calling LocalEventManager._emit_system_info_event()...')
-        system_info = await self._get_system_info()
-        event_data = EventSystemInfoData(system_info=system_info)
+
+        cpu_info = await asyncio.to_thread(get_cpu_info)
+        memory_info = await asyncio.to_thread(get_memory_info)
+
+        event_data = EventSystemInfoData(cpu_info=cpu_info, memory_info=memory_info)
         self.emit(event=Event.SYSTEM_INFO, event_data=event_data)
-
-    async def _get_system_info(self) -> SystemInfo:
-        """Gathers system info about the CPU and memory usage.
-
-        Returns:
-            The system info.
-        """
-        logger.debug('Calling LocalEventManager._get_system_info()...')
-        cpu_info = await self._get_cpu_info()
-        mem_usage = self._get_current_mem_usage()
-
-        return SystemInfo(
-            cpu_info=cpu_info,
-            mem_current_bytes=mem_usage,
-        )
-
-    async def _get_cpu_info(self) -> LoadRatioInfo:
-        """Retrieves the current CPU usage and calculates the load ratio.
-
-        It utilizes the `psutil` library. Function `psutil.cpu_percent()` returns a float representing the current
-        system-wide CPU utilization as a percentage.
-
-        Returns:
-            The load ratio info.
-        """
-        logger.debug('Calling LocalEventManager._get_cpu_info()...')
-        cpu_percent = await asyncio.to_thread(psutil.cpu_percent, interval=0.1)
-        cpu_ratio = cpu_percent / 100
-        return LoadRatioInfo(limit_ratio=self.config.max_used_cpu_ratio, actual_ratio=cpu_ratio)
-
-    def _get_current_mem_usage(self) -> int:
-        """Retrieves the current memory usage of the process and its children.
-
-        Returns:
-            The current memory usage in bytes.
-        """
-        logger.debug('Calling LocalEventManager._get_current_mem_usage()...')
-        current_process = psutil.Process(os.getpid())
-
-        # Retrieve the Resident Set Size (RSS) of the current process. RSS is the portion of memory
-        # occupied by a process that is held in RAM.
-        mem_bytes = int(current_process.memory_info().rss)
-
-        for child in current_process.children(recursive=True):
-            # Ignore any NoSuchProcess exception that might occur if a child process ends before we retrieve
-            # its memory usage.
-            with suppress(psutil.NoSuchProcess):
-                mem_bytes += int(child.memory_info().rss)
-
-        return mem_bytes

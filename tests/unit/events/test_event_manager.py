@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from crawlee.autoscaling.types import SystemInfo
 from crawlee.events.event_manager import EventManager
 from crawlee.events.types import Event, EventSystemInfoData
 
@@ -17,8 +16,7 @@ def event_manager() -> EventManager:
 
 @pytest.fixture()
 def event_system_info_data() -> EventSystemInfoData:
-    system_info = SystemInfo()
-    return EventSystemInfoData(system_info)
+    return MagicMock(spec=EventSystemInfoData)
 
 
 @pytest.fixture()
@@ -113,8 +111,8 @@ async def test_close_clears_listeners_and_tasks(
     await event_manager.close()
 
     assert async_listener.call_count == 0
-    assert len(event_manager._listener_tasks) == 0  # noqa: SLF001
-    assert len(event_manager._listeners_to_wrappers) == 0  # noqa: SLF001
+    assert len(event_manager._listener_tasks) == 0
+    assert len(event_manager._listeners_to_wrappers) == 0
 
 
 async def test_close_after_emit_processes_event(
@@ -131,5 +129,5 @@ async def test_close_after_emit_processes_event(
     assert async_listener.call_count == 1
     assert async_listener.call_args[0] == (event_system_info_data,)
 
-    assert len(event_manager._listener_tasks) == 0  # noqa: SLF001
-    assert len(event_manager._listeners_to_wrappers) == 0  # noqa: SLF001
+    assert len(event_manager._listener_tasks) == 0
+    assert len(event_manager._listeners_to_wrappers) == 0
