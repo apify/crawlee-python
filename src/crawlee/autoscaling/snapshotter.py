@@ -189,7 +189,7 @@ class Snapshotter:
         return [snapshot for snapshot in reversed(snapshots) if latest_time - snapshot.created_at <= duration]
 
     def _snapshot_cpu(self, event_data: EventSystemInfoData) -> None:
-        """Creates a snapshot of current CPU usage using the Apify platform `SystemInfo` event.
+        """Captures a snapshot of the current CPU usage.
 
         This method does not perform CPU usage measurement. Instead, it just reads the data received through
         the `event_data` parameter, which is expected to be supplied by the event manager.
@@ -208,7 +208,7 @@ class Snapshotter:
         self._cpu_snapshots.append(snapshot)
 
     def _snapshot_memory(self, event_data: EventSystemInfoData) -> None:
-        """Creates a snapshot of current memory usage using the Apify platform `SystemInfo` event.
+        """Captures a snapshot of the current memory usage.
 
         This method does not perform memory usage measurement. Instead, it just reads the data received through
         the `event_data` parameter, which is expected to be supplied by the event manager.
@@ -231,7 +231,7 @@ class Snapshotter:
         self._evaluate_memory_load(event_data.memory_info.current_bytes, event_data.memory_info.created_at)
 
     def _snapshot_event_loop(self) -> None:
-        """Creates a snapshot of the current event loop state.
+        """Captures a snapshot of the current event loop usage.
 
         This method assesses the event loop's responsiveness by measuring the time elapsed between the creation of
         the last snapshot and the current moment. This delay is calculated by subtracting the time of the last snapshot
@@ -250,7 +250,7 @@ class Snapshotter:
         self._event_loop_snapshots.append(snapshot)
 
     def _snapshot_client(self) -> None:
-        """Creates a snapshot of the current API state by checking for rate limit errors (HTTP 429).
+        """Captures a snapshot of the current API state by checking for rate limit errors (HTTP 429).
 
         Only errors produced by a 2nd retry of the API call are considered for snapshotting since earlier errors may
         just be caused by a random spike in the number of requests and do not necessarily signify API overloading.
