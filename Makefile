@@ -20,13 +20,13 @@ type-check:
 	poetry run mypy $(DIRS_WITH_CODE)
 
 unit-tests:
-	poetry run pytest -n auto -ra -v tests/unit --cov=src/crawlee
+	poetry run pytest --numprocesses=auto -ra --verbose --cov=src/crawlee tests/unit
 
 unit-tests-cov:
-	poetry run pytest -n auto -ra -v tests/unit --cov=src/crawlee --cov-report=html
+	poetry run pytest --numprocesses=auto -ra --verbose --cov=src/crawlee --cov-report=html tests/unit
 
 integration-tests:
-	poetry run pytest -n $(INTEGRATION_TESTS_CONCURRENCY) -ra tests/integration
+	poetry run pytest --numprocesses=$(INTEGRATION_TESTS_CONCURRENCY) -ra tests/integration
 
 format:
 	poetry run ruff check --fix $(DIRS_WITH_CODE)

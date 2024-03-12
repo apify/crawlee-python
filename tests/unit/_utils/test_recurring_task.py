@@ -21,7 +21,6 @@ def delay() -> timedelta:
     return timedelta(milliseconds=30)
 
 
-@pytest.mark.asyncio()
 async def test_init(function: AsyncMock, delay: timedelta) -> None:
     rt = RecurringTask(function, delay)
     assert rt.func == function
@@ -29,7 +28,6 @@ async def test_init(function: AsyncMock, delay: timedelta) -> None:
     assert rt.task is None
 
 
-@pytest.mark.asyncio()
 async def test_start_and_stop(function: AsyncMock, delay: timedelta) -> None:
     rt = RecurringTask(function, delay)
 
@@ -43,7 +41,6 @@ async def test_start_and_stop(function: AsyncMock, delay: timedelta) -> None:
     assert rt.task.done()
 
 
-@pytest.mark.asyncio()
 async def test_execution(function: AsyncMock, delay: timedelta) -> None:
     task = RecurringTask(function, delay)
 

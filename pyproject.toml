@@ -57,10 +57,10 @@ filelock = "~3.13.1"
 mypy = "~1.8.0"
 pre-commit = "~3.6.0"
 pydoc-markdown = "~4.8.2"
-pytest = "~8.0.0"
+pytest = "~8.1.0"
 pytest-asyncio = "~0.23.5"
 pytest-cov = "~4.1.0"
-pytest-only = "~2.0.0"
+pytest-only = "~2.1.0"
 pytest-timeout = "~2.3.0"
 pytest-xdist = "~3.5.0"
 respx = "~0.20.1"
@@ -138,7 +138,7 @@ convention = "google"
 [tool.ruff.lint.isort]
 known-local-folder = ["crawlee"]
 
-[tool.pytest]
+[tool.pytest.ini_options]
 asyncio_mode = "auto"
 timeout = 1200
 
