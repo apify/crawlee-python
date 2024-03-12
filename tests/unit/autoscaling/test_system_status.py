@@ -74,7 +74,7 @@ def test_cpu_is_not_overloaded(snapshotter: Snapshotter, now: datetime) -> None:
 def test_get_system_info(snapshotter: Snapshotter, now: datetime) -> None:
     system_status = SystemStatus(
         snapshotter,
-        current_history=timedelta(minutes=1),
+        max_snapshot_age=timedelta(minutes=1),
         cpu_overload_threshold=0.5,
         memory_overload_threshold=0.5,
         event_loop_overload_threshold=0.5,

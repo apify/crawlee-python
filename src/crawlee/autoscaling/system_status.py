@@ -28,7 +28,7 @@ class SystemStatus:
     is overloaded.
 
     `get_current_status` returns a `SystemInfo` data structure that represents the current status
-    of the system. The length of the current timeframe in seconds is configurable by the `current_history` option
+    of the system. The length of the current timeframe in seconds is configurable by the `max_snapshot_age` option
     and represents the max age of snapshots to be considered for the computation.
 
     `SystemStatus.get_historical_status` returns a `SystemInfo` that represents the long-term status of the system. It
@@ -39,7 +39,7 @@ class SystemStatus:
         self,
         snapshotter: Snapshotter,
         *,
-        current_history: timedelta = timedelta(seconds=5),
+        max_snapshot_age: timedelta = timedelta(seconds=5),
         cpu_overload_threshold: float = 0.4,
         memory_overload_threshold: float = 0.2,
         event_loop_overload_threshold: float = 0.6,
@@ -50,7 +50,7 @@ class SystemStatus:
         Args:
             snapshotter: The `Snapshotter` instance to be queried for `SystemStatus`.
 
-            current_history: Defines max age of snapshots used in the `SystemStatus.get_current_status` measurement.
+            max_snapshot_age: Defines max age of snapshots used in the `SystemStatus.get_current_status` measurement.
 
             cpu_overload_threshold: Sets the threshold of overloaded snapshots in the CPU sample.
                 If the sample exceeds this threshold, the system will be considered overloaded.
@@ -65,7 +65,7 @@ class SystemStatus:
                 If the sample exceeds this threshold, the system will be considered overloaded.
         """
         self._snapshotter = snapshotter
-        self._current_history = current_history
+        self._max_snapshot_age = max_snapshot_age
         self._cpu_overload_threshold = cpu_overload_threshold
         self._memory_overload_threshold = memory_overload_threshold
         self._event_loop_overload_threshold = event_loop_overload_threshold
@@ -74,13 +74,13 @@ class SystemStatus:
     def get_current_status(self) -> SystemInfo:
         """Retrieves and evaluates the current status of system resources.
 
-        Considers snapshots within the `_current_history` timeframe and determines if the system is currently
+        Considers snapshots within the `_max_snapshot_age` timeframe and determines if the system is currently
         overloaded based on predefined thresholds for each resource type.
 
         Returns:
             An object representing the current system status.
         """
-        return self._get_system_info(self._current_history)
+        return self._get_system_info(self._max_snapshot_age)
 
     def get_historical_status(self) -> SystemInfo:
         """Retrieves and evaluates the historical status of system resources.
