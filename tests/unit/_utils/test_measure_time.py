@@ -1,8 +1,6 @@
 import asyncio
 import time
 
-import pytest
-
 from crawlee._utils.measure_time import measure_time
 
 
@@ -29,7 +27,6 @@ def test_measure_time_cpu_sync() -> None:
     assert elapsed.cpu >= 0.05
 
 
-@pytest.mark.asyncio()
 async def test_measure_time_wall_async() -> None:
     with measure_time() as elapsed:
         await asyncio.sleep(0.1)

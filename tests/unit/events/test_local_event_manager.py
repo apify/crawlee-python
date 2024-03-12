@@ -19,6 +19,7 @@ def listener() -> AsyncMock:
     return al
 
 
+
 async def test_emit_system_info_event(listener: AsyncMock) -> None:
     async with LocalEventManager(system_info_interval=timedelta(milliseconds=50)) as event_manager:
         event_manager.on(event=Event.SYSTEM_INFO, listener=listener)
