@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from more_itertools import pairwise
 
-from crawlee._utils.math import get_weighted_avg
+from crawlee._utils.math import compute_weighted_avg
 from crawlee.autoscaling.types import LoadRatioInfo, Snapshot, SystemInfo
 
 if TYPE_CHECKING:
@@ -190,7 +190,7 @@ class SystemStatus:
             values.append(value)
 
         try:
-            weighted_avg = get_weighted_avg(values, weights)
+            weighted_avg = compute_weighted_avg(values, weights)
         except ValueError:
             logger.warning('Total weight cannot be zero')
             return LoadRatioInfo(limit_ratio=max_ratio, actual_ratio=0)

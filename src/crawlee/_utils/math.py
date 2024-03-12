@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 
-def get_weighted_avg(values: list[float], weights: list[float]) -> float:
+def compute_weighted_avg(values: list[float], weights: list[float]) -> float:
     """Computes a weighted average of an array of numbers, complemented by an array of weights.
 
     Args:
