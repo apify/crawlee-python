@@ -4,7 +4,6 @@ from datetime import datetime, timedelta, timezone
 from typing import AsyncGenerator
 
 import pytest
-import pytest_asyncio
 
 from crawlee.autoscaling import Snapshotter, SystemStatus
 from crawlee.autoscaling.types import (
@@ -18,7 +17,7 @@ from crawlee.autoscaling.types import (
 from crawlee.events import LocalEventManager
 
 
-@pytest_asyncio.fixture()
+@pytest.fixture()
 async def snapshotter() -> AsyncGenerator[Snapshotter, None]:
     async with LocalEventManager() as event_manager:
         snapshotter = Snapshotter(event_manager)
@@ -32,7 +31,6 @@ def now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-@pytest.mark.asyncio()
 async def test_start_stop_lifecycle() -> None:
     async with LocalEventManager() as event_manager:
         snapshotter = Snapshotter(event_manager)

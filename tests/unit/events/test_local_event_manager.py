@@ -9,15 +9,12 @@ import pytest
 from crawlee.events import LocalEventManager
 from crawlee.events.types import Event, EventSystemInfoData
 
-pytestmark = pytest.mark.asyncio()
-
 
 @pytest.fixture()
 def listener() -> AsyncMock:
     al = AsyncMock()
     al.__name__ = 'listener'  # To avoid issues with the function name
     return al
-
 
 
 async def test_emit_system_info_event(listener: AsyncMock) -> None:

@@ -8,8 +8,6 @@ import pytest
 from crawlee.events.event_manager import EventManager
 from crawlee.events.types import Event, EventSystemInfoData
 
-pytestmark = pytest.mark.asyncio()
-
 
 @pytest.fixture()
 def event_manager() -> EventManager:

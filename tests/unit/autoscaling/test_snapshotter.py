@@ -28,7 +28,6 @@ def event_system_data_info() -> EventSystemInfoData:
     )
 
 
-@pytest.mark.asyncio()
 async def test_start_stop_lifecycle() -> None:
     async with LocalEventManager() as event_manager:
         snapshotter = Snapshotter(event_manager)
