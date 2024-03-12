@@ -40,10 +40,10 @@ class SystemStatus:
         snapshotter: Snapshotter,
         *,
         current_history: timedelta = timedelta(seconds=5),
-        max_memory_overloaded_ratio: float = 0.2,
-        max_event_loop_overloaded_ratio: float = 0.6,
-        max_cpu_overloaded_ratio: float = 0.4,
-        max_client_overloaded_ratio: float = 0.3,
+        cpu_overload_threshold: float = 0.4,
+        memory_overload_threshold: float = 0.2,
+        event_loop_overload_threshold: float = 0.6,
+        client_overload_threshold: float = 0.3,
     ) -> None:
         """Creates a new instance.
 
@@ -52,24 +52,24 @@ class SystemStatus:
 
             current_history: Defines max age of snapshots used in the `SystemStatus.get_current_status` measurement.
 
-            max_memory_overloaded_ratio: Sets the maximum ratio of overloaded snapshots in a memory sample.
-                If the sample exceeds this ratio, the system will be overloaded.
+            cpu_overload_threshold: Sets the threshold of overloaded snapshots in the CPU sample.
+                If the sample exceeds this threshold, the system will be considered overloaded.
 
-            max_event_loop_overloaded_ratio: Sets the maximum ratio of overloaded snapshots in an event loop sample.
-                If the sample exceeds this ratio, the system will be overloaded.
+            memory_overload_threshold: Sets the threshold of overloaded snapshots in the memory sample.
+                If the sample exceeds this threshold, the system will be considered overloaded.
 
-            max_cpu_overloaded_ratio: Sets the maximum ratio of overloaded snapshots in a CPU sample. If the sample
-                exceeds this ratio, the system will be overloaded.
+            event_loop_overload_threshold: Sets the threshold of overloaded snapshots in the event loop sample.
+                If the sample exceeds this threshold, the system will be considered overloaded.
 
-            max_client_overloaded_ratio: Sets the maximum ratio of overloaded snapshots in a Client sample.
-                If the sample exceeds this ratio, the system will be overloaded.
+            client_overload_threshold: Sets the threshold of overloaded snapshots in the Client sample.
+                If the sample exceeds this threshold, the system will be considered overloaded.
         """
         self._snapshotter = snapshotter
         self._current_history = current_history
-        self._max_memory_overloaded_ratio = max_memory_overloaded_ratio
-        self._max_event_loop_overloaded_ratio = max_event_loop_overloaded_ratio
-        self._max_cpu_overloaded_ratio = max_cpu_overloaded_ratio
-        self._max_client_overloaded_ratio = max_client_overloaded_ratio
+        self._cpu_overload_threshold = cpu_overload_threshold
+        self._memory_overload_threshold = memory_overload_threshold
+        self._event_loop_overload_threshold = event_loop_overload_threshold
+        self._client_overload_threshold = client_overload_threshold
 
     def get_current_status(self) -> SystemInfo:
         """Retrieves and evaluates the current status of system resources.
@@ -126,7 +126,7 @@ class SystemStatus:
             CPU load ratio information.
         """
         sample = self._snapshotter.get_cpu_sample(sample_duration)
-        return self._is_sample_overloaded(sample, self._max_cpu_overloaded_ratio)
+        return self._is_sample_overloaded(sample, self._cpu_overload_threshold)
 
     def _is_memory_overloaded(self, sample_duration: timedelta | None = None) -> LoadRatioInfo:
         """Determine if memory has been overloaded within a specified time duration.
@@ -139,7 +139,7 @@ class SystemStatus:
             Memory load ratio information.
         """
         sample = self._snapshotter.get_memory_sample(sample_duration)
-        return self._is_sample_overloaded(sample, self._max_memory_overloaded_ratio)
+        return self._is_sample_overloaded(sample, self._memory_overload_threshold)
 
     def _is_event_loop_overloaded(self, sample_duration: timedelta | None = None) -> LoadRatioInfo:
         """Determine if the event loop has been overloaded within a specified time duration.
@@ -152,7 +152,7 @@ class SystemStatus:
             Event loop load ratio information.
         """
         sample = self._snapshotter.get_event_loop_sample(sample_duration)
-        return self._is_sample_overloaded(sample, self._max_event_loop_overloaded_ratio)
+        return self._is_sample_overloaded(sample, self._event_loop_overload_threshold)
 
     def _is_client_overloaded(self, sample_duration: timedelta | None = None) -> LoadRatioInfo:
         """Determine if the client has been overloaded within a specified time duration.
@@ -165,21 +165,21 @@ class SystemStatus:
             Client load ratio information.
         """
         sample = self._snapshotter.get_client_sample(sample_duration)
-        return self._is_sample_overloaded(sample, self._max_client_overloaded_ratio)
+        return self._is_sample_overloaded(sample, self._client_overload_threshold)
 
-    def _is_sample_overloaded(self, sample: list[Snapshot], max_ratio: float) -> LoadRatioInfo:
+    def _is_sample_overloaded(self, sample: list[Snapshot], threshold: float) -> LoadRatioInfo:
         """Determine if a sample of snapshot data is overloaded based on a specified ratio.
 
         Args:
             sample: A list of snapshot data to analyze.
-            max_ratio: The ratio threshold to consider the sample as overloaded.
+            threshold: The threshold ratio to use for determining if the sample is overloaded.
 
         Returns:
             An object with an `is_overloaded` property set to `True` if the sample is considered overloaded based
-            on the specified ratio. Otherwise, `is_overloaded` is set to `False`.
+            on the specified threshold ratio. Otherwise, `is_overloaded` is set to `False`.
         """
         if not sample:
-            return LoadRatioInfo(limit_ratio=max_ratio, actual_ratio=0)
+            return LoadRatioInfo(limit_ratio=threshold, actual_ratio=0)
 
         weights, values = [], []
 
@@ -193,6 +193,6 @@ class SystemStatus:
             weighted_avg = compute_weighted_avg(values, weights)
         except ValueError:
             logger.warning('Total weight cannot be zero')
-            return LoadRatioInfo(limit_ratio=max_ratio, actual_ratio=0)
+            return LoadRatioInfo(limit_ratio=threshold, actual_ratio=0)
 
-        return LoadRatioInfo(limit_ratio=max_ratio, actual_ratio=round(weighted_avg, 3))
+        return LoadRatioInfo(limit_ratio=threshold, actual_ratio=round(weighted_avg, 3))
