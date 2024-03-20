@@ -50,13 +50,13 @@ async def test_persist_storage(tmp_path: Path) -> None:
 
 def test_config_via_env_vars_persist_storage(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     # Env var changes persist_storage to False
-    monkeypatch.setenv('APIFY_PERSIST_STORAGE', 'false')
+    monkeypatch.setenv('CRAWLEE_PERSIST_STORAGE', 'false')
     ms = MemoryStorageClient(local_data_directory=str(tmp_path))
     assert ms._persist_storage is False
-    monkeypatch.setenv('APIFY_PERSIST_STORAGE', '0')
+    monkeypatch.setenv('CRAWLEE_PERSIST_STORAGE', '0')
     ms = MemoryStorageClient(local_data_directory=str(tmp_path))
     assert ms._persist_storage is False
-    monkeypatch.setenv('APIFY_PERSIST_STORAGE', '')
+    monkeypatch.setenv('CRAWLEE_PERSIST_STORAGE', '')
     ms = MemoryStorageClient(local_data_directory=str(tmp_path))
     assert ms._persist_storage is False
     # Test if constructor arg takes precedence over env var value
