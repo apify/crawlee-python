@@ -8,9 +8,6 @@ from pathlib import Path
 import aioshutil
 from aiofiles import ospath
 from aiofiles.os import rename, scandir
-from apify_shared.consts import ApifyEnvVars
-from apify_shared.utils import ignore_docs
-
 from apify._memory_storage.resource_clients.dataset import DatasetClient
 from apify._memory_storage.resource_clients.dataset_collection import DatasetCollectionClient
 from apify._memory_storage.resource_clients.key_value_store import KeyValueStoreClient
@@ -18,6 +15,9 @@ from apify._memory_storage.resource_clients.key_value_store_collection import Ke
 from apify._memory_storage.resource_clients.request_queue import RequestQueueClient
 from apify._memory_storage.resource_clients.request_queue_collection import RequestQueueCollectionClient
 from apify._utils import maybe_parse_bool
+from apify_shared.utils import ignore_docs
+
+from crawlee.consts import CrawleeEnvVars
 
 """
 Memory storage emulates data storages that are available on the Apify platform.
@@ -60,7 +60,7 @@ class MemoryStorageClient:
             persist_storage (bool, optional): Whether to persist the data to the `local_data_directory` or just keep them in memory
             write_metadata (bool, optional): Whether to persist metadata of the storages as well
         """
-        self._local_data_directory = local_data_directory or os.getenv(ApifyEnvVars.LOCAL_STORAGE_DIR) or './storage'
+        self._local_data_directory = local_data_directory or os.getenv(CrawleeEnvVars.LOCAL_STORAGE_DIR) or './storage'
         self._datasets_directory = os.path.join(self._local_data_directory, 'datasets')
         self._key_value_stores_directory = os.path.join(self._local_data_directory, 'key_value_stores')
         self._request_queues_directory = os.path.join(self._local_data_directory, 'request_queues')
@@ -68,7 +68,7 @@ class MemoryStorageClient:
         self._persist_storage = (
             persist_storage
             if persist_storage is not None
-            else maybe_parse_bool(os.getenv(ApifyEnvVars.PERSIST_STORAGE, 'true'))
+            else maybe_parse_bool(os.getenv(CrawleeEnvVars.PERSIST_STORAGE, 'true'))
         )
         self._datasets_handled = []
         self._key_value_stores_handled = []

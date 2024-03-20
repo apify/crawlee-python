@@ -75,7 +75,9 @@ async def test_for_each_key(key_value_store: KeyValueStore) -> None:
 
 async def test_get_public_url() -> None:
     store = await KeyValueStore.open()
-    with pytest.raises(RuntimeError, match='Cannot generate a public URL for this key-value store as it is not on the Apify Platform!'):
+    with pytest.raises(
+        RuntimeError, match='Cannot generate a public URL for this key-value store as it is not on the Apify Platform!'
+    ):
         await store.get_public_url('dummy')
 
 

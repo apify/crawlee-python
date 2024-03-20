@@ -4,11 +4,10 @@ from abc import ABC, abstractmethod
 from operator import itemgetter
 from typing import TYPE_CHECKING, Generic, TypeVar, cast
 
-from apify_shared.models import ListPage
-from apify_shared.utils import ignore_docs
-
 from apify._memory_storage.file_storage_utils import update_metadata
 from apify._memory_storage.resource_clients.base_resource_client import BaseResourceClient
+from apify_shared.models import ListPage
+from apify_shared.utils import ignore_docs
 
 if TYPE_CHECKING:
     from apify._memory_storage.memory_storage_client import MemoryStorageClient
