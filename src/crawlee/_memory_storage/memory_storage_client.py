@@ -10,13 +10,12 @@ from aiofiles import ospath
 from aiofiles.os import rename, scandir
 from apify._memory_storage.resource_clients.dataset import DatasetClient
 from apify._memory_storage.resource_clients.dataset_collection import DatasetCollectionClient
-from apify._memory_storage.resource_clients.key_value_store import KeyValueStoreClient
-from apify._memory_storage.resource_clients.key_value_store_collection import KeyValueStoreCollectionClient
 from apify._memory_storage.resource_clients.request_queue import RequestQueueClient
 from apify._memory_storage.resource_clients.request_queue_collection import RequestQueueCollectionClient
-from apify._utils import maybe_parse_bool
-from apify_shared.utils import ignore_docs
 
+from crawlee._memory_storage.resource_clients.key_value_store_client import KeyValueStoreClient
+from crawlee._memory_storage.resource_clients.key_value_store_collection_client import KeyValueStoreCollectionClient
+from crawlee._utils.file import maybe_parse_bool
 from crawlee.consts import CrawleeEnvVars
 
 """
@@ -27,7 +26,6 @@ The metadata of the storages is also persisted if `write_metadata` is True.
 """
 
 
-@ignore_docs
 class MemoryStorageClient:
     """Class representing an in-memory storage."""
 
@@ -56,9 +54,9 @@ class MemoryStorageClient:
         """Initialize the MemoryStorageClient.
 
         Args:
-            local_data_directory (str, optional): A local directory where all data will be persisted
-            persist_storage (bool, optional): Whether to persist the data to the `local_data_directory` or just keep them in memory
-            write_metadata (bool, optional): Whether to persist metadata of the storages as well
+            local_data_directory: A local directory where all data will be persisted
+            persist_storage: Whether to persist the data to the `local_data_directory` or just keep them in memory
+            write_metadata: Whether to persist metadata of the storages as well
         """
         self._local_data_directory = local_data_directory or os.getenv(CrawleeEnvVars.LOCAL_STORAGE_DIR) or './storage'
         self._datasets_directory = os.path.join(self._local_data_directory, 'datasets')
@@ -77,7 +75,10 @@ class MemoryStorageClient:
 
     def datasets(self: MemoryStorageClient) -> DatasetCollectionClient:
         """Retrieve the sub-client for manipulating datasets."""
-        return DatasetCollectionClient(base_storage_directory=self._datasets_directory, memory_storage_client=self)
+        return DatasetCollectionClient(
+            base_storage_directory=self._datasets_directory,
+            memory_storage_client=self,
+        )
 
     def dataset(self: MemoryStorageClient, dataset_id: str) -> DatasetClient:
         """Retrieve the sub-client for manipulating a single dataset.
@@ -85,12 +86,17 @@ class MemoryStorageClient:
         Args:
             dataset_id (str): ID of the dataset to be manipulated
         """
-        return DatasetClient(base_storage_directory=self._datasets_directory, memory_storage_client=self, id=dataset_id)
+        return DatasetClient(
+            base_storage_directory=self._datasets_directory,
+            memory_storage_client=self,
+            id=dataset_id,
+        )
 
     def key_value_stores(self: MemoryStorageClient) -> KeyValueStoreCollectionClient:
         """Retrieve the sub-client for manipulating key-value stores."""
         return KeyValueStoreCollectionClient(
-            base_storage_directory=self._key_value_stores_directory, memory_storage_client=self
+            base_storage_directory=self._key_value_stores_directory,
+            memory_storage_client=self,
         )
 
     def key_value_store(self: MemoryStorageClient, key_value_store_id: str) -> KeyValueStoreClient:
@@ -100,13 +106,16 @@ class MemoryStorageClient:
             key_value_store_id (str): ID of the key-value store to be manipulated
         """
         return KeyValueStoreClient(
-            base_storage_directory=self._key_value_stores_directory, memory_storage_client=self, id=key_value_store_id
+            base_storage_directory=self._key_value_stores_directory,
+            memory_storage_client=self,
+            id=key_value_store_id,
         )
 
     def request_queues(self: MemoryStorageClient) -> RequestQueueCollectionClient:
         """Retrieve the sub-client for manipulating request queues."""
         return RequestQueueCollectionClient(
-            base_storage_directory=self._request_queues_directory, memory_storage_client=self
+            base_storage_directory=self._request_queues_directory,
+            memory_storage_client=self,
         )
 
     def request_queue(
@@ -122,7 +131,9 @@ class MemoryStorageClient:
             client_key (str): A unique identifier of the client accessing the request queue
         """
         return RequestQueueClient(
-            base_storage_directory=self._request_queues_directory, memory_storage_client=self, id=request_queue_id
+            base_storage_directory=self._request_queues_directory,
+            memory_storage_client=self,
+            id=request_queue_id,
         )
 
     async def _purge_on_start(self: MemoryStorageClient) -> None:

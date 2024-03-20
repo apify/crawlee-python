@@ -15,7 +15,7 @@ from aiofiles import ospath
 from aiofiles.os import makedirs, remove, rename
 
 if TYPE_CHECKING:
-    from crawlee._memory_storage.types import Storage
+    from crawlee.storages.types import StorageTypes
 
 
 def maybe_parse_bool(val: str | None) -> bool:
@@ -41,12 +41,12 @@ def maybe_extract_enum_member_value(maybe_enum_member: Any) -> Any:
     return maybe_enum_member
 
 
-def raise_on_non_existing_storage(client_type: Storage, id_: str | None) -> NoReturn:
+def raise_on_non_existing_storage(client_type: StorageTypes, id_: str | None) -> NoReturn:
     client_type = maybe_extract_enum_member_value(client_type)
     raise ValueError(f'{client_type} with id "{id_}" does not exist.')
 
 
-def raise_on_duplicate_storage(client_type: Storage, key_name: str, value: str) -> NoReturn:
+def raise_on_duplicate_storage(client_type: StorageTypes, key_name: str, value: str) -> NoReturn:
     client_type = maybe_extract_enum_member_value(client_type)
     raise ValueError(f'{client_type} with {key_name} "{value}" already exists.')
 

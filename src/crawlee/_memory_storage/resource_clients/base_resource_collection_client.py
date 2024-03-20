@@ -4,10 +4,9 @@ from abc import ABC, abstractmethod
 from operator import itemgetter
 from typing import TYPE_CHECKING, Generic, TypeVar, cast
 
-from apify._memory_storage.file_storage_utils import update_metadata
-from apify._memory_storage.resource_clients.base_resource_client import BaseResourceClient
-from apify_shared.models import ListPage
-from apify_shared.utils import ignore_docs
+from crawlee._memory_storage.resource_clients.base_resource_client import BaseResourceClient
+from crawlee._utils.file import update_metadata
+from crawlee._utils.list_page import ListPage
 
 if TYPE_CHECKING:
     from apify._memory_storage.memory_storage_client import MemoryStorageClient
@@ -16,7 +15,6 @@ if TYPE_CHECKING:
 ResourceClientType = TypeVar('ResourceClientType', bound=BaseResourceClient, contravariant=True)  # noqa: PLC0105
 
 
-@ignore_docs
 class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
     """Base class for resource collection clients."""
 

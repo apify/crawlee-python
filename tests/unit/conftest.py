@@ -6,7 +6,8 @@ import pytest
 
 from crawlee._memory_storage import MemoryStorageClient
 from crawlee.consts import CrawleeEnvVars
-from crawlee.storages import KeyValueStore, StorageClientManager
+from crawlee.storages.key_value_store import KeyValueStore
+from crawlee.storages.storage_client_manager import StorageClientManager
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -24,6 +25,7 @@ def reset_default_instances(monkeypatch: pytest.MonkeyPatch) -> Callable[[], Non
         monkeypatch.setattr(StorageClientManager, '_default_instance', None)
 
     return reset
+
 
 # To isolate the tests, we need to reset the used singletons before each test case
 # We also set the MemoryStorageClient to use a temp path

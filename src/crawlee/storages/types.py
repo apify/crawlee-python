@@ -1,8 +1,8 @@
 from enum import Enum
 
 
-class Storage(str, Enum):
-    """Enum of all possible storage types."""
+class StorageTypes(str, Enum):
+    """Possible Crawlee storage types."""
 
     DATASET = 'Dataset'
     KEY_VALUE_STORE = 'Key-value store'

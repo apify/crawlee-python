@@ -7,30 +7,37 @@ import mimetypes
 import os
 import pathlib
 from datetime import datetime, timezone
+from logging import getLogger
 from operator import itemgetter
 from typing import TYPE_CHECKING, Any, AsyncIterator, TypedDict
 
 import aiofiles
 import aioshutil
 from aiofiles.os import makedirs
-from apify._crypto import crypto_random_object_id
-from apify._memory_storage.file_storage_utils import update_metadata
-from apify._memory_storage.resource_clients.base_resource_client import BaseResourceClient
-from apify._utils import (
+
+from crawlee._memory_storage.resource_clients.base_resource_client import BaseResourceClient
+from crawlee._utils.crypto import crypto_random_object_id
+from crawlee._utils.file import (
     force_remove,
     force_rename,
     guess_file_extension,
+    is_file_or_bytes,
+    json_dumps,
     maybe_parse_body,
     raise_on_duplicate_storage,
     raise_on_non_existing_storage,
+    update_metadata,
 )
-from apify.consts import DEFAULT_API_PARAM_LIMIT, StorageTypes
-from apify.log import logger
-from apify_shared.utils import ignore_docs, is_file_or_bytes, json_dumps
+from crawlee.consts import DEFAULT_API_PARAM_LIMIT
+from crawlee.storages.types import StorageTypes
 
 if TYPE_CHECKING:
-    from apify._memory_storage.memory_storage_client import MemoryStorageClient
     from typing_extensions import NotRequired
+
+    from crawlee._memory_storage.memory_storage_client import MemoryStorageClient
+
+
+logger = getLogger(__name__)
 
 
 class KeyValueStoreRecord(TypedDict):
@@ -55,7 +62,6 @@ def _filename_from_record(record: KeyValueStoreRecord) -> str:
     return f'{record["key"]}.{extension}'
 
 
-@ignore_docs
 class KeyValueStoreClient(BaseResourceClient):
     """Sub-client for manipulating a single key-value store."""
 

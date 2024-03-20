@@ -5,14 +5,12 @@ import os
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
-from apify_shared.utils import ignore_docs
-
 if TYPE_CHECKING:
-    from apify._memory_storage.memory_storage_client import MemoryStorageClient
     from typing_extensions import Self
 
+    from crawlee._memory_storage.memory_storage_client import MemoryStorageClient
 
-@ignore_docs
+
 class BaseResourceClient(ABC):
     """Base class for resource clients."""
 

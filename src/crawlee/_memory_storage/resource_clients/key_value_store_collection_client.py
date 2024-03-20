@@ -2,15 +2,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from apify._memory_storage.resource_clients.base_resource_collection_client import BaseResourceCollectionClient
-from apify._memory_storage.resource_clients.key_value_store import KeyValueStoreClient
-from apify_shared.utils import ignore_docs
+from crawlee._memory_storage.resource_clients.base_resource_collection_client import BaseResourceCollectionClient
+from crawlee._memory_storage.resource_clients.key_value_store_client import KeyValueStoreClient
 
 if TYPE_CHECKING:
-    from apify_shared.models import ListPage
+    from crawlee._utils.list_page import ListPage
 
 
-@ignore_docs
 class KeyValueStoreCollectionClient(BaseResourceCollectionClient):
     """Sub-client for manipulating key-value stores."""
 
