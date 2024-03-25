@@ -29,10 +29,8 @@ def event_system_data_info() -> EventSystemInfoData:
 
 
 async def test_start_stop_lifecycle() -> None:
-    async with LocalEventManager() as event_manager:
-        snapshotter = Snapshotter(event_manager)
-        await snapshotter.start()
-        await snapshotter.stop()
+    async with LocalEventManager() as event_manager, Snapshotter(event_manager):
+        pass
 
 
 def test_snapshot_cpu(snapshotter: Snapshotter, event_system_data_info: EventSystemInfoData) -> None:

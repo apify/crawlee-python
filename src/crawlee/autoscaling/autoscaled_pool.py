@@ -32,9 +32,9 @@ class AutoscaledPool:
         self,
         *,
         system_status: SystemStatus,
-        run_task_function: Callable[..., Awaitable],
-        is_task_ready_function: Callable[..., bool],
-        is_finished_function: Callable[..., bool],
+        run_task_function: Callable[[], Awaitable],
+        is_task_ready_function: Callable[[], Awaitable[bool]],
+        is_finished_function: Callable[[], Awaitable[bool]],
         task_timeout: timedelta | None = None,
         autoscale_interval: timedelta = timedelta(seconds=10),
         logging_interval: timedelta = timedelta(minutes=1),
@@ -243,7 +243,7 @@ class AutoscaledPool:
         Exits when `is_finished_function` returns True.
         """
         try:
-            while not self._is_finished_function() and not self._run_result.done():
+            while not await self._is_finished_function() and not self._run_result.done():
                 self._worker_tasks_updated.clear()
 
                 current_status = self._system_status.get_current_system_info()
@@ -253,7 +253,7 @@ class AutoscaledPool:
                     logger.debug('Not scheduling new tasks - the autoscaled pool is paused')
                 elif self.current_concurrency >= self.desired_concurrency:
                     logger.debug('Not scheduling new tasks - already running at desired concurrency')
-                elif not self._is_task_ready_function():
+                elif not await self._is_task_ready_function():
                     logger.debug('Not scheduling new task - no task is ready')
                 else:
                     logger.debug('Scheduling a new task')
