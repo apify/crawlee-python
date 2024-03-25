@@ -55,6 +55,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         min_concurrency: int | None = None,
         max_concurrency: int | None = None,
         max_requests_per_minute: int | None = None,
+        max_request_retries: int = 3,
         configuration: Configuration | None = None,
         request_handler_timeout: timedelta = timedelta(minutes=1),
     ) -> None:
@@ -70,6 +71,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         self._error_handler: ErrorHandler[BasicCrawlingContext] | None = None
         self._failed_request_handler: FailedRequestHandler[BasicCrawlingContext] | None = None
+
+        self._max_request_retries = max_request_retries
 
         pool_kwargs = {}
         if min_concurrency is not None:
@@ -235,7 +238,13 @@ class BasicCrawler(Generic[TCrawlingContext]):
         await self._context_pipeline(crawling_context, self.router)
 
     async def _handle_request_error(self, crawling_context: TCrawlingContext, error: Exception) -> None:
-        should_retry_request = False  # TODO: handle and track retries
+        max_request_retries = crawling_context.request.max_retries
+        if max_request_retries is None:
+            max_request_retries = self._max_request_retries
+
+        should_retry_request = (
+            not crawling_context.request.no_retry and crawling_context.request.retry_count < max_request_retries
+        )
 
         if should_retry_request:
             if self._error_handler:

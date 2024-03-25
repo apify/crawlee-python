@@ -69,6 +69,18 @@ class CreateRequestSchema(BaseModel):
         self.user_data.setdefault('__crawlee', {})
         self.user_data['__crawlee']['state'] = new_state
 
+    @property
+    def max_retries(self) -> int | None:
+        return self.crawlee_data.max_retries
+
+    @max_retries.setter
+    def max_retries(self, new_max_retries: int) -> int | None:
+        if self.user_data is None:
+            self.user_data = {}
+
+        self.user_data.setdefault('__crawlee', {})
+        self.user_data['__crawlee']['maxRetries'] = new_max_retries
+
 
 class RequestData(CreateRequestSchema):
     id: str
