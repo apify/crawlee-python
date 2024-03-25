@@ -23,7 +23,7 @@ T = TypeVar('T')
 
 
 def future(value: T) -> Awaitable[T]:
-    f = asyncio.Future()
+    f = asyncio.Future[T]()
     f.set_result(value)
     return f
 
