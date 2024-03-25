@@ -150,7 +150,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         )
 
     async def run(self, requests: list[str | CreateRequestSchema] | None = None) -> FinalStatistics:
-        """Run the crawler until all reqeuests are processed."""
+        """Run the crawler until all requests are processed."""
         if requests is not None:
             await self.add_requests(requests)
 
