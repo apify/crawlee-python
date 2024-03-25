@@ -1,3 +1,5 @@
+# ruff: noqa: TCH003
+
 from __future__ import annotations
 
 from dataclasses import dataclass

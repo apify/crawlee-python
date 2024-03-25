@@ -157,10 +157,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
         return FinalStatistics()
 
     async def __is_finished_function(self) -> bool:
-        return self._request_provider.is_finished()
+        return await self._request_provider.is_finished()
 
     async def __is_task_ready_function(self) -> bool:
-        return self._request_provider.is_empty()
+        return not await self._request_provider.is_empty()
 
     async def __run_task_function(self) -> None:
         request = await wait_for(
