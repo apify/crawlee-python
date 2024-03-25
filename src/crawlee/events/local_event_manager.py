@@ -68,9 +68,6 @@ class LocalEventManager(EventManager):
         """
         logger.debug('Calling LocalEventManager.__aexit__()...')
 
-        if exc_value:
-            logger.error('An error occurred while exiting the async context: %s', exc_value)
-
         if self._emit_system_info_event_rec_task is not None:
             await self._emit_system_info_event_rec_task.stop()
 
