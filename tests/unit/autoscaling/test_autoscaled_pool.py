@@ -1,9 +1,11 @@
+# ruff: noqa: FBT003 Boolean positional value in function call
+
 from __future__ import annotations
 
 import asyncio
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
-from typing import cast
+from typing import Awaitable, TypeVar, cast
 from unittest.mock import Mock
 
 import pytest
@@ -19,6 +21,15 @@ def system_status() -> SystemStatus | Mock:
     return Mock(spec=SystemStatus)
 
 
+T = TypeVar('T')
+
+
+def future(value: T, /) -> Awaitable[T]:
+    f = asyncio.Future[T]()
+    f.set_result(value)
+    return f
+
+
 async def test_runs_concurrently(system_status: SystemStatus | Mock) -> None:
     done_count = 0
 
@@ -30,8 +41,8 @@ async def test_runs_concurrently(system_status: SystemStatus | Mock) -> None:
     pool = AutoscaledPool(
         system_status=system_status,
         run_task_function=run,
-        is_task_ready_function=lambda: True,
-        is_finished_function=lambda: done_count >= 10,
+        is_task_ready_function=lambda: future(True),
+        is_finished_function=lambda: future(done_count >= 10),
         min_concurrency=10,
         max_concurrency=10,
     )
@@ -52,8 +63,8 @@ async def test_abort_works(system_status: SystemStatus | Mock) -> None:
     pool = AutoscaledPool(
         system_status=system_status,
         run_task_function=run,
-        is_task_ready_function=lambda: True,
-        is_finished_function=lambda: False,
+        is_task_ready_function=lambda: future(True),
+        is_finished_function=lambda: future(False),
         min_concurrency=10,
         max_concurrency=10,
     )
@@ -84,8 +95,8 @@ async def test_propagates_exceptions(system_status: SystemStatus | Mock) -> None
     pool = AutoscaledPool(
         system_status=system_status,
         run_task_function=run,
-        is_task_ready_function=lambda: True,
-        is_finished_function=lambda: done_count >= 20,
+        is_task_ready_function=lambda: future(True),
+        is_finished_function=lambda: future(done_count >= 20),
         min_concurrency=10,
         max_concurrency=10,
     )
@@ -125,8 +136,8 @@ async def test_autoscales(system_status: SystemStatus | Mock) -> None:
     pool = AutoscaledPool(
         system_status=system_status,
         run_task_function=run,
-        is_task_ready_function=lambda: True,
-        is_finished_function=lambda: False,
+        is_task_ready_function=lambda: future(True),
+        is_finished_function=lambda: future(False),
         min_concurrency=1,
         desired_concurrency=1,
         max_concurrency=4,
@@ -171,8 +182,8 @@ async def test_max_tasks_per_minute_works(system_status: SystemStatus | Mock) ->
     pool = AutoscaledPool(
         system_status=system_status,
         run_task_function=run,
-        is_task_ready_function=lambda: True,
-        is_finished_function=lambda: False,
+        is_task_ready_function=lambda: future(True),
+        is_finished_function=lambda: future(False),
         min_concurrency=1,
         desired_concurrency=1,
         max_concurrency=1,
