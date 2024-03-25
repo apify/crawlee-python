@@ -13,9 +13,9 @@ class Router(Generic[TCrawlingContext]):
 
     def __init__(self: Router) -> None:
         self._default_handler = None
-        self._handlers_by_label = dict[str, RequestHandler]()
+        self._handlers_by_label = dict[str, RequestHandler[TCrawlingContext]]()
 
-    def default_handler(self: Router, handler: RequestHandler) -> None:
+    def default_handler(self: Router, handler: RequestHandler[TCrawlingContext]) -> RequestHandler[TCrawlingContext]:
         """A decorator used to register a default handler.
 
         The default handler is invoked for requests that have either no label or a label for which we have no matching
@@ -26,7 +26,9 @@ class Router(Generic[TCrawlingContext]):
 
         self._default_handler = handler
 
-    def handler(self: Router, label: str) -> Callable[[RequestHandler], None]:
+        return handler
+
+    def handler(self: Router, label: str) -> Callable[[RequestHandler[TCrawlingContext]], None]:
         """A decorator used to register a label-based handler.
 
         The registered will be invoked only for requests with the exact same label.

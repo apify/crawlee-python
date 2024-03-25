@@ -52,6 +52,8 @@ pyee = "^11.1.0"
 typing-extensions = "^4.1.0"
 pydantic = "^2.6.3"
 eval-type-backport = "^0.1.3"
+pydantic-settings = "^2.2.1"
+httpx = "^0.27.0"
 
 [tool.poetry.group.dev.dependencies]
 build = "~1.1.0"

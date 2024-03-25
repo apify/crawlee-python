@@ -11,12 +11,8 @@ pytestmark = pytest.mark.asyncio()
 
 
 class MockContext(BasicCrawlingContext):
-    def __init__(self: MockContext, *, label: str | None) -> None:
-        self._label = label
-
-    @property
-    def request(self: MockContext) -> RequestData:
-        return RequestData(id='', url='', unique_key='', user_data={'label': self._label})
+    def __init__(self, *, label: str | None) -> None:
+        self.request = RequestData(id='', url='', unique_key='', user_data={'label': label})
 
 
 async def test_router_no_handlers() -> None:

@@ -1,18 +1,19 @@
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Annotated, Any, Protocol
+from dataclasses import dataclass
+from enum import Enum
+from typing import TYPE_CHECKING, Annotated, Any
 
+if TYPE_CHECKING:
+    from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class RequestData(BaseModel):
+class CreateRequestSchema(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     url: str
     """URL of the web page to crawl. It must be a non-empty string."""
-
-    loaded_url: Annotated[str | None, Field(alias='loadedUrl')] = None
 
     unique_key: Annotated[str, Field(alias='uniqueKey')]
     """A unique key identifying the request. Two requests with the same `uniqueKey` are considered as pointing to the
@@ -32,7 +33,7 @@ class RequestData(BaseModel):
 
     headers: Annotated[dict[str, str] | None, Field(default_factory=dict)] = None
 
-    user_data: Annotated[dict[str, Any] | None, Field(alias='userData')]
+    user_data: Annotated[dict[str, Any] | None, Field(alias='userData')] = None
     """Custom user data assigned to the request. Use this to save any request related data to the
     request's scope, keeping them accessible on retries, failures etc.
     """
@@ -41,19 +42,46 @@ class RequestData(BaseModel):
 
     no_retry: Annotated[bool, Field(alias='noRetry')] = False
 
-    id: str
+    loaded_url: Annotated[str | None, Field(alias='loadedUrl')] = None
 
     handled_at: Annotated[datetime | None, Field(alias='handledAt')] = None
 
     @property
-    def crawlee_data(self: RequestData) -> CrawleeRequestData:
+    def crawlee_data(self) -> CrawleeRequestData:
         return CrawleeRequestData.model_validate(self.user_data.get('__crawlee', {}) if self.user_data else {})
 
     @property
-    def label(self: RequestData) -> str | None:
+    def label(self) -> str | None:
         if self.user_data and 'label' in self.user_data:
             return str(self.user_data['label'])
         return None
+
+    @property
+    def state(self) -> RequestState | None:
+        return self.crawlee_data.state
+
+    @state.setter
+    def state(self, new_state: RequestState) -> None:
+        if self.user_data is None:
+            self.user_data = {}
+
+        self.user_data.setdefault('__crawlee', {})
+        self.user_data['__crawlee']['state'] = new_state
+
+
+class RequestData(CreateRequestSchema):
+    id: str
+
+
+class RequestState(Enum):
+    UNPROCESSED = 0
+    BEFORE_NAV = 1
+    AFTER_NAV = 2
+    REQUEST_HANDLER = 3
+    DONE = 4
+    ERROR_HANDLER = 5
+    ERROR = 6
+    SKIPPED = 7
 
 
 class CrawleeRequestData(BaseModel):
@@ -63,7 +91,7 @@ class CrawleeRequestData(BaseModel):
 
     enqueue_strategy: Annotated[str | None, Field(alias='enqueueStrategy')] = None
 
-    state: str | None = None
+    state: RequestState | None = None
     """Describes the request's current lifecycle state."""
 
     session_rotation_count: Annotated[int | None, Field(alias='sessionRotationCount')] = None
@@ -71,7 +99,11 @@ class CrawleeRequestData(BaseModel):
     skip_navigation: Annotated[bool, Field(alias='skipNavigation')] = False
 
 
-class BasicCrawlingContext(Protocol):
-    @property
-    def request(self: BasicCrawlingContext) -> RequestData:
-        ...
+@dataclass(frozen=True)
+class BasicCrawlingContext:
+    request: RequestData
+
+
+@dataclass
+class FinalStatistics:
+    """Statistics about a crawler run."""
