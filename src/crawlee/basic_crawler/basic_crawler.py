@@ -165,8 +165,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
     async def __run_task_function(self) -> None:
         request = await wait_for(
             self._request_provider.fetch_next_request(),
-            self._internal_timeout,
-            f'Fetching next request failed after {self._internal_timeout.total_seconds()} seconds',
+            timeout=self._internal_timeout,
+            timeout_message=f'Fetching next request failed after {self._internal_timeout.total_seconds()} seconds',
+            logger=logger,
+            max_retries=3,
         )
 
         if request is None:
@@ -181,15 +183,20 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
             await wait_for(
                 self.__run_request_handler(crawling_context),
-                self._request_handler_timeout,
-                f'Request handler timed out after {self._request_handler_timeout.total_seconds()} seconds',
+                timeout=self._request_handler_timeout,
+                timeout_message='Request handler timed out after '
+                'f{self._request_handler_timeout.total_seconds()} seconds',
+                logger=logger,
             )
 
             await wait_for(
                 self._request_provider.mark_request_handled(request),
-                self._internal_timeout,
-                f'Marking request as handled timed out after {self._internal_timeout.total_seconds()} seconds',
-            )  # TODO: retry on failure
+                timeout=self._internal_timeout,
+                timeout_message='Marking request as handled timed out after '
+                f'{self._internal_timeout.total_seconds()} seconds',
+                logger=logger,
+                max_retries=3,
+            )
 
             request.state = RequestState.DONE
         except RequestHandlerError[TCrawlingContext] as primary_error:
@@ -198,8 +205,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
                 await wait_for(
                     self._handle_request_error(primary_error.crawling_context, primary_error.wrapped_exception),
-                    self._internal_timeout,
-                    f'Handling request failure timed out after {self._internal_timeout.total_seconds()} seconds',
+                    timeout=self._internal_timeout,
+                    timeout_message='Handling request failure timed out after '
+                    f'{self._internal_timeout.total_seconds()} seconds',
+                    logger=logger,
                 )
 
                 request.state = RequestState.DONE
