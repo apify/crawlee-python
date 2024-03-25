@@ -23,3 +23,6 @@ htmlcov
 .DS_Store
 
 docs/changelog.md
+
+.nvim.lua
+Session.vim
