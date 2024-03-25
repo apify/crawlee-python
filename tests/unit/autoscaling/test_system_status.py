@@ -19,11 +19,8 @@ from crawlee.events import LocalEventManager
 
 @pytest.fixture()
 async def snapshotter() -> AsyncGenerator[Snapshotter, None]:
-    async with LocalEventManager() as event_manager:
-        snapshotter = Snapshotter(event_manager)
-        await snapshotter.start()
+    async with LocalEventManager() as event_manager, Snapshotter(event_manager) as snapshotter:
         yield snapshotter
-        await snapshotter.stop()
 
 
 @pytest.fixture()
@@ -32,15 +29,10 @@ def now() -> datetime:
 
 
 async def test_start_stop_lifecycle() -> None:
-    async with LocalEventManager() as event_manager:
-        snapshotter = Snapshotter(event_manager)
-        await snapshotter.start()
-
+    async with LocalEventManager() as event_manager, Snapshotter(event_manager) as snapshotter:
         system_status = SystemStatus(snapshotter)
         system_status.get_current_system_info()
         system_status.get_historical_system_info()
-
-        await snapshotter.stop()
 
 
 def test_cpu_is_overloaded(snapshotter: Snapshotter, now: datetime) -> None:

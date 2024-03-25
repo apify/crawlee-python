@@ -14,6 +14,8 @@ from crawlee.autoscaling.types import ClientSnapshot, CpuSnapshot, EventLoopSnap
 from crawlee.events.types import Event, EventSystemInfoData
 
 if TYPE_CHECKING:
+    from types import TracebackType
+
     from crawlee.events import EventManager
 
 logger = getLogger(__name__)
@@ -115,14 +117,20 @@ class Snapshotter:
         logger.info(f'Setting max_memory_bytes of this run to {to_mb(max_memory_bytes)} MB.')
         return max_memory_bytes
 
-    async def start(self) -> None:
+    async def __aenter__(self) -> Snapshotter:
         """Starts capturing snapshots at configured intervals."""
         self._event_manager.on(event=Event.SYSTEM_INFO, listener=self._snapshot_cpu)
         self._event_manager.on(event=Event.SYSTEM_INFO, listener=self._snapshot_memory)
         self._snapshot_event_loop_task.start()
         self._snapshot_client_task.start()
+        return self
 
-    async def stop(self) -> None:
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        exc_traceback: TracebackType | None,
+    ) -> None:
         """Stops all resource capturing.
 
         This method stops capturing snapshots of system resources (CPU, memory, event loop, and client information).
