@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Awaitable, Callable, Generic
 
 from typing_extensions import TypeVar
 
+from crawlee._utils.unique_key import compute_unique_key
 from crawlee._utils.wait import wait_for
 from crawlee.autoscaling import AutoscaledPool
 from crawlee.autoscaling.snapshotter import Snapshotter
@@ -137,7 +138,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             [
                 request
                 if isinstance(request, CreateRequestSchema)
-                else CreateRequestSchema(url=request, unique_key='')  # TODO: move unique key generation from sdk
+                else CreateRequestSchema(url=request, unique_key=compute_unique_key(request))
                 for request in requests
             ],
             batch_size=batch_size,
