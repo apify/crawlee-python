@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import pytest
-from apify.storages import KeyValueStore
+
+from crawlee.storages.key_value_store import KeyValueStore
 
 
 @pytest.fixture()

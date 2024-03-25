@@ -6,22 +6,17 @@ import json
 import mimetypes
 import os
 import re
-from enum import Enum
-from typing import TYPE_CHECKING, Any, NoReturn
+from typing import Any
 
 import aiofiles
 import aioshutil
 from aiofiles import ospath
 from aiofiles.os import makedirs, remove, rename
 
-if TYPE_CHECKING:
-    from crawlee.storages.types import StorageTypes
 
-
-def maybe_parse_bool(val: str | None) -> bool:
-    if val in {'true', 'True', '1'}:
-        return True
-    return False
+def json_dumps(obj: Any) -> str:
+    """Dump JSON to a string with the correct settings and serializer."""
+    return json.dumps(obj, ensure_ascii=False, indent=2, default=str)
 
 
 def is_file_or_bytes(value: Any) -> bool:
@@ -32,23 +27,6 @@ def is_file_or_bytes(value: Any) -> bool:
     This way should be good enough for the vast majority of use cases, if it causes issues, we can improve it later.
     """
     return isinstance(value, (bytes, bytearray, io.IOBase))
-
-
-def maybe_extract_enum_member_value(maybe_enum_member: Any) -> Any:
-    """Extract the value of an enumeration member if it is an Enum, otherwise return the original value."""
-    if isinstance(maybe_enum_member, Enum):
-        return maybe_enum_member.value
-    return maybe_enum_member
-
-
-def raise_on_non_existing_storage(client_type: StorageTypes, id_: str | None) -> NoReturn:
-    client_type = maybe_extract_enum_member_value(client_type)
-    raise ValueError(f'{client_type} with id "{id_}" does not exist.')
-
-
-def raise_on_duplicate_storage(client_type: StorageTypes, key_name: str, value: str) -> NoReturn:
-    client_type = maybe_extract_enum_member_value(client_type)
-    raise ValueError(f'{client_type} with {key_name} "{value}" already exists.')
 
 
 def is_content_type_json(content_type: str) -> bool:
@@ -64,14 +42,6 @@ def is_content_type_xml(content_type: str) -> bool:
 def is_content_type_text(content_type: str) -> bool:
     """Check if the given content type is text."""
     return bool(re.search(r'^text/', content_type, flags=re.IGNORECASE))
-
-
-def maybe_parse_body(body: bytes, content_type: str) -> Any:
-    if is_content_type_json(content_type):
-        return json.loads(body.decode('utf-8'))  # Returns any
-    if is_content_type_xml(content_type) or is_content_type_text(content_type):
-        return body.decode('utf-8')
-    return body
 
 
 def guess_file_extension(content_type: str) -> str | None:
@@ -90,11 +60,6 @@ def guess_file_extension(content_type: str) -> str | None:
 
     # Remove the leading dot if extension successfully parsed
     return ext[1:] if ext is not None else ext
-
-
-def json_dumps(obj: Any) -> str:
-    """Dump JSON to a string with the correct settings and serializer."""
-    return json.dumps(obj, ensure_ascii=False, indent=2, default=str)
 
 
 async def force_remove(filename: str) -> None:
@@ -127,7 +92,7 @@ async def update_metadata(*, data: dict, entity_directory: str, write_metadata: 
         await f.write(json_dumps(data).encode('utf-8'))
 
 
-async def _update_dataset_items(
+async def update_dataset_items(
     *,
     data: list[tuple[str, dict]],
     entity_directory: str,

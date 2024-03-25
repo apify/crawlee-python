@@ -21,7 +21,7 @@ class StorageClientManager:
 
     @classmethod
     def get_storage_client(
-        cls: type[StorageClientManager],
+        cls,
         force_cloud: bool = False,  # noqa: FBT001, FBT002
     ) -> ApifyClientAsync | MemoryStorageClient:
         """Get the current storage client instance.
@@ -42,7 +42,7 @@ class StorageClientManager:
         return default_instance._local_client
 
     @classmethod
-    def set_cloud_client(cls: type[StorageClientManager], client: ApifyClientAsync) -> None:
+    def set_cloud_client(cls, client: ApifyClientAsync) -> None:
         """Set the storage client.
 
         Args:
@@ -51,7 +51,7 @@ class StorageClientManager:
         cls._get_default_instance()._cloud_client = client
 
     @classmethod
-    def _get_default_instance(cls: type[StorageClientManager]) -> StorageClientManager:
+    def _get_default_instance(cls) -> StorageClientManager:
         if cls._default_instance is None:
             cls._default_instance = cls()
 

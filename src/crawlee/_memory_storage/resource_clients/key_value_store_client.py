@@ -17,15 +17,13 @@ from aiofiles.os import makedirs
 
 from crawlee._memory_storage.resource_clients.base_resource_client import BaseResourceClient
 from crawlee._utils.crypto import crypto_random_object_id
+from crawlee._utils.data_processing import maybe_parse_body, raise_on_duplicate_storage, raise_on_non_existing_storage
 from crawlee._utils.file import (
     force_remove,
     force_rename,
     guess_file_extension,
     is_file_or_bytes,
     json_dumps,
-    maybe_parse_body,
-    raise_on_duplicate_storage,
-    raise_on_non_existing_storage,
     update_metadata,
 )
 from crawlee.consts import DEFAULT_API_PARAM_LIMIT
@@ -76,7 +74,7 @@ class KeyValueStoreClient(BaseResourceClient):
     _file_operation_lock: asyncio.Lock
 
     def __init__(
-        self: KeyValueStoreClient,
+        self,
         *,
         base_storage_directory: str,
         memory_storage_client: MemoryStorageClient,
@@ -94,7 +92,7 @@ class KeyValueStoreClient(BaseResourceClient):
         self._modified_at = datetime.now(timezone.utc)
         self._file_operation_lock = asyncio.Lock()
 
-    async def get(self: KeyValueStoreClient) -> dict | None:
+    async def get(self) -> dict | None:
         """Retrieve the key-value store.
 
         Returns:
@@ -111,7 +109,7 @@ class KeyValueStoreClient(BaseResourceClient):
 
         return None
 
-    async def update(self: KeyValueStoreClient, *, name: str | None = None) -> dict:
+    async def update(self, *, name: str | None = None) -> dict:
         """Update the key-value store with specified fields.
 
         Args:
@@ -161,7 +159,7 @@ class KeyValueStoreClient(BaseResourceClient):
 
         return existing_store_by_id._to_resource_info()
 
-    async def delete(self: KeyValueStoreClient) -> None:
+    async def delete(self) -> None:
         """Delete the key-value store."""
         store = next(
             (store for store in self._memory_storage_client._key_value_stores_handled if store._id == self._id), None
@@ -176,7 +174,7 @@ class KeyValueStoreClient(BaseResourceClient):
                     await aioshutil.rmtree(store._resource_directory)
 
     async def list_keys(
-        self: KeyValueStoreClient,
+        self,
         *,
         limit: int = DEFAULT_API_PARAM_LIMIT,
         exclusive_start_key: str | None = None,
@@ -248,7 +246,7 @@ class KeyValueStoreClient(BaseResourceClient):
         }
 
     async def _get_record_internal(
-        self: KeyValueStoreClient,
+        self,
         key: str,
         as_bytes: bool = False,  # noqa: FBT001, FBT002
     ) -> dict | None:
@@ -282,7 +280,7 @@ class KeyValueStoreClient(BaseResourceClient):
 
         return record
 
-    async def get_record(self: KeyValueStoreClient, key: str) -> dict | None:
+    async def get_record(self, key: str) -> dict | None:
         """Retrieve the given record from the key-value store.
 
         Args:
@@ -293,7 +291,7 @@ class KeyValueStoreClient(BaseResourceClient):
         """
         return await self._get_record_internal(key)
 
-    async def get_record_as_bytes(self: KeyValueStoreClient, key: str) -> dict | None:
+    async def get_record_as_bytes(self, key: str) -> dict | None:
         """Retrieve the given record from the key-value store, without parsing it.
 
         Args:
@@ -304,10 +302,10 @@ class KeyValueStoreClient(BaseResourceClient):
         """
         return await self._get_record_internal(key, as_bytes=True)
 
-    async def stream_record(self: KeyValueStoreClient, _key: str) -> AsyncIterator[dict | None]:
+    async def stream_record(self, _key: str) -> AsyncIterator[dict | None]:
         raise NotImplementedError('This method is not supported in local memory storage.')
 
-    async def set_record(self: KeyValueStoreClient, key: str, value: Any, content_type: str | None = None) -> None:
+    async def set_record(self, key: str, value: Any, content_type: str | None = None) -> None:
         """Set a value to the given record in the key-value store.
 
         Args:
@@ -354,7 +352,7 @@ class KeyValueStoreClient(BaseResourceClient):
 
                 await existing_store_by_id._persist_record(record)
 
-    async def _persist_record(self: KeyValueStoreClient, record: KeyValueStoreRecord) -> None:
+    async def _persist_record(self, record: KeyValueStoreRecord) -> None:
         store_directory = self._resource_directory
         record_filename = _filename_from_record(record)
         record['filename'] = record_filename
@@ -384,7 +382,7 @@ class KeyValueStoreClient(BaseResourceClient):
                     ).encode('utf-8')
                 )
 
-    async def delete_record(self: KeyValueStoreClient, key: str) -> None:
+    async def delete_record(self, key: str) -> None:
         """Delete the specified record from the key-value store.
 
         Args:
@@ -407,7 +405,7 @@ class KeyValueStoreClient(BaseResourceClient):
                 if self._memory_storage_client._persist_storage:
                     await existing_store_by_id._delete_persisted_record(record)
 
-    async def _delete_persisted_record(self: KeyValueStoreClient, record: KeyValueStoreRecord) -> None:
+    async def _delete_persisted_record(self, record: KeyValueStoreRecord) -> None:
         store_directory = self._resource_directory
         record_filename = _filename_from_record(record)
 
@@ -421,7 +419,7 @@ class KeyValueStoreClient(BaseResourceClient):
         await force_remove(record_path)
         await force_remove(record_metadata_path)
 
-    def _to_resource_info(self: KeyValueStoreClient) -> dict:
+    def _to_resource_info(self) -> dict:
         """Retrieve the key-value store info."""
         return {
             'id': self._id,
@@ -432,7 +430,7 @@ class KeyValueStoreClient(BaseResourceClient):
             'userId': '1',
         }
 
-    async def _update_timestamps(self: KeyValueStoreClient, has_been_modified: bool) -> None:  # noqa: FBT001
+    async def _update_timestamps(self, has_been_modified: bool) -> None:  # noqa: FBT001
         self._accessed_at = datetime.now(timezone.utc)
 
         if has_been_modified:
@@ -446,19 +444,19 @@ class KeyValueStoreClient(BaseResourceClient):
         )
 
     @classmethod
-    def _get_storages_dir(cls: type[KeyValueStoreClient], memory_storage_client: MemoryStorageClient) -> str:
+    def _get_storages_dir(cls, memory_storage_client: MemoryStorageClient) -> str:
         return memory_storage_client._key_value_stores_directory
 
     @classmethod
     def _get_storage_client_cache(
-        cls: type[KeyValueStoreClient],
+        cls,
         memory_storage_client: MemoryStorageClient,
     ) -> list[KeyValueStoreClient]:
         return memory_storage_client._key_value_stores_handled
 
     @classmethod
     def _create_from_directory(
-        cls: type[KeyValueStoreClient],
+        cls,
         storage_directory: str,
         memory_storage_client: MemoryStorageClient,
         id: str | None = None,  # noqa: A002

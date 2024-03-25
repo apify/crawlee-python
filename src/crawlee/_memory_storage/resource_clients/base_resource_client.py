@@ -20,7 +20,7 @@ class BaseResourceClient(ABC):
 
     @abstractmethod
     def __init__(
-        self: BaseResourceClient,
+        self,
         *,
         base_storage_directory: str,
         memory_storage_client: MemoryStorageClient,
@@ -31,7 +31,7 @@ class BaseResourceClient(ABC):
         raise NotImplementedError('You must override this method in the subclass!')
 
     @abstractmethod
-    async def get(self: BaseResourceClient) -> dict | None:
+    async def get(self) -> dict | None:
         """Retrieve the storage.
 
         Returns:
@@ -41,7 +41,7 @@ class BaseResourceClient(ABC):
 
     @classmethod
     @abstractmethod
-    def _get_storages_dir(cls: type[BaseResourceClient], memory_storage_client: MemoryStorageClient) -> str:
+    def _get_storages_dir(cls, memory_storage_client: MemoryStorageClient) -> str:
         raise NotImplementedError('You must override this method in the subclass!')
 
     @classmethod
@@ -53,7 +53,7 @@ class BaseResourceClient(ABC):
         raise NotImplementedError('You must override this method in the subclass!')
 
     @abstractmethod
-    def _to_resource_info(self: BaseResourceClient) -> dict:
+    def _to_resource_info(self) -> dict:
         raise NotImplementedError('You must override this method in the subclass!')
 
     @classmethod

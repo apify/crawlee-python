@@ -2,26 +2,23 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from apify_shared.utils import ignore_docs
-
-from apify._memory_storage.resource_clients.base_resource_collection_client import BaseResourceCollectionClient
-from apify._memory_storage.resource_clients.request_queue import RequestQueueClient
+from crawlee._memory_storage.resource_clients.base_resource_collection_client import BaseResourceCollectionClient
+from crawlee._memory_storage.resource_clients.request_queue_client import RequestQueueClient
 
 if TYPE_CHECKING:
-    from apify_shared.models import ListPage
+    from crawlee._utils.types import ListPage
 
 
-@ignore_docs
 class RequestQueueCollectionClient(BaseResourceCollectionClient):
     """Sub-client for manipulating request queues."""
 
-    def _get_storage_client_cache(self: RequestQueueCollectionClient) -> list[RequestQueueClient]:
+    def _get_storage_client_cache(self) -> list[RequestQueueClient]:
         return self._memory_storage_client._request_queues_handled
 
-    def _get_resource_client_class(self: RequestQueueCollectionClient) -> type[RequestQueueClient]:
+    def _get_resource_client_class(self) -> type[RequestQueueClient]:
         return RequestQueueClient
 
-    async def list(self: RequestQueueCollectionClient) -> ListPage:
+    async def list(self) -> ListPage:
         """List the available request queues.
 
         Returns:
@@ -30,7 +27,7 @@ class RequestQueueCollectionClient(BaseResourceCollectionClient):
         return await super().list()
 
     async def get_or_create(
-        self: RequestQueueCollectionClient,
+        self,
         *,
         name: str | None = None,
         schema: dict | None = None,

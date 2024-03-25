@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, AsyncIterator, NamedTuple, TypedDict, TypeVar, overload
 
-from apify._utils import wrap_internal  # TODO: remove this
 from apify_client.clients import KeyValueStoreClientAsync, KeyValueStoreCollectionClientAsync
 
+from crawlee._utils.wrappers import wrap_internal
 from crawlee.storages.base_storage import BaseStorage
 
 if TYPE_CHECKING:
-    from apify_client import ApifyClientAsync  # TODO: remove this
+    from apify_client import ApifyClientAsync
 
     from crawlee._memory_storage import MemoryStorageClient
     from crawlee._memory_storage.resource_clients import KeyValueStoreClient, KeyValueStoreCollectionClient
@@ -98,16 +98,16 @@ class KeyValueStore(BaseStorage):
         self._default_key_value_store_id = default_key_value_store_id
 
     @classmethod
-    def _get_human_friendly_label(cls: type[KeyValueStore]) -> str:
+    def _get_human_friendly_label(cls) -> str:
         return 'Key-value store'
 
     @classmethod
-    def _get_default_id(cls: type[KeyValueStore]) -> str:
+    def _get_default_id(cls) -> str:
         return cls._default_key_value_store_id
 
     @classmethod
     def _get_single_storage_client(
-        cls: type[KeyValueStore],
+        cls,
         id: str,  # noqa: A002
         client: ApifyClientAsync | MemoryStorageClient,
     ) -> KeyValueStoreClientAsync | KeyValueStoreClient:
@@ -115,25 +115,25 @@ class KeyValueStore(BaseStorage):
 
     @classmethod
     def _get_storage_collection_client(
-        cls: type[KeyValueStore],
+        cls,
         client: ApifyClientAsync | MemoryStorageClient,
     ) -> KeyValueStoreCollectionClientAsync | KeyValueStoreCollectionClient:
         return client.key_value_stores()
 
     @overload
     @classmethod
-    async def get_value(cls: type[KeyValueStore], key: str) -> Any: ...
+    async def get_value(cls, key: str) -> Any: ...
 
     @overload
     @classmethod
-    async def get_value(cls: type[KeyValueStore], key: str, default_value: T) -> T: ...
+    async def get_value(cls, key: str, default_value: T) -> T: ...
 
     @overload
     @classmethod
-    async def get_value(cls: type[KeyValueStore], key: str, default_value: T | None = None) -> T | None: ...
+    async def get_value(cls, key: str, default_value: T | None = None) -> T | None: ...
 
     @classmethod
-    async def get_value(cls: type[KeyValueStore], key: str, default_value: T | None = None) -> T | None:
+    async def get_value(cls, key: str, default_value: T | None = None) -> T | None:
         """Get a value from the key-value store.
 
         Args:
@@ -175,7 +175,7 @@ class KeyValueStore(BaseStorage):
 
     @classmethod
     async def set_value(
-        cls: type[KeyValueStore],
+        cls,
         key: str,
         value: Any,
         content_type: str | None = None,
@@ -202,7 +202,7 @@ class KeyValueStore(BaseStorage):
         return await self._key_value_store_client.set_record(key, value, content_type)
 
     @classmethod
-    async def get_public_url(cls: type[KeyValueStore], key: str) -> str:
+    async def get_public_url(cls, key: str) -> str:
         """Get a URL for the given key that may be used to publicly access the value in the remote key-value store.
 
         Args:
@@ -224,7 +224,7 @@ class KeyValueStore(BaseStorage):
 
     @classmethod
     async def open(
-        cls: type[KeyValueStore],
+        cls,
         *,
         id: str | None = None,  # noqa: A002
         name: str | None = None,

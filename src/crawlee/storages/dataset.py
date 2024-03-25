@@ -5,22 +5,19 @@ import io
 import math
 from typing import TYPE_CHECKING, AsyncIterator, Iterable, Iterator
 
-from apify_shared.utils import ignore_docs, json_dumps
-
-from apify._utils import wrap_internal
-from apify.consts import MAX_PAYLOAD_SIZE_BYTES
-from apify.storages.base_storage import BaseStorage
-from apify.storages.key_value_store import KeyValueStore
+from crawlee._utils.file import json_dumps
+from crawlee._utils.wrappers import wrap_internal
+from crawlee.consts import MAX_PAYLOAD_SIZE_BYTES
+from crawlee.storages.base_storage import BaseStorage
+from crawlee.storages.key_value_store import KeyValueStore
 
 if TYPE_CHECKING:
     from apify_client import ApifyClientAsync
     from apify_client.clients import DatasetClientAsync, DatasetCollectionClientAsync
-    from apify_shared.models import ListPage
-    from apify_shared.types import JSONSerializable
 
-    from apify._memory_storage import MemoryStorageClient
-    from apify._memory_storage.resource_clients import DatasetClient, DatasetCollectionClient
-    from apify.config import Configuration
+    from crawlee._memory_storage import MemoryStorageClient
+    from crawlee._memory_storage.resource_clients import DatasetClient, DatasetCollectionClient
+    from crawlee._utils.types import JSONSerializable, ListPage
 
 # 0.01%
 SAFETY_BUFFER_PERCENT = 0.01 / 100
@@ -98,14 +95,14 @@ class Dataset(BaseStorage):
     _id: str
     _name: str | None
     _dataset_client: DatasetClientAsync | DatasetClient
+    _default_dataset_id: str
 
-    @ignore_docs
     def __init__(
-        self: Dataset,
+        self,
         id: str,  # noqa: A002
         name: str | None,
         client: ApifyClientAsync | MemoryStorageClient,
-        config: Configuration,
+        default_dataset_id: str,
     ) -> None:
         """Create a `Dataset` instance.
 
@@ -117,7 +114,7 @@ class Dataset(BaseStorage):
             client (ApifyClientAsync or MemoryStorageClient): The storage client which should be used.
             config (Configuration): The configuration which should be used.
         """
-        super().__init__(id=id, name=name, client=client, config=config)
+        super().__init__(id=id, name=name, client=client)
 
         self.get_data = wrap_internal(self._get_data_internal, self.get_data)  # type: ignore
         self.push_data = wrap_internal(self._push_data_internal, self.push_data)  # type: ignore
@@ -125,18 +122,19 @@ class Dataset(BaseStorage):
         self.export_to_csv = wrap_internal(self._export_to_csv_internal, self.export_to_csv)  # type: ignore
 
         self._dataset_client = client.dataset(self._id)
+        self._default_dataset_id = default_dataset_id
 
     @classmethod
-    def _get_human_friendly_label(cls: type[Dataset]) -> str:
+    def _get_human_friendly_label(cls) -> str:
         return 'Dataset'
 
     @classmethod
-    def _get_default_id(cls: type[Dataset], config: Configuration) -> str:
-        return config.default_dataset_id
+    def _get_default_id(cls) -> str:
+        return cls._default_dataset_id
 
     @classmethod
     def _get_single_storage_client(
-        cls: type[Dataset],
+        cls,
         id: str,  # noqa: A002
         client: ApifyClientAsync | MemoryStorageClient,
     ) -> DatasetClientAsync | DatasetClient:
@@ -144,13 +142,13 @@ class Dataset(BaseStorage):
 
     @classmethod
     def _get_storage_collection_client(
-        cls: type[Dataset],
+        cls,
         client: ApifyClientAsync | MemoryStorageClient,
     ) -> DatasetCollectionClientAsync | DatasetCollectionClient:
         return client.datasets()
 
     @classmethod
-    async def push_data(cls: type[Dataset], data: JSONSerializable) -> None:
+    async def push_data(cls, data: JSONSerializable) -> None:
         """Store an object or an array of objects to the dataset.
 
         The size of the data is limited by the receiving API and therefore `push_data()` will only
@@ -164,7 +162,7 @@ class Dataset(BaseStorage):
         dataset = await cls.open()
         return await dataset.push_data(data)
 
-    async def _push_data_internal(self: Dataset, data: JSONSerializable) -> None:
+    async def _push_data_internal(self, data: JSONSerializable) -> None:
         # Handle singular items
         if not isinstance(data, list):
             payload = _check_and_serialize(data)
@@ -180,7 +178,7 @@ class Dataset(BaseStorage):
 
     @classmethod
     async def get_data(
-        cls: type[Dataset],
+        cls,
         *,
         offset: int | None = None,
         limit: int | None = None,
@@ -239,7 +237,7 @@ class Dataset(BaseStorage):
         )
 
     async def _get_data_internal(
-        self: Dataset,
+        self,
         *,
         offset: int | None = None,
         limit: int | None = None,
@@ -270,7 +268,7 @@ class Dataset(BaseStorage):
         )
 
     async def export_to(
-        self: Dataset,
+        self,
         key: str,
         *,
         to_key_value_store_id: str | None = None,
@@ -315,7 +313,7 @@ class Dataset(BaseStorage):
 
     @classmethod
     async def export_to_json(
-        cls: type[Dataset],
+        cls,
         key: str,
         *,
         from_dataset_id: str | None = None,
@@ -337,10 +335,12 @@ class Dataset(BaseStorage):
                 If you omit both, it uses the default key-value store.
         """
         dataset = await cls.open(id=from_dataset_id, name=from_dataset_name)
-        await dataset.export_to_json(key, to_key_value_store_id=to_key_value_store_id, to_key_value_store_name=to_key_value_store_name)
+        await dataset.export_to_json(
+            key, to_key_value_store_id=to_key_value_store_id, to_key_value_store_name=to_key_value_store_name
+        )
 
     async def _export_to_json_internal(
-        self: Dataset,
+        self,
         key: str,
         *,
         from_dataset_id: str | None = None,  # noqa: ARG002
@@ -357,7 +357,7 @@ class Dataset(BaseStorage):
 
     @classmethod
     async def export_to_csv(
-        cls: type[Dataset],
+        cls,
         key: str,
         *,
         from_dataset_id: str | None = None,
@@ -379,10 +379,12 @@ class Dataset(BaseStorage):
                 If you omit both, it uses the default key-value store.
         """
         dataset = await cls.open(id=from_dataset_id, name=from_dataset_name)
-        await dataset.export_to_csv(key, to_key_value_store_id=to_key_value_store_id, to_key_value_store_name=to_key_value_store_name)
+        await dataset.export_to_csv(
+            key, to_key_value_store_id=to_key_value_store_id, to_key_value_store_name=to_key_value_store_name
+        )
 
     async def _export_to_csv_internal(
-        self: Dataset,
+        self,
         key: str,
         *,
         from_dataset_id: str | None = None,  # noqa: ARG002
@@ -397,7 +399,7 @@ class Dataset(BaseStorage):
             content_type='text/csv',
         )
 
-    async def get_info(self: Dataset) -> dict | None:
+    async def get_info(self) -> dict | None:
         """Get an object containing general information about the dataset.
 
         Returns:
@@ -406,7 +408,7 @@ class Dataset(BaseStorage):
         return await self._dataset_client.get()
 
     def iterate_items(
-        self: Dataset,
+        self,
         *,
         offset: int = 0,
         limit: int | None = None,
@@ -457,19 +459,18 @@ class Dataset(BaseStorage):
             skip_hidden=skip_hidden,
         )
 
-    async def drop(self: Dataset) -> None:
+    async def drop(self) -> None:
         """Remove the dataset either from the Apify cloud storage or from the local directory."""
         await self._dataset_client.delete()
         self._remove_from_cache()
 
     @classmethod
     async def open(
-        cls: type[Dataset],
+        cls,
         *,
         id: str | None = None,  # noqa: A002
         name: str | None = None,
         force_cloud: bool = False,
-        config: Configuration | None = None,
     ) -> Dataset:
         """Open a dataset.
 
@@ -491,4 +492,4 @@ class Dataset(BaseStorage):
         Returns:
             Dataset: An instance of the `Dataset` class for the given ID or name.
         """
-        return await super().open(id=id, name=name, force_cloud=force_cloud, config=config)  # type: ignore
+        return await super().open(id=id, name=name, force_cloud=force_cloud)  # type: ignore

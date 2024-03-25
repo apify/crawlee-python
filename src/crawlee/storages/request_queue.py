@@ -3,25 +3,27 @@ from __future__ import annotations
 import asyncio
 from collections import OrderedDict
 from datetime import datetime, timezone
+from logging import getLogger
 from typing import TYPE_CHECKING
 from typing import OrderedDict as OrderedDictType
 
-from apify_shared.utils import ignore_docs
+from apify._utils import budget_ow
 
-from apify._crypto import crypto_random_object_id
-from apify._utils import LRUCache, budget_ow, compute_unique_key, unique_key_to_request_id
-from apify.consts import REQUEST_QUEUE_HEAD_MAX_LIMIT
-from apify.log import logger
-from apify.storages.base_storage import BaseStorage
+from crawlee._utils.cache import LRUCache
+from crawlee._utils.crypto import crypto_random_object_id
+from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
+from crawlee.consts import REQUEST_QUEUE_HEAD_MAX_LIMIT
+from crawlee.storages.base_storage import BaseStorage
 
 if TYPE_CHECKING:
     from apify_client import ApifyClientAsync
     from apify_client.clients import RequestQueueClientAsync, RequestQueueCollectionClientAsync
 
-    from apify._memory_storage import MemoryStorageClient
-    from apify._memory_storage.resource_clients import RequestQueueClient, RequestQueueCollectionClient
-    from apify.config import Configuration
+    from crawlee._memory_storage import MemoryStorageClient
+    from crawlee._memory_storage.resource_clients import RequestQueueClient, RequestQueueCollectionClient
 
+
+logger = getLogger(__name__)
 
 MAX_CACHED_REQUESTS = 1_000_000
 
@@ -88,14 +90,14 @@ class RequestQueue(BaseStorage):
     _assumed_total_count = 0
     _assumed_handled_count = 0
     _requests_cache: LRUCache[dict]
+    _default_request_queue_id: str
 
-    @ignore_docs
     def __init__(
-        self: RequestQueue,
+        self,
         id: str,  # noqa: A002
         name: str | None,
         client: ApifyClientAsync | MemoryStorageClient,
-        config: Configuration,
+        default_request_queue_id: str,
     ) -> None:
         """Create a `RequestQueue` instance.
 
@@ -105,9 +107,8 @@ class RequestQueue(BaseStorage):
             id (str): ID of the request queue.
             name (str, optional): Name of the request queue.
             client (ApifyClientAsync or MemoryStorageClient): The storage client which should be used.
-            config (Configuration): The configuration which should be used.
         """
-        super().__init__(id=id, name=name, client=client, config=config)
+        super().__init__(id=id, name=name, client=client)
 
         self._request_queue_client = client.request_queue(self._id, client_key=self._client_key)
         self._queue_head_dict = OrderedDict()
@@ -116,18 +117,19 @@ class RequestQueue(BaseStorage):
         self._last_activity = datetime.now(timezone.utc)
         self._recently_handled = LRUCache[bool](max_length=RECENTLY_HANDLED_CACHE_SIZE)
         self._requests_cache = LRUCache(max_length=MAX_CACHED_REQUESTS)
+        self._default_request_queue_id = default_request_queue_id
 
     @classmethod
-    def _get_human_friendly_label(cls: type[RequestQueue]) -> str:
+    def _get_human_friendly_label(cls) -> str:
         return 'Request queue'
 
     @classmethod
-    def _get_default_id(cls: type[RequestQueue], config: Configuration) -> str:
-        return config.default_request_queue_id
+    def _get_default_id(cls) -> str:
+        return cls._default_request_queue_id
 
     @classmethod
     def _get_single_storage_client(
-        cls: type[RequestQueue],
+        cls,
         id: str,  # noqa: A002
         client: ApifyClientAsync | MemoryStorageClient,
     ) -> RequestQueueClientAsync | RequestQueueClient:
@@ -135,13 +137,13 @@ class RequestQueue(BaseStorage):
 
     @classmethod
     def _get_storage_collection_client(
-        cls: type[RequestQueue],
+        cls,
         client: ApifyClientAsync | MemoryStorageClient,
     ) -> RequestQueueCollectionClientAsync | RequestQueueCollectionClient:
         return client.request_queues()
 
     async def add_request(
-        self: RequestQueue,
+        self,
         request: dict,
         *,
         forefront: bool = False,
@@ -216,14 +218,19 @@ class RequestQueue(BaseStorage):
 
         request_id, was_already_present = queue_operation_info['requestId'], queue_operation_info['wasAlreadyPresent']
         is_handled = request.get('handledAt') is not None
-        if not is_handled and not was_already_present and request_id not in self._in_progress and self._recently_handled.get(request_id) is None:
+        if (
+            not is_handled
+            and not was_already_present
+            and request_id not in self._in_progress
+            and self._recently_handled.get(request_id) is None
+        ):
             self._assumed_total_count += 1
 
             self._maybe_add_request_to_queue_head(request_id, forefront)
 
         return queue_operation_info
 
-    async def get_request(self: RequestQueue, request_id: str) -> dict | None:
+    async def get_request(self, request_id: str) -> dict | None:
         """Retrieve a request from the queue.
 
         Args:
@@ -235,7 +242,7 @@ class RequestQueue(BaseStorage):
         budget_ow(request_id, (str, True), 'request_id')
         return await self._request_queue_client.get_request(request_id)
 
-    async def fetch_next_request(self: RequestQueue) -> dict | None:
+    async def fetch_next_request(self) -> dict | None:
         """Return the next request in the queue to be processed.
 
         Once you successfully finish processing of the request, you need to call
@@ -287,8 +294,13 @@ class RequestQueue(BaseStorage):
                 will try to fetch this request again, until it eventually appears in the main table.
         """
         if request is None:
-            logger.debug('Cannot find a request from the beginning of queue, will be retried later', extra={'nextRequestId': next_request_id})
-            asyncio.get_running_loop().call_later(STORAGE_CONSISTENCY_DELAY_MILLIS // 1000, lambda: self._in_progress.remove(next_request_id))
+            logger.debug(
+                'Cannot find a request from the beginning of queue, will be retried later',
+                extra={'nextRequestId': next_request_id},
+            )
+            asyncio.get_running_loop().call_later(
+                STORAGE_CONSISTENCY_DELAY_MILLIS // 1000, lambda: self._in_progress.remove(next_request_id)
+            )
             return None
 
         """ 2) Queue head index is behind the main table and the underlying request was already handled
@@ -297,13 +309,16 @@ class RequestQueue(BaseStorage):
                will not put the request again to queueHeadDict.
         """
         if request.get('handledAt') is not None:
-            logger.debug('Request fetched from the beginning of queue was already handled', extra={'nextRequestId': next_request_id})
+            logger.debug(
+                'Request fetched from the beginning of queue was already handled',
+                extra={'nextRequestId': next_request_id},
+            )
             self._recently_handled[next_request_id] = True
             return None
 
         return request
 
-    async def mark_request_as_handled(self: RequestQueue, request: dict) -> dict | None:
+    async def mark_request_as_handled(self, request: dict) -> dict | None:
         """Mark a request as handled after successful processing.
 
         Handled requests will never again be returned by the `RequestQueue.fetch_next_request` method.
@@ -325,7 +340,9 @@ class RequestQueue(BaseStorage):
         )
         self._last_activity = datetime.now(timezone.utc)
         if request['id'] not in self._in_progress:
-            logger.debug('Cannot mark request as handled, because it is not in progress!', extra={'requestId': request['id']})
+            logger.debug(
+                'Cannot mark request as handled, because it is not in progress!', extra={'requestId': request['id']}
+            )
             return None
 
         request['handledAt'] = request.get('handledAt', datetime.now(timezone.utc))
@@ -343,7 +360,7 @@ class RequestQueue(BaseStorage):
         return queue_operation_info
 
     async def reclaim_request(
-        self: RequestQueue,
+        self,
         request: dict,
         forefront: bool = False,  # noqa: FBT001, FBT002
     ) -> dict | None:
@@ -383,7 +400,9 @@ class RequestQueue(BaseStorage):
         # This is to compensate for the limitation of DynamoDB, where writes might not be immediately visible to subsequent reads.
         def callback() -> None:
             if request['id'] not in self._in_progress:
-                logger.debug('The request is no longer marked as in progress in the queue?!', {'requestId': request['id']})
+                logger.debug(
+                    'The request is no longer marked as in progress in the queue?!', {'requestId': request['id']}
+                )
                 return
 
             self._in_progress.remove(request['id'])
@@ -395,10 +414,10 @@ class RequestQueue(BaseStorage):
 
         return queue_operation_info
 
-    def _in_progress_count(self: RequestQueue) -> int:
+    def _in_progress_count(self) -> int:
         return len(self._in_progress)
 
-    async def is_empty(self: RequestQueue) -> bool:
+    async def is_empty(self) -> bool:
         """Check whether the queue is empty.
 
         Returns:
@@ -407,7 +426,7 @@ class RequestQueue(BaseStorage):
         await self._ensure_head_is_non_empty()
         return len(self._queue_head_dict) == 0
 
-    async def is_finished(self: RequestQueue) -> bool:
+    async def is_finished(self) -> bool:
         """Check whether the queue is finished.
 
         Due to the nature of distributed storage used by the queue,
@@ -419,7 +438,9 @@ class RequestQueue(BaseStorage):
         """
         seconds_since_last_activity = (datetime.now(timezone.utc) - self._last_activity).seconds
         if self._in_progress_count() > 0 and seconds_since_last_activity > self._internal_timeout_seconds:
-            message = f'The request queue seems to be stuck for {self._internal_timeout_seconds}s, resetting internal state.'
+            message = (
+                f'The request queue seems to be stuck for {self._internal_timeout_seconds}s, resetting internal state.'
+            )
             logger.warning(message)
             self._reset()
 
@@ -429,7 +450,7 @@ class RequestQueue(BaseStorage):
         is_head_consistent = await self._ensure_head_is_non_empty(ensure_consistency=True)
         return is_head_consistent and len(self._queue_head_dict) == 0 and self._in_progress_count() == 0
 
-    def _reset(self: RequestQueue) -> None:
+    def _reset(self) -> None:
         self._queue_head_dict.clear()
         self._query_queue_head_task = None
         self._in_progress.clear()
@@ -439,7 +460,7 @@ class RequestQueue(BaseStorage):
         self._requests_cache.clear()
         self._last_activity = datetime.now(timezone.utc)
 
-    def _cache_request(self: RequestQueue, cache_key: str, queue_operation_info: dict) -> None:
+    def _cache_request(self, cache_key: str, queue_operation_info: dict) -> None:
         self._requests_cache[cache_key] = {
             'id': queue_operation_info['requestId'],
             'isHandled': queue_operation_info['wasAlreadyHandled'],
@@ -447,13 +468,18 @@ class RequestQueue(BaseStorage):
             'wasAlreadyHandled': queue_operation_info['wasAlreadyHandled'],
         }
 
-    async def _queue_query_head(self: RequestQueue, limit: int) -> dict:
+    async def _queue_query_head(self, limit: int) -> dict:
         query_started_at = datetime.now(timezone.utc)
 
         list_head = await self._request_queue_client.list_head(limit=limit)
         for request in list_head['items']:
             # Queue head index might be behind the main table, so ensure we don't recycle requests
-            if not request['id'] or not request['uniqueKey'] or request['id'] in self._in_progress or self._recently_handled.get(request['id']):
+            if (
+                not request['id']
+                or not request['uniqueKey']
+                or request['id'] in self._in_progress
+                or self._recently_handled.get(request['id'])
+            ):
                 continue
             self._queue_head_dict[request['id']] = request['id']
             self._cache_request(
@@ -478,7 +504,7 @@ class RequestQueue(BaseStorage):
         }
 
     async def _ensure_head_is_non_empty(
-        self: RequestQueue,
+        self,
         ensure_consistency: bool = False,  # noqa: FBT001, FBT002
         limit: int | None = None,
         iteration: int = 0,
@@ -506,19 +532,25 @@ class RequestQueue(BaseStorage):
 
         # If limit was not reached in the call then there are no more requests to be returned.
         if queue_head['prevLimit'] >= REQUEST_QUEUE_HEAD_MAX_LIMIT:
-            logger.warning('Reached the maximum number of requests in progress', extra={'limit': REQUEST_QUEUE_HEAD_MAX_LIMIT})
+            logger.warning(
+                'Reached the maximum number of requests in progress', extra={'limit': REQUEST_QUEUE_HEAD_MAX_LIMIT}
+            )
 
         should_repeat_with_higher_limit = (
-            len(self._queue_head_dict) == 0 and queue_head['wasLimitReached'] and queue_head['prevLimit'] < REQUEST_QUEUE_HEAD_MAX_LIMIT
+            len(self._queue_head_dict) == 0
+            and queue_head['wasLimitReached']
+            and queue_head['prevLimit'] < REQUEST_QUEUE_HEAD_MAX_LIMIT
         )
 
         # If ensureConsistency=true then we must ensure that either:
         # - queueModifiedAt is older than queryStartedAt by at least API_PROCESSED_REQUESTS_DELAY_MILLIS
         # - hadMultipleClients=false and this.assumedTotalCount<=this.assumedHandledCount
-        is_database_consistent = (queue_head['queryStartedAt'] - queue_head['queueModifiedAt'].replace(tzinfo=timezone.utc)).seconds >= (
-            API_PROCESSED_REQUESTS_DELAY_MILLIS // 1000
+        is_database_consistent = (
+            queue_head['queryStartedAt'] - queue_head['queueModifiedAt'].replace(tzinfo=timezone.utc)
+        ).seconds >= (API_PROCESSED_REQUESTS_DELAY_MILLIS // 1000)
+        is_locally_consistent = (
+            not queue_head['hadMultipleClients'] and self._assumed_total_count <= self._assumed_handled_count
         )
-        is_locally_consistent = not queue_head['hadMultipleClients'] and self._assumed_total_count <= self._assumed_handled_count
         # Consistent information from one source is enough to consider request queue finished.
         should_repeat_for_consistency = ensure_consistency and not is_database_consistent and not is_locally_consistent
 
@@ -531,18 +563,24 @@ class RequestQueue(BaseStorage):
         if not should_repeat_with_higher_limit and iteration > MAX_QUERIES_FOR_CONSISTENCY:
             return False
 
-        next_limit = round(queue_head['prevLimit'] * 1.5) if should_repeat_with_higher_limit else queue_head['prevLimit']
+        next_limit = (
+            round(queue_head['prevLimit'] * 1.5) if should_repeat_with_higher_limit else queue_head['prevLimit']
+        )
 
         # If we are repeating for consistency then wait required time.
         if should_repeat_for_consistency:
-            delay_seconds = (API_PROCESSED_REQUESTS_DELAY_MILLIS // 1000) - (datetime.now(timezone.utc) - queue_head['queueModifiedAt']).seconds
-            logger.info(f'Waiting for {delay_seconds}s before considering the queue as finished to ensure that the data is consistent.')
+            delay_seconds = (API_PROCESSED_REQUESTS_DELAY_MILLIS // 1000) - (
+                datetime.now(timezone.utc) - queue_head['queueModifiedAt']
+            ).seconds
+            logger.info(
+                f'Waiting for {delay_seconds}s before considering the queue as finished to ensure that the data is consistent.'
+            )
             await asyncio.sleep(delay_seconds)
 
         return await self._ensure_head_is_non_empty(ensure_consistency, next_limit, iteration + 1)
 
     def _maybe_add_request_to_queue_head(
-        self: RequestQueue,
+        self,
         request_id: str,
         forefront: bool,  # noqa: FBT001
     ) -> None:
@@ -554,12 +592,12 @@ class RequestQueue(BaseStorage):
             # OrderedDict puts the item to the end of the queue by default
             self._queue_head_dict[request_id] = request_id
 
-    async def drop(self: RequestQueue) -> None:
+    async def drop(self) -> None:
         """Remove the request queue either from the Apify cloud storage or from the local directory."""
         await self._request_queue_client.delete()
         self._remove_from_cache()
 
-    async def get_info(self: RequestQueue) -> dict | None:
+    async def get_info(self) -> dict | None:
         """Get an object containing general information about the request queue.
 
         Returns:
@@ -569,12 +607,11 @@ class RequestQueue(BaseStorage):
 
     @classmethod
     async def open(
-        cls: type[RequestQueue],
+        cls,
         *,
         id: str | None = None,  # noqa: A002
         name: str | None = None,
         force_cloud: bool = False,
-        config: Configuration | None = None,
     ) -> RequestQueue:
         """Open a request queue.
 
@@ -597,6 +634,6 @@ class RequestQueue(BaseStorage):
         Returns:
             RequestQueue: An instance of the `RequestQueue` class for the given ID or name.
         """
-        queue = await super().open(id=id, name=name, force_cloud=force_cloud, config=config)
+        queue = await super().open(id=id, name=name, force_cloud=force_cloud)
         await queue._ensure_head_is_non_empty()  # type: ignore
         return queue  # type: ignore

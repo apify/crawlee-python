@@ -1,8 +1,16 @@
 from __future__ import annotations
 
-from typing import Generic, TypeVar
+from typing import Any, Dict, Generic, List, TypeVar, Union
 
 T = TypeVar('T')
+
+
+# Type for representing json-serializable values.
+# It's close enough to the real thing supported by json.parse,
+# and the best we can do until mypy supports recursive types.
+# It was suggested in a discussion with (and approved by) Guido van Rossum,
+# so I'd consider it correct enough.
+JSONSerializable = Union[str, int, float, bool, None, Dict[str, Any], List[Any]]
 
 
 class ListPage(Generic[T]):

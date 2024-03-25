@@ -7,19 +7,21 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, AsyncIterator
 
 import aioshutil
-from apify_shared.models import ListPage
-from apify_shared.utils import ignore_docs
 
-from apify._crypto import crypto_random_object_id
-from apify._memory_storage.file_storage_utils import _update_dataset_items, update_metadata
-from apify._memory_storage.resource_clients.base_resource_client import BaseResourceClient
-from apify._utils import force_rename, raise_on_duplicate_storage, raise_on_non_existing_storage
-from apify.consts import StorageTypes
+from crawlee._memory_storage.resource_clients.base_resource_client import BaseResourceClient
+from crawlee._utils.crypto import crypto_random_object_id
+from crawlee._utils.data_processing import raise_on_duplicate_storage, raise_on_non_existing_storage
+from crawlee._utils.file import (
+    force_rename,
+    update_dataset_items,
+    update_metadata,
+)
+from crawlee._utils.types import ListPage
+from crawlee.storages.types import StorageTypes
 
 if TYPE_CHECKING:
-    from apify_shared.types import JSONSerializable
-
-    from apify._memory_storage.memory_storage_client import MemoryStorageClient
+    from crawlee._memory_storage.memory_storage_client import MemoryStorageClient
+    from crawlee._utils.types import JSONSerializable
 
 # This is what API returns in the x-apify-pagination-limit
 # header when no limit query parameter is used.
@@ -30,7 +32,6 @@ LIST_ITEMS_LIMIT = 999_999_999_999
 LOCAL_ENTRY_NAME_DIGITS = 9
 
 
-@ignore_docs
 class DatasetClient(BaseResourceClient):
     """Sub-client for manipulating a single dataset."""
 
@@ -46,7 +47,7 @@ class DatasetClient(BaseResourceClient):
     _file_operation_lock: asyncio.Lock
 
     def __init__(
-        self: DatasetClient,
+        self,
         *,
         base_storage_directory: str,
         memory_storage_client: MemoryStorageClient,
@@ -64,13 +65,15 @@ class DatasetClient(BaseResourceClient):
         self._modified_at = datetime.now(timezone.utc)
         self._file_operation_lock = asyncio.Lock()
 
-    async def get(self: DatasetClient) -> dict | None:
+    async def get(self) -> dict | None:
         """Retrieve the dataset.
 
         Returns:
             dict, optional: The retrieved dataset, or None, if it does not exist
         """
-        found = self._find_or_create_client_by_id_or_name(memory_storage_client=self._memory_storage_client, id=self._id, name=self._name)
+        found = self._find_or_create_client_by_id_or_name(
+            memory_storage_client=self._memory_storage_client, id=self._id, name=self._name
+        )
 
         if found:
             async with found._file_operation_lock:
@@ -79,7 +82,7 @@ class DatasetClient(BaseResourceClient):
 
         return None
 
-    async def update(self: DatasetClient, *, name: str | None = None) -> dict:
+    async def update(self, *, name: str | None = None) -> dict:
         """Update the dataset with specified fields.
 
         Args:
@@ -105,7 +108,11 @@ class DatasetClient(BaseResourceClient):
         async with existing_dataset_by_id._file_operation_lock:
             # Check that name is not in use already
             existing_dataset_by_name = next(
-                (dataset for dataset in self._memory_storage_client._datasets_handled if dataset._name and dataset._name.lower() == name.lower()),
+                (
+                    dataset
+                    for dataset in self._memory_storage_client._datasets_handled
+                    if dataset._name and dataset._name.lower() == name.lower()
+                ),
                 None,
             )
 
@@ -116,7 +123,9 @@ class DatasetClient(BaseResourceClient):
 
             previous_dir = existing_dataset_by_id._resource_directory
 
-            existing_dataset_by_id._resource_directory = os.path.join(self._memory_storage_client._datasets_directory, name)
+            existing_dataset_by_id._resource_directory = os.path.join(
+                self._memory_storage_client._datasets_directory, name
+            )
 
             await force_rename(previous_dir, existing_dataset_by_id._resource_directory)
 
@@ -125,9 +134,11 @@ class DatasetClient(BaseResourceClient):
 
         return existing_dataset_by_id._to_resource_info()
 
-    async def delete(self: DatasetClient) -> None:
+    async def delete(self) -> None:
         """Delete the dataset."""
-        dataset = next((dataset for dataset in self._memory_storage_client._datasets_handled if dataset._id == self._id), None)
+        dataset = next(
+            (dataset for dataset in self._memory_storage_client._datasets_handled if dataset._id == self._id), None
+        )
 
         if dataset is not None:
             async with dataset._file_operation_lock:
@@ -139,7 +150,7 @@ class DatasetClient(BaseResourceClient):
                     await aioshutil.rmtree(dataset._resource_directory)
 
     async def list_items(
-        self: DatasetClient,
+        self,
         *,
         offset: int | None = 0,
         limit: int | None = LIST_ITEMS_LIMIT,
@@ -194,7 +205,9 @@ class DatasetClient(BaseResourceClient):
 
         async with existing_dataset_by_id._file_operation_lock:
             start, end = existing_dataset_by_id._get_start_and_end_indexes(
-                max(existing_dataset_by_id._item_count - (offset or 0) - (limit or LIST_ITEMS_LIMIT), 0) if desc else offset or 0,
+                max(existing_dataset_by_id._item_count - (offset or 0) - (limit or LIST_ITEMS_LIMIT), 0)
+                if desc
+                else offset or 0,
                 limit,
             )
 
@@ -221,7 +234,7 @@ class DatasetClient(BaseResourceClient):
             )
 
     async def iterate_items(
-        self: DatasetClient,
+        self,
         *,
         offset: int = 0,
         limit: int | None = None,
@@ -283,13 +296,13 @@ class DatasetClient(BaseResourceClient):
             for item in current_items_page.items:
                 yield item
 
-    async def get_items_as_bytes(self: DatasetClient, *_args: Any, **_kwargs: Any) -> bytes:
+    async def get_items_as_bytes(self, *_args: Any, **_kwargs: Any) -> bytes:
         raise NotImplementedError('This method is not supported in local memory storage.')
 
-    async def stream_items(self: DatasetClient, *_args: Any, **_kwargs: Any) -> AsyncIterator:
+    async def stream_items(self, *_args: Any, **_kwargs: Any) -> AsyncIterator:
         raise NotImplementedError('This method is not supported in local memory storage.')
 
-    async def push_items(self: DatasetClient, items: JSONSerializable) -> None:
+    async def push_items(self, items: JSONSerializable) -> None:
         """Push items to the dataset.
 
         Args:
@@ -318,13 +331,13 @@ class DatasetClient(BaseResourceClient):
         async with existing_dataset_by_id._file_operation_lock:
             await existing_dataset_by_id._update_timestamps(has_been_modified=True)
 
-            await _update_dataset_items(
+            await update_dataset_items(
                 data=data_entries,
                 entity_directory=existing_dataset_by_id._resource_directory,
                 persist_storage=self._memory_storage_client._persist_storage,
             )
 
-    def _to_resource_info(self: DatasetClient) -> dict:
+    def _to_resource_info(self) -> dict:
         """Retrieve the dataset info."""
         return {
             'id': self._id,
@@ -335,7 +348,7 @@ class DatasetClient(BaseResourceClient):
             'modifiedAt': self._modified_at,
         }
 
-    async def _update_timestamps(self: DatasetClient, has_been_modified: bool) -> None:  # noqa: FBT001
+    async def _update_timestamps(self, has_been_modified: bool) -> None:  # noqa: FBT001
         """Update the timestamps of the dataset."""
         self._accessed_at = datetime.now(timezone.utc)
 
@@ -349,23 +362,25 @@ class DatasetClient(BaseResourceClient):
             write_metadata=self._memory_storage_client._write_metadata,
         )
 
-    def _get_start_and_end_indexes(self: DatasetClient, offset: int, limit: int | None = None) -> tuple[int, int]:
+    def _get_start_and_end_indexes(self, offset: int, limit: int | None = None) -> tuple[int, int]:
         actual_limit = limit or self._item_count
         start = offset + 1
         end = min(offset + actual_limit, self._item_count) + 1
         return (start, end)
 
-    def _generate_local_entry_name(self: DatasetClient, idx: int) -> str:
+    def _generate_local_entry_name(self, idx: int) -> str:
         return str(idx).zfill(LOCAL_ENTRY_NAME_DIGITS)
 
-    def _normalize_items(self: DatasetClient, items: JSONSerializable) -> list[dict]:
+    def _normalize_items(self, items: JSONSerializable) -> list[dict]:
         def normalize_item(item: Any) -> dict | None:
             if isinstance(item, str):
                 item = json.loads(item)
 
             if isinstance(item, list):
                 received = ',\n'.join(item)
-                raise TypeError(f'Each dataset item can only be a single JSON object, not an array. Received: [{received}]')
+                raise TypeError(
+                    f'Each dataset item can only be a single JSON object, not an array. Received: [{received}]'
+                )
 
             if (not isinstance(item, dict)) and item is not None:
                 raise TypeError(f'Each dataset item must be a JSON object. Received: {item}')
@@ -380,19 +395,19 @@ class DatasetClient(BaseResourceClient):
         return list(filter(None, result))
 
     @classmethod
-    def _get_storages_dir(cls: type[DatasetClient], memory_storage_client: MemoryStorageClient) -> str:
+    def _get_storages_dir(cls, memory_storage_client: MemoryStorageClient) -> str:
         return memory_storage_client._datasets_directory
 
     @classmethod
     def _get_storage_client_cache(
-        cls: type[DatasetClient],
+        cls,
         memory_storage_client: MemoryStorageClient,
     ) -> list[DatasetClient]:
         return memory_storage_client._datasets_handled
 
     @classmethod
     def _create_from_directory(
-        cls: type[DatasetClient],
+        cls,
         storage_directory: str,
         memory_storage_client: MemoryStorageClient,
         id: str | None = None,  # noqa: A002

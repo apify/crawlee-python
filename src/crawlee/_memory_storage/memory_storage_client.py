@@ -8,14 +8,14 @@ from pathlib import Path
 import aioshutil
 from aiofiles import ospath
 from aiofiles.os import rename, scandir
-from apify._memory_storage.resource_clients.dataset import DatasetClient
-from apify._memory_storage.resource_clients.dataset_collection import DatasetCollectionClient
-from apify._memory_storage.resource_clients.request_queue import RequestQueueClient
-from apify._memory_storage.resource_clients.request_queue_collection import RequestQueueCollectionClient
 
+from crawlee._memory_storage.resource_clients.dataset_client import DatasetClient
+from crawlee._memory_storage.resource_clients.dataset_collection_client import DatasetCollectionClient
 from crawlee._memory_storage.resource_clients.key_value_store_client import KeyValueStoreClient
 from crawlee._memory_storage.resource_clients.key_value_store_collection_client import KeyValueStoreCollectionClient
-from crawlee._utils.file import maybe_parse_bool
+from crawlee._memory_storage.resource_clients.request_queue_client import RequestQueueClient
+from crawlee._memory_storage.resource_clients.request_queue_collection_client import RequestQueueCollectionClient
+from crawlee._utils.data_processing import maybe_parse_bool
 from crawlee.consts import CrawleeEnvVars
 
 """
@@ -45,7 +45,7 @@ class MemoryStorageClient:
     """Indicates whether a purge was already performed on this instance"""
 
     def __init__(
-        self: MemoryStorageClient,
+        self,
         *,
         local_data_directory: str | None = None,
         write_metadata: bool | None = None,
@@ -73,14 +73,14 @@ class MemoryStorageClient:
         self._request_queues_handled = []
         self._purge_lock = asyncio.Lock()
 
-    def datasets(self: MemoryStorageClient) -> DatasetCollectionClient:
+    def datasets(self) -> DatasetCollectionClient:
         """Retrieve the sub-client for manipulating datasets."""
         return DatasetCollectionClient(
             base_storage_directory=self._datasets_directory,
             memory_storage_client=self,
         )
 
-    def dataset(self: MemoryStorageClient, dataset_id: str) -> DatasetClient:
+    def dataset(self, dataset_id: str) -> DatasetClient:
         """Retrieve the sub-client for manipulating a single dataset.
 
         Args:
@@ -92,14 +92,14 @@ class MemoryStorageClient:
             id=dataset_id,
         )
 
-    def key_value_stores(self: MemoryStorageClient) -> KeyValueStoreCollectionClient:
+    def key_value_stores(self) -> KeyValueStoreCollectionClient:
         """Retrieve the sub-client for manipulating key-value stores."""
         return KeyValueStoreCollectionClient(
             base_storage_directory=self._key_value_stores_directory,
             memory_storage_client=self,
         )
 
-    def key_value_store(self: MemoryStorageClient, key_value_store_id: str) -> KeyValueStoreClient:
+    def key_value_store(self, key_value_store_id: str) -> KeyValueStoreClient:
         """Retrieve the sub-client for manipulating a single key-value store.
 
         Args:
@@ -111,7 +111,7 @@ class MemoryStorageClient:
             id=key_value_store_id,
         )
 
-    def request_queues(self: MemoryStorageClient) -> RequestQueueCollectionClient:
+    def request_queues(self) -> RequestQueueCollectionClient:
         """Retrieve the sub-client for manipulating request queues."""
         return RequestQueueCollectionClient(
             base_storage_directory=self._request_queues_directory,
@@ -119,7 +119,7 @@ class MemoryStorageClient:
         )
 
     def request_queue(
-        self: MemoryStorageClient,
+        self,
         request_queue_id: str,
         *,
         client_key: str | None = None,  # noqa: ARG002
@@ -136,7 +136,7 @@ class MemoryStorageClient:
             id=request_queue_id,
         )
 
-    async def _purge_on_start(self: MemoryStorageClient) -> None:
+    async def _purge_on_start(self) -> None:
         # Optimistic, non-blocking check
         if self._purged_on_start is True:
             return
@@ -149,7 +149,7 @@ class MemoryStorageClient:
             await self._purge()
             self._purged_on_start = True
 
-    async def _purge(self: MemoryStorageClient) -> None:
+    async def _purge(self) -> None:
         """Clean up the default storage directories before the run starts.
 
         Specifically, `purge` cleans up:
@@ -181,7 +181,7 @@ class MemoryStorageClient:
                 if request_queue_folder.name == 'default' or request_queue_folder.name.startswith('__APIFY_TEMPORARY'):
                     await self._batch_remove_files(request_queue_folder.path)
 
-    async def _handle_default_key_value_store(self: MemoryStorageClient, folder: str) -> None:
+    async def _handle_default_key_value_store(self, folder: str) -> None:
         """Remove everything from the default key-value store folder except `possible_input_keys`."""
         folder_exists = await ospath.exists(folder)
         temporary_path = os.path.normpath(os.path.join(folder, '../__APIFY_MIGRATING_KEY_VALUE_STORE__'))
@@ -223,7 +223,7 @@ class MemoryStorageClient:
             # Remove the old folder
             await self._batch_remove_files(temp_path_for_old_folder)
 
-    async def _batch_remove_files(self: MemoryStorageClient, folder: str, counter: int = 0) -> None:
+    async def _batch_remove_files(self, folder: str, counter: int = 0) -> None:
         folder_exists = await ospath.exists(folder)
 
         if folder_exists:

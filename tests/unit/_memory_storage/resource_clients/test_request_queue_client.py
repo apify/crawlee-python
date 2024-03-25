@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 if TYPE_CHECKING:
-    from apify._memory_storage import MemoryStorageClient
-    from apify._memory_storage.resource_clients import RequestQueueClient
+    from crawlee._memory_storage import MemoryStorageClient
+    from crawlee._memory_storage.resource_clients import RequestQueueClient
 
 
 @pytest.fixture()

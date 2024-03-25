@@ -2,14 +2,11 @@ from __future__ import annotations
 
 import asyncio
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Generic, TypeVar, cast
+from typing import Generic, TypeVar, cast
 
 from crawlee._memory_storage import MemoryStorageClient
 from crawlee._memory_storage.resource_clients import BaseResourceClient, BaseResourceCollectionClient
 from crawlee.storages.storage_client_manager import StorageClientManager
-
-if TYPE_CHECKING:
-    from apify_client import ApifyClientAsync
 
 BaseResourceClientType = TypeVar('BaseResourceClientType', bound=BaseResourceClient)
 BaseResourceCollectionClientType = TypeVar('BaseResourceCollectionClientType', bound=BaseResourceCollectionClient)
@@ -49,33 +46,33 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
 
     @classmethod
     @abstractmethod
-    def _get_human_friendly_label(cls: type[BaseStorage]) -> str:
+    def _get_human_friendly_label(cls) -> str:
         raise NotImplementedError('You must override this method in the subclass!')
 
     @classmethod
     @abstractmethod
-    def _get_default_id(cls: type[BaseStorage]) -> str:
+    def _get_default_id(cls) -> str:
         raise NotImplementedError('You must override this method in the subclass!')
 
     @classmethod
     @abstractmethod
     def _get_single_storage_client(
-        cls: type[BaseStorage],
+        cls,
         id: str,  # noqa: A002
-        client: ApifyClientAsync | MemoryStorageClient,
+        client: MemoryStorageClient,
     ) -> BaseResourceClientType:
         raise NotImplementedError('You must override this method in the subclass!')
 
     @classmethod
     @abstractmethod
     def _get_storage_collection_client(
-        cls: type[BaseStorage],
-        client: ApifyClientAsync | MemoryStorageClient,
+        cls,
+        client: MemoryStorageClient,
     ) -> BaseResourceCollectionClientType:
         raise NotImplementedError('You must override this method in the subclass!')
 
     @classmethod
-    def _ensure_class_initialized(cls: type[BaseStorage]) -> None:
+    def _ensure_class_initialized(cls) -> None:
         if cls._cache_by_id is None:
             cls._cache_by_id = {}
         if cls._cache_by_name is None:
@@ -86,7 +83,7 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
     @classmethod
     @abstractmethod
     async def open(
-        cls: type[BaseStorage],
+        cls,
         *,
         id: str | None = None,  # noqa: A002
         name: str | None = None,

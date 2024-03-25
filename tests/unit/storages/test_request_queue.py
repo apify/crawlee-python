@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from apify.storages import RequestQueue
+from crawlee.storages.request_queue import RequestQueue
 
 
 @pytest.fixture()

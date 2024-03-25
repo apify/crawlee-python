@@ -8,20 +8,29 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import aioshutil
-from apify_shared.utils import filter_out_none_values_recursively, ignore_docs, json_dumps
-from sortedcollections import ValueSortedDict
+from sortedcollections import ValueSortedDict  # type: ignore
 
-from apify._crypto import crypto_random_object_id
-from apify._memory_storage.file_storage_utils import delete_request, update_metadata, update_request_queue_item
-from apify._memory_storage.resource_clients.base_resource_client import BaseResourceClient
-from apify._utils import force_rename, raise_on_duplicate_storage, raise_on_non_existing_storage, unique_key_to_request_id
-from apify.consts import StorageTypes
+from crawlee._memory_storage.resource_clients.base_resource_client import BaseResourceClient
+from crawlee._utils.crypto import crypto_random_object_id
+from crawlee._utils.data_processing import (
+    filter_out_none_values_recursively,
+    raise_on_duplicate_storage,
+    raise_on_non_existing_storage,
+)
+from crawlee._utils.file import (
+    delete_request,
+    force_rename,
+    json_dumps,
+    update_metadata,
+    update_request_queue_item,
+)
+from crawlee._utils.requests import unique_key_to_request_id
+from crawlee.storages.types import StorageTypes
 
 if TYPE_CHECKING:
-    from apify._memory_storage.memory_storage_client import MemoryStorageClient
+    from crawlee._memory_storage.memory_storage_client import MemoryStorageClient
 
 
-@ignore_docs
 class RequestQueueClient(BaseResourceClient):
     """Sub-client for manipulating a single request queue."""
 
@@ -39,7 +48,7 @@ class RequestQueueClient(BaseResourceClient):
     _file_operation_lock: asyncio.Lock
 
     def __init__(
-        self: RequestQueueClient,
+        self,
         *,
         base_storage_directory: str,
         memory_storage_client: MemoryStorageClient,
@@ -57,13 +66,15 @@ class RequestQueueClient(BaseResourceClient):
         self._modified_at = datetime.now(timezone.utc)
         self._file_operation_lock = asyncio.Lock()
 
-    async def get(self: RequestQueueClient) -> dict | None:
+    async def get(self) -> dict | None:
         """Retrieve the request queue.
 
         Returns:
             dict, optional: The retrieved request queue, or None, if it does not exist
         """
-        found = self._find_or_create_client_by_id_or_name(memory_storage_client=self._memory_storage_client, id=self._id, name=self._name)
+        found = self._find_or_create_client_by_id_or_name(
+            memory_storage_client=self._memory_storage_client, id=self._id, name=self._name
+        )
 
         if found:
             async with found._file_operation_lock:
@@ -72,7 +83,7 @@ class RequestQueueClient(BaseResourceClient):
 
         return None
 
-    async def update(self: RequestQueueClient, *, name: str | None = None) -> dict:
+    async def update(self, *, name: str | None = None) -> dict:
         """Update the request queue with specified fields.
 
         Args:
@@ -96,7 +107,12 @@ class RequestQueueClient(BaseResourceClient):
         async with existing_queue_by_id._file_operation_lock:
             # Check that name is not in use already
             existing_queue_by_name = next(
-                (queue for queue in self._memory_storage_client._request_queues_handled if queue._name and queue._name.lower() == name.lower()), None
+                (
+                    queue
+                    for queue in self._memory_storage_client._request_queues_handled
+                    if queue._name and queue._name.lower() == name.lower()
+                ),
+                None,
             )
 
             if existing_queue_by_name is not None:
@@ -106,7 +122,9 @@ class RequestQueueClient(BaseResourceClient):
 
             previous_dir = existing_queue_by_id._resource_directory
 
-            existing_queue_by_id._resource_directory = os.path.join(self._memory_storage_client._request_queues_directory, name)
+            existing_queue_by_id._resource_directory = os.path.join(
+                self._memory_storage_client._request_queues_directory, name
+            )
 
             await force_rename(previous_dir, existing_queue_by_id._resource_directory)
 
@@ -115,9 +133,11 @@ class RequestQueueClient(BaseResourceClient):
 
             return existing_queue_by_id._to_resource_info()
 
-    async def delete(self: RequestQueueClient) -> None:
+    async def delete(self) -> None:
         """Delete the request queue."""
-        queue = next((queue for queue in self._memory_storage_client._request_queues_handled if queue._id == self._id), None)
+        queue = next(
+            (queue for queue in self._memory_storage_client._request_queues_handled if queue._id == self._id), None
+        )
 
         if queue is not None:
             async with queue._file_operation_lock:
@@ -129,7 +149,7 @@ class RequestQueueClient(BaseResourceClient):
                 if os.path.exists(queue._resource_directory):
                     await aioshutil.rmtree(queue._resource_directory)
 
-    async def list_head(self: RequestQueueClient, *, limit: int | None = None) -> dict:
+    async def list_head(self, *, limit: int | None = None) -> dict:
         """Retrieve a given number of requests from the beginning of the queue.
 
         Args:
@@ -152,7 +172,9 @@ class RequestQueueClient(BaseResourceClient):
 
             # Iterate all requests in the queue which have sorted key larger than infinity, which means `orderNo` is not `None`
             # This will iterate them in order of `orderNo`
-            for request_key in existing_queue_by_id._requests.irange_key(min_key=-float('inf'), inclusive=(False, True)):
+            for request_key in existing_queue_by_id._requests.irange_key(
+                min_key=-float('inf'), inclusive=(False, True)
+            ):
                 if len(items) == limit:
                     break
 
@@ -170,7 +192,7 @@ class RequestQueueClient(BaseResourceClient):
                 'items': [self._json_to_request(item['json']) for item in items],
             }
 
-    async def add_request(self: RequestQueueClient, request: dict, *, forefront: bool | None = None) -> dict:
+    async def add_request(self, request: dict, *, forefront: bool | None = None) -> dict:
         """Add a request to the queue.
 
         Args:
@@ -223,7 +245,7 @@ class RequestQueueClient(BaseResourceClient):
                 'wasAlreadyPresent': False,
             }
 
-    async def get_request(self: RequestQueueClient, request_id: str) -> dict | None:
+    async def get_request(self, request_id: str) -> dict | None:
         """Retrieve a request from the queue.
 
         Args:
@@ -245,7 +267,7 @@ class RequestQueueClient(BaseResourceClient):
             request = existing_queue_by_id._requests.get(request_id)
             return self._json_to_request(request['json'] if request is not None else None)
 
-    async def update_request(self: RequestQueueClient, request: dict, *, forefront: bool | None = None) -> dict:
+    async def update_request(self, request: dict, *, forefront: bool | None = None) -> dict:
         """Update a request in the queue.
 
         Args:
@@ -280,7 +302,9 @@ class RequestQueueClient(BaseResourceClient):
             existing_queue_by_id._requests[request_model['id']] = request_model
 
             pending_count_adjustment = 0
-            is_request_handled_state_changing = not isinstance(existing_request['orderNo'], type(request_model['orderNo']))
+            is_request_handled_state_changing = not isinstance(
+                existing_request['orderNo'], type(request_model['orderNo'])
+            )
             request_was_handled_before_update = existing_request['orderNo'] is None
 
             # We add 1 pending request if previous state was handled
@@ -303,7 +327,7 @@ class RequestQueueClient(BaseResourceClient):
                 'wasAlreadyPresent': True,
             }
 
-    async def delete_request(self: RequestQueueClient, request_id: str) -> None:
+    async def delete_request(self, request_id: str) -> None:
         """Delete a request from the queue.
 
         Args:
@@ -328,7 +352,7 @@ class RequestQueueClient(BaseResourceClient):
                 await existing_queue_by_id._update_timestamps(has_been_modified=True)
                 await delete_request(entity_directory=existing_queue_by_id._resource_directory, request_id=request_id)
 
-    def _to_resource_info(self: RequestQueueClient) -> dict:
+    def _to_resource_info(self) -> dict:
         """Retrieve the request queue store info."""
         return {
             'accessedAt': self._accessed_at,
@@ -344,7 +368,7 @@ class RequestQueueClient(BaseResourceClient):
             'userId': '1',
         }
 
-    async def _update_timestamps(self: RequestQueueClient, has_been_modified: bool) -> None:  # noqa: FBT001
+    async def _update_timestamps(self, has_been_modified: bool) -> None:  # noqa: FBT001
         self._accessed_at = datetime.now(timezone.utc)
 
         if has_been_modified:
@@ -357,13 +381,13 @@ class RequestQueueClient(BaseResourceClient):
             write_metadata=self._memory_storage_client._write_metadata,
         )
 
-    def _json_to_request(self: RequestQueueClient, request_json: str | None) -> dict | None:
+    def _json_to_request(self, request_json: str | None) -> dict | None:
         if request_json is None:
             return None
         request = json.loads(request_json)
         return filter_out_none_values_recursively(request)
 
-    def _create_internal_request(self: RequestQueueClient, request: dict, forefront: bool | None) -> dict:
+    def _create_internal_request(self, request: dict, forefront: bool | None) -> dict:
         order_no = self._calculate_order_no(request, forefront)
         id = unique_key_to_request_id(request['uniqueKey'])  # noqa: A001
 
@@ -381,7 +405,7 @@ class RequestQueueClient(BaseResourceClient):
             'url': request['url'],
         }
 
-    def _calculate_order_no(self: RequestQueueClient, request: dict, forefront: bool | None) -> Decimal | None:
+    def _calculate_order_no(self, request: dict, forefront: bool | None) -> Decimal | None:
         if request.get('handledAt') is not None:
             return None
 
@@ -398,19 +422,19 @@ class RequestQueueClient(BaseResourceClient):
         return -timestamp if forefront else timestamp
 
     @classmethod
-    def _get_storages_dir(cls: type[RequestQueueClient], memory_storage_client: MemoryStorageClient) -> str:
+    def _get_storages_dir(cls, memory_storage_client: MemoryStorageClient) -> str:
         return memory_storage_client._request_queues_directory
 
     @classmethod
     def _get_storage_client_cache(
-        cls: type[RequestQueueClient],
+        cls,
         memory_storage_client: MemoryStorageClient,
     ) -> list[RequestQueueClient]:
         return memory_storage_client._request_queues_handled
 
     @classmethod
     def _create_from_directory(
-        cls: type[RequestQueueClient],
+        cls,
         storage_directory: str,
         memory_storage_client: MemoryStorageClient,
         id: str | None = None,  # noqa: A002

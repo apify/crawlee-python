@@ -6,19 +6,19 @@ from crawlee._memory_storage.resource_clients.base_resource_collection_client im
 from crawlee._memory_storage.resource_clients.key_value_store_client import KeyValueStoreClient
 
 if TYPE_CHECKING:
-    from crawlee._utils.list_page import ListPage
+    from crawlee._utils.types import ListPage
 
 
 class KeyValueStoreCollectionClient(BaseResourceCollectionClient):
     """Sub-client for manipulating key-value stores."""
 
-    def _get_storage_client_cache(self: KeyValueStoreCollectionClient) -> list[KeyValueStoreClient]:
+    def _get_storage_client_cache(self) -> list[KeyValueStoreClient]:
         return self._memory_storage_client._key_value_stores_handled
 
-    def _get_resource_client_class(self: KeyValueStoreCollectionClient) -> type[KeyValueStoreClient]:
+    def _get_resource_client_class(self) -> type[KeyValueStoreClient]:
         return KeyValueStoreClient
 
-    async def list(self: KeyValueStoreCollectionClient) -> ListPage:
+    async def list(self) -> ListPage:
         """List the available key-value stores.
 
         Returns:
@@ -27,7 +27,7 @@ class KeyValueStoreCollectionClient(BaseResourceCollectionClient):
         return await super().list()
 
     async def get_or_create(
-        self: KeyValueStoreCollectionClient,
+        self,
         *,
         name: str | None = None,
         schema: dict | None = None,

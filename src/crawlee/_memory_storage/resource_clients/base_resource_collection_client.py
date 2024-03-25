@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING, Generic, TypeVar, cast
 
 from crawlee._memory_storage.resource_clients.base_resource_client import BaseResourceClient
 from crawlee._utils.file import update_metadata
-from crawlee._utils.list_page import ListPage
+from crawlee._utils.types import ListPage
 
 if TYPE_CHECKING:
-    from apify._memory_storage.memory_storage_client import MemoryStorageClient
+    from crawlee._memory_storage.memory_storage_client import MemoryStorageClient
 
 
 ResourceClientType = TypeVar('ResourceClientType', bound=BaseResourceClient, contravariant=True)  # noqa: PLC0105
@@ -22,7 +22,7 @@ class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
     _memory_storage_client: MemoryStorageClient
 
     def __init__(
-        self: BaseResourceCollectionClient,
+        self,
         *,
         base_storage_directory: str,
         memory_storage_client: MemoryStorageClient,
@@ -32,15 +32,15 @@ class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
         self._memory_storage_client = memory_storage_client
 
     @abstractmethod
-    def _get_storage_client_cache(self: BaseResourceCollectionClient) -> list[ResourceClientType]:
+    def _get_storage_client_cache(self) -> list[ResourceClientType]:
         raise NotImplementedError('You must override this method in the subclass!')
 
     @abstractmethod
-    def _get_resource_client_class(self: BaseResourceCollectionClient) -> type[ResourceClientType]:
+    def _get_resource_client_class(self) -> type[ResourceClientType]:
         raise NotImplementedError('You must override this method in the subclass!')
 
     @abstractmethod
-    async def list(self: BaseResourceCollectionClient) -> ListPage:
+    async def list(self) -> ListPage:
         """List the available storages.
 
         Returns:
@@ -63,7 +63,7 @@ class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
 
     @abstractmethod
     async def get_or_create(
-        self: BaseResourceCollectionClient,
+        self,
         *,
         name: str | None = None,
         schema: dict | None = None,

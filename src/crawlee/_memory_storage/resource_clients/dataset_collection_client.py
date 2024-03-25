@@ -2,26 +2,23 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from apify_shared.utils import ignore_docs
-
-from apify._memory_storage.resource_clients.base_resource_collection_client import BaseResourceCollectionClient
-from apify._memory_storage.resource_clients.dataset import DatasetClient
+from crawlee._memory_storage.resource_clients.base_resource_collection_client import BaseResourceCollectionClient
+from crawlee._memory_storage.resource_clients.dataset_client import DatasetClient
 
 if TYPE_CHECKING:
-    from apify_shared.models import ListPage
+    from crawlee._utils.types import ListPage
 
 
-@ignore_docs
 class DatasetCollectionClient(BaseResourceCollectionClient):
     """Sub-client for manipulating datasets."""
 
-    def _get_storage_client_cache(self: DatasetCollectionClient) -> list[DatasetClient]:
+    def _get_storage_client_cache(self) -> list[DatasetClient]:
         return self._memory_storage_client._datasets_handled
 
-    def _get_resource_client_class(self: DatasetCollectionClient) -> type[DatasetClient]:
+    def _get_resource_client_class(self) -> type[DatasetClient]:
         return DatasetClient
 
-    async def list(self: DatasetCollectionClient) -> ListPage:
+    async def list(self) -> ListPage:
         """List the available datasets.
 
         Returns:
@@ -30,7 +27,7 @@ class DatasetCollectionClient(BaseResourceCollectionClient):
         return await super().list()
 
     async def get_or_create(
-        self: DatasetCollectionClient,
+        self,
         *,
         name: str | None = None,
         schema: dict | None = None,
