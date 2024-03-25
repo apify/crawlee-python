@@ -1,3 +1,5 @@
+# ruff: noqa: FBT003 Boolean positional value in function call
+
 from __future__ import annotations
 
 import asyncio
@@ -22,7 +24,7 @@ def system_status() -> SystemStatus | Mock:
 T = TypeVar('T')
 
 
-def future(value: T) -> Awaitable[T]:
+def future(value: T, /) -> Awaitable[T]:
     f = asyncio.Future[T]()
     f.set_result(value)
     return f

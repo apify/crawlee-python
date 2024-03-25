@@ -127,7 +127,6 @@ indent-style = "space"
     "SLF001",  # Private member accessed: `{name}`
     "T20",     # flake8-print
     "TRY301",  # Abstract `raise` to an inner function
-    "FBT003",  # Boolean positional value in function call
 ]
 
 [tool.ruff.lint.flake8-quotes]
