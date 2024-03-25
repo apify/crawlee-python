@@ -45,7 +45,9 @@ async def test_update(request_queue_client: RequestQueueClient) -> None:
     )
     old_rq_info = await request_queue_client.get()
     assert old_rq_info is not None
-    old_rq_directory = os.path.join(request_queue_client._memory_storage_client._request_queues_directory, old_rq_info['name'])
+    old_rq_directory = os.path.join(
+        request_queue_client._memory_storage_client._request_queues_directory, old_rq_info['name']
+    )
     new_rq_directory = os.path.join(request_queue_client._memory_storage_client._request_queues_directory, new_rq_name)
     assert os.path.exists(os.path.join(old_rq_directory, 'fvwscO2UJLdr10B.json')) is True
     assert os.path.exists(os.path.join(new_rq_directory, 'fvwscO2UJLdr10B.json')) is False
@@ -167,7 +169,9 @@ async def test_update_record(request_queue_client: RequestQueueClient) -> None:
     assert rq_info_before_update['pendingRequestCount'] == 1
     assert rq_info_before_update['handledRequestCount'] == 0
 
-    request_update_info = await request_queue_client.update_request({**request, 'handledAt': datetime.now(timezone.utc)})
+    request_update_info = await request_queue_client.update_request(
+        {**request, 'handledAt': datetime.now(timezone.utc)}
+    )
     assert request_update_info['wasAlreadyHandled'] is False
 
     rq_info_after_update = await request_queue_client.get()

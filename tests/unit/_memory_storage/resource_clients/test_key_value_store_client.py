@@ -8,10 +8,10 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 import pytest
-import pytest_asyncio
 
 from crawlee._utils.crypto import crypto_random_object_id
-from crawlee._utils.file import json_dumps, maybe_parse_body
+from crawlee._utils.data_processing import maybe_parse_body
+from crawlee._utils.file import json_dumps
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -27,7 +27,7 @@ TINY_DATA = {'a': 'b'}
 TINY_TEXT = 'abcd'
 
 
-@pytest_asyncio.fixture()
+@pytest.fixture()
 async def key_value_store_client(memory_storage_client: MemoryStorageClient) -> KeyValueStoreClient:
     key_value_stores_client = memory_storage_client.key_value_stores()
     kvs_info = await key_value_stores_client.get_or_create(name='test')

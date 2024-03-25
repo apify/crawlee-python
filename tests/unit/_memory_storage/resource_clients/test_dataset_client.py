@@ -53,7 +53,9 @@ async def test_update(dataset_client: DatasetClient) -> None:
 
     old_dataset_info = await dataset_client.get()
     assert old_dataset_info is not None
-    old_dataset_directory = os.path.join(dataset_client._memory_storage_client._datasets_directory, old_dataset_info['name'])
+    old_dataset_directory = os.path.join(
+        dataset_client._memory_storage_client._datasets_directory, old_dataset_info['name']
+    )
     new_dataset_directory = os.path.join(dataset_client._memory_storage_client._datasets_directory, new_dataset_name)
     assert os.path.exists(os.path.join(old_dataset_directory, '000000001.json')) is True
     assert os.path.exists(os.path.join(new_dataset_directory, '000000001.json')) is False

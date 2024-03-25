@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import pytest_asyncio
+import pytest
 
 if TYPE_CHECKING:
     from crawlee._memory_storage import MemoryStorageClient
     from crawlee._memory_storage.resource_clients import KeyValueStoreCollectionClient
 
 
-@pytest_asyncio.fixture()
+@pytest.fixture()
 def key_value_stores_client(memory_storage_client: MemoryStorageClient) -> KeyValueStoreCollectionClient:
     return memory_storage_client.key_value_stores()
 
