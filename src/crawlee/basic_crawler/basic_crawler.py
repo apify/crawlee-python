@@ -150,16 +150,15 @@ class BasicCrawler(Generic[TCrawlingContext]):
         if requests is not None:
             await self.add_requests(requests)
 
-        async with self._event_manager:
-            await self._snapshotter.start()
+        async with self._event_manager, self._snapshotter:
             await self._pool.run()
-            await self._snapshotter.stop()
-            return FinalStatistics()
 
-    def __is_finished_function(self) -> bool:
+        return FinalStatistics()
+
+    async def __is_finished_function(self) -> bool:
         return self._request_provider.is_finished()
 
-    def __is_task_ready_function(self) -> bool:
+    async def __is_task_ready_function(self) -> bool:
         return self._request_provider.is_empty()
 
     async def __run_task_function(self) -> None:

@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import Annotated, Any
 
-if TYPE_CHECKING:
-    from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 
