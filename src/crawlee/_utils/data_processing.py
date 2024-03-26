@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from enum import Enum
-from typing import TYPE_CHECKING, Any, NoReturn, cast
+from typing import TYPE_CHECKING, Any, NoReturn
 
 from crawlee._utils.file import is_content_type_json, is_content_type_text, is_content_type_xml
 
@@ -11,27 +11,28 @@ if TYPE_CHECKING:
     from crawlee.storages.types import StorageTypes
 
 
-def filter_out_none_values_recursively(dictionary: dict) -> dict:
-    """Return copy of the dictionary, recursively omitting all keys for which values are None."""
-    return cast(dict, filter_out_none_values_recursively_internal(dictionary))
-
-
-def filter_out_none_values_recursively_internal(
-    dictionary: dict,
-    remove_empty_dicts: bool | None = None,
-) -> dict | None:
+def filter_out_none_values_recursively(dictionary: dict, *, remove_empty_dicts: bool = False) -> dict | None:
     """Recursively filters out None values from a dictionary.
 
-    Unfortunately, it's necessary to have an internal function for the correct result typing,
-    without having to create complicated overloads
+    Args:
+        dictionary: The dictionary to filter.
+        remove_empty_dicts: Flag indicating whether to remove empty nested dictionaries.
+
+    Returns:
+        A copy of the dictionary with all None values (and potentially empty dictionaries) removed.
     """
     result = {}
     for k, v in dictionary.items():
+        # If the value is a dictionary, apply recursion
         if isinstance(v, dict):
-            v = filter_out_none_values_recursively_internal(v, remove_empty_dicts is True or remove_empty_dicts is None)  # noqa: PLW2901
-        if v is not None:
+            nested = filter_out_none_values_recursively(v, remove_empty_dicts=remove_empty_dicts)
+            if nested or not remove_empty_dicts:
+                result[k] = nested
+        elif v is not None:
             result[k] = v
-    if not result and remove_empty_dicts:
+
+    # If removing empty dictionaries and result is empty, return None
+    if remove_empty_dicts and not result:
         return None
     return result
 
