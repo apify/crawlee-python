@@ -12,14 +12,13 @@ from crawlee._utils.wait import wait_for
 from crawlee.autoscaling import AutoscaledPool
 from crawlee.autoscaling.snapshotter import Snapshotter
 from crawlee.autoscaling.system_status import SystemStatus
-from crawlee.basic_crawler.context_pipeline import RequestHandlerError
+from crawlee.basic_crawler.context_pipeline import ContextPipeline, RequestHandlerError
 from crawlee.basic_crawler.router import Router
 from crawlee.basic_crawler.types import BasicCrawlingContext, CreateRequestSchema, FinalStatistics, RequestState
 from crawlee.config import Configuration
 from crawlee.events.local_event_manager import LocalEventManager
 
 if TYPE_CHECKING:
-    from crawlee.basic_crawler.context_pipeline import ContextPipeline
     from crawlee.storages.request_provider import RequestProvider
 
 
@@ -49,7 +48,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self,
         *,
         router: Callable[[TCrawlingContext], Awaitable] | None = None,
-        _context_pipeline: ContextPipeline[TCrawlingContext],
+        _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         # TODO: make request_provider optional (and instantiate based on configuration if None is supplied)
         request_provider: RequestProvider,
         min_concurrency: int | None = None,
@@ -67,7 +66,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         else:
             self._router = None
 
-        self._context_pipeline = _context_pipeline
+        self._context_pipeline = _context_pipeline or ContextPipeline()
 
         self._error_handler: ErrorHandler[BasicCrawlingContext] | None = None
         self._failed_request_handler: FailedRequestHandler[BasicCrawlingContext] | None = None
