@@ -73,7 +73,7 @@ def maybe_extract_enum_member_value(maybe_enum_member: Any) -> Any:
 
 def maybe_parse_body(body: bytes, content_type: str) -> Any:
     if is_content_type_json(content_type):
-        return json.loads(body.decode('utf-8'))  # Returns any
+        return json.loads(body.decode('utf-8'))
     if is_content_type_xml(content_type) or is_content_type_text(content_type):
         return body.decode('utf-8')
     return body
