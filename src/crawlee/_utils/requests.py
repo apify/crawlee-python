@@ -7,10 +7,9 @@ from logging import getLogger
 from urllib.parse import parse_qsl, urlencode, urlparse
 
 from crawlee._utils.crypto import compute_short_hash
+from crawlee.consts import REQUEST_ID_LENGTH
 
 logger = getLogger(__name__)
-
-REQUEST_ID_LENGTH = 15
 
 
 def unique_key_to_request_id(unique_key: str) -> str:
