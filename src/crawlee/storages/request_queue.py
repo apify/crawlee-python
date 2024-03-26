@@ -9,10 +9,9 @@ from typing import OrderedDict as OrderedDictType
 
 from apify._utils import budget_ow
 
-from crawlee._utils.cache import LRUCache
 from crawlee._utils.crypto import crypto_random_object_id
+from crawlee._utils.lru_cache import LRUCache
 from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
-from crawlee.config import Config
 from crawlee.consts import REQUEST_QUEUE_HEAD_MAX_LIMIT
 from crawlee.storages.base_storage import BaseStorage
 
@@ -22,6 +21,7 @@ if TYPE_CHECKING:
 
     from crawlee._memory_storage import MemoryStorageClient
     from crawlee._memory_storage.resource_clients import RequestQueueClient, RequestQueueCollectionClient
+    from crawlee.config import Config
 
 
 logger = getLogger(__name__)

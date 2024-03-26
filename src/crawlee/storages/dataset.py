@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, AsyncIterator, Iterable, Iterator
 
 from crawlee._utils.file import json_dumps
 from crawlee._utils.wrappers import wrap_internal
-from crawlee.config import Config
 from crawlee.consts import MAX_PAYLOAD_SIZE_BYTES
 from crawlee.storages.base_storage import BaseStorage
 from crawlee.storages.key_value_store import KeyValueStore
@@ -19,6 +18,7 @@ if TYPE_CHECKING:
     from crawlee._memory_storage import MemoryStorageClient
     from crawlee._memory_storage.resource_clients import DatasetClient, DatasetCollectionClient
     from crawlee._utils.types import JSONSerializable, ListPage
+    from crawlee.config import Config
 
 # 0.01%
 SAFETY_BUFFER_PERCENT = 0.01 / 100
@@ -365,7 +365,9 @@ class Dataset(BaseStorage):
         """
         dataset = await cls.open(id=from_dataset_id, name=from_dataset_name)
         await dataset.export_to_json(
-            key, to_key_value_store_id=to_key_value_store_id, to_key_value_store_name=to_key_value_store_name
+            key,
+            to_key_value_store_id=to_key_value_store_id,
+            to_key_value_store_name=to_key_value_store_name,
         )
 
     async def _export_to_json_internal(
