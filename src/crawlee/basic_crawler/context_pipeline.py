@@ -58,7 +58,10 @@ class ContextPipeline(Generic[TCrawlingContext]):
                 crawling_context = result
                 cleanup_stack.append(middleware_instance)
 
-        await final_context_consumer(cast(TCrawlingContext, crawling_context))
+        try:
+            await final_context_consumer(cast(TCrawlingContext, crawling_context))
+        except Exception as e:
+            raise RequestHandlerError(e, crawling_context) from e
 
         for middleware_instance in reversed(cleanup_stack):
             try:

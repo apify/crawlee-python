@@ -2,7 +2,9 @@ from dataclasses import dataclass
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock
 
-from crawlee.basic_crawler.context_pipeline import ContextPipeline
+import pytest
+
+from crawlee.basic_crawler.context_pipeline import ContextPipeline, RequestHandlerError
 from crawlee.basic_crawler.types import BasicCrawlingContext, RequestData
 
 
@@ -56,3 +58,13 @@ async def test_calls_consumers_and_middlewares() -> None:
         'middleware_b_out',
         'middleware_a_out',
     ]
+
+
+async def test_wraps_consumer_errors() -> None:
+    consumer = AsyncMock(side_effect=RuntimeError('Arbitrary crash for testing purposes'))
+
+    pipeline = ContextPipeline()
+    context = BasicCrawlingContext(request=RequestData(url='', unique_key='', id=''))
+
+    with pytest.raises(RequestHandlerError):
+        await pipeline(context, consumer)

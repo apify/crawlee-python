@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from logging import getLogger
-from typing import TYPE_CHECKING, Awaitable, Callable, Generic
+from typing import TYPE_CHECKING, Awaitable, Callable, Generic, cast
 
 from typing_extensions import TypeVar
 
@@ -201,7 +201,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
             )
 
             request.state = RequestState.DONE
-        except RequestHandlerError[TCrawlingContext] as primary_error:
+        except RequestHandlerError as primary_error:
+            primary_error = cast(
+                RequestHandlerError[TCrawlingContext], primary_error
+            )  # valid thanks to ContextPipeline
+
             try:
                 request.state = RequestState.ERROR_HANDLER
 
@@ -242,10 +246,12 @@ class BasicCrawler(Generic[TCrawlingContext]):
             max_request_retries = self._max_request_retries
 
         should_retry_request = (
-            not crawling_context.request.no_retry and crawling_context.request.retry_count < max_request_retries
+            not crawling_context.request.no_retry and (crawling_context.request.retry_count + 1) < max_request_retries
         )
 
         if should_retry_request:
+            crawling_context.request.retry_count += 1
+
             if self._error_handler:
                 try:
                     await self._error_handler(crawling_context, error)
