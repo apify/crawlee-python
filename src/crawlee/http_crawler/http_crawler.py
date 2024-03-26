@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Awaitable, Callable
+from typing import AsyncGenerator, Awaitable, Callable
 
 import httpx
 
 from crawlee.basic_crawler.basic_crawler import BasicCrawler
-from crawlee.basic_crawler.context_pipeline import ContextPipeline, MiddlewareCallNext
+from crawlee.basic_crawler.context_pipeline import ContextPipeline
 from crawlee.basic_crawler.types import BasicCrawlingContext
 from crawlee.config import Configuration
 from crawlee.http_crawler.types import HttpCrawlingContext
@@ -45,9 +45,9 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
         )
 
     async def make_http_request(
-        self, crawling_context: BasicCrawlingContext, call_next: MiddlewareCallNext[HttpCrawlingContext]
-    ):
+        self, crawling_context: BasicCrawlingContext
+    ) -> AsyncGenerator[HttpCrawlingContext, None]:
         response = await self._client.request(crawling_context.request.method, crawling_context.request.url)
         response.raise_for_status()
 
-        await call_next(HttpCrawlingContext(request=crawling_context.request, http_response=response))
+        yield HttpCrawlingContext(request=crawling_context.request, http_response=response)

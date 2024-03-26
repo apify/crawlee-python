@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Awaitable, Callable, Generic, cast
+from typing import Any, AsyncGenerator, Awaitable, Callable, Generator, Generic, cast
 
 from typing_extensions import TypeVar
 
@@ -23,42 +23,61 @@ class ContextPipeline(Generic[TCrawlingContext]):
     def __init__(
         self,
         *,
-        _middleware: Callable[[BasicCrawlingContext, MiddlewareCallNext[BasicCrawlingContext]], Awaitable[None]]
+        _middleware: Callable[
+            [TCrawlingContext],
+            AsyncGenerator[TMiddlewareCrawlingContext, None],
+        ]
         | None = None,
         _parent: ContextPipeline[BasicCrawlingContext] | None = None,
     ) -> None:
         self._middleware = _middleware
         self._parent = _parent
 
+    def _middleware_chain(self) -> Generator[ContextPipeline[Any], None, None]:
+        yield self
+
+        if self._parent is not None:
+            yield from self._parent._middleware_chain()  # noqa: SLF001
+
     async def __call__(
         self,
         crawling_context: BasicCrawlingContext,
         final_context_consumer: Callable[[TCrawlingContext], Awaitable[None]],
     ) -> None:
-        if not self._middleware:
-            return
+        chain = list(self._middleware_chain())
+        cleanup_stack = list[AsyncGenerator]()
 
-        async def call_next(
-            enhanced_context: BasicCrawlingContext,
-        ) -> None:
-            if self._parent:
-                await self._parent(
-                    enhanced_context, cast(Callable[[BasicCrawlingContext], Awaitable[None]], final_context_consumer)
-                )
-            else:
+        for member in reversed(chain):
+            if member._middleware:
+                middleware_instance = member._middleware(crawling_context)
                 try:
-                    await final_context_consumer(cast(TCrawlingContext, enhanced_context))
-                except Exception as e:
-                    raise RequestHandlerError(e, cast(TCrawlingContext, enhanced_context)) from e
+                    result = await middleware_instance.__anext__()
+                except StopAsyncIteration as e:
+                    raise RuntimeError('The middleware did not yield') from e
 
-        await self._middleware(crawling_context, call_next)
+                crawling_context = result
+                cleanup_stack.append(middleware_instance)
+
+        await final_context_consumer(cast(TCrawlingContext, crawling_context))
+
+        for middleware_instance in reversed(cleanup_stack):
+            try:
+                result = await middleware_instance.__anext__()
+            except StopAsyncIteration:  # noqa: PERF203
+                pass
+            else:
+                raise RuntimeError('The middleware yielded more than once')
 
     def compose(
-        self, middleware: Callable[[TCrawlingContext, MiddlewareCallNext[TMiddlewareCrawlingContext]], Awaitable[None]]
+        self,
+        middleware: Callable[
+            [TCrawlingContext],
+            AsyncGenerator[TMiddlewareCrawlingContext, None],
+        ],
     ) -> ContextPipeline[TMiddlewareCrawlingContext]:
         return ContextPipeline[TMiddlewareCrawlingContext](
             _middleware=cast(
-                Callable[[BasicCrawlingContext, MiddlewareCallNext[BasicCrawlingContext]], Awaitable[None]], middleware
+                Callable[[BasicCrawlingContext], AsyncGenerator[TMiddlewareCrawlingContext, None]], middleware
             ),
             _parent=cast(ContextPipeline[BasicCrawlingContext], self),
         )
