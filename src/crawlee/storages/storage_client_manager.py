@@ -23,7 +23,7 @@ class StorageClientManager:
     def get_storage_client(
         cls,
         force_cloud: bool = False,  # noqa: FBT001, FBT002
-    ) -> ApifyClientAsync | MemoryStorageClient:
+    ) -> MemoryStorageClient:
         """Get the current storage client instance.
 
         Returns:

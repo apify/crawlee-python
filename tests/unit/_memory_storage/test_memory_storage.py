@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from crawlee._memory_storage import MemoryStorageClient
-from crawlee.consts import CrawleeEnvVars
+from crawlee._utils.env_vars import CrawleeEnvVars
 
 if TYPE_CHECKING:
     from pathlib import Path

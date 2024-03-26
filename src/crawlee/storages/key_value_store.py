@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 
     from crawlee._memory_storage import MemoryStorageClient
     from crawlee._memory_storage.resource_clients import KeyValueStoreClient, KeyValueStoreCollectionClient
+    from crawlee.config import Config
 
 
 T = TypeVar('T')
@@ -66,15 +67,13 @@ class KeyValueStore(BaseStorage):
     _name: str | None
     _key_value_store_client: KeyValueStoreClientAsync | KeyValueStoreClient
     _api_public_base_url: str
-    _default_key_value_store_id: str = 'default'
 
     def __init__(
         self,
         id: str,  # noqa: A002
         name: str | None,
-        client: ApifyClientAsync | MemoryStorageClient,
-        api_public_base_url: str,
-        default_key_value_store_id: str,
+        client: MemoryStorageClient,
+        config: Config,
     ) -> None:
         """Create a `KeyValueStore` instance.
 
@@ -85,7 +84,7 @@ class KeyValueStore(BaseStorage):
             name (str, optional): Name of the key-value store.
             client (ApifyClientAsync or MemoryStorageClient): The storage client which should be used.
         """
-        super().__init__(id=id, name=name, client=client)
+        super().__init__(id=id, name=name, client=client, config=config)
 
         self.get_value = wrap_internal(self._get_value_internal, self.get_value)  # type: ignore
         self.set_value = wrap_internal(self._set_value_internal, self.set_value)  # type: ignore
@@ -93,16 +92,44 @@ class KeyValueStore(BaseStorage):
         self._id = id
         self._name = name
         self._key_value_store_client = client.key_value_store(self._id)
-        self._api_public_base_url = api_public_base_url
-        self._default_key_value_store_id = default_key_value_store_id
+
+    @classmethod
+    async def open(
+        cls,
+        *,
+        config: Config | None = None,
+        id: str | None = None,  # noqa: A002
+        name: str | None = None,
+        force_cloud: bool = False,
+    ) -> KeyValueStore:
+        """Open a key-value store.
+
+        Key-value stores are used to store records or files, along with their MIME content type.
+        The records are stored and retrieved using a unique key.
+        The actual data is stored either on a local filesystem or in the Apify cloud.
+
+        Args:
+            id (str, optional): ID of the key-value store to be opened.
+                If neither `id` nor `name` are provided, the method returns the default key-value store associated with the actor run.
+                If the key-value store with the given ID does not exist, it raises an error.
+            name (str, optional): Name of the key-value store to be opened.
+                If neither `id` nor `name` are provided, the method returns the default key-value store associated with the actor run.
+                If the key-value store with the given name does not exist, it is created.
+            force_cloud (bool, optional): If set to True, it will open a key-value store on the Apify Platform even when running the actor locally.
+                Defaults to False.
+
+        Returns:
+            KeyValueStore: An instance of the `KeyValueStore` class for the given ID or name.
+        """
+        return await super().open(id=id, name=name, force_cloud=force_cloud, config=config)
 
     @classmethod
     def _get_human_friendly_label(cls) -> str:
         return 'Key-value store'
 
     @classmethod
-    def _get_default_id(cls) -> str:
-        return cls._default_key_value_store_id
+    def _get_default_id(cls, config: Config) -> str:
+        return config.default_key_value_store_id
 
     @classmethod
     def _get_single_storage_client(
@@ -220,32 +247,3 @@ class KeyValueStore(BaseStorage):
         """Remove the key-value store either from the Apify cloud storage or from the local directory."""
         await self._key_value_store_client.delete()
         self._remove_from_cache()
-
-    @classmethod
-    async def open(
-        cls,
-        *,
-        id: str | None = None,  # noqa: A002
-        name: str | None = None,
-        force_cloud: bool = False,
-    ) -> KeyValueStore:
-        """Open a key-value store.
-
-        Key-value stores are used to store records or files, along with their MIME content type.
-        The records are stored and retrieved using a unique key.
-        The actual data is stored either on a local filesystem or in the Apify cloud.
-
-        Args:
-            id (str, optional): ID of the key-value store to be opened.
-                If neither `id` nor `name` are provided, the method returns the default key-value store associated with the actor run.
-                If the key-value store with the given ID does not exist, it raises an error.
-            name (str, optional): Name of the key-value store to be opened.
-                If neither `id` nor `name` are provided, the method returns the default key-value store associated with the actor run.
-                If the key-value store with the given name does not exist, it is created.
-            force_cloud (bool, optional): If set to True, it will open a key-value store on the Apify Platform even when running the actor locally.
-                Defaults to False.
-
-        Returns:
-            KeyValueStore: An instance of the `KeyValueStore` class for the given ID or name.
-        """
-        return await super().open(id=id, name=name, force_cloud=force_cloud)

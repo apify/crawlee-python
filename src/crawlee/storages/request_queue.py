@@ -12,6 +12,7 @@ from apify._utils import budget_ow
 from crawlee._utils.cache import LRUCache
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
+from crawlee.config import Config
 from crawlee.consts import REQUEST_QUEUE_HEAD_MAX_LIMIT
 from crawlee.storages.base_storage import BaseStorage
 
@@ -90,14 +91,13 @@ class RequestQueue(BaseStorage):
     _assumed_total_count = 0
     _assumed_handled_count = 0
     _requests_cache: LRUCache[dict]
-    _default_request_queue_id: str = 'default'
 
     def __init__(
         self,
         id: str,  # noqa: A002
         name: str | None,
-        client: ApifyClientAsync | MemoryStorageClient,
-        default_request_queue_id: str,
+        client: MemoryStorageClient,
+        config: Config,
     ) -> None:
         """Create a `RequestQueue` instance.
 
@@ -108,7 +108,7 @@ class RequestQueue(BaseStorage):
             name (str, optional): Name of the request queue.
             client (ApifyClientAsync or MemoryStorageClient): The storage client which should be used.
         """
-        super().__init__(id=id, name=name, client=client)
+        super().__init__(id=id, name=name, client=client, config=config)
 
         self._request_queue_client = client.request_queue(self._id, client_key=self._client_key)
         self._queue_head_dict = OrderedDict()
@@ -117,15 +117,47 @@ class RequestQueue(BaseStorage):
         self._last_activity = datetime.now(timezone.utc)
         self._recently_handled = LRUCache[bool](max_length=RECENTLY_HANDLED_CACHE_SIZE)
         self._requests_cache = LRUCache(max_length=MAX_CACHED_REQUESTS)
-        self._default_request_queue_id = default_request_queue_id
+
+    @classmethod
+    async def open(
+        cls,
+        *,
+        config: Config | None = None,
+        id: str | None = None,  # noqa: A002
+        name: str | None = None,
+        force_cloud: bool = False,
+    ) -> RequestQueue:
+        """Open a request queue.
+
+        Request queue represents a queue of URLs to crawl, which is stored either on local filesystem or in the Apify cloud.
+        The queue is used for deep crawling of websites, where you start with several URLs and then
+        recursively follow links to other pages. The data structure supports both breadth-first
+        and depth-first crawling orders.
+
+        Args:
+            id (str, optional): ID of the request queue to be opened.
+                If neither `id` nor `name` are provided, the method returns the default request queue associated with the actor run.
+                If the request queue with the given ID does not exist, it raises an error.
+            name (str, optional): Name of the request queue to be opened.
+                If neither `id` nor `name` are provided, the method returns the default request queue associated with the actor run.
+                If the request queue with the given name does not exist, it is created.
+            force_cloud (bool, optional): If set to True, it will open a request queue on the Apify Platform even when running the actor locally.
+                Defaults to False.
+
+        Returns:
+            RequestQueue: An instance of the `RequestQueue` class for the given ID or name.
+        """
+        queue = await super().open(id=id, name=name, force_cloud=force_cloud, config=config)
+        await queue._ensure_head_is_non_empty()  # type: ignore
+        return queue  # type: ignore
 
     @classmethod
     def _get_human_friendly_label(cls) -> str:
         return 'Request queue'
 
     @classmethod
-    def _get_default_id(cls) -> str:
-        return cls._default_request_queue_id
+    def _get_default_id(cls, config: Config) -> str:
+        return config.default_request_queue_id
 
     @classmethod
     def _get_single_storage_client(
@@ -604,35 +636,3 @@ class RequestQueue(BaseStorage):
             dict: Object returned by calling the GET request queue API endpoint.
         """
         return await self._request_queue_client.get()
-
-    @classmethod
-    async def open(
-        cls,
-        *,
-        id: str | None = None,  # noqa: A002
-        name: str | None = None,
-        force_cloud: bool = False,
-    ) -> RequestQueue:
-        """Open a request queue.
-
-        Request queue represents a queue of URLs to crawl, which is stored either on local filesystem or in the Apify cloud.
-        The queue is used for deep crawling of websites, where you start with several URLs and then
-        recursively follow links to other pages. The data structure supports both breadth-first
-        and depth-first crawling orders.
-
-        Args:
-            id (str, optional): ID of the request queue to be opened.
-                If neither `id` nor `name` are provided, the method returns the default request queue associated with the actor run.
-                If the request queue with the given ID does not exist, it raises an error.
-            name (str, optional): Name of the request queue to be opened.
-                If neither `id` nor `name` are provided, the method returns the default request queue associated with the actor run.
-                If the request queue with the given name does not exist, it is created.
-            force_cloud (bool, optional): If set to True, it will open a request queue on the Apify Platform even when running the actor locally.
-                Defaults to False.
-
-        Returns:
-            RequestQueue: An instance of the `RequestQueue` class for the given ID or name.
-        """
-        queue = await super().open(id=id, name=name, force_cloud=force_cloud)
-        await queue._ensure_head_is_non_empty()  # type: ignore
-        return queue  # type: ignore

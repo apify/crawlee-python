@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from enum import Enum
 from typing import TYPE_CHECKING, Any, NoReturn, cast
 
@@ -39,6 +40,27 @@ def maybe_parse_bool(val: str | None) -> bool:
     if val in {'true', 'True', '1'}:
         return True
     return False
+
+
+def maybe_parse_datetime(val: str) -> datetime | str:
+    try:
+        return datetime.strptime(val, '%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=timezone.utc)
+    except ValueError:
+        return val
+
+
+def maybe_parse_float(val: str) -> float | None:
+    try:
+        return float(val)
+    except ValueError:
+        return None
+
+
+def maybe_parse_int(val: str) -> int | None:
+    try:
+        return int(val)
+    except ValueError:
+        return None
 
 
 def maybe_extract_enum_member_value(maybe_enum_member: Any) -> Any:

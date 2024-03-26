@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, AsyncIterator, Iterable, Iterator
 
 from crawlee._utils.file import json_dumps
 from crawlee._utils.wrappers import wrap_internal
+from crawlee.config import Config
 from crawlee.consts import MAX_PAYLOAD_SIZE_BYTES
 from crawlee.storages.base_storage import BaseStorage
 from crawlee.storages.key_value_store import KeyValueStore
@@ -95,14 +96,13 @@ class Dataset(BaseStorage):
     _id: str
     _name: str | None
     _dataset_client: DatasetClientAsync | DatasetClient
-    _default_dataset_id: str = 'default'
 
     def __init__(
         self,
         id: str,  # noqa: A002
         name: str | None,
         client: ApifyClientAsync | MemoryStorageClient,
-        default_dataset_id: str,
+        config: Config,
     ) -> None:
         """Create a `Dataset` instance.
 
@@ -113,7 +113,7 @@ class Dataset(BaseStorage):
             name (str, optional): Name of the dataset.
             client (ApifyClientAsync or MemoryStorageClient): The storage client which should be used.
         """
-        super().__init__(id=id, name=name, client=client)
+        super().__init__(id=id, name=name, client=client, config=config)
 
         self.get_data = wrap_internal(self._get_data_internal, self.get_data)  # type: ignore
         self.push_data = wrap_internal(self._push_data_internal, self.push_data)  # type: ignore
@@ -121,15 +121,45 @@ class Dataset(BaseStorage):
         self.export_to_csv = wrap_internal(self._export_to_csv_internal, self.export_to_csv)  # type: ignore
 
         self._dataset_client = client.dataset(self._id)
-        self._default_dataset_id = default_dataset_id
+        self._config = config
+
+    @classmethod
+    async def open(
+        cls,
+        *,
+        config: Config | None = None,
+        id: str | None = None,  # noqa: A002
+        name: str | None = None,
+        force_cloud: bool = False,
+    ) -> Dataset:
+        """Open a dataset.
+
+        Datasets are used to store structured data where each object stored has the same attributes,
+        such as online store products or real estate offers.
+        The actual data is stored either on the local filesystem or in the Apify cloud.
+
+        Args:
+            id (str, optional): ID of the dataset to be opened.
+                If neither `id` nor `name` are provided, the method returns the default dataset associated with the actor run.
+                If the dataset with the given ID does not exist, it raises an error.
+            name (str, optional): Name of the dataset to be opened.
+                If neither `id` nor `name` are provided, the method returns the default dataset associated with the actor run.
+                If the dataset with the given name does not exist, it is created.
+            force_cloud (bool, optional): If set to True, it will open a dataset on the Apify Platform even when running the actor locally.
+                Defaults to False.
+
+        Returns:
+            Dataset: An instance of the `Dataset` class for the given ID or name.
+        """
+        return await super().open(id=id, name=name, force_cloud=force_cloud, config=config)  # type: ignore
 
     @classmethod
     def _get_human_friendly_label(cls) -> str:
         return 'Dataset'
 
     @classmethod
-    def _get_default_id(cls) -> str:
-        return cls._default_dataset_id
+    def _get_default_id(cls, config: Config) -> str:
+        return config.default_dataset_id
 
     @classmethod
     def _get_single_storage_client(
@@ -462,32 +492,3 @@ class Dataset(BaseStorage):
         """Remove the dataset either from the Apify cloud storage or from the local directory."""
         await self._dataset_client.delete()
         self._remove_from_cache()
-
-    @classmethod
-    async def open(
-        cls,
-        *,
-        id: str | None = None,  # noqa: A002
-        name: str | None = None,
-        force_cloud: bool = False,
-    ) -> Dataset:
-        """Open a dataset.
-
-        Datasets are used to store structured data where each object stored has the same attributes,
-        such as online store products or real estate offers.
-        The actual data is stored either on the local filesystem or in the Apify cloud.
-
-        Args:
-            id (str, optional): ID of the dataset to be opened.
-                If neither `id` nor `name` are provided, the method returns the default dataset associated with the actor run.
-                If the dataset with the given ID does not exist, it raises an error.
-            name (str, optional): Name of the dataset to be opened.
-                If neither `id` nor `name` are provided, the method returns the default dataset associated with the actor run.
-                If the dataset with the given name does not exist, it is created.
-            force_cloud (bool, optional): If set to True, it will open a dataset on the Apify Platform even when running the actor locally.
-                Defaults to False.
-
-        Returns:
-            Dataset: An instance of the `Dataset` class for the given ID or name.
-        """
-        return await super().open(id=id, name=name, force_cloud=force_cloud)  # type: ignore

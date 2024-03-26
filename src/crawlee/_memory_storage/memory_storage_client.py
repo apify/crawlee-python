@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import os
 from pathlib import Path
+from typing import Any
 
 import aioshutil
 from aiofiles import ospath
@@ -16,7 +17,7 @@ from crawlee._memory_storage.resource_clients.key_value_store_collection_client 
 from crawlee._memory_storage.resource_clients.request_queue_client import RequestQueueClient
 from crawlee._memory_storage.resource_clients.request_queue_collection_client import RequestQueueCollectionClient
 from crawlee._utils.data_processing import maybe_parse_bool
-from crawlee.consts import CrawleeEnvVars
+from crawlee._utils.env_vars import CrawleeEnvVars
 
 
 class MemoryStorageClient:
@@ -122,7 +123,7 @@ class MemoryStorageClient:
             memory_storage_client=self,
         )
 
-    def request_queue(self, request_queue_id: str) -> RequestQueueClient:
+    def request_queue(self, request_queue_id: str, **kwargs: Any) -> RequestQueueClient:
         """Retrieve the sub-client for manipulating a single request queue.
 
         Args:

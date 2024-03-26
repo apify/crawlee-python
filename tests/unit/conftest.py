@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Callable
 import pytest
 
 from crawlee._memory_storage import MemoryStorageClient
-from crawlee.consts import CrawleeEnvVars
+from crawlee._utils.env_vars import CrawleeEnvVars
 from crawlee.storages.key_value_store import KeyValueStore
 from crawlee.storages.storage_client_manager import StorageClientManager
 
