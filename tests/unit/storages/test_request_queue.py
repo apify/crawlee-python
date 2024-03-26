@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
+from typing import AsyncGenerator
 
 import pytest
 
@@ -9,8 +10,10 @@ from crawlee.storages.request_queue import RequestQueue
 
 
 @pytest.fixture()
-async def request_queue() -> RequestQueue:
-    return await RequestQueue.open()
+async def request_queue() -> AsyncGenerator[RequestQueue, None]:
+    rq = await RequestQueue.open()
+    yield rq
+    await rq.drop()
 
 
 async def test_open() -> None:

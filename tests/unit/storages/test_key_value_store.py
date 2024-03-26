@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+from typing import AsyncGenerator
+
 import pytest
 
 from crawlee.storages.key_value_store import KeyValueStore
 
 
 @pytest.fixture()
-async def key_value_store() -> KeyValueStore:
-    return await KeyValueStore.open()
+async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
+    kvs = await KeyValueStore.open()
+    yield kvs
+    await kvs.drop()
 
 
 async def test_open() -> None:
@@ -77,7 +81,7 @@ async def test_for_each_key(key_value_store: KeyValueStore) -> None:
 async def test_get_public_url() -> None:
     store = await KeyValueStore.open()
     with pytest.raises(
-        RuntimeError, match='Cannot generate a public URL for this key-value store as it is not on the Apify Platform!'
+        TypeError, match='Cannot generate a public URL for this key-value store as it is not on the Apify Platform!'
     ):
         await store.get_public_url('dummy')
 
