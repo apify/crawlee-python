@@ -38,7 +38,6 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
             id (str): The storage id
             name (str, optional): The storage name
             client (ApifyClientAsync or MemoryStorageClient): The storage client
-            config (Configuration): The configuration
         """
         self._id = id
         self._name = name
@@ -81,7 +80,6 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
             cls._storage_creating_lock = asyncio.Lock()
 
     @classmethod
-    @abstractmethod
     async def open(
         cls,
         *,
@@ -103,7 +101,6 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
                 If the storage with the given name does not exist, it is created.
             force_cloud (bool, optional): If set to True, it will open a storage on the Apify Platform even when running the actor locally.
                 Defaults to False.
-            config (Configuration, optional): A `Configuration` instance, uses global configuration if omitted.
 
         Returns:
             An instance of the storage.
@@ -135,7 +132,7 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
 
         # Purge default storages if configured
         if cls._purge_on_start and isinstance(used_client, MemoryStorageClient):
-            await used_client._purge_on_start()
+            await used_client.purge_on_start()
 
         assert cls._storage_creating_lock is not None  # noqa: S101
         async with cls._storage_creating_lock:

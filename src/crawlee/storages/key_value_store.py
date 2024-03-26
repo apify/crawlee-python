@@ -66,7 +66,7 @@ class KeyValueStore(BaseStorage):
     _name: str | None
     _key_value_store_client: KeyValueStoreClientAsync | KeyValueStoreClient
     _api_public_base_url: str
-    _default_key_value_store_id: str
+    _default_key_value_store_id: str = 'default'
 
     def __init__(
         self,
@@ -84,7 +84,6 @@ class KeyValueStore(BaseStorage):
             id (str): ID of the key-value store.
             name (str, optional): Name of the key-value store.
             client (ApifyClientAsync or MemoryStorageClient): The storage client which should be used.
-            config (Configuration): The configuration which should be used.
         """
         super().__init__(id=id, name=name, client=client)
 
@@ -245,9 +244,8 @@ class KeyValueStore(BaseStorage):
                 If the key-value store with the given name does not exist, it is created.
             force_cloud (bool, optional): If set to True, it will open a key-value store on the Apify Platform even when running the actor locally.
                 Defaults to False.
-            config (Configuration, optional): A `Configuration` instance, uses global configuration if omitted.
 
         Returns:
             KeyValueStore: An instance of the `KeyValueStore` class for the given ID or name.
         """
-        return await super().open(id=id, name=name, force_cloud=force_cloud)  # type: ignore
+        return await super().open(id=id, name=name, force_cloud=force_cloud)

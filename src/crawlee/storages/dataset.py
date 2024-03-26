@@ -95,7 +95,7 @@ class Dataset(BaseStorage):
     _id: str
     _name: str | None
     _dataset_client: DatasetClientAsync | DatasetClient
-    _default_dataset_id: str
+    _default_dataset_id: str = 'default'
 
     def __init__(
         self,
@@ -112,7 +112,6 @@ class Dataset(BaseStorage):
             id (str): ID of the dataset.
             name (str, optional): Name of the dataset.
             client (ApifyClientAsync or MemoryStorageClient): The storage client which should be used.
-            config (Configuration): The configuration which should be used.
         """
         super().__init__(id=id, name=name, client=client)
 
@@ -487,7 +486,6 @@ class Dataset(BaseStorage):
                 If the dataset with the given name does not exist, it is created.
             force_cloud (bool, optional): If set to True, it will open a dataset on the Apify Platform even when running the actor locally.
                 Defaults to False.
-            config (Configuration, optional): A `Configuration` instance, uses global configuration if omitted.
 
         Returns:
             Dataset: An instance of the `Dataset` class for the given ID or name.

@@ -90,7 +90,7 @@ class RequestQueue(BaseStorage):
     _assumed_total_count = 0
     _assumed_handled_count = 0
     _requests_cache: LRUCache[dict]
-    _default_request_queue_id: str
+    _default_request_queue_id: str = 'default'
 
     def __init__(
         self,
@@ -629,7 +629,6 @@ class RequestQueue(BaseStorage):
                 If the request queue with the given name does not exist, it is created.
             force_cloud (bool, optional): If set to True, it will open a request queue on the Apify Platform even when running the actor locally.
                 Defaults to False.
-            config (Configuration, optional): A `Configuration` instance, uses global configuration if omitted.
 
         Returns:
             RequestQueue: An instance of the `RequestQueue` class for the given ID or name.
