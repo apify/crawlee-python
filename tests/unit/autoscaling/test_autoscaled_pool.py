@@ -107,6 +107,30 @@ async def test_propagates_exceptions(system_status: SystemStatus | Mock) -> None
     assert done_count < 20
 
 
+async def test_propagates_exceptions_after_finished(system_status: SystemStatus | Mock) -> None:
+    started_count = 0
+
+    async def run() -> None:
+        nonlocal started_count
+        started_count += 1
+
+        await asyncio.sleep(1)
+
+        raise RuntimeError('Scheduled crash')
+
+    pool = AutoscaledPool(
+        system_status=system_status,
+        run_task_function=run,
+        is_task_ready_function=lambda: future(True),
+        is_finished_function=lambda: future(started_count > 0),
+        min_concurrency=1,
+        max_concurrency=1,
+    )
+
+    with pytest.raises(RuntimeError, match='Scheduled crash'):
+        await pool.run()
+
+
 async def test_autoscales(system_status: SystemStatus | Mock) -> None:
     done_count = 0
 

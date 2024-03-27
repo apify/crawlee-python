@@ -269,7 +269,9 @@ class AutoscaledPool:
                 with suppress(asyncio.TimeoutError):
                     await asyncio.wait_for(self._worker_tasks_updated.wait(), timeout=0.5)
         finally:
-            if not (self._run_result.done() and self._run_result.exception() is not None):
+            await asyncio.wait(self._worker_tasks, return_when=asyncio.ALL_COMPLETED)
+
+            if not self._run_result.done():
                 self._run_result.set_result(object())
 
     def _reap_worker_task(self, task: asyncio.Task) -> None:
