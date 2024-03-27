@@ -31,7 +31,7 @@ async def test_get(request_queue_client: RequestQueueClient) -> None:
     await asyncio.sleep(0.1)
     info = await request_queue_client.get()
     assert info is not None
-    assert info['id'] == request_queue_client._id
+    assert info['id'] == request_queue_client.id
     assert info['accessedAt'] != info['createdAt']
 
 
@@ -46,9 +46,9 @@ async def test_update(request_queue_client: RequestQueueClient) -> None:
     old_rq_info = await request_queue_client.get()
     assert old_rq_info is not None
     old_rq_directory = os.path.join(
-        request_queue_client._memory_storage_client._request_queues_directory, old_rq_info['name']
+        request_queue_client._memory_storage_client.request_queues_directory, old_rq_info['name']
     )
-    new_rq_directory = os.path.join(request_queue_client._memory_storage_client._request_queues_directory, new_rq_name)
+    new_rq_directory = os.path.join(request_queue_client._memory_storage_client.request_queues_directory, new_rq_name)
     assert os.path.exists(os.path.join(old_rq_directory, 'fvwscO2UJLdr10B.json')) is True
     assert os.path.exists(os.path.join(new_rq_directory, 'fvwscO2UJLdr10B.json')) is False
 
@@ -76,7 +76,7 @@ async def test_delete(request_queue_client: RequestQueueClient) -> None:
     rq_info = await request_queue_client.get()
     assert rq_info is not None
 
-    rq_directory = os.path.join(request_queue_client._memory_storage_client._request_queues_directory, rq_info['name'])
+    rq_directory = os.path.join(request_queue_client._memory_storage_client.request_queues_directory, rq_info['name'])
     assert os.path.exists(os.path.join(rq_directory, 'fvwscO2UJLdr10B.json')) is True
 
     await request_queue_client.delete()

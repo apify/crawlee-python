@@ -110,8 +110,8 @@ class Dataset(BaseStorage):
         Do not use the constructor directly, use the `Actor.open_dataset()` function instead.
 
         Args:
-            id (str): ID of the dataset.
-            name (str, optional): Name of the dataset.
+            id ID of the dataset.
+            name: Name of the dataset.
             client (ApifyClientAsync or MemoryStorageClient): The storage client which should be used.
         """
         super().__init__(id=id, name=name, client=client, config=config)
@@ -140,17 +140,17 @@ class Dataset(BaseStorage):
         The actual data is stored either on the local filesystem or in the Apify cloud.
 
         Args:
-            id (str, optional): ID of the dataset to be opened.
+            id: ID of the dataset to be opened.
                 If neither `id` nor `name` are provided, the method returns the default dataset associated with the actor run.
                 If the dataset with the given ID does not exist, it raises an error.
-            name (str, optional): Name of the dataset to be opened.
+            name: Name of the dataset to be opened.
                 If neither `id` nor `name` are provided, the method returns the default dataset associated with the actor run.
                 If the dataset with the given name does not exist, it is created.
-            force_cloud (bool, optional): If set to True, it will open a dataset on the Apify Platform even when running the actor locally.
+            force_cloud: If set to True, it will open a dataset on the Apify Platform even when running the actor locally.
                 Defaults to False.
 
         Returns:
-            Dataset: An instance of the `Dataset` class for the given ID or name.
+            An instance of the `Dataset` class for the given ID or name.
         """
         return await super().open(id=id, name=name, force_cloud=force_cloud, config=config)  # type: ignore
 
@@ -225,11 +225,11 @@ class Dataset(BaseStorage):
         """Get items from the dataset.
 
         Args:
-            offset (int, optional): Number of items that should be skipped at the start. The default value is 0
-            limit (int, optional): Maximum number of items to return. By default there is no limit.
-            desc (bool, optional): By default, results are returned in the same order as they were stored.
+            offset: Number of items that should be skipped at the start. The default value is 0
+            limit: Maximum number of items to return. By default there is no limit.
+            desc: By default, results are returned in the same order as they were stored.
                 To reverse the order, set this parameter to True.
-            clean (bool, optional): If True, returns only non-empty items and skips hidden fields (i.e. fields starting with the # character).
+            clean: If True, returns only non-empty items and skips hidden fields (i.e. fields starting with the # character).
                 The clean parameter is just a shortcut for skip_hidden=True and skip_empty=True parameters.
                 Note that since some objects might be skipped from the output, that the result might contain less items than the limit value.
             fields (list of str, optional): A list of fields which should be picked from the items,
@@ -237,19 +237,19 @@ class Dataset(BaseStorage):
                 Note that the fields in the outputted items are sorted the same way as they are specified in the fields parameter.
                 You can use this feature to effectively fix the output format.
             omit (list of str, optional): A list of fields which should be omitted from the items.
-            unwind (str, optional): Name of a field which should be unwound.
+            unwind: Name of a field which should be unwound.
                 If the field is an array then every element of the array will become a separate record and merged with parent object.
                 If the unwound field is an object then it is merged with the parent object.
                 If the unwound field is missing or its value is neither an array nor an object and therefore cannot be merged with a parent object,
                 then the item gets preserved as it is. Note that the unwound items ignore the desc parameter.
-            skip_empty (bool, optional): If True, then empty items are skipped from the output.
+            skip_empty: If True, then empty items are skipped from the output.
                 Note that if used, the results might contain less items than the limit value.
-            skip_hidden (bool, optional): If True, then hidden fields are skipped from the output, i.e. fields starting with the # character.
+            skip_hidden: If True, then hidden fields are skipped from the output, i.e. fields starting with the # character.
             flatten (list of str, optional): A list of fields that should be flattened
-            view (str, optional): Name of the dataset view to be used
+            view: Name of the dataset view to be used
 
         Returns:
-            ListPage: A page of the list of dataset items according to the specified filters.
+            A page of the list of dataset items according to the specified filters.
         """
         dataset = await cls.open()
         return await dataset.get_data(
@@ -308,12 +308,12 @@ class Dataset(BaseStorage):
         """Save the entirety of the dataset's contents into one file within a key-value store.
 
         Args:
-            key (str): The key to save the data under.
-            to_key_value_store_id (str, optional): The id of the key-value store in which the result will be saved.
-            to_key_value_store_name (str, optional): The name of the key-value store in which the result will be saved.
+            key The key to save the data under.
+            to_key_value_store_id: The id of the key-value store in which the result will be saved.
+            to_key_value_store_name: The name of the key-value store in which the result will be saved.
                 You must specify only one of `to_key_value_store_id` and `to_key_value_store_name` arguments.
                 If you omit both, it uses the default key-value store.
-            content_type (str, optional): Either 'text/csv' or 'application/json'. Defaults to JSON.
+            content_type: Either 'text/csv' or 'application/json'. Defaults to JSON.
         """
         key_value_store = await KeyValueStore.open(id=to_key_value_store_id, name=to_key_value_store_name)
         items: list[dict] = []
@@ -354,13 +354,13 @@ class Dataset(BaseStorage):
         """Save the entirety of the dataset's contents into one JSON file within a key-value store.
 
         Args:
-            key (str): The key to save the data under.
-            from_dataset_id (str, optional): The ID of the dataset in case of calling the class method. Uses default dataset if omitted.
-            from_dataset_name (str, optional): The name of the dataset in case of calling the class method. Uses default dataset if omitted.
+            key The key to save the data under.
+            from_dataset_id: The ID of the dataset in case of calling the class method. Uses default dataset if omitted.
+            from_dataset_name: The name of the dataset in case of calling the class method. Uses default dataset if omitted.
                 You must specify only one of `from_dataset_id` and `from_dataset_name` arguments.
                 If you omit both, it uses the default dataset.
-            to_key_value_store_id (str, optional): The id of the key-value store in which the result will be saved.
-            to_key_value_store_name (str, optional): The name of the key-value store in which the result will be saved.
+            to_key_value_store_id: The id of the key-value store in which the result will be saved.
+            to_key_value_store_name: The name of the key-value store in which the result will be saved.
                 You must specify only one of `to_key_value_store_id` and `to_key_value_store_name` arguments.
                 If you omit both, it uses the default key-value store.
         """
@@ -400,13 +400,13 @@ class Dataset(BaseStorage):
         """Save the entirety of the dataset's contents into one CSV file within a key-value store.
 
         Args:
-            key (str): The key to save the data under.
-            from_dataset_id (str, optional): The ID of the dataset in case of calling the class method. Uses default dataset if omitted.
-            from_dataset_name (str, optional): The name of the dataset in case of calling the class method. Uses default dataset if omitted.
+            key The key to save the data under.
+            from_dataset_id: The ID of the dataset in case of calling the class method. Uses default dataset if omitted.
+            from_dataset_name: The name of the dataset in case of calling the class method. Uses default dataset if omitted.
                 You must specify only one of `from_dataset_id` and `from_dataset_name` arguments.
                 If you omit both, it uses the default dataset.
-            to_key_value_store_id (str, optional): The id of the key-value store in which the result will be saved.
-            to_key_value_store_name (str, optional): The name of the key-value store in which the result will be saved.
+            to_key_value_store_id: The id of the key-value store in which the result will be saved.
+            to_key_value_store_name: The name of the key-value store in which the result will be saved.
                 You must specify only one of `to_key_value_store_id` and `to_key_value_store_name` arguments.
                 If you omit both, it uses the default key-value store.
         """
@@ -435,7 +435,7 @@ class Dataset(BaseStorage):
         """Get an object containing general information about the dataset.
 
         Returns:
-            dict: Object returned by calling the GET dataset API endpoint.
+            Object returned by calling the GET dataset API endpoint.
         """
         return await self._dataset_client.get()
 
@@ -455,11 +455,11 @@ class Dataset(BaseStorage):
         """Iterate over the items in the dataset.
 
         Args:
-            offset (int, optional): Number of items that should be skipped at the start. The default value is 0
-            limit (int, optional): Maximum number of items to return. By default there is no limit.
-            desc (bool, optional): By default, results are returned in the same order as they were stored.
+            offset: Number of items that should be skipped at the start. The default value is 0
+            limit: Maximum number of items to return. By default there is no limit.
+            desc: By default, results are returned in the same order as they were stored.
                 To reverse the order, set this parameter to True.
-            clean (bool, optional): If True, returns only non-empty items and skips hidden fields (i.e. fields starting with the # character).
+            clean: If True, returns only non-empty items and skips hidden fields (i.e. fields starting with the # character).
                 The clean parameter is just a shortcut for skip_hidden=True and skip_empty=True parameters.
                 Note that since some objects might be skipped from the output, that the result might contain less items than the limit value.
             fields (list of str, optional): A list of fields which should be picked from the items,
@@ -467,14 +467,14 @@ class Dataset(BaseStorage):
                 Note that the fields in the outputted items are sorted the same way as they are specified in the fields parameter.
                 You can use this feature to effectively fix the output format.
             omit (list of str, optional): A list of fields which should be omitted from the items.
-            unwind (str, optional): Name of a field which should be unwound.
+            unwind: Name of a field which should be unwound.
                 If the field is an array then every element of the array will become a separate record and merged with parent object.
                 If the unwound field is an object then it is merged with the parent object.
                 If the unwound field is missing or its value is neither an array nor an object and therefore cannot be merged with a parent object,
                 then the item gets preserved as it is. Note that the unwound items ignore the desc parameter.
-            skip_empty (bool, optional): If True, then empty items are skipped from the output.
+            skip_empty: If True, then empty items are skipped from the output.
                 Note that if used, the results might contain less items than the limit value.
-            skip_hidden (bool, optional): If True, then hidden fields are skipped from the output, i.e. fields starting with the # character.
+            skip_hidden: If True, then hidden fields are skipped from the output, i.e. fields starting with the # character.
 
         Yields:
             dict: An item from the dataset

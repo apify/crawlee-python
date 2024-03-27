@@ -12,17 +12,18 @@ if TYPE_CHECKING:
 class DatasetCollectionClient(BaseResourceCollectionClient):
     """Sub-client for manipulating datasets."""
 
-    def _get_storage_client_cache(self) -> list[DatasetClient]:
-        return self._memory_storage_client._datasets_handled
-
-    def _get_resource_client_class(self) -> type[DatasetClient]:
+    @property
+    def _client_class(self) -> type[DatasetClient]:
         return DatasetClient
+
+    def _get_storage_client_cache(self) -> list[DatasetClient]:
+        return self._memory_storage_client.datasets_handled
 
     async def list(self) -> ListPage:
         """List the available datasets.
 
         Returns:
-            ListPage: The list of available datasets matching the specified filters.
+            The list of available datasets matching the specified filters.
         """
         return await super().list()
 
@@ -31,15 +32,16 @@ class DatasetCollectionClient(BaseResourceCollectionClient):
         *,
         name: str | None = None,
         schema: dict | None = None,
-        _id: str | None = None,
+        id_: str | None = None,
     ) -> dict:
         """Retrieve a named dataset, or create a new one when it doesn't exist.
 
         Args:
-            name (str, optional): The name of the dataset to retrieve or create.
-            schema (dict, optional): The schema of the dataset
+            name: The name of the dataset to retrieve or create.
+            schema: The schema of the dataset
+            id_: ID of the dataset to retrieve or create
 
         Returns:
-            dict: The retrieved or newly-created dataset.
+            The retrieved or newly-created dataset.
         """
-        return await super().get_or_create(name=name, schema=schema, _id=_id)
+        return await super().get_or_create(name=name, schema=schema, id_=id_)

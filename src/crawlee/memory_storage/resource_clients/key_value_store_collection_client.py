@@ -12,17 +12,18 @@ if TYPE_CHECKING:
 class KeyValueStoreCollectionClient(BaseResourceCollectionClient):
     """Sub-client for manipulating key-value stores."""
 
-    def _get_storage_client_cache(self) -> list[KeyValueStoreClient]:
-        return self._memory_storage_client._key_value_stores_handled
-
-    def _get_resource_client_class(self) -> type[KeyValueStoreClient]:
+    @property
+    def _client_class(self) -> type[KeyValueStoreClient]:
         return KeyValueStoreClient
+
+    def _get_storage_client_cache(self) -> list[KeyValueStoreClient]:
+        return self._memory_storage_client.key_value_stores_handled
 
     async def list(self) -> ListPage:
         """List the available key-value stores.
 
         Returns:
-            ListPage: The list of available key-value stores matching the specified filters.
+            The list of available key-value stores matching the specified filters.
         """
         return await super().list()
 
@@ -31,15 +32,16 @@ class KeyValueStoreCollectionClient(BaseResourceCollectionClient):
         *,
         name: str | None = None,
         schema: dict | None = None,
-        _id: str | None = None,
+        id_: str | None = None,
     ) -> dict:
         """Retrieve a named key-value store, or create a new one when it doesn't exist.
 
         Args:
-            name (str, optional): The name of the key-value store to retrieve or create.
-            schema (Dict, optional): The schema of the key-value store
+            name: The name of the key-value store to retrieve or create.
+            schema: The schema of the key-value store
+            id_: The id of the key-value store to retrieve or create.
 
         Returns:
-            dict: The retrieved or newly-created key-value store.
+            The retrieved or newly-created key-value store.
         """
-        return await super().get_or_create(name=name, schema=schema, _id=_id)
+        return await super().get_or_create(name=name, schema=schema, id_=id_)

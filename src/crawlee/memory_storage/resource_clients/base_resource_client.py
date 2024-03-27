@@ -14,67 +14,82 @@ if TYPE_CHECKING:
 class BaseResourceClient(ABC):
     """Base class for resource clients."""
 
-    _id: str
-    _name: str | None
-    _resource_directory: str
-
-    @abstractmethod
     def __init__(
         self,
         *,
         base_storage_directory: str,
         memory_storage_client: MemoryStorageClient,
-        id: str | None = None,  # noqa: A002
+        id_: str | None = None,
         name: str | None = None,
     ) -> None:
-        """Initialize the BaseResourceClient."""
-        raise NotImplementedError('You must override this method in the subclass!')
+        self._base_storage_directory = base_storage_directory
+        self._memory_storage_client = memory_storage_client
+        self.id = id_
+        self.name = name
 
     @abstractmethod
     async def get(self) -> dict | None:
         """Retrieve the storage.
 
         Returns:
-            dict, optional: The retrieved storage, or None, if it does not exist
+            The retrieved storage, or None, if it does not exist
         """
-        raise NotImplementedError('You must override this method in the subclass!')
+        raise NotImplementedError('The subclass must implement this method.')
 
     @classmethod
     @abstractmethod
     def _get_storages_dir(cls, memory_storage_client: MemoryStorageClient) -> str:
-        raise NotImplementedError('You must override this method in the subclass!')
+        raise NotImplementedError('The subclass must implement this method.')
 
     @classmethod
     @abstractmethod
-    def _get_storage_client_cache(
-        cls,  # type annotated cls does not work with Self as a return type
-        memory_storage_client: MemoryStorageClient,
-    ) -> list[Self]:
-        raise NotImplementedError('You must override this method in the subclass!')
+    def _get_storage_client_cache(cls, memory_storage_client: MemoryStorageClient) -> list[Self]:
+        raise NotImplementedError('The subclass must implement this method.')
 
     @abstractmethod
-    def _to_resource_info(self) -> dict:
-        raise NotImplementedError('You must override this method in the subclass!')
+    def to_resource_info(self) -> dict:
+        raise NotImplementedError('The subclass must implement this method.')
 
     @classmethod
     @abstractmethod
     def _create_from_directory(
-        cls,  # type annotated cls does not work with Self as a return type
+        cls,
         storage_directory: str,
         memory_storage_client: MemoryStorageClient,
-        id: str | None = None,  # noqa: A002
+        id_: str | None = None,
         name: str | None = None,
     ) -> Self:
-        raise NotImplementedError('You must override this method in the subclass!')
+        raise NotImplementedError('The subclass must implement this method.')
 
     @classmethod
-    def _find_or_create_client_by_id_or_name(
-        cls,  # type annotated cls does not work with Self as a return type
+    def find_or_create_client_by_id_or_name(  # noqa: PLR0912
+        cls,
         memory_storage_client: MemoryStorageClient,
-        id: str | None = None,  # noqa: A002
+        id_: str | None = None,
         name: str | None = None,
     ) -> Self | None:
-        assert id is not None or name is not None  # noqa: S101
+        """Locates or creates a new storage client based on the given ID or name.
+
+        This method attempts to find a storage client in the memory cache first. If not found,
+        it tries to locate a storage directory by name. If still not found, it searches through
+        storage directories for a matching ID or name in their metadata. If none exists, and the
+        specified ID is 'default', it checks for a default storage directory. If a storage client
+        is found or created, it is added to the memory cache. If no storage client can be located or
+        created, the method returns None.
+
+        Args:
+            memory_storage_client: The memory storage client used to store and retrieve storage clients.
+            id_: The unique identifier for the storage client. Defaults to None.
+            name: The name of the storage client. Defaults to None.
+
+        Raises:
+            ValueError: If both id_ and name are None.
+
+        Returns:
+            The found or created storage client, or None if no client could be found or created.
+        """
+        if id_ is None and name is None:
+            raise ValueError('Either id_ or name must be specified.')
 
         storage_client_cache = cls._get_storage_client_cache(memory_storage_client)
         storages_dir = cls._get_storages_dir(memory_storage_client)
@@ -84,8 +99,8 @@ class BaseResourceClient(ABC):
             (
                 storage_client
                 for storage_client in storage_client_cache
-                if storage_client._id == id
-                or (storage_client._name and name and storage_client._name.lower() == name.lower())
+                if storage_client.id == id_
+                or (storage_client.name and name and storage_client.name.lower() == name.lower())
             ),
             None,
         )
@@ -111,29 +126,27 @@ class BaseResourceClient(ABC):
                     continue
                 with open(metadata_path, encoding='utf-8') as metadata_file:
                     metadata = json.load(metadata_file)
-                if id and id == metadata.get('id'):
+                if id_ and id_ == metadata.get('id'):
                     storage_path = entry.path
                     name = metadata.get(name)
                     break
                 if name and name == metadata.get('name'):
                     storage_path = entry.path
-                    id = metadata.get(id)  # noqa: A001
+                    id_ = metadata.get(id_)
                     break
 
         # As a last resort, try to check if the accessed storage is the default one,
         # and the folder has no metadata
         # TODO: make this respect the APIFY_DEFAULT_XXX_ID env var
         # https://github.com/apify/apify-sdk-python/issues/149
-        if id == 'default':
-            possible_storage_path = os.path.join(storages_dir, id)
+        if id_ == 'default':
+            possible_storage_path = os.path.join(storages_dir, id_)
             if os.access(possible_storage_path, os.F_OK):
                 storage_path = possible_storage_path
 
         if not storage_path:
             return None
 
-        resource_client = cls._create_from_directory(storage_path, memory_storage_client, id, name)
-
+        resource_client = cls._create_from_directory(storage_path, memory_storage_client, id_, name)
         storage_client_cache.append(resource_client)
-
         return resource_client

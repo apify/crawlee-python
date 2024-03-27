@@ -4,7 +4,6 @@ import asyncio
 import contextlib
 import os
 from pathlib import Path
-from typing import Any
 
 import aioshutil
 from aiofiles import ospath
@@ -53,35 +52,35 @@ class MemoryStorageClient:
                 CrawleeEnvVars.PERSIST_STORAGE.
         """
         self._local_data_directory = local_data_directory or os.getenv(CrawleeEnvVars.LOCAL_STORAGE_DIR) or './storage'
-        self._write_metadata = write_metadata if write_metadata is not None else '*' in os.getenv('DEBUG', '')
-        self._persist_storage = (
+        self.write_metadata = write_metadata if write_metadata is not None else '*' in os.getenv('DEBUG', '')
+        self.persist_storage = (
             persist_storage
             if persist_storage is not None
             else maybe_parse_bool(os.getenv(CrawleeEnvVars.PERSIST_STORAGE, 'true'))
         )
 
         self._purged_on_start = False  # Indicates whether a purge was already performed on this instance.
-        self._datasets_handled: list[DatasetClient] = []
-        self._key_value_stores_handled: list[KeyValueStoreClient] = []
-        self._request_queues_handled: list[RequestQueueClient] = []
+        self.datasets_handled: list[DatasetClient] = []
+        self.key_value_stores_handled: list[KeyValueStoreClient] = []
+        self.request_queues_handled: list[RequestQueueClient] = []
         self._purge_lock = asyncio.Lock()
 
     @property
-    def _datasets_directory(self) -> str:
+    def datasets_directory(self) -> str:
         return os.path.join(self._local_data_directory, 'datasets')
 
     @property
-    def _key_value_stores_directory(self) -> str:
+    def key_value_stores_directory(self) -> str:
         return os.path.join(self._local_data_directory, 'key_value_stores')
 
     @property
-    def _request_queues_directory(self) -> str:
+    def request_queues_directory(self) -> str:
         return os.path.join(self._local_data_directory, 'request_queues')
 
     def datasets(self) -> DatasetCollectionClient:
         """Retrieve the sub-client for manipulating datasets."""
         return DatasetCollectionClient(
-            base_storage_directory=self._datasets_directory,
+            base_storage_directory=self.datasets_directory,
             memory_storage_client=self,
         )
 
@@ -92,15 +91,15 @@ class MemoryStorageClient:
             dataset_id: ID of the dataset to be manipulated
         """
         return DatasetClient(
-            base_storage_directory=self._datasets_directory,
+            base_storage_directory=self.datasets_directory,
             memory_storage_client=self,
-            id=dataset_id,
+            id_=dataset_id,
         )
 
     def key_value_stores(self) -> KeyValueStoreCollectionClient:
         """Retrieve the sub-client for manipulating key-value stores."""
         return KeyValueStoreCollectionClient(
-            base_storage_directory=self._key_value_stores_directory,
+            base_storage_directory=self.key_value_stores_directory,
             memory_storage_client=self,
         )
 
@@ -111,28 +110,28 @@ class MemoryStorageClient:
             key_value_store_id: ID of the key-value store to be manipulated
         """
         return KeyValueStoreClient(
-            base_storage_directory=self._key_value_stores_directory,
+            base_storage_directory=self.key_value_stores_directory,
             memory_storage_client=self,
-            id=key_value_store_id,
+            id_=key_value_store_id,
         )
 
     def request_queues(self) -> RequestQueueCollectionClient:
         """Retrieve the sub-client for manipulating request queues."""
         return RequestQueueCollectionClient(
-            base_storage_directory=self._request_queues_directory,
+            base_storage_directory=self.request_queues_directory,
             memory_storage_client=self,
         )
 
-    def request_queue(self, request_queue_id: str, **kwargs: Any) -> RequestQueueClient:
+    def request_queue(self, request_queue_id: str) -> RequestQueueClient:
         """Retrieve the sub-client for manipulating a single request queue.
 
         Args:
             request_queue_id: ID of the request queue to be manipulated.
         """
         return RequestQueueClient(
-            base_storage_directory=self._request_queues_directory,
+            base_storage_directory=self.request_queues_directory,
             memory_storage_client=self,
-            id=request_queue_id,
+            id_=request_queue_id,
         )
 
     async def purge_on_start(self) -> None:
@@ -165,8 +164,8 @@ class MemoryStorageClient:
          - The local directory containing the default request queue.
         """
         # Key-value stores
-        if await ospath.exists(self._key_value_stores_directory):
-            key_value_store_folders = await scandir(self._key_value_stores_directory)
+        if await ospath.exists(self.key_value_stores_directory):
+            key_value_store_folders = await scandir(self.key_value_stores_directory)
             for key_value_store_folder in key_value_store_folders:
                 if key_value_store_folder.name.startswith(
                     self._TEMPORARY_DIR_NAME
@@ -176,15 +175,15 @@ class MemoryStorageClient:
                     await self._handle_default_key_value_store(key_value_store_folder.path)
 
         # Datasets
-        if await ospath.exists(self._datasets_directory):
-            dataset_folders = await scandir(self._datasets_directory)
+        if await ospath.exists(self.datasets_directory):
+            dataset_folders = await scandir(self.datasets_directory)
             for dataset_folder in dataset_folders:
                 if dataset_folder.name == 'default' or dataset_folder.name.startswith(self._TEMPORARY_DIR_NAME):
                     await self._batch_remove_files(dataset_folder.path)
 
         # Request queues
-        if await ospath.exists(self._request_queues_directory):
-            request_queue_folders = await scandir(self._request_queues_directory)
+        if await ospath.exists(self.request_queues_directory):
+            request_queue_folders = await scandir(self.request_queues_directory)
             for request_queue_folder in request_queue_folders:
                 if request_queue_folder.name == 'default' or request_queue_folder.name.startswith(
                     self._TEMPORARY_DIR_NAME

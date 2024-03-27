@@ -80,8 +80,8 @@ class KeyValueStore(BaseStorage):
         Do not use the constructor directly, use the `Actor.open_key_value_store()` function instead.
 
         Args:
-            id (str): ID of the key-value store.
-            name (str, optional): Name of the key-value store.
+            id ID of the key-value store.
+            name: Name of the key-value store.
             client (ApifyClientAsync or MemoryStorageClient): The storage client which should be used.
         """
         super().__init__(id=id, name=name, client=client, config=config)
@@ -109,13 +109,13 @@ class KeyValueStore(BaseStorage):
         The actual data is stored either on a local filesystem or in the Apify cloud.
 
         Args:
-            id (str, optional): ID of the key-value store to be opened.
+            id: ID of the key-value store to be opened.
                 If neither `id` nor `name` are provided, the method returns the default key-value store associated with the actor run.
                 If the key-value store with the given ID does not exist, it raises an error.
-            name (str, optional): Name of the key-value store to be opened.
+            name: Name of the key-value store to be opened.
                 If neither `id` nor `name` are provided, the method returns the default key-value store associated with the actor run.
                 If the key-value store with the given name does not exist, it is created.
-            force_cloud (bool, optional): If set to True, it will open a key-value store on the Apify Platform even when running the actor locally.
+            force_cloud: If set to True, it will open a key-value store on the Apify Platform even when running the actor locally.
                 Defaults to False.
 
         Returns:
@@ -163,7 +163,7 @@ class KeyValueStore(BaseStorage):
         """Get a value from the key-value store.
 
         Args:
-            key (str): Key of the record to retrieve.
+            key Key of the record to retrieve.
             default_value (Any, optional): Default value returned in case the record does not exist.
 
         Returns:
@@ -183,7 +183,7 @@ class KeyValueStore(BaseStorage):
         """Iterate over the keys in the key-value store.
 
         Args:
-            exclusive_start_key (str, optional): All keys up to this one (including) are skipped from the result.
+            exclusive_start_key: All keys up to this one (including) are skipped from the result.
 
         Yields:
             IterateKeysTuple: A tuple `(key, info)`,
@@ -209,9 +209,9 @@ class KeyValueStore(BaseStorage):
         """Set or delete a value in the key-value store.
 
         Args:
-            key (str): The key under which the value should be saved.
-            value (Any): The value to save. If the value is `None`, the corresponding key-value pair will be deleted.
-            content_type (str, optional): The content type of the saved value.
+            key The key under which the value should be saved.
+            value The value to save. If the value is `None`, the corresponding key-value pair will be deleted.
+            content_type: The content type of the saved value.
         """
         store = await cls.open()
         return await store.set_value(key, value, content_type)
@@ -232,7 +232,7 @@ class KeyValueStore(BaseStorage):
         """Get a URL for the given key that may be used to publicly access the value in the remote key-value store.
 
         Args:
-            key (str): The key for which the URL should be generated.
+            key The key for which the URL should be generated.
         """
         store = await cls.open()
         return await store.get_public_url(key)

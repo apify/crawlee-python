@@ -104,13 +104,13 @@ class RequestQueue(BaseStorage):
         Do not use the constructor directly, use the `Actor.open_request_queue()` function instead.
 
         Args:
-            id (str): ID of the request queue.
-            name (str, optional): Name of the request queue.
+            id ID of the request queue.
+            name: Name of the request queue.
             client (ApifyClientAsync or MemoryStorageClient): The storage client which should be used.
         """
         super().__init__(id=id, name=name, client=client, config=config)
 
-        self._request_queue_client = client.request_queue(self._id, client_key=self._client_key)
+        self._request_queue_client = client.request_queue(self._id)
         self._queue_head_dict = OrderedDict()
         self._query_queue_head_task = None
         self._in_progress = set()
@@ -135,13 +135,13 @@ class RequestQueue(BaseStorage):
         and depth-first crawling orders.
 
         Args:
-            id (str, optional): ID of the request queue to be opened.
+            id: ID of the request queue to be opened.
                 If neither `id` nor `name` are provided, the method returns the default request queue associated with the actor run.
                 If the request queue with the given ID does not exist, it raises an error.
-            name (str, optional): Name of the request queue to be opened.
+            name: Name of the request queue to be opened.
                 If neither `id` nor `name` are provided, the method returns the default request queue associated with the actor run.
                 If the request queue with the given name does not exist, it is created.
-            force_cloud (bool, optional): If set to True, it will open a request queue on the Apify Platform even when running the actor locally.
+            force_cloud: If set to True, it will open a request queue on the Apify Platform even when running the actor locally.
                 Defaults to False.
 
         Returns:
@@ -207,8 +207,8 @@ class RequestQueue(BaseStorage):
                 method and payload into the unique key computation.
 
         Returns: A dictionary containing information about the operation, including:
-            - `requestId` (str): The ID of the request.
-            - `uniqueKey` (str): The unique key associated with the request.
+            - `requestId` The ID of the request.
+            - `uniqueKey` The unique key associated with the request.
             - `wasAlreadyPresent` (bool): Indicates whether the request was already in the queue.
             - `wasAlreadyHandled` (bool): Indicates whether the request was already processed.
         """
@@ -266,10 +266,10 @@ class RequestQueue(BaseStorage):
         """Retrieve a request from the queue.
 
         Args:
-            request_id (str): ID of the request to retrieve.
+            request_id: ID of the request to retrieve.
 
         Returns:
-            dict, optional: The retrieved request, or `None`, if it does not exist.
+            The retrieved request, or `None`, if it does not exist.
         """
         budget_ow(request_id, (str, True), 'request_id')
         return await self._request_queue_client.get_request(request_id)
@@ -286,7 +286,7 @@ class RequestQueue(BaseStorage):
         To check whether all requests in queue were finished, use `RequestQueue.is_finished` instead.
 
         Returns:
-            dict, optional: The request or `None` if there are no more pending requests.
+            The request or `None` if there are no more pending requests.
         """
         await self._ensure_head_is_non_empty()
 
@@ -356,10 +356,10 @@ class RequestQueue(BaseStorage):
         Handled requests will never again be returned by the `RequestQueue.fetch_next_request` method.
 
         Args:
-            request (dict): The request to mark as handled.
+            request: The request to mark as handled.
 
         Returns:
-            dict, optional: Information about the queue operation with keys `requestId`, `uniqueKey`, `wasAlreadyPresent`, `wasAlreadyHandled`.
+            Information about the queue operation with keys `requestId`, `uniqueKey`, `wasAlreadyPresent`, `wasAlreadyHandled`.
                 `None` if the given request was not in progress.
         """
         budget_ow(
@@ -402,10 +402,10 @@ class RequestQueue(BaseStorage):
         by another call to `RequestQueue.fetchNextRequest`.
 
         Args:
-            request (dict): The request to return to the queue.
-            forefront (bool, optional): Whether to add the request to the head or the end of the queue
+            request: The request to return to the queue.
+            forefront: Whether to add the request to the head or the end of the queue
         Returns:
-            dict, optional: Information about the queue operation with keys `requestId`, `uniqueKey`, `wasAlreadyPresent`, `wasAlreadyHandled`.
+            Information about the queue operation with keys `requestId`, `uniqueKey`, `wasAlreadyPresent`, `wasAlreadyHandled`.
                 `None` if the given request was not in progress.
         """
         budget_ow(
@@ -633,6 +633,6 @@ class RequestQueue(BaseStorage):
         """Get an object containing general information about the request queue.
 
         Returns:
-            dict: Object returned by calling the GET request queue API endpoint.
+            Object returned by calling the GET request queue API endpoint.
         """
         return await self._request_queue_client.get()

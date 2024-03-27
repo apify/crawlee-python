@@ -12,17 +12,18 @@ if TYPE_CHECKING:
 class RequestQueueCollectionClient(BaseResourceCollectionClient):
     """Sub-client for manipulating request queues."""
 
-    def _get_storage_client_cache(self) -> list[RequestQueueClient]:
-        return self._memory_storage_client._request_queues_handled
-
-    def _get_resource_client_class(self) -> type[RequestQueueClient]:
+    @property
+    def _client_class(self) -> type[RequestQueueClient]:
         return RequestQueueClient
+
+    def _get_storage_client_cache(self) -> list[RequestQueueClient]:
+        return self._memory_storage_client.request_queues_handled
 
     async def list(self) -> ListPage:
         """List the available request queues.
 
         Returns:
-            ListPage: The list of available request queues matching the specified filters.
+            The list of available request queues matching the specified filters.
         """
         return await super().list()
 
@@ -31,15 +32,16 @@ class RequestQueueCollectionClient(BaseResourceCollectionClient):
         *,
         name: str | None = None,
         schema: dict | None = None,
-        _id: str | None = None,
+        id_: str | None = None,
     ) -> dict:
         """Retrieve a named request queue, or create a new one when it doesn't exist.
 
         Args:
-            name (str, optional): The name of the request queue to retrieve or create.
-            schema (dict, optional): The schema of the request queue
+            name: The name of the request queue to retrieve or create.
+            schema: The schema of the request queue
+            id_: The ID of the request queue to retrieve or create.
 
         Returns:
-            dict: The retrieved or newly-created request queue.
+            The retrieved or newly-created request queue.
         """
-        return await super().get_or_create(name=name, schema=schema, _id=_id)
+        return await super().get_or_create(name=name, schema=schema, id_=id_)

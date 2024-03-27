@@ -33,50 +33,45 @@ LOCAL_ENTRY_NAME_DIGITS = 9
 class DatasetClient(BaseResourceClient):
     """Sub-client for manipulating a single dataset."""
 
-    _id: str
-    _resource_directory: str
-    _memory_storage_client: MemoryStorageClient
-    _name: str | None
-    _dataset_entries: dict[str, dict]
-    _created_at: datetime
-    _accessed_at: datetime
-    _modified_at: datetime
-    _item_count = 0
-    _file_operation_lock: asyncio.Lock
-
     def __init__(
         self,
         *,
         base_storage_directory: str,
         memory_storage_client: MemoryStorageClient,
-        id: str | None = None,  # noqa: A002
+        id_: str | None = None,
         name: str | None = None,
+        created_at: datetime | None = None,
+        accessed_at: datetime | None = None,
+        modified_at: datetime | None = None,
+        item_count: int = 0,
     ) -> None:
-        """Initialize the DatasetClient."""
-        self._id = id or crypto_random_object_id()
-        self._resource_directory = os.path.join(base_storage_directory, name or self._id)
+        self._base_storage_directory = base_storage_directory
         self._memory_storage_client = memory_storage_client
-        self._name = name
-        self._dataset_entries = {}
-        self._created_at = datetime.now(timezone.utc)
-        self._accessed_at = datetime.now(timezone.utc)
-        self._modified_at = datetime.now(timezone.utc)
-        self._file_operation_lock = asyncio.Lock()
+        self.id = id_ or crypto_random_object_id()
+        self.name = name
+        self._created_at = created_at or datetime.now(timezone.utc)
+        self._accessed_at = accessed_at or datetime.now(timezone.utc)
+        self._modified_at = modified_at or datetime.now(timezone.utc)
+
+        self.resource_directory = os.path.join(self._base_storage_directory, self.name or self.id)
+        self.dataset_entries: dict[str, dict] = {}
+        self.file_operation_lock = asyncio.Lock()
+        self.item_count = item_count
 
     async def get(self) -> dict | None:
         """Retrieve the dataset.
 
         Returns:
-            dict, optional: The retrieved dataset, or None, if it does not exist
+            The retrieved dataset, or None, if it does not exist
         """
-        found = self._find_or_create_client_by_id_or_name(
-            memory_storage_client=self._memory_storage_client, id=self._id, name=self._name
+        found = self.find_or_create_client_by_id_or_name(
+            memory_storage_client=self._memory_storage_client, id_=self.id, name=self.name
         )
 
         if found:
-            async with found._file_operation_lock:
-                await found._update_timestamps(has_been_modified=False)
-                return found._to_resource_info()
+            async with found.file_operation_lock:
+                await found.update_timestamps(has_been_modified=False)
+                return found.to_resource_info()
 
         return None
 
@@ -84,32 +79,32 @@ class DatasetClient(BaseResourceClient):
         """Update the dataset with specified fields.
 
         Args:
-            name (str, optional): The new name for the dataset
+            name: The new name for the dataset
 
         Returns:
-            dict: The updated dataset
+            The updated dataset
         """
         # Check by id
-        existing_dataset_by_id = self._find_or_create_client_by_id_or_name(
+        existing_dataset_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
-            id=self._id,
-            name=self._name,
+            id_=self.id,
+            name=self.name,
         )
 
         if existing_dataset_by_id is None:
-            raise_on_non_existing_storage(StorageTypes.DATASET, self._id)
+            raise_on_non_existing_storage(StorageTypes.DATASET, self.id)
 
         # Skip if no changes
         if name is None:
-            return existing_dataset_by_id._to_resource_info()
+            return existing_dataset_by_id.to_resource_info()
 
-        async with existing_dataset_by_id._file_operation_lock:
+        async with existing_dataset_by_id.file_operation_lock:
             # Check that name is not in use already
             existing_dataset_by_name = next(
                 (
                     dataset
-                    for dataset in self._memory_storage_client._datasets_handled
-                    if dataset._name and dataset._name.lower() == name.lower()
+                    for dataset in self._memory_storage_client.datasets_handled
+                    if dataset.name and dataset.name.lower() == name.lower()
                 ),
                 None,
             )
@@ -117,93 +112,98 @@ class DatasetClient(BaseResourceClient):
             if existing_dataset_by_name is not None:
                 raise_on_duplicate_storage(StorageTypes.DATASET, 'name', name)
 
-            existing_dataset_by_id._name = name
+            existing_dataset_by_id.name = name
 
-            previous_dir = existing_dataset_by_id._resource_directory
+            previous_dir = existing_dataset_by_id.resource_directory
 
-            existing_dataset_by_id._resource_directory = os.path.join(
-                self._memory_storage_client._datasets_directory, name
+            existing_dataset_by_id.resource_directory = os.path.join(
+                self._memory_storage_client.datasets_directory, name
             )
 
-            await force_rename(previous_dir, existing_dataset_by_id._resource_directory)
+            await force_rename(previous_dir, existing_dataset_by_id.resource_directory)
 
             # Update timestamps
-            await existing_dataset_by_id._update_timestamps(has_been_modified=True)
+            await existing_dataset_by_id.update_timestamps(has_been_modified=True)
 
-        return existing_dataset_by_id._to_resource_info()
+        return existing_dataset_by_id.to_resource_info()
 
     async def delete(self) -> None:
         """Delete the dataset."""
         dataset = next(
-            (dataset for dataset in self._memory_storage_client._datasets_handled if dataset._id == self._id), None
+            (dataset for dataset in self._memory_storage_client.datasets_handled if dataset.id == self.id), None
         )
 
         if dataset is not None:
-            async with dataset._file_operation_lock:
-                self._memory_storage_client._datasets_handled.remove(dataset)
-                dataset._item_count = 0
-                dataset._dataset_entries.clear()
+            async with dataset.file_operation_lock:
+                self._memory_storage_client.datasets_handled.remove(dataset)
+                dataset.item_count = 0
+                dataset.dataset_entries.clear()
 
-                if os.path.exists(dataset._resource_directory):
-                    await aioshutil.rmtree(dataset._resource_directory)
+                if os.path.exists(dataset.resource_directory):
+                    await aioshutil.rmtree(dataset.resource_directory)
 
     async def list_items(
         self,
         *,
         offset: int | None = 0,
         limit: int | None = LIST_ITEMS_LIMIT,
-        clean: bool | None = None,  # noqa: ARG002
-        desc: bool | None = None,
+        clean: bool = False,  # noqa: ARG002
+        desc: bool = False,
         fields: list[str] | None = None,  # noqa: ARG002
         omit: list[str] | None = None,  # noqa: ARG002
         unwind: str | None = None,  # noqa: ARG002
-        skip_empty: bool | None = None,  # noqa: ARG002
-        skip_hidden: bool | None = None,  # noqa: ARG002
+        skip_empty: bool = False,  # noqa: ARG002
+        skip_hidden: bool = False,  # noqa: ARG002
         flatten: list[str] | None = None,  # noqa: ARG002
         view: str | None = None,  # noqa: ARG002
     ) -> ListPage:
-        """List the items of the dataset.
+        """Retrieves a paginated list of items from a dataset based on various filtering parameters.
+
+        This method provides the flexibility to filter, sort, and modify the appearance of dataset items when listed.
+        Each parameter modifies the result set according to its purpose. The method also supports pagination
+        through 'offset' and 'limit' parameters.
 
         Args:
-            offset (int, optional): Number of items that should be skipped at the start. The default value is 0
-            limit (int, optional): Maximum number of items to return. By default there is no limit.
-            desc (bool, optional): By default, results are returned in the same order as they were stored.
-                To reverse the order, set this parameter to True.
-            clean (bool, optional): If True, returns only non-empty items and skips hidden fields (i.e. fields starting with the # character).
-                The clean parameter is just a shortcut for skip_hidden=True and skip_empty=True parameters.
-                Note that since some objects might be skipped from the output, that the result might contain less items than the limit value.
-            fields (list of str, optional): A list of fields which should be picked from the items,
-                only these fields will remain in the resulting record objects.
-                Note that the fields in the outputted items are sorted the same way as they are specified in the fields parameter.
-                You can use this feature to effectively fix the output format.
-            omit (list of str, optional): A list of fields which should be omitted from the items.
-            unwind (str, optional): Name of a field which should be unwound.
-                If the field is an array then every element of the array will become a separate record and merged with parent object.
-                If the unwound field is an object then it is merged with the parent object.
-                If the unwound field is missing or its value is neither an array nor an object and therefore cannot be merged with a parent object,
-                then the item gets preserved as it is. Note that the unwound items ignore the desc parameter.
-            skip_empty (bool, optional): If True, then empty items are skipped from the output.
-                Note that if used, the results might contain less items than the limit value.
-            skip_hidden (bool, optional): If True, then hidden fields are skipped from the output, i.e. fields starting with the # character.
-            flatten (list of str, optional): A list of fields that should be flattened
-            view (str, optional): Name of the dataset view to be used
+            offset: The number of initial items to skip.
+
+            limit: The maximum number of items to return.
+
+            clean: If True, filters out empty items and hidden fields. This is equivalent to setting 'skip_hidden'
+                and 'skip_empty' to True.
+
+            desc: If True, items are returned in descending order, i.e., newest first.
+
+            fields: Specifies a subset of fields to include in each item.
+
+            omit: Specifies a subset of fields to exclude from each item.
+
+            unwind: Specifies a field that should be unwound. If it's an array, each element becomes a separate record.
+
+            skip_empty: If True, omits items that are empty after other filters have been applied.
+
+            skip_hidden: If True, omits fields starting with the '#' character.
+
+            flatten: A list of fields to flatten in each item.
+
+            view: The specific view of the dataset to use when retrieving items.
 
         Returns:
-            ListPage: A page of the list of dataset items according to the specified filters.
+            An object containing the list of filtered, sorted, and paginated dataset items,
+                as well as additional pagination details.
         """
         # Check by id
-        existing_dataset_by_id = self._find_or_create_client_by_id_or_name(
+        existing_dataset_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
-            id=self._id,
-            name=self._name,
+            id_=self.id,
+            name=self.name,
         )
 
         if existing_dataset_by_id is None:
-            raise_on_non_existing_storage(StorageTypes.DATASET, self._id)
+            raise_on_non_existing_storage(StorageTypes.DATASET, self.id)
 
-        async with existing_dataset_by_id._file_operation_lock:
-            start, end = existing_dataset_by_id._get_start_and_end_indexes(
-                max(existing_dataset_by_id._item_count - (offset or 0) - (limit or LIST_ITEMS_LIMIT), 0)
+        async with existing_dataset_by_id.file_operation_lock:
+            start, end = existing_dataset_by_id.get_start_and_end_indexes(
+                max(existing_dataset_by_id.item_count - (offset or 0) - (limit or LIST_ITEMS_LIMIT), 0)
                 if desc
                 else offset or 0,
                 limit,
@@ -213,9 +213,9 @@ class DatasetClient(BaseResourceClient):
 
             for idx in range(start, end):
                 entry_number = self._generate_local_entry_name(idx)
-                items.append(existing_dataset_by_id._dataset_entries[entry_number])
+                items.append(existing_dataset_by_id.dataset_entries[entry_number])
 
-            await existing_dataset_by_id._update_timestamps(has_been_modified=False)
+            await existing_dataset_by_id.update_timestamps(has_been_modified=False)
 
             if desc:
                 items.reverse()
@@ -227,7 +227,7 @@ class DatasetClient(BaseResourceClient):
                     'items': items,
                     'limit': limit or LIST_ITEMS_LIMIT,
                     'offset': offset or 0,
-                    'total': existing_dataset_by_id._item_count,
+                    'total': existing_dataset_by_id.item_count,
                 }
             )
 
@@ -236,40 +236,45 @@ class DatasetClient(BaseResourceClient):
         *,
         offset: int = 0,
         limit: int | None = None,
-        clean: bool | None = None,  # noqa: ARG002
-        desc: bool | None = None,
+        clean: bool = False,  # noqa: ARG002
+        desc: bool = False,
         fields: list[str] | None = None,  # noqa: ARG002
         omit: list[str] | None = None,  # noqa: ARG002
         unwind: str | None = None,  # noqa: ARG002
-        skip_empty: bool | None = None,  # noqa: ARG002
-        skip_hidden: bool | None = None,  # noqa: ARG002
+        skip_empty: bool = False,  # noqa: ARG002
+        skip_hidden: bool = False,  # noqa: ARG002
     ) -> AsyncIterator[dict]:
-        """Iterate over the items in the dataset.
+        """Iterates over items in the dataset according to specified filters and sorting.
+
+        This method allows for asynchronously iterating through dataset items while applying various filters such as
+        skipping empty items, hiding specific fields, and sorting. It supports pagination via `offset` and `limit`
+        parameters, and can modify the appearance of dataset items using `fields`, `omit`, `unwind`, `skip_empty`, and
+        `skip_hidden` parameters.
 
         Args:
-            offset (int, optional): Number of items that should be skipped at the start. The default value is 0
-            limit (int, optional): Maximum number of items to return. By default there is no limit.
-            desc (bool, optional): By default, results are returned in the same order as they were stored.
-                To reverse the order, set this parameter to True.
-            clean (bool, optional): If True, returns only non-empty items and skips hidden fields (i.e. fields starting with the # character).
-                The clean parameter is just a shortcut for skip_hidden=True and skip_empty=True parameters.
-                Note that since some objects might be skipped from the output, that the result might contain less items than the limit value.
-            fields (list of str, optional): A list of fields which should be picked from the items,
-                only these fields will remain in the resulting record objects.
-                Note that the fields in the outputted items are sorted the same way as they are specified in the fields parameter.
-                You can use this feature to effectively fix the output format.
-            omit (list of str, optional): A list of fields which should be omitted from the items.
-            unwind (str, optional): Name of a field which should be unwound.
-                If the field is an array then every element of the array will become a separate record and merged with parent object.
-                If the unwound field is an object then it is merged with the parent object.
-                If the unwound field is missing or its value is neither an array nor an object and therefore cannot be merged with a parent object,
-                then the item gets preserved as it is. Note that the unwound items ignore the desc parameter.
-            skip_empty (bool, optional): If True, then empty items are skipped from the output.
-                Note that if used, the results might contain less items than the limit value.
-            skip_hidden (bool, optional): If True, then hidden fields are skipped from the output, i.e. fields starting with the # character.
+            offset: The number of initial items to skip.
+
+            limit: The maximum number of items to iterate over. Defaults to no limit.
+
+            clean: If set to True, filters out empty items and hidden fields. Acts as a shortcut for setting
+                `skip_hidden` and `skip_empty` to True.
+
+            desc: If set to True, items are returned in descending order, i.e., newest first.
+
+            fields: Specifies a subset of fields to include in each item.
+
+            omit: Specifies a subset of fields to exclude from each item.
+
+            unwind: Specifies a field that should be unwound into separate items.
+
+            skip_empty: If set to True, omits items that are empty after other filters have been applied.
+
+            skip_hidden: If set to True, omits fields starting with the '#' character from the output.
 
         Yields:
-            dict: An item from the dataset
+            An asynchronous iterator of dictionary objects, each representing a dataset item after applying
+            the specified filters and transformations.
+
         """
         cache_size = 1000
         first_item = offset
@@ -304,35 +309,36 @@ class DatasetClient(BaseResourceClient):
         """Push items to the dataset.
 
         Args:
-            items: The items which to push in the dataset. Either a stringified JSON, a dictionary, or a list of strings or dictionaries.
+            items: The items which to push in the dataset. Either a stringified JSON, a dictionary,
+                or a list of strings or dictionaries.
         """
         # Check by id
-        existing_dataset_by_id = self._find_or_create_client_by_id_or_name(
-            memory_storage_client=self._memory_storage_client, id=self._id, name=self._name
+        existing_dataset_by_id = self.find_or_create_client_by_id_or_name(
+            memory_storage_client=self._memory_storage_client, id_=self.id, name=self.name
         )
 
         if existing_dataset_by_id is None:
-            raise_on_non_existing_storage(StorageTypes.DATASET, self._id)
+            raise_on_non_existing_storage(StorageTypes.DATASET, self.id)
 
         normalized = self._normalize_items(items)
 
         added_ids: list[str] = []
         for entry in normalized:
-            existing_dataset_by_id._item_count += 1
-            idx = self._generate_local_entry_name(existing_dataset_by_id._item_count)
+            existing_dataset_by_id.item_count += 1
+            idx = self._generate_local_entry_name(existing_dataset_by_id.item_count)
 
-            existing_dataset_by_id._dataset_entries[idx] = entry
+            existing_dataset_by_id.dataset_entries[idx] = entry
             added_ids.append(idx)
 
-        data_entries = [(id, existing_dataset_by_id._dataset_entries[id]) for id in added_ids]  # noqa: A001
+        data_entries = [(id, existing_dataset_by_id.dataset_entries[id]) for id in added_ids]  # noqa: A001
 
-        async with existing_dataset_by_id._file_operation_lock:
-            await existing_dataset_by_id._update_timestamps(has_been_modified=True)
+        async with existing_dataset_by_id.file_operation_lock:
+            await existing_dataset_by_id.update_timestamps(has_been_modified=True)
 
             await self._persist_dataset_items_to_disk(
                 data=data_entries,
-                entity_directory=existing_dataset_by_id._resource_directory,
-                persist_storage=self._memory_storage_client._persist_storage,
+                entity_directory=existing_dataset_by_id.resource_directory,
+                persist_storage=self._memory_storage_client.persist_storage,
             )
 
     async def _persist_dataset_items_to_disk(
@@ -367,35 +373,35 @@ class DatasetClient(BaseResourceClient):
             async with aiofiles.open(file_path, mode='wb') as f:
                 await f.write(json_dumps(item).encode('utf-8'))
 
-    def _to_resource_info(self) -> dict:
+    def to_resource_info(self) -> dict:
         """Retrieve the dataset info."""
         return {
-            'id': self._id,
-            'name': self._name,
-            'itemCount': self._item_count,
+            'id': self.id,
+            'name': self.name,
+            'itemCount': self.item_count,
             'accessedAt': self._accessed_at,
             'createdAt': self._created_at,
             'modifiedAt': self._modified_at,
         }
 
-    async def _update_timestamps(self, has_been_modified: bool) -> None:  # noqa: FBT001
+    async def update_timestamps(self, *, has_been_modified: bool) -> None:
         """Update the timestamps of the dataset."""
         self._accessed_at = datetime.now(timezone.utc)
 
         if has_been_modified:
             self._modified_at = datetime.now(timezone.utc)
 
-        dataset_info = self._to_resource_info()
+        dataset_info = self.to_resource_info()
         await persist_metadata_if_enabled(
             data=dataset_info,
-            entity_directory=self._resource_directory,
-            write_metadata=self._memory_storage_client._write_metadata,
+            entity_directory=self.resource_directory,
+            write_metadata=self._memory_storage_client.write_metadata,
         )
 
-    def _get_start_and_end_indexes(self, offset: int, limit: int | None = None) -> tuple[int, int]:
-        actual_limit = limit or self._item_count
+    def get_start_and_end_indexes(self, offset: int, limit: int | None = None) -> tuple[int, int]:
+        actual_limit = limit or self.item_count
         start = offset + 1
-        end = min(offset + actual_limit, self._item_count) + 1
+        end = min(offset + actual_limit, self.item_count) + 1
         return (start, end)
 
     def _generate_local_entry_name(self, idx: int) -> str:
@@ -426,21 +432,21 @@ class DatasetClient(BaseResourceClient):
 
     @classmethod
     def _get_storages_dir(cls, memory_storage_client: MemoryStorageClient) -> str:
-        return memory_storage_client._datasets_directory
+        return memory_storage_client.datasets_directory
 
     @classmethod
     def _get_storage_client_cache(
         cls,
         memory_storage_client: MemoryStorageClient,
     ) -> list[DatasetClient]:
-        return memory_storage_client._datasets_handled
+        return memory_storage_client.datasets_handled
 
     @classmethod
     def _create_from_directory(
         cls,
         storage_directory: str,
         memory_storage_client: MemoryStorageClient,
-        id: str | None = None,  # noqa: A002
+        id_: str | None = None,
         name: str | None = None,
     ) -> DatasetClient:
         item_count = 0
@@ -479,19 +485,17 @@ class DatasetClient(BaseResourceClient):
                     item_count += 1
 
         new_client = DatasetClient(
-            base_storage_directory=memory_storage_client._datasets_directory,
+            base_storage_directory=memory_storage_client.datasets_directory,
             memory_storage_client=memory_storage_client,
-            id=id,
+            id_=id,
             name=name,
+            created_at=created_at,
+            accessed_at=accessed_at,
+            modified_at=modified_at,
+            item_count=item_count,
         )
 
-        # Overwrite properties
-        new_client._accessed_at = accessed_at
-        new_client._created_at = created_at
-        new_client._modified_at = modified_at
-        new_client._item_count = item_count
-
         for entry_id, content in entries.items():
-            new_client._dataset_entries[entry_id] = content
+            new_client.dataset_entries[entry_id] = content
 
         return new_client

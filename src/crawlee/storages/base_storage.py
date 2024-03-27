@@ -63,13 +63,13 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
         Returns the cached storage object if the storage was opened before.
 
         Args:
-            id (str, optional): ID of the storage to be opened.
+            id: ID of the storage to be opened.
                 If neither `id` nor `name` are provided, the method returns the default storage associated with the actor run.
                 If the storage with the given ID does not exist, it raises an error.
-            name (str, optional): Name of the storage to be opened.
+            name: Name of the storage to be opened.
                 If neither `id` nor `name` are provided, the method returns the default storage associated with the actor run.
                 If the storage with the given name does not exist, it is created.
-            force_cloud (bool, optional): If set to True, it will open a storage on the Apify Platform even when running the actor locally.
+            force_cloud: If set to True, it will open a storage on the Apify Platform even when running the actor locally.
                 Defaults to False.
             config (Configuration, optional): A `Configuration` instance, uses global configuration if omitted.
 
@@ -117,7 +117,7 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
                     raise RuntimeError(f'{storage_label} with id "{id}" does not exist!')
             elif is_default_storage_on_local:
                 storage_collection_client = cls._get_storage_collection_client(used_client)
-                storage_info = await storage_collection_client.get_or_create(name=name, _id=id)
+                storage_info = await storage_collection_client.get_or_create(name=name, id_=id)
             else:
                 storage_collection_client = cls._get_storage_collection_client(used_client)
                 storage_info = await storage_collection_client.get_or_create(name=name)
@@ -134,12 +134,12 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
     @classmethod
     @abstractmethod
     def _get_human_friendly_label(cls) -> str:
-        raise NotImplementedError('You must override this method in the subclass!')
+        raise NotImplementedError('The subclass must implement this method.')
 
     @classmethod
     @abstractmethod
     def _get_default_id(cls, config: Config) -> str:
-        raise NotImplementedError('You must override this method in the subclass!')
+        raise NotImplementedError('The subclass must implement this method.')
 
     @classmethod
     @abstractmethod
@@ -148,7 +148,7 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
         id: str,  # noqa: A002
         client: MemoryStorageClient,
     ) -> BaseResourceClientType:
-        raise NotImplementedError('You must override this method in the subclass!')
+        raise NotImplementedError('The subclass must implement this method.')
 
     @classmethod
     @abstractmethod
@@ -156,7 +156,7 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
         cls,
         client: MemoryStorageClient,
     ) -> BaseResourceCollectionClientType:
-        raise NotImplementedError('You must override this method in the subclass!')
+        raise NotImplementedError('The subclass must implement this method.')
 
     @classmethod
     def _ensure_class_initialized(cls) -> None:

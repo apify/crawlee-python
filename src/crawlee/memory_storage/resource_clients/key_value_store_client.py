@@ -39,6 +39,8 @@ logger = getLogger(__name__)
 
 
 class KeyValueStoreRecord(TypedDict):
+    """Type definition for a key-value store record."""
+
     key: str
     value: Any
     contentType: str | None
@@ -63,49 +65,45 @@ def _filename_from_record(record: KeyValueStoreRecord) -> str:
 class KeyValueStoreClient(BaseResourceClient):
     """Sub-client for manipulating a single key-value store."""
 
-    _id: str
-    _resource_directory: str
-    _memory_storage_client: MemoryStorageClient
-    _name: str | None
-    _records: dict[str, KeyValueStoreRecord]
-    _created_at: datetime
-    _accessed_at: datetime
-    _modified_at: datetime
-    _file_operation_lock: asyncio.Lock
-
     def __init__(
         self,
         *,
         base_storage_directory: str,
         memory_storage_client: MemoryStorageClient,
-        id: str | None = None,  # noqa: A002
+        id_: str | None = None,
         name: str | None = None,
+        created_at: datetime | None = None,
+        accessed_at: datetime | None = None,
+        modified_at: datetime | None = None,
     ) -> None:
-        """Initialize the KeyValueStoreClient."""
-        self._id = id or crypto_random_object_id()
-        self._resource_directory = os.path.join(base_storage_directory, name or self._id)
+        self._base_storage_directory = base_storage_directory
         self._memory_storage_client = memory_storage_client
-        self._name = name
-        self._records = {}
-        self._created_at = datetime.now(timezone.utc)
-        self._accessed_at = datetime.now(timezone.utc)
-        self._modified_at = datetime.now(timezone.utc)
-        self._file_operation_lock = asyncio.Lock()
+        self.id = id_ or crypto_random_object_id()
+        self.name = name
+        self._created_at = created_at or datetime.now(timezone.utc)
+        self._accessed_at = accessed_at or datetime.now(timezone.utc)
+        self._modified_at = modified_at or datetime.now(timezone.utc)
+
+        self.resource_directory = os.path.join(base_storage_directory, self.name or self.id)
+        self.records: dict[str, KeyValueStoreRecord] = {}
+        self.file_operation_lock = asyncio.Lock()
 
     async def get(self) -> dict | None:
         """Retrieve the key-value store.
 
         Returns:
-            dict, optional: The retrieved key-value store, or None if it does not exist
+            The retrieved key-value store, or None if it does not exist
         """
-        found = self._find_or_create_client_by_id_or_name(
-            memory_storage_client=self._memory_storage_client, id=self._id, name=self._name
+        found = self.find_or_create_client_by_id_or_name(
+            memory_storage_client=self._memory_storage_client,
+            id_=self.id,
+            name=self.name,
         )
 
         if found:
-            async with found._file_operation_lock:
-                await found._update_timestamps(has_been_modified=False)
-                return found._to_resource_info()
+            async with found.file_operation_lock:
+                await found.update_timestamps(has_been_modified=False)
+                return found.to_resource_info()
 
         return None
 
@@ -113,30 +111,30 @@ class KeyValueStoreClient(BaseResourceClient):
         """Update the key-value store with specified fields.
 
         Args:
-            name (str, optional): The new name for key-value store
+            name: The new name for key-value store
 
         Returns:
-            dict: The updated key-value store
+            The updated key-value store
         """
         # Check by id
-        existing_store_by_id = self._find_or_create_client_by_id_or_name(
-            memory_storage_client=self._memory_storage_client, id=self._id, name=self._name
+        existing_store_by_id = self.find_or_create_client_by_id_or_name(
+            memory_storage_client=self._memory_storage_client, id_=self.id, name=self.name
         )
 
         if existing_store_by_id is None:
-            raise_on_non_existing_storage(StorageTypes.KEY_VALUE_STORE, self._id)
+            raise_on_non_existing_storage(StorageTypes.KEY_VALUE_STORE, self.id)
 
         # Skip if no changes
         if name is None:
-            return existing_store_by_id._to_resource_info()
+            return existing_store_by_id.to_resource_info()
 
-        async with existing_store_by_id._file_operation_lock:
+        async with existing_store_by_id.file_operation_lock:
             # Check that name is not in use already
             existing_store_by_name = next(
                 (
                     store
-                    for store in self._memory_storage_client._key_value_stores_handled
-                    if store._name and store._name.lower() == name.lower()
+                    for store in self._memory_storage_client.key_value_stores_handled
+                    if store.name and store.name.lower() == name.lower()
                 ),
                 None,
             )
@@ -144,34 +142,35 @@ class KeyValueStoreClient(BaseResourceClient):
             if existing_store_by_name is not None:
                 raise_on_duplicate_storage(StorageTypes.KEY_VALUE_STORE, 'name', name)
 
-            existing_store_by_id._name = name
+            existing_store_by_id.name = name
 
-            previous_dir = existing_store_by_id._resource_directory
+            previous_dir = existing_store_by_id.resource_directory
 
-            existing_store_by_id._resource_directory = os.path.join(
-                self._memory_storage_client._key_value_stores_directory, name
+            existing_store_by_id.resource_directory = os.path.join(
+                self._memory_storage_client.key_value_stores_directory,
+                name,
             )
 
-            await force_rename(previous_dir, existing_store_by_id._resource_directory)
+            await force_rename(previous_dir, existing_store_by_id.resource_directory)
 
             # Update timestamps
-            await existing_store_by_id._update_timestamps(has_been_modified=True)
+            await existing_store_by_id.update_timestamps(has_been_modified=True)
 
-        return existing_store_by_id._to_resource_info()
+        return existing_store_by_id.to_resource_info()
 
     async def delete(self) -> None:
         """Delete the key-value store."""
         store = next(
-            (store for store in self._memory_storage_client._key_value_stores_handled if store._id == self._id), None
+            (store for store in self._memory_storage_client.key_value_stores_handled if store.id == self.id), None
         )
 
         if store is not None:
-            async with store._file_operation_lock:
-                self._memory_storage_client._key_value_stores_handled.remove(store)
-                store._records.clear()
+            async with store.file_operation_lock:
+                self._memory_storage_client.key_value_stores_handled.remove(store)
+                store.records.clear()
 
-                if os.path.exists(store._resource_directory):
-                    await aioshutil.rmtree(store._resource_directory)
+                if os.path.exists(store.resource_directory):
+                    await aioshutil.rmtree(store.resource_directory)
 
     async def list_keys(
         self,
@@ -182,23 +181,23 @@ class KeyValueStoreClient(BaseResourceClient):
         """List the keys in the key-value store.
 
         Args:
-            limit (int, optional): Number of keys to be returned. Maximum value is 1000
-            exclusive_start_key (str, optional): All keys up to this one (including) are skipped from the result
+            limit: Number of keys to be returned. Maximum value is 1000
+            exclusive_start_key: All keys up to this one (including) are skipped from the result
 
         Returns:
-            dict: The list of keys in the key-value store matching the given arguments
+            The list of keys in the key-value store matching the given arguments
         """
         # Check by id
-        existing_store_by_id = self._find_or_create_client_by_id_or_name(
-            memory_storage_client=self._memory_storage_client, id=self._id, name=self._name
+        existing_store_by_id = self.find_or_create_client_by_id_or_name(
+            memory_storage_client=self._memory_storage_client, id_=self.id, name=self.name
         )
 
         if existing_store_by_id is None:
-            raise_on_non_existing_storage(StorageTypes.KEY_VALUE_STORE, self._id)
+            raise_on_non_existing_storage(StorageTypes.KEY_VALUE_STORE, self.id)
 
         items = []
 
-        for record in existing_store_by_id._records.values():
+        for record in existing_store_by_id.records.values():
             size = len(record['value'])
             items.append(
                 {
@@ -233,8 +232,8 @@ class KeyValueStoreClient(BaseResourceClient):
         is_last_selected_item_absolutely_last = last_item_in_store == last_selected_item
         next_exclusive_start_key = None if is_last_selected_item_absolutely_last else last_selected_item['key']
 
-        async with existing_store_by_id._file_operation_lock:
-            await existing_store_by_id._update_timestamps(has_been_modified=False)
+        async with existing_store_by_id.file_operation_lock:
+            await existing_store_by_id.update_timestamps(has_been_modified=False)
 
         return {
             'count': len(items),
@@ -251,14 +250,14 @@ class KeyValueStoreClient(BaseResourceClient):
         as_bytes: bool = False,  # noqa: FBT001, FBT002
     ) -> dict | None:
         # Check by id
-        existing_store_by_id = self._find_or_create_client_by_id_or_name(
-            memory_storage_client=self._memory_storage_client, id=self._id, name=self._name
+        existing_store_by_id = self.find_or_create_client_by_id_or_name(
+            memory_storage_client=self._memory_storage_client, id_=self.id, name=self.name
         )
 
         if existing_store_by_id is None:
-            raise_on_non_existing_storage(StorageTypes.KEY_VALUE_STORE, self._id)
+            raise_on_non_existing_storage(StorageTypes.KEY_VALUE_STORE, self.id)
 
-        stored_record = existing_store_by_id._records.get(key)
+        stored_record = existing_store_by_id.records.get(key)
 
         if stored_record is None:
             return None
@@ -275,8 +274,8 @@ class KeyValueStoreClient(BaseResourceClient):
             except ValueError:
                 logger.exception('Error parsing key-value store record')
 
-        async with existing_store_by_id._file_operation_lock:
-            await existing_store_by_id._update_timestamps(has_been_modified=False)
+        async with existing_store_by_id.file_operation_lock:
+            await existing_store_by_id.update_timestamps(has_been_modified=False)
 
         return record
 
@@ -284,10 +283,10 @@ class KeyValueStoreClient(BaseResourceClient):
         """Retrieve the given record from the key-value store.
 
         Args:
-            key (str): Key of the record to retrieve
+            key Key of the record to retrieve
 
         Returns:
-            dict, optional: The requested record, or None, if the record does not exist
+            The requested record, or None, if the record does not exist
         """
         return await self._get_record_internal(key)
 
@@ -295,10 +294,10 @@ class KeyValueStoreClient(BaseResourceClient):
         """Retrieve the given record from the key-value store, without parsing it.
 
         Args:
-            key (str): Key of the record to retrieve
+            key: Key of the record to retrieve
 
         Returns:
-            dict, optional: The requested record, or None, if the record does not exist
+            The requested record, or None, if the record does not exist
         """
         return await self._get_record_internal(key, as_bytes=True)
 
@@ -309,17 +308,17 @@ class KeyValueStoreClient(BaseResourceClient):
         """Set a value to the given record in the key-value store.
 
         Args:
-            key (str): The key of the record to save the value to
-            value (Any): The value to save into the record
-            content_type (str, optional): The content type of the saved value
+            key: The key of the record to save the value to
+            value: The value to save into the record
+            content_type: The content type of the saved value
         """
         # Check by id
-        existing_store_by_id = self._find_or_create_client_by_id_or_name(
-            memory_storage_client=self._memory_storage_client, id=self._id, name=self._name
+        existing_store_by_id = self.find_or_create_client_by_id_or_name(
+            memory_storage_client=self._memory_storage_client, id_=self.id, name=self.name
         )
 
         if existing_store_by_id is None:
-            raise_on_non_existing_storage(StorageTypes.KEY_VALUE_STORE, self._id)
+            raise_on_non_existing_storage(StorageTypes.KEY_VALUE_STORE, self.id)
 
         if isinstance(value, io.IOBase):
             raise NotImplementedError('File-like values are not supported in local memory storage')
@@ -335,25 +334,25 @@ class KeyValueStoreClient(BaseResourceClient):
         if 'application/json' in content_type and not is_file_or_bytes(value) and not isinstance(value, str):
             value = json_dumps(value).encode('utf-8')
 
-        async with existing_store_by_id._file_operation_lock:
-            await existing_store_by_id._update_timestamps(has_been_modified=True)
+        async with existing_store_by_id.file_operation_lock:
+            await existing_store_by_id.update_timestamps(has_been_modified=True)
             record: KeyValueStoreRecord = {
                 'key': key,
                 'value': value,
                 'contentType': content_type,
             }
 
-            old_record = existing_store_by_id._records.get(key)
-            existing_store_by_id._records[key] = record
+            old_record = existing_store_by_id.records.get(key)
+            existing_store_by_id.records[key] = record
 
-            if self._memory_storage_client._persist_storage:
+            if self._memory_storage_client.persist_storage:
                 if old_record is not None and _filename_from_record(old_record) != _filename_from_record(record):
-                    await existing_store_by_id._delete_persisted_record(old_record)
+                    await existing_store_by_id.delete_persisted_record(old_record)
 
-                await existing_store_by_id._persist_record(record)
+                await existing_store_by_id.persist_record(record)
 
-    async def _persist_record(self, record: KeyValueStoreRecord) -> None:
-        store_directory = self._resource_directory
+    async def persist_record(self, record: KeyValueStoreRecord) -> None:
+        store_directory = self.resource_directory
         record_filename = _filename_from_record(record)
         record['filename'] = record_filename
 
@@ -371,7 +370,7 @@ class KeyValueStoreClient(BaseResourceClient):
         async with aiofiles.open(record_path, mode='wb') as f:
             await f.write(record['value'])
 
-        if self._memory_storage_client._write_metadata:
+        if self._memory_storage_client.write_metadata:
             async with aiofiles.open(record_metadata_path, mode='wb') as f:
                 await f.write(
                     json_dumps(
@@ -386,27 +385,27 @@ class KeyValueStoreClient(BaseResourceClient):
         """Delete the specified record from the key-value store.
 
         Args:
-            key (str): The key of the record which to delete
+            key: The key of the record which to delete
         """
         # Check by id
-        existing_store_by_id = self._find_or_create_client_by_id_or_name(
-            memory_storage_client=self._memory_storage_client, id=self._id, name=self._name
+        existing_store_by_id = self.find_or_create_client_by_id_or_name(
+            memory_storage_client=self._memory_storage_client, id_=self.id, name=self.name
         )
 
         if existing_store_by_id is None:
-            raise_on_non_existing_storage(StorageTypes.KEY_VALUE_STORE, self._id)
+            raise_on_non_existing_storage(StorageTypes.KEY_VALUE_STORE, self.id)
 
-        record = existing_store_by_id._records.get(key)
+        record = existing_store_by_id.records.get(key)
 
         if record is not None:
-            async with existing_store_by_id._file_operation_lock:
-                del existing_store_by_id._records[key]
-                await existing_store_by_id._update_timestamps(has_been_modified=True)
-                if self._memory_storage_client._persist_storage:
-                    await existing_store_by_id._delete_persisted_record(record)
+            async with existing_store_by_id.file_operation_lock:
+                del existing_store_by_id.records[key]
+                await existing_store_by_id.update_timestamps(has_been_modified=True)
+                if self._memory_storage_client.persist_storage:
+                    await existing_store_by_id.delete_persisted_record(record)
 
-    async def _delete_persisted_record(self, record: KeyValueStoreRecord) -> None:
-        store_directory = self._resource_directory
+    async def delete_persisted_record(self, record: KeyValueStoreRecord) -> None:
+        store_directory = self.resource_directory
         record_filename = _filename_from_record(record)
 
         # Ensure the directory for the entity exists
@@ -419,47 +418,47 @@ class KeyValueStoreClient(BaseResourceClient):
         await force_remove(record_path)
         await force_remove(record_metadata_path)
 
-    def _to_resource_info(self) -> dict:
+    def to_resource_info(self) -> dict:
         """Retrieve the key-value store info."""
         return {
-            'id': self._id,
-            'name': self._name,
+            'id': self.id,
+            'name': self.name,
             'accessedAt': self._accessed_at,
             'createdAt': self._created_at,
             'modifiedAt': self._modified_at,
             'userId': '1',
         }
 
-    async def _update_timestamps(self, has_been_modified: bool) -> None:  # noqa: FBT001
+    async def update_timestamps(self, *, has_been_modified: bool) -> None:
         self._accessed_at = datetime.now(timezone.utc)
 
         if has_been_modified:
             self._modified_at = datetime.now(timezone.utc)
 
-        kv_store_info = self._to_resource_info()
+        kv_store_info = self.to_resource_info()
         await persist_metadata_if_enabled(
             data=kv_store_info,
-            entity_directory=self._resource_directory,
-            write_metadata=self._memory_storage_client._write_metadata,
+            entity_directory=self.resource_directory,
+            write_metadata=self._memory_storage_client.write_metadata,
         )
 
     @classmethod
     def _get_storages_dir(cls, memory_storage_client: MemoryStorageClient) -> str:
-        return memory_storage_client._key_value_stores_directory
+        return memory_storage_client.key_value_stores_directory
 
     @classmethod
     def _get_storage_client_cache(
         cls,
         memory_storage_client: MemoryStorageClient,
     ) -> list[KeyValueStoreClient]:
-        return memory_storage_client._key_value_stores_handled
+        return memory_storage_client.key_value_stores_handled
 
     @classmethod
     def _create_from_directory(
         cls,
         storage_directory: str,
         memory_storage_client: MemoryStorageClient,
-        id: str | None = None,  # noqa: A002
+        id_: str | None = None,
         name: str | None = None,
     ) -> KeyValueStoreClient:
         created_at = datetime.now(timezone.utc)
@@ -470,23 +469,21 @@ class KeyValueStoreClient(BaseResourceClient):
         if os.path.exists(store_metadata_path):
             with open(store_metadata_path, encoding='utf-8') as f:
                 metadata = json.load(f)
-            id = metadata['id']  # noqa: A001
+            id_ = metadata['id']
             name = metadata['name']
             created_at = datetime.fromisoformat(metadata['createdAt'])
             accessed_at = datetime.fromisoformat(metadata['accessedAt'])
             modified_at = datetime.fromisoformat(metadata['modifiedAt'])
 
         new_client = KeyValueStoreClient(
-            base_storage_directory=memory_storage_client._key_value_stores_directory,
+            base_storage_directory=memory_storage_client.key_value_stores_directory,
             memory_storage_client=memory_storage_client,
-            id=id,
+            id_=id_,
             name=name,
+            accessed_at=accessed_at,
+            created_at=created_at,
+            modified_at=modified_at,
         )
-
-        # Overwrite internal properties
-        new_client._accessed_at = accessed_at
-        new_client._created_at = created_at
-        new_client._modified_at = modified_at
 
         # Scan the key value store folder, check each entry in there and parse it as a store record
         for entry in os.scandir(storage_directory):
@@ -512,8 +509,8 @@ class KeyValueStoreClient(BaseResourceClient):
                         assert metadata.get('contentType') is not None  # noqa: S101
                     except Exception:
                         logger.warning(
-                            f"""Metadata of key-value store entry "{entry.name}" for store {name or id} could not be parsed."""
-                            'The metadata file will be ignored.',
+                            f'Metadata of key-value store entry "{entry.name}" for store {name or id} could '
+                            'not be parsed. The metadata file will be ignored.',
                             exc_info=True,
                         )
 
@@ -537,7 +534,7 @@ class KeyValueStoreClient(BaseResourceClient):
                     exc_info=True,
                 )
 
-            new_client._records[metadata['key']] = {
+            new_client.records[metadata['key']] = {
                 'key': metadata['key'],
                 'contentType': metadata['contentType'],
                 'filename': entry.name,

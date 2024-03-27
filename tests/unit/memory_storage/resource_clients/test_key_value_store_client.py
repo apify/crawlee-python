@@ -34,7 +34,6 @@ async def key_value_store_client(memory_storage_client: MemoryStorageClient) -> 
     return memory_storage_client.key_value_store(kvs_info['id'])
 
 
-@pytest.mark.asyncio()
 async def test_nonexistent(memory_storage_client: MemoryStorageClient) -> None:
     kvs_client = memory_storage_client.key_value_store(key_value_store_id='nonexistent-id')
     assert await kvs_client.get() is None
@@ -60,32 +59,29 @@ async def test_nonexistent(memory_storage_client: MemoryStorageClient) -> None:
     await kvs_client.delete()
 
 
-@pytest.mark.asyncio()
 async def test_not_implemented(key_value_store_client: KeyValueStoreClient) -> None:
     with pytest.raises(NotImplementedError, match='This method is not supported in local memory storage.'):
         await key_value_store_client.stream_record('test')
 
 
-@pytest.mark.asyncio()
 async def test_get(key_value_store_client: KeyValueStoreClient) -> None:
     await asyncio.sleep(0.1)
     info = await key_value_store_client.get()
     assert info is not None
-    assert info['id'] == key_value_store_client._id
+    assert info['id'] == key_value_store_client.id
     assert info['accessedAt'] != info['createdAt']
 
 
-@pytest.mark.asyncio()
 async def test_update(key_value_store_client: KeyValueStoreClient) -> None:
     new_kvs_name = 'test-update'
     await key_value_store_client.set_record('test', {'abc': 123})
     old_kvs_info = await key_value_store_client.get()
     assert old_kvs_info is not None
     old_kvs_directory = os.path.join(
-        key_value_store_client._memory_storage_client._key_value_stores_directory, old_kvs_info['name']
+        key_value_store_client._memory_storage_client.key_value_stores_directory, old_kvs_info['name']
     )
     new_kvs_directory = os.path.join(
-        key_value_store_client._memory_storage_client._key_value_stores_directory, new_kvs_name
+        key_value_store_client._memory_storage_client.key_value_stores_directory, new_kvs_name
     )
     assert os.path.exists(os.path.join(old_kvs_directory, 'test.json')) is True
     assert os.path.exists(os.path.join(new_kvs_directory, 'test.json')) is False
@@ -104,13 +100,12 @@ async def test_update(key_value_store_client: KeyValueStoreClient) -> None:
         await key_value_store_client.update(name=new_kvs_name)
 
 
-@pytest.mark.asyncio()
 async def test_delete(key_value_store_client: KeyValueStoreClient) -> None:
     await key_value_store_client.set_record('test', {'abc': 123})
     kvs_info = await key_value_store_client.get()
     assert kvs_info is not None
     kvs_directory = os.path.join(
-        key_value_store_client._memory_storage_client._key_value_stores_directory, kvs_info['name']
+        key_value_store_client._memory_storage_client.key_value_stores_directory, kvs_info['name']
     )
     assert os.path.exists(os.path.join(kvs_directory, 'test.json')) is True
     await key_value_store_client.delete()
@@ -119,7 +114,6 @@ async def test_delete(key_value_store_client: KeyValueStoreClient) -> None:
     await key_value_store_client.delete()
 
 
-@pytest.mark.asyncio()
 async def test_list_keys_empty(key_value_store_client: KeyValueStoreClient) -> None:
     keys = await key_value_store_client.list_keys()
     assert len(keys['items']) == 0
@@ -127,7 +121,6 @@ async def test_list_keys_empty(key_value_store_client: KeyValueStoreClient) -> N
     assert keys['isTruncated'] is False
 
 
-@pytest.mark.asyncio()
 async def test_list_keys(key_value_store_client: KeyValueStoreClient) -> None:
     record_count = 4
     used_limit = 2
@@ -157,7 +150,6 @@ async def test_list_keys(key_value_store_client: KeyValueStoreClient) -> None:
     assert keys_exclusive_start['items'][-1]['key'] == keys_exclusive_start['nextExclusiveStartKey']
 
 
-@pytest.mark.asyncio()
 async def test_get_and_set_record(tmp_path: Path, key_value_store_client: KeyValueStoreClient) -> None:
     # Test setting dict record
     dict_record_key = 'test-dict'
@@ -200,7 +192,6 @@ async def test_get_and_set_record(tmp_path: Path, key_value_store_client: KeyVal
             await key_value_store_client.set_record('file', f)
 
 
-@pytest.mark.asyncio()
 async def test_get_record_as_bytes(key_value_store_client: KeyValueStoreClient) -> None:
     record_key = 'test'
     record_value = 'testing'
@@ -210,7 +201,6 @@ async def test_get_record_as_bytes(key_value_store_client: KeyValueStoreClient) 
     assert record_info['value'] == record_value.encode('utf-8')
 
 
-@pytest.mark.asyncio()
 async def test_delete_record(key_value_store_client: KeyValueStoreClient) -> None:
     record_key = 'test'
     await key_value_store_client.set_record(record_key, 'test')
@@ -272,7 +262,6 @@ async def test_delete_record(key_value_store_client: KeyValueStoreClient) -> Non
         },
     ],
 )
-@pytest.mark.asyncio()
 async def test_writes_correct_metadata(memory_storage_client: MemoryStorageClient, test_case: dict) -> None:
     test_input = test_case['input']
     expected_output = test_case['expectedOutput']
@@ -286,7 +275,7 @@ async def test_writes_correct_metadata(memory_storage_client: MemoryStorageClien
     )
 
     # Check that everything was written correctly, both the data and metadata
-    storage_path = os.path.join(memory_storage_client._key_value_stores_directory, key_value_store_name)
+    storage_path = os.path.join(memory_storage_client.key_value_stores_directory, key_value_store_name)
     item_path = os.path.join(storage_path, expected_output['filename'])
     metadata_path = os.path.join(storage_path, expected_output['filename'] + '.__metadata__.json')
 
@@ -400,14 +389,13 @@ async def test_writes_correct_metadata(memory_storage_client: MemoryStorageClien
         },
     ],
 )
-@pytest.mark.asyncio()
 async def test_reads_correct_metadata(memory_storage_client: MemoryStorageClient, test_case: dict) -> None:
     test_input = test_case['input']
     expected_output = test_case['expectedOutput']
     key_value_store_name = crypto_random_object_id()
 
     # Ensure the directory for the store exists
-    storage_path = os.path.join(memory_storage_client._key_value_stores_directory, key_value_store_name)
+    storage_path = os.path.join(memory_storage_client.key_value_stores_directory, key_value_store_name)
     os.makedirs(storage_path, exist_ok=True)
 
     store_metadata = {
