@@ -37,6 +37,21 @@ def filter_out_none_values_recursively(dictionary: dict, *, remove_empty_dicts: 
     return result
 
 
+def maybe_extract_enum_member_value(maybe_enum_member: Any) -> Any:
+    """Extract the value of an enumeration member if it is an Enum, otherwise return the original value."""
+    if isinstance(maybe_enum_member, Enum):
+        return maybe_enum_member.value
+    return maybe_enum_member
+
+
+def maybe_parse_body(body: bytes, content_type: str) -> Any:
+    if is_content_type_json(content_type):
+        return json.loads(body.decode('utf-8'))
+    if is_content_type_xml(content_type) or is_content_type_text(content_type):
+        return body.decode('utf-8')
+    return body
+
+
 def maybe_parse_bool(val: str | None) -> bool:
     if val in {'true', 'True', '1'}:
         return True
@@ -64,26 +79,11 @@ def maybe_parse_int(val: str) -> int | None:
         return None
 
 
-def maybe_extract_enum_member_value(maybe_enum_member: Any) -> Any:
-    """Extract the value of an enumeration member if it is an Enum, otherwise return the original value."""
-    if isinstance(maybe_enum_member, Enum):
-        return maybe_enum_member.value
-    return maybe_enum_member
-
-
-def maybe_parse_body(body: bytes, content_type: str) -> Any:
-    if is_content_type_json(content_type):
-        return json.loads(body.decode('utf-8'))
-    if is_content_type_xml(content_type) or is_content_type_text(content_type):
-        return body.decode('utf-8')
-    return body
+def raise_on_duplicate_storage(client_type: StorageTypes, key_name: str, value: str) -> NoReturn:
+    client_type = maybe_extract_enum_member_value(client_type)
+    raise ValueError(f'{client_type} with {key_name} "{value}" already exists.')
 
 
 def raise_on_non_existing_storage(client_type: StorageTypes, id_: str | None) -> NoReturn:
     client_type = maybe_extract_enum_member_value(client_type)
     raise ValueError(f'{client_type} with id "{id_}" does not exist.')
-
-
-def raise_on_duplicate_storage(client_type: StorageTypes, key_name: str, value: str) -> NoReturn:
-    client_type = maybe_extract_enum_member_value(client_type)
-    raise ValueError(f'{client_type} with {key_name} "{value}" already exists.')

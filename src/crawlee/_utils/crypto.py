@@ -4,12 +4,6 @@ import secrets
 from hashlib import sha256
 
 
-def crypto_random_object_id(length: int = 17) -> str:
-    """Python reimplementation of cryptoRandomObjectId from `@apify/utilities`."""
-    chars = 'abcdefghijklmnopqrstuvwxyzABCEDFGHIJKLMNOPQRSTUVWXYZ0123456789'
-    return ''.join(secrets.choice(chars) for _ in range(length))
-
-
 def compute_short_hash(data: bytes, *, length: int = 8) -> str:
     """Computes a hexadecimal SHA-256 hash of the provided data and returns a substring (prefix) of it.
 
@@ -22,3 +16,9 @@ def compute_short_hash(data: bytes, *, length: int = 8) -> str:
     """
     hash_object = sha256(data)
     return hash_object.hexdigest()[:length]
+
+
+def crypto_random_object_id(length: int = 17) -> str:
+    """Python reimplementation of cryptoRandomObjectId from `@apify/utilities`."""
+    chars = 'abcdefghijklmnopqrstuvwxyzABCEDFGHIJKLMNOPQRSTUVWXYZ0123456789'
+    return ''.join(secrets.choice(chars) for _ in range(length))

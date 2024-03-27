@@ -10,15 +10,16 @@ from crawlee._utils.wrappers import wrap_internal
 from crawlee.consts import MAX_PAYLOAD_SIZE_BYTES
 from crawlee.storages.base_storage import BaseStorage
 from crawlee.storages.key_value_store import KeyValueStore
+from crawlee.storages.types import ListPage
 
 if TYPE_CHECKING:
     from apify_client import ApifyClientAsync
     from apify_client.clients import DatasetClientAsync, DatasetCollectionClientAsync
 
-    from crawlee._utils.types import JSONSerializable, ListPage
     from crawlee.config import Config
     from crawlee.memory_storage import MemoryStorageClient
     from crawlee.memory_storage.resource_clients import DatasetClient, DatasetCollectionClient
+    from crawlee.storages.types import JSONSerializable
 
 # 0.01%
 SAFETY_BUFFER_PERCENT = 0.01 / 100

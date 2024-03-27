@@ -6,7 +6,7 @@ from crawlee.memory_storage.resource_clients.base_resource_collection_client imp
 from crawlee.memory_storage.resource_clients.key_value_store_client import KeyValueStoreClient
 
 if TYPE_CHECKING:
-    from crawlee._utils.types import ListPage
+    from crawlee.storages.types import ListPage
 
 
 class KeyValueStoreCollectionClient(BaseResourceCollectionClient):
