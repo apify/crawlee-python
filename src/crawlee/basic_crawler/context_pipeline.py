@@ -8,7 +8,6 @@ from crawlee.basic_crawler.types import BasicCrawlingContext
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 TMiddlewareCrawlingContext = TypeVar('TMiddlewareCrawlingContext', bound=BasicCrawlingContext)
-MiddlewareCallNext = Callable[[TMiddlewareCrawlingContext], Awaitable[None]]
 
 
 class RequestHandlerError(Exception, Generic[TCrawlingContext]):
