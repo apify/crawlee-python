@@ -222,3 +222,29 @@ async def test_max_tasks_per_minute_works(system_status: SystemStatus | Mock) ->
         pool_run_task.cancel()
         with suppress(asyncio.CancelledError):
             await pool_run_task
+
+
+async def test_allows_multiple_run_calls(system_status: SystemStatus | Mock) -> None:
+    done_count = 0
+
+    async def run() -> None:
+        await asyncio.sleep(0.1)
+        nonlocal done_count
+        done_count += 1
+
+    pool = AutoscaledPool(
+        system_status=system_status,
+        run_task_function=run,
+        is_task_ready_function=lambda: future(True),
+        is_finished_function=lambda: future(done_count >= 4),
+        min_concurrency=4,
+        max_concurrency=4,
+    )
+
+    await pool.run()
+    assert done_count == 4
+
+    done_count = 0
+
+    await pool.run()
+    assert done_count == 4
