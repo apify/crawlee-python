@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from logging import getLogger
-from typing import TYPE_CHECKING, Awaitable, Callable, Generic, cast
+from typing import TYPE_CHECKING, Awaitable, Callable, Generic, Union, cast
 
 from typing_extensions import TypeVar
 
@@ -14,7 +14,13 @@ from crawlee.autoscaling.snapshotter import Snapshotter
 from crawlee.autoscaling.system_status import SystemStatus
 from crawlee.basic_crawler.context_pipeline import ContextPipeline, RequestHandlerError
 from crawlee.basic_crawler.router import Router
-from crawlee.basic_crawler.types import BasicCrawlingContext, CreateRequestSchema, FinalStatistics, RequestState
+from crawlee.basic_crawler.types import (
+    BasicCrawlingContext,
+    CreateRequestSchema,
+    FinalStatistics,
+    RequestData,
+    RequestState,
+)
 from crawlee.config import Configuration
 from crawlee.events.local_event_manager import LocalEventManager
 
@@ -23,7 +29,7 @@ if TYPE_CHECKING:
 
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
-ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[TCrawlingContext]]
+ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Union[RequestData, None]]]
 FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
 
 logger = getLogger(__name__)
@@ -68,8 +74,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         self._context_pipeline = _context_pipeline or ContextPipeline()
 
-        self._error_handler: ErrorHandler[BasicCrawlingContext] | None = None
-        self._failed_request_handler: FailedRequestHandler[BasicCrawlingContext] | None = None
+        self._error_handler: ErrorHandler[TCrawlingContext] | None = None
+        self._failed_request_handler: FailedRequestHandler[TCrawlingContext] | None = None
 
         self._max_request_retries = max_request_retries
 
@@ -115,14 +121,14 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         self._router = router
 
-    def error_handler(self, handler: ErrorHandler[BasicCrawlingContext]) -> ErrorHandler[BasicCrawlingContext]:
+    def error_handler(self, handler: ErrorHandler[TCrawlingContext]) -> ErrorHandler[TCrawlingContext]:
         """Decorator for configuring an error handler (called after a request handler error and before retrying)."""
         self._error_handler = handler
         return handler
 
     def failed_request_handler(
-        self, handler: FailedRequestHandler[BasicCrawlingContext]
-    ) -> FailedRequestHandler[BasicCrawlingContext]:
+        self, handler: FailedRequestHandler[TCrawlingContext]
+    ) -> FailedRequestHandler[TCrawlingContext]:
         """Decorator for configuring a failed request handler (called after max retries are reached)."""
         self._failed_request_handler = handler
         return handler
@@ -250,15 +256,19 @@ class BasicCrawler(Generic[TCrawlingContext]):
         )
 
         if should_retry_request:
-            crawling_context.request.retry_count += 1
+            request = crawling_context.request
+            request.retry_count += 1
 
             if self._error_handler:
                 try:
-                    await self._error_handler(crawling_context, error)
+                    new_request = await self._error_handler(crawling_context, error)
                 except Exception as e:
                     raise UserDefinedErrorHandlerError('Exception thrown in user-defined request error handler') from e
+                else:
+                    if new_request is not None:
+                        request = new_request
 
-            await self._request_provider.reclaim_request(crawling_context.request)
+            await self._request_provider.reclaim_request(request)
         else:
             await self._handle_failed_request(crawling_context, error)
 
