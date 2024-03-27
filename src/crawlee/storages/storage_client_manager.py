@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from crawlee._memory_storage import MemoryStorageClient
+from crawlee.memory_storage import MemoryStorageClient
 
 if TYPE_CHECKING:
     from apify_client import ApifyClientAsync

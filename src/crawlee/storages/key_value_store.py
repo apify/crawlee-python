@@ -10,9 +10,9 @@ from crawlee.storages.base_storage import BaseStorage
 if TYPE_CHECKING:
     from apify_client import ApifyClientAsync
 
-    from crawlee._memory_storage import MemoryStorageClient
-    from crawlee._memory_storage.resource_clients import KeyValueStoreClient, KeyValueStoreCollectionClient
     from crawlee.config import Config
+    from crawlee.memory_storage import MemoryStorageClient
+    from crawlee.memory_storage.resource_clients import KeyValueStoreClient, KeyValueStoreCollectionClient
 
 
 T = TypeVar('T')

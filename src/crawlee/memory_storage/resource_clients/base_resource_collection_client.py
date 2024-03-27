@@ -4,12 +4,12 @@ from abc import ABC, abstractmethod
 from operator import itemgetter
 from typing import TYPE_CHECKING, Generic, TypeVar, cast
 
-from crawlee._memory_storage.resource_clients.base_resource_client import BaseResourceClient
-from crawlee._utils.file import update_metadata
+from crawlee._utils.file import persist_metadata_if_enabled
 from crawlee._utils.types import ListPage
+from crawlee.memory_storage.resource_clients.base_resource_client import BaseResourceClient
 
 if TYPE_CHECKING:
-    from crawlee._memory_storage.memory_storage_client import MemoryStorageClient
+    from crawlee.memory_storage.memory_storage_client import MemoryStorageClient
 
 
 ResourceClientType = TypeVar('ResourceClientType', bound=BaseResourceClient, contravariant=True)  # noqa: PLC0105
@@ -102,7 +102,7 @@ class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
         resource_info = new_resource._to_resource_info()
 
         # Write to the disk
-        await update_metadata(
+        await persist_metadata_if_enabled(
             data=resource_info,
             entity_directory=new_resource._resource_directory,
             write_metadata=self._memory_storage_client._write_metadata,

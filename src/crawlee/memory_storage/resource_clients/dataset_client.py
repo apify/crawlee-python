@@ -6,22 +6,21 @@ import os
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, AsyncIterator
 
+import aiofiles
 import aioshutil
+from aiofiles.os import makedirs
 
-from crawlee._memory_storage.resource_clients.base_resource_client import BaseResourceClient
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import raise_on_duplicate_storage, raise_on_non_existing_storage
-from crawlee._utils.file import (
-    force_rename,
-    update_dataset_items,
-    update_metadata,
-)
+from crawlee._utils.file import force_rename, json_dumps, persist_metadata_if_enabled
 from crawlee._utils.types import ListPage
+from crawlee.memory_storage.resource_clients.base_resource_client import BaseResourceClient
 from crawlee.storages.types import StorageTypes
 
 if TYPE_CHECKING:
-    from crawlee._memory_storage.memory_storage_client import MemoryStorageClient
     from crawlee._utils.types import JSONSerializable
+    from crawlee.memory_storage.memory_storage_client import MemoryStorageClient
+
 
 # This is what API returns in the x-apify-pagination-limit
 # header when no limit query parameter is used.
@@ -331,11 +330,43 @@ class DatasetClient(BaseResourceClient):
         async with existing_dataset_by_id._file_operation_lock:
             await existing_dataset_by_id._update_timestamps(has_been_modified=True)
 
-            await update_dataset_items(
+            await self._persist_dataset_items_to_disk(
                 data=data_entries,
                 entity_directory=existing_dataset_by_id._resource_directory,
                 persist_storage=self._memory_storage_client._persist_storage,
             )
+
+    async def _persist_dataset_items_to_disk(
+        self,
+        *,
+        data: list[tuple[str, dict]],
+        entity_directory: str,
+        persist_storage: bool,
+    ) -> None:
+        """Writes dataset items to the disk.
+
+        The function iterates over a list of dataset items, each represented as a tuple of an identifier
+        and a dictionary, and writes them as individual JSON files in a specified directory. The function
+        will skip writing if `persist_storage` is False. Before writing, it ensures that the target
+        directory exists, creating it if necessary.
+
+        Args:
+            data: A list of tuples, each containing an identifier (string) and a data dictionary.
+            entity_directory: The directory path where the dataset items should be stored.
+            persist_storage: A boolean flag indicating whether the data should be persisted to the disk.
+        """
+        # Skip writing files to the disk if the client has the option set to false
+        if not persist_storage:
+            return
+
+        # Ensure the directory for the entity exists
+        await makedirs(entity_directory, exist_ok=True)
+
+        # Save all the new items to the disk
+        for idx, item in data:
+            file_path = os.path.join(entity_directory, f'{idx}.json')
+            async with aiofiles.open(file_path, mode='wb') as f:
+                await f.write(json_dumps(item).encode('utf-8'))
 
     def _to_resource_info(self) -> dict:
         """Retrieve the dataset info."""
@@ -356,7 +387,7 @@ class DatasetClient(BaseResourceClient):
             self._modified_at = datetime.now(timezone.utc)
 
         dataset_info = self._to_resource_info()
-        await update_metadata(
+        await persist_metadata_if_enabled(
             data=dataset_info,
             entity_directory=self._resource_directory,
             write_metadata=self._memory_storage_client._write_metadata,

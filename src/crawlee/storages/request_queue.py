@@ -19,9 +19,9 @@ if TYPE_CHECKING:
     from apify_client import ApifyClientAsync
     from apify_client.clients import RequestQueueClientAsync, RequestQueueCollectionClientAsync
 
-    from crawlee._memory_storage import MemoryStorageClient
-    from crawlee._memory_storage.resource_clients import RequestQueueClient, RequestQueueCollectionClient
     from crawlee.config import Config
+    from crawlee.memory_storage import MemoryStorageClient
+    from crawlee.memory_storage.resource_clients import RequestQueueClient, RequestQueueCollectionClient
 
 
 logger = getLogger(__name__)

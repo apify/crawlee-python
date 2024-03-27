@@ -15,7 +15,6 @@ import aiofiles
 import aioshutil
 from aiofiles.os import makedirs
 
-from crawlee._memory_storage.resource_clients.base_resource_client import BaseResourceClient
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import maybe_parse_body, raise_on_duplicate_storage, raise_on_non_existing_storage
 from crawlee._utils.file import (
@@ -24,15 +23,16 @@ from crawlee._utils.file import (
     guess_file_extension,
     is_file_or_bytes,
     json_dumps,
-    update_metadata,
+    persist_metadata_if_enabled,
 )
 from crawlee.consts import DEFAULT_API_PARAM_LIMIT
+from crawlee.memory_storage.resource_clients.base_resource_client import BaseResourceClient
 from crawlee.storages.types import StorageTypes
 
 if TYPE_CHECKING:
     from typing_extensions import NotRequired
 
-    from crawlee._memory_storage.memory_storage_client import MemoryStorageClient
+    from crawlee.memory_storage.memory_storage_client import MemoryStorageClient
 
 
 logger = getLogger(__name__)
@@ -437,7 +437,7 @@ class KeyValueStoreClient(BaseResourceClient):
             self._modified_at = datetime.now(timezone.utc)
 
         kv_store_info = self._to_resource_info()
-        await update_metadata(
+        await persist_metadata_if_enabled(
             data=kv_store_info,
             entity_directory=self._resource_directory,
             write_metadata=self._memory_storage_client._write_metadata,

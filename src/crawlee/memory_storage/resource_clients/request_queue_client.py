@@ -7,10 +7,11 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
+import aiofiles
 import aioshutil
+from aiofiles.os import makedirs
 from sortedcollections import ValueSortedDict  # type: ignore
 
-from crawlee._memory_storage.resource_clients.base_resource_client import BaseResourceClient
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import (
     filter_out_none_values_recursively,
@@ -18,17 +19,17 @@ from crawlee._utils.data_processing import (
     raise_on_non_existing_storage,
 )
 from crawlee._utils.file import (
-    delete_request,
+    force_remove,
     force_rename,
     json_dumps,
-    update_metadata,
-    update_request_queue_item,
+    persist_metadata_if_enabled,
 )
 from crawlee._utils.requests import unique_key_to_request_id
+from crawlee.memory_storage.resource_clients.base_resource_client import BaseResourceClient
 from crawlee.storages.types import StorageTypes
 
 if TYPE_CHECKING:
-    from crawlee._memory_storage.memory_storage_client import MemoryStorageClient
+    from crawlee.memory_storage.memory_storage_client import MemoryStorageClient
 
 
 class RequestQueueClient(BaseResourceClient):
@@ -230,7 +231,7 @@ class RequestQueueClient(BaseResourceClient):
             else:
                 existing_queue_by_id._pending_request_count += 1
             await existing_queue_by_id._update_timestamps(has_been_modified=True)
-            await update_request_queue_item(
+            await self._persist_single_request_to_storage(
                 request=request_model,
                 request_id=request_model['id'],
                 entity_directory=existing_queue_by_id._resource_directory,
@@ -314,7 +315,7 @@ class RequestQueueClient(BaseResourceClient):
             existing_queue_by_id._pending_request_count += pending_count_adjustment
             existing_queue_by_id._handled_request_count -= pending_count_adjustment
             await existing_queue_by_id._update_timestamps(has_been_modified=True)
-            await update_request_queue_item(
+            await self._persist_single_request_to_storage(
                 request=request_model,
                 request_id=request_model['id'],
                 entity_directory=existing_queue_by_id._resource_directory,
@@ -350,7 +351,59 @@ class RequestQueueClient(BaseResourceClient):
                 else:
                     existing_queue_by_id._pending_request_count -= 1
                 await existing_queue_by_id._update_timestamps(has_been_modified=True)
-                await delete_request(entity_directory=existing_queue_by_id._resource_directory, request_id=request_id)
+                await self._delete_request_file_from_storage(
+                    entity_directory=existing_queue_by_id._resource_directory,
+                    request_id=request_id,
+                )
+
+    async def _persist_single_request_to_storage(
+        self,
+        *,
+        request_id: str,
+        request: dict,
+        entity_directory: str,
+        persist_storage: bool,
+    ) -> None:
+        """Updates or writes a single request item to the disk.
+
+        This function writes a given request dictionary to a JSON file, named after the request's ID,
+        within a specified directory. The writing process is skipped if `persist_storage` is False.
+        Before writing, it ensures that the target directory exists, creating it if necessary.
+
+        Args:
+            request_id: The identifier of the request to be written.
+            request: The dictionary containing the request data.
+            entity_directory: The directory path where the request file should be stored.
+            persist_storage: A boolean flag indicating whether the request should be persisted to the disk.
+        """
+        # Skip writing files to the disk if the client has the option set to false
+        if not persist_storage:
+            return
+
+        # Ensure the directory for the entity exists
+        await makedirs(entity_directory, exist_ok=True)
+
+        # Write the request to the file
+        file_path = os.path.join(entity_directory, f'{request_id}.json')
+        async with aiofiles.open(file_path, mode='wb') as f:
+            await f.write(json_dumps(request).encode('utf-8'))
+
+    async def _delete_request_file_from_storage(self, *, request_id: str, entity_directory: str) -> None:
+        """Deletes a specific request item from the disk.
+
+        This function removes a file representing a request, identified by the request's ID, from a
+        specified directory. Before attempting to remove the file, it ensures that the target directory
+        exists, creating it if necessary.
+
+        Args:
+            request_id: The identifier of the request to be deleted.
+            entity_directory: The directory path where the request file is stored.
+        """
+        # Ensure the directory for the entity exists
+        await makedirs(entity_directory, exist_ok=True)
+
+        file_path = os.path.join(entity_directory, f'{request_id}.json')
+        await force_remove(file_path)
 
     def _to_resource_info(self) -> dict:
         """Retrieve the request queue store info."""
@@ -375,7 +428,7 @@ class RequestQueueClient(BaseResourceClient):
             self._modified_at = datetime.now(timezone.utc)
 
         request_queue_info = self._to_resource_info()
-        await update_metadata(
+        await persist_metadata_if_enabled(
             data=request_queue_info,
             entity_directory=self._resource_directory,
             write_metadata=self._memory_storage_client._write_metadata,

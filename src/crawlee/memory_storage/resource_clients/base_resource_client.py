@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing_extensions import Self
 
-    from crawlee._memory_storage.memory_storage_client import MemoryStorageClient
+    from crawlee.memory_storage.memory_storage_client import MemoryStorageClient
 
 
 class BaseResourceClient(ABC):
