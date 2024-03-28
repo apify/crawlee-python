@@ -18,6 +18,40 @@ async def test_processes_requests() -> None:
     assert calls == ['http://a.com', 'http://b.com', 'http://c.com']
 
 
+async def test_processes_requests_from_run_args() -> None:
+    crawler = BasicCrawler(request_provider=RequestList())
+    calls = list[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        calls.append(context.request.url)
+
+    await crawler.run(['http://a.com', 'http://b.com', 'http://c.com'])
+
+    assert calls == ['http://a.com', 'http://b.com', 'http://c.com']
+
+
+async def test_allows_multiple_run_calls() -> None:
+    crawler = BasicCrawler(request_provider=RequestList())
+    calls = list[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        calls.append(context.request.url)
+
+    await crawler.run(['http://a.com', 'http://b.com', 'http://c.com'])
+    await crawler.run(['http://a.com', 'http://b.com', 'http://c.com'])
+
+    assert calls == [
+        'http://a.com',
+        'http://b.com',
+        'http://c.com',
+        'http://a.com',
+        'http://b.com',
+        'http://c.com',
+    ]
+
+
 async def test_retries_failed_requests() -> None:
     crawler = BasicCrawler(request_provider=RequestList(['http://a.com', 'http://b.com', 'http://c.com']))
     calls = list[str]()
@@ -37,6 +71,63 @@ async def test_retries_failed_requests() -> None:
         'http://c.com',
         'http://b.com',
         'http://b.com',
+    ]
+
+
+async def test_respects_no_retry() -> None:
+    crawler = BasicCrawler(
+        request_provider=RequestList(
+            ['http://a.com', 'http://b.com', RequestData(url='http://c.com', unique_key='', id='', no_retry=True)]
+        ),
+        max_request_retries=3,
+    )
+    calls = list[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        calls.append(context.request.url)
+        raise RuntimeError('Arbitrary crash for testing purposes')
+
+    await crawler.run()
+
+    assert calls == [
+        'http://a.com',
+        'http://b.com',
+        'http://c.com',
+        'http://a.com',
+        'http://b.com',
+        'http://a.com',
+        'http://b.com',
+    ]
+
+
+async def test_respects_request_specific_max_retries() -> None:
+    crawler = BasicCrawler(
+        request_provider=RequestList(
+            [
+                'http://a.com',
+                'http://b.com',
+                RequestData(url='http://c.com', unique_key='', id='', user_data={'__crawlee': {'maxRetries': 4}}),
+            ]
+        ),
+        max_request_retries=1,
+    )
+    calls = list[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        calls.append(context.request.url)
+        raise RuntimeError('Arbitrary crash for testing purposes')
+
+    await crawler.run()
+
+    assert calls == [
+        'http://a.com',
+        'http://b.com',
+        'http://c.com',
+        'http://c.com',
+        'http://c.com',
+        'http://c.com',
     ]
 
 

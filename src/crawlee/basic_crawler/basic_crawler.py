@@ -270,6 +270,14 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
             await self._request_provider.reclaim_request(request)
         else:
+            await wait_for(
+                self._request_provider.mark_request_handled(crawling_context.request),
+                timeout=self._internal_timeout,
+                timeout_message='Marking request as handled timed out after '
+                f'{self._internal_timeout.total_seconds()} seconds',
+                logger=logger,
+                max_retries=3,
+            )
             await self._handle_failed_request(crawling_context, error)
 
     async def _handle_failed_request(self, crawling_context: TCrawlingContext, error: Exception) -> None:
