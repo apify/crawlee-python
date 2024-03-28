@@ -1,19 +1,24 @@
 from __future__ import annotations
 
-from datetime import timedelta
-from typing import AsyncGenerator, Awaitable, Callable
+from typing import TYPE_CHECKING, AsyncGenerator, Awaitable, Callable
 
 import httpx
 
 from crawlee.basic_crawler.basic_crawler import BasicCrawler
 from crawlee.basic_crawler.context_pipeline import ContextPipeline
-from crawlee.basic_crawler.types import BasicCrawlingContext
-from crawlee.config import Configuration
 from crawlee.http_crawler.types import HttpCrawlingContext
-from crawlee.storages.request_provider import RequestProvider
+
+if TYPE_CHECKING:
+    from datetime import timedelta
+
+    from crawlee.basic_crawler.types import BasicCrawlingContext
+    from crawlee.config import Configuration
+    from crawlee.storages.request_provider import RequestProvider
 
 
 class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
+    """A crawler that fetches the request URL using `httpx`."""
+
     def __init__(
         self,
         *,
@@ -25,7 +30,7 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
         configuration: Configuration | None = None,
         request_handler_timeout: timedelta | None = None,
     ) -> None:
-        context_pipeline = ContextPipeline().compose(self.make_http_request)
+        context_pipeline = ContextPipeline().compose(self._make_http_request)
         self._client = httpx.AsyncClient()
 
         basic_crawler_kwargs = {}
@@ -44,7 +49,7 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
             **basic_crawler_kwargs,
         )
 
-    async def make_http_request(
+    async def _make_http_request(
         self, crawling_context: BasicCrawlingContext
     ) -> AsyncGenerator[HttpCrawlingContext, None]:
         response = await self._client.request(crawling_context.request.method, crawling_context.request.url)

@@ -143,6 +143,9 @@ convention = "google"
 [tool.ruff.lint.isort]
 known-local-folder = ["crawlee"]
 
+[tool.ruff.lint.pylint]
+max-branches = 18
+
 [tool.pytest.ini_options]
 addopts = "-ra"
 asyncio_mode = "auto"

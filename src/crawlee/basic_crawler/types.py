@@ -11,6 +11,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class CreateRequestSchema(BaseModel):
+    """A crawling request body."""
+
     model_config = ConfigDict(populate_by_name=True)
 
     url: str
@@ -49,16 +51,19 @@ class CreateRequestSchema(BaseModel):
 
     @property
     def crawlee_data(self) -> CrawleeRequestData:
+        """Crawlee-specific configuration stored in the user_data."""
         return CrawleeRequestData.model_validate(self.user_data.get('__crawlee', {}) if self.user_data else {})
 
     @property
     def label(self) -> str | None:
+        """A string used to differentiate between arbitrary request types."""
         if self.user_data and 'label' in self.user_data:
             return str(self.user_data['label'])
         return None
 
     @property
     def state(self) -> RequestState | None:
+        """Crawlee-specific request handling state."""
         return self.crawlee_data.state
 
     @state.setter
@@ -71,6 +76,7 @@ class CreateRequestSchema(BaseModel):
 
     @property
     def max_retries(self) -> int | None:
+        """Crawlee-specific limit on the number of retries of the request."""
         return self.crawlee_data.max_retries
 
     @max_retries.setter
@@ -83,10 +89,14 @@ class CreateRequestSchema(BaseModel):
 
 
 class RequestData(CreateRequestSchema):
+    """A crawling request data, as returned from a storage."""
+
     id: str
 
 
 class RequestState(Enum):
+    """Crawlee-specific request handling state."""
+
     UNPROCESSED = 0
     BEFORE_NAV = 1
     AFTER_NAV = 2
@@ -98,6 +108,8 @@ class RequestState(Enum):
 
 
 class CrawleeRequestData(BaseModel):
+    """Crawlee-specific configuration stored in the user_data."""
+
     max_retries: Annotated[int | None, Field(alias='maxRetries')] = None
     """Maximum number of retries for this request. Allows to override the global `maxRequestRetries` option of
     `BasicCrawler`."""
@@ -114,6 +126,8 @@ class CrawleeRequestData(BaseModel):
 
 @dataclass(frozen=True)
 class BasicCrawlingContext:
+    """Basic crawling context intended to be extended by crawlers."""
+
     request: RequestData
 
 

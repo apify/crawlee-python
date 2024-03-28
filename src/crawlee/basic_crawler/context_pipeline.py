@@ -19,6 +19,11 @@ class RequestHandlerError(Exception, Generic[TCrawlingContext]):
 
 
 class ContextPipeline(Generic[TCrawlingContext]):
+    """Encapsulates the logic of gradually enhancing the crawling context with additional information and utilities.
+
+    The enhancement is done by a chain of middlewares that are added to the pipeline after it's creation.
+    """
+
     def __init__(
         self,
         *,
@@ -43,12 +48,16 @@ class ContextPipeline(Generic[TCrawlingContext]):
         crawling_context: BasicCrawlingContext,
         final_context_consumer: Callable[[TCrawlingContext], Awaitable[None]],
     ) -> None:
+        """Run a crawling context through the middleware chain and pipe it into a consumer function.
+
+        Exceptions from the consumer function are wrapped together with the final crawling context.
+        """
         chain = list(self._middleware_chain())
         cleanup_stack = list[AsyncGenerator]()
 
         for member in reversed(chain):
-            if member._middleware:
-                middleware_instance = member._middleware(crawling_context)
+            if member._middleware:  # noqa: SLF001
+                middleware_instance = member._middleware(crawling_context)  # noqa: SLF001
                 try:
                     result = await middleware_instance.__anext__()
                 except StopAsyncIteration as e:
@@ -77,6 +86,14 @@ class ContextPipeline(Generic[TCrawlingContext]):
             AsyncGenerator[TMiddlewareCrawlingContext, None],
         ],
     ) -> ContextPipeline[TMiddlewareCrawlingContext]:
+        """Add a middleware to the pipeline.
+
+        The middleware should yield exactly once, and it should yield an (optionally) extended crawling context object.
+        The part before the yield can be used for initialization and the part after it for cleanup.
+
+        Returns:
+            The extended pipeline instance, providing a fluent interface
+        """
         return ContextPipeline[TMiddlewareCrawlingContext](
             _middleware=cast(
                 Callable[[BasicCrawlingContext], AsyncGenerator[TMiddlewareCrawlingContext, None]], middleware

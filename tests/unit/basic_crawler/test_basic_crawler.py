@@ -1,3 +1,4 @@
+# ruff: noqa: ARG001
 import pytest
 
 from crawlee.basic_crawler.basic_crawler import BasicCrawler, UserDefinedErrorHandlerError

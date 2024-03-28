@@ -56,6 +56,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         router: Callable[[TCrawlingContext], Awaitable] | None = None,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         # TODO: make request_provider optional (and instantiate based on configuration if None is supplied)
+        # https://github.com/apify/crawlee-py/issues/83
         request_provider: RequestProvider,
         min_concurrency: int | None = None,
         max_concurrency: int | None = None,
@@ -97,6 +98,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         )
 
         self._event_manager = LocalEventManager()  # TODO: switch based on configuration
+        # https://github.com/apify/crawlee-py/issues/83
         self._snapshotter = Snapshotter(self._event_manager)
         self._pool = AutoscaledPool(
             system_status=SystemStatus(self._snapshotter),
@@ -183,6 +185,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             return
 
         # TODO: fetch session from the session pool
+        # https://github.com/apify/crawlee-py/issues/78
 
         crawling_context = BasicCrawlingContext(request=request)
 

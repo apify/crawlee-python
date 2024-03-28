@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from datetime import timedelta
@@ -8,26 +9,50 @@ if TYPE_CHECKING:
     from crawlee.basic_crawler.types import CreateRequestSchema, RequestData
 
 
-class RequestProvider(Protocol):
+class RequestProvider(ABC):
+    """Provides access to a queue of crawling requests."""
+
     @property
-    def name(self) -> str: ...
+    @abstractmethod
+    def name(self) -> str:
+        """ID or name of the request queue."""
 
-    async def get_total_count(self) -> int: ...
+    @abstractmethod
+    async def get_total_count(self) -> int:
+        """Returns an offline approximation of the total number of requests in the queue (i.e. pending + handled)."""
 
-    async def is_empty(self) -> bool: ...
+    @abstractmethod
+    async def is_empty(self) -> bool:
+        """Returns True if there are no more requests in the queue (there might still be unfinished requests)."""
 
-    async def is_finished(self) -> bool: ...
+    @abstractmethod
+    async def is_finished(self) -> bool:
+        """Returns True if all requests have been handled."""
 
-    async def drop(self) -> None: ...
+    @abstractmethod
+    async def drop(self) -> None:
+        """Removes the queue either from the Apify Cloud storage or from the local database."""
 
-    async def fetch_next_request(self) -> RequestData | None: ...
+    @abstractmethod
+    async def fetch_next_request(self) -> RequestData | None:
+        """Returns a next request in the queue to be processed, or `null` if there are no more pending requests."""
 
-    async def reclaim_request(self, request: RequestData, *, forefront: bool = False) -> None: ...
+    @abstractmethod
+    async def reclaim_request(self, request: RequestData, *, forefront: bool = False) -> None:
+        """Reclaims a failed request back to the queue, so that it can be returned for processing later again.
 
-    async def mark_request_handled(self, request: RequestData) -> None: ...
+        It is possible to modify the request data by supplying an updated request as a parameter.
+        """
 
-    async def get_handled_count(self) -> int: ...
+    @abstractmethod
+    async def mark_request_handled(self, request: RequestData) -> None:
+        """Marks a request as handled after a successful processing (or after giving up retrying)."""
 
+    @abstractmethod
+    async def get_handled_count(self) -> int:
+        """Returns the number of handled requests."""
+
+    @abstractmethod
     async def add_requests_batched(
         self,
         requests: list[CreateRequestSchema],
@@ -35,4 +60,11 @@ class RequestProvider(Protocol):
         batch_size: int,
         wait_for_all_requests_to_be_added: bool,
         wait_time_between_batches: timedelta,
-    ) -> None: ...
+    ) -> None:
+        """Adds requests to the queue in batches.
+
+        By default, it will resolve after the initial batch is added, and continue adding the rest in background.
+        You can configure the batch size via `batch_size` option and the sleep time in between the batches
+        via `wait_time_between_batches`. If you want to wait for all batches to be added to the queue, you can use
+        the `wait_for_all_requests_to_be_added` option.
+        """

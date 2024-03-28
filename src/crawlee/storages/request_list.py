@@ -16,6 +16,8 @@ if TYPE_CHECKING:
 
 
 class RequestList(RequestProvider):
+    """Represents a (potentially very large) list of URLs to crawl."""
+
     def __init__(self, sources: list[str | RequestData] | None = None, name: str | None = None) -> None:
         self._name = name or ''
         self._handled_count = 0
