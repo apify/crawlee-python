@@ -17,7 +17,7 @@ async def dataset() -> AsyncGenerator[Dataset, None]:
 
 async def test_open() -> None:
     default_dataset = await Dataset.open()
-    default_dataset_by_id = await Dataset.open(id=default_dataset._id)
+    default_dataset_by_id = await Dataset.open(id_=default_dataset.id)
 
     assert default_dataset is default_dataset_by_id
 
@@ -26,12 +26,12 @@ async def test_open() -> None:
     assert default_dataset is not named_dataset
 
     with pytest.raises(RuntimeError, match='Dataset with id "nonexistent-id" does not exist!'):
-        await Dataset.open(id='nonexistent-id')
+        await Dataset.open(id_='nonexistent-id')
 
     # Test that when you try to open a dataset by ID and you use a name of an existing dataset,
     # it doesn't work
     with pytest.raises(RuntimeError, match='Dataset with id "dummy-name" does not exist!'):
-        await Dataset.open(id='dummy-name')
+        await Dataset.open(id_='dummy-name')
 
 
 async def test_same_references() -> None:
@@ -103,10 +103,10 @@ async def test_get_data(dataset: Dataset) -> None:  # We don't test everything, 
     assert list_page.items[-1]['id'] == desired_item_count - 1
 
 
-# async def test_iterate_items(dataset: Dataset) -> None:
-#     desired_item_count = 3
-#     idx = 0
-#     await dataset.push_data([{'id': i} for i in range(desired_item_count)])
-#     async for item in dataset.iterate_items():
-#         assert item['id'] == idx
-#         idx += 1
+async def test_iterate_items(dataset: Dataset) -> None:
+    desired_item_count = 3
+    idx = 0
+    await dataset.push_data([{'id': i} for i in range(desired_item_count)])
+    async for item in dataset.iterate_items():
+        assert item['id'] == idx
+        idx += 1

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, AsyncIterator, NamedTuple, TypedDict, TypeVar, overload
+from typing import TYPE_CHECKING, Any, AsyncIterator, NamedTuple, TypedDict, TypeVar, cast, overload
 
 from apify_client.clients import KeyValueStoreClientAsync, KeyValueStoreCollectionClientAsync
 
@@ -8,8 +8,6 @@ from crawlee._utils.wrappers import wrap_internal
 from crawlee.storages.base_storage import BaseStorage
 
 if TYPE_CHECKING:
-    from apify_client import ApifyClientAsync
-
     from crawlee.config import Config
     from crawlee.memory_storage import MemoryStorageClient
     from crawlee.memory_storage.resource_clients import KeyValueStoreClient, KeyValueStoreCollectionClient
@@ -48,18 +46,18 @@ class KeyValueStore(BaseStorage):
     `KeyValueStore.get_value` and `KeyValueStore.set_value` convenience functions.
 
     `KeyValueStore` stores its data either on local disk or in the Apify cloud,
-    depending on whether the `APIFY_LOCAL_STORAGE_DIR` or `APIFY_TOKEN` environment variables are set.
+    depending on whether the `CRAWLEE_LOCAL_STORAGE_DIR` or `APIFY_TOKEN` environment variables are set.
 
-    If the `APIFY_LOCAL_STORAGE_DIR` environment variable is set, the data is stored in
+    If the `CRAWLEE_LOCAL_STORAGE_DIR` environment variable is set, the data is stored in
     the local directory in the following files:
     ```
-    {APIFY_LOCAL_STORAGE_DIR}/key_value_stores/{STORE_ID}/{INDEX}.{EXT}
+    {CRAWLEE_LOCAL_STORAGE_DIR}/key_value_stores/{STORE_ID}/{INDEX}.{EXT}
     ```
     Note that `{STORE_ID}` is the name or ID of the key-value store. The default key-value store has ID: `default`,
     unless you override it by setting the `APIFY_DEFAULT_KEY_VALUE_STORE_ID` environment variable.
     The `{KEY}` is the key of the record and `{EXT}` corresponds to the MIME content type of the data value.
 
-    If the `APIFY_TOKEN` environment variable is set but `APIFY_LOCAL_STORAGE_DIR` is not, the data is stored in the
+    If the `APIFY_TOKEN` environment variable is set but `CRAWLEE_LOCAL_STORAGE_DIR` is not, the data is stored in the
     [Apify Key-value store](https://docs.apify.com/storage/key-value-store) cloud storage.
     """
 
@@ -70,26 +68,27 @@ class KeyValueStore(BaseStorage):
 
     def __init__(
         self,
-        id: str,  # noqa: A002
+        id_: str,
         name: str | None,
-        client: MemoryStorageClient,
         config: Config,
+        client: MemoryStorageClient,
     ) -> None:
-        """Create a `KeyValueStore` instance.
+        """Create a new instance.
 
         Do not use the constructor directly, use the `Actor.open_key_value_store()` function instead.
 
         Args:
-            id ID of the key-value store.
+            id: ID of the key-value store.
             name: Name of the key-value store.
-            client (ApifyClientAsync or MemoryStorageClient): The storage client which should be used.
+            config: The configuration.
+            client: The storage client which should be used.
         """
-        super().__init__(id=id, name=name, client=client, config=config)
+        super().__init__(id_=id_, name=name, client=client, config=config)
 
         self.get_value = wrap_internal(self._get_value_internal, self.get_value)  # type: ignore
         self.set_value = wrap_internal(self._set_value_internal, self.set_value)  # type: ignore
         self.get_public_url = wrap_internal(self._get_public_url_internal, self.get_public_url)  # type: ignore
-        self._id = id
+        self._id = id_
         self._name = name
         self._key_value_store_client = client.key_value_store(self._id)
 
@@ -98,9 +97,8 @@ class KeyValueStore(BaseStorage):
         cls,
         *,
         config: Config | None = None,
-        id: str | None = None,  # noqa: A002
+        id_: str | None = None,
         name: str | None = None,
-        force_cloud: bool = False,
     ) -> KeyValueStore:
         """Open a key-value store.
 
@@ -115,13 +113,12 @@ class KeyValueStore(BaseStorage):
             name: Name of the key-value store to be opened.
                 If neither `id` nor `name` are provided, the method returns the default key-value store associated with the actor run.
                 If the key-value store with the given name does not exist, it is created.
-            force_cloud: If set to True, it will open a key-value store on the Apify Platform even when running the actor locally.
-                Defaults to False.
 
         Returns:
             KeyValueStore: An instance of the `KeyValueStore` class for the given ID or name.
         """
-        return await super().open(id=id, name=name, force_cloud=force_cloud, config=config)
+        storage = await super().open(id_=id_, name=name, config=config)
+        return cast(KeyValueStore, storage)
 
     @classmethod
     def _get_human_friendly_label(cls) -> str:
@@ -134,15 +131,15 @@ class KeyValueStore(BaseStorage):
     @classmethod
     def _get_single_storage_client(
         cls,
-        id: str,  # noqa: A002
-        client: ApifyClientAsync | MemoryStorageClient,
+        id_: str,
+        client: MemoryStorageClient,
     ) -> KeyValueStoreClientAsync | KeyValueStoreClient:
-        return client.key_value_store(id)
+        return client.key_value_store(id_)
 
     @classmethod
     def _get_storage_collection_client(
         cls,
-        client: ApifyClientAsync | MemoryStorageClient,
+        client: MemoryStorageClient,
     ) -> KeyValueStoreCollectionClientAsync | KeyValueStoreCollectionClient:
         return client.key_value_stores()
 
@@ -209,7 +206,7 @@ class KeyValueStore(BaseStorage):
         """Set or delete a value in the key-value store.
 
         Args:
-            key The key under which the value should be saved.
+            key: The key under which the value should be saved.
             value The value to save. If the value is `None`, the corresponding key-value pair will be deleted.
             content_type: The content type of the saved value.
         """
@@ -232,7 +229,7 @@ class KeyValueStore(BaseStorage):
         """Get a URL for the given key that may be used to publicly access the value in the remote key-value store.
 
         Args:
-            key The key for which the URL should be generated.
+            key: The key for which the URL should be generated.
         """
         store = await cls.open()
         return await store.get_public_url(key)

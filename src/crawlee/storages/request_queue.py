@@ -4,7 +4,7 @@ import asyncio
 from collections import OrderedDict
 from datetime import datetime, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from typing import OrderedDict as OrderedDictType
 
 from apify._utils import budget_ow
@@ -16,7 +16,6 @@ from crawlee.consts import REQUEST_QUEUE_HEAD_MAX_LIMIT
 from crawlee.storages.base_storage import BaseStorage
 
 if TYPE_CHECKING:
-    from apify_client import ApifyClientAsync
     from apify_client.clients import RequestQueueClientAsync, RequestQueueCollectionClientAsync
 
     from crawlee.config import Config
@@ -64,18 +63,18 @@ class RequestQueue(BaseStorage):
     Do not instantiate this class directly, use the `Actor.open_request_queue()` function instead.
 
     `RequestQueue` stores its data either on local disk or in the Apify cloud,
-    depending on whether the `APIFY_LOCAL_STORAGE_DIR` or `APIFY_TOKEN` environment variables are set.
+    depending on whether the `CRAWLEE_LOCAL_STORAGE_DIR` or `APIFY_TOKEN` environment variables are set.
 
-    If the `APIFY_LOCAL_STORAGE_DIR` environment variable is set, the data is stored in
+    If the `CRAWLEE_LOCAL_STORAGE_DIR` environment variable is set, the data is stored in
     the local directory in the following files:
     ```
-    {APIFY_LOCAL_STORAGE_DIR}/request_queues/{QUEUE_ID}/{REQUEST_ID}.json
+    {CRAWLEE_LOCAL_STORAGE_DIR}/request_queues/{QUEUE_ID}/{REQUEST_ID}.json
     ```
     Note that `{QUEUE_ID}` is the name or ID of the request queue. The default request queue has ID: `default`,
     unless you override it by setting the `APIFY_DEFAULT_REQUEST_QUEUE_ID` environment variable.
     The `{REQUEST_ID}` is the id of the request.
 
-    If the `APIFY_TOKEN` environment variable is set but `APIFY_LOCAL_STORAGE_DIR` is not, the data is stored in the
+    If the `APIFY_TOKEN` environment variable is set but `CRAWLEE_LOCAL_STORAGE_DIR` is not, the data is stored in the
     [Apify Request Queue](https://docs.apify.com/storage/request-queue)
     cloud storage.
     """
@@ -94,23 +93,23 @@ class RequestQueue(BaseStorage):
 
     def __init__(
         self,
-        id: str,  # noqa: A002
+        id_: str,
         name: str | None,
         client: MemoryStorageClient,
         config: Config,
     ) -> None:
-        """Create a `RequestQueue` instance.
+        """Create a new instance.
 
         Do not use the constructor directly, use the `Actor.open_request_queue()` function instead.
 
         Args:
-            id ID of the request queue.
+            id: ID of the request queue.
             name: Name of the request queue.
-            client (ApifyClientAsync or MemoryStorageClient): The storage client which should be used.
+            client: The storage client which should be used.
         """
-        super().__init__(id=id, name=name, client=client, config=config)
+        super().__init__(id_=id_, name=name, client=client, config=config)
 
-        self._request_queue_client = client.request_queue(self._id)
+        self._request_queue_client = client.request_queue(self.id)
         self._queue_head_dict = OrderedDict()
         self._query_queue_head_task = None
         self._in_progress = set()
@@ -123,9 +122,8 @@ class RequestQueue(BaseStorage):
         cls,
         *,
         config: Config | None = None,
-        id: str | None = None,  # noqa: A002
+        id_: str | None = None,
         name: str | None = None,
-        force_cloud: bool = False,
     ) -> RequestQueue:
         """Open a request queue.
 
@@ -141,15 +139,13 @@ class RequestQueue(BaseStorage):
             name: Name of the request queue to be opened.
                 If neither `id` nor `name` are provided, the method returns the default request queue associated with the actor run.
                 If the request queue with the given name does not exist, it is created.
-            force_cloud: If set to True, it will open a request queue on the Apify Platform even when running the actor locally.
-                Defaults to False.
 
         Returns:
             RequestQueue: An instance of the `RequestQueue` class for the given ID or name.
         """
-        queue = await super().open(id=id, name=name, force_cloud=force_cloud, config=config)
+        queue = await super().open(id_=id_, name=name, config=config)
         await queue._ensure_head_is_non_empty()  # type: ignore
-        return queue  # type: ignore
+        return cast(RequestQueue, queue)
 
     @classmethod
     def _get_human_friendly_label(cls) -> str:
@@ -162,15 +158,15 @@ class RequestQueue(BaseStorage):
     @classmethod
     def _get_single_storage_client(
         cls,
-        id: str,  # noqa: A002
-        client: ApifyClientAsync | MemoryStorageClient,
+        id_: str,
+        client: MemoryStorageClient,
     ) -> RequestQueueClientAsync | RequestQueueClient:
-        return client.request_queue(id)
+        return client.request_queue(id_)
 
     @classmethod
     def _get_storage_collection_client(
         cls,
-        client: ApifyClientAsync | MemoryStorageClient,
+        client: MemoryStorageClient,
     ) -> RequestQueueCollectionClientAsync | RequestQueueCollectionClient:
         return client.request_queues()
 

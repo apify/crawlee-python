@@ -11,44 +11,43 @@ if TYPE_CHECKING:
 class StorageClientManager:
     """A class for managing storage clients."""
 
-    _persist_storage: bool | None = None
-    _is_at_home: bool | None = None
+    persist_storage: bool | None = None
+    is_at_home: bool | None = None
 
-    _local_client: MemoryStorageClient | None = None
-    _cloud_client: ApifyClientAsync | None = None
+    local_client: MemoryStorageClient | None = None
+    cloud_client: ApifyClientAsync | None = None
 
     _default_instance: StorageClientManager | None = None
 
     @classmethod
-    def get_storage_client(
-        cls,
-        force_cloud: bool = False,  # noqa: FBT001, FBT002
-    ) -> MemoryStorageClient:
+    def get_storage_client(cls) -> MemoryStorageClient:
         """Get the current storage client instance.
 
         Returns:
             ApifyClientAsync or MemoryStorageClient: The current storage client instance.
         """
         default_instance = cls._get_default_instance()
-        if not default_instance._local_client:
-            default_instance._local_client = MemoryStorageClient(
-                persist_storage=default_instance._persist_storage, write_metadata=True
+        if not default_instance.local_client:
+            default_instance.local_client = MemoryStorageClient(
+                persist_storage=default_instance.persist_storage, write_metadata=True
             )
 
-        if default_instance._is_at_home or force_cloud:
-            assert default_instance._cloud_client is not None  # noqa: S101
-            return default_instance._cloud_client
+        if default_instance.is_at_home:
+            if default_instance.cloud_client is None:
+                raise RuntimeError('Cloud client is expected but not set in Apify Cloud environment.')
 
-        return default_instance._local_client
+            return default_instance.cloud_client  # type: ignore
+
+        return default_instance.local_client
 
     @classmethod
     def set_cloud_client(cls, client: ApifyClientAsync) -> None:
         """Set the storage client.
 
         Args:
-            client (ApifyClientAsync or MemoryStorageClient): The instance of a storage client.
+            client: The instance of a storage client.
         """
-        cls._get_default_instance()._cloud_client = client
+        cls._get_default_instance().cloud_client = client
 
     @classmethod
     def _get_default_instance(cls) -> StorageClientManager:

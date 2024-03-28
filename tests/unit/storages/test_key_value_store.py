@@ -16,7 +16,7 @@ async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
 
 async def test_open() -> None:
     default_key_value_store = await KeyValueStore.open()
-    default_key_value_store_by_id = await KeyValueStore.open(id=default_key_value_store._id)
+    default_key_value_store_by_id = await KeyValueStore.open(id_=default_key_value_store._id)
 
     assert default_key_value_store is default_key_value_store_by_id
 
@@ -25,12 +25,12 @@ async def test_open() -> None:
     assert default_key_value_store is not named_key_value_store
 
     with pytest.raises(RuntimeError, match='Key-value store with id "nonexistent-id" does not exist!'):
-        await KeyValueStore.open(id='nonexistent-id')
+        await KeyValueStore.open(id_='nonexistent-id')
 
     # Test that when you try to open a key-value store by ID and you use a name of an existing key-value store,
     # it doesn't work
     with pytest.raises(RuntimeError, match='Key-value store with id "dummy-name" does not exist!'):
-        await KeyValueStore.open(id='dummy-name')
+        await KeyValueStore.open(id_='dummy-name')
 
 
 async def test_same_references() -> None:
