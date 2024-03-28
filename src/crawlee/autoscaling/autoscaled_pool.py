@@ -145,6 +145,7 @@ class AutoscaledPool:
             raise RuntimeError('The pool is already running')
 
         self._is_running = True
+        self._cleanup_done.clear()
         logger.debug('Starting the pool')
 
         self._autoscale_task.start()
@@ -242,8 +243,10 @@ class AutoscaledPool:
 
         Exits when `is_finished_function` returns True.
         """
+        finished = False
+
         try:
-            while not await self._is_finished_function() and not self._run_result.done():
+            while not (finished := await self._is_finished_function()) and not self._run_result.done():
                 self._worker_tasks_updated.clear()
 
                 current_status = self._system_status.get_current_system_info()
@@ -269,8 +272,17 @@ class AutoscaledPool:
                 with suppress(asyncio.TimeoutError):
                     await asyncio.wait_for(self._worker_tasks_updated.wait(), timeout=0.5)
         finally:
+            if finished:
+                logger.debug('`is_finished_function` reports that we are finished')
+            elif self._run_result.done() and self._run_result.exception() is not None:
+                logger.debug('Unhandled exception in `run_task_function`')
+
             if self._worker_tasks:
+                logger.debug('Terminating - waiting for tasks to complete')
                 await asyncio.wait(self._worker_tasks, return_when=asyncio.ALL_COMPLETED)
+                logger.debug('Worker tasks finished')
+            else:
+                logger.debug('Terminating - no running tasks to wait for')
 
             if not self._run_result.done():
                 self._run_result.set_result(object())
