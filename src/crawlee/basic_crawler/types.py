@@ -80,7 +80,7 @@ class CreateRequestSchema(BaseModel):
         return self.crawlee_data.max_retries
 
     @max_retries.setter
-    def max_retries(self, new_max_retries: int) -> int | None:
+    def max_retries(self, new_max_retries: int) -> None:
         if self.user_data is None:
             self.user_data = {}
 

@@ -46,7 +46,7 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
             max_concurrency=max_concurrency,
             max_requests_per_minute=max_requests_per_minute,
             configuration=configuration,
-            **basic_crawler_kwargs,
+            **basic_crawler_kwargs,  # type: ignore
         )
 
     async def _make_http_request(

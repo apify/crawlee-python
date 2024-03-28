@@ -5,14 +5,14 @@ from typing import Awaitable, Callable, Generic, TypeVar
 from crawlee.basic_crawler.types import BasicCrawlingContext
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext)
-RequestHandler = Callable[[TCrawlingContext], Awaitable]
+RequestHandler = Callable[[TCrawlingContext], Awaitable[None]]
 
 
 class Router(Generic[TCrawlingContext]):
     """Dispatches requests to registered handlers based on their labels."""
 
     def __init__(self: Router) -> None:
-        self._default_handler = None
+        self._default_handler: RequestHandler[TCrawlingContext] | None = None
         self._handlers_by_label = dict[str, RequestHandler[TCrawlingContext]]()
 
     def default_handler(self: Router, handler: RequestHandler[TCrawlingContext]) -> RequestHandler[TCrawlingContext]:

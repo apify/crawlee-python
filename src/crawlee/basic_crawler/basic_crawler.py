@@ -53,7 +53,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
     def __init__(
         self,
         *,
-        router: Callable[[TCrawlingContext], Awaitable] | None = None,
+        router: Callable[[TCrawlingContext], Awaitable[None]] | None = None,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         # TODO: make request_provider optional (and instantiate based on configuration if None is supplied)
         # https://github.com/apify/crawlee-py/issues/83
@@ -65,13 +65,13 @@ class BasicCrawler(Generic[TCrawlingContext]):
         configuration: Configuration | None = None,
         request_handler_timeout: timedelta = timedelta(minutes=1),
     ) -> None:
-        if isinstance(router, Router):
-            self._router = router
+        self._router: Router[TCrawlingContext] | None = None
+
+        if isinstance(cast(Router, router), Router):
+            self._router = cast(Router[TCrawlingContext], router)
         elif router is not None:
             self._router = None
             self.router.default_handler(router)
-        else:
-            self._router = None
 
         self._context_pipeline = _context_pipeline or ContextPipeline()
 
@@ -85,7 +85,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             pool_kwargs['min_concurrency'] = min_concurrency
         if max_concurrency is not None:
             pool_kwargs['max_concurrency'] = max_concurrency
-        pool_kwargs['max_tasks_per_minute'] = max_requests_per_minute
+        pool_kwargs['max_tasks_per_minute'] = max_requests_per_minute  # type: ignore
 
         self._request_provider = request_provider
         self._configuration = configuration or Configuration()
@@ -105,7 +105,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             is_finished_function=self.__is_finished_function,
             is_task_ready_function=self.__is_task_ready_function,
             run_task_function=self.__run_task_function,
-            **pool_kwargs,
+            **pool_kwargs,  # type: ignore
         )
 
     @property
