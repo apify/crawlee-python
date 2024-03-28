@@ -78,14 +78,6 @@ async def test_for_each_key(key_value_store: KeyValueStore) -> None:
     assert index == 2001
 
 
-async def test_get_public_url() -> None:
-    store = await KeyValueStore.open()
-    with pytest.raises(
-        TypeError, match='Cannot generate a public URL for this key-value store as it is not on the Apify Platform!'
-    ):
-        await store.get_public_url('dummy')
-
-
 async def test_static_get_set_value() -> None:
     await KeyValueStore.set_value('test-static', 'static')
     value = await KeyValueStore.get_value('test-static')

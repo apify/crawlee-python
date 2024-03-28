@@ -247,7 +247,8 @@ class KeyValueStoreClient(BaseResourceClient):
     async def _get_record_internal(
         self,
         key: str,
-        as_bytes: bool = False,  # noqa: FBT001, FBT002
+        *,
+        as_bytes: bool = False,
     ) -> dict | None:
         # Check by id
         existing_store_by_id = self.find_or_create_client_by_id_or_name(

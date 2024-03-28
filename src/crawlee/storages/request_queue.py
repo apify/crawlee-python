@@ -7,8 +7,6 @@ from logging import getLogger
 from typing import TYPE_CHECKING, cast
 from typing import OrderedDict as OrderedDictType
 
-from apify._utils import budget_ow
-
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.lru_cache import LRUCache
 from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
@@ -16,12 +14,9 @@ from crawlee.consts import REQUEST_QUEUE_HEAD_MAX_LIMIT
 from crawlee.storages.base_storage import BaseStorage
 
 if TYPE_CHECKING:
-    from apify_client.clients import RequestQueueClientAsync, RequestQueueCollectionClientAsync
-
     from crawlee.config import Config
     from crawlee.memory_storage import MemoryStorageClient
     from crawlee.memory_storage.resource_clients import RequestQueueClient, RequestQueueCollectionClient
-
 
 logger = getLogger(__name__)
 
@@ -51,101 +46,86 @@ STORAGE_CONSISTENCY_DELAY_MILLIS = 3000
 class RequestQueue(BaseStorage):
     """Represents a queue of URLs to crawl.
 
-    Can be used for deep crawling of websites where you start with several URLs and then recursively
-    follow links to other pages. The data structure supports both breadth-first and depth-first crawling orders.
+    Can be used for deep crawling of websites where you start with several URLs and then recursively follow
+    links to other pages. The data structure supports both breadth-first and depth-first crawling orders.
 
-    Each URL is represented using an instance of the {@apilink Request} class.
-    The queue can only contain unique URLs. More precisely, it can only contain request dictionaries
-    with distinct `uniqueKey` properties. By default, `uniqueKey` is generated from the URL, but it can also be overridden.
-    To add a single URL multiple times to the queue,
-    corresponding request dictionary will need to have different `uniqueKey` properties.
-
-    Do not instantiate this class directly, use the `Actor.open_request_queue()` function instead.
-
-    `RequestQueue` stores its data either on local disk or in the Apify cloud,
-    depending on whether the `CRAWLEE_LOCAL_STORAGE_DIR` or `APIFY_TOKEN` environment variables are set.
+    Each URL is represented using an instance of the request class. The queue can only contain unique URLs.
+    More precisely, it can only contain request dictionaries with distinct `uniqueKey` properties. By default,
+    `uniqueKey` is generated from the request, but it can also be overridden. To add a single URL multiple times
+    to the queue, corresponding request dictionary will need to have different `uniqueKey` properties.
 
     If the `CRAWLEE_LOCAL_STORAGE_DIR` environment variable is set, the data is stored in
     the local directory in the following files:
     ```
     {CRAWLEE_LOCAL_STORAGE_DIR}/request_queues/{QUEUE_ID}/{REQUEST_ID}.json
     ```
+
     Note that `{QUEUE_ID}` is the name or ID of the request queue. The default request queue has ID: `default`,
-    unless you override it by setting the `APIFY_DEFAULT_REQUEST_QUEUE_ID` environment variable.
+    unless you override it by setting the `CRAWLEE_DEFAULT_REQUEST_QUEUE_ID` environment variable.
     The `{REQUEST_ID}` is the id of the request.
-
-    If the `APIFY_TOKEN` environment variable is set but `CRAWLEE_LOCAL_STORAGE_DIR` is not, the data is stored in the
-    [Apify Request Queue](https://docs.apify.com/storage/request-queue)
-    cloud storage.
     """
-
-    _request_queue_client: RequestQueueClientAsync | RequestQueueClient
-    _client_key = crypto_random_object_id()
-    _queue_head_dict: OrderedDictType[str, str]
-    _query_queue_head_task: asyncio.Task | None
-    _in_progress: set[str]
-    _last_activity: datetime
-    _internal_timeout_seconds = 5 * 60
-    _recently_handled: LRUCache[bool]
-    _assumed_total_count = 0
-    _assumed_handled_count = 0
-    _requests_cache: LRUCache[dict]
 
     def __init__(
         self,
         id_: str,
         name: str | None,
-        client: MemoryStorageClient,
         config: Config,
+        client: MemoryStorageClient,
     ) -> None:
         """Create a new instance.
 
-        Do not use the constructor directly, use the `Actor.open_request_queue()` function instead.
-
         Args:
-            id: ID of the request queue.
+            id_: ID of the request queue.
             name: Name of the request queue.
+            config: The configuration.
             client: The storage client which should be used.
         """
         super().__init__(id_=id_, name=name, client=client, config=config)
 
+        self._client_key = crypto_random_object_id()
+        self._internal_timeout_seconds = 5 * 60
+        self._assumed_total_count = 0
+        self._assumed_handled_count = 0
         self._request_queue_client = client.request_queue(self.id)
-        self._queue_head_dict = OrderedDict()
-        self._query_queue_head_task = None
-        self._in_progress = set()
+        self._queue_head_dict: OrderedDictType[str, str] = OrderedDict()
+        self._query_queue_head_task: asyncio.Task | None = None
+        self._in_progress: set[str] = set()
         self._last_activity = datetime.now(timezone.utc)
-        self._recently_handled = LRUCache[bool](max_length=RECENTLY_HANDLED_CACHE_SIZE)
-        self._requests_cache = LRUCache(max_length=MAX_CACHED_REQUESTS)
+        self._recently_handled: LRUCache[bool] = LRUCache(max_length=RECENTLY_HANDLED_CACHE_SIZE)
+        self._requests_cache: LRUCache[dict] = LRUCache(max_length=MAX_CACHED_REQUESTS)
 
     @classmethod
     async def open(
         cls,
         *,
-        config: Config | None = None,
         id_: str | None = None,
         name: str | None = None,
+        config: Config | None = None,
     ) -> RequestQueue:
         """Open a request queue.
 
-        Request queue represents a queue of URLs to crawl, which is stored either on local filesystem or in the Apify cloud.
-        The queue is used for deep crawling of websites, where you start with several URLs and then
-        recursively follow links to other pages. The data structure supports both breadth-first
-        and depth-first crawling orders.
+        Request queue represents a queue of URLs to crawl. The queue is used for deep crawling of websites, where
+        you start with several URLs and then recursively follow links to other pages. The data structure supports
+        both breadth-first and depth-first crawling orders.
 
         Args:
-            id: ID of the request queue to be opened.
-                If neither `id` nor `name` are provided, the method returns the default request queue associated with the actor run.
-                If the request queue with the given ID does not exist, it raises an error.
-            name: Name of the request queue to be opened.
-                If neither `id` nor `name` are provided, the method returns the default request queue associated with the actor run.
-                If the request queue with the given name does not exist, it is created.
+            id_: ID of the request queue to be opened. If neither `id` nor `name` are provided, the method returns
+                the default request queue associated with the actor run. If the request queue with the given ID does
+                not exist, it raises an error.
+
+            name: Name of the request queue to be opened. If neither `id` nor `name` are provided, the method returns
+                the default request queue associated with the actor run. If the request queue with the given name
+                does not exist, it is created.
+
+            config: Configuration settings.
 
         Returns:
             RequestQueue: An instance of the `RequestQueue` class for the given ID or name.
         """
-        queue = await super().open(id_=id_, name=name, config=config)
-        await queue._ensure_head_is_non_empty()  # type: ignore
-        return cast(RequestQueue, queue)
+        storage = await super().open(id_=id_, name=name, config=config)
+        rq = cast(RequestQueue, storage)
+        await rq.ensure_head_is_non_empty()
+        return rq
 
     @classmethod
     def _get_human_friendly_label(cls) -> str:
@@ -160,14 +140,14 @@ class RequestQueue(BaseStorage):
         cls,
         id_: str,
         client: MemoryStorageClient,
-    ) -> RequestQueueClientAsync | RequestQueueClient:
+    ) -> RequestQueueClient:
         return client.request_queue(id_)
 
     @classmethod
     def _get_storage_collection_client(
         cls,
         client: MemoryStorageClient,
-    ) -> RequestQueueCollectionClientAsync | RequestQueueCollectionClient:
+    ) -> RequestQueueCollectionClient:
         return client.request_queues()
 
     async def add_request(
@@ -208,12 +188,9 @@ class RequestQueue(BaseStorage):
             - `wasAlreadyPresent` (bool): Indicates whether the request was already in the queue.
             - `wasAlreadyHandled` (bool): Indicates whether the request was already processed.
         """
-        budget_ow(
-            request,
-            {
-                'url': (str, True),
-            },
-        )
+        if 'url' not in request:
+            raise ValueError('Field "url" is required.')
+
         self._last_activity = datetime.now(timezone.utc)
 
         if request.get('uniqueKey') is None:
@@ -254,7 +231,7 @@ class RequestQueue(BaseStorage):
         ):
             self._assumed_total_count += 1
 
-            self._maybe_add_request_to_queue_head(request_id, forefront)
+            self._maybe_add_request_to_queue_head(request_id, forefront=forefront)
 
         return queue_operation_info
 
@@ -267,24 +244,24 @@ class RequestQueue(BaseStorage):
         Returns:
             The retrieved request, or `None`, if it does not exist.
         """
-        budget_ow(request_id, (str, True), 'request_id')
         return await self._request_queue_client.get_request(request_id)
 
     async def fetch_next_request(self) -> dict | None:
         """Return the next request in the queue to be processed.
 
-        Once you successfully finish processing of the request, you need to call
-        `RequestQueue.mark_request_as_handled` to mark the request as handled in the queue.
-        If there was some error in processing the request, call `RequestQueue.reclaim_request` instead,
-        so that the queue will give the request to some other consumer in another call to the `fetch_next_request` method.
+        Once you successfully finish processing of the request, you need to call `RequestQueue.mark_request_as_handled`
+        to mark the request as handled in the queue. If there was some error in processing the request, call
+        `RequestQueue.reclaim_request` instead, so that the queue will give the request to some other consumer
+        in another call to the `fetch_next_request` method.
 
-        Note that the `None` return value does not mean the queue processing finished, it means there are currently no pending requests.
-        To check whether all requests in queue were finished, use `RequestQueue.is_finished` instead.
+        Note that the `None` return value does not mean the queue processing finished, it means there are currently
+        no pending requests. To check whether all requests in queue were finished, use `RequestQueue.is_finished`
+        instead.
 
         Returns:
             The request or `None` if there are no more pending requests.
         """
-        await self._ensure_head_is_non_empty()
+        await self.ensure_head_is_non_empty()
 
         # We are likely done at this point.
         if len(self._queue_head_dict) == 0:
@@ -313,29 +290,31 @@ class RequestQueue(BaseStorage):
             self._in_progress.remove(next_request_id)
             raise
 
-        # NOTE: It can happen that the queue head index is inconsistent with the main queue table. This can occur in two situations:
+        # NOTE: It can happen that the queue head index is inconsistent with the main queue table.
+        # This can occur in two situations:
 
-        """ 1) Queue head index is ahead of the main table and the request is not present in the main table yet (i.e. getRequest() returned null).
-                In this case, keep the request marked as in progress for a short while,
-                so that isFinished() doesn't return true and _ensureHeadIsNonEmpty() doesn't not load the request
-                into the queueHeadDict straight again. After the interval expires, fetchNextRequest()
-                will try to fetch this request again, until it eventually appears in the main table.
-        """
+        # 1)
+        # Queue head index is ahead of the main table and the request is not present in the main table yet
+        # (i.e. getRequest() returned null). In this case, keep the request marked as in progress for a short while,
+        # so that isFinished() doesn't return true and _ensureHeadIsNonEmpty() doesn't not load the request into
+        # the queueHeadDict straight again. After the interval expires, fetchNextRequest() will try to fetch this
+        # request again, until it eventually appears in the main table.
         if request is None:
             logger.debug(
                 'Cannot find a request from the beginning of queue, will be retried later',
                 extra={'nextRequestId': next_request_id},
             )
             asyncio.get_running_loop().call_later(
-                STORAGE_CONSISTENCY_DELAY_MILLIS // 1000, lambda: self._in_progress.remove(next_request_id)
+                STORAGE_CONSISTENCY_DELAY_MILLIS // 1000,
+                lambda: self._in_progress.remove(next_request_id),
             )
             return None
 
-        """ 2) Queue head index is behind the main table and the underlying request was already handled
-               (by some other client, since we keep the track of handled requests in recentlyHandled dictionary).
-               We just add the request to the recentlyHandled dictionary so that next call to _ensureHeadIsNonEmpty()
-               will not put the request again to queueHeadDict.
-        """
+        # 2)
+        # Queue head index is behind the main table and the underlying request was already handled (by some other
+        # client, since we keep the track of handled requests in recentlyHandled dictionary). We just add the request
+        # to the recentlyHandled dictionary so that next call to _ensureHeadIsNonEmpty() will not put the request again
+        # to queueHeadDict.
         if request.get('handledAt') is not None:
             logger.debug(
                 'Request fetched from the beginning of queue was already handled',
@@ -355,17 +334,9 @@ class RequestQueue(BaseStorage):
             request: The request to mark as handled.
 
         Returns:
-            Information about the queue operation with keys `requestId`, `uniqueKey`, `wasAlreadyPresent`, `wasAlreadyHandled`.
-                `None` if the given request was not in progress.
+            Information about the queue operation with keys `requestId`, `uniqueKey`, `wasAlreadyPresent`,
+            `wasAlreadyHandled`. `None` if the given request was not in progress.
         """
-        budget_ow(
-            request,
-            {
-                'id': (str, True),
-                'uniqueKey': (str, True),
-                'handledAt': (datetime, False),
-            },
-        )
         self._last_activity = datetime.now(timezone.utc)
         if request['id'] not in self._in_progress:
             logger.debug(
@@ -390,27 +361,21 @@ class RequestQueue(BaseStorage):
     async def reclaim_request(
         self,
         request: dict,
-        forefront: bool = False,  # noqa: FBT001, FBT002
+        *,
+        forefront: bool = False,
     ) -> dict | None:
         """Reclaim a failed request back to the queue.
 
-        The request will be returned for processing later again
-        by another call to `RequestQueue.fetchNextRequest`.
+        The request will be returned for processing later again by another call to `RequestQueue.fetchNextRequest`.
 
         Args:
             request: The request to return to the queue.
             forefront: Whether to add the request to the head or the end of the queue
+
         Returns:
-            Information about the queue operation with keys `requestId`, `uniqueKey`, `wasAlreadyPresent`, `wasAlreadyHandled`.
-                `None` if the given request was not in progress.
+            Information about the queue operation with keys `requestId`, `uniqueKey`, `wasAlreadyPresent`,
+                `wasAlreadyHandled`. `None` if the given request was not in progress.
         """
-        budget_ow(
-            request,
-            {
-                'id': (str, True),
-                'uniqueKey': (str, True),
-            },
-        )
         self._last_activity = datetime.now(timezone.utc)
 
         if request['id'] not in self._in_progress:
@@ -424,19 +389,17 @@ class RequestQueue(BaseStorage):
         queue_operation_info['uniqueKey'] = request['uniqueKey']
         self._cache_request(unique_key_to_request_id(request['uniqueKey']), queue_operation_info)
 
-        # Wait a little to increase a chance that the next call to fetchNextRequest() will return the request with updated data.
-        # This is to compensate for the limitation of DynamoDB, where writes might not be immediately visible to subsequent reads.
+        # Wait a little to increase a chance that the next call to fetchNextRequest() will return the request with
+        # updated data. This is to compensate for the limitation of DynamoDB, where writes might not be immediately
+        # visible to subsequent reads.
         def callback() -> None:
             if request['id'] not in self._in_progress:
-                logger.debug(
-                    'The request is no longer marked as in progress in the queue?!', {'requestId': request['id']}
-                )
+                logger.debug(f'The request (ID: {request["id"]}) is no longer marked as in progress in the queue?!')
                 return
 
             self._in_progress.remove(request['id'])
-
             # Performance optimization: add request straight to head if possible
-            self._maybe_add_request_to_queue_head(request['id'], forefront)
+            self._maybe_add_request_to_queue_head(request['id'], forefront=forefront)
 
         asyncio.get_running_loop().call_later(STORAGE_CONSISTENCY_DELAY_MILLIS // 1000, callback)
 
@@ -451,7 +414,7 @@ class RequestQueue(BaseStorage):
         Returns:
             bool: `True` if the next call to `RequestQueue.fetchNextRequest` would return `None`, otherwise `False`.
         """
-        await self._ensure_head_is_non_empty()
+        await self.ensure_head_is_non_empty()
         return len(self._queue_head_dict) == 0
 
     async def is_finished(self) -> bool:
@@ -475,7 +438,7 @@ class RequestQueue(BaseStorage):
         if len(self._queue_head_dict) > 0 or self._in_progress_count() > 0:
             return False
 
-        is_head_consistent = await self._ensure_head_is_non_empty(ensure_consistency=True)
+        is_head_consistent = await self.ensure_head_is_non_empty(ensure_consistency=True)
         return is_head_consistent and len(self._queue_head_dict) == 0 and self._in_progress_count() == 0
 
     def _reset(self) -> None:
@@ -531,9 +494,10 @@ class RequestQueue(BaseStorage):
             'hadMultipleClients': list_head['hadMultipleClients'],
         }
 
-    async def _ensure_head_is_non_empty(
+    async def ensure_head_is_non_empty(
         self,
-        ensure_consistency: bool = False,  # noqa: FBT001, FBT002
+        *,
+        ensure_consistency: bool = False,
         limit: int | None = None,
         iteration: int = 0,
     ) -> bool:
@@ -605,12 +569,17 @@ class RequestQueue(BaseStorage):
             )
             await asyncio.sleep(delay_seconds)
 
-        return await self._ensure_head_is_non_empty(ensure_consistency, next_limit, iteration + 1)
+        return await self.ensure_head_is_non_empty(
+            ensure_consistency=ensure_consistency,
+            limit=next_limit,
+            iteration=iteration + 1,
+        )
 
     def _maybe_add_request_to_queue_head(
         self,
         request_id: str,
-        forefront: bool,  # noqa: FBT001
+        *,
+        forefront: bool,
     ) -> None:
         if forefront:
             self._queue_head_dict[request_id] = request_id

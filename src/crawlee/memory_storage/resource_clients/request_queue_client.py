@@ -436,14 +436,14 @@ class RequestQueueClient(BaseResourceClient):
 
     def _create_internal_request(self, request: dict, forefront: bool | None) -> dict:
         order_no = self._calculate_order_no(request, forefront)
-        id = unique_key_to_request_id(request['uniqueKey'])  # noqa: A001
+        id_ = unique_key_to_request_id(request['uniqueKey'])
 
-        if request.get('id') is not None and request['id'] != id:
+        if request.get('id') is not None and request['id'] != id_:
             raise ValueError('Request ID does not match its unique_key.')
 
-        json_request = json_dumps({**request, 'id': id})
+        json_request = json_dumps({**request, 'id': id_})
         return {
-            'id': id,
+            'id': id_,
             'json': json_request,
             'method': request.get('method'),
             'orderNo': order_no,

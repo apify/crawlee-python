@@ -69,14 +69,12 @@ async def test_get_request(request_queue: RequestQueue) -> None:
 async def test_add_fetch_handle_request(request_queue: RequestQueue) -> None:
     url = 'https://example.com'
     assert await request_queue.is_empty() is True
-    with pytest.raises(ValueError, match='"url" is required'):
+
+    with pytest.raises(ValueError, match='Field "url" is required.'):
         await request_queue.add_request({})
-    add_request_info = await request_queue.add_request(
-        {
-            'uniqueKey': url,
-            'url': url,
-        }
-    )
+
+    add_request_info = await request_queue.add_request({'uniqueKey': url, 'url': url})
+
     assert add_request_info['wasAlreadyPresent'] is False
     assert add_request_info['wasAlreadyHandled'] is False
     assert await request_queue.is_empty() is False

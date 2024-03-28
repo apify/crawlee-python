@@ -105,8 +105,6 @@ class Dataset(BaseStorage):
     ) -> None:
         """Create a new instance.
 
-        Do not use the constructor directly, use the `Actor.open_dataset()` function instead.
-
         Args:
             id_: The unique ID of the dataset.
             name: Optional name for the dataset.
@@ -130,9 +128,15 @@ class Dataset(BaseStorage):
         specified in `config`. If unspecified, returns the default dataset associated with the current actor run.
 
         Args:
-            id_: Unique identifier of the dataset. If absent and no `name`, returns the default dataset.
-            name: Name of the dataset to open or create.
-            config: Configuration settings, influencing storage location and behavior.
+            id_: ID of the dataset to be opened. If neither `id_` nor `name` are provided, the method returns
+                the default dataset associated with the run. If the dataset with the given ID does not exist,
+                it raises an error.
+
+            name: Name of the dataset to be opened. If neither `id` nor `name` are provided, the method returns
+                the default dataset associated with the actor run. If the dataset with the given name does not exist,
+                it is created.
+
+            config: Configuration settings.
 
         Returns:
             Dataset: The opened or created dataset instance.
@@ -175,8 +179,8 @@ class Dataset(BaseStorage):
         none of the included objects may be larger than 9MB, but the array itself may be of any size.
 
         Args:
-            data (JSONSerializable): dict or array of dicts containing data to be stored in the default dataset.
-                The JSON representation of each item must be smaller than 9MB.
+            data: dict or array of dicts containing data to be stored in the default dataset. The JSON representation
+                of each item must be smaller than 9MB.
         """
         dataset = await cls.open()
         return await dataset.push_data_inner(data)
@@ -290,10 +294,13 @@ class Dataset(BaseStorage):
 
         Args:
             key: The key to save the data under.
+
             to_key_value_store_id: The id of the key-value store in which the result will be saved.
-            to_key_value_store_name: The name of the key-value store in which the result will be saved.
-                You must specify only one of `to_key_value_store_id` and `to_key_value_store_name` arguments.
-                If you omit both, it uses the default key-value store.
+
+            to_key_value_store_name: The name of the key-value store in which the result will be saved. You must
+                specify only one of `to_key_value_store_id` and `to_key_value_store_name` arguments. If you omit both,
+                it uses the default key-value store.
+
             content_type: Either 'text/csv' or 'application/json'. Defaults to JSON.
         """
         key_value_store = await KeyValueStore.open(id_=to_key_value_store_id, name=to_key_value_store_name)
