@@ -65,7 +65,9 @@ class DatasetClient(BaseResourceClient):
             The retrieved dataset, or None, if it does not exist
         """
         found = self.find_or_create_client_by_id_or_name(
-            memory_storage_client=self._memory_storage_client, id_=self.id, name=self.name
+            memory_storage_client=self._memory_storage_client,
+            id_=self.id,
+            name=self.name,
         )
 
         if found:
@@ -330,7 +332,7 @@ class DatasetClient(BaseResourceClient):
             existing_dataset_by_id.dataset_entries[idx] = entry
             added_ids.append(idx)
 
-        data_entries = [(id, existing_dataset_by_id.dataset_entries[id]) for id in added_ids]  # noqa: A001
+        data_entries = [(id_, existing_dataset_by_id.dataset_entries[id_]) for id_ in added_ids]
 
         async with existing_dataset_by_id.file_operation_lock:
             await existing_dataset_by_id.update_timestamps(has_been_modified=True)
@@ -466,7 +468,7 @@ class DatasetClient(BaseResourceClient):
                     # We have found the dataset's metadata file, build out information based on it
                     with open(os.path.join(storage_directory, entry.name), encoding='utf-8') as f:
                         metadata = json.load(f)
-                    id = metadata['id']  # noqa: A001
+                    id_ = metadata['id']
                     name = metadata['name']
                     item_count = metadata['itemCount']
                     created_at = datetime.fromisoformat(metadata['createdAt'])
@@ -487,7 +489,7 @@ class DatasetClient(BaseResourceClient):
         new_client = DatasetClient(
             base_storage_directory=memory_storage_client.datasets_directory,
             memory_storage_client=memory_storage_client,
-            id_=id,
+            id_=id_,
             name=name,
             created_at=created_at,
             accessed_at=accessed_at,
