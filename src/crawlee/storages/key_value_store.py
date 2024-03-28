@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, Any, AsyncIterator, NamedTuple, TypedDict, Typ
 
 from apify_client.clients import KeyValueStoreClientAsync, KeyValueStoreCollectionClientAsync
 
-from crawlee._utils.wrappers import wrap_internal
 from crawlee.storages.base_storage import BaseStorage
 
 if TYPE_CHECKING:
@@ -61,7 +60,7 @@ class KeyValueStore(BaseStorage):
     [Apify Key-value store](https://docs.apify.com/storage/key-value-store) cloud storage.
     """
 
-    _id: str
+    id: str
     _name: str | None
     _key_value_store_client: KeyValueStoreClientAsync | KeyValueStoreClient
     _api_public_base_url: str
@@ -78,19 +77,13 @@ class KeyValueStore(BaseStorage):
         Do not use the constructor directly, use the `Actor.open_key_value_store()` function instead.
 
         Args:
-            id: ID of the key-value store.
+            id_: ID of the key-value store.
             name: Name of the key-value store.
             config: The configuration.
             client: The storage client which should be used.
         """
         super().__init__(id_=id_, name=name, client=client, config=config)
-
-        self.get_value = wrap_internal(self._get_value_internal, self.get_value)  # type: ignore
-        self.set_value = wrap_internal(self._set_value_internal, self.set_value)  # type: ignore
-        self.get_public_url = wrap_internal(self._get_public_url_internal, self.get_public_url)  # type: ignore
-        self._id = id_
-        self._name = name
-        self._key_value_store_client = client.key_value_store(self._id)
+        self._key_value_store_client = client.key_value_store(self.id)
 
     @classmethod
     async def open(
@@ -107,12 +100,12 @@ class KeyValueStore(BaseStorage):
         The actual data is stored either on a local filesystem or in the Apify cloud.
 
         Args:
-            id: ID of the key-value store to be opened.
-                If neither `id` nor `name` are provided, the method returns the default key-value store associated with the actor run.
-                If the key-value store with the given ID does not exist, it raises an error.
-            name: Name of the key-value store to be opened.
-                If neither `id` nor `name` are provided, the method returns the default key-value store associated with the actor run.
-                If the key-value store with the given name does not exist, it is created.
+            id: ID of the key-value store to be opened. If neither `id` nor `name` are provided, the method returns
+                the default key-value store associated with the actor run. If the key-value store with the given
+                ID does not exist, it raises an error.
+            name: Name of the key-value store to be opened. If neither `id` nor `name` are provided, the method returns
+                the default key-value store associated with the actor run. If the key-value store with the given name
+                does not exist, it is created.
 
         Returns:
             KeyValueStore: An instance of the `KeyValueStore` class for the given ID or name.
@@ -160,16 +153,16 @@ class KeyValueStore(BaseStorage):
         """Get a value from the key-value store.
 
         Args:
-            key Key of the record to retrieve.
-            default_value (Any, optional): Default value returned in case the record does not exist.
+            key: Key of the record to retrieve.
+            default_value: Default value returned in case the record does not exist.
 
         Returns:
             Any: The value associated with the given key. `default_value` is used in case the record does not exist.
         """
         store = await cls.open()
-        return await store.get_value(key, default_value)
+        return await store.get_value_inner(key, default_value)
 
-    async def _get_value_internal(self, key: str, default_value: T | None = None) -> T | None:
+    async def get_value_inner(self, key: str, default_value: T | None = None) -> T | None:
         record = await self._key_value_store_client.get_record(key)
         return record['value'] if record else default_value
 
@@ -183,9 +176,8 @@ class KeyValueStore(BaseStorage):
             exclusive_start_key: All keys up to this one (including) are skipped from the result.
 
         Yields:
-            IterateKeysTuple: A tuple `(key, info)`,
-                where `key` is the record key, and `info` is an object that contains a single property `size`
-                indicating size of the record in bytes.
+            IterateKeysTuple: A tuple `(key, info)`, where `key` is the record key, and `info` is an object that
+                contains a single property `size` indicating size of the record in bytes.
         """
         while True:
             list_keys = await self._key_value_store_client.list_keys(exclusive_start_key=exclusive_start_key)
@@ -207,13 +199,13 @@ class KeyValueStore(BaseStorage):
 
         Args:
             key: The key under which the value should be saved.
-            value The value to save. If the value is `None`, the corresponding key-value pair will be deleted.
+            value: The value to save. If the value is `None`, the corresponding key-value pair will be deleted.
             content_type: The content type of the saved value.
         """
         store = await cls.open()
-        return await store.set_value(key, value, content_type)
+        return await store.set_value_inner(key, value, content_type)
 
-    async def _set_value_internal(
+    async def set_value_inner(
         self,
         key: str,
         value: Any,
@@ -232,13 +224,13 @@ class KeyValueStore(BaseStorage):
             key: The key for which the URL should be generated.
         """
         store = await cls.open()
-        return await store.get_public_url(key)
+        return await store.get_public_url_inner(key)
 
-    async def _get_public_url_internal(self, key: str) -> str:
+    async def get_public_url_inner(self, key: str) -> str:
         if not isinstance(self._key_value_store_client, KeyValueStoreClientAsync):
             raise TypeError('Cannot generate a public URL for this key-value store as it is not on the Apify Platform!')
 
-        return f'{self._api_public_base_url}/v2/key-value-stores/{self._id}/records/{key}'
+        return f'{self._api_public_base_url}/v2/key-value-stores/{self.id}/records/{key}'
 
     async def drop(self) -> None:
         """Remove the key-value store either from the Apify cloud storage or from the local directory."""

@@ -16,7 +16,7 @@ async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
 
 async def test_open() -> None:
     default_key_value_store = await KeyValueStore.open()
-    default_key_value_store_by_id = await KeyValueStore.open(id_=default_key_value_store._id)
+    default_key_value_store_by_id = await KeyValueStore.open(id_=default_key_value_store.id)
 
     assert default_key_value_store is default_key_value_store_by_id
 
