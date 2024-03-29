@@ -510,8 +510,13 @@ class KeyValueStoreClient(BaseResourceClient):
                 ) as metadata_file:
                     try:
                         metadata = json.load(metadata_file)
-                        assert metadata.get('key') is not None  # noqa: S101
-                        assert metadata.get('contentType') is not None  # noqa: S101
+
+                        if metadata.get('key') is None:
+                            raise ValueError('Metadata missing required "key".')  # noqa: TRY301
+
+                        if metadata.get('contentType') is None:
+                            raise ValueError('Metadata missing required "contentType".')  # noqa: TRY301
+
                     except Exception:
                         logger.warning(
                             f'Metadata of key-value store entry "{entry.name}" for store {name or id} could '

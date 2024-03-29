@@ -100,7 +100,9 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
         if used_config.purge_on_start and isinstance(used_client, MemoryStorageClient):
             await used_client.purge_on_start()
 
-        assert cls._storage_creating_lock is not None  # noqa: S101
+        if cls._storage_creating_lock is None:
+            raise AttributeError('cls._storage_creating_lock must be initialized before calling open.')
+
         async with cls._storage_creating_lock:
             # Create the storage
             if id_ and not is_default_storage_on_local:
