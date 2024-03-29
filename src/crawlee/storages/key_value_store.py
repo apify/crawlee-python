@@ -103,34 +103,23 @@ class KeyValueStore(BaseStorage):
         return config.default_key_value_store_id
 
     @classmethod
-    def _get_single_storage_client(
-        cls,
-        id_: str,
-        client: MemoryStorageClient,
-    ) -> KeyValueStoreClient:
+    def _get_single_storage_client(cls, id_: str, client: MemoryStorageClient) -> KeyValueStoreClient:
         return client.key_value_store(id_)
 
     @classmethod
-    def _get_storage_collection_client(
-        cls,
-        client: MemoryStorageClient,
-    ) -> KeyValueStoreCollectionClient:
+    def _get_storage_collection_client(cls, client: MemoryStorageClient) -> KeyValueStoreCollectionClient:
         return client.key_value_stores()
 
     @overload
-    @classmethod
-    async def get_value(cls, key: str) -> Any: ...
+    async def get_value(self, key: str) -> Any: ...
 
     @overload
-    @classmethod
-    async def get_value(cls, key: str, default_value: T) -> T: ...
+    async def get_value(self, key: str, default_value: T) -> T: ...
 
     @overload
-    @classmethod
-    async def get_value(cls, key: str, default_value: T | None = None) -> T | None: ...
+    async def get_value(self, key: str, default_value: T | None = None) -> T | None: ...
 
-    @classmethod
-    async def get_value(cls, key: str, default_value: T | None = None) -> T | None:
+    async def get_value(self, key: str, default_value: T | None = None) -> T | None:
         """Get a value from the key-value store.
 
         Args:
@@ -140,17 +129,10 @@ class KeyValueStore(BaseStorage):
         Returns:
             Any: The value associated with the given key. `default_value` is used in case the record does not exist.
         """
-        store = await cls.open()
-        return await store.get_value_inner(key, default_value)
-
-    async def get_value_inner(self, key: str, default_value: T | None = None) -> T | None:  # noqa: D102
         record = await self._key_value_store_client.get_record(key)
         return record['value'] if record else default_value
 
-    async def iterate_keys(
-        self,
-        exclusive_start_key: str | None = None,
-    ) -> AsyncIterator[IterateKeysTuple]:
+    async def iterate_keys(self, exclusive_start_key: str | None = None) -> AsyncIterator[IterateKeysTuple]:
         """Iterate over the keys in the key-value store.
 
         Args:
@@ -169,9 +151,8 @@ class KeyValueStore(BaseStorage):
                 break
             exclusive_start_key = list_keys['nextExclusiveStartKey']
 
-    @classmethod
     async def set_value(
-        cls,
+        self,
         key: str,
         value: Any,
         content_type: str | None = None,
@@ -183,15 +164,6 @@ class KeyValueStore(BaseStorage):
             value: The value to save. If the value is `None`, the corresponding key-value pair will be deleted.
             content_type: The content type of the saved value.
         """
-        store = await cls.open()
-        return await store.set_value_inner(key, value, content_type)
-
-    async def set_value_inner(  # noqa: D102
-        self,
-        key: str,
-        value: Any,
-        content_type: str | None = None,
-    ) -> None:
         if value is None:
             return await self._key_value_store_client.delete_record(key)
 

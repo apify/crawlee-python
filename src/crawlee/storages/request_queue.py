@@ -405,9 +405,6 @@ class RequestQueue(BaseStorage):
 
         return queue_operation_info
 
-    def _in_progress_count(self) -> int:
-        return len(self._in_progress)
-
     async def is_empty(self) -> bool:
         """Check whether the queue is empty.
 
@@ -441,58 +438,18 @@ class RequestQueue(BaseStorage):
         is_head_consistent = await self.ensure_head_is_non_empty(ensure_consistency=True)
         return is_head_consistent and len(self._queue_head_dict) == 0 and self._in_progress_count() == 0
 
-    def _reset(self) -> None:
-        self._queue_head_dict.clear()
-        self._query_queue_head_task = None
-        self._in_progress.clear()
-        self._recently_handled.clear()
-        self._assumed_total_count = 0
-        self._assumed_handled_count = 0
-        self._requests_cache.clear()
-        self._last_activity = datetime.now(timezone.utc)
+    async def drop(self) -> None:
+        """Remove the request queue either from the Apify cloud storage or from the local directory."""
+        await self._request_queue_client.delete()
+        self._remove_from_cache()
 
-    def _cache_request(self, cache_key: str, queue_operation_info: dict) -> None:
-        self._requests_cache[cache_key] = {
-            'id': queue_operation_info['requestId'],
-            'isHandled': queue_operation_info['wasAlreadyHandled'],
-            'uniqueKey': queue_operation_info['uniqueKey'],
-            'wasAlreadyHandled': queue_operation_info['wasAlreadyHandled'],
-        }
+    async def get_info(self) -> dict | None:
+        """Get an object containing general information about the request queue.
 
-    async def _queue_query_head(self, limit: int) -> dict:
-        query_started_at = datetime.now(timezone.utc)
-
-        list_head = await self._request_queue_client.list_head(limit=limit)
-        for request in list_head['items']:
-            # Queue head index might be behind the main table, so ensure we don't recycle requests
-            if (
-                not request['id']
-                or not request['uniqueKey']
-                or request['id'] in self._in_progress
-                or self._recently_handled.get(request['id'])
-            ):
-                continue
-            self._queue_head_dict[request['id']] = request['id']
-            self._cache_request(
-                unique_key_to_request_id(request['uniqueKey']),
-                {
-                    'requestId': request['id'],
-                    'wasAlreadyHandled': False,
-                    'wasAlreadyPresent': True,
-                    'uniqueKey': request['uniqueKey'],
-                },
-            )
-
-        # This is needed so that the next call to _ensureHeadIsNonEmpty() will fetch the queue head again.
-        self._query_queue_head_task = None
-
-        return {
-            'wasLimitReached': len(list_head['items']) >= limit,
-            'prevLimit': limit,
-            'queueModifiedAt': list_head['queueModifiedAt'],
-            'queryStartedAt': query_started_at,
-            'hadMultipleClients': list_head['hadMultipleClients'],
-        }
+        Returns:
+            Object returned by calling the GET request queue API endpoint.
+        """
+        return await self._request_queue_client.get()
 
     async def ensure_head_is_non_empty(
         self,
@@ -573,6 +530,62 @@ class RequestQueue(BaseStorage):
             iteration=iteration + 1,
         )
 
+    def _in_progress_count(self) -> int:
+        return len(self._in_progress)
+
+    def _reset(self) -> None:
+        self._queue_head_dict.clear()
+        self._query_queue_head_task = None
+        self._in_progress.clear()
+        self._recently_handled.clear()
+        self._assumed_total_count = 0
+        self._assumed_handled_count = 0
+        self._requests_cache.clear()
+        self._last_activity = datetime.now(timezone.utc)
+
+    def _cache_request(self, cache_key: str, queue_operation_info: dict) -> None:
+        self._requests_cache[cache_key] = {
+            'id': queue_operation_info['requestId'],
+            'isHandled': queue_operation_info['wasAlreadyHandled'],
+            'uniqueKey': queue_operation_info['uniqueKey'],
+            'wasAlreadyHandled': queue_operation_info['wasAlreadyHandled'],
+        }
+
+    async def _queue_query_head(self, limit: int) -> dict:
+        query_started_at = datetime.now(timezone.utc)
+
+        list_head = await self._request_queue_client.list_head(limit=limit)
+        for request in list_head['items']:
+            # Queue head index might be behind the main table, so ensure we don't recycle requests
+            if (
+                not request['id']
+                or not request['uniqueKey']
+                or request['id'] in self._in_progress
+                or self._recently_handled.get(request['id'])
+            ):
+                continue
+            self._queue_head_dict[request['id']] = request['id']
+            self._cache_request(
+                unique_key_to_request_id(request['uniqueKey']),
+                {
+                    'requestId': request['id'],
+                    'wasAlreadyHandled': False,
+                    'wasAlreadyPresent': True,
+                    'uniqueKey': request['uniqueKey'],
+                },
+            )
+
+        # This is needed so that the next call to _ensureHeadIsNonEmpty() will fetch the queue head again.
+        self._query_queue_head_task = None
+
+        return {
+            'wasLimitReached': len(list_head['items']) >= limit,
+            'prevLimit': limit,
+            'queueModifiedAt': list_head['queueModifiedAt'],
+            'queryStartedAt': query_started_at,
+            'hadMultipleClients': list_head['hadMultipleClients'],
+        }
+
     def _maybe_add_request_to_queue_head(
         self,
         request_id: str,
@@ -586,16 +599,3 @@ class RequestQueue(BaseStorage):
         elif self._assumed_total_count < QUERY_HEAD_MIN_LENGTH:
             # OrderedDict puts the item to the end of the queue by default
             self._queue_head_dict[request_id] = request_id
-
-    async def drop(self) -> None:
-        """Remove the request queue either from the Apify cloud storage or from the local directory."""
-        await self._request_queue_client.delete()
-        self._remove_from_cache()
-
-    async def get_info(self) -> dict | None:
-        """Get an object containing general information about the request queue.
-
-        Returns:
-            Object returned by calling the GET request queue API endpoint.
-        """
-        return await self._request_queue_client.get()

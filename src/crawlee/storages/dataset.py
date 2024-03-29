@@ -156,22 +156,14 @@ class Dataset(BaseStorage):
         return config.default_dataset_id
 
     @classmethod
-    def _get_single_storage_client(
-        cls,
-        id_: str,
-        client: MemoryStorageClient,
-    ) -> DatasetClient:
+    def _get_single_storage_client(cls, id_: str, client: MemoryStorageClient) -> DatasetClient:
         return client.dataset(id_)
 
     @classmethod
-    def _get_storage_collection_client(
-        cls,
-        client: MemoryStorageClient,
-    ) -> DatasetCollectionClient:
+    def _get_storage_collection_client(cls, client: MemoryStorageClient) -> DatasetCollectionClient:
         return client.datasets()
 
-    @classmethod
-    async def push_data(cls, data: JSONSerializable) -> None:
+    async def push_data(self, data: JSONSerializable) -> None:
         """Store an object or an array of objects to the dataset.
 
         The size of the data is limited by the receiving API and therefore `push_data()` will only
@@ -179,13 +171,9 @@ class Dataset(BaseStorage):
         none of the included objects may be larger than 9MB, but the array itself may be of any size.
 
         Args:
-            data: dict or array of dicts containing data to be stored in the default dataset. The JSON representation
-                of each item must be smaller than 9MB.
+            data: A JSON serializable data structure to be stored in the dataset.
+                The JSON representation of each item must be smaller than 9MB.
         """
-        dataset = await cls.open()
-        return await dataset.push_data_inner(data)
-
-    async def push_data_inner(self, data: JSONSerializable) -> None:  # noqa: D102
         # Handle singular items
         if not isinstance(data, list):
             payload = _check_and_serialize(data)
@@ -197,11 +185,11 @@ class Dataset(BaseStorage):
         # Invoke client in series to preserve the order of data
         for chunk in _chunk_by_size(payloads_generator):
             await self._dataset_client.push_items(chunk)
+
         return None
 
-    @classmethod
     async def get_data(
-        cls,
+        self,
         *,
         offset: int | None = None,
         limit: int | None = None,
@@ -236,36 +224,6 @@ class Dataset(BaseStorage):
         Returns:
             ListPage containing filtered and paginated dataset items.
         """
-        dataset = await cls.open()
-        return await dataset.get_data_inner(
-            offset=offset,
-            limit=limit,
-            desc=desc,
-            clean=clean,
-            fields=fields,
-            omit=omit,
-            unwind=unwind,
-            skip_empty=skip_empty,
-            skip_hidden=skip_hidden,
-            flatten=flatten,
-            view=view,
-        )
-
-    async def get_data_inner(  # noqa: D102
-        self,
-        *,
-        offset: int | None = None,
-        limit: int | None = None,
-        clean: bool = False,
-        desc: bool = False,
-        fields: list[str] | None = None,
-        omit: list[str] | None = None,
-        unwind: str | None = None,
-        skip_empty: bool = False,
-        skip_hidden: bool = False,
-        flatten: list[str] | None = None,
-        view: str | None = None,
-    ) -> ListPage:
         # TODO: Improve error handling here
         # https://github.com/apify/apify-sdk-python/issues/140
         return await self._dataset_client.list_items(
@@ -282,60 +240,10 @@ class Dataset(BaseStorage):
             view=view,
         )
 
-    async def export_to(
+    async def export_to_json(
         self,
         key: str,
         *,
-        to_key_value_store_id: str | None = None,
-        to_key_value_store_name: str | None = None,
-        content_type: str | None = None,
-    ) -> None:
-        """Save the entirety of the dataset's contents into one file within a key-value store.
-
-        Args:
-            key: The key to save the data under.
-
-            to_key_value_store_id: The id of the key-value store in which the result will be saved.
-
-            to_key_value_store_name: The name of the key-value store in which the result will be saved. You must
-                specify only one of `to_key_value_store_id` and `to_key_value_store_name` arguments. If you omit both,
-                it uses the default key-value store.
-
-            content_type: Either 'text/csv' or 'application/json'. Defaults to JSON.
-        """
-        key_value_store = await KeyValueStore.open(id_=to_key_value_store_id, name=to_key_value_store_name)
-        items: list[dict] = []
-        limit = 1000
-        offset = 0
-        while True:
-            list_items = await self._dataset_client.list_items(limit=limit, offset=offset)
-            items.extend(list_items.items)
-            if list_items.total <= offset + list_items.count:
-                break
-            offset += list_items.count
-
-        if len(items) == 0:
-            raise ValueError('Cannot export an empty dataset')
-
-        if content_type == 'text/csv':
-            output = io.StringIO()
-            writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
-            writer.writerows([items[0].keys(), *[item.values() for item in items]])
-            value = output.getvalue()
-            return await key_value_store.set_value(key, value, content_type)
-
-        if content_type == 'application/json':
-            return await key_value_store.set_value(key, items)
-
-        raise ValueError(f'Unsupported content type: {content_type}')
-
-    @classmethod
-    async def export_to_json(
-        cls,
-        key: str,
-        *,
-        from_dataset_id: str | None = None,
-        from_dataset_name: str | None = None,
         to_key_value_store_id: str | None = None,
         to_key_value_store_name: str | None = None,
     ) -> None:
@@ -347,8 +255,6 @@ class Dataset(BaseStorage):
 
         Args:
             key: The key under which to save the JSON data.
-            from_dataset_id: Dataset ID to export from. Defaults to the default dataset if omitted.
-            from_dataset_name: Dataset name to export from. Use if no dataset ID provided.
             to_key_value_store_id: ID of the key-value store to save the exported file. Defaults to default store.
             to_key_value_store_name: Name of the key-value store to save the exported file. Use if no store ID provided.
 
@@ -356,36 +262,17 @@ class Dataset(BaseStorage):
             Specify only one of `from_dataset_id` and `from_dataset_name`, and one of `to_key_value_store_id` and
             `to_key_value_store_name`. If both or neither are specified in each pair, defaults are used.
         """
-        dataset = await cls.open(id_=from_dataset_id, name=from_dataset_name)
-        await dataset.export_to_json_inner(
-            key,
-            to_key_value_store_id=to_key_value_store_id,
-            to_key_value_store_name=to_key_value_store_name,
-        )
-
-    async def export_to_json_inner(  # noqa: D102
-        self,
-        key: str,
-        *,
-        from_dataset_id: str | None = None,  # noqa: ARG002
-        from_dataset_name: str | None = None,  # noqa: ARG002
-        to_key_value_store_id: str | None = None,
-        to_key_value_store_name: str | None = None,
-    ) -> None:
-        await self.export_to(
+        await self._export_to(
             key,
             to_key_value_store_id=to_key_value_store_id,
             to_key_value_store_name=to_key_value_store_name,
             content_type='application/json',
         )
 
-    @classmethod
     async def export_to_csv(
-        cls,
+        self,
         key: str,
         *,
-        from_dataset_id: str | None = None,
-        from_dataset_name: str | None = None,
         to_key_value_store_id: str | None = None,
         to_key_value_store_name: str | None = None,
     ) -> None:
@@ -397,8 +284,6 @@ class Dataset(BaseStorage):
 
         Args:
             key: Key under which to save the CSV data.
-            from_dataset_id: Optional dataset ID to export from. Defaults to the default dataset.
-            from_dataset_name: Optional dataset name to export from.
             to_key_value_store_id: Optional key-value store ID to save the exported file.
             to_key_value_store_name: Optional key-value store name to save the exported file.
 
@@ -406,23 +291,7 @@ class Dataset(BaseStorage):
             Specify only one dataset source (`from_dataset_id` or `from_dataset_name`) and one storage destination
             (`to_key_value_store_id` or `to_key_value_store_name`). Default settings apply if omitted.
         """
-        dataset = await cls.open(id_=from_dataset_id, name=from_dataset_name)
-        await dataset.export_to_csv_inner(
-            key,
-            to_key_value_store_id=to_key_value_store_id,
-            to_key_value_store_name=to_key_value_store_name,
-        )
-
-    async def export_to_csv_inner(  # noqa: D102
-        self,
-        key: str,
-        *,
-        from_dataset_id: str | None = None,  # noqa: ARG002
-        from_dataset_name: str | None = None,  # noqa: ARG002
-        to_key_value_store_id: str | None = None,
-        to_key_value_store_name: str | None = None,
-    ) -> None:
-        await self.export_to(
+        await self._export_to(
             key,
             to_key_value_store_id=to_key_value_store_id,
             to_key_value_store_name=to_key_value_store_name,
@@ -486,3 +355,50 @@ class Dataset(BaseStorage):
         """Remove the dataset either from the Apify cloud storage or from the local directory."""
         await self._dataset_client.delete()
         self._remove_from_cache()
+
+    async def _export_to(
+        self,
+        key: str,
+        *,
+        to_key_value_store_id: str | None = None,
+        to_key_value_store_name: str | None = None,
+        content_type: str | None = None,
+    ) -> None:
+        """Save the entirety of the dataset's contents into one file within a key-value store.
+
+        Args:
+            key: The key to save the data under.
+
+            to_key_value_store_id: The id of the key-value store in which the result will be saved.
+
+            to_key_value_store_name: The name of the key-value store in which the result will be saved. You must
+                specify only one of `to_key_value_store_id` and `to_key_value_store_name` arguments. If you omit both,
+                it uses the default key-value store.
+
+            content_type: Either 'text/csv' or 'application/json'. Defaults to JSON.
+        """
+        key_value_store = await KeyValueStore.open(id_=to_key_value_store_id, name=to_key_value_store_name)
+        items: list[dict] = []
+        limit = 1000
+        offset = 0
+        while True:
+            list_items = await self._dataset_client.list_items(limit=limit, offset=offset)
+            items.extend(list_items.items)
+            if list_items.total <= offset + list_items.count:
+                break
+            offset += list_items.count
+
+        if len(items) == 0:
+            raise ValueError('Cannot export an empty dataset')
+
+        if content_type == 'text/csv':
+            output = io.StringIO()
+            writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
+            writer.writerows([items[0].keys(), *[item.values() for item in items]])
+            value = output.getvalue()
+            return await key_value_store.set_value(key, value, content_type)
+
+        if content_type == 'application/json':
+            return await key_value_store.set_value(key, items)
+
+        raise ValueError(f'Unsupported content type: {content_type}')

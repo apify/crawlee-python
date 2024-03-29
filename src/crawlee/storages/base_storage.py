@@ -142,19 +142,12 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
 
     @classmethod
     @abstractmethod
-    def _get_single_storage_client(
-        cls,
-        id_: str,
-        client: MemoryStorageClient,
-    ) -> BaseResourceClientType:
+    def _get_single_storage_client(cls, id_: str, client: MemoryStorageClient) -> BaseResourceClientType:
         raise NotImplementedError('The subclass must implement this method.')
 
     @classmethod
     @abstractmethod
-    def _get_storage_collection_client(
-        cls,
-        client: MemoryStorageClient,
-    ) -> BaseResourceCollectionClientType:
+    def _get_storage_collection_client(cls, client: MemoryStorageClient) -> BaseResourceCollectionClientType:
         raise NotImplementedError('The subclass must implement this method.')
 
     @classmethod

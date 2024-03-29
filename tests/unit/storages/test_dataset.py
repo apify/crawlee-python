@@ -59,8 +59,9 @@ async def test_export(dataset: Dataset) -> None:
     await dataset.push_data([{'id': i, 'test': 'test'} for i in range(desired_item_count)])
     await dataset.export_to_csv('dataset-csv')
     await dataset.export_to_json('dataset-json')
-    dataset_csv = await KeyValueStore.get_value('dataset-csv')
-    dataset_json = await KeyValueStore.get_value('dataset-json')
+    kvs = await KeyValueStore.open()
+    dataset_csv = await kvs.get_value('dataset-csv')
+    dataset_json = await kvs.get_value('dataset-json')
     assert dataset_csv == expected_csv
     assert dataset_json == expected_json
 

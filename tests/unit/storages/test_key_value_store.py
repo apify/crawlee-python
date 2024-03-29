@@ -78,7 +78,7 @@ async def test_for_each_key(key_value_store: KeyValueStore) -> None:
     assert index == 2001
 
 
-async def test_static_get_set_value() -> None:
-    await KeyValueStore.set_value('test-static', 'static')
-    value = await KeyValueStore.get_value('test-static')
+async def test_static_get_set_value(key_value_store: KeyValueStore) -> None:
+    await key_value_store.set_value('test-static', 'static')
+    value = await key_value_store.get_value('test-static')
     assert value == 'static'
