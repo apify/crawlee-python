@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Any
 
 from crawlee.memory_storage import MemoryStorageClient
-
-if TYPE_CHECKING:
-    from apify_client import ApifyClientAsync
 
 
 class StorageClientManager:
@@ -15,7 +12,7 @@ class StorageClientManager:
     is_at_home: bool | None = None
 
     local_client: MemoryStorageClient | None = None
-    cloud_client: ApifyClientAsync | None = None
+    cloud_client: None = None
 
     _default_instance: StorageClientManager | None = None
 
@@ -24,24 +21,24 @@ class StorageClientManager:
         """Get the current storage client instance.
 
         Returns:
-            ApifyClientAsync or MemoryStorageClient: The current storage client instance.
+            The current storage client instance.
         """
         default_instance = cls._get_default_instance()
         if not default_instance.local_client:
             default_instance.local_client = MemoryStorageClient(
-                persist_storage=default_instance.persist_storage, write_metadata=True
+                persist_storage=default_instance.persist_storage,
+                write_metadata=True,
             )
 
         if default_instance.is_at_home:
             if default_instance.cloud_client is None:
-                raise RuntimeError('Cloud client is expected but not set in Apify Cloud environment.')
-
+                raise RuntimeError('Cloud client is expected but not set in the environment.')
             return default_instance.cloud_client  # type: ignore
 
         return default_instance.local_client
 
     @classmethod
-    def set_cloud_client(cls, client: ApifyClientAsync) -> None:
+    def set_cloud_client(cls, client: Any) -> None:
         """Set the storage client.
 
         Args:
