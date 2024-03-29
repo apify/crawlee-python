@@ -8,7 +8,7 @@ class Config:
     """Configuration of the Crawler.
 
     Args:
-        purge_on_start: Whether to purge the storage on start. Defaults to False.
+        purge_on_start: Whether to purge the storage on start.
     """
 
     default_dataset_id: str = 'default'

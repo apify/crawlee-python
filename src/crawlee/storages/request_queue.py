@@ -501,6 +501,7 @@ class RequestQueue(BaseStorage):
         limit: int | None = None,
         iteration: int = 0,
     ) -> bool:
+        """Ensure that the queue head is nonempty."""
         # If is nonempty resolve immediately.
         if len(self._queue_head_dict) > 0:
             return True
@@ -561,12 +562,9 @@ class RequestQueue(BaseStorage):
 
         # If we are repeating for consistency then wait required time.
         if should_repeat_for_consistency:
-            delay_seconds = (API_PROCESSED_REQUESTS_DELAY_MILLIS // 1000) - (
-                datetime.now(timezone.utc) - queue_head['queueModifiedAt']
-            ).seconds
-            logger.info(
-                f'Waiting for {delay_seconds}s before considering the queue as finished to ensure that the data is consistent.'
-            )
+            elapsed_time = (datetime.now(timezone.utc) - queue_head['queueModifiedAt']).seconds
+            delay_seconds = (API_PROCESSED_REQUESTS_DELAY_MILLIS // 1000) - elapsed_time
+            logger.info(f'Waiting for {delay_seconds} for queue finalization, to ensure data consistency.')
             await asyncio.sleep(delay_seconds)
 
         return await self.ensure_head_is_non_empty(

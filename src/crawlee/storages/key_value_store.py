@@ -143,7 +143,7 @@ class KeyValueStore(BaseStorage):
         store = await cls.open()
         return await store.get_value_inner(key, default_value)
 
-    async def get_value_inner(self, key: str, default_value: T | None = None) -> T | None:
+    async def get_value_inner(self, key: str, default_value: T | None = None) -> T | None:  # noqa: D102
         record = await self._key_value_store_client.get_record(key)
         return record['value'] if record else default_value
 
@@ -186,7 +186,7 @@ class KeyValueStore(BaseStorage):
         store = await cls.open()
         return await store.set_value_inner(key, value, content_type)
 
-    async def set_value_inner(
+    async def set_value_inner(  # noqa: D102
         self,
         key: str,
         value: Any,

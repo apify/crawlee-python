@@ -67,14 +67,17 @@ class MemoryStorageClient:
 
     @property
     def datasets_directory(self) -> str:
+        """Path to the directory containing datasets."""
         return os.path.join(self._local_data_directory, 'datasets')
 
     @property
     def key_value_stores_directory(self) -> str:
+        """Path to the directory containing key-value stores."""
         return os.path.join(self._local_data_directory, 'key_value_stores')
 
     @property
     def request_queues_directory(self) -> str:
+        """Path to the directory containing request queues."""
         return os.path.join(self._local_data_directory, 'request_queues')
 
     def datasets(self) -> DatasetCollectionClient:

@@ -302,9 +302,11 @@ class DatasetClient(BaseResourceClient):
                 yield item
 
     async def get_items_as_bytes(self, *_args: Any, **_kwargs: Any) -> bytes:
+        """Retrieve the items as bytes."""
         raise NotImplementedError('This method is not supported in local memory storage.')
 
     async def stream_items(self, *_args: Any, **_kwargs: Any) -> AsyncIterator:
+        """Stream items from the dataset."""
         raise NotImplementedError('This method is not supported in local memory storage.')
 
     async def push_items(self, items: JSONSerializable) -> None:
@@ -401,6 +403,7 @@ class DatasetClient(BaseResourceClient):
         )
 
     def get_start_and_end_indexes(self, offset: int, limit: int | None = None) -> tuple[int, int]:
+        """Calculate the start and end indexes for listing items."""
         actual_limit = limit or self.item_count
         start = offset + 1
         end = min(offset + actual_limit, self.item_count) + 1

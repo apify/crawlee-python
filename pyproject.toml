@@ -51,6 +51,7 @@ colorama = "^0.4.6"
 more_itertools = "^10.2.0"
 psutil = "^5.9.8"
 pyee = "^11.1.0"
+sortedcollections = "^2.1.0"
 typing-extensions = "^4.1.0"
 
 [tool.poetry.group.dev.dependencies]

@@ -284,7 +284,7 @@ class KeyValueStoreClient(BaseResourceClient):
         """Retrieve the given record from the key-value store.
 
         Args:
-            key Key of the record to retrieve
+            key: Key of the record to retrieve
 
         Returns:
             The requested record, or None, if the record does not exist
@@ -303,6 +303,7 @@ class KeyValueStoreClient(BaseResourceClient):
         return await self._get_record_internal(key, as_bytes=True)
 
     async def stream_record(self, _key: str) -> AsyncIterator[dict | None]:
+        """Stream the given record from the key-value store."""
         raise NotImplementedError('This method is not supported in local memory storage.')
 
     async def set_record(self, key: str, value: Any, content_type: str | None = None) -> None:
@@ -353,6 +354,7 @@ class KeyValueStoreClient(BaseResourceClient):
                 await existing_store_by_id.persist_record(record)
 
     async def persist_record(self, record: KeyValueStoreRecord) -> None:
+        """Persist the specified record to the key-value store."""
         store_directory = self.resource_directory
         record_filename = _filename_from_record(record)
         record['filename'] = record_filename
@@ -406,6 +408,7 @@ class KeyValueStoreClient(BaseResourceClient):
                     await existing_store_by_id.delete_persisted_record(record)
 
     async def delete_persisted_record(self, record: KeyValueStoreRecord) -> None:
+        """Delete the specified record from the key-value store."""
         store_directory = self.resource_directory
         record_filename = _filename_from_record(record)
 
@@ -431,6 +434,7 @@ class KeyValueStoreClient(BaseResourceClient):
         }
 
     async def update_timestamps(self, *, has_been_modified: bool) -> None:
+        """Update the timestamps of the key-value store."""
         self._accessed_at = datetime.now(timezone.utc)
 
         if has_been_modified:

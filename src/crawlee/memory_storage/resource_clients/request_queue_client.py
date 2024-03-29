@@ -416,6 +416,7 @@ class RequestQueueClient(BaseResourceClient):
         }
 
     async def update_timestamps(self, *, has_been_modified: bool) -> None:
+        """Update the timestamps of the request queue."""
         self._accessed_at = datetime.now(timezone.utc)
 
         if has_been_modified:

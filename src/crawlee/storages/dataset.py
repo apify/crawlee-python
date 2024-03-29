@@ -185,7 +185,7 @@ class Dataset(BaseStorage):
         dataset = await cls.open()
         return await dataset.push_data_inner(data)
 
-    async def push_data_inner(self, data: JSONSerializable) -> None:
+    async def push_data_inner(self, data: JSONSerializable) -> None:  # noqa: D102
         # Handle singular items
         if not isinstance(data, list):
             payload = _check_and_serialize(data)
@@ -251,7 +251,7 @@ class Dataset(BaseStorage):
             view=view,
         )
 
-    async def get_data_inner(
+    async def get_data_inner(  # noqa: D102
         self,
         *,
         offset: int | None = None,
@@ -363,7 +363,7 @@ class Dataset(BaseStorage):
             to_key_value_store_name=to_key_value_store_name,
         )
 
-    async def export_to_json_inner(
+    async def export_to_json_inner(  # noqa: D102
         self,
         key: str,
         *,
@@ -413,7 +413,7 @@ class Dataset(BaseStorage):
             to_key_value_store_name=to_key_value_store_name,
         )
 
-    async def export_to_csv_inner(
+    async def export_to_csv_inner(  # noqa: D102
         self,
         key: str,
         *,

@@ -48,6 +48,7 @@ class BaseResourceClient(ABC):
 
     @abstractmethod
     def to_resource_info(self) -> dict:
+        """Convert the resource client to a resource info dictionary."""
         raise NotImplementedError('The subclass must implement this method.')
 
     @classmethod
