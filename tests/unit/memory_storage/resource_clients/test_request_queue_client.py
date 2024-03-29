@@ -192,7 +192,7 @@ async def test_delete_record(request_queue_client: RequestQueueClient) -> None:
         {
             'uniqueKey': 'handled',
             'url': request_url,
-            'handledAt': datetime.now(tz=timezone.utc),
+            'handledAt': datetime.now(timezone.utc),
         }
     )
 

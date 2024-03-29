@@ -41,7 +41,7 @@ class SystemInfo:
     memory_info: LoadRatioInfo
     event_loop_info: LoadRatioInfo
     client_info: LoadRatioInfo
-    created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     @property
     def is_system_idle(self) -> bool:
@@ -76,7 +76,7 @@ class CpuSnapshot:
 
     used_ratio: float
     max_used_ratio: float
-    created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     @property
     def is_overloaded(self) -> bool:
@@ -100,7 +100,7 @@ class MemorySnapshot:
     current_bytes: int
     max_memory_bytes: int
     max_used_memory_ratio: float
-    created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     @property
     def is_overloaded(self) -> bool:
@@ -120,7 +120,7 @@ class EventLoopSnapshot:
 
     delay: timedelta
     max_delay: timedelta
-    created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     @property
     def max_delay_exceeded(self) -> timedelta:
@@ -145,7 +145,7 @@ class ClientSnapshot:
 
     num_of_errors: int
     max_num_of_errors: int
-    created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     @property
     def is_overloaded(self) -> bool:
