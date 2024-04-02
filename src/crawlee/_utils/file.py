@@ -41,14 +41,14 @@ async def force_rename(src_dir: str, dst_dir: str) -> None:
         await rename(src_dir, dst_dir)
 
 
-def guess_file_extension(content_type: str) -> str | None:
-    """Guess the file extension for a given MIME content type.
+def determine_file_extension(content_type: str) -> str | None:
+    """Determine the file extension for a given MIME content type.
 
     Args:
         content_type: The MIME content type string.
 
     Returns:
-        A string representing the guessed file extension without a leading dot,
+        A string representing the determined file extension without a leading dot,
             or None if no extension could be determined.
     """
     # e.g. mimetypes.guess_extension('application/json ') does not work...
@@ -59,7 +59,7 @@ def guess_file_extension(content_type: str) -> str | None:
     if actual_content_type == 'application/xml':
         return 'xml'
 
-    # Guess the extension from the mime type
+    # Determine the extension from the mime type
     ext = mimetypes.guess_extension(actual_content_type)
 
     # Remove the leading dot if extension successfully parsed

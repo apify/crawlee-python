@@ -8,8 +8,7 @@ import os
 import pathlib
 from datetime import datetime, timezone
 from logging import getLogger
-from operator import itemgetter
-from typing import TYPE_CHECKING, Any, AsyncIterator, TypedDict
+from typing import TYPE_CHECKING, Any, AsyncIterator
 
 import aiofiles
 import aioshutil
@@ -18,48 +17,28 @@ from aiofiles.os import makedirs
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import maybe_parse_body, raise_on_duplicate_storage, raise_on_non_existing_storage
 from crawlee._utils.file import (
+    determine_file_extension,
     force_remove,
     force_rename,
-    guess_file_extension,
     is_file_or_bytes,
     json_dumps,
     persist_metadata_if_enabled,
 )
 from crawlee.consts import DEFAULT_API_PARAM_LIMIT
 from crawlee.memory_storage.base_resource_client import BaseResourceClient
-from crawlee.storages.types import KeyValueStoreResourceInfo, StorageTypes
+from crawlee.storages.types import (
+    KeyValueStoreListKeysOutput,
+    KeyValueStoreRecord,
+    KeyValueStoreRecordInfo,
+    KeyValueStoreResourceInfo,
+    StorageTypes,
+)
 
 if TYPE_CHECKING:
-    from typing_extensions import NotRequired
-
     from crawlee.memory_storage.memory_storage_client import MemoryStorageClient
 
 
 logger = getLogger(__name__)
-
-
-class KeyValueStoreRecord(TypedDict):
-    """Type definition for a key-value store record."""
-
-    key: str
-    value: Any
-    contentType: str | None
-    filename: NotRequired[str]
-
-
-def _filename_from_record(record: KeyValueStoreRecord) -> str:
-    if record.get('filename') is not None:
-        return record['filename']
-
-    content_type = record.get('contentType')
-    if not content_type or content_type == 'application/octet-stream':
-        return record['key']
-
-    extension = guess_file_extension(content_type)
-    if record['key'].endswith(f'.{extension}'):
-        return record['key']
-
-    return f'{record["key"]}.{extension}'
 
 
 class KeyValueStoreClient(BaseResourceClient):
@@ -179,7 +158,7 @@ class KeyValueStoreClient(BaseResourceClient):
         *,
         limit: int = DEFAULT_API_PARAM_LIMIT,
         exclusive_start_key: str | None = None,
-    ) -> dict:
+    ) -> KeyValueStoreListKeysOutput:
         """List the keys in the key-value store.
 
         Args:
@@ -199,33 +178,28 @@ class KeyValueStoreClient(BaseResourceClient):
         if existing_store_by_id is None:
             raise_on_non_existing_storage(StorageTypes.KEY_VALUE_STORE, self.id)
 
-        items = []
+        items: list[KeyValueStoreRecordInfo] = []
 
         for record in existing_store_by_id.records.values():
-            size = len(record['value'])
-            items.append(
-                {
-                    'key': record['key'],
-                    'size': size,
-                }
-            )
+            size = len(record.value)
+            items.append(KeyValueStoreRecordInfo(key=record.key, size=size))
 
         if len(items) == 0:
-            return {
-                'count': len(items),
-                'limit': limit,
-                'exclusiveStartKey': exclusive_start_key,
-                'isTruncated': False,
-                'nextExclusiveStartKey': None,
-                'items': items,
-            }
+            return KeyValueStoreListKeysOutput(
+                count=len(items),
+                limit=limit,
+                exclusive_start_key=exclusive_start_key,
+                is_truncated=False,
+                next_exclusive_start_key=None,
+                items=items,
+            )
 
         # Lexically sort to emulate the API
-        items = sorted(items, key=itemgetter('key'))
+        items = sorted(items, key=lambda item: item.key)
 
         truncated_items = items
         if exclusive_start_key is not None:
-            key_pos = next((idx for idx, i in enumerate(items) if i['key'] == exclusive_start_key), None)
+            key_pos = next((idx for idx, item in enumerate(items) if item.key == exclusive_start_key), None)
             if key_pos is not None:
                 truncated_items = items[(key_pos + 1) :]
 
@@ -234,26 +208,26 @@ class KeyValueStoreClient(BaseResourceClient):
         last_item_in_store = items[-1]
         last_selected_item = limited_items[-1]
         is_last_selected_item_absolutely_last = last_item_in_store == last_selected_item
-        next_exclusive_start_key = None if is_last_selected_item_absolutely_last else last_selected_item['key']
+        next_exclusive_start_key = None if is_last_selected_item_absolutely_last else last_selected_item.key
 
         async with existing_store_by_id.file_operation_lock:
             await existing_store_by_id.update_timestamps(has_been_modified=False)
 
-        return {
-            'count': len(items),
-            'limit': limit,
-            'exclusiveStartKey': exclusive_start_key,
-            'isTruncated': not is_last_selected_item_absolutely_last,
-            'nextExclusiveStartKey': next_exclusive_start_key,
-            'items': limited_items,
-        }
+        return KeyValueStoreListKeysOutput(
+            count=len(items),
+            limit=limit,
+            exclusive_start_key=exclusive_start_key,
+            is_truncated=not is_last_selected_item_absolutely_last,
+            next_exclusive_start_key=next_exclusive_start_key,
+            items=limited_items,
+        )
 
     async def _get_record_internal(
         self,
         key: str,
         *,
         as_bytes: bool = False,
-    ) -> dict | None:
+    ) -> KeyValueStoreRecord | None:
         # Check by id
         existing_store_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
@@ -269,15 +243,15 @@ class KeyValueStoreClient(BaseResourceClient):
         if stored_record is None:
             return None
 
-        record = {
-            'key': stored_record['key'],
-            'value': stored_record['value'],
-            'contentType': stored_record.get('contentType'),
-        }
+        record = KeyValueStoreRecord(
+            key=stored_record.key,
+            value=stored_record.value,
+            content_type=stored_record.content_type,
+        )
 
         if not as_bytes:
             try:
-                record['value'] = maybe_parse_body(record['value'], record['contentType'])
+                record.value = maybe_parse_body(record.value, str(record.content_type))
             except ValueError:
                 logger.exception('Error parsing key-value store record')
 
@@ -286,7 +260,7 @@ class KeyValueStoreClient(BaseResourceClient):
 
         return record
 
-    async def get_record(self, key: str) -> dict | None:
+    async def get_record(self, key: str) -> KeyValueStoreRecord | None:
         """Retrieve the given record from the key-value store.
 
         Args:
@@ -297,7 +271,7 @@ class KeyValueStoreClient(BaseResourceClient):
         """
         return await self._get_record_internal(key)
 
-    async def get_record_as_bytes(self, key: str) -> dict | None:
+    async def get_record_as_bytes(self, key: str) -> KeyValueStoreRecord | None:
         """Retrieve the given record from the key-value store, without parsing it.
 
         Args:
@@ -346,17 +320,19 @@ class KeyValueStoreClient(BaseResourceClient):
 
         async with existing_store_by_id.file_operation_lock:
             await existing_store_by_id.update_timestamps(has_been_modified=True)
-            record: KeyValueStoreRecord = {
-                'key': key,
-                'value': value,
-                'contentType': content_type,
-            }
+            record = KeyValueStoreRecord(
+                key=key,
+                value=value,
+                content_type=content_type,
+            )
 
             old_record = existing_store_by_id.records.get(key)
             existing_store_by_id.records[key] = record
 
             if self._memory_storage_client.persist_storage:
-                if old_record is not None and _filename_from_record(old_record) != _filename_from_record(record):
+                record_filename = self._filename_from_record(record)
+
+                if old_record is not None and self._filename_from_record(old_record) != record_filename:
                     await existing_store_by_id.delete_persisted_record(old_record)
 
                 await existing_store_by_id.persist_record(record)
@@ -364,8 +340,8 @@ class KeyValueStoreClient(BaseResourceClient):
     async def persist_record(self, record: KeyValueStoreRecord) -> None:
         """Persist the specified record to the key-value store."""
         store_directory = self.resource_directory
-        record_filename = _filename_from_record(record)
-        record['filename'] = record_filename
+        record_filename = self._filename_from_record(record)
+        record.filename = record_filename
 
         # Ensure the directory for the entity exists
         await makedirs(store_directory, exist_ok=True)
@@ -375,19 +351,19 @@ class KeyValueStoreClient(BaseResourceClient):
         record_metadata_path = os.path.join(store_directory, record_filename + '.__metadata__.json')
 
         # Convert to bytes if string
-        if isinstance(record['value'], str):
-            record['value'] = record['value'].encode('utf-8')
+        if isinstance(record.value, str):
+            record.value = record.value.encode('utf-8')
 
         async with aiofiles.open(record_path, mode='wb') as f:
-            await f.write(record['value'])
+            await f.write(record.value)
 
         if self._memory_storage_client.write_metadata:
             async with aiofiles.open(record_metadata_path, mode='wb') as f:
                 await f.write(
                     json_dumps(
                         {
-                            'key': record['key'],
-                            'contentType': record['contentType'],
+                            'key': record.key,
+                            'contentType': record.content_type,
                         }
                     ).encode('utf-8')
                 )
@@ -420,7 +396,7 @@ class KeyValueStoreClient(BaseResourceClient):
     async def delete_persisted_record(self, record: KeyValueStoreRecord) -> None:
         """Delete the specified record from the key-value store."""
         store_directory = self.resource_directory
-        record_filename = _filename_from_record(record)
+        record_filename = self._filename_from_record(record)
 
         # Ensure the directory for the entity exists
         await makedirs(store_directory, exist_ok=True)
@@ -556,11 +532,25 @@ class KeyValueStoreClient(BaseResourceClient):
                     exc_info=True,
                 )
 
-            new_client.records[metadata['key']] = {
-                'key': metadata['key'],
-                'contentType': metadata['contentType'],
-                'filename': entry.name,
-                'value': file_content,
-            }
+            new_client.records[metadata['key']] = KeyValueStoreRecord(
+                key=metadata['key'],
+                content_type=metadata['contentType'],
+                filename=entry.name,
+                value=file_content,
+            )
 
         return new_client
+
+    def _filename_from_record(self, record: KeyValueStoreRecord) -> str:
+        if record.filename is not None:
+            return record.filename
+
+        if not record.content_type or record.content_type == 'application/octet-stream':
+            return record.key
+
+        extension = determine_file_extension(record.content_type)
+
+        if record.key.endswith(f'.{extension}'):
+            return record.key
+
+        return f'{record.key}.{extension}'

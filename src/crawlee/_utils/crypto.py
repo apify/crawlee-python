@@ -19,6 +19,6 @@ def compute_short_hash(data: bytes, *, length: int = 8) -> str:
 
 
 def crypto_random_object_id(length: int = 17) -> str:
-    """Python reimplementation of cryptoRandomObjectId from `@apify/utilities`."""
+    """Generates a random object ID."""
     chars = 'abcdefghijklmnopqrstuvwxyzABCEDFGHIJKLMNOPQRSTUVWXYZ0123456789'
     return ''.join(secrets.choice(chars) for _ in range(length))

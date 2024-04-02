@@ -43,6 +43,7 @@ STRING_ENV_VARS: list[STRING_ENV_VARS_TYPE] = list(get_args(STRING_ENV_VARS_TYPE
 
 
 def fetch_and_parse_env_var(env_var: Any, default: Any = None) -> Any:
+    """Fetches the value of the provided environment variable and parses it according to its type."""
     env_var_name = str(maybe_extract_enum_member_value(env_var))
 
     val = os.getenv(env_var_name)

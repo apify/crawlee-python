@@ -10,9 +10,9 @@ import aiofiles
 from aiofiles.os import mkdir
 
 from crawlee._utils.file import (
+    determine_file_extension,
     force_remove,
     force_rename,
-    guess_file_extension,
     is_content_type_json,
     is_content_type_text,
     is_content_type_xml,
@@ -63,20 +63,20 @@ def test_is_content_type_text() -> None:
     assert is_content_type_text('application/xml') is False
 
 
-def test_guess_file_extension() -> None:
-    # Can guess common types properly
-    assert guess_file_extension('application/json') == 'json'
-    assert guess_file_extension('application/xml') == 'xml'
-    assert guess_file_extension('text/plain') == 'txt'
+def test_determine_file_extension() -> None:
+    # Can determine common types properly
+    assert determine_file_extension('application/json') == 'json'
+    assert determine_file_extension('application/xml') == 'xml'
+    assert determine_file_extension('text/plain') == 'txt'
 
     # Can handle unusual formats
-    assert guess_file_extension(' application/json ') == 'json'
-    assert guess_file_extension('APPLICATION/JSON') == 'json'
-    assert guess_file_extension('application/json;charset=utf-8') == 'json'
+    assert determine_file_extension(' application/json ') == 'json'
+    assert determine_file_extension('APPLICATION/JSON') == 'json'
+    assert determine_file_extension('application/json;charset=utf-8') == 'json'
 
     # Returns None for non-existent content types
-    assert guess_file_extension('clearly not a content type') is None
-    assert guess_file_extension('') is None
+    assert determine_file_extension('clearly not a content type') is None
+    assert determine_file_extension('') is None
 
 
 async def test_force_remove(tmp_path: Path) -> None:

@@ -1,27 +1,15 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, AsyncIterator, NamedTuple, TypedDict, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Any, AsyncIterator, TypeVar, cast, overload
 
 from crawlee.storages.base_storage import BaseStorage
+from crawlee.storages.types import KeyValueStoreRecordInfo
 
 if TYPE_CHECKING:
     from crawlee.config import Config
     from crawlee.memory_storage import KeyValueStoreClient, KeyValueStoreCollectionClient, MemoryStorageClient
 
 T = TypeVar('T')
-
-
-class IterateKeysInfo(TypedDict):
-    """Contains information about a key-value store record."""
-
-    size: int
-
-
-class IterateKeysTuple(NamedTuple):
-    """A tuple representing a key-value store record."""
-
-    key: str
-    info: IterateKeysInfo
 
 
 class KeyValueStore(BaseStorage):
@@ -129,26 +117,26 @@ class KeyValueStore(BaseStorage):
             Any: The value associated with the given key. `default_value` is used in case the record does not exist.
         """
         record = await self._key_value_store_client.get_record(key)
-        return record['value'] if record else default_value
+        return record.value if record else default_value
 
-    async def iterate_keys(self, exclusive_start_key: str | None = None) -> AsyncIterator[IterateKeysTuple]:
+    async def iterate_keys(self, exclusive_start_key: str | None = None) -> AsyncIterator[KeyValueStoreRecordInfo]:
         """Iterate over the keys in the key-value store.
 
         Args:
             exclusive_start_key: All keys up to this one (including) are skipped from the result.
 
         Yields:
-            IterateKeysTuple: A tuple `(key, info)`, where `key` is the record key, and `info` is an object that
+            An object, where `key` is the record key, and `info` is an object that
                 contains a single property `size` indicating size of the record in bytes.
         """
         while True:
             list_keys = await self._key_value_store_client.list_keys(exclusive_start_key=exclusive_start_key)
-            for item in list_keys['items']:
-                yield IterateKeysTuple(item['key'], {'size': item['size']})
+            for item in list_keys.items:
+                yield KeyValueStoreRecordInfo(key=item.key, size=item.size)
 
-            if not list_keys['isTruncated']:
+            if not list_keys.is_truncated:
                 break
-            exclusive_start_key = list_keys['nextExclusiveStartKey']
+            exclusive_start_key = list_keys.next_exclusive_start_key
 
     async def set_value(
         self,

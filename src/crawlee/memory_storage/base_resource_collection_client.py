@@ -46,14 +46,12 @@ class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
         items = [storage.to_resource_info() for storage in storage_client_cache]
 
         return ListPage(
-            {
-                'total': len(items),
-                'count': len(items),
-                'offset': 0,
-                'limit': len(items),
-                'desc': False,
-                'items': sorted(items, key=lambda item: item.created_at),
-            }
+            total=len(items),
+            count=len(items),
+            offset=0,
+            limit=len(items),
+            desc=False,
+            items=sorted(items, key=lambda item: item.created_at),
         )
 
     async def get_or_create(

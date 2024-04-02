@@ -27,6 +27,36 @@ class StorageTypes(str, Enum):
 
 
 @dataclass
+class KeyValueStoreRecord:
+    """Type definition for a key-value store record."""
+
+    key: str
+    value: Any
+    content_type: str | None = None
+    filename: str | None = None
+
+
+@dataclass
+class KeyValueStoreRecordInfo:
+    """Information about a key-value store record."""
+
+    key: str
+    size: int
+
+
+@dataclass
+class KeyValueStoreListKeysOutput(Generic[T]):
+    """Represents the output of listing keys in the key-value store."""
+
+    count: int
+    limit: int
+    is_truncated: bool
+    items: list[T] = field(default_factory=list)
+    exclusive_start_key: str | None = None
+    next_exclusive_start_key: str | None = None
+
+
+@dataclass
 class RequestQueueOperationInfo:
     """Result of adding a request to the queue."""
 
@@ -95,10 +125,11 @@ class RequestQueueResourceInfo(BaseResourceInfo):
     resource_directory: str
 
 
+@dataclass
 class ListPage(Generic[T]):
     """A single page of items returned from a list() method.
 
-    Attributes:
+    Args:
         items: List of returned objects on this page
         count: Count of the returned objects on this page
         offset: The limit on the number of returned objects offset specified in the API call
@@ -114,11 +145,13 @@ class ListPage(Generic[T]):
     total: int
     desc: bool
 
-    def __init__(self, data: dict) -> None:
+    @classmethod
+    def from_dict(cls, data: dict) -> ListPage:
         """Initialize a new instance from the API response data."""
-        self.items = data.get('items', [])
-        self.offset = data.get('offset', 0)
-        self.limit = data.get('limit', 0)
-        self.count = data.get('count', len(self.items))
-        self.total = data.get('total', self.offset + self.count)
-        self.desc = data.get('desc', False)
+        items = data.get('items', [])
+        offset = data.get('offset', 0)
+        limit = data.get('limit', 0)
+        count = data.get('count', len(items))
+        total = data.get('total', offset + count)
+        desc = data.get('desc', False)
+        return cls(items=items, count=count, offset=offset, limit=limit, total=total, desc=desc)

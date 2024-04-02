@@ -115,9 +115,9 @@ async def test_delete(key_value_store_client: KeyValueStoreClient) -> None:
 
 async def test_list_keys_empty(key_value_store_client: KeyValueStoreClient) -> None:
     keys = await key_value_store_client.list_keys()
-    assert len(keys['items']) == 0
-    assert keys['count'] == 0
-    assert keys['isTruncated'] is False
+    assert len(keys.items) == 0
+    assert keys.count == 0
+    assert keys.is_truncated is False
 
 
 async def test_list_keys(key_value_store_client: KeyValueStoreClient) -> None:
@@ -131,22 +131,22 @@ async def test_list_keys(key_value_store_client: KeyValueStoreClient) -> None:
 
     # Default settings
     keys = await key_value_store_client.list_keys()
-    assert keys['items'][0]['key'] == 'a'
-    assert keys['items'][3]['key'] == 'd'
-    assert keys['count'] == record_count
-    assert keys['isTruncated'] is False
+    assert keys.items[0].key == 'a'
+    assert keys.items[3].key == 'd'
+    assert keys.count == record_count
+    assert keys.is_truncated is False
     # Test limit
     keys_limit_2 = await key_value_store_client.list_keys(limit=used_limit)
-    assert keys_limit_2['count'] == record_count
-    assert keys_limit_2['limit'] == used_limit
-    assert keys_limit_2['items'][1]['key'] == 'b'
+    assert keys_limit_2.count == record_count
+    assert keys_limit_2.limit == used_limit
+    assert keys_limit_2.items[1].key == 'b'
     # Test exclusive start key
     keys_exclusive_start = await key_value_store_client.list_keys(exclusive_start_key=used_exclusive_start_key, limit=2)
-    assert keys_exclusive_start['exclusiveStartKey'] == used_exclusive_start_key
-    assert keys_exclusive_start['isTruncated'] is True
-    assert keys_exclusive_start['nextExclusiveStartKey'] == 'c'
-    assert keys_exclusive_start['items'][0]['key'] == 'b'
-    assert keys_exclusive_start['items'][-1]['key'] == keys_exclusive_start['nextExclusiveStartKey']
+    assert keys_exclusive_start.exclusive_start_key == used_exclusive_start_key
+    assert keys_exclusive_start.is_truncated is True
+    assert keys_exclusive_start.next_exclusive_start_key == 'c'
+    assert keys_exclusive_start.items[0].key == 'b'
+    assert keys_exclusive_start.items[-1].key == keys_exclusive_start.next_exclusive_start_key
 
 
 async def test_get_and_set_record(tmp_path: Path, key_value_store_client: KeyValueStoreClient) -> None:
@@ -155,24 +155,24 @@ async def test_get_and_set_record(tmp_path: Path, key_value_store_client: KeyVal
     await key_value_store_client.set_record(dict_record_key, {'test': 123})
     dict_record_info = await key_value_store_client.get_record(dict_record_key)
     assert dict_record_info is not None
-    assert 'application/json' in dict_record_info['contentType']
-    assert dict_record_info['value']['test'] == 123
+    assert 'application/json' in str(dict_record_info.content_type)
+    assert dict_record_info.value['test'] == 123
 
     # Test setting str record
     str_record_key = 'test-str'
     await key_value_store_client.set_record(str_record_key, 'test')
     str_record_info = await key_value_store_client.get_record(str_record_key)
     assert str_record_info is not None
-    assert 'text/plain' in str_record_info['contentType']
-    assert str_record_info['value'] == 'test'
+    assert 'text/plain' in str(str_record_info.content_type)
+    assert str_record_info.value == 'test'
 
     # Test setting explicit json record but use str as value, i.e. json dumps is skipped
     explicit_json_key = 'test-json'
     await key_value_store_client.set_record(explicit_json_key, '{"test": "explicit string"}', 'application/json')
     bytes_record_info = await key_value_store_client.get_record(explicit_json_key)
     assert bytes_record_info is not None
-    assert 'application/json' in bytes_record_info['contentType']
-    assert bytes_record_info['value']['test'] == 'explicit string'
+    assert 'application/json' in str(bytes_record_info.content_type)
+    assert bytes_record_info.value['test'] == 'explicit string'
 
     # Test using bytes
     bytes_key = 'test-json'
@@ -180,9 +180,9 @@ async def test_get_and_set_record(tmp_path: Path, key_value_store_client: KeyVal
     await key_value_store_client.set_record(bytes_key, bytes_value, 'unknown')
     bytes_record_info = await key_value_store_client.get_record(bytes_key)
     assert bytes_record_info is not None
-    assert 'unknown' in bytes_record_info['contentType']
-    assert bytes_record_info['value'] == bytes_value
-    assert bytes_record_info['value'].decode('utf-8') == bytes_value.decode('utf-8')
+    assert 'unknown' in str(bytes_record_info.content_type)
+    assert bytes_record_info.value == bytes_value
+    assert bytes_record_info.value.decode('utf-8') == bytes_value.decode('utf-8')
 
     # Test using file descriptor
     with open(os.path.join(tmp_path, 'test.json'), 'w+', encoding='utf-8') as f:  # noqa: ASYNC101
@@ -197,7 +197,7 @@ async def test_get_record_as_bytes(key_value_store_client: KeyValueStoreClient) 
     await key_value_store_client.set_record(record_key, record_value)
     record_info = await key_value_store_client.get_record_as_bytes(record_key)
     assert record_info is not None
-    assert record_info['value'] == record_value.encode('utf-8')
+    assert record_info.value == record_value.encode('utf-8')
 
 
 async def test_delete_record(key_value_store_client: KeyValueStoreClient) -> None:
@@ -442,6 +442,6 @@ async def test_reads_correct_metadata(memory_storage_client: MemoryStorageClient
     actual_record = await key_value_store_client.get_record(expected_output['key'])
     assert actual_record is not None
 
-    assert actual_record['key'] == expected_output['key']
-    assert actual_record['contentType'] == expected_output['contentType']
-    assert actual_record['value'] == test_input['value']
+    assert actual_record.key == expected_output['key']
+    assert actual_record.content_type == expected_output['contentType']
+    assert actual_record.value == test_input['value']

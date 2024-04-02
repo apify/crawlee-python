@@ -66,14 +66,14 @@ async def test_get_set_value(key_value_store: KeyValueStore) -> None:
 
 
 async def test_for_each_key(key_value_store: KeyValueStore) -> None:
-    keys = [i async for i in key_value_store.iterate_keys()]
+    keys = [item.key async for item in key_value_store.iterate_keys()]
     assert len(keys) == 0
 
     for i in range(2001):
         await key_value_store.set_value(str(i).zfill(4), i)
     index = 0
-    async for key, _ in key_value_store.iterate_keys():
-        assert key == str(index).zfill(4)
+    async for item in key_value_store.iterate_keys():
+        assert item.key == str(index).zfill(4)
         index += 1
     assert index == 2001
 

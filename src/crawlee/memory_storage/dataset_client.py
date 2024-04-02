@@ -21,17 +21,14 @@ if TYPE_CHECKING:
     from crawlee.storages.types import JSONSerializable
 
 
-# This is what API returns in the x-apify-pagination-limit
-# header when no limit query parameter is used.
-LIST_ITEMS_LIMIT = 999_999_999_999
-
-# Number of characters of the dataset item file names.
-# E.g.: 000000019.json - 9 digits
-LOCAL_ENTRY_NAME_DIGITS = 9
-
-
 class DatasetClient(BaseResourceClient):
     """Sub-client for manipulating a single dataset."""
+
+    # This is what API returns in the x-apify-pagination-limit header when no limit query parameter is used.
+    _LIST_ITEMS_LIMIT = 999_999_999_999
+
+    # Number of characters of the dataset item file names, e.g.: 000000019.json - 9 digits.
+    _LOCAL_ENTRY_NAME_DIGITS = 9
 
     def __init__(
         self,
@@ -148,7 +145,7 @@ class DatasetClient(BaseResourceClient):
         self,
         *,
         offset: int | None = 0,
-        limit: int | None = LIST_ITEMS_LIMIT,
+        limit: int | None = _LIST_ITEMS_LIMIT,
         clean: bool = False,  # noqa: ARG002
         desc: bool = False,
         fields: list[str] | None = None,  # noqa: ARG002
@@ -205,7 +202,7 @@ class DatasetClient(BaseResourceClient):
 
         async with existing_dataset_by_id.file_operation_lock:
             start, end = existing_dataset_by_id.get_start_and_end_indexes(
-                max(existing_dataset_by_id.item_count - (offset or 0) - (limit or LIST_ITEMS_LIMIT), 0)
+                max(existing_dataset_by_id.item_count - (offset or 0) - (limit or self._LIST_ITEMS_LIMIT), 0)
                 if desc
                 else offset or 0,
                 limit,
@@ -223,14 +220,12 @@ class DatasetClient(BaseResourceClient):
                 items.reverse()
 
             return ListPage(
-                {
-                    'count': len(items),
-                    'desc': desc or False,
-                    'items': items,
-                    'limit': limit or LIST_ITEMS_LIMIT,
-                    'offset': offset or 0,
-                    'total': existing_dataset_by_id.item_count,
-                }
+                count=len(items),
+                desc=desc or False,
+                items=items,
+                limit=limit or self._LIST_ITEMS_LIMIT,
+                offset=offset or 0,
+                total=existing_dataset_by_id.item_count,
             )
 
     async def iterate_items(
@@ -414,7 +409,7 @@ class DatasetClient(BaseResourceClient):
         return (start, end)
 
     def _generate_local_entry_name(self, idx: int) -> str:
-        return str(idx).zfill(LOCAL_ENTRY_NAME_DIGITS)
+        return str(idx).zfill(self._LOCAL_ENTRY_NAME_DIGITS)
 
     def _normalize_items(self, items: JSONSerializable) -> list[dict]:
         def normalize_item(item: Any) -> dict | None:

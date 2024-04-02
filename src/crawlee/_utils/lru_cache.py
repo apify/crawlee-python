@@ -29,9 +29,9 @@ class LRUCache(MutableMapping, Generic[T]):
         self._cache.move_to_end(key)
         return val
 
-    # Sadly TS impl returns bool indicating whether the key was already present or not
     def __setitem__(self, key: str, value: T) -> None:
         """Add an item to the cache. Remove least used item if max_length exceeded."""
+        # Sadly TS impl returns bool indicating whether the key was already present or not
         self._cache[key] = value
         if len(self._cache) > self._max_length:
             self._cache.popitem(last=False)
