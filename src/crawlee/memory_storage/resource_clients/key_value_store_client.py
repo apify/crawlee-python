@@ -27,7 +27,7 @@ from crawlee._utils.file import (
 )
 from crawlee.consts import DEFAULT_API_PARAM_LIMIT
 from crawlee.memory_storage.resource_clients.base_resource_client import BaseResourceClient
-from crawlee.storages.types import StorageTypes
+from crawlee.storages.types import KeyValueStoreResourceInfo, StorageTypes
 
 if TYPE_CHECKING:
     from typing_extensions import NotRequired
@@ -88,7 +88,7 @@ class KeyValueStoreClient(BaseResourceClient):
         self.records: dict[str, KeyValueStoreRecord] = {}
         self.file_operation_lock = asyncio.Lock()
 
-    async def get(self) -> dict | None:
+    async def get(self) -> KeyValueStoreResourceInfo | None:
         """Retrieve the key-value store.
 
         Returns:
@@ -107,7 +107,7 @@ class KeyValueStoreClient(BaseResourceClient):
 
         return None
 
-    async def update(self, *, name: str | None = None) -> dict:
+    async def update(self, *, name: str | None = None) -> KeyValueStoreResourceInfo:
         """Update the key-value store with specified fields.
 
         Args:
@@ -432,16 +432,16 @@ class KeyValueStoreClient(BaseResourceClient):
         await force_remove(record_path)
         await force_remove(record_metadata_path)
 
-    def to_resource_info(self) -> dict:
+    def to_resource_info(self) -> KeyValueStoreResourceInfo:
         """Retrieve the key-value store info."""
-        return {
-            'id': self.id,
-            'name': self.name,
-            'accessedAt': self._accessed_at,
-            'createdAt': self._created_at,
-            'modifiedAt': self._modified_at,
-            'userId': '1',
-        }
+        return KeyValueStoreResourceInfo(
+            id=str(self.id),
+            name=str(self.name),
+            accessed_at=self._accessed_at,
+            created_at=self._created_at,
+            modified_at=self._modified_at,
+            user_id='1',
+        )
 
     async def update_timestamps(self, *, has_been_modified: bool) -> None:
         """Update the timestamps of the key-value store."""
@@ -451,8 +451,10 @@ class KeyValueStoreClient(BaseResourceClient):
             self._modified_at = datetime.now(timezone.utc)
 
         kv_store_info = self.to_resource_info()
+        kv_store_info_as_dict = kv_store_info.__dict__
+
         await persist_metadata_if_enabled(
-            data=kv_store_info,
+            data=kv_store_info_as_dict,
             entity_directory=self.resource_directory,
             write_metadata=self._memory_storage_client.write_metadata,
         )

@@ -6,7 +6,7 @@ from crawlee.memory_storage.resource_clients.base_resource_collection_client imp
 from crawlee.memory_storage.resource_clients.key_value_store_client import KeyValueStoreClient
 
 if TYPE_CHECKING:
-    from crawlee.storages.types import ListPage
+    from crawlee.storages.types import BaseResourceInfo, ListPage
 
 
 class KeyValueStoreCollectionClient(BaseResourceCollectionClient):
@@ -33,7 +33,7 @@ class KeyValueStoreCollectionClient(BaseResourceCollectionClient):
         name: str | None = None,
         schema: dict | None = None,
         id_: str | None = None,
-    ) -> dict:
+    ) -> BaseResourceInfo:
         """Retrieve a named key-value store, or create a new one when it doesn't exist.
 
         Args:

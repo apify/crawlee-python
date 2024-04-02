@@ -31,7 +31,7 @@ TINY_TEXT = 'abcd'
 async def key_value_store_client(memory_storage_client: MemoryStorageClient) -> KeyValueStoreClient:
     key_value_stores_client = memory_storage_client.key_value_stores()
     kvs_info = await key_value_stores_client.get_or_create(name='test')
-    return memory_storage_client.key_value_store(kvs_info['id'])
+    return memory_storage_client.key_value_store(kvs_info.id)
 
 
 async def test_nonexistent(memory_storage_client: MemoryStorageClient) -> None:
@@ -68,8 +68,8 @@ async def test_get(key_value_store_client: KeyValueStoreClient) -> None:
     await asyncio.sleep(0.1)
     info = await key_value_store_client.get()
     assert info is not None
-    assert info['id'] == key_value_store_client.id
-    assert info['accessedAt'] != info['createdAt']
+    assert info.id == key_value_store_client.id
+    assert info.accessed_at != info.created_at
 
 
 async def test_update(key_value_store_client: KeyValueStoreClient) -> None:
@@ -78,7 +78,7 @@ async def test_update(key_value_store_client: KeyValueStoreClient) -> None:
     old_kvs_info = await key_value_store_client.get()
     assert old_kvs_info is not None
     old_kvs_directory = os.path.join(
-        key_value_store_client._memory_storage_client.key_value_stores_directory, old_kvs_info['name']
+        key_value_store_client._memory_storage_client.key_value_stores_directory, old_kvs_info.name
     )
     new_kvs_directory = os.path.join(
         key_value_store_client._memory_storage_client.key_value_stores_directory, new_kvs_name
@@ -91,9 +91,9 @@ async def test_update(key_value_store_client: KeyValueStoreClient) -> None:
     assert os.path.exists(os.path.join(old_kvs_directory, 'test.json')) is False
     assert os.path.exists(os.path.join(new_kvs_directory, 'test.json')) is True
     # Only modifiedAt and accessedAt should be different
-    assert old_kvs_info['createdAt'] == updated_kvs_info['createdAt']
-    assert old_kvs_info['modifiedAt'] != updated_kvs_info['modifiedAt']
-    assert old_kvs_info['accessedAt'] != updated_kvs_info['accessedAt']
+    assert old_kvs_info.created_at == updated_kvs_info.created_at
+    assert old_kvs_info.modified_at != updated_kvs_info.modified_at
+    assert old_kvs_info.accessed_at != updated_kvs_info.accessed_at
 
     # Should fail with the same name
     with pytest.raises(ValueError, match='Key-value store with name "test-update" already exists.'):
@@ -105,7 +105,7 @@ async def test_delete(key_value_store_client: KeyValueStoreClient) -> None:
     kvs_info = await key_value_store_client.get()
     assert kvs_info is not None
     kvs_directory = os.path.join(
-        key_value_store_client._memory_storage_client.key_value_stores_directory, kvs_info['name']
+        key_value_store_client._memory_storage_client.key_value_stores_directory, kvs_info.name
     )
     assert os.path.exists(os.path.join(kvs_directory, 'test.json')) is True
     await key_value_store_client.delete()
@@ -269,7 +269,7 @@ async def test_writes_correct_metadata(memory_storage_client: MemoryStorageClien
 
     # Write the input data to the key-value store
     store_details = await memory_storage_client.key_value_stores().get_or_create(name=key_value_store_name)
-    key_value_store_client = memory_storage_client.key_value_store(store_details['id'])
+    key_value_store_client = memory_storage_client.key_value_store(store_details.id)
     await key_value_store_client.set_record(
         test_input['key'], test_input['value'], content_type=test_input['contentType']
     )
@@ -437,7 +437,7 @@ async def test_reads_correct_metadata(memory_storage_client: MemoryStorageClient
 
     # Create the key-value store client to load the items from disk
     store_details = await memory_storage_client.key_value_stores().get_or_create(name=key_value_store_name)
-    key_value_store_client = memory_storage_client.key_value_store(store_details['id'])
+    key_value_store_client = memory_storage_client.key_value_store(store_details.id)
 
     # Read the item from the store and check if it is as expected
     actual_record = await key_value_store_client.get_record(expected_output['key'])

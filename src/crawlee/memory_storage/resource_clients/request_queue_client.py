@@ -27,7 +27,12 @@ from crawlee._utils.file import (
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee.memory_storage.resource_clients.base_resource_client import BaseResourceClient
 from crawlee.models import RequestData
-from crawlee.storages.types import RequestQueueHeadResponse, RequestQueueOperationInfo, ResourceInfo, StorageTypes
+from crawlee.storages.types import (
+    RequestQueueHeadResponse,
+    RequestQueueOperationInfo,
+    RequestQueueResourceInfo,
+    StorageTypes,
+)
 
 if TYPE_CHECKING:
     from crawlee.memory_storage.memory_storage_client import MemoryStorageClient
@@ -64,7 +69,7 @@ class RequestQueueClient(BaseResourceClient):
         self.file_operation_lock = asyncio.Lock()
         self._last_used_timestamp = Decimal(0.0)
 
-    async def get(self) -> ResourceInfo | None:
+    async def get(self) -> RequestQueueResourceInfo | None:
         """Retrieve the request queue.
 
         Returns:
@@ -83,7 +88,7 @@ class RequestQueueClient(BaseResourceClient):
 
         return None
 
-    async def update(self, *, name: str | None = None) -> ResourceInfo:
+    async def update(self, *, name: str | None = None) -> RequestQueueResourceInfo:
         """Update the request queue with specified fields.
 
         Args:
@@ -424,16 +429,16 @@ class RequestQueueClient(BaseResourceClient):
         file_path = os.path.join(entity_directory, f'{request_id}.json')
         await force_remove(file_path)
 
-    def to_resource_info(self) -> ResourceInfo:
+    def to_resource_info(self) -> RequestQueueResourceInfo:
         """Retrieve the request queue store info."""
-        return ResourceInfo(
+        return RequestQueueResourceInfo(
+            id=str(self.id),
+            name=str(self.name),
             accessed_at=self._accessed_at,
             created_at=self._created_at,
+            modified_at=self._modified_at,
             had_multiple_clients=False,
             handled_request_count=self.handled_request_count,
-            id=self.id,
-            modified_at=self._modified_at,
-            name=self.name,
             pending_request_count=self.pending_request_count,
             stats={},
             total_request_count=len(self.requests),
@@ -449,8 +454,10 @@ class RequestQueueClient(BaseResourceClient):
             self._modified_at = datetime.now(timezone.utc)
 
         request_queue_info = self.to_resource_info()
+        request_queue_info_as_dict = request_queue_info.__dict__
+
         await persist_metadata_if_enabled(
-            data=request_queue_info.__dict__,
+            data=request_queue_info_as_dict,
             entity_directory=self.resource_directory,
             write_metadata=self._memory_storage_client.write_metadata,
         )

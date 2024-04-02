@@ -14,7 +14,7 @@ from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import raise_on_duplicate_storage, raise_on_non_existing_storage
 from crawlee._utils.file import force_rename, json_dumps, persist_metadata_if_enabled
 from crawlee.memory_storage.resource_clients.base_resource_client import BaseResourceClient
-from crawlee.storages.types import ListPage, StorageTypes
+from crawlee.storages.types import DatasetResourceInfo, ListPage, StorageTypes
 
 if TYPE_CHECKING:
     from crawlee.memory_storage.memory_storage_client import MemoryStorageClient
@@ -58,7 +58,7 @@ class DatasetClient(BaseResourceClient):
         self.file_operation_lock = asyncio.Lock()
         self.item_count = item_count
 
-    async def get(self) -> dict | None:
+    async def get(self) -> DatasetResourceInfo | None:
         """Retrieve the dataset.
 
         Returns:
@@ -77,7 +77,7 @@ class DatasetClient(BaseResourceClient):
 
         return None
 
-    async def update(self, *, name: str | None = None) -> dict:
+    async def update(self, *, name: str | None = None) -> DatasetResourceInfo:
         """Update the dataset with specified fields.
 
         Args:
@@ -379,16 +379,16 @@ class DatasetClient(BaseResourceClient):
             async with aiofiles.open(file_path, mode='wb') as f:
                 await f.write(json_dumps(item).encode('utf-8'))
 
-    def to_resource_info(self) -> dict:
+    def to_resource_info(self) -> DatasetResourceInfo:
         """Retrieve the dataset info."""
-        return {
-            'id': self.id,
-            'name': self.name,
-            'itemCount': self.item_count,
-            'accessedAt': self._accessed_at,
-            'createdAt': self._created_at,
-            'modifiedAt': self._modified_at,
-        }
+        return DatasetResourceInfo(
+            id=str(self.id),
+            name=str(self.name),
+            accessed_at=self._accessed_at,
+            created_at=self._created_at,
+            modified_at=self._modified_at,
+            item_count=self.item_count,
+        )
 
     async def update_timestamps(self, *, has_been_modified: bool) -> None:
         """Update the timestamps of the dataset."""
@@ -398,8 +398,10 @@ class DatasetClient(BaseResourceClient):
             self._modified_at = datetime.now(timezone.utc)
 
         dataset_info = self.to_resource_info()
+        dataset_info_as_dict = dataset_info.__dict__
+
         await persist_metadata_if_enabled(
-            data=dataset_info,
+            data=dataset_info_as_dict,
             entity_directory=self.resource_directory,
             write_metadata=self._memory_storage_client.write_metadata,
         )

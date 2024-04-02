@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
     from crawlee.memory_storage.memory_storage_client import MemoryStorageClient
-    from crawlee.storages.types import ResourceInfo
+    from crawlee.storages.types import BaseResourceInfo
 
 
 class BaseResourceClient(ABC):
@@ -29,7 +29,7 @@ class BaseResourceClient(ABC):
         self.name = name
 
     @abstractmethod
-    async def get(self) -> ResourceInfo | dict | None:
+    async def get(self) -> BaseResourceInfo | None:
         """Retrieve the storage.
 
         Returns:
@@ -48,7 +48,7 @@ class BaseResourceClient(ABC):
         raise NotImplementedError('The subclass must implement this method.')
 
     @abstractmethod
-    def to_resource_info(self) -> ResourceInfo:
+    def to_resource_info(self) -> BaseResourceInfo:
         """Convert the resource client to a resource info dictionary."""
         raise NotImplementedError('The subclass must implement this method.')
 

@@ -6,8 +6,7 @@ from crawlee.memory_storage.resource_clients.base_resource_collection_client imp
 from crawlee.memory_storage.resource_clients.request_queue_client import RequestQueueClient
 
 if TYPE_CHECKING:
-    from crawlee.memory_storage.resource_clients.request_queue_client import ResourceInfo
-    from crawlee.storages.types import ListPage
+    from crawlee.storages.types import BaseResourceInfo, ListPage
 
 
 class RequestQueueCollectionClient(BaseResourceCollectionClient):
@@ -34,7 +33,7 @@ class RequestQueueCollectionClient(BaseResourceCollectionClient):
         name: str | None = None,
         schema: dict | None = None,
         id_: str | None = None,
-    ) -> ResourceInfo:
+    ) -> BaseResourceInfo:
         """Retrieve a named request queue, or create a new one when it doesn't exist.
 
         Args:

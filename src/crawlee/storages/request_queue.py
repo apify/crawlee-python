@@ -12,7 +12,7 @@ from crawlee._utils.lru_cache import LRUCache
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee.consts import REQUEST_QUEUE_HEAD_MAX_LIMIT
 from crawlee.storages.base_storage import BaseStorage
-from crawlee.storages.types import RequestQueueOperationInfo, RequestQueueSnapshot, ResourceInfo
+from crawlee.storages.types import BaseResourceInfo, RequestQueueOperationInfo, RequestQueueSnapshot
 
 if TYPE_CHECKING:
     from crawlee.config import Config
@@ -428,7 +428,7 @@ class RequestQueue(BaseStorage):
         await self._request_queue_client.delete()
         self._remove_from_cache()
 
-    async def get_info(self) -> ResourceInfo | None:
+    async def get_info(self) -> BaseResourceInfo | None:
         """Get an object containing general information about the request queue.
 
         Returns:

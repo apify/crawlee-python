@@ -58,16 +58,36 @@ class RequestQueueHeadResponse:
 
 
 @dataclass
-class ResourceInfo:
-    """Resource information."""
+class BaseResourceInfo:
+    """Base class for resource information."""
 
+    id: str
+    name: str
     accessed_at: datetime
     created_at: datetime
+    modified_at: datetime
+
+
+@dataclass
+class DatasetResourceInfo(BaseResourceInfo):
+    """Dataset resource information."""
+
+    item_count: int
+
+
+@dataclass
+class KeyValueStoreResourceInfo(BaseResourceInfo):
+    """Key-value store resource information."""
+
+    user_id: str
+
+
+@dataclass
+class RequestQueueResourceInfo(BaseResourceInfo):
+    """Resource information."""
+
     had_multiple_clients: bool
     handled_request_count: int
-    id: str
-    modified_at: datetime
-    name: str | None
     pending_request_count: int
     stats: dict[str, Any]
     total_request_count: int

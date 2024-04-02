@@ -35,13 +35,11 @@ async def test_persist_storage(tmp_path: Path) -> None:
     kvs_no_metadata_client = ms_no_persist.key_value_stores()
     kvs_info = await kvs_client.get_or_create(name='kvs')
     kvs_no_metadata_info = await kvs_no_metadata_client.get_or_create(name='kvs-no-persist')
-    await ms.key_value_store(kvs_info['id']).set_record('test', {'x': 1}, 'application/json')
-    await ms_no_persist.key_value_store(kvs_no_metadata_info['id']).set_record('test', {'x': 1}, 'application/json')
-    assert os.path.exists(os.path.join(ms.key_value_stores_directory, kvs_info['name'], 'test.json')) is True
+    await ms.key_value_store(kvs_info.id).set_record('test', {'x': 1}, 'application/json')
+    await ms_no_persist.key_value_store(kvs_no_metadata_info.id).set_record('test', {'x': 1}, 'application/json')
+    assert os.path.exists(os.path.join(ms.key_value_stores_directory, kvs_info.name, 'test.json')) is True
     assert (
-        os.path.exists(
-            os.path.join(ms_no_persist.key_value_stores_directory, kvs_no_metadata_info['name'], 'test.json')
-        )
+        os.path.exists(os.path.join(ms_no_persist.key_value_stores_directory, kvs_no_metadata_info.name, 'test.json'))
         is False
     )
 
@@ -81,13 +79,13 @@ async def test_purge_datasets(tmp_path: Path) -> None:
 
     # Check all folders inside datasets directory before and after purge
     folders_before_purge = os.listdir(ms.datasets_directory)
-    assert default_dataset_info['name'] in folders_before_purge
-    assert non_default_dataset_info['name'] in folders_before_purge
+    assert default_dataset_info.name in folders_before_purge
+    assert non_default_dataset_info.name in folders_before_purge
 
     await ms._purge_inner()
     folders_after_purge = os.listdir(ms.datasets_directory)
-    assert default_dataset_info['name'] not in folders_after_purge
-    assert non_default_dataset_info['name'] in folders_after_purge
+    assert default_dataset_info.name not in folders_after_purge
+    assert non_default_dataset_info.name in folders_after_purge
 
 
 async def test_purge_key_value_stores(tmp_path: Path) -> None:
@@ -97,7 +95,7 @@ async def test_purge_key_value_stores(tmp_path: Path) -> None:
     kvs_client = ms.key_value_stores()
     default_kvs_info = await kvs_client.get_or_create(name='default')
     non_default_kvs_info = await kvs_client.get_or_create(name='non-default')
-    default_kvs_client = ms.key_value_store(default_kvs_info['id'])
+    default_kvs_client = ms.key_value_store(default_kvs_info.id)
     # INPUT.json should be kept
     await default_kvs_client.set_record('INPUT', {'abc': 123}, 'application/json')
     # test.json should not be kept
@@ -105,16 +103,16 @@ async def test_purge_key_value_stores(tmp_path: Path) -> None:
 
     # Check all folders and files inside kvs directory before and after purge
     folders_before_purge = os.listdir(ms.key_value_stores_directory)
-    assert default_kvs_info['name'] in folders_before_purge
-    assert non_default_kvs_info['name'] in folders_before_purge
+    assert default_kvs_info.name in folders_before_purge
+    assert non_default_kvs_info.name in folders_before_purge
     default_folder_files_before_purge = os.listdir(os.path.join(ms.key_value_stores_directory, 'default'))
     assert 'INPUT.json' in default_folder_files_before_purge
     assert 'test.json' in default_folder_files_before_purge
 
     await ms._purge_inner()
     folders_after_purge = os.listdir(ms.key_value_stores_directory)
-    assert default_kvs_info['name'] in folders_after_purge
-    assert non_default_kvs_info['name'] in folders_after_purge
+    assert default_kvs_info.name in folders_after_purge
+    assert non_default_kvs_info.name in folders_after_purge
     default_folder_files_after_purge = os.listdir(os.path.join(ms.key_value_stores_directory, 'default'))
     assert 'INPUT.json' in default_folder_files_after_purge
     assert 'test.json' not in default_folder_files_after_purge
@@ -129,12 +127,12 @@ async def test_purge_request_queues(tmp_path: Path) -> None:
 
     # Check all folders inside rq directory before and after purge
     folders_before_purge = os.listdir(ms.request_queues_directory)
-    assert default_rq_info['name'] in folders_before_purge
-    assert non_default_rq_info['name'] in folders_before_purge
+    assert default_rq_info.name in folders_before_purge
+    assert non_default_rq_info.name in folders_before_purge
     await ms._purge_inner()
     folders_after_purge = os.listdir(ms.request_queues_directory)
-    assert default_rq_info['name'] not in folders_after_purge
-    assert non_default_rq_info['name'] in folders_after_purge
+    assert default_rq_info.name not in folders_after_purge
+    assert non_default_rq_info.name in folders_after_purge
 
 
 async def test_not_implemented_method(tmp_path: Path) -> None:

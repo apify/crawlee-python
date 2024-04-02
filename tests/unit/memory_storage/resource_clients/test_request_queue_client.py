@@ -86,9 +86,9 @@ async def test_list_head(request_queue_client: RequestQueueClient) -> None:
     await request_queue_client.add_request(RequestData.from_url('https://apify.com'))
     await request_queue_client.add_request(RequestData.from_url('https://example.com'))
     list_head = await request_queue_client.list_head()
-    assert len(list_head['items']) == 2
+    assert len(list_head.items) == 2
 
-    for item in list_head['items']:
+    for item in list_head.items:
         assert item.id is not None
 
 
@@ -206,7 +206,7 @@ async def test_forefront(request_queue_client: RequestQueueClient) -> None:
 
     # Check that the queue head (unhandled items) is in the right order
     queue_head = await request_queue_client.list_head()
-    req_unique_keys = [req.unique_key for req in queue_head['items']]
+    req_unique_keys = [req.unique_key for req in queue_head.items]
     assert req_unique_keys == ['7', '4', '1', '0', '3', '6']
 
     # Mark request #1 as handled
@@ -230,5 +230,5 @@ async def test_forefront(request_queue_client: RequestQueueClient) -> None:
 
     # Check that the queue head (unhandled items) is in the right order after the updates
     queue_head = await request_queue_client.list_head()
-    req_unique_keys = [req.unique_key for req in queue_head['items']]
+    req_unique_keys = [req.unique_key for req in queue_head.items]
     assert req_unique_keys == ['3', '7', '4', '0', '6']

@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from crawlee.config import Config
     from crawlee.memory_storage import MemoryStorageClient
     from crawlee.memory_storage.resource_clients import DatasetClient, DatasetCollectionClient
-    from crawlee.storages.types import JSONSerializable, ListPage
+    from crawlee.storages.types import DatasetResourceInfo, JSONSerializable, ListPage
 
 
 class Dataset(BaseStorage):
@@ -240,7 +240,7 @@ class Dataset(BaseStorage):
             content_type='text/csv',
         )
 
-    async def get_info(self) -> dict | None:
+    async def get_info(self) -> DatasetResourceInfo | None:
         """Get an object containing general information about the dataset.
 
         Returns:
