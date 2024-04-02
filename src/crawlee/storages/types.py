@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Generic, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, Union
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 T = TypeVar('T')
 
@@ -18,6 +22,27 @@ class StorageTypes(str, Enum):
     DATASET = 'Dataset'
     KEY_VALUE_STORE = 'Key-value store'
     REQUEST_QUEUE = 'Request queue'
+
+
+@dataclass
+class RequestQueueOperationInfo:
+    """Result of adding a request to the queue."""
+
+    request_id: str
+    request_unique_key: str
+    was_already_present: bool
+    was_already_handled: bool
+
+
+@dataclass
+class RequestQueueSnapshot:
+    """Information about the head of the request queue."""
+
+    was_limit_reached: bool
+    prev_limit: int
+    queue_modified_at: datetime
+    query_started_at: datetime
+    had_multiple_clients: bool
 
 
 class ListPage(Generic[T]):

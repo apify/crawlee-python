@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from operator import itemgetter
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 from crawlee._utils.file import persist_metadata_if_enabled
 from crawlee.memory_storage.resource_clients.base_resource_client import BaseResourceClient
+from crawlee.memory_storage.resource_clients.types import ResourceInfo
 from crawlee.storages.types import ListPage
 
 if TYPE_CHECKING:
@@ -53,7 +53,7 @@ class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
                 'offset': 0,
                 'limit': len(items),
                 'desc': False,
-                'items': sorted(items, key=itemgetter('createdAt')),
+                'items': sorted(items, key=lambda item: item.created_at),
             }
         )
 
@@ -63,7 +63,7 @@ class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
         name: str | None = None,
         schema: dict | None = None,  # noqa: ARG002
         id_: str | None = None,
-    ) -> dict:
+    ) -> ResourceInfo:
         """Retrieve a named storage, or create a new one when it doesn't exist.
 
         Args:
@@ -95,10 +95,11 @@ class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
         storage_client_cache.append(new_resource)
 
         resource_info = new_resource.to_resource_info()
+        data = resource_info.__dict__ if isinstance(resource_info, ResourceInfo) else resource_info
 
         # Write to the disk
         await persist_metadata_if_enabled(
-            data=resource_info,
+            data=data,
             entity_directory=new_resource.resource_directory,  # type: ignore
             write_metadata=self._memory_storage_client.write_metadata,
         )

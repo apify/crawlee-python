@@ -9,14 +9,17 @@ from typing import OrderedDict as OrderedDictType
 
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.lru_cache import LRUCache
-from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
+from crawlee._utils.requests import unique_key_to_request_id
 from crawlee.consts import REQUEST_QUEUE_HEAD_MAX_LIMIT
 from crawlee.storages.base_storage import BaseStorage
+from crawlee.storages.types import RequestQueueOperationInfo, RequestQueueSnapshot
 
 if TYPE_CHECKING:
     from crawlee.config import Config
     from crawlee.memory_storage import MemoryStorageClient
     from crawlee.memory_storage.resource_clients import RequestQueueClient, RequestQueueCollectionClient
+    from crawlee.memory_storage.resource_clients.request_queue_client import RequestQueueResourceInfo
+    from crawlee.models import RequestData
 
 logger = getLogger(__name__)
 
@@ -152,12 +155,10 @@ class RequestQueue(BaseStorage):
 
     async def add_request(
         self,
-        request: dict,
+        request: RequestData,
         *,
         forefront: bool = False,
-        keep_url_fragment: bool = False,
-        use_extended_unique_key: bool = False,
-    ) -> dict:
+    ) -> RequestQueueOperationInfo:
         """Adds a request to the `RequestQueue` while managing deduplication and positioning within the queue.
 
         The deduplication of requests relies on the `uniqueKey` field within the request dictionary. If `uniqueKey`
@@ -188,41 +189,30 @@ class RequestQueue(BaseStorage):
             - `wasAlreadyPresent` (bool): Indicates whether the request was already in the queue.
             - `wasAlreadyHandled` (bool): Indicates whether the request was already processed.
         """
-        if 'url' not in request:
-            raise ValueError('Field "url" is required.')
-
         self._last_activity = datetime.now(timezone.utc)
 
-        if request.get('uniqueKey') is None:
-            request['uniqueKey'] = compute_unique_key(
-                url=request['url'],
-                method=request.get('method', 'GET'),
-                payload=request.get('payload'),
-                keep_url_fragment=keep_url_fragment,
-                use_extended_unique_key=use_extended_unique_key,
-            )
-
-        cache_key = unique_key_to_request_id(request['uniqueKey'])
+        cache_key = unique_key_to_request_id(request.unique_key)
         cached_info = self._requests_cache.get(cache_key)
 
         if cached_info:
-            request['id'] = cached_info['id']
-            return {
-                'wasAlreadyPresent': True,
-                # We may assume that if request is in local cache then also the information if the
-                # request was already handled is there because just one client should be using one queue.
-                'wasAlreadyHandled': cached_info['isHandled'],
-                'requestId': cached_info['id'],
-                'uniqueKey': cached_info['uniqueKey'],
-            }
+            request.id = cached_info['id']
+            # We may assume that if request is in local cache then also the information if the request was already
+            # handled is there because just one client should be using one queue.
+            return RequestQueueOperationInfo(
+                request_id=request.id,
+                request_unique_key=request.unique_key,
+                was_already_present=True,
+                was_already_handled=cached_info['wasAlreadyHandled'],
+            )
 
         queue_operation_info = await self._request_queue_client.add_request(request, forefront=forefront)
-        queue_operation_info['uniqueKey'] = request['uniqueKey']
+        queue_operation_info.request_unique_key = request.unique_key
 
         self._cache_request(cache_key, queue_operation_info)
 
-        request_id, was_already_present = queue_operation_info['requestId'], queue_operation_info['wasAlreadyPresent']
-        is_handled = request.get('handledAt') is not None
+        request_id, was_already_present = queue_operation_info.request_id, queue_operation_info.was_already_present
+        is_handled = request.handled_at is not None
+
         if (
             not is_handled
             and not was_already_present
@@ -230,12 +220,11 @@ class RequestQueue(BaseStorage):
             and self._recently_handled.get(request_id) is None
         ):
             self._assumed_total_count += 1
-
             self._maybe_add_request_to_queue_head(request_id, forefront=forefront)
 
         return queue_operation_info
 
-    async def get_request(self, request_id: str) -> dict | None:
+    async def get_request(self, request_id: str) -> RequestData | None:
         """Retrieve a request from the queue.
 
         Args:
@@ -246,7 +235,7 @@ class RequestQueue(BaseStorage):
         """
         return await self._request_queue_client.get_request(request_id)
 
-    async def fetch_next_request(self) -> dict | None:
+    async def fetch_next_request(self) -> RequestData | None:
         """Return the next request in the queue to be processed.
 
         Once you successfully finish processing of the request, you need to call `RequestQueue.mark_request_as_handled`
@@ -315,7 +304,7 @@ class RequestQueue(BaseStorage):
         # client, since we keep the track of handled requests in recentlyHandled dictionary). We just add the request
         # to the recentlyHandled dictionary so that next call to _ensureHeadIsNonEmpty() will not put the request again
         # to queueHeadDict.
-        if request.get('handledAt') is not None:
+        if request.handled_at is not None:
             logger.debug(
                 'Request fetched from the beginning of queue was already handled',
                 extra={'nextRequestId': next_request_id},
@@ -325,7 +314,7 @@ class RequestQueue(BaseStorage):
 
         return request
 
-    async def mark_request_as_handled(self, request: dict) -> dict | None:
+    async def mark_request_as_handled(self, request: RequestData) -> RequestQueueOperationInfo | None:
         """Mark a request as handled after successful processing.
 
         Handled requests will never again be returned by the `RequestQueue.fetch_next_request` method.
@@ -334,36 +323,35 @@ class RequestQueue(BaseStorage):
             request: The request to mark as handled.
 
         Returns:
-            Information about the queue operation with keys `requestId`, `uniqueKey`, `wasAlreadyPresent`,
-            `wasAlreadyHandled`. `None` if the given request was not in progress.
+            Information about the queue operation. `None` if the given request was not in progress.
         """
         self._last_activity = datetime.now(timezone.utc)
-        if request['id'] not in self._in_progress:
-            logger.debug(
-                'Cannot mark request as handled, because it is not in progress!', extra={'requestId': request['id']}
-            )
+
+        if request.id not in self._in_progress:
+            logger.debug(f'Cannot mark request (ID: {request.id}) as handled, because it is not in progress!')
             return None
 
-        request['handledAt'] = request.get('handledAt', datetime.now(timezone.utc))
-        queue_operation_info = await self._request_queue_client.update_request({**request})
-        queue_operation_info['uniqueKey'] = request['uniqueKey']
+        if request.handled_at is None:
+            request.handled_at = datetime.now(timezone.utc)
 
-        self._in_progress.remove(request['id'])
-        self._recently_handled[request['id']] = True
+        queue_operation_info = await self._request_queue_client.update_request(request)
+        queue_operation_info.request_unique_key = request.unique_key
 
-        if not queue_operation_info['wasAlreadyHandled']:
+        self._in_progress.remove(request.id)
+        self._recently_handled[request.id] = True
+
+        if not queue_operation_info.was_already_handled:
             self._assumed_handled_count += 1
 
-        self._cache_request(unique_key_to_request_id(request['uniqueKey']), queue_operation_info)
-
+        self._cache_request(unique_key_to_request_id(request.unique_key), queue_operation_info)
         return queue_operation_info
 
     async def reclaim_request(
         self,
-        request: dict,
+        request: RequestData,
         *,
         forefront: bool = False,
-    ) -> dict | None:
+    ) -> RequestQueueOperationInfo | None:
         """Reclaim a failed request back to the queue.
 
         The request will be returned for processing later again by another call to `RequestQueue.fetchNextRequest`.
@@ -373,36 +361,34 @@ class RequestQueue(BaseStorage):
             forefront: Whether to add the request to the head or the end of the queue
 
         Returns:
-            Information about the queue operation with keys `requestId`, `uniqueKey`, `wasAlreadyPresent`,
-                `wasAlreadyHandled`. `None` if the given request was not in progress.
+            Information about the queue operation. `None` if the given request was not in progress.
         """
         self._last_activity = datetime.now(timezone.utc)
 
-        if request['id'] not in self._in_progress:
-            logger.debug('Cannot reclaim request, because it is not in progress!', extra={'requestId': request['id']})
+        if request.id not in self._in_progress:
+            logger.debug(f'Cannot reclaim request (ID: {request.id}), because it is not in progress!')
             return None
 
         # TODO: If request hasn't been changed since the last getRequest(), we don't need to call updateRequest()
         # and thus improve performance.
         # https://github.com/apify/apify-sdk-python/issues/143
         queue_operation_info = await self._request_queue_client.update_request(request, forefront=forefront)
-        queue_operation_info['uniqueKey'] = request['uniqueKey']
-        self._cache_request(unique_key_to_request_id(request['uniqueKey']), queue_operation_info)
+        queue_operation_info.request_unique_key = request.unique_key
+        self._cache_request(unique_key_to_request_id(request.unique_key), queue_operation_info)
 
         # Wait a little to increase a chance that the next call to fetchNextRequest() will return the request with
         # updated data. This is to compensate for the limitation of DynamoDB, where writes might not be immediately
         # visible to subsequent reads.
         def callback() -> None:
-            if request['id'] not in self._in_progress:
-                logger.debug(f'The request (ID: {request["id"]}) is no longer marked as in progress in the queue?!')
+            if request.id not in self._in_progress:
+                logger.debug(f'The request (ID: {request.id}) is no longer marked as in progress in the queue?!')
                 return
 
-            self._in_progress.remove(request['id'])
+            self._in_progress.remove(request.id)
             # Performance optimization: add request straight to head if possible
-            self._maybe_add_request_to_queue_head(request['id'], forefront=forefront)
+            self._maybe_add_request_to_queue_head(request.id, forefront=forefront)
 
         asyncio.get_running_loop().call_later(STORAGE_CONSISTENCY_DELAY_MILLIS // 1000, callback)
-
         return queue_operation_info
 
     async def is_empty(self) -> bool:
@@ -443,7 +429,7 @@ class RequestQueue(BaseStorage):
         await self._request_queue_client.delete()
         self._remove_from_cache()
 
-    async def get_info(self) -> dict | None:
+    async def get_info(self) -> RequestQueueResourceInfo | None:
         """Get an object containing general information about the request queue.
 
         Returns:
@@ -469,7 +455,7 @@ class RequestQueue(BaseStorage):
         if self._query_queue_head_task is None:
             self._query_queue_head_task = asyncio.Task(self._queue_query_head(limit))
 
-        queue_head = await self._query_queue_head_task
+        queue_head: RequestQueueSnapshot = await self._query_queue_head_task
 
         # TODO: I feel this code below can be greatly simplified... (comes from TS implementation *wink*)
         # https://github.com/apify/apify-sdk-python/issues/142
@@ -481,25 +467,25 @@ class RequestQueue(BaseStorage):
         # - the whole queue was processed and we are done
 
         # If limit was not reached in the call then there are no more requests to be returned.
-        if queue_head['prevLimit'] >= REQUEST_QUEUE_HEAD_MAX_LIMIT:
+        if queue_head.prev_limit >= REQUEST_QUEUE_HEAD_MAX_LIMIT:
             logger.warning(
                 'Reached the maximum number of requests in progress', extra={'limit': REQUEST_QUEUE_HEAD_MAX_LIMIT}
             )
 
         should_repeat_with_higher_limit = (
             len(self._queue_head_dict) == 0
-            and queue_head['wasLimitReached']
-            and queue_head['prevLimit'] < REQUEST_QUEUE_HEAD_MAX_LIMIT
+            and queue_head.was_limit_reached
+            and queue_head.prev_limit < REQUEST_QUEUE_HEAD_MAX_LIMIT
         )
 
         # If ensureConsistency=true then we must ensure that either:
         # - queueModifiedAt is older than queryStartedAt by at least API_PROCESSED_REQUESTS_DELAY_MILLIS
         # - hadMultipleClients=false and this.assumedTotalCount<=this.assumedHandledCount
         is_database_consistent = (
-            queue_head['queryStartedAt'] - queue_head['queueModifiedAt'].replace(tzinfo=timezone.utc)
+            queue_head.query_started_at - queue_head.queue_modified_at.replace(tzinfo=timezone.utc)
         ).seconds >= (API_PROCESSED_REQUESTS_DELAY_MILLIS // 1000)
         is_locally_consistent = (
-            not queue_head['hadMultipleClients'] and self._assumed_total_count <= self._assumed_handled_count
+            not queue_head.had_multiple_clients and self._assumed_total_count <= self._assumed_handled_count
         )
         # Consistent information from one source is enough to consider request queue finished.
         should_repeat_for_consistency = ensure_consistency and not is_database_consistent and not is_locally_consistent
@@ -513,13 +499,11 @@ class RequestQueue(BaseStorage):
         if not should_repeat_with_higher_limit and iteration > MAX_QUERIES_FOR_CONSISTENCY:
             return False
 
-        next_limit = (
-            round(queue_head['prevLimit'] * 1.5) if should_repeat_with_higher_limit else queue_head['prevLimit']
-        )
+        next_limit = round(queue_head.prev_limit * 1.5) if should_repeat_with_higher_limit else queue_head.prev_limit
 
         # If we are repeating for consistency then wait required time.
         if should_repeat_for_consistency:
-            elapsed_time = (datetime.now(timezone.utc) - queue_head['queueModifiedAt']).seconds
+            elapsed_time = (datetime.now(timezone.utc) - queue_head.queue_modified_at).seconds
             delay_seconds = (API_PROCESSED_REQUESTS_DELAY_MILLIS // 1000) - elapsed_time
             logger.info(f'Waiting for {delay_seconds} for queue finalization, to ensure data consistency.')
             await asyncio.sleep(delay_seconds)
@@ -543,48 +527,51 @@ class RequestQueue(BaseStorage):
         self._requests_cache.clear()
         self._last_activity = datetime.now(timezone.utc)
 
-    def _cache_request(self, cache_key: str, queue_operation_info: dict) -> None:
+    def _cache_request(self, cache_key: str, operation_info: RequestQueueOperationInfo) -> None:
         self._requests_cache[cache_key] = {
-            'id': queue_operation_info['requestId'],
-            'isHandled': queue_operation_info['wasAlreadyHandled'],
-            'uniqueKey': queue_operation_info['uniqueKey'],
-            'wasAlreadyHandled': queue_operation_info['wasAlreadyHandled'],
+            'id': operation_info.request_id,
+            'isHandled': operation_info.was_already_handled,
+            'uniqueKey': operation_info.request_unique_key,
+            'wasAlreadyHandled': operation_info.was_already_handled,
         }
 
-    async def _queue_query_head(self, limit: int) -> dict:
+    async def _queue_query_head(self, limit: int) -> RequestQueueSnapshot:
         query_started_at = datetime.now(timezone.utc)
 
         list_head = await self._request_queue_client.list_head(limit=limit)
-        for request in list_head['items']:
+        list_head_items: list[RequestData] = list_head['items']  # TODO: check if this is correct
+
+        for request in list_head_items:
             # Queue head index might be behind the main table, so ensure we don't recycle requests
             if (
-                not request['id']
-                or not request['uniqueKey']
-                or request['id'] in self._in_progress
-                or self._recently_handled.get(request['id'])
+                not request.id
+                or not request.unique_key
+                or request.id in self._in_progress
+                or self._recently_handled.get(request.id)
             ):
                 continue
-            self._queue_head_dict[request['id']] = request['id']
+
+            self._queue_head_dict[request.id] = request.id
             self._cache_request(
-                unique_key_to_request_id(request['uniqueKey']),
-                {
-                    'requestId': request['id'],
-                    'wasAlreadyHandled': False,
-                    'wasAlreadyPresent': True,
-                    'uniqueKey': request['uniqueKey'],
-                },
+                cache_key=unique_key_to_request_id(request.unique_key),
+                operation_info=RequestQueueOperationInfo(
+                    request_id=request.id,
+                    was_already_handled=False,
+                    was_already_present=True,
+                    request_unique_key=request.unique_key,
+                ),
             )
 
         # This is needed so that the next call to _ensureHeadIsNonEmpty() will fetch the queue head again.
         self._query_queue_head_task = None
 
-        return {
-            'wasLimitReached': len(list_head['items']) >= limit,
-            'prevLimit': limit,
-            'queueModifiedAt': list_head['queueModifiedAt'],
-            'queryStartedAt': query_started_at,
-            'hadMultipleClients': list_head['hadMultipleClients'],
-        }
+        return RequestQueueSnapshot(
+            was_limit_reached=len(list_head['items']) >= limit,
+            prev_limit=limit,
+            queue_modified_at=list_head['queueModifiedAt'],
+            query_started_at=query_started_at,
+            had_multiple_clients=list_head['hadMultipleClients'],
+        )
 
     def _maybe_add_request_to_queue_head(
         self,

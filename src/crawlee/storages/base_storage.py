@@ -7,6 +7,7 @@ from typing import Generic, TypeVar, cast
 from crawlee.config import Config
 from crawlee.memory_storage import MemoryStorageClient
 from crawlee.memory_storage.resource_clients import BaseResourceClient, BaseResourceCollectionClient
+from crawlee.memory_storage.resource_clients.types import ResourceInfo
 from crawlee.storages.storage_client_manager import StorageClientManager
 
 BaseResourceClientType = TypeVar('BaseResourceClientType', bound=BaseResourceClient)
@@ -107,7 +108,7 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
             # Create the storage
             if id_ and not is_default_storage_on_local:
                 single_storage_client = cls._get_single_storage_client(id_, used_client)
-                storage_info = await single_storage_client.get()
+                storage_info: ResourceInfo = await single_storage_client.get()
                 if not storage_info:
                     storage_label = cls._get_human_friendly_label()
                     raise RuntimeError(f'{storage_label} with id "{id_}" does not exist!')
@@ -119,8 +120,8 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
                 storage_info = await storage_collection_client.get_or_create(name=name)
 
             storage = cls(
-                id_=storage_info['id'],
-                name=storage_info.get('name'),
+                id_=storage_info.id,
+                name=storage_info.name,
                 config=used_config,
                 client=used_client,
             )

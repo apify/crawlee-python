@@ -6,6 +6,7 @@ from typing import AsyncGenerator
 
 import pytest
 
+from crawlee.models import RequestData
 from crawlee.storages.request_queue import RequestQueue
 
 
@@ -54,29 +55,21 @@ async def test_drop() -> None:
 
 
 async def test_get_request(request_queue: RequestQueue) -> None:
-    url = 'https://example.com'
-    add_request_info = await request_queue.add_request(
-        {
-            'uniqueKey': url,
-            'url': url,
-        }
-    )
-    request = await request_queue.get_request(add_request_info['requestId'])
-    assert request is not None
-    assert request['url'] == url
+    request = RequestData.from_url('https://example.com')
+    add_request_info = await request_queue.add_request(request)
+    assert request.id == add_request_info.request_id
+    request_2 = await request_queue.get_request(request.id)
+    assert request_2 is not None
+    assert request == request_2
 
 
 async def test_add_fetch_handle_request(request_queue: RequestQueue) -> None:
-    url = 'https://example.com'
+    request = RequestData.from_url('https://example.com')
     assert await request_queue.is_empty() is True
+    add_request_info = await request_queue.add_request(request)
 
-    with pytest.raises(ValueError, match='Field "url" is required.'):
-        await request_queue.add_request({})
-
-    add_request_info = await request_queue.add_request({'uniqueKey': url, 'url': url})
-
-    assert add_request_info['wasAlreadyPresent'] is False
-    assert add_request_info['wasAlreadyHandled'] is False
+    assert add_request_info.was_already_present is False
+    assert add_request_info.was_already_handled is False
     assert await request_queue.is_empty() is False
 
     # Fetch the request
@@ -84,30 +77,30 @@ async def test_add_fetch_handle_request(request_queue: RequestQueue) -> None:
     assert next_request is not None
 
     # Mark it as handled
-    next_request['handledAt'] = datetime.now(timezone.utc)
+    next_request.handled_at = datetime.now(timezone.utc)
     queue_operation_info = await request_queue.mark_request_as_handled(next_request)
+
     assert queue_operation_info is not None
-    assert queue_operation_info['uniqueKey'] == url
+    assert queue_operation_info.request_id == request.id
+    assert queue_operation_info.request_unique_key == request.unique_key
     assert await request_queue.is_finished() is True
 
 
 async def test_reclaim_request(request_queue: RequestQueue) -> None:
-    url = 'https://example.com'
-    await request_queue.add_request(
-        {
-            'uniqueKey': url,
-            'url': url,
-        }
-    )
+    request = RequestData.from_url('https://example.com')
+    await request_queue.add_request(request)
+
     # Fetch the request
     next_request = await request_queue.fetch_next_request()
     assert next_request is not None
-    assert next_request['uniqueKey'] == url
+    assert next_request.unique_key == request.url
 
     # Reclaim
     await request_queue.reclaim_request(next_request)
     # Try to fetch again after a few secs
     await asyncio.sleep(4)  # 3 seconds is the consistency delay in request queue
     next_again = await request_queue.fetch_next_request()
+
     assert next_again is not None
-    assert next_again['uniqueKey'] == url
+    assert next_again.id == request.id
+    assert next_again.unique_key == request.unique_key
