@@ -12,8 +12,7 @@ from crawlee.storages.key_value_store import KeyValueStore
 
 if TYPE_CHECKING:
     from crawlee.config import Config
-    from crawlee.memory_storage import MemoryStorageClient
-    from crawlee.memory_storage.resource_clients import DatasetClient, DatasetCollectionClient
+    from crawlee.memory_storage import DatasetClient, DatasetCollectionClient, MemoryStorageClient
     from crawlee.storages.types import DatasetResourceInfo, JSONSerializable, ListPage
 
 

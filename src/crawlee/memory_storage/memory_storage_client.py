@@ -11,12 +11,12 @@ from aiofiles.os import rename, scandir
 
 from crawlee._utils.data_processing import maybe_parse_bool
 from crawlee._utils.env_vars import CrawleeEnvVars
-from crawlee.memory_storage.resource_clients.dataset_client import DatasetClient
-from crawlee.memory_storage.resource_clients.dataset_collection_client import DatasetCollectionClient
-from crawlee.memory_storage.resource_clients.key_value_store_client import KeyValueStoreClient
-from crawlee.memory_storage.resource_clients.key_value_store_collection_client import KeyValueStoreCollectionClient
-from crawlee.memory_storage.resource_clients.request_queue_client import RequestQueueClient
-from crawlee.memory_storage.resource_clients.request_queue_collection_client import RequestQueueCollectionClient
+from crawlee.memory_storage.dataset_client import DatasetClient
+from crawlee.memory_storage.dataset_collection_client import DatasetCollectionClient
+from crawlee.memory_storage.key_value_store_client import KeyValueStoreClient
+from crawlee.memory_storage.key_value_store_collection_client import KeyValueStoreCollectionClient
+from crawlee.memory_storage.request_queue_client import RequestQueueClient
+from crawlee.memory_storage.request_queue_collection_client import RequestQueueCollectionClient
 
 
 class MemoryStorageClient:

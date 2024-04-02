@@ -5,8 +5,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Generic, TypeVar, cast
 
 from crawlee.config import Config
-from crawlee.memory_storage import MemoryStorageClient
-from crawlee.memory_storage.resource_clients import BaseResourceClient, BaseResourceCollectionClient
+from crawlee.memory_storage import BaseResourceClient, BaseResourceCollectionClient, MemoryStorageClient
 from crawlee.storages.storage_client_manager import StorageClientManager
 
 if TYPE_CHECKING:

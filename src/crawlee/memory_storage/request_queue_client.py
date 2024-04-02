@@ -25,7 +25,7 @@ from crawlee._utils.file import (
     persist_metadata_if_enabled,
 )
 from crawlee._utils.requests import unique_key_to_request_id
-from crawlee.memory_storage.resource_clients.base_resource_client import BaseResourceClient
+from crawlee.memory_storage.base_resource_client import BaseResourceClient
 from crawlee.models import RequestData
 from crawlee.storages.types import (
     RequestQueueHeadResponse,

@@ -26,7 +26,7 @@ from crawlee._utils.file import (
     persist_metadata_if_enabled,
 )
 from crawlee.consts import DEFAULT_API_PARAM_LIMIT
-from crawlee.memory_storage.resource_clients.base_resource_client import BaseResourceClient
+from crawlee.memory_storage.base_resource_client import BaseResourceClient
 from crawlee.storages.types import KeyValueStoreResourceInfo, StorageTypes
 
 if TYPE_CHECKING:

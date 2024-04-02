@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 from crawlee._utils.file import persist_metadata_if_enabled
-from crawlee.memory_storage.resource_clients.base_resource_client import BaseResourceClient
+from crawlee.memory_storage.base_resource_client import BaseResourceClient
 from crawlee.storages.types import BaseResourceInfo, ListPage
 
 if TYPE_CHECKING:

@@ -13,7 +13,7 @@ from aiofiles.os import makedirs
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import raise_on_duplicate_storage, raise_on_non_existing_storage
 from crawlee._utils.file import force_rename, json_dumps, persist_metadata_if_enabled
-from crawlee.memory_storage.resource_clients.base_resource_client import BaseResourceClient
+from crawlee.memory_storage.base_resource_client import BaseResourceClient
 from crawlee.storages.types import DatasetResourceInfo, ListPage, StorageTypes
 
 if TYPE_CHECKING:

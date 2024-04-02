@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from crawlee.memory_storage.resource_clients.base_resource_collection_client import BaseResourceCollectionClient
-from crawlee.memory_storage.resource_clients.request_queue_client import RequestQueueClient
+from crawlee.memory_storage.base_resource_collection_client import BaseResourceCollectionClient
+from crawlee.memory_storage.request_queue_client import RequestQueueClient
 
 if TYPE_CHECKING:
     from crawlee.storages.types import BaseResourceInfo, ListPage

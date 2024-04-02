@@ -55,8 +55,7 @@ def guess_file_extension(content_type: str) -> str | None:
     actual_content_type = content_type.split(';')[0].strip()
 
     # mimetypes.guess_extension returns 'xsl' in this case, because 'application/xxx' is "structured"
-    # ('text/xml' would be "unstructured" and return 'xml')
-    # we have to explicitly override it here
+    # ('text/xml' would be "unstructured" and return 'xml') we have to explicitly override it here
     if actual_content_type == 'application/xml':
         return 'xml'
 

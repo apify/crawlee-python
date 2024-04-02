@@ -16,8 +16,7 @@ from crawlee.storages.types import BaseResourceInfo, RequestQueueOperationInfo, 
 
 if TYPE_CHECKING:
     from crawlee.config import Config
-    from crawlee.memory_storage import MemoryStorageClient
-    from crawlee.memory_storage.resource_clients import RequestQueueClient, RequestQueueCollectionClient
+    from crawlee.memory_storage import MemoryStorageClient, RequestQueueClient, RequestQueueCollectionClient
     from crawlee.models import RequestData
 
 logger = getLogger(__name__)

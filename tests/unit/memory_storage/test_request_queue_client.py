@@ -11,8 +11,7 @@ from crawlee._utils.requests import unique_key_to_request_id
 from crawlee.models import RequestData
 
 if TYPE_CHECKING:
-    from crawlee.memory_storage import MemoryStorageClient
-    from crawlee.memory_storage.resource_clients import RequestQueueClient
+    from crawlee.memory_storage import MemoryStorageClient, RequestQueueClient
 
 
 @pytest.fixture()
