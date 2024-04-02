@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import asyncio
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar, cast
+from typing import TYPE_CHECKING, Generic, TypeVar, cast
 
 from crawlee.config import Config
 from crawlee.memory_storage import MemoryStorageClient
 from crawlee.memory_storage.resource_clients import BaseResourceClient, BaseResourceCollectionClient
-from crawlee.memory_storage.resource_clients.types import ResourceInfo
 from crawlee.storages.storage_client_manager import StorageClientManager
+
+if TYPE_CHECKING:
+    from crawlee.storages.types import ResourceInfo
 
 BaseResourceClientType = TypeVar('BaseResourceClientType', bound=BaseResourceClient)
 BaseResourceCollectionClientType = TypeVar('BaseResourceCollectionClientType', bound=BaseResourceCollectionClient)

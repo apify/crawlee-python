@@ -5,8 +5,7 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 
 from crawlee._utils.file import persist_metadata_if_enabled
 from crawlee.memory_storage.resource_clients.base_resource_client import BaseResourceClient
-from crawlee.memory_storage.resource_clients.types import ResourceInfo
-from crawlee.storages.types import ListPage
+from crawlee.storages.types import ListPage, ResourceInfo
 
 if TYPE_CHECKING:
     from crawlee.memory_storage.memory_storage_client import MemoryStorageClient

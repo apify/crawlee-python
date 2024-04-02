@@ -318,7 +318,9 @@ class DatasetClient(BaseResourceClient):
         """
         # Check by id
         existing_dataset_by_id = self.find_or_create_client_by_id_or_name(
-            memory_storage_client=self._memory_storage_client, id_=self.id, name=self.name
+            memory_storage_client=self._memory_storage_client,
+            id_=self.id,
+            name=self.name,
         )
 
         if existing_dataset_by_id is None:

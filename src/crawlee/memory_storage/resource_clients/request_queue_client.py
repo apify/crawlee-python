@@ -26,9 +26,8 @@ from crawlee._utils.file import (
 )
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee.memory_storage.resource_clients.base_resource_client import BaseResourceClient
-from crawlee.memory_storage.resource_clients.types import ResourceInfo
 from crawlee.models import RequestData
-from crawlee.storages.types import RequestQueueOperationInfo, StorageTypes
+from crawlee.storages.types import RequestQueueHeadResponse, RequestQueueOperationInfo, ResourceInfo, StorageTypes
 
 if TYPE_CHECKING:
     from crawlee.memory_storage.memory_storage_client import MemoryStorageClient
@@ -72,7 +71,9 @@ class RequestQueueClient(BaseResourceClient):
             The retrieved request queue, or None, if it does not exist
         """
         found = self.find_or_create_client_by_id_or_name(
-            memory_storage_client=self._memory_storage_client, id_=self.id, name=self.name
+            memory_storage_client=self._memory_storage_client,
+            id_=self.id,
+            name=self.name,
         )
 
         if found:
@@ -93,7 +94,9 @@ class RequestQueueClient(BaseResourceClient):
         """
         # Check by id
         existing_queue_by_id = self.find_or_create_client_by_id_or_name(
-            memory_storage_client=self._memory_storage_client, id_=self.id, name=self.name
+            memory_storage_client=self._memory_storage_client,
+            id_=self.id,
+            name=self.name,
         )
 
         if existing_queue_by_id is None:
@@ -148,7 +151,7 @@ class RequestQueueClient(BaseResourceClient):
                 if os.path.exists(queue.resource_directory):
                     await aioshutil.rmtree(queue.resource_directory)
 
-    async def list_head(self, *, limit: int | None = None) -> dict:  # TODO: predelat
+    async def list_head(self, *, limit: int | None = None) -> RequestQueueHeadResponse:
         """Retrieve a given number of requests from the beginning of the queue.
 
         Args:
@@ -158,7 +161,9 @@ class RequestQueueClient(BaseResourceClient):
             The desired number of requests from the beginning of the queue.
         """
         existing_queue_by_id = self.find_or_create_client_by_id_or_name(
-            memory_storage_client=self._memory_storage_client, id_=self.id, name=self.name
+            memory_storage_client=self._memory_storage_client,
+            id_=self.id,
+            name=self.name,
         )
 
         if existing_queue_by_id is None:
@@ -167,12 +172,15 @@ class RequestQueueClient(BaseResourceClient):
         async with existing_queue_by_id.file_operation_lock:
             await existing_queue_by_id.update_timestamps(has_been_modified=False)
 
-            items: list[RequestData] = []
+            requests: list[RequestData] = []
 
-            # Iterate all requests in the queue which have sorted key larger than infinity, which means `orderNo`
-            # is not `None`. This will iterate them in order of `orderNo`.
-            for request_key in existing_queue_by_id.requests.irange_key(min_key=-float('inf'), inclusive=(False, True)):
-                if len(items) == limit:
+            # Iterate all requests in the queue which have sorted key larger than infinity, which means
+            # `order_no` is not `None`. This will iterate them in order of `order_no`.
+            for request_key in existing_queue_by_id.requests.irange_key(
+                min_key=-float('inf'),
+                inclusive=(False, True),
+            ):
+                if len(requests) == limit:
                     break
 
                 request = existing_queue_by_id.requests.get(request_key)
@@ -180,14 +188,16 @@ class RequestQueueClient(BaseResourceClient):
                 # Check that the request still exists and was not handled,
                 # in case something deleted it or marked it as handled concurrenctly
                 if request and request.order_no:
-                    items.append(request)
+                    requests.append(request)
 
-            return {
-                'limit': limit,
-                'hadMultipleClients': False,
-                'queueModifiedAt': existing_queue_by_id._modified_at,  # noqa: SLF001
-                'items': [self._json_to_request(item.json_) for item in items],
-            }
+            items = [request for item in requests if (request := self._json_to_request(item.json_))]
+
+            return RequestQueueHeadResponse(
+                limit=limit,
+                had_multiple_clients=False,
+                queue_modified_at=existing_queue_by_id._modified_at,  # noqa: SLF001
+                items=items,
+            )
 
     async def add_request(
         self,
@@ -205,7 +215,9 @@ class RequestQueueClient(BaseResourceClient):
             The added request.
         """
         existing_queue_by_id = self.find_or_create_client_by_id_or_name(
-            memory_storage_client=self._memory_storage_client, id_=self.id, name=self.name
+            memory_storage_client=self._memory_storage_client,
+            id_=self.id,
+            name=self.name,
         )
 
         if existing_queue_by_id is None:
@@ -258,7 +270,9 @@ class RequestQueueClient(BaseResourceClient):
             The retrieved request, or None, if it did not exist.
         """
         existing_queue_by_id = self.find_or_create_client_by_id_or_name(
-            memory_storage_client=self._memory_storage_client, id_=self.id, name=self.name
+            memory_storage_client=self._memory_storage_client,
+            id_=self.id,
+            name=self.name,
         )
 
         if existing_queue_by_id is None:
@@ -286,7 +300,9 @@ class RequestQueueClient(BaseResourceClient):
             The updated request
         """
         existing_queue_by_id = self.find_or_create_client_by_id_or_name(
-            memory_storage_client=self._memory_storage_client, id_=self.id, name=self.name
+            memory_storage_client=self._memory_storage_client,
+            id_=self.id,
+            name=self.name,
         )
 
         if existing_queue_by_id is None:
@@ -338,7 +354,9 @@ class RequestQueueClient(BaseResourceClient):
             request_id: ID of the request to delete.
         """
         existing_queue_by_id = self.find_or_create_client_by_id_or_name(
-            memory_storage_client=self._memory_storage_client, id_=self.id, name=self.name
+            memory_storage_client=self._memory_storage_client,
+            id_=self.id,
+            name=self.name,
         )
 
         if existing_queue_by_id is None:

@@ -118,7 +118,9 @@ class KeyValueStoreClient(BaseResourceClient):
         """
         # Check by id
         existing_store_by_id = self.find_or_create_client_by_id_or_name(
-            memory_storage_client=self._memory_storage_client, id_=self.id, name=self.name
+            memory_storage_client=self._memory_storage_client,
+            id_=self.id,
+            name=self.name,
         )
 
         if existing_store_by_id is None:
@@ -189,7 +191,9 @@ class KeyValueStoreClient(BaseResourceClient):
         """
         # Check by id
         existing_store_by_id = self.find_or_create_client_by_id_or_name(
-            memory_storage_client=self._memory_storage_client, id_=self.id, name=self.name
+            memory_storage_client=self._memory_storage_client,
+            id_=self.id,
+            name=self.name,
         )
 
         if existing_store_by_id is None:
@@ -252,7 +256,9 @@ class KeyValueStoreClient(BaseResourceClient):
     ) -> dict | None:
         # Check by id
         existing_store_by_id = self.find_or_create_client_by_id_or_name(
-            memory_storage_client=self._memory_storage_client, id_=self.id, name=self.name
+            memory_storage_client=self._memory_storage_client,
+            id_=self.id,
+            name=self.name,
         )
 
         if existing_store_by_id is None:
@@ -316,7 +322,9 @@ class KeyValueStoreClient(BaseResourceClient):
         """
         # Check by id
         existing_store_by_id = self.find_or_create_client_by_id_or_name(
-            memory_storage_client=self._memory_storage_client, id_=self.id, name=self.name
+            memory_storage_client=self._memory_storage_client,
+            id_=self.id,
+            name=self.name,
         )
 
         if existing_store_by_id is None:
@@ -392,7 +400,9 @@ class KeyValueStoreClient(BaseResourceClient):
         """
         # Check by id
         existing_store_by_id = self.find_or_create_client_by_id_or_name(
-            memory_storage_client=self._memory_storage_client, id_=self.id, name=self.name
+            memory_storage_client=self._memory_storage_client,
+            id_=self.id,
+            name=self.name,
         )
 
         if existing_store_by_id is None:

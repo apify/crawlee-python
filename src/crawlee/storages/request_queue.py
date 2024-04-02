@@ -12,38 +12,15 @@ from crawlee._utils.lru_cache import LRUCache
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee.consts import REQUEST_QUEUE_HEAD_MAX_LIMIT
 from crawlee.storages.base_storage import BaseStorage
-from crawlee.storages.types import RequestQueueOperationInfo, RequestQueueSnapshot
+from crawlee.storages.types import RequestQueueOperationInfo, RequestQueueSnapshot, ResourceInfo
 
 if TYPE_CHECKING:
     from crawlee.config import Config
     from crawlee.memory_storage import MemoryStorageClient
     from crawlee.memory_storage.resource_clients import RequestQueueClient, RequestQueueCollectionClient
-    from crawlee.memory_storage.resource_clients.request_queue_client import RequestQueueResourceInfo
     from crawlee.models import RequestData
 
 logger = getLogger(__name__)
-
-MAX_CACHED_REQUESTS = 1_000_000
-
-# When requesting queue head we always fetch requestsInProgressCount * QUERY_HEAD_BUFFER number of requests.
-QUERY_HEAD_MIN_LENGTH = 100
-
-QUERY_HEAD_BUFFER = 3
-
-# If queue was modified (request added/updated/deleted) before more than API_PROCESSED_REQUESTS_DELAY_MILLIS
-# then we assume the get head operation to be consistent.
-API_PROCESSED_REQUESTS_DELAY_MILLIS = 10_000
-
-# How many times we try to get queue head with queueModifiedAt older than API_PROCESSED_REQUESTS_DELAY_MILLIS.
-MAX_QUERIES_FOR_CONSISTENCY = 6
-
-# This number must be large enough so that processing of all these requests cannot be done in
-# a time lower than expected maximum latency of DynamoDB, but low enough not to waste too much memory.
-RECENTLY_HANDLED_CACHE_SIZE = 1000
-
-# Indicates how long it usually takes for the underlying storage to propagate all writes
-# to be available to subsequent reads.
-STORAGE_CONSISTENCY_DELAY_MILLIS = 3000
 
 
 class RequestQueue(BaseStorage):
@@ -67,6 +44,28 @@ class RequestQueue(BaseStorage):
     unless you override it by setting the `CRAWLEE_DEFAULT_REQUEST_QUEUE_ID` environment variable.
     The `{REQUEST_ID}` is the id of the request.
     """
+
+    _MAX_CACHED_REQUESTS = 1_000_000
+
+    # When requesting queue head we always fetch requestsInProgressCount * QUERY_HEAD_BUFFER number of requests.
+    _QUERY_HEAD_MIN_LENGTH = 100
+
+    _QUERY_HEAD_BUFFER = 3
+
+    # If queue was modified (request added/updated/deleted) before more than API_PROCESSED_REQUESTS_DELAY_MILLIS
+    # then we assume the get head operation to be consistent.
+    _API_PROCESSED_REQUESTS_DELAY_MILLIS = 10_000
+
+    # How many times we try to get queue head with queueModifiedAt older than API_PROCESSED_REQUESTS_DELAY_MILLIS.
+    _MAX_QUERIES_FOR_CONSISTENCY = 6
+
+    # This number must be large enough so that processing of all these requests cannot be done in
+    # a time lower than expected maximum latency of DynamoDB, but low enough not to waste too much memory.
+    _RECENTLY_HANDLED_CACHE_SIZE = 1000
+
+    # Indicates how long it usually takes for the underlying storage to propagate all writes
+    # to be available to subsequent reads.
+    _STORAGE_CONSISTENCY_DELAY_MILLIS = 3000
 
     def __init__(
         self,
@@ -94,8 +93,8 @@ class RequestQueue(BaseStorage):
         self._query_queue_head_task: asyncio.Task | None = None
         self._in_progress: set[str] = set()
         self._last_activity = datetime.now(timezone.utc)
-        self._recently_handled: LRUCache[bool] = LRUCache(max_length=RECENTLY_HANDLED_CACHE_SIZE)
-        self._requests_cache: LRUCache[dict] = LRUCache(max_length=MAX_CACHED_REQUESTS)
+        self._recently_handled: LRUCache[bool] = LRUCache(max_length=self._RECENTLY_HANDLED_CACHE_SIZE)
+        self._requests_cache: LRUCache[dict] = LRUCache(max_length=self._MAX_CACHED_REQUESTS)
 
     @classmethod
     async def open(
@@ -294,7 +293,7 @@ class RequestQueue(BaseStorage):
                 extra={'nextRequestId': next_request_id},
             )
             asyncio.get_running_loop().call_later(
-                STORAGE_CONSISTENCY_DELAY_MILLIS // 1000,
+                self._STORAGE_CONSISTENCY_DELAY_MILLIS // 1000,
                 lambda: self._in_progress.remove(next_request_id),
             )
             return None
@@ -388,7 +387,7 @@ class RequestQueue(BaseStorage):
             # Performance optimization: add request straight to head if possible
             self._maybe_add_request_to_queue_head(request.id, forefront=forefront)
 
-        asyncio.get_running_loop().call_later(STORAGE_CONSISTENCY_DELAY_MILLIS // 1000, callback)
+        asyncio.get_running_loop().call_later(self._STORAGE_CONSISTENCY_DELAY_MILLIS // 1000, callback)
         return queue_operation_info
 
     async def is_empty(self) -> bool:
@@ -429,7 +428,7 @@ class RequestQueue(BaseStorage):
         await self._request_queue_client.delete()
         self._remove_from_cache()
 
-    async def get_info(self) -> RequestQueueResourceInfo | None:
+    async def get_info(self) -> ResourceInfo | None:
         """Get an object containing general information about the request queue.
 
         Returns:
@@ -450,7 +449,7 @@ class RequestQueue(BaseStorage):
             return True
 
         if limit is None:
-            limit = max(self._in_progress_count() * QUERY_HEAD_BUFFER, QUERY_HEAD_MIN_LENGTH)
+            limit = max(self._in_progress_count() * self._QUERY_HEAD_BUFFER, self._QUERY_HEAD_MIN_LENGTH)
 
         if self._query_queue_head_task is None:
             self._query_queue_head_task = asyncio.Task(self._queue_query_head(limit))
@@ -483,7 +482,7 @@ class RequestQueue(BaseStorage):
         # - hadMultipleClients=false and this.assumedTotalCount<=this.assumedHandledCount
         is_database_consistent = (
             queue_head.query_started_at - queue_head.queue_modified_at.replace(tzinfo=timezone.utc)
-        ).seconds >= (API_PROCESSED_REQUESTS_DELAY_MILLIS // 1000)
+        ).seconds >= (self._API_PROCESSED_REQUESTS_DELAY_MILLIS // 1000)
         is_locally_consistent = (
             not queue_head.had_multiple_clients and self._assumed_total_count <= self._assumed_handled_count
         )
@@ -496,7 +495,7 @@ class RequestQueue(BaseStorage):
 
         # If we are querying for consistency then we limit the number of queries to MAX_QUERIES_FOR_CONSISTENCY.
         # If this is reached then we return false so that empty() and finished() returns possibly false negative.
-        if not should_repeat_with_higher_limit and iteration > MAX_QUERIES_FOR_CONSISTENCY:
+        if not should_repeat_with_higher_limit and iteration > self._MAX_QUERIES_FOR_CONSISTENCY:
             return False
 
         next_limit = round(queue_head.prev_limit * 1.5) if should_repeat_with_higher_limit else queue_head.prev_limit
@@ -504,7 +503,7 @@ class RequestQueue(BaseStorage):
         # If we are repeating for consistency then wait required time.
         if should_repeat_for_consistency:
             elapsed_time = (datetime.now(timezone.utc) - queue_head.queue_modified_at).seconds
-            delay_seconds = (API_PROCESSED_REQUESTS_DELAY_MILLIS // 1000) - elapsed_time
+            delay_seconds = (self._API_PROCESSED_REQUESTS_DELAY_MILLIS // 1000) - elapsed_time
             logger.info(f'Waiting for {delay_seconds} for queue finalization, to ensure data consistency.')
             await asyncio.sleep(delay_seconds)
 
@@ -539,7 +538,7 @@ class RequestQueue(BaseStorage):
         query_started_at = datetime.now(timezone.utc)
 
         list_head = await self._request_queue_client.list_head(limit=limit)
-        list_head_items: list[RequestData] = list_head['items']  # TODO: check if this is correct
+        list_head_items: list[RequestData] = list_head.items
 
         for request in list_head_items:
             # Queue head index might be behind the main table, so ensure we don't recycle requests
@@ -566,11 +565,11 @@ class RequestQueue(BaseStorage):
         self._query_queue_head_task = None
 
         return RequestQueueSnapshot(
-            was_limit_reached=len(list_head['items']) >= limit,
+            was_limit_reached=len(list_head.items) >= limit,
             prev_limit=limit,
-            queue_modified_at=list_head['queueModifiedAt'],
+            queue_modified_at=list_head.queue_modified_at,
             query_started_at=query_started_at,
-            had_multiple_clients=list_head['hadMultipleClients'],
+            had_multiple_clients=list_head.had_multiple_clients,
         )
 
     def _maybe_add_request_to_queue_head(
@@ -583,6 +582,6 @@ class RequestQueue(BaseStorage):
             self._queue_head_dict[request_id] = request_id
             # Move to start, i.e. forefront of the queue
             self._queue_head_dict.move_to_end(request_id, last=False)
-        elif self._assumed_total_count < QUERY_HEAD_MIN_LENGTH:
+        elif self._assumed_total_count < self._QUERY_HEAD_MIN_LENGTH:
             # OrderedDict puts the item to the end of the queue by default
             self._queue_head_dict[request_id] = request_id

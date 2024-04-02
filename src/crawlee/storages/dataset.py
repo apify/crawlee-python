@@ -16,67 +16,6 @@ if TYPE_CHECKING:
     from crawlee.memory_storage.resource_clients import DatasetClient, DatasetCollectionClient
     from crawlee.storages.types import JSONSerializable, ListPage
 
-SAFETY_BUFFER_PERCENT = 0.01 / 100  # 0.01%
-EFFECTIVE_LIMIT_BYTES = MAX_PAYLOAD_SIZE_BYTES - math.ceil(MAX_PAYLOAD_SIZE_BYTES * SAFETY_BUFFER_PERCENT)
-
-
-def _check_and_serialize(item: JSONSerializable, index: int | None = None) -> str:
-    """Serializes a given item to JSON, checks its serializability and size against a limit.
-
-    Args:
-        item: The item to serialize.
-        index: Index of the item, used for error context.
-
-    Returns:
-        Serialized JSON string.
-
-    Raises:
-        ValueError: If item is not JSON serializable or exceeds size limit.
-    """
-    s = ' ' if index is None else f' at index {index} '
-
-    try:
-        payload = json_dumps(item)
-    except Exception as exc:
-        raise ValueError(f'Data item{s}is not serializable to JSON.') from exc
-
-    length_bytes = len(payload.encode('utf-8'))
-    if length_bytes > EFFECTIVE_LIMIT_BYTES:
-        raise ValueError(f'Data item{s}is too large (size: {length_bytes} bytes, limit: {EFFECTIVE_LIMIT_BYTES} bytes)')
-
-    return payload
-
-
-def _chunk_by_size(items: Iterable[str]) -> Iterator[str]:
-    """Yields chunks of JSON arrays composed of input strings, respecting a size limit.
-
-    Groups an iterable of JSON string payloads into larger JSON arrays, ensuring the total size
-    of each array does not exceed `EFFECTIVE_LIMIT_BYTES`. Each output is a JSON array string that
-    contains as many payloads as possible without breaching the size threshold, maintaining the
-    order of the original payloads. Assumes individual items are below the size limit.
-
-    Args:
-        items: Iterable of JSON string payloads.
-
-    Yields:
-        Strings representing JSON arrays of payloads, each staying within the size limit.
-    """
-    last_chunk_bytes = 2  # Add 2 bytes for [] wrapper.
-    current_chunk = []
-
-    for payload in items:
-        length_bytes = len(payload.encode('utf-8'))
-
-        if last_chunk_bytes + length_bytes <= EFFECTIVE_LIMIT_BYTES:
-            current_chunk.append(payload)
-            last_chunk_bytes += length_bytes + 1  # Add 1 byte for ',' separator.
-        else:
-            yield f'[{",".join(current_chunk)}]'
-            current_chunk = [payload]
-            last_chunk_bytes = length_bytes + 2  # Add 2 bytes for [] wrapper.
-
-    yield f'[{",".join(current_chunk)}]'
-
 
 class Dataset(BaseStorage):
     """The class represents a store for structured data where each object stored has the same attributes.
@@ -95,6 +34,9 @@ class Dataset(BaseStorage):
     override it by setting the `APIFY_DEFAULT_DATASET_ID` environment variable. Each dataset item is stored
     as a separate JSON file, where `{INDEX}` is a zero-based index of the item in the dataset.
     """
+
+    _SAFETY_BUFFER_PERCENT = 0.01 / 100  # 0.01%
+    _EFFECTIVE_LIMIT_BYTES = MAX_PAYLOAD_SIZE_BYTES - math.ceil(MAX_PAYLOAD_SIZE_BYTES * _SAFETY_BUFFER_PERCENT)
 
     def __init__(
         self,
@@ -176,14 +118,14 @@ class Dataset(BaseStorage):
         """
         # Handle singular items
         if not isinstance(data, list):
-            payload = _check_and_serialize(data)
+            payload = self._check_and_serialize(data)
             return await self._dataset_client.push_items(payload)
 
         # Handle lists
-        payloads_generator = (_check_and_serialize(item, index) for index, item in enumerate(data))
+        payloads_generator = (self._check_and_serialize(item, index) for index, item in enumerate(data))
 
         # Invoke client in series to preserve the order of data
-        for chunk in _chunk_by_size(payloads_generator):
+        for chunk in self._chunk_by_size(payloads_generator):
             await self._dataset_client.push_items(chunk)
 
         return None
@@ -402,3 +344,61 @@ class Dataset(BaseStorage):
             return await key_value_store.set_value(key, items)
 
         raise ValueError(f'Unsupported content type: {content_type}')
+
+    def _check_and_serialize(self, item: JSONSerializable, index: int | None = None) -> str:
+        """Serializes a given item to JSON, checks its serializability and size against a limit.
+
+        Args:
+            item: The item to serialize.
+            index: Index of the item, used for error context.
+
+        Returns:
+            Serialized JSON string.
+
+        Raises:
+            ValueError: If item is not JSON serializable or exceeds size limit.
+        """
+        s = ' ' if index is None else f' at index {index} '
+
+        try:
+            payload = json_dumps(item)
+        except Exception as exc:
+            raise ValueError(f'Data item{s}is not serializable to JSON.') from exc
+
+        length_bytes = len(payload.encode('utf-8'))
+        if length_bytes > self._EFFECTIVE_LIMIT_BYTES:
+            raise ValueError(
+                f'Data item{s}is too large (size: {length_bytes} bytes, limit: {self._EFFECTIVE_LIMIT_BYTES} bytes)'
+            )
+
+        return payload
+
+    def _chunk_by_size(self, items: Iterable[str]) -> Iterator[str]:
+        """Yields chunks of JSON arrays composed of input strings, respecting a size limit.
+
+        Groups an iterable of JSON string payloads into larger JSON arrays, ensuring the total size
+        of each array does not exceed `EFFECTIVE_LIMIT_BYTES`. Each output is a JSON array string that
+        contains as many payloads as possible without breaching the size threshold, maintaining the
+        order of the original payloads. Assumes individual items are below the size limit.
+
+        Args:
+            items: Iterable of JSON string payloads.
+
+        Yields:
+            Strings representing JSON arrays of payloads, each staying within the size limit.
+        """
+        last_chunk_bytes = 2  # Add 2 bytes for [] wrapper.
+        current_chunk = []
+
+        for payload in items:
+            length_bytes = len(payload.encode('utf-8'))
+
+            if last_chunk_bytes + length_bytes <= self._EFFECTIVE_LIMIT_BYTES:
+                current_chunk.append(payload)
+                last_chunk_bytes += length_bytes + 1  # Add 1 byte for ',' separator.
+            else:
+                yield f'[{",".join(current_chunk)}]'
+                current_chunk = [payload]
+                last_chunk_bytes = length_bytes + 2  # Add 2 bytes for [] wrapper.
+
+        yield f'[{",".join(current_chunk)}]'

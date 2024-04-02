@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Generic, TypeVar, Union
 
 if TYPE_CHECKING:
     from datetime import datetime
+
+    from crawlee.models import RequestData
 
 T = TypeVar('T')
 
@@ -43,6 +45,34 @@ class RequestQueueSnapshot:
     queue_modified_at: datetime
     query_started_at: datetime
     had_multiple_clients: bool
+
+
+@dataclass
+class RequestQueueHeadResponse:
+    """Response for getting the head of the request queue."""
+
+    limit: int | None
+    had_multiple_clients: bool
+    queue_modified_at: datetime
+    items: list[RequestData] = field(default_factory=list)
+
+
+@dataclass
+class ResourceInfo:
+    """Resource information."""
+
+    accessed_at: datetime
+    created_at: datetime
+    had_multiple_clients: bool
+    handled_request_count: int
+    id: str
+    modified_at: datetime
+    name: str | None
+    pending_request_count: int
+    stats: dict[str, Any]
+    total_request_count: int
+    user_id: str
+    resource_directory: str
 
 
 class ListPage(Generic[T]):
