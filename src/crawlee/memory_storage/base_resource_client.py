@@ -28,9 +28,14 @@ class BaseResourceClient(ABC):
         self.id = id_
         self.name = name
 
+    @property
+    @abstractmethod
+    def resource_info(self) -> BaseResourceInfo:
+        """Get the resource info for the storage client."""
+
     @abstractmethod
     async def get(self) -> BaseResourceInfo | None:
-        """Retrieve the storage.
+        """Get the storage client.
 
         Returns:
             The retrieved storage, or None, if it does not exist
@@ -45,10 +50,6 @@ class BaseResourceClient(ABC):
     @abstractmethod
     def _get_storage_client_cache(cls, memory_storage_client: MemoryStorageClient) -> list[Self]:
         """Get the storage client cache."""
-
-    @abstractmethod
-    def to_resource_info(self) -> BaseResourceInfo:
-        """Convert the resource client to a resource info dictionary."""
 
     @classmethod
     @abstractmethod

@@ -69,6 +69,24 @@ class RequestQueueClient(BaseResourceClient):
         self.file_operation_lock = asyncio.Lock()
         self._last_used_timestamp = Decimal(0.0)
 
+    @property
+    def resource_info(self) -> RequestQueueResourceInfo:
+        """Get the resource info for the request queue client."""
+        return RequestQueueResourceInfo(
+            id=str(self.id),
+            name=str(self.name),
+            accessed_at=self._accessed_at,
+            created_at=self._created_at,
+            modified_at=self._modified_at,
+            had_multiple_clients=False,
+            handled_request_count=self.handled_request_count,
+            pending_request_count=self.pending_request_count,
+            stats={},
+            total_request_count=len(self.requests),
+            user_id='1',
+            resource_directory=self.resource_directory,
+        )
+
     async def get(self) -> RequestQueueResourceInfo | None:
         """Retrieve the request queue.
 
@@ -84,7 +102,7 @@ class RequestQueueClient(BaseResourceClient):
         if found:
             async with found.file_operation_lock:
                 await found.update_timestamps(has_been_modified=False)
-                return found.to_resource_info()
+                return found.resource_info
 
         return None
 
@@ -109,7 +127,7 @@ class RequestQueueClient(BaseResourceClient):
 
         # Skip if no changes
         if name is None:
-            return existing_queue_by_id.to_resource_info()
+            return existing_queue_by_id.resource_info
 
         async with existing_queue_by_id.file_operation_lock:
             # Check that name is not in use already
@@ -137,7 +155,7 @@ class RequestQueueClient(BaseResourceClient):
             # Update timestamps
             await existing_queue_by_id.update_timestamps(has_been_modified=True)
 
-            return existing_queue_by_id.to_resource_info()
+            return existing_queue_by_id.resource_info
 
     async def delete(self) -> None:
         """Delete the request queue."""
@@ -430,23 +448,6 @@ class RequestQueueClient(BaseResourceClient):
         file_path = os.path.join(entity_directory, f'{request_id}.json')
         await force_remove(file_path)
 
-    def to_resource_info(self) -> RequestQueueResourceInfo:
-        """Retrieve the request queue store info."""
-        return RequestQueueResourceInfo(
-            id=str(self.id),
-            name=str(self.name),
-            accessed_at=self._accessed_at,
-            created_at=self._created_at,
-            modified_at=self._modified_at,
-            had_multiple_clients=False,
-            handled_request_count=self.handled_request_count,
-            pending_request_count=self.pending_request_count,
-            stats={},
-            total_request_count=len(self.requests),
-            user_id='1',
-            resource_directory=self.resource_directory,
-        )
-
     async def update_timestamps(self, *, has_been_modified: bool) -> None:
         """Update the timestamps of the request queue."""
         self._accessed_at = datetime.now(timezone.utc)
@@ -454,7 +455,7 @@ class RequestQueueClient(BaseResourceClient):
         if has_been_modified:
             self._modified_at = datetime.now(timezone.utc)
 
-        request_queue_info = self.to_resource_info()
+        request_queue_info = self.resource_info
         request_queue_info_as_dict = request_queue_info.__dict__
 
         await persist_metadata_if_enabled(

@@ -55,6 +55,18 @@ class DatasetClient(BaseResourceClient):
         self.file_operation_lock = asyncio.Lock()
         self.item_count = item_count
 
+    @property
+    def resource_info(self) -> DatasetResourceInfo:
+        """Get the resource info for the dataset client."""
+        return DatasetResourceInfo(
+            id=str(self.id),
+            name=str(self.name),
+            accessed_at=self._accessed_at,
+            created_at=self._created_at,
+            modified_at=self._modified_at,
+            item_count=self.item_count,
+        )
+
     async def get(self) -> DatasetResourceInfo | None:
         """Retrieve the dataset.
 
@@ -70,7 +82,7 @@ class DatasetClient(BaseResourceClient):
         if found:
             async with found.file_operation_lock:
                 await found.update_timestamps(has_been_modified=False)
-                return found.to_resource_info()
+                return found.resource_info
 
         return None
 
@@ -95,7 +107,7 @@ class DatasetClient(BaseResourceClient):
 
         # Skip if no changes
         if name is None:
-            return existing_dataset_by_id.to_resource_info()
+            return existing_dataset_by_id.resource_info
 
         async with existing_dataset_by_id.file_operation_lock:
             # Check that name is not in use already
@@ -124,7 +136,7 @@ class DatasetClient(BaseResourceClient):
             # Update timestamps
             await existing_dataset_by_id.update_timestamps(has_been_modified=True)
 
-        return existing_dataset_by_id.to_resource_info()
+        return existing_dataset_by_id.resource_info
 
     async def delete(self) -> None:
         """Delete the dataset."""
@@ -375,16 +387,7 @@ class DatasetClient(BaseResourceClient):
                 s = await json_dumps(item)
                 await f.write(s.encode('utf-8'))
 
-    def to_resource_info(self) -> DatasetResourceInfo:
-        """Retrieve the dataset info."""
-        return DatasetResourceInfo(
-            id=str(self.id),
-            name=str(self.name),
-            accessed_at=self._accessed_at,
-            created_at=self._created_at,
-            modified_at=self._modified_at,
-            item_count=self.item_count,
-        )
+
 
     async def update_timestamps(self, *, has_been_modified: bool) -> None:
         """Update the timestamps of the dataset."""
@@ -393,7 +396,7 @@ class DatasetClient(BaseResourceClient):
         if has_been_modified:
             self._modified_at = datetime.now(timezone.utc)
 
-        dataset_info = self.to_resource_info()
+        dataset_info = self.resource_info
         dataset_info_as_dict = dataset_info.__dict__
 
         await persist_metadata_if_enabled(

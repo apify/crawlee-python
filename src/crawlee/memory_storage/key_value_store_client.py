@@ -66,6 +66,18 @@ class KeyValueStoreClient(BaseResourceClient):
         self.records: dict[str, KeyValueStoreRecord] = {}
         self.file_operation_lock = asyncio.Lock()
 
+    @property
+    def resource_info(self) -> KeyValueStoreResourceInfo:
+        """Get the resource info for the key-value store client."""
+        return KeyValueStoreResourceInfo(
+            id=str(self.id),
+            name=str(self.name),
+            accessed_at=self._accessed_at,
+            created_at=self._created_at,
+            modified_at=self._modified_at,
+            user_id='1',
+        )
+
     async def get(self) -> KeyValueStoreResourceInfo | None:
         """Retrieve the key-value store.
 
@@ -81,7 +93,7 @@ class KeyValueStoreClient(BaseResourceClient):
         if found:
             async with found.file_operation_lock:
                 await found.update_timestamps(has_been_modified=False)
-                return found.to_resource_info()
+                return found.resource_info
 
         return None
 
@@ -106,7 +118,7 @@ class KeyValueStoreClient(BaseResourceClient):
 
         # Skip if no changes
         if name is None:
-            return existing_store_by_id.to_resource_info()
+            return existing_store_by_id.resource_info
 
         async with existing_store_by_id.file_operation_lock:
             # Check that name is not in use already
@@ -136,7 +148,7 @@ class KeyValueStoreClient(BaseResourceClient):
             # Update timestamps
             await existing_store_by_id.update_timestamps(has_been_modified=True)
 
-        return existing_store_by_id.to_resource_info()
+        return existing_store_by_id.resource_info
 
     async def delete(self) -> None:
         """Delete the key-value store."""
@@ -402,17 +414,6 @@ class KeyValueStoreClient(BaseResourceClient):
         await force_remove(record_path)
         await force_remove(record_metadata_path)
 
-    def to_resource_info(self) -> KeyValueStoreResourceInfo:
-        """Retrieve the key-value store info."""
-        return KeyValueStoreResourceInfo(
-            id=str(self.id),
-            name=str(self.name),
-            accessed_at=self._accessed_at,
-            created_at=self._created_at,
-            modified_at=self._modified_at,
-            user_id='1',
-        )
-
     async def update_timestamps(self, *, has_been_modified: bool) -> None:
         """Update the timestamps of the key-value store."""
         self._accessed_at = datetime.now(timezone.utc)
@@ -420,7 +421,7 @@ class KeyValueStoreClient(BaseResourceClient):
         if has_been_modified:
             self._modified_at = datetime.now(timezone.utc)
 
-        kv_store_info = self.to_resource_info()
+        kv_store_info = self.resource_info
         kv_store_info_as_dict = kv_store_info.__dict__
 
         await persist_metadata_if_enabled(

@@ -42,7 +42,7 @@ class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
         """
         storage_client_cache = self._get_storage_client_cache()
 
-        items = [storage.to_resource_info() for storage in storage_client_cache]
+        items = [storage.resource_info for storage in storage_client_cache]
 
         return ListPage(
             total=len(items),
@@ -80,7 +80,7 @@ class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
                 id_=id_,
             )
             if found:
-                return found.to_resource_info()
+                return found.resource_info
 
         new_resource = resource_client_class(
             id_=id_,
@@ -90,7 +90,7 @@ class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
         )
         storage_client_cache.append(new_resource)
 
-        resource_info = new_resource.to_resource_info()
+        resource_info = new_resource.resource_info
         data = resource_info.__dict__ if isinstance(resource_info, BaseResourceInfo) else resource_info
 
         # Write to the disk
