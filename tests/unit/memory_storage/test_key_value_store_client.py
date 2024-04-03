@@ -409,7 +409,8 @@ async def test_reads_correct_metadata(memory_storage_client: MemoryStorageClient
     # Write the store metadata to disk
     store_metadata_path = os.path.join(storage_path, '__metadata__.json')
     with open(store_metadata_path, mode='wb') as store_metadata_file:  # noqa: ASYNC101
-        store_metadata_file.write(json_dumps(store_metadata).encode('utf-8'))
+        s = await json_dumps(store_metadata)
+        store_metadata_file.write(s.encode('utf-8'))
 
     # Write the test input item to the disk
     item_path = os.path.join(storage_path, test_input['filename'])
@@ -419,20 +420,20 @@ async def test_reads_correct_metadata(memory_storage_client: MemoryStorageClient
         elif isinstance(test_input['value'], str):
             item_file.write(test_input['value'].encode('utf-8'))
         else:
-            item_file.write(json_dumps(test_input['value']).encode('utf-8'))
+            s = await json_dumps(test_input['value'])
+            item_file.write(s.encode('utf-8'))
 
     # Optionally write the metadata to disk if there is some
     if test_input['metadata'] is not None:
         metadata_path = os.path.join(storage_path, test_input['filename'] + '.__metadata__.json')
         with open(metadata_path, 'w', encoding='utf-8') as metadata_file:  # noqa: ASYNC101
-            metadata_file.write(
-                json_dumps(
-                    {
-                        'key': test_input['metadata']['key'],
-                        'contentType': test_input['metadata']['contentType'],
-                    }
-                )
+            s = await json_dumps(
+                {
+                    'key': test_input['metadata']['key'],
+                    'contentType': test_input['metadata']['contentType'],
+                }
             )
+            metadata_file.write(s)
 
     # Create the key-value store client to load the items from disk
     store_details = await memory_storage_client.key_value_stores().get_or_create(name=key_value_store_name)

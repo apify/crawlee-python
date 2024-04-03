@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import io
 import json
@@ -117,7 +118,7 @@ def is_file_or_bytes(value: Any) -> bool:
     return isinstance(value, (bytes, bytearray, io.IOBase))
 
 
-def json_dumps(obj: Any) -> str:
+async def json_dumps(obj: Any) -> str:
     """Serialize an object to a JSON-formatted string with specific settings.
 
     Args:
@@ -126,7 +127,7 @@ def json_dumps(obj: Any) -> str:
     Returns:
         A string containing the JSON representation of the input object.
     """
-    return json.dumps(obj, ensure_ascii=False, indent=2, default=str)
+    return await asyncio.to_thread(json.dumps, obj, ensure_ascii=False, indent=2, default=str)
 
 
 async def persist_metadata_if_enabled(*, data: dict, entity_directory: str, write_metadata: bool) -> None:
@@ -151,4 +152,5 @@ async def persist_metadata_if_enabled(*, data: dict, entity_directory: str, writ
     # Write the metadata to the file
     file_path = os.path.join(entity_directory, '__metadata__.json')
     async with aiofiles.open(file_path, mode='wb') as f:
-        await f.write(json_dumps(data).encode('utf-8'))
+        s = await json_dumps(data)
+        await f.write(s.encode('utf-8'))

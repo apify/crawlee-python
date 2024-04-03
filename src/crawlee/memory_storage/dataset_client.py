@@ -372,7 +372,8 @@ class DatasetClient(BaseResourceClient):
         for idx, item in data:
             file_path = os.path.join(entity_directory, f'{idx}.json')
             async with aiofiles.open(file_path, mode='wb') as f:
-                await f.write(json_dumps(item).encode('utf-8'))
+                s = await json_dumps(item)
+                await f.write(s.encode('utf-8'))
 
     def to_resource_info(self) -> DatasetResourceInfo:
         """Retrieve the dataset info."""

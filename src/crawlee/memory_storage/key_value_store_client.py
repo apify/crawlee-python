@@ -315,7 +315,8 @@ class KeyValueStoreClient(BaseResourceClient):
                 content_type = 'application/json; charset=utf-8'
 
         if 'application/json' in content_type and not is_file_or_bytes(value) and not isinstance(value, str):
-            value = json_dumps(value).encode('utf-8')
+            s = await json_dumps(value)
+            value = s.encode('utf-8')
 
         async with existing_store_by_id.file_operation_lock:
             await existing_store_by_id.update_timestamps(has_been_modified=True)
@@ -358,14 +359,8 @@ class KeyValueStoreClient(BaseResourceClient):
 
         if self._memory_storage_client.write_metadata:
             async with aiofiles.open(record_metadata_path, mode='wb') as f:
-                await f.write(
-                    json_dumps(
-                        {
-                            'key': record.key,
-                            'contentType': record.content_type,
-                        }
-                    ).encode('utf-8')
-                )
+                s = await json_dumps({'key': record.key, 'contentType': record.content_type})
+                await f.write(s.encode('utf-8'))
 
     async def delete_record(self, key: str) -> None:
         """Delete the specified record from the key-value store.

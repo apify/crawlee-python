@@ -3,7 +3,7 @@ from __future__ import annotations
 import csv
 import io
 import math
-from typing import TYPE_CHECKING, AsyncIterator, Iterable, Iterator, cast
+from typing import TYPE_CHECKING, AsyncIterator, cast
 
 from crawlee._utils.file import json_dumps
 from crawlee.consts import MAX_PAYLOAD_SIZE_BYTES
@@ -117,14 +117,14 @@ class Dataset(BaseStorage):
         """
         # Handle singular items
         if not isinstance(data, list):
-            payload = self._check_and_serialize(data)
+            payload = await self._check_and_serialize(data)
             return await self._dataset_client.push_items(payload)
 
         # Handle lists
-        payloads_generator = (self._check_and_serialize(item, index) for index, item in enumerate(data))
+        payloads_generator = (await self._check_and_serialize(item, index) for index, item in enumerate(data))
 
         # Invoke client in series to preserve the order of data
-        for chunk in self._chunk_by_size(payloads_generator):
+        async for chunk in self._chunk_by_size(payloads_generator):
             await self._dataset_client.push_items(chunk)
 
         return None
@@ -344,7 +344,7 @@ class Dataset(BaseStorage):
 
         raise ValueError(f'Unsupported content type: {content_type}')
 
-    def _check_and_serialize(self, item: JSONSerializable, index: int | None = None) -> str:
+    async def _check_and_serialize(self, item: JSONSerializable, index: int | None = None) -> str:
         """Serializes a given item to JSON, checks its serializability and size against a limit.
 
         Args:
@@ -360,7 +360,7 @@ class Dataset(BaseStorage):
         s = ' ' if index is None else f' at index {index} '
 
         try:
-            payload = json_dumps(item)
+            payload = await json_dumps(item)
         except Exception as exc:
             raise ValueError(f'Data item{s}is not serializable to JSON.') from exc
 
@@ -372,7 +372,7 @@ class Dataset(BaseStorage):
 
         return payload
 
-    def _chunk_by_size(self, items: Iterable[str]) -> Iterator[str]:
+    async def _chunk_by_size(self, items: AsyncIterator[str]) -> AsyncIterator[str]:
         """Yields chunks of JSON arrays composed of input strings, respecting a size limit.
 
         Groups an iterable of JSON string payloads into larger JSON arrays, ensuring the total size
@@ -389,7 +389,7 @@ class Dataset(BaseStorage):
         last_chunk_bytes = 2  # Add 2 bytes for [] wrapper.
         current_chunk = []
 
-        for payload in items:
+        async for payload in items:
             length_bytes = len(payload.encode('utf-8'))
 
             if last_chunk_bytes + length_bytes <= self._EFFECTIVE_LIMIT_BYTES:

@@ -25,12 +25,12 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def test_json_dumps() -> None:
-    assert json_dumps({'key': 'value'}) == '{\n  "key": "value"\n}'
-    assert json_dumps(['one', 2, 3.0]) == '[\n  "one",\n  2,\n  3.0\n]'
-    assert json_dumps('string') == '"string"'
-    assert json_dumps(123) == '123'
-    assert json_dumps(datetime(2022, 1, 1, tzinfo=timezone.utc)) == '"2022-01-01 00:00:00+00:00"'
+async def test_json_dumps() -> None:
+    assert await json_dumps({'key': 'value'}) == '{\n  "key": "value"\n}'
+    assert await json_dumps(['one', 2, 3.0]) == '[\n  "one",\n  2,\n  3.0\n]'
+    assert await json_dumps('string') == '"string"'
+    assert await json_dumps(123) == '123'
+    assert await json_dumps(datetime(2022, 1, 1, tzinfo=timezone.utc)) == '"2022-01-01 00:00:00+00:00"'
 
 
 def test_is_file_or_bytes() -> None:

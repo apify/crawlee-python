@@ -228,7 +228,7 @@ class RequestQueueClient(BaseResourceClient):
         if existing_queue_by_id is None:
             raise_on_non_existing_storage(StorageTypes.REQUEST_QUEUE, self.id)
 
-        request_model = self._create_internal_request(request, forefront)
+        request_model = await self._create_internal_request(request, forefront)
 
         async with existing_queue_by_id.file_operation_lock:
             existing_request_with_id = existing_queue_by_id.requests.get(request_model.id)
@@ -313,7 +313,7 @@ class RequestQueueClient(BaseResourceClient):
         if existing_queue_by_id is None:
             raise_on_non_existing_storage(StorageTypes.REQUEST_QUEUE, self.id)
 
-        request_model = self._create_internal_request(request, forefront)
+        request_model = await self._create_internal_request(request, forefront)
 
         # First we need to check the existing request to be able to return information about its handled state.
         existing_request = existing_queue_by_id.requests.get(request_model.id)
@@ -410,7 +410,8 @@ class RequestQueueClient(BaseResourceClient):
         # Write the request to the file
         file_path = os.path.join(entity_directory, f'{request.id}.json')
         async with aiofiles.open(file_path, mode='wb') as f:
-            await f.write(json_dumps(request).encode('utf-8'))
+            s = await json_dumps(request)
+            await f.write(s.encode('utf-8'))
 
     async def _delete_request_file_from_storage(self, *, request_id: str, entity_directory: str) -> None:
         """Deletes a specific request item from the disk.
@@ -470,14 +471,14 @@ class RequestQueueClient(BaseResourceClient):
             return None
         return RequestData(**request_dict)
 
-    def _create_internal_request(self, request: RequestData, forefront: bool | None) -> RequestData:
+    async def _create_internal_request(self, request: RequestData, forefront: bool | None) -> RequestData:
         order_no = self._calculate_order_no(request, forefront)
         id_ = unique_key_to_request_id(request.unique_key)
 
         if request.id is not None and request.id != id_:
             raise ValueError('Request ID does not match its unique_key.')
 
-        json_request = json_dumps({**(request.__dict__), 'id': id_})
+        json_request = await json_dumps({**(request.__dict__), 'id': id_})
         return RequestData(
             url=request.url,
             unique_key=request.unique_key,
