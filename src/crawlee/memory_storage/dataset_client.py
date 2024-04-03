@@ -387,8 +387,6 @@ class DatasetClient(BaseResourceClient):
                 s = await json_dumps(item)
                 await f.write(s.encode('utf-8'))
 
-
-
     async def update_timestamps(self, *, has_been_modified: bool) -> None:
         """Update the timestamps of the dataset."""
         self._accessed_at = datetime.now(timezone.utc)

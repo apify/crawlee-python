@@ -1,10 +1,10 @@
-from dataclasses import dataclass, field
+from typing import Annotated
 
-from crawlee._utils.env_vars import CrawleeEnvVars, fetch_and_parse_env_var
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
-@dataclass
-class Config:
+class Config(BaseSettings):
     """Configuration of the Crawler.
 
     Args:
@@ -14,9 +14,7 @@ class Config:
         purge_on_start: Whether to purge the storage on start.
     """
 
-    default_dataset_id: str = 'default'
-    default_key_value_store_id: str = 'default'
-    default_request_queue_id: str = 'default'
-    purge_on_start: bool = field(
-        default_factory=lambda: fetch_and_parse_env_var(CrawleeEnvVars.PURGE_ON_START, default=False)
-    )
+    default_dataset_id: Annotated[str, Field(alias='crawlee_default_dataset_id')] = 'default'
+    default_key_value_store_id: Annotated[str, Field(alias='crawlee_default_key_value_store_id')] = 'default'
+    default_request_queue_id: Annotated[str, Field(alias='crawlee_default_request_queue_id')] = 'default'
+    purge_on_start: Annotated[bool, Field(alias='crawlee_purge_on_start')] = False
