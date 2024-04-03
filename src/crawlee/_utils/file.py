@@ -7,12 +7,28 @@ import json
 import mimetypes
 import os
 import re
+from enum import Enum
 from typing import Any
 
 import aiofiles
 import aioshutil
 from aiofiles import ospath
 from aiofiles.os import makedirs, remove, rename
+
+
+class ContentType(Enum):
+    JSON = r'^application/json'
+    TEXT = r'^text/'
+    XML = r'^application/.*xml$'
+
+    def matches(self, content_type: str) -> bool:
+        """Check if the content type matches the enum's pattern."""
+        return bool(re.search(self.value, content_type, re.IGNORECASE))
+
+
+def is_content_type(content_type_enum: ContentType, content_type: str) -> bool:
+    """Check if the provided content type string matches the specified ContentType."""
+    return content_type_enum.matches(content_type)
 
 
 async def force_remove(filename: str) -> None:
@@ -65,42 +81,6 @@ def determine_file_extension(content_type: str) -> str | None:
 
     # Remove the leading dot if extension successfully parsed
     return ext[1:] if ext is not None else ext
-
-
-def is_content_type_json(content_type: str) -> bool:
-    """Check if the provided content type string indicates JSON content.
-
-    Args:
-        content_type: The MIME content type string.
-
-    Returns:
-        True if the content type is application/json, False otherwise.
-    """
-    return bool(re.search(r'^application/json', content_type, flags=re.IGNORECASE))
-
-
-def is_content_type_text(content_type: str) -> bool:
-    """Check if the provided content type string indicates plaintext content.
-
-    Args:
-        content_type: The MIME content type string.
-
-    Returns:
-        True if the content type starts with 'text/', indicating that it is a text format, False otherwise.
-    """
-    return bool(re.search(r'^text/', content_type, flags=re.IGNORECASE))
-
-
-def is_content_type_xml(content_type: str) -> bool:
-    """Check if the provided content type string indicates XML content.
-
-    Args:
-        content_type: The MIME content type string.
-
-    Returns:
-        True if the content type is XML-related (application/xml or similar), False otherwise.
-    """
-    return bool(re.search(r'^application/.*xml$', content_type, flags=re.IGNORECASE))
 
 
 def is_file_or_bytes(value: Any) -> bool:

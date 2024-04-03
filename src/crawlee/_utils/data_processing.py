@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import TYPE_CHECKING, Any, NoReturn
 
-from crawlee._utils.file import is_content_type_json, is_content_type_text, is_content_type_xml
+from crawlee._utils.file import ContentType, is_content_type
 
 if TYPE_CHECKING:
     from crawlee.storages.types import StorageTypes
@@ -45,11 +45,14 @@ def maybe_extract_enum_member_value(maybe_enum_member: Any) -> Any:
 
 
 def maybe_parse_body(body: bytes, content_type: str) -> Any:
-    """Parse the body based on the content type."""
-    if is_content_type_json(content_type):
-        return json.loads(body.decode('utf-8'))
-    if is_content_type_xml(content_type) or is_content_type_text(content_type):
+    """Parse the response body based on the content type."""
+    if is_content_type(ContentType.JSON, content_type):
+        s = body.decode('utf-8')
+        return json.loads(s)
+
+    if is_content_type(ContentType.XML, content_type) or is_content_type(ContentType.TEXT, content_type):
         return body.decode('utf-8')
+
     return body
 
 

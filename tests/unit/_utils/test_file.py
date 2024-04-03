@@ -7,15 +7,15 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 import aiofiles
+import pytest
 from aiofiles.os import mkdir
 
 from crawlee._utils.file import (
+    ContentType,
     determine_file_extension,
     force_remove,
     force_rename,
-    is_content_type_json,
-    is_content_type_text,
-    is_content_type_xml,
+    is_content_type,
     is_file_or_bytes,
     json_dumps,
     persist_metadata_if_enabled,
@@ -42,25 +42,61 @@ def test_is_file_or_bytes() -> None:
     assert is_file_or_bytes(12345) is False
 
 
+@pytest.mark.parametrize(
+    ('content_type_enum', 'content_type', 'expected_result'),
+    [
+        (ContentType.JSON, 'application/json', True),
+        (ContentType.JSON, 'application/json; charset=utf-8', True),
+        (ContentType.JSON, 'text/plain', False),
+        (ContentType.JSON, 'application/xml', False),
+        (ContentType.XML, 'application/xml', True),
+        (ContentType.XML, 'application/xhtml+xml', True),
+        (ContentType.XML, 'text/xml; charset=utf-8', False),
+        (ContentType.XML, 'application/json', False),
+        (ContentType.TEXT, 'text/plain', True),
+        (ContentType.TEXT, 'text/html; charset=utf-8', True),
+        (ContentType.TEXT, 'application/json', False),
+        (ContentType.TEXT, 'application/xml', False),
+    ],
+    ids=[
+        'json_valid_simple',
+        'json_valid_charset',
+        'json_invalid_text',
+        'json_invalid_xml',
+        'xml_valid_simple',
+        'xml_valid_xhtml',
+        'xml_invalid_text_charset',
+        'xml_invalid_json',
+        'text_valid_plain',
+        'text_valid_html_charset',
+        'text_invalid_json',
+        'text_invalid_xml',
+    ],
+)
+def test_is_content_type(content_type_enum: ContentType, content_type: str, *, expected_result: bool) -> None:
+    result = is_content_type(content_type_enum, content_type)
+    assert expected_result == result
+
+
 def test_is_content_type_json() -> None:
-    assert is_content_type_json('application/json') is True
-    assert is_content_type_json('application/json; charset=utf-8') is True
-    assert is_content_type_json('text/plain') is False
-    assert is_content_type_json('application/xml') is False
+    assert is_content_type(ContentType.JSON, 'application/json') is True
+    assert is_content_type(ContentType.JSON, 'application/json; charset=utf-8') is True
+    assert is_content_type(ContentType.JSON, 'text/plain') is False
+    assert is_content_type(ContentType.JSON, 'application/xml') is False
 
 
 def test_is_content_type_xml() -> None:
-    assert is_content_type_xml('application/xml') is True
-    assert is_content_type_xml('application/xhtml+xml') is True
-    assert is_content_type_xml('text/xml; charset=utf-8') is False
-    assert is_content_type_xml('application/json') is False
+    assert is_content_type(ContentType.XML, 'application/xml') is True
+    assert is_content_type(ContentType.XML, 'application/xhtml+xml') is True
+    assert is_content_type(ContentType.XML, 'text/xml; charset=utf-8') is False
+    assert is_content_type(ContentType.XML, 'application/json') is False
 
 
 def test_is_content_type_text() -> None:
-    assert is_content_type_text('text/plain') is True
-    assert is_content_type_text('text/html; charset=utf-8') is True
-    assert is_content_type_text('application/json') is False
-    assert is_content_type_text('application/xml') is False
+    assert is_content_type(ContentType.TEXT, 'text/plain') is True
+    assert is_content_type(ContentType.TEXT, 'text/html; charset=utf-8') is True
+    assert is_content_type(ContentType.TEXT, 'application/json') is False
+    assert is_content_type(ContentType.TEXT, 'application/xml') is False
 
 
 def test_determine_file_extension() -> None:
