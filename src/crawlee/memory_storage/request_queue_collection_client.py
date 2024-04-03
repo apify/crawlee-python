@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from typing_extensions import override
+
 from crawlee.memory_storage.base_resource_collection_client import BaseResourceCollectionClient
 from crawlee.memory_storage.request_queue_client import RequestQueueClient
 
@@ -13,9 +15,11 @@ class RequestQueueCollectionClient(BaseResourceCollectionClient):
     """Sub-client for manipulating request queues."""
 
     @property
+    @override
     def _client_class(self) -> type[RequestQueueClient]:
         return RequestQueueClient
 
+    @override
     def _get_storage_client_cache(self) -> list[RequestQueueClient]:
         return self._memory_storage_client.request_queues_handled
 

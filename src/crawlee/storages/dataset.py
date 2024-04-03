@@ -5,6 +5,8 @@ import io
 import math
 from typing import TYPE_CHECKING, AsyncIterator, cast
 
+from typing_extensions import override
+
 from crawlee._utils.file import json_dumps
 from crawlee.consts import MAX_PAYLOAD_SIZE_BYTES
 from crawlee.storages.base_storage import BaseStorage
@@ -56,6 +58,7 @@ class Dataset(BaseStorage):
         self._dataset_client = client.dataset(self.id)
 
     @classmethod
+    @override
     async def open(
         cls,
         *,
@@ -89,18 +92,22 @@ class Dataset(BaseStorage):
         return cast(Dataset, storage)
 
     @classmethod
+    @override
     def _get_human_friendly_label(cls) -> str:
         return 'Dataset'
 
     @classmethod
+    @override
     def _get_default_id(cls, config: Config) -> str:
         return config.default_dataset_id
 
     @classmethod
+    @override
     def _get_single_storage_client(cls, id_: str, client: MemoryStorageClient) -> DatasetClient:
         return client.dataset(id_)
 
     @classmethod
+    @override
     def _get_storage_collection_client(cls, client: MemoryStorageClient) -> DatasetCollectionClient:
         return client.datasets()
 

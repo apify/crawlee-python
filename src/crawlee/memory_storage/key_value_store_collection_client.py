@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from typing_extensions import override
+
 from crawlee.memory_storage.base_resource_collection_client import BaseResourceCollectionClient
 from crawlee.memory_storage.key_value_store_client import KeyValueStoreClient
 
@@ -13,9 +15,11 @@ class KeyValueStoreCollectionClient(BaseResourceCollectionClient):
     """Sub-client for manipulating key-value stores."""
 
     @property
+    @override
     def _client_class(self) -> type[KeyValueStoreClient]:
         return KeyValueStoreClient
 
+    @override
     def _get_storage_client_cache(self) -> list[KeyValueStoreClient]:
         return self._memory_storage_client.key_value_stores_handled
 

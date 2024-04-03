@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, AsyncIterator
 import aiofiles
 import aioshutil
 from aiofiles.os import makedirs
+from typing_extensions import override
 
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import maybe_parse_body, raise_on_duplicate_storage, raise_on_non_existing_storage
@@ -67,6 +68,7 @@ class KeyValueStoreClient(BaseResourceClient):
         self.file_operation_lock = asyncio.Lock()
 
     @property
+    @override
     def resource_info(self) -> KeyValueStoreResourceInfo:
         """Get the resource info for the key-value store client."""
         return KeyValueStoreResourceInfo(
@@ -78,6 +80,116 @@ class KeyValueStoreClient(BaseResourceClient):
             user_id='1',
         )
 
+    @classmethod
+    @override
+    def _get_storages_dir(cls, memory_storage_client: MemoryStorageClient) -> str:
+        return memory_storage_client.key_value_stores_directory
+
+    @classmethod
+    @override
+    def _get_storage_client_cache(
+        cls,
+        memory_storage_client: MemoryStorageClient,
+    ) -> list[KeyValueStoreClient]:
+        return memory_storage_client.key_value_stores_handled
+
+    @classmethod
+    @override
+    def _create_from_directory(
+        cls,
+        storage_directory: str,
+        memory_storage_client: MemoryStorageClient,
+        id_: str | None = None,
+        name: str | None = None,
+    ) -> KeyValueStoreClient:
+        created_at = datetime.now(timezone.utc)
+        accessed_at = datetime.now(timezone.utc)
+        modified_at = datetime.now(timezone.utc)
+
+        store_metadata_path = os.path.join(storage_directory, '__metadata__.json')
+        if os.path.exists(store_metadata_path):
+            with open(store_metadata_path, encoding='utf-8') as f:
+                metadata = json.load(f)
+            id_ = metadata['id']
+            name = metadata['name']
+            created_at = datetime.fromisoformat(metadata['createdAt'])
+            accessed_at = datetime.fromisoformat(metadata['accessedAt'])
+            modified_at = datetime.fromisoformat(metadata['modifiedAt'])
+
+        new_client = KeyValueStoreClient(
+            base_storage_directory=memory_storage_client.key_value_stores_directory,
+            memory_storage_client=memory_storage_client,
+            id_=id_,
+            name=name,
+            accessed_at=accessed_at,
+            created_at=created_at,
+            modified_at=modified_at,
+        )
+
+        # Scan the key value store folder, check each entry in there and parse it as a store record
+        for entry in os.scandir(storage_directory):
+            if not entry.is_file():
+                continue
+
+            # Ignore metadata files on their own
+            if entry.name.endswith('__metadata__.json'):
+                continue
+
+            with open(os.path.join(storage_directory, entry.name), 'rb') as f:
+                file_content = f.read()
+
+            # Try checking if this file has a metadata file associated with it
+            metadata = None
+            if os.path.exists(os.path.join(storage_directory, entry.name + '.__metadata__.json')):
+                with open(
+                    os.path.join(storage_directory, entry.name + '.__metadata__.json'), encoding='utf-8'
+                ) as metadata_file:
+                    try:
+                        metadata = json.load(metadata_file)
+
+                        if metadata.get('key') is None:
+                            raise ValueError('Metadata missing required "key".')  # noqa: TRY301
+
+                        if metadata.get('contentType') is None:
+                            raise ValueError('Metadata missing required "contentType".')  # noqa: TRY301
+
+                    except Exception:
+                        logger.warning(
+                            f'Metadata of key-value store entry "{entry.name}" for store {name or id} could '
+                            'not be parsed. The metadata file will be ignored.',
+                            exc_info=True,
+                        )
+
+            if not metadata:
+                content_type, _ = mimetypes.guess_type(entry.name)
+                if content_type is None:
+                    content_type = 'application/octet-stream'
+
+                metadata = {
+                    'key': pathlib.Path(entry.name).stem,
+                    'contentType': content_type,
+                }
+
+            try:
+                maybe_parse_body(file_content, metadata['contentType'])
+            except Exception:
+                metadata['contentType'] = 'application/octet-stream'
+                logger.warning(
+                    f"""Key-value store entry "{metadata['key']}" for store {name or id} could not be parsed."""
+                    'The entry will be assumed as binary.',
+                    exc_info=True,
+                )
+
+            new_client.records[metadata['key']] = KeyValueStoreRecord(
+                key=metadata['key'],
+                content_type=metadata['contentType'],
+                filename=entry.name,
+                value=file_content,
+            )
+
+        return new_client
+
+    @override
     async def get(self) -> KeyValueStoreResourceInfo | None:
         """Retrieve the key-value store.
 
@@ -429,112 +541,6 @@ class KeyValueStoreClient(BaseResourceClient):
             entity_directory=self.resource_directory,
             write_metadata=self._memory_storage_client.write_metadata,
         )
-
-    @classmethod
-    def _get_storages_dir(cls, memory_storage_client: MemoryStorageClient) -> str:
-        return memory_storage_client.key_value_stores_directory
-
-    @classmethod
-    def _get_storage_client_cache(
-        cls,
-        memory_storage_client: MemoryStorageClient,
-    ) -> list[KeyValueStoreClient]:
-        return memory_storage_client.key_value_stores_handled
-
-    @classmethod
-    def _create_from_directory(
-        cls,
-        storage_directory: str,
-        memory_storage_client: MemoryStorageClient,
-        id_: str | None = None,
-        name: str | None = None,
-    ) -> KeyValueStoreClient:
-        created_at = datetime.now(timezone.utc)
-        accessed_at = datetime.now(timezone.utc)
-        modified_at = datetime.now(timezone.utc)
-
-        store_metadata_path = os.path.join(storage_directory, '__metadata__.json')
-        if os.path.exists(store_metadata_path):
-            with open(store_metadata_path, encoding='utf-8') as f:
-                metadata = json.load(f)
-            id_ = metadata['id']
-            name = metadata['name']
-            created_at = datetime.fromisoformat(metadata['createdAt'])
-            accessed_at = datetime.fromisoformat(metadata['accessedAt'])
-            modified_at = datetime.fromisoformat(metadata['modifiedAt'])
-
-        new_client = KeyValueStoreClient(
-            base_storage_directory=memory_storage_client.key_value_stores_directory,
-            memory_storage_client=memory_storage_client,
-            id_=id_,
-            name=name,
-            accessed_at=accessed_at,
-            created_at=created_at,
-            modified_at=modified_at,
-        )
-
-        # Scan the key value store folder, check each entry in there and parse it as a store record
-        for entry in os.scandir(storage_directory):
-            if not entry.is_file():
-                continue
-
-            # Ignore metadata files on their own
-            if entry.name.endswith('__metadata__.json'):
-                continue
-
-            with open(os.path.join(storage_directory, entry.name), 'rb') as f:
-                file_content = f.read()
-
-            # Try checking if this file has a metadata file associated with it
-            metadata = None
-            if os.path.exists(os.path.join(storage_directory, entry.name + '.__metadata__.json')):
-                with open(
-                    os.path.join(storage_directory, entry.name + '.__metadata__.json'), encoding='utf-8'
-                ) as metadata_file:
-                    try:
-                        metadata = json.load(metadata_file)
-
-                        if metadata.get('key') is None:
-                            raise ValueError('Metadata missing required "key".')  # noqa: TRY301
-
-                        if metadata.get('contentType') is None:
-                            raise ValueError('Metadata missing required "contentType".')  # noqa: TRY301
-
-                    except Exception:
-                        logger.warning(
-                            f'Metadata of key-value store entry "{entry.name}" for store {name or id} could '
-                            'not be parsed. The metadata file will be ignored.',
-                            exc_info=True,
-                        )
-
-            if not metadata:
-                content_type, _ = mimetypes.guess_type(entry.name)
-                if content_type is None:
-                    content_type = 'application/octet-stream'
-
-                metadata = {
-                    'key': pathlib.Path(entry.name).stem,
-                    'contentType': content_type,
-                }
-
-            try:
-                maybe_parse_body(file_content, metadata['contentType'])
-            except Exception:
-                metadata['contentType'] = 'application/octet-stream'
-                logger.warning(
-                    f"""Key-value store entry "{metadata['key']}" for store {name or id} could not be parsed."""
-                    'The entry will be assumed as binary.',
-                    exc_info=True,
-                )
-
-            new_client.records[metadata['key']] = KeyValueStoreRecord(
-                key=metadata['key'],
-                content_type=metadata['contentType'],
-                filename=entry.name,
-                value=file_content,
-            )
-
-        return new_client
 
     def _filename_from_record(self, record: KeyValueStoreRecord) -> str:
         if record.filename is not None:

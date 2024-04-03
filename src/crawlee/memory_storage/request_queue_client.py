@@ -11,6 +11,7 @@ import aiofiles
 import aioshutil
 from aiofiles.os import makedirs
 from sortedcollections import ValueSortedDict  # type: ignore
+from typing_extensions import override
 
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import (
@@ -70,6 +71,7 @@ class RequestQueueClient(BaseResourceClient):
         self._last_used_timestamp = Decimal(0.0)
 
     @property
+    @override
     def resource_info(self) -> RequestQueueResourceInfo:
         """Get the resource info for the request queue client."""
         return RequestQueueResourceInfo(
@@ -87,6 +89,73 @@ class RequestQueueClient(BaseResourceClient):
             resource_directory=self.resource_directory,
         )
 
+    @classmethod
+    @override
+    def _get_storages_dir(cls, memory_storage_client: MemoryStorageClient) -> str:
+        return memory_storage_client.request_queues_directory
+
+    @classmethod
+    @override
+    def _get_storage_client_cache(cls, memory_storage_client: MemoryStorageClient) -> list[RequestQueueClient]:
+        return memory_storage_client.request_queues_handled
+
+    @classmethod
+    @override
+    def _create_from_directory(
+        cls,
+        storage_directory: str,
+        memory_storage_client: MemoryStorageClient,
+        id_: str | None = None,
+        name: str | None = None,
+    ) -> RequestQueueClient:
+        created_at = datetime.now(timezone.utc)
+        accessed_at = datetime.now(timezone.utc)
+        modified_at = datetime.now(timezone.utc)
+        handled_request_count = 0
+        pending_request_count = 0
+        entries: list[dict] = []
+
+        # Access the request queue folder
+        for entry in os.scandir(storage_directory):
+            if entry.is_file():
+                if entry.name == '__metadata__.json':
+                    # We have found the queue's metadata file, build out information based on it
+                    with open(os.path.join(storage_directory, entry.name), encoding='utf-8') as f:
+                        metadata = json.load(f)
+
+                    id_ = metadata['id']
+                    name = metadata['name']
+                    created_at = datetime.fromisoformat(metadata['createdAt'])
+                    accessed_at = datetime.fromisoformat(metadata['accessedAt'])
+                    modified_at = datetime.fromisoformat(metadata['modifiedAt'])
+                    handled_request_count = metadata['handledRequestCount']
+                    pending_request_count = metadata['pendingRequestCount']
+                    continue
+
+                with open(os.path.join(storage_directory, entry.name), encoding='utf-8') as f:
+                    request = json.load(f)
+                    if request.order_no:
+                        request.order_no = Decimal(request.order_no)
+                entries.append(request)
+
+        new_client = cls(
+            base_storage_directory=memory_storage_client.request_queues_directory,
+            memory_storage_client=memory_storage_client,
+            id_=id_,
+            name=name,
+            accessed_at=accessed_at,
+            created_at=created_at,
+            modified_at=modified_at,
+            handled_request_count=handled_request_count,
+            pending_request_count=pending_request_count,
+        )
+
+        for request in entries:
+            new_client.requests[request['id']] = request
+
+        return new_client
+
+    @override
     async def get(self) -> RequestQueueResourceInfo | None:
         """Retrieve the request queue.
 
@@ -505,66 +574,3 @@ class RequestQueueClient(BaseResourceClient):
         self._last_used_timestamp = timestamp
 
         return -timestamp if forefront else timestamp
-
-    @classmethod
-    def _get_storages_dir(cls, memory_storage_client: MemoryStorageClient) -> str:
-        return memory_storage_client.request_queues_directory
-
-    @classmethod
-    def _get_storage_client_cache(cls, memory_storage_client: MemoryStorageClient) -> list[RequestQueueClient]:
-        return memory_storage_client.request_queues_handled
-
-    @classmethod
-    def _create_from_directory(
-        cls,
-        storage_directory: str,
-        memory_storage_client: MemoryStorageClient,
-        id_: str | None = None,
-        name: str | None = None,
-    ) -> RequestQueueClient:
-        created_at = datetime.now(timezone.utc)
-        accessed_at = datetime.now(timezone.utc)
-        modified_at = datetime.now(timezone.utc)
-        handled_request_count = 0
-        pending_request_count = 0
-        entries: list[dict] = []
-
-        # Access the request queue folder
-        for entry in os.scandir(storage_directory):
-            if entry.is_file():
-                if entry.name == '__metadata__.json':
-                    # We have found the queue's metadata file, build out information based on it
-                    with open(os.path.join(storage_directory, entry.name), encoding='utf-8') as f:
-                        metadata = json.load(f)
-
-                    id_ = metadata['id']
-                    name = metadata['name']
-                    created_at = datetime.fromisoformat(metadata['createdAt'])
-                    accessed_at = datetime.fromisoformat(metadata['accessedAt'])
-                    modified_at = datetime.fromisoformat(metadata['modifiedAt'])
-                    handled_request_count = metadata['handledRequestCount']
-                    pending_request_count = metadata['pendingRequestCount']
-                    continue
-
-                with open(os.path.join(storage_directory, entry.name), encoding='utf-8') as f:
-                    request = json.load(f)
-                    if request.order_no:
-                        request.order_no = Decimal(request.order_no)
-                entries.append(request)
-
-        new_client = cls(
-            base_storage_directory=memory_storage_client.request_queues_directory,
-            memory_storage_client=memory_storage_client,
-            id_=id_,
-            name=name,
-            accessed_at=accessed_at,
-            created_at=created_at,
-            modified_at=modified_at,
-            handled_request_count=handled_request_count,
-            pending_request_count=pending_request_count,
-        )
-
-        for request in entries:
-            new_client.requests[request['id']] = request
-
-        return new_client

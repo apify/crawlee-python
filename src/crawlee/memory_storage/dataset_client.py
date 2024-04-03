@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, AsyncIterator
 import aiofiles
 import aioshutil
 from aiofiles.os import makedirs
+from typing_extensions import override
 
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import raise_on_duplicate_storage, raise_on_non_existing_storage
@@ -56,6 +57,7 @@ class DatasetClient(BaseResourceClient):
         self.item_count = item_count
 
     @property
+    @override
     def resource_info(self) -> DatasetResourceInfo:
         """Get the resource info for the dataset client."""
         return DatasetResourceInfo(
@@ -67,6 +69,80 @@ class DatasetClient(BaseResourceClient):
             item_count=self.item_count,
         )
 
+    @classmethod
+    @override
+    def _get_storages_dir(cls, memory_storage_client: MemoryStorageClient) -> str:
+        return memory_storage_client.datasets_directory
+
+    @classmethod
+    @override
+    def _get_storage_client_cache(
+        cls,
+        memory_storage_client: MemoryStorageClient,
+    ) -> list[DatasetClient]:
+        return memory_storage_client.datasets_handled
+
+    @classmethod
+    @override
+    def _create_from_directory(
+        cls,
+        storage_directory: str,
+        memory_storage_client: MemoryStorageClient,
+        id_: str | None = None,
+        name: str | None = None,
+    ) -> DatasetClient:
+        item_count = 0
+        created_at = datetime.now(timezone.utc)
+        accessed_at = datetime.now(timezone.utc)
+        modified_at = datetime.now(timezone.utc)
+        entries: dict[str, dict] = {}
+
+        has_seen_metadata_file = False
+
+        # Access the dataset folder
+        for entry in os.scandir(storage_directory):
+            if entry.is_file():
+                if entry.name == '__metadata__.json':
+                    has_seen_metadata_file = True
+
+                    # We have found the dataset's metadata file, build out information based on it
+                    with open(os.path.join(storage_directory, entry.name), encoding='utf-8') as f:
+                        metadata = json.load(f)
+                    id_ = metadata['id']
+                    name = metadata['name']
+                    item_count = metadata['itemCount']
+                    created_at = datetime.fromisoformat(metadata['createdAt'])
+                    accessed_at = datetime.fromisoformat(metadata['accessedAt'])
+                    modified_at = datetime.fromisoformat(metadata['modifiedAt'])
+
+                    continue
+
+                with open(os.path.join(storage_directory, entry.name), encoding='utf-8') as f:
+                    entry_content = json.load(f)
+                entry_name = entry.name.split('.')[0]
+
+                entries[entry_name] = entry_content
+
+                if not has_seen_metadata_file:
+                    item_count += 1
+
+        new_client = DatasetClient(
+            base_storage_directory=memory_storage_client.datasets_directory,
+            memory_storage_client=memory_storage_client,
+            id_=id_,
+            name=name,
+            created_at=created_at,
+            accessed_at=accessed_at,
+            modified_at=modified_at,
+            item_count=item_count,
+        )
+
+        for entry_id, content in entries.items():
+            new_client.dataset_entries[entry_id] = content
+
+        return new_client
+
+    @override
     async def get(self) -> DatasetResourceInfo | None:
         """Retrieve the dataset.
 
@@ -435,73 +511,3 @@ class DatasetClient(BaseResourceClient):
         result = list(map(normalize_item, items)) if isinstance(items, list) else [normalize_item(items)]
         # filter(None, ..) returns items that are True
         return list(filter(None, result))
-
-    @classmethod
-    def _get_storages_dir(cls, memory_storage_client: MemoryStorageClient) -> str:
-        return memory_storage_client.datasets_directory
-
-    @classmethod
-    def _get_storage_client_cache(
-        cls,
-        memory_storage_client: MemoryStorageClient,
-    ) -> list[DatasetClient]:
-        return memory_storage_client.datasets_handled
-
-    @classmethod
-    def _create_from_directory(
-        cls,
-        storage_directory: str,
-        memory_storage_client: MemoryStorageClient,
-        id_: str | None = None,
-        name: str | None = None,
-    ) -> DatasetClient:
-        item_count = 0
-        created_at = datetime.now(timezone.utc)
-        accessed_at = datetime.now(timezone.utc)
-        modified_at = datetime.now(timezone.utc)
-        entries: dict[str, dict] = {}
-
-        has_seen_metadata_file = False
-
-        # Access the dataset folder
-        for entry in os.scandir(storage_directory):
-            if entry.is_file():
-                if entry.name == '__metadata__.json':
-                    has_seen_metadata_file = True
-
-                    # We have found the dataset's metadata file, build out information based on it
-                    with open(os.path.join(storage_directory, entry.name), encoding='utf-8') as f:
-                        metadata = json.load(f)
-                    id_ = metadata['id']
-                    name = metadata['name']
-                    item_count = metadata['itemCount']
-                    created_at = datetime.fromisoformat(metadata['createdAt'])
-                    accessed_at = datetime.fromisoformat(metadata['accessedAt'])
-                    modified_at = datetime.fromisoformat(metadata['modifiedAt'])
-
-                    continue
-
-                with open(os.path.join(storage_directory, entry.name), encoding='utf-8') as f:
-                    entry_content = json.load(f)
-                entry_name = entry.name.split('.')[0]
-
-                entries[entry_name] = entry_content
-
-                if not has_seen_metadata_file:
-                    item_count += 1
-
-        new_client = DatasetClient(
-            base_storage_directory=memory_storage_client.datasets_directory,
-            memory_storage_client=memory_storage_client,
-            id_=id_,
-            name=name,
-            created_at=created_at,
-            accessed_at=accessed_at,
-            modified_at=modified_at,
-            item_count=item_count,
-        )
-
-        for entry_id, content in entries.items():
-            new_client.dataset_entries[entry_id] = content
-
-        return new_client

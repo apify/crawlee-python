@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from typing_extensions import override
+
 from crawlee.memory_storage.base_resource_collection_client import BaseResourceCollectionClient
 from crawlee.memory_storage.dataset_client import DatasetClient
 
@@ -13,9 +15,11 @@ class DatasetCollectionClient(BaseResourceCollectionClient):
     """Sub-client for manipulating datasets."""
 
     @property
+    @override
     def _client_class(self) -> type[DatasetClient]:
         return DatasetClient
 
+    @override
     def _get_storage_client_cache(self) -> list[DatasetClient]:
         return self._memory_storage_client.datasets_handled
 

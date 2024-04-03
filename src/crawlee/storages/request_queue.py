@@ -7,6 +7,8 @@ from logging import getLogger
 from typing import TYPE_CHECKING, cast
 from typing import OrderedDict as OrderedDictType
 
+from typing_extensions import override
+
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.lru_cache import LRUCache
 from crawlee._utils.requests import unique_key_to_request_id
@@ -96,6 +98,7 @@ class RequestQueue(BaseStorage):
         self._requests_cache: LRUCache[dict] = LRUCache(max_length=self._MAX_CACHED_REQUESTS)
 
     @classmethod
+    @override
     async def open(
         cls,
         *,
@@ -129,14 +132,17 @@ class RequestQueue(BaseStorage):
         return rq
 
     @classmethod
+    @override
     def _get_human_friendly_label(cls) -> str:
         return 'Request queue'
 
     @classmethod
+    @override
     def _get_default_id(cls, config: Config) -> str:
         return config.default_request_queue_id
 
     @classmethod
+    @override
     def _get_single_storage_client(
         cls,
         id_: str,
@@ -145,6 +151,7 @@ class RequestQueue(BaseStorage):
         return client.request_queue(id_)
 
     @classmethod
+    @override
     def _get_storage_collection_client(
         cls,
         client: MemoryStorageClient,

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, AsyncIterator, TypeVar, cast, overload
 
+from typing_extensions import override
+
 from crawlee.storages.base_storage import BaseStorage
 from crawlee.storages.types import KeyValueStoreRecordInfo
 
@@ -53,6 +55,7 @@ class KeyValueStore(BaseStorage):
         self._key_value_store_client = client.key_value_store(self.id)
 
     @classmethod
+    @override
     async def open(
         cls,
         *,
@@ -82,18 +85,22 @@ class KeyValueStore(BaseStorage):
         return cast(KeyValueStore, storage)
 
     @classmethod
+    @override
     def _get_human_friendly_label(cls) -> str:
         return 'Key-value store'
 
     @classmethod
+    @override
     def _get_default_id(cls, config: Config) -> str:
         return config.default_key_value_store_id
 
     @classmethod
+    @override
     def _get_single_storage_client(cls, id_: str, client: MemoryStorageClient) -> KeyValueStoreClient:
         return client.key_value_store(id_)
 
     @classmethod
+    @override
     def _get_storage_collection_client(cls, client: MemoryStorageClient) -> KeyValueStoreCollectionClient:
         return client.key_value_stores()
 
