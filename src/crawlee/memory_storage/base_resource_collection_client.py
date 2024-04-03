@@ -10,7 +10,6 @@ from crawlee.storages.types import BaseResourceInfo, ListPage
 if TYPE_CHECKING:
     from crawlee.memory_storage.memory_storage_client import MemoryStorageClient
 
-
 ResourceClientType = TypeVar('ResourceClientType', bound=BaseResourceClient, contravariant=True)  # noqa: PLC0105
 
 
@@ -29,11 +28,11 @@ class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
     @property
     @abstractmethod
     def _client_class(self) -> type[ResourceClientType]:
-        raise NotImplementedError('The subclass must implement this method.')
+        """Get the class of the resource clients."""
 
     @abstractmethod
     def _get_storage_client_cache(self) -> list[ResourceClientType]:
-        raise NotImplementedError('The subclass must implement this method.')
+        """Get the storage client cache."""
 
     async def list(self) -> ListPage:
         """List the available storages.

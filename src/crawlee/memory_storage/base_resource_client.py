@@ -35,22 +35,20 @@ class BaseResourceClient(ABC):
         Returns:
             The retrieved storage, or None, if it does not exist
         """
-        raise NotImplementedError('The subclass must implement this method.')
 
     @classmethod
     @abstractmethod
     def _get_storages_dir(cls, memory_storage_client: MemoryStorageClient) -> str:
-        raise NotImplementedError('The subclass must implement this method.')
+        """Get the directory where the storage clients are stored."""
 
     @classmethod
     @abstractmethod
     def _get_storage_client_cache(cls, memory_storage_client: MemoryStorageClient) -> list[Self]:
-        raise NotImplementedError('The subclass must implement this method.')
+        """Get the storage client cache."""
 
     @abstractmethod
     def to_resource_info(self) -> BaseResourceInfo:
         """Convert the resource client to a resource info dictionary."""
-        raise NotImplementedError('The subclass must implement this method.')
 
     @classmethod
     @abstractmethod
@@ -61,7 +59,7 @@ class BaseResourceClient(ABC):
         id_: str | None = None,
         name: str | None = None,
     ) -> Self:
-        raise NotImplementedError('The subclass must implement this method.')
+        """Create a new resource client from a directory."""
 
     @classmethod
     def find_or_create_client_by_id_or_name(  # noqa: PLR0912

@@ -137,22 +137,22 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
     @classmethod
     @abstractmethod
     def _get_human_friendly_label(cls) -> str:
-        raise NotImplementedError('The subclass must implement this method.')
+        """Get a human-friendly label for the storage."""
 
     @classmethod
     @abstractmethod
     def _get_default_id(cls, config: Config) -> str:
-        raise NotImplementedError('The subclass must implement this method.')
+        """Get the default storage ID."""
 
     @classmethod
     @abstractmethod
     def _get_single_storage_client(cls, id_: str, client: MemoryStorageClient) -> BaseResourceClientType:
-        raise NotImplementedError('The subclass must implement this method.')
+        """Get the single storage client for the given ID."""
 
     @classmethod
     @abstractmethod
     def _get_storage_collection_client(cls, client: MemoryStorageClient) -> BaseResourceCollectionClientType:
-        raise NotImplementedError('The subclass must implement this method.')
+        """Get the storage collection client."""
 
     @classmethod
     def _ensure_class_initialized(cls) -> None:
