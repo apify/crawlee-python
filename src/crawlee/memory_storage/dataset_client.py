@@ -25,11 +25,11 @@ if TYPE_CHECKING:
 class DatasetClient(BaseResourceClient):
     """Sub-client for manipulating a single dataset."""
 
-    # This is what API returns in the x-apify-pagination-limit header when no limit query parameter is used.
     _LIST_ITEMS_LIMIT = 999_999_999_999
+    """This is what API returns in the x-apify-pagination-limit header when no limit query parameter is used."""
 
-    # Number of characters of the dataset item file names, e.g.: 000000019.json - 9 digits.
     _LOCAL_ENTRY_NAME_DIGITS = 9
+    """Number of characters of the dataset item file names, e.g.: 000000019.json - 9 digits."""
 
     def __init__(
         self,

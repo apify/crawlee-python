@@ -25,7 +25,6 @@ from crawlee._utils.file import (
     json_dumps,
     persist_metadata_if_enabled,
 )
-from crawlee.consts import DEFAULT_API_PARAM_LIMIT
 from crawlee.memory_storage.base_resource_client import BaseResourceClient
 from crawlee.storages.types import (
     KeyValueStoreListKeysOutput,
@@ -279,17 +278,17 @@ class KeyValueStoreClient(BaseResourceClient):
     async def list_keys(
         self,
         *,
-        limit: int = DEFAULT_API_PARAM_LIMIT,
+        limit: int = 1000,
         exclusive_start_key: str | None = None,
     ) -> KeyValueStoreListKeysOutput:
         """List the keys in the key-value store.
 
         Args:
-            limit: Number of keys to be returned. Maximum value is 1000
-            exclusive_start_key: All keys up to this one (including) are skipped from the result
+            limit: Number of keys to be returned. Maximum value is 1000.
+            exclusive_start_key: All keys up to this one (including) are skipped from the result.
 
         Returns:
-            The list of keys in the key-value store matching the given arguments
+            The list of keys in the key-value store matching the given arguments.
         """
         # Check by id
         existing_store_by_id = self.find_or_create_client_by_id_or_name(

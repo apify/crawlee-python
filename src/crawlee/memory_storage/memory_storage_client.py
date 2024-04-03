@@ -30,7 +30,10 @@ class MemoryStorageClient:
     """
 
     _MIGRATING_KEY_VALUE_STORE_DIR_NAME = '__CRAWLEE_MIGRATING_KEY_VALUE_STORE'
+    """Name of the directory used to temporarily store files during the migration of the default key-value store."""
+
     _TEMPORARY_DIR_NAME = '__CRAWLEE_TEMPORARY'
+    """Name of the directory used to temporarily store files during purges."""
 
     def __init__(
         self,

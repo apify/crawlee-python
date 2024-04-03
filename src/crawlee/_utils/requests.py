@@ -7,16 +7,16 @@ from logging import getLogger
 from urllib.parse import parse_qsl, urlencode, urlparse
 
 from crawlee._utils.crypto import compute_short_hash
-from crawlee.consts import REQUEST_ID_LENGTH
 
 logger = getLogger(__name__)
 
 
-def unique_key_to_request_id(unique_key: str) -> str:
+def unique_key_to_request_id(unique_key: str, *, request_id_length: int = 15) -> str:
     """Generate a deterministic request ID based on a unique key.
 
     Args:
         unique_key: The unique key to convert into a request ID.
+        request_id_length: The length of the request ID.
 
     Returns:
         A URL-safe, truncated request ID based on the unique key.
@@ -31,7 +31,7 @@ def unique_key_to_request_id(unique_key: str) -> str:
     url_safe_key = re.sub(r'(\+|\/|=)', '', base64_encoded)
 
     # Truncate the key to the desired length
-    return url_safe_key[:REQUEST_ID_LENGTH]
+    return url_safe_key[:request_id_length]
 
 
 def normalize_url(url: str, *, keep_url_fragment: bool = False) -> str:

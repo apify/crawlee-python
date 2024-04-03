@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import OrderedDict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, cast
 from typing import OrderedDict as OrderedDictType
@@ -12,7 +12,6 @@ from typing_extensions import override
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.lru_cache import LRUCache
 from crawlee._utils.requests import unique_key_to_request_id
-from crawlee.consts import REQUEST_QUEUE_HEAD_MAX_LIMIT
 from crawlee.storages.base_storage import BaseStorage
 from crawlee.storages.types import BaseResourceInfo, RequestQueueOperationInfo, RequestQueueSnapshot
 
@@ -46,27 +45,29 @@ class RequestQueue(BaseStorage):
     The `{REQUEST_ID}` is the id of the request.
     """
 
-    _MAX_CACHED_REQUESTS = 1_000_000
+    _API_PROCESSED_REQUESTS_DELAY = timedelta(seconds=10)
+    """Delay threshold to assume consistency of queue head operations after queue modifications."""
 
-    # When requesting queue head we always fetch requestsInProgressCount * QUERY_HEAD_BUFFER number of requests.
-    _QUERY_HEAD_MIN_LENGTH = 100
+    _MAX_CACHED_REQUESTS = 1_000_000
+    """Maximum number of requests that can be cached."""
+
+    _MAX_HEAD_LIMIT = 1000
+    """Cap on requests in progress when querying queue head."""
+
+    _MAX_QUERIES_FOR_CONSISTENCY = 6
+    """Maximum attempts to fetch a consistent queue head."""
 
     _QUERY_HEAD_BUFFER = 3
+    """Multiplier for determining the number of requests to fetch based on in-progress requests."""
 
-    # If queue was modified (request added/updated/deleted) before more than API_PROCESSED_REQUESTS_DELAY_MILLIS
-    # then we assume the get head operation to be consistent.
-    _API_PROCESSED_REQUESTS_DELAY_MILLIS = 10_000
+    _QUERY_HEAD_MIN_LENGTH = 100
+    """The minimum number of requests fetched when querying the queue head."""
 
-    # How many times we try to get queue head with queueModifiedAt older than API_PROCESSED_REQUESTS_DELAY_MILLIS.
-    _MAX_QUERIES_FOR_CONSISTENCY = 6
-
-    # This number must be large enough so that processing of all these requests cannot be done in
-    # a time lower than expected maximum latency of DynamoDB, but low enough not to waste too much memory.
     _RECENTLY_HANDLED_CACHE_SIZE = 1000
+    """Cache size for recently handled requests."""
 
-    # Indicates how long it usually takes for the underlying storage to propagate all writes
-    # to be available to subsequent reads.
-    _STORAGE_CONSISTENCY_DELAY_MILLIS = 3000
+    _STORAGE_CONSISTENCY_DELAY = timedelta(seconds=3)
+    """Expected delay for storage to achieve consistency, guiding the timing of subsequent read operations."""
 
     def __init__(
         self,
@@ -299,7 +300,7 @@ class RequestQueue(BaseStorage):
                 extra={'nextRequestId': next_request_id},
             )
             asyncio.get_running_loop().call_later(
-                self._STORAGE_CONSISTENCY_DELAY_MILLIS // 1000,
+                self._STORAGE_CONSISTENCY_DELAY.total_seconds(),
                 lambda: self._in_progress.remove(next_request_id),
             )
             return None
@@ -393,7 +394,7 @@ class RequestQueue(BaseStorage):
             # Performance optimization: add request straight to head if possible
             self._maybe_add_request_to_queue_head(request.id, forefront=forefront)
 
-        asyncio.get_running_loop().call_later(self._STORAGE_CONSISTENCY_DELAY_MILLIS // 1000, callback)
+        asyncio.get_running_loop().call_later(self._STORAGE_CONSISTENCY_DELAY.total_seconds(), callback)
         return queue_operation_info
 
     async def is_empty(self) -> bool:
@@ -415,7 +416,7 @@ class RequestQueue(BaseStorage):
         Returns:
             bool: `True` if all requests were already handled and there are no more left. `False` otherwise.
         """
-        seconds_since_last_activity = (datetime.now(timezone.utc) - self._last_activity).seconds
+        seconds_since_last_activity = (datetime.now(timezone.utc) - self._last_activity).total_seconds()
         if self._in_progress_count() > 0 and seconds_since_last_activity > self._internal_timeout_seconds:
             message = (
                 f'The request queue seems to be stuck for {self._internal_timeout_seconds}s, resetting internal state.'
@@ -472,26 +473,26 @@ class RequestQueue(BaseStorage):
         # - the whole queue was processed and we are done
 
         # If limit was not reached in the call then there are no more requests to be returned.
-        if queue_head.prev_limit >= REQUEST_QUEUE_HEAD_MAX_LIMIT:
-            logger.warning(
-                'Reached the maximum number of requests in progress', extra={'limit': REQUEST_QUEUE_HEAD_MAX_LIMIT}
-            )
+        if queue_head.prev_limit >= self._MAX_HEAD_LIMIT:
+            logger.warning(f'Reached the maximum number of requests in progress (limit: {self._MAX_HEAD_LIMIT})')
 
         should_repeat_with_higher_limit = (
             len(self._queue_head_dict) == 0
             and queue_head.was_limit_reached
-            and queue_head.prev_limit < REQUEST_QUEUE_HEAD_MAX_LIMIT
+            and queue_head.prev_limit < self._MAX_HEAD_LIMIT
         )
 
         # If ensureConsistency=true then we must ensure that either:
-        # - queueModifiedAt is older than queryStartedAt by at least API_PROCESSED_REQUESTS_DELAY_MILLIS
+        # - queueModifiedAt is older than queryStartedAt by at least _API_PROCESSED_REQUESTS_DELAY
         # - hadMultipleClients=false and this.assumedTotalCount<=this.assumedHandledCount
         is_database_consistent = (
             queue_head.query_started_at - queue_head.queue_modified_at.replace(tzinfo=timezone.utc)
-        ).seconds >= (self._API_PROCESSED_REQUESTS_DELAY_MILLIS // 1000)
+        ).total_seconds() >= (self._API_PROCESSED_REQUESTS_DELAY.total_seconds())
+
         is_locally_consistent = (
             not queue_head.had_multiple_clients and self._assumed_total_count <= self._assumed_handled_count
         )
+
         # Consistent information from one source is enough to consider request queue finished.
         should_repeat_for_consistency = ensure_consistency and not is_database_consistent and not is_locally_consistent
 
@@ -508,8 +509,8 @@ class RequestQueue(BaseStorage):
 
         # If we are repeating for consistency then wait required time.
         if should_repeat_for_consistency:
-            elapsed_time = (datetime.now(timezone.utc) - queue_head.queue_modified_at).seconds
-            delay_seconds = (self._API_PROCESSED_REQUESTS_DELAY_MILLIS // 1000) - elapsed_time
+            elapsed_time = (datetime.now(timezone.utc) - queue_head.queue_modified_at).total_seconds()
+            delay_seconds = self._API_PROCESSED_REQUESTS_DELAY.total_seconds() - elapsed_time
             logger.info(f'Waiting for {delay_seconds} for queue finalization, to ensure data consistency.')
             await asyncio.sleep(delay_seconds)
 

@@ -130,12 +130,12 @@ class ListPage(Generic[T]):
     """A single page of items returned from a list() method.
 
     Args:
-        items: List of returned objects on this page
-        count: Count of the returned objects on this page
-        offset: The limit on the number of returned objects offset specified in the API call
-        limit: The offset of the first object specified in the API call
-        total: Total number of objects matching the API call criteria
-        desc: Whether the listing is descending or not
+        items: List of returned objects on this page.
+        count: Count of the returned objects on this page.
+        offset: The limit on the number of returned objects offset specified in the API call.
+        limit: The offset of the first object specified in the API call.
+        total: Total number of objects matching the API call criteria.
+        desc: Whether the listing is descending or not.
     """
 
     items: list[T]

@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, AsyncIterator, cast
 from typing_extensions import override
 
 from crawlee._utils.file import json_dumps
-from crawlee.consts import MAX_PAYLOAD_SIZE_BYTES
 from crawlee.storages.base_storage import BaseStorage
 from crawlee.storages.key_value_store import KeyValueStore
 
@@ -36,8 +35,14 @@ class Dataset(BaseStorage):
     as a separate JSON file, where `{INDEX}` is a zero-based index of the item in the dataset.
     """
 
+    _MAX_PAYLOAD_SIZE_BYTES = 9437184  # 9 MB
+    """Maximum size in bytes for a single payload."""
+
     _SAFETY_BUFFER_PERCENT = 0.01 / 100  # 0.01%
-    _EFFECTIVE_LIMIT_BYTES = MAX_PAYLOAD_SIZE_BYTES - math.ceil(MAX_PAYLOAD_SIZE_BYTES * _SAFETY_BUFFER_PERCENT)
+    """Percentage buffer to reduce payload limit slightly for safety."""
+
+    _EFFECTIVE_LIMIT_BYTES = _MAX_PAYLOAD_SIZE_BYTES - math.ceil(_MAX_PAYLOAD_SIZE_BYTES * _SAFETY_BUFFER_PERCENT)
+    """Calculated payload limit considering safety buffer, in bytes."""
 
     def __init__(
         self,

@@ -3,13 +3,12 @@ from __future__ import annotations
 import pytest
 
 from crawlee._utils.requests import compute_unique_key, normalize_url, unique_key_to_request_id
-from crawlee.consts import REQUEST_ID_LENGTH
 
 
 def test_unique_key_to_request_id_length() -> None:
     unique_key = 'exampleKey123'
-    request_id = unique_key_to_request_id(unique_key)
-    assert len(request_id) == REQUEST_ID_LENGTH, 'Request ID should have the correct length.'
+    request_id = unique_key_to_request_id(unique_key, request_id_length=15)
+    assert len(request_id) == 15, 'Request ID should have the correct length.'
 
 
 def test_unique_key_to_request_id_consistency() -> None:
