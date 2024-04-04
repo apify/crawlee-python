@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Union
+from typing import TYPE_CHECKING, Union
+
+if TYPE_CHECKING:
+    from crawlee._utils.digital_size import DigitalSize
 
 
 @dataclass
@@ -89,23 +92,23 @@ class MemorySnapshot:
     """A snapshot of memory usage.
 
     Args:
-        total_bytes: Total memory available in the system.
-        current_bytes: Memory usage of the current Python process and its children.
-        max_memory_bytes: The maximum memory that can be used by `AutoscaledPool`.
-        max_used_memory_ratio: The maximum acceptable ratio of `current_bytes` to `max_memory_bytes`.
+        total_size: Total memory available in the system.
+        current_size: Memory usage of the current Python process and its children.
+        max_memory_size: The maximum memory that can be used by `AutoscaledPool`.
+        max_used_memory_ratio: The maximum acceptable ratio of `current_size` to `max_memory_size`.
         created_at: The time at which the measurement was taken.
     """
 
-    total_bytes: int
-    current_bytes: int
-    max_memory_bytes: int
+    total_size: DigitalSize
+    current_size: DigitalSize
+    max_memory_size: DigitalSize
     max_used_memory_ratio: float
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     @property
     def is_overloaded(self) -> bool:
         """Returns whether the memory is considered as overloaded."""
-        return (self.current_bytes / self.max_memory_bytes) > self.max_used_memory_ratio
+        return (self.current_size / self.max_memory_size) > self.max_used_memory_ratio
 
 
 @dataclass

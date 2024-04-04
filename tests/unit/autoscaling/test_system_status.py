@@ -5,6 +5,7 @@ from typing import AsyncGenerator
 
 import pytest
 
+from crawlee._utils.digital_size import DigitalSize
 from crawlee.autoscaling import Snapshotter, SystemStatus
 from crawlee.autoscaling.types import (
     ClientSnapshot,
@@ -84,30 +85,30 @@ def test_get_system_info(snapshotter: Snapshotter, now: datetime) -> None:
     # Add memory snapshots
     system_status._snapshotter._memory_snapshots = [
         MemorySnapshot(
-            total_bytes=16 * 1024**3,
-            current_bytes=4 * 1024**3,
-            max_memory_bytes=12 * 1024**3,
+            total_size=DigitalSize.from_gb(16),
+            current_size=DigitalSize.from_gb(4),
+            max_memory_size=DigitalSize.from_gb(12),
             max_used_memory_ratio=0.8,
             created_at=now - timedelta(minutes=3),
         ),
         MemorySnapshot(
-            total_bytes=8 * 1024**3,
-            current_bytes=7 * 1024**3,
-            max_memory_bytes=8 * 1024**3,
+            total_size=DigitalSize.from_gb(8),
+            current_size=DigitalSize.from_gb(7),
+            max_memory_size=DigitalSize.from_gb(8),
             max_used_memory_ratio=0.8,
             created_at=now - timedelta(minutes=2),
         ),
         MemorySnapshot(
-            total_bytes=32 * 1024**3,
-            current_bytes=28 * 1024**3,
-            max_memory_bytes=30 * 1024**3,
+            total_size=DigitalSize.from_gb(32),
+            current_size=DigitalSize.from_gb(28),
+            max_memory_size=DigitalSize.from_gb(30),
             max_used_memory_ratio=0.8,
             created_at=now - timedelta(minutes=1),
         ),
         MemorySnapshot(
-            total_bytes=64 * 1024**3,
-            current_bytes=48 * 1024**3,
-            max_memory_bytes=60 * 1024**3,
+            total_size=DigitalSize.from_gb(64),
+            current_size=DigitalSize.from_gb(48),
+            max_memory_size=DigitalSize.from_gb(60),
             max_used_memory_ratio=0.8,
             created_at=now,
         ),
