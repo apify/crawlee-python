@@ -16,7 +16,7 @@ class DigitalSize:
 
     def __post_init__(self) -> None:
         if self.bytes_ < 0:
-            raise ValueError('Digital size cannot be negative')
+            raise ValueError('DigitalSize cannot be negative')
 
     @classmethod
     def from_kb(cls, kb: float) -> DigitalSize:
