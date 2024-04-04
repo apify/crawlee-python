@@ -3,7 +3,7 @@ from __future__ import annotations
 import csv
 import io
 import math
-from typing import TYPE_CHECKING, AsyncIterator, cast
+from typing import TYPE_CHECKING, AsyncIterator
 
 from typing_extensions import override
 
@@ -18,21 +18,22 @@ if TYPE_CHECKING:
 
 
 class Dataset(BaseStorage):
-    """The class represents a store for structured data where each object stored has the same attributes.
+    """Represents an append-only structured storage, ideal for tabular data akin to database tables.
 
-    You can imagine it as a table, where each object is a row and its attributes are columns. Dataset is an
-    append-only storage - you can only add new records to it but you cannot modify or remove existing records.
-    Typically it is used to store crawling results.
+    Represents a structured data store similar to a table, where each object (row) has consistent attributes (columns).
+    Datasets operate on an append-only basis, allowing for the addition of new records without the modification or
+    removal of existing ones. This class is typically used for storing crawling results.
 
-    If the `CRAWLEE_LOCAL_STORAGE_DIR` environment variable is set, the data is stored in the local directory
-    in the following files:
-    ```
-    {CRAWLEE_LOCAL_STORAGE_DIR}/datasets/{DATASET_ID}/{INDEX}.json
-    ```
+    Data can be stored locally or in the cloud, with local storage paths formatted as:
+    `{CRAWLEE_LOCAL_STORAGE_DIR}/datasets/{DATASET_ID}/{INDEX}.json`. Here, `{DATASET_ID}` is either "default" or
+    a specific dataset ID, and `{INDEX}` represents the zero-based index of the item in the dataset.
 
-    Note that `{DATASET_ID}` is the name or ID of the dataset. The default dataset has ID: `default`, unless you
-    override it by setting the `APIFY_DEFAULT_DATASET_ID` environment variable. Each dataset item is stored
-    as a separate JSON file, where `{INDEX}` is a zero-based index of the item in the dataset.
+    To open a dataset, use the `open` class method with an `id_`, `name`, or `config`. If unspecified, the default
+    dataset for the current crawler run is used. Opening a non-existent dataset by `id_` raises an error, while
+    by `name`, it is created.
+
+    Usage:
+        dataset = await Dataset.open(id_='my_dataset_id')
     """
 
     _MAX_PAYLOAD_SIZE_BYTES = 9437184  # 9 MB
@@ -51,50 +52,8 @@ class Dataset(BaseStorage):
         config: Config,
         client: MemoryStorageClient,
     ) -> None:
-        """Create a new instance.
-
-        Args:
-            id_: The unique ID of the dataset.
-            name: Optional name for the dataset.
-            config: Global configuration settings.
-            client: Configured storage client instance.
-        """
         super().__init__(id_=id_, name=name, client=client, config=config)
         self._dataset_client = client.dataset(self.id)
-
-    @classmethod
-    @override
-    async def open(
-        cls,
-        *,
-        id_: str | None = None,
-        name: str | None = None,
-        config: Config | None = None,
-    ) -> Dataset:
-        """Opens a specified or default dataset for structured data storage.
-
-        This method initializes or retrieves a dataset identified by `id_` or `name`, prioritizing local storage unless
-        specified in `config`. If unspecified, returns the default dataset associated with the current actor run.
-
-        Args:
-            id_: ID of the dataset to be opened. If neither `id_` nor `name` are provided, the method returns
-                the default dataset associated with the run. If the dataset with the given ID does not exist,
-                it raises an error.
-
-            name: Name of the dataset to be opened. If neither `id` nor `name` are provided, the method returns
-                the default dataset associated with the actor run. If the dataset with the given name does not exist,
-                it is created.
-
-            config: Configuration settings.
-
-        Returns:
-            Dataset: The opened or created dataset instance.
-
-        Raises:
-            RuntimeError: If no dataset exists for a given `id_` and one cannot be created.
-        """
-        storage = await super().open(id_=id_, name=name, config=config)
-        return cast(Dataset, storage)
 
     @classmethod
     @override

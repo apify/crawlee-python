@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, AsyncIterator, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Any, AsyncIterator, TypeVar, overload
 
 from typing_extensions import override
 
@@ -15,25 +15,24 @@ T = TypeVar('T')
 
 
 class KeyValueStore(BaseStorage):
-    """The `KeyValueStore` class represents a key-value store.
+    """Represents a key-value based storage for reading data records or files.
 
-    You can imagine it as a simple data storage that is used for saving and reading data records or files. Each data
-    record is represented by a unique key and associated with a MIME content type.
+    Each record is identified by a unique key and associated with a MIME content type. This class is used within
+    crawler runs to store inputs and outputs, typically in JSON format, but supports other types as well.
 
-    Each crawler run is associated with a default key-value store, which is created exclusively for the run.
-    By convention, the crawler input and output are stored into the default key-value store under the `INPUT`
-    and `OUTPUT` key, respectively. Typically, input and output are JSON files, although it can be any other
-    format.
+    The data can be stored on a local filesystem or in the cloud, determined by the `CRAWLEE_LOCAL_STORAGE_DIR`
+    environment variable.
 
-    If the `CRAWLEE_LOCAL_STORAGE_DIR` environment variable is set, the data is stored in
-    the local directory in the following files:
-    ```
-    {CRAWLEE_LOCAL_STORAGE_DIR}/key_value_stores/{STORE_ID}/{INDEX}.{EXT}
-    ```
+    By default, data is stored in `{CRAWLEE_LOCAL_STORAGE_DIR}/key_value_stores/{STORE_ID}/{INDEX}.{EXT}`, where
+    `{STORE_ID}` is either "default" or specified by `CRAWLEE_DEFAULT_KEY_VALUE_STORE_ID`, `{KEY}` is the record key,
+    and `{EXT}` is the MIME type.
 
-    Note that `{STORE_ID}` is the name or ID of the key-value store. The default key-value store has ID: `default`,
-    unless you override it by setting the `CRAWLEE_DEFAULT_KEY_VALUE_STORE_ID` environment variable.
-    The `{KEY}` is the key of the record and `{EXT}` corresponds to the MIME content type of the data value.
+    To open a key-value store, use the class method `open`, providing either an `id_` or `name` along with optional
+    `config`. If neither is provided, the default store for the crawler run is used. Opening a non-existent store by
+    `id_` raises an error, while a non-existent store by `name` is created.
+
+    Usage:
+        kvs = await KeyValueStore.open(id_='my_kvs_id')
     """
 
     def __init__(
@@ -43,46 +42,8 @@ class KeyValueStore(BaseStorage):
         config: Config,
         client: MemoryStorageClient,
     ) -> None:
-        """Create a new instance.
-
-        Args:
-            id_: ID of the key-value store.
-            name: Name of the key-value store.
-            config: The configuration.
-            client: The storage client which should be used.
-        """
         super().__init__(id_=id_, name=name, client=client, config=config)
         self._key_value_store_client = client.key_value_store(self.id)
-
-    @classmethod
-    @override
-    async def open(
-        cls,
-        *,
-        id_: str | None = None,
-        name: str | None = None,
-        config: Config | None = None,
-    ) -> KeyValueStore:
-        """Open a key-value store.
-
-        Key-value stores are used to store records or files, along with their MIME content type.
-        The records are stored and retrieved using a unique key.
-        The actual data is stored either on a local filesystem or in the Apify cloud.
-
-        Args:
-            id_: ID of the key-value store to be opened. If neither `id` nor `name` are provided, the method returns
-                the default key-value store associated with the actor run. If the key-value store with the given
-                ID does not exist, it raises an error.
-            name: Name of the key-value store to be opened. If neither `id` nor `name` are provided, the method returns
-                the default key-value store associated with the actor run. If the key-value store with the given name
-                does not exist, it is created.
-            config: Configuration settings.
-
-        Returns:
-            KeyValueStore: An instance of the `KeyValueStore` class for the given ID or name.
-        """
-        storage = await super().open(id_=id_, name=name, config=config)
-        return cast(KeyValueStore, storage)
 
     @classmethod
     @override

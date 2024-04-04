@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import asyncio
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Generic, TypeVar, cast
+from typing import Generic, TypeVar, cast
+
+from typing_extensions import Self
 
 from crawlee.config import Config
 from crawlee.memory_storage import BaseResourceClient, BaseResourceCollectionClient, MemoryStorageClient
 from crawlee.storages.storage_client_manager import StorageClientManager
-
-if TYPE_CHECKING:
-    from crawlee.storages.types import BaseResourceInfo
 
 BaseResourceClientType = TypeVar('BaseResourceClientType', bound=BaseResourceClient)
 BaseResourceCollectionClientType = TypeVar('BaseResourceCollectionClientType', bound=BaseResourceCollectionClient)
@@ -24,7 +23,7 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
     _storage_creating_lock: asyncio.Lock | None = None
 
     def __init__(
-        self: BaseStorage,
+        self,
         id_: str,
         name: str | None,
         config: Config,
@@ -33,10 +32,10 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
         """Create a new instance.
 
         Args:
-            id_: The storage id
-            name: The storage name
-            config: The configuration
-            client: The storage client
+            id_: ID of the storage.
+            name: Name of the storage.
+            config: The configuration settings.
+            client: The underlying storage client to be used.
         """
         self.id = id_
         self.name = name
@@ -45,12 +44,12 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
 
     @classmethod
     async def open(
-        cls: type[BaseStorage],
+        cls,
         *,
         config: Config | None = None,
         id_: str | None = None,
         name: str | None = None,
-    ) -> BaseStorage:
+    ) -> Self:
         """Opens a storage instance based on provided identifiers or returns a previously opened instance from cache.
 
         This method facilitates the retrieval or initialization of a storage instance using specified configuration
@@ -96,7 +95,7 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
 
         if cached_storage is not None:
             # This cast is needed since MyPy doesn't understand very well that Self and Storage are the same
-            return cast(BaseStorage, cached_storage)
+            return cast(Self, cached_storage)
 
         # Purge default storages if configured
         if used_config.purge_on_start and isinstance(used_client, MemoryStorageClient):
@@ -109,7 +108,7 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
             # Create the storage
             if id_ and not is_default_storage_on_local:
                 single_storage_client = cls._get_single_storage_client(id_, used_client)
-                storage_info: BaseResourceInfo = await single_storage_client.get()
+                storage_info = await single_storage_client.get()
                 if not storage_info:
                     storage_label = cls._get_human_friendly_label()
                     raise RuntimeError(f'{storage_label} with id "{id_}" does not exist!')

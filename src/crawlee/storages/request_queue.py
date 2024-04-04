@@ -4,7 +4,7 @@ import asyncio
 from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 from typing import OrderedDict as OrderedDictType
 
 from typing_extensions import override
@@ -24,25 +24,23 @@ logger = getLogger(__name__)
 
 
 class RequestQueue(BaseStorage):
-    """Represents a queue of URLs to crawl.
+    """Represents a queue storage for HTTP requests to crawl.
 
-    Can be used for deep crawling of websites where you start with several URLs and then recursively follow
-    links to other pages. The data structure supports both breadth-first and depth-first crawling orders.
+    Manages a queue of requests with unique URLs for structured deep web crawling with support for both breadth-first
+    and depth-first orders. This queue is designed for crawling websites by starting with initial URLs and recursively
+    following links. Each URL is uniquely identified by a `unique_key` field, which can be overridden to add the same
+    URL multiple times under different keys.
 
-    Each URL is represented using an instance of the request class. The queue can only contain unique URLs.
-    More precisely, it can only contain request dictionaries with distinct `uniqueKey` properties. By default,
-    `uniqueKey` is generated from the request, but it can also be overridden. To add a single URL multiple times
-    to the queue, corresponding request dictionary will need to have different `uniqueKey` properties.
+    Local storage path (if `CRAWLEE_LOCAL_STORAGE_DIR` is set):
+    `{CRAWLEE_LOCAL_STORAGE_DIR}/request_queues/{QUEUE_ID}/{REQUEST_ID}.json`, where `{QUEUE_ID}` is the request
+    queue's ID (default or specified) and `{REQUEST_ID}` is the request's ID.
 
-    If the `CRAWLEE_LOCAL_STORAGE_DIR` environment variable is set, the data is stored in
-    the local directory in the following files:
-    ```
-    {CRAWLEE_LOCAL_STORAGE_DIR}/request_queues/{QUEUE_ID}/{REQUEST_ID}.json
-    ```
+    Usage includes creating or opening existing queues by ID or name, with named queues retained indefinitely and
+    unnamed queues expiring after 7 days unless specified otherwise. Supports mutable operations—URLs can be added
+    and deleted.
 
-    Note that `{QUEUE_ID}` is the name or ID of the request queue. The default request queue has ID: `default`,
-    unless you override it by setting the `CRAWLEE_DEFAULT_REQUEST_QUEUE_ID` environment variable.
-    The `{REQUEST_ID}` is the id of the request.
+    Usage:
+        rq = await RequestQueue.open(id_='my_rq_id')
     """
 
     _API_PROCESSED_REQUESTS_DELAY = timedelta(seconds=10)
@@ -76,14 +74,6 @@ class RequestQueue(BaseStorage):
         config: Config,
         client: MemoryStorageClient,
     ) -> None:
-        """Create a new instance.
-
-        Args:
-            id_: ID of the request queue.
-            name: Name of the request queue.
-            config: The configuration.
-            client: The storage client which should be used.
-        """
         super().__init__(id_=id_, name=name, client=client, config=config)
 
         self._client_key = crypto_random_object_id()
@@ -107,28 +97,7 @@ class RequestQueue(BaseStorage):
         name: str | None = None,
         config: Config | None = None,
     ) -> RequestQueue:
-        """Open a request queue.
-
-        Request queue represents a queue of URLs to crawl. The queue is used for deep crawling of websites, where
-        you start with several URLs and then recursively follow links to other pages. The data structure supports
-        both breadth-first and depth-first crawling orders.
-
-        Args:
-            id_: ID of the request queue to be opened. If neither `id` nor `name` are provided, the method returns
-                the default request queue associated with the actor run. If the request queue with the given ID does
-                not exist, it raises an error.
-
-            name: Name of the request queue to be opened. If neither `id` nor `name` are provided, the method returns
-                the default request queue associated with the actor run. If the request queue with the given name
-                does not exist, it is created.
-
-            config: Configuration settings.
-
-        Returns:
-            RequestQueue: An instance of the `RequestQueue` class for the given ID or name.
-        """
-        storage = await super().open(id_=id_, name=name, config=config)
-        rq = cast(RequestQueue, storage)
+        rq = await super().open(id_=id_, name=name, config=config)
         await rq.ensure_head_is_non_empty()
         return rq
 
