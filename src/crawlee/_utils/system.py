@@ -21,7 +21,7 @@ class CpuInfo:
     """
 
     used_ratio: float
-    created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @dataclass
@@ -36,7 +36,7 @@ class MemoryInfo:
 
     total_bytes: int
     current_bytes: int
-    created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 def get_cpu_info() -> CpuInfo:
