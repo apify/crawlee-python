@@ -2,13 +2,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import MutableMapping
-from typing import (
-    Generic,
-    ItemsView,
-    Iterator,
-    TypeVar,
-    ValuesView,
-)
+from typing import Generic, ItemsView, Iterator, TypeVar, ValuesView
 from typing import OrderedDict as OrderedDictType
 
 T = TypeVar('T')
