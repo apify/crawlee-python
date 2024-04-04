@@ -21,7 +21,7 @@ class CpuInfo:
     """
 
     used_ratio: float
-    created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @dataclass
@@ -30,13 +30,13 @@ class MemoryInfo:
 
     Args:
         total_bytes: Total memory available in the system.
-        current_bytes: current_bytes: Memory usage of the current Python process and its children.
+        current_bytes: Memory usage of the current Python process and its children.
         created_at: The time at which the measurement was taken.
     """
 
     total_bytes: int
     current_bytes: int
-    created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 def get_cpu_info() -> CpuInfo:

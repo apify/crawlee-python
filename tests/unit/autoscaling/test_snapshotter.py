@@ -61,7 +61,7 @@ def test_snapshot_client(snapshotter: Snapshotter) -> None:
 
 
 def test_get_cpu_sample(snapshotter: Snapshotter) -> None:
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(timezone.utc)
     cpu_snapshots = [
         CpuSnapshot(
             used_ratio=0.5,
@@ -105,7 +105,7 @@ def test_snapshot_pruning_removes_outdated_records(snapshotter: Snapshotter) -> 
     snapshotter._snapshot_history = timedelta(hours=2)
 
     # Create timestamps for testing
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(timezone.utc)
     two_hours_ago = now - timedelta(hours=2)
     three_hours_ago = now - timedelta(hours=3)
     five_hours_ago = now - timedelta(hours=5)
@@ -132,7 +132,7 @@ def test_snapshot_pruning_removes_outdated_records(snapshotter: Snapshotter) -> 
 
 
 def test_pruning_empty_snapshot_list_remains_empty(snapshotter: Snapshotter) -> None:
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(timezone.utc)
     snapshotter._cpu_snapshots = []
     snapshots_casted = cast(list[Snapshot], snapshotter._cpu_snapshots)
     snapshotter._prune_snapshots(snapshots_casted, now)
@@ -143,7 +143,7 @@ def test_snapshot_pruning_keeps_recent_records_unaffected(snapshotter: Snapshott
     snapshotter._snapshot_history = timedelta(hours=2)
 
     # Create timestamps for testing
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(timezone.utc)
     one_hour_ago = now - timedelta(hours=1)
 
     # Create mock snapshots with varying creation times
@@ -177,7 +177,7 @@ def test_memory_load_evaluation_logs_warning_on_high_usage(
 
     snapshotter._evaluate_memory_load(
         current_memory_usage_bytes=high_memory_usage,
-        snapshot_timestamp=datetime.now(tz=timezone.utc),
+        snapshot_timestamp=datetime.now(timezone.utc),
     )
 
     assert mock_logger_warn.call_count == 1
@@ -186,7 +186,7 @@ def test_memory_load_evaluation_logs_warning_on_high_usage(
     # It should not log again, since the last log was short time ago
     snapshotter._evaluate_memory_load(
         current_memory_usage_bytes=high_memory_usage,
-        snapshot_timestamp=datetime.now(tz=timezone.utc),
+        snapshot_timestamp=datetime.now(timezone.utc),
     )
 
     assert mock_logger_warn.call_count == 1
@@ -204,7 +204,7 @@ def test_memory_load_evaluation_silent_on_acceptable_usage(
 
     snapshotter._evaluate_memory_load(
         current_memory_usage_bytes=low_memory_usage,
-        snapshot_timestamp=datetime.now(tz=timezone.utc),
+        snapshot_timestamp=datetime.now(timezone.utc),
     )
 
     assert mock_logger_warn.call_count == 0
