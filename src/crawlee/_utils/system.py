@@ -30,7 +30,7 @@ class MemoryInfo:
 
     Args:
         total_bytes: Total memory available in the system.
-        current_bytes: current_bytes: Memory usage of the current Python process and its children.
+        current_bytes: Memory usage of the current Python process and its children.
         created_at: The time at which the measurement was taken.
     """
 
