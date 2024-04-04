@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar, Union
 if TYPE_CHECKING:
     from datetime import datetime
 
-    from crawlee.models import RequestData
+    from crawlee.types import Request
 
 T = TypeVar('T')
 
@@ -84,7 +84,7 @@ class RequestQueueHeadResponse:
     limit: int | None
     had_multiple_clients: bool
     queue_modified_at: datetime
-    items: list[RequestData] = field(default_factory=list)
+    items: list[Request] = field(default_factory=list)
 
 
 @dataclass

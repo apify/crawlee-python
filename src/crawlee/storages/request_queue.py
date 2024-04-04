@@ -18,7 +18,7 @@ from crawlee.storages.types import BaseResourceInfo, RequestQueueOperationInfo, 
 if TYPE_CHECKING:
     from crawlee.config import Config
     from crawlee.memory_storage import MemoryStorageClient, RequestQueueClient, RequestQueueCollectionClient
-    from crawlee.models import RequestData
+    from crawlee.types import Request
 
 logger = getLogger(__name__)
 
@@ -130,7 +130,7 @@ class RequestQueue(BaseStorage):
 
     async def add_request(
         self,
-        request: RequestData,
+        request: Request,
         *,
         forefront: bool = False,
     ) -> RequestQueueOperationInfo:
@@ -170,11 +170,11 @@ class RequestQueue(BaseStorage):
         cached_info = self._requests_cache.get(cache_key)
 
         if cached_info:
-            request.id = cached_info['id']
+            request.id_ = cached_info['id']
             # We may assume that if request is in local cache then also the information if the request was already
             # handled is there because just one client should be using one queue.
             return RequestQueueOperationInfo(
-                request_id=request.id,
+                request_id=request.id_,
                 request_unique_key=request.unique_key,
                 was_already_present=True,
                 was_already_handled=cached_info['wasAlreadyHandled'],
@@ -199,7 +199,7 @@ class RequestQueue(BaseStorage):
 
         return queue_operation_info
 
-    async def get_request(self, request_id: str) -> RequestData | None:
+    async def get_request(self, request_id: str) -> Request | None:
         """Retrieve a request from the queue.
 
         Args:
@@ -210,7 +210,7 @@ class RequestQueue(BaseStorage):
         """
         return await self._request_queue_client.get_request(request_id)
 
-    async def fetch_next_request(self) -> RequestData | None:
+    async def fetch_next_request(self) -> Request | None:
         """Return the next request in the queue to be processed.
 
         Once you successfully finish processing of the request, you need to call `RequestQueue.mark_request_as_handled`
@@ -289,7 +289,7 @@ class RequestQueue(BaseStorage):
 
         return request
 
-    async def mark_request_as_handled(self, request: RequestData) -> RequestQueueOperationInfo | None:
+    async def mark_request_as_handled(self, request: Request) -> RequestQueueOperationInfo | None:
         """Mark a request as handled after successful processing.
 
         Handled requests will never again be returned by the `RequestQueue.fetch_next_request` method.
@@ -302,8 +302,8 @@ class RequestQueue(BaseStorage):
         """
         self._last_activity = datetime.now(timezone.utc)
 
-        if request.id not in self._in_progress:
-            logger.debug(f'Cannot mark request (ID: {request.id}) as handled, because it is not in progress!')
+        if request.id_ not in self._in_progress:
+            logger.debug(f'Cannot mark request (ID: {request.id_}) as handled, because it is not in progress!')
             return None
 
         if request.handled_at is None:
@@ -312,8 +312,8 @@ class RequestQueue(BaseStorage):
         queue_operation_info = await self._request_queue_client.update_request(request)
         queue_operation_info.request_unique_key = request.unique_key
 
-        self._in_progress.remove(request.id)
-        self._recently_handled[request.id] = True
+        self._in_progress.remove(request.id_)
+        self._recently_handled[request.id_] = True
 
         if not queue_operation_info.was_already_handled:
             self._assumed_handled_count += 1
@@ -323,7 +323,7 @@ class RequestQueue(BaseStorage):
 
     async def reclaim_request(
         self,
-        request: RequestData,
+        request: Request,
         *,
         forefront: bool = False,
     ) -> RequestQueueOperationInfo | None:
@@ -340,8 +340,8 @@ class RequestQueue(BaseStorage):
         """
         self._last_activity = datetime.now(timezone.utc)
 
-        if request.id not in self._in_progress:
-            logger.debug(f'Cannot reclaim request (ID: {request.id}), because it is not in progress!')
+        if request.id_ not in self._in_progress:
+            logger.debug(f'Cannot reclaim request (ID: {request.id_}), because it is not in progress!')
             return None
 
         # TODO: If request hasn't been changed since the last getRequest(), we don't need to call updateRequest()
@@ -355,13 +355,13 @@ class RequestQueue(BaseStorage):
         # updated data. This is to compensate for the limitation of DynamoDB, where writes might not be immediately
         # visible to subsequent reads.
         def callback() -> None:
-            if request.id not in self._in_progress:
-                logger.debug(f'The request (ID: {request.id}) is no longer marked as in progress in the queue?!')
+            if request.id_ not in self._in_progress:
+                logger.debug(f'The request (ID: {request.id_}) is no longer marked as in progress in the queue?!')
                 return
 
-            self._in_progress.remove(request.id)
+            self._in_progress.remove(request.id_)
             # Performance optimization: add request straight to head if possible
-            self._maybe_add_request_to_queue_head(request.id, forefront=forefront)
+            self._maybe_add_request_to_queue_head(request.id_, forefront=forefront)
 
         asyncio.get_running_loop().call_later(self._STORAGE_CONSISTENCY_DELAY.total_seconds(), callback)
         return queue_operation_info
@@ -514,23 +514,23 @@ class RequestQueue(BaseStorage):
         query_started_at = datetime.now(timezone.utc)
 
         list_head = await self._request_queue_client.list_head(limit=limit)
-        list_head_items: list[RequestData] = list_head.items
+        list_head_items: list[Request] = list_head.items
 
         for request in list_head_items:
             # Queue head index might be behind the main table, so ensure we don't recycle requests
             if (
-                not request.id
+                not request.id_
                 or not request.unique_key
-                or request.id in self._in_progress
-                or self._recently_handled.get(request.id)
+                or request.id_ in self._in_progress
+                or self._recently_handled.get(request.id_)
             ):
                 continue
 
-            self._queue_head_dict[request.id] = request.id
+            self._queue_head_dict[request.id_] = request.id_
             self._cache_request(
                 cache_key=unique_key_to_request_id(request.unique_key),
                 operation_info=RequestQueueOperationInfo(
-                    request_id=request.id,
+                    request_id=request.id_,
                     was_already_handled=False,
                     was_already_present=True,
                     request_unique_key=request.unique_key,
