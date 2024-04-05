@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from datetime import timedelta
 
+    from crawlee.storages.types import RequestQueueOperationInfo
     from crawlee.types import BaseRequestData, Request
 
 
@@ -14,7 +15,7 @@ class RequestProvider(ABC):
 
     @property
     @abstractmethod
-    def name(self) -> str:
+    def name(self) -> str | None:
         """ID or name of the request queue."""
 
     @abstractmethod
@@ -38,7 +39,7 @@ class RequestProvider(ABC):
         """Returns a next request in the queue to be processed, or `null` if there are no more pending requests."""
 
     @abstractmethod
-    async def reclaim_request(self, request: Request, *, forefront: bool = False) -> None:
+    async def reclaim_request(self, request: Request, *, forefront: bool = False) -> RequestQueueOperationInfo | None:
         """Reclaims a failed request back to the queue, so that it can be returned for processing later again.
 
         It is possible to modify the request data by supplying an updated request as a parameter.

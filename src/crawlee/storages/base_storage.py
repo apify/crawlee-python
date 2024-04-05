@@ -39,9 +39,14 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
             client: The underlying storage client to be used.
         """
         self.id = id_
-        self.name = name
+        self._name = name
         self._config = config
         self._storage_client = client
+
+    @property
+    def name(self) -> str | None:
+        """Name of the storage."""
+        return self._name
 
     @classmethod
     async def open(

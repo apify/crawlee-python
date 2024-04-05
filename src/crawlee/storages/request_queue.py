@@ -13,6 +13,7 @@ from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.lru_cache import LRUCache
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee.storages.base_storage import BaseStorage
+from crawlee.storages.request_provider import RequestProvider
 from crawlee.storages.types import BaseResourceInfo, RequestQueueOperationInfo, RequestQueueSnapshot
 
 if TYPE_CHECKING:
@@ -24,7 +25,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-class RequestQueue(BaseStorage):
+class RequestQueue(BaseStorage, RequestProvider):
     """Represents a queue storage for HTTP requests to crawl.
 
     Manages a queue of requests with unique URLs for structured deep web crawling with support for both breadth-first

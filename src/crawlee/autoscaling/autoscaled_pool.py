@@ -22,7 +22,7 @@ class AbortError(Exception):
     """Raised when an AutoscaledPool run is aborted. Not for direct use."""
 
 
-@dataclass(kw_only=True)
+@dataclass
 class ConcurrencySettings:
     """Concurrency settings for AutoscaledPool."""
 
