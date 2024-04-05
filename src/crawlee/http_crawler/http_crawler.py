@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from datetime import timedelta
 
     from crawlee.basic_crawler.types import BasicCrawlingContext
-    from crawlee.config import Configuration
+    from crawlee.config import Config
     from crawlee.storages.request_provider import RequestProvider
 
 
@@ -27,7 +27,7 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
         min_concurrency: int | None = None,
         max_concurrency: int | None = None,
         max_requests_per_minute: int | None = None,
-        configuration: Configuration | None = None,
+        configuration: Config | None = None,
         request_handler_timeout: timedelta | None = None,
     ) -> None:
         context_pipeline = ContextPipeline().compose(self._make_http_request)

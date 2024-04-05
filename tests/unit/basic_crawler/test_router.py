@@ -7,8 +7,6 @@ import pytest
 from crawlee.basic_crawler.router import Router
 from crawlee.basic_crawler.types import BasicCrawlingContext, RequestData
 
-pytestmark = pytest.mark.asyncio()
-
 
 class MockContext(BasicCrawlingContext):
     def __init__(self, *, label: str | None) -> None:

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Awaitable, Callable, Generic, Union, cast
 
 from typing_extensions import TypeVar
 
-from crawlee._utils.unique_key import compute_unique_key
+from crawlee._utils.requests import compute_unique_key
 from crawlee._utils.wait import wait_for
 from crawlee.autoscaling import AutoscaledPool
 from crawlee.autoscaling.snapshotter import Snapshotter
@@ -21,7 +21,7 @@ from crawlee.basic_crawler.types import (
     RequestData,
     RequestState,
 )
-from crawlee.config import Configuration
+from crawlee.config import Config
 from crawlee.events.local_event_manager import LocalEventManager
 
 if TYPE_CHECKING:
@@ -62,7 +62,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         max_concurrency: int | None = None,
         max_requests_per_minute: int | None = None,
         max_request_retries: int = 3,
-        configuration: Configuration | None = None,
+        configuration: Config | None = None,
         request_handler_timeout: timedelta = timedelta(minutes=1),
     ) -> None:
         self._router: Router[TCrawlingContext] | None = None
@@ -88,7 +88,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         pool_kwargs['max_tasks_per_minute'] = max_requests_per_minute  # type: ignore
 
         self._request_provider = request_provider
-        self._configuration = configuration or Configuration()
+        self._configuration = configuration or Config()
 
         self._request_handler_timeout = request_handler_timeout
         self._internal_timeout = (

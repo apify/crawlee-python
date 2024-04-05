@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
-from crawlee._utils.unique_key import compute_unique_key
+from crawlee._utils.requests import compute_unique_key
 from crawlee.basic_crawler.types import RequestData
 from crawlee.storages.request_provider import RequestProvider
 
