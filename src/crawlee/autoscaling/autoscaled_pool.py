@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import math
 from contextlib import suppress
+from dataclasses import dataclass
 from datetime import timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING, Awaitable, Callable
@@ -21,6 +22,40 @@ class AbortError(Exception):
     """Raised when an AutoscaledPool run is aborted. Not for direct use."""
 
 
+@dataclass(kw_only=True)
+class ConcurrencySettings:
+    """Concurrency settings for AutoscaledPool."""
+
+    desired_concurrency: int | None = None
+    """The desired number of tasks that should be running parallel on the start of the pool, if there is a large enough
+    supply of them. By default, it is `min_concurrency`."""
+
+    min_concurrency: int = 1
+    """The minimum number of tasks running in parallel. If you set this value too high with respect to the available
+    system memory and CPU, your code might run extremely slow or crash."""
+
+    max_concurrency: int = 200
+    """The maximum number of tasks running in parallel."""
+
+    max_tasks_per_minute: int | None = None
+    """The maximum number of tasks per minute the pool can run. By default, this is set to `Infinity`, but you can pass
+    any positive, non-zero integer."""
+
+    def __post_init__(self) -> None:
+        """Validate the settings."""
+        if self.desired_concurrency is not None and self.desired_concurrency < 1:
+            raise ValueError('desired_concurrency must be 1 or larger')
+
+        if self.min_concurrency < 1:
+            raise ValueError('min_concurrency must be 1 or larger')
+
+        if self.max_concurrency < self.min_concurrency:
+            raise ValueError('max_concurrency cannot be less than min_concurrency')
+
+        if self.max_tasks_per_minute is not None and self.max_tasks_per_minute <= 0:
+            raise ValueError('max_tasks_per_minute must be positive')
+
+
 class AutoscaledPool:
     """Manages a pool of asynchronous resource-intensive tasks that are executed in parallel.
 
@@ -32,19 +67,16 @@ class AutoscaledPool:
         self,
         *,
         system_status: SystemStatus,
+        concurrency_settings: ConcurrencySettings | None = None,
         run_task_function: Callable[[], Awaitable],
         is_task_ready_function: Callable[[], Awaitable[bool]],
         is_finished_function: Callable[[], Awaitable[bool]],
         task_timeout: timedelta | None = None,
         autoscale_interval: timedelta = timedelta(seconds=10),
         logging_interval: timedelta = timedelta(minutes=1),
-        desired_concurrency: int | None = None,
         desired_concurrency_ratio: float = 0.9,
-        min_concurrency: int = 1,
-        max_concurrency: int = 200,
         scale_up_step_ratio: float = 0.05,
         scale_down_step_ratio: float = 0.05,
-        max_tasks_per_minute: int | None = None,
     ) -> None:
         """Initialize the AutoscaledPool.
 
@@ -75,22 +107,13 @@ class AutoscaledPool:
 
             logging_interval: Specifies a period in which the instance logs its state, in seconds.
 
-            desired_concurrency: The desired number of tasks that should be running parallel on the start of the pool,
-                if there is a large enough supply of them. By default, it is `min_concurrency`.
-
             desired_concurrency_ratio: Minimum level of desired concurrency to reach before more scaling up is allowed.
-
-            min_concurrency: The minimum number of tasks running in parallel. If you set this value too high with
-                respect to the available system memory and CPU, your code might run extremely slow or crash.
-
-            max_concurrency: The maximum number of tasks running in parallel.
 
             scale_up_step_ratio: Defines the fractional amount of desired concurrency to be added with each scaling up.
 
             scale_down_step_ratio: Defines the amount of desired concurrency to be subtracted with each scaling down.
 
-            max_tasks_per_minute: The maximum number of tasks per minute the pool can run. By default, this is set to
-                `Infinity`, but you can pass any positive, non-zero integer.
+            concurrency_settings: Settings of concurrency levels
         """
         self._system_status = system_status
 
@@ -112,27 +135,26 @@ class AutoscaledPool:
         self._cleanup_done = asyncio.Event()
         self._run_result: asyncio.Future = asyncio.Future()
 
-        if desired_concurrency is not None and desired_concurrency < 1:
-            raise ValueError('desired_concurrency must be 1 or larger')
-
-        if min_concurrency < 1:
-            raise ValueError('min_concurrency must be 1 or larger')
-
-        if max_concurrency < min_concurrency:
-            raise ValueError('max_concurrency cannot be less than min_concurrency')
-
         if desired_concurrency_ratio < 0 or desired_concurrency_ratio > 1:
             raise ValueError('desired_concurrency_ratio must be between 0 and 1 (non-inclusive)')
 
         self._desired_concurrency_ratio = desired_concurrency_ratio
-        self._desired_concurrency = desired_concurrency if desired_concurrency is not None else min_concurrency
-        self._max_concurrency = max_concurrency
-        self._min_concurrency = min_concurrency
+
+        if concurrency_settings is None:
+            concurrency_settings = ConcurrencySettings()
+
+        self._desired_concurrency = (
+            concurrency_settings.desired_concurrency
+            if concurrency_settings.desired_concurrency is not None
+            else concurrency_settings.min_concurrency
+        )
+        self._max_concurrency = concurrency_settings.max_concurrency
+        self._min_concurrency = concurrency_settings.min_concurrency
 
         self._scale_up_step_ratio = scale_up_step_ratio
         self._scale_down_step_ratio = scale_down_step_ratio
 
-        self._max_tasks_per_minute = max_tasks_per_minute
+        self._max_tasks_per_minute = concurrency_settings.max_tasks_per_minute
         self._is_paused = False
         self._is_running = False
 

@@ -11,7 +11,7 @@ from unittest.mock import Mock
 import pytest
 
 from crawlee._utils.measure_time import measure_time
-from crawlee.autoscaling.autoscaled_pool import AutoscaledPool
+from crawlee.autoscaling.autoscaled_pool import AutoscaledPool, ConcurrencySettings
 from crawlee.autoscaling.system_status import SystemStatus
 from crawlee.autoscaling.types import LoadRatioInfo, SystemInfo
 
@@ -43,8 +43,10 @@ async def test_runs_concurrently(system_status: SystemStatus | Mock) -> None:
         run_task_function=run,
         is_task_ready_function=lambda: future(True),
         is_finished_function=lambda: future(done_count >= 10),
-        min_concurrency=10,
-        max_concurrency=10,
+        concurrency_settings=ConcurrencySettings(
+            min_concurrency=10,
+            max_concurrency=10,
+        ),
     )
 
     with measure_time() as elapsed:
@@ -65,8 +67,10 @@ async def test_abort_works(system_status: SystemStatus | Mock) -> None:
         run_task_function=run,
         is_task_ready_function=lambda: future(True),
         is_finished_function=lambda: future(False),
-        min_concurrency=10,
-        max_concurrency=10,
+        concurrency_settings=ConcurrencySettings(
+            min_concurrency=10,
+            max_concurrency=10,
+        ),
     )
 
     with measure_time() as elapsed:
@@ -97,8 +101,10 @@ async def test_propagates_exceptions(system_status: SystemStatus | Mock) -> None
         run_task_function=run,
         is_task_ready_function=lambda: future(True),
         is_finished_function=lambda: future(done_count >= 20),
-        min_concurrency=10,
-        max_concurrency=10,
+        concurrency_settings=ConcurrencySettings(
+            min_concurrency=10,
+            max_concurrency=10,
+        ),
     )
 
     with pytest.raises(RuntimeError, match='Scheduled crash'):
@@ -123,8 +129,10 @@ async def test_propagates_exceptions_after_finished(system_status: SystemStatus 
         run_task_function=run,
         is_task_ready_function=lambda: future(True),
         is_finished_function=lambda: future(started_count > 0),
-        min_concurrency=1,
-        max_concurrency=1,
+        concurrency_settings=ConcurrencySettings(
+            min_concurrency=1,
+            max_concurrency=1,
+        ),
     )
 
     with pytest.raises(RuntimeError, match='Scheduled crash'):
@@ -162,9 +170,11 @@ async def test_autoscales(system_status: SystemStatus | Mock) -> None:
         run_task_function=run,
         is_task_ready_function=lambda: future(True),
         is_finished_function=lambda: future(False),
-        min_concurrency=1,
-        desired_concurrency=1,
-        max_concurrency=4,
+        concurrency_settings=ConcurrencySettings(
+            min_concurrency=1,
+            desired_concurrency=1,
+            max_concurrency=4,
+        ),
         autoscale_interval=timedelta(seconds=0.1),
     )
 
@@ -208,10 +218,12 @@ async def test_max_tasks_per_minute_works(system_status: SystemStatus | Mock) ->
         run_task_function=run,
         is_task_ready_function=lambda: future(True),
         is_finished_function=lambda: future(False),
-        min_concurrency=1,
-        desired_concurrency=1,
-        max_concurrency=1,
-        max_tasks_per_minute=120,
+        concurrency_settings=ConcurrencySettings(
+            min_concurrency=1,
+            desired_concurrency=1,
+            max_concurrency=1,
+            max_tasks_per_minute=120,
+        ),
     )
 
     pool_run_task = asyncio.create_task(pool.run(), name='pool run task')
@@ -237,8 +249,10 @@ async def test_allows_multiple_run_calls(system_status: SystemStatus | Mock) -> 
         run_task_function=run,
         is_task_ready_function=lambda: future(True),
         is_finished_function=lambda: future(done_count >= 4),
-        min_concurrency=4,
-        max_concurrency=4,
+        concurrency_settings=ConcurrencySettings(
+            min_concurrency=4,
+            max_concurrency=4,
+        ),
     )
 
     await pool.run()

@@ -11,6 +11,7 @@ from crawlee.http_crawler.types import HttpCrawlingContext
 if TYPE_CHECKING:
     from datetime import timedelta
 
+    from crawlee.autoscaling.autoscaled_pool import ConcurrencySettings
     from crawlee.basic_crawler.types import BasicCrawlingContext
     from crawlee.config import Config
     from crawlee.storages.request_provider import RequestProvider
@@ -24,9 +25,7 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
         *,
         router: Callable[[HttpCrawlingContext], Awaitable[None]] | None = None,
         request_provider: RequestProvider,
-        min_concurrency: int | None = None,
-        max_concurrency: int | None = None,
-        max_requests_per_minute: int | None = None,
+        concurrency_settings: ConcurrencySettings | None = None,
         configuration: Config | None = None,
         request_handler_timeout: timedelta | None = None,
     ) -> None:
@@ -42,9 +41,7 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
             router=router,
             _context_pipeline=context_pipeline,
             request_provider=request_provider,
-            min_concurrency=min_concurrency,
-            max_concurrency=max_concurrency,
-            max_requests_per_minute=max_requests_per_minute,
+            concurrency_settings=concurrency_settings,
             configuration=configuration,
             **basic_crawler_kwargs,  # type: ignore
         )
