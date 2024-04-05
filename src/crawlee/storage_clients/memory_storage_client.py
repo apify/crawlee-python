@@ -8,18 +8,20 @@ from pathlib import Path
 import aioshutil
 from aiofiles import ospath
 from aiofiles.os import rename, scandir
+from typing_extensions import override
 
 from crawlee._utils.data_processing import maybe_parse_bool
 from crawlee._utils.env_vars import CrawleeEnvVars
-from crawlee.memory_storage.dataset_client import DatasetClient
-from crawlee.memory_storage.dataset_collection_client import DatasetCollectionClient
-from crawlee.memory_storage.key_value_store_client import KeyValueStoreClient
-from crawlee.memory_storage.key_value_store_collection_client import KeyValueStoreCollectionClient
-from crawlee.memory_storage.request_queue_client import RequestQueueClient
-from crawlee.memory_storage.request_queue_collection_client import RequestQueueCollectionClient
+from crawlee.resource_clients.dataset_client import DatasetClient
+from crawlee.resource_clients.dataset_collection_client import DatasetCollectionClient
+from crawlee.resource_clients.key_value_store_client import KeyValueStoreClient
+from crawlee.resource_clients.key_value_store_collection_client import KeyValueStoreCollectionClient
+from crawlee.resource_clients.request_queue_client import RequestQueueClient
+from crawlee.resource_clients.request_queue_collection_client import RequestQueueCollectionClient
+from crawlee.storage_clients.base_storage_client import BaseStorageClient
 
 
-class MemoryStorageClient:
+class MemoryStorageClient(BaseStorageClient):
     """Represents an in-memory storage client for managing datasets, key-value stores, and request queues.
 
     It emulates in-memory storage similar to the Apify platform, supporting both in-memory and local file system-based
@@ -83,61 +85,49 @@ class MemoryStorageClient:
         """Path to the directory containing request queues."""
         return os.path.join(self._local_data_directory, 'request_queues')
 
+    @override
+    def dataset(self, id_: str) -> DatasetClient:
+        return DatasetClient(
+            base_storage_directory=self.datasets_directory,
+            memory_storage_client=self,
+            id_=id_,
+        )
+
+    @override
     def datasets(self) -> DatasetCollectionClient:
-        """Retrieve the sub-client for manipulating datasets."""
         return DatasetCollectionClient(
             base_storage_directory=self.datasets_directory,
             memory_storage_client=self,
         )
 
-    def dataset(self, dataset_id: str) -> DatasetClient:
-        """Retrieve the sub-client for manipulating a single dataset.
-
-        Args:
-            dataset_id: ID of the dataset to be manipulated
-        """
-        return DatasetClient(
-            base_storage_directory=self.datasets_directory,
+    @override
+    def key_value_store(self, id_: str) -> KeyValueStoreClient:
+        return KeyValueStoreClient(
+            base_storage_directory=self.key_value_stores_directory,
             memory_storage_client=self,
-            id_=dataset_id,
+            id_=id_,
         )
 
+    @override
     def key_value_stores(self) -> KeyValueStoreCollectionClient:
-        """Retrieve the sub-client for manipulating key-value stores."""
         return KeyValueStoreCollectionClient(
             base_storage_directory=self.key_value_stores_directory,
             memory_storage_client=self,
         )
 
-    def key_value_store(self, key_value_store_id: str) -> KeyValueStoreClient:
-        """Retrieve the sub-client for manipulating a single key-value store.
-
-        Args:
-            key_value_store_id: ID of the key-value store to be manipulated
-        """
-        return KeyValueStoreClient(
-            base_storage_directory=self.key_value_stores_directory,
-            memory_storage_client=self,
-            id_=key_value_store_id,
-        )
-
-    def request_queues(self) -> RequestQueueCollectionClient:
-        """Retrieve the sub-client for manipulating request queues."""
-        return RequestQueueCollectionClient(
-            base_storage_directory=self.request_queues_directory,
-            memory_storage_client=self,
-        )
-
-    def request_queue(self, request_queue_id: str) -> RequestQueueClient:
-        """Retrieve the sub-client for manipulating a single request queue.
-
-        Args:
-            request_queue_id: ID of the request queue to be manipulated.
-        """
+    @override
+    def request_queue(self, id_: str) -> RequestQueueClient:
         return RequestQueueClient(
             base_storage_directory=self.request_queues_directory,
             memory_storage_client=self,
-            id_=request_queue_id,
+            id_=id_,
+        )
+
+    @override
+    def request_queues(self) -> RequestQueueCollectionClient:
+        return RequestQueueCollectionClient(
+            base_storage_directory=self.request_queues_directory,
+            memory_storage_client=self,
         )
 
     async def purge_on_start(self) -> None:

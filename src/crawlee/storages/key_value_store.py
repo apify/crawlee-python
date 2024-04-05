@@ -9,7 +9,8 @@ from crawlee.storages.types import KeyValueStoreRecordInfo
 
 if TYPE_CHECKING:
     from crawlee.config import Config
-    from crawlee.memory_storage import KeyValueStoreClient, KeyValueStoreCollectionClient, MemoryStorageClient
+    from crawlee.resource_clients import KeyValueStoreClient, KeyValueStoreCollectionClient
+    from crawlee.storage_clients import MemoryStorageClient
 
 T = TypeVar('T')
 

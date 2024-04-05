@@ -16,7 +16,8 @@ from crawlee._utils.file import json_dumps
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from crawlee.memory_storage import KeyValueStoreClient, MemoryStorageClient
+    from crawlee.resource_clients import KeyValueStoreClient
+    from crawlee.storage_clients import MemoryStorageClient
 
 TINY_PNG = base64.b64decode(
     s='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVQYV2NgYAAAAAMAAWgmWQ0AAAAASUVORK5CYII=',
@@ -34,7 +35,7 @@ async def key_value_store_client(memory_storage_client: MemoryStorageClient) -> 
 
 
 async def test_nonexistent(memory_storage_client: MemoryStorageClient) -> None:
-    kvs_client = memory_storage_client.key_value_store(key_value_store_id='nonexistent-id')
+    kvs_client = memory_storage_client.key_value_store(id_='nonexistent-id')
     assert await kvs_client.get() is None
 
     with pytest.raises(ValueError, match='Key-value store with id "nonexistent-id" does not exist.'):

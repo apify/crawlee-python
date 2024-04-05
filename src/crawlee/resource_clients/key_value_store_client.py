@@ -25,7 +25,7 @@ from crawlee._utils.file import (
     json_dumps,
     persist_metadata_if_enabled,
 )
-from crawlee.memory_storage.base_resource_client import BaseResourceClient
+from crawlee.resource_clients.base_resource_client import BaseResourceClient
 from crawlee.storages.types import (
     KeyValueStoreListKeysOutput,
     KeyValueStoreRecord,
@@ -35,7 +35,7 @@ from crawlee.storages.types import (
 )
 
 if TYPE_CHECKING:
-    from crawlee.memory_storage.memory_storage_client import MemoryStorageClient
+    from crawlee.storage_clients import MemoryStorageClient
 
 logger = getLogger(__name__)
 
@@ -190,11 +190,6 @@ class KeyValueStoreClient(BaseResourceClient):
 
     @override
     async def get(self) -> KeyValueStoreResourceInfo | None:
-        """Retrieve the key-value store.
-
-        Returns:
-            The retrieved key-value store, or None if it does not exist
-        """
         found = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
             id_=self.id,

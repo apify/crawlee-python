@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from crawlee.memory_storage import MemoryStorageClient
+from crawlee.storage_clients import MemoryStorageClient
 
 
 class StorageClientManager:

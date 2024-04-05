@@ -4,8 +4,8 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
-from crawlee.memory_storage.base_resource_collection_client import BaseResourceCollectionClient
-from crawlee.memory_storage.key_value_store_client import KeyValueStoreClient
+from crawlee.resource_clients.base_resource_collection_client import BaseResourceCollectionClient
+from crawlee.resource_clients.key_value_store_client import KeyValueStoreClient
 
 if TYPE_CHECKING:
     from crawlee.storages.types import BaseResourceInfo, ListPage

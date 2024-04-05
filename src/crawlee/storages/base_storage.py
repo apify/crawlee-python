@@ -7,8 +7,9 @@ from typing import Generic, TypeVar, cast
 from typing_extensions import Self
 
 from crawlee.config import Config
-from crawlee.memory_storage import BaseResourceClient, BaseResourceCollectionClient, MemoryStorageClient
-from crawlee.storages.storage_client_manager import StorageClientManager
+from crawlee.resource_clients import BaseResourceClient, BaseResourceCollectionClient
+from crawlee.storage_client_manager import StorageClientManager
+from crawlee.storage_clients import MemoryStorageClient
 
 BaseResourceClientType = TypeVar('BaseResourceClientType', bound=BaseResourceClient)
 BaseResourceCollectionClientType = TypeVar('BaseResourceCollectionClientType', bound=BaseResourceCollectionClient)
