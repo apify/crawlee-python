@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from functools import partial
 from logging import getLogger
 from typing import TYPE_CHECKING, Awaitable, Callable, Generic, Union, cast
 
@@ -169,7 +170,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     async def __run_task_function(self) -> None:
         request = await wait_for(
-            self._request_provider.fetch_next_request(),
+            lambda: self._request_provider.fetch_next_request(),
             timeout=self._internal_timeout,
             timeout_message=f'Fetching next request failed after {self._internal_timeout.total_seconds()} seconds',
             logger=logger,
@@ -188,7 +189,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             request.state = RequestState.REQUEST_HANDLER
 
             await wait_for(
-                self.__run_request_handler(crawling_context),
+                lambda: self.__run_request_handler(crawling_context),
                 timeout=self._request_handler_timeout,
                 timeout_message='Request handler timed out after '
                 'f{self._request_handler_timeout.total_seconds()} seconds',
@@ -196,7 +197,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             )
 
             await wait_for(
-                self._request_provider.mark_request_handled(request),
+                lambda: self._request_provider.mark_request_handled(request),
                 timeout=self._internal_timeout,
                 timeout_message='Marking request as handled timed out after '
                 f'{self._internal_timeout.total_seconds()} seconds',
@@ -214,7 +215,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 request.state = RequestState.ERROR_HANDLER
 
                 await wait_for(
-                    self._handle_request_error(primary_error.crawling_context, primary_error.wrapped_exception),
+                    partial(
+                        self._handle_request_error, primary_error.crawling_context, primary_error.wrapped_exception
+                    ),
                     timeout=self._internal_timeout,
                     timeout_message='Handling request failure timed out after '
                     f'{self._internal_timeout.total_seconds()} seconds',
@@ -269,7 +272,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             await self._request_provider.reclaim_request(request)
         else:
             await wait_for(
-                self._request_provider.mark_request_handled(crawling_context.request),
+                lambda: self._request_provider.mark_request_handled(crawling_context.request),
                 timeout=self._internal_timeout,
                 timeout_message='Marking request as handled timed out after '
                 f'{self._internal_timeout.total_seconds()} seconds',
