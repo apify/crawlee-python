@@ -61,6 +61,17 @@ class BasicCrawler(Generic[TCrawlingContext]):
         configuration: Config | None = None,
         request_handler_timeout: timedelta = timedelta(minutes=1),
     ) -> None:
+        """Initialize the HttpCrawler.
+
+        Parameters:
+            router: A callable to which request handling is delegated
+            request_provider: Provides requests to be processed
+            concurrency_settings: Allows fine-tuning concurrency levels
+            configuration: Crawler configuration
+            request_handler_timeout: How long is a single request handler allowed to run
+            _context_pipeline: Allows extending the request lifecycle and modifying the crawling context.
+                This parameter is meant to be used by child classes, not when BasicCrawler is instantiated directly.
+        """
         self._router: Router[TCrawlingContext] | None = None
 
         if isinstance(cast(Router, router), Router):

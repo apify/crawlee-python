@@ -17,6 +17,12 @@ class RequestList(RequestProvider):
     """Represents a (potentially very large) list of URLs to crawl."""
 
     def __init__(self, sources: list[str | Request] | None = None, name: str | None = None) -> None:
+        """Initialize the RequestList.
+
+        Parameters:
+            sources: the URLs (or crawling requests) to crawl
+            name: a name of the request list
+        """
         self._name = name or ''
         self._handled_count = 0
         self._sources = deque(url if isinstance(url, Request) else Request.from_url(url) for url in sources or [])

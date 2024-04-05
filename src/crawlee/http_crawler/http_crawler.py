@@ -29,6 +29,15 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
         configuration: Config | None = None,
         request_handler_timeout: timedelta | None = None,
     ) -> None:
+        """Initialize the HttpCrawler.
+
+        Parameters:
+            router: A callable to which request handling is delegated
+            request_provider: Provides requests to be processed
+            concurrency_settings: Allows fine-tuning concurrency levels
+            configuration: Crawler configuration
+            request_handler_timeout: How long is a single request handler allowed to run
+        """
         context_pipeline = ContextPipeline().compose(self._make_http_request)
         self._client = httpx.AsyncClient()
 
