@@ -5,7 +5,8 @@ from unittest.mock import AsyncMock
 import pytest
 
 from crawlee.basic_crawler.context_pipeline import ContextPipeline, RequestHandlerError
-from crawlee.basic_crawler.types import BasicCrawlingContext, RequestData
+from crawlee.basic_crawler.types import BasicCrawlingContext
+from crawlee.types import Request
 
 
 @dataclass(frozen=True)
@@ -22,7 +23,7 @@ async def test_calls_consumer_without_middleware() -> None:
     consumer = AsyncMock()
 
     pipeline = ContextPipeline()
-    context = BasicCrawlingContext(request=RequestData(url='', unique_key='', id=''))
+    context = BasicCrawlingContext(request=Request.from_url(url='aaa'))
 
     await pipeline(context, consumer)
 
@@ -48,7 +49,7 @@ async def test_calls_consumers_and_middlewares() -> None:
 
     pipeline = ContextPipeline[BasicCrawlingContext]().compose(middleware_a).compose(middleware_b)
 
-    context = BasicCrawlingContext(request=RequestData(url='', unique_key='', id=''))
+    context = BasicCrawlingContext(request=Request.from_url(url='aaa'))
     await pipeline(context, consumer)
 
     assert events == [
@@ -64,7 +65,7 @@ async def test_wraps_consumer_errors() -> None:
     consumer = AsyncMock(side_effect=RuntimeError('Arbitrary crash for testing purposes'))
 
     pipeline = ContextPipeline()
-    context = BasicCrawlingContext(request=RequestData(url='', unique_key='', id=''))
+    context = BasicCrawlingContext(request=Request.from_url(url='aaa'))
 
     with pytest.raises(RequestHandlerError):
         await pipeline(context, consumer)

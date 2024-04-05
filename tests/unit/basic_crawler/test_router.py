@@ -5,12 +5,13 @@ from unittest.mock import Mock
 import pytest
 
 from crawlee.basic_crawler.router import Router
-from crawlee.basic_crawler.types import BasicCrawlingContext, RequestData
+from crawlee.basic_crawler.types import BasicCrawlingContext
+from crawlee.types import Request
 
 
 class MockContext(BasicCrawlingContext):
     def __init__(self, *, label: str | None) -> None:
-        super().__init__(request=RequestData(id='', url='', unique_key='', user_data={'label': label}))
+        super().__init__(request=Request.from_url(url='42', user_data={'label': label}))
 
 
 async def test_router_no_handlers() -> None:

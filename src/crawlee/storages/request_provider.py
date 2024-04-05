@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from datetime import timedelta
 
-    from crawlee.basic_crawler.types import CreateRequestSchema, RequestData
+    from crawlee.types import BaseRequestData, Request
 
 
 class RequestProvider(ABC):
@@ -34,18 +34,18 @@ class RequestProvider(ABC):
         """Removes the queue either from the Apify Cloud storage or from the local database."""
 
     @abstractmethod
-    async def fetch_next_request(self) -> RequestData | None:
+    async def fetch_next_request(self) -> Request | None:
         """Returns a next request in the queue to be processed, or `null` if there are no more pending requests."""
 
     @abstractmethod
-    async def reclaim_request(self, request: RequestData, *, forefront: bool = False) -> None:
+    async def reclaim_request(self, request: Request, *, forefront: bool = False) -> None:
         """Reclaims a failed request back to the queue, so that it can be returned for processing later again.
 
         It is possible to modify the request data by supplying an updated request as a parameter.
         """
 
     @abstractmethod
-    async def mark_request_handled(self, request: RequestData) -> None:
+    async def mark_request_handled(self, request: Request) -> None:
         """Marks a request as handled after a successful processing (or after giving up retrying)."""
 
     @abstractmethod
@@ -55,7 +55,7 @@ class RequestProvider(ABC):
     @abstractmethod
     async def add_requests_batched(
         self,
-        requests: list[CreateRequestSchema],
+        requests: list[BaseRequestData],
         *,
         batch_size: int,
         wait_for_all_requests_to_be_added: bool,

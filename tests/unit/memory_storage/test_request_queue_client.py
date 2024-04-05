@@ -87,7 +87,7 @@ async def test_list_head(request_queue_client: RequestQueueClient) -> None:
     assert len(list_head.items) == 2
 
     for item in list_head.items:
-        assert item.id_ is not None
+        assert item.id is not None
 
 
 async def test_add_record(request_queue_client: RequestQueueClient) -> None:

@@ -5,28 +5,21 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
-from crawlee._utils.requests import compute_unique_key
-from crawlee.basic_crawler.types import RequestData
+from crawlee._utils.requests import unique_key_to_request_id
 from crawlee.storages.request_provider import RequestProvider
+from crawlee.types import BaseRequestData, Request
 
 if TYPE_CHECKING:
     from datetime import timedelta
-
-    from crawlee.basic_crawler.types import CreateRequestSchema
 
 
 class RequestList(RequestProvider):
     """Represents a (potentially very large) list of URLs to crawl."""
 
-    def __init__(self, sources: list[str | RequestData] | None = None, name: str | None = None) -> None:
+    def __init__(self, sources: list[str | Request] | None = None, name: str | None = None) -> None:
         self._name = name or ''
         self._handled_count = 0
-        self._sources = deque(
-            url
-            if isinstance(url, RequestData)
-            else RequestData(id=compute_unique_key(url), unique_key=compute_unique_key(url), url=url)
-            for url in sources or []
-        )
+        self._sources = deque(url if isinstance(url, Request) else Request.from_url(url) for url in sources or [])
         self._in_progress = set[str]()
 
     @property
@@ -51,7 +44,7 @@ class RequestList(RequestProvider):
         self._sources.clear()
 
     @override
-    async def fetch_next_request(self) -> RequestData | None:
+    async def fetch_next_request(self) -> Request | None:
         try:
             request = self._sources.popleft()
         except IndexError:
@@ -61,7 +54,7 @@ class RequestList(RequestProvider):
             return request
 
     @override
-    async def reclaim_request(self, request: RequestData, *, forefront: bool = False) -> None:
+    async def reclaim_request(self, request: Request, *, forefront: bool = False) -> None:
         if forefront:
             self._sources.appendleft(request)
         else:
@@ -70,7 +63,7 @@ class RequestList(RequestProvider):
         self._in_progress.remove(request.id)
 
     @override
-    async def mark_request_handled(self, request: RequestData) -> None:
+    async def mark_request_handled(self, request: Request) -> None:
         self._handled_count += 1
         self._in_progress.remove(request.id)
 
@@ -81,10 +74,12 @@ class RequestList(RequestProvider):
     @override
     async def add_requests_batched(
         self,
-        requests: list[CreateRequestSchema],
+        requests: list[BaseRequestData],
         *,
         batch_size: int,
         wait_for_all_requests_to_be_added: bool,
         wait_time_between_batches: timedelta,
     ) -> None:
-        self._sources.extend(RequestData(id=request.unique_key, **request.model_dump()) for request in requests)
+        self._sources.extend(
+            Request(id=unique_key_to_request_id(request.unique_key), **request.model_dump()) for request in requests
+        )

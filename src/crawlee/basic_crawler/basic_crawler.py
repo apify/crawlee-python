@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Awaitable, Callable, Generic, Union, cast
 
 from typing_extensions import TypeVar
 
-from crawlee._utils.requests import compute_unique_key
 from crawlee._utils.wait import wait_for
 from crawlee.autoscaling import AutoscaledPool
 from crawlee.autoscaling.snapshotter import Snapshotter
@@ -16,20 +15,18 @@ from crawlee.basic_crawler.context_pipeline import ContextPipeline, RequestHandl
 from crawlee.basic_crawler.router import Router
 from crawlee.basic_crawler.types import (
     BasicCrawlingContext,
-    CreateRequestSchema,
     FinalStatistics,
-    RequestData,
-    RequestState,
 )
 from crawlee.config import Config
 from crawlee.events.local_event_manager import LocalEventManager
+from crawlee.types import BaseRequestData, Request, RequestState
 
 if TYPE_CHECKING:
     from crawlee.storages.request_provider import RequestProvider
 
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
-ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Union[RequestData, None]]]
+ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Union[Request, None]]]
 FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
 
 logger = getLogger(__name__)
@@ -137,7 +134,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     async def add_requests(
         self,
-        requests: list[str | CreateRequestSchema],
+        requests: list[str | BaseRequestData],
         *,
         batch_size: int = 1000,
         wait_for_all_requests_to_be_added: bool = False,
@@ -146,9 +143,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         """Add requests to the underlying queue."""
         await self._request_provider.add_requests_batched(
             [
-                request
-                if isinstance(request, CreateRequestSchema)
-                else CreateRequestSchema(url=request, unique_key=compute_unique_key(request))
+                request if isinstance(request, BaseRequestData) else BaseRequestData.from_url(url=request)
                 for request in requests
             ],
             batch_size=batch_size,
@@ -156,7 +151,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             wait_time_between_batches=wait_time_between_batches,
         )
 
-    async def run(self, requests: list[str | CreateRequestSchema] | None = None) -> FinalStatistics:
+    async def run(self, requests: list[str | BaseRequestData] | None = None) -> FinalStatistics:
         """Run the crawler until all requests are processed."""
         if requests is not None:
             await self.add_requests(requests)

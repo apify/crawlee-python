@@ -2,8 +2,9 @@
 import pytest
 
 from crawlee.basic_crawler.basic_crawler import BasicCrawler, UserDefinedErrorHandlerError
-from crawlee.basic_crawler.types import BasicCrawlingContext, RequestData
+from crawlee.basic_crawler.types import BasicCrawlingContext
 from crawlee.storages.request_list import RequestList
+from crawlee.types import Request
 
 
 async def test_processes_requests() -> None:
@@ -78,7 +79,7 @@ async def test_retries_failed_requests() -> None:
 async def test_respects_no_retry() -> None:
     crawler = BasicCrawler(
         request_provider=RequestList(
-            ['http://a.com', 'http://b.com', RequestData(url='http://c.com', unique_key='', id='', no_retry=True)]
+            ['http://a.com', 'http://b.com', Request.from_url(url='http://c.com', no_retry=True)]
         ),
         max_request_retries=3,
     )
@@ -108,7 +109,7 @@ async def test_respects_request_specific_max_retries() -> None:
             [
                 'http://a.com',
                 'http://b.com',
-                RequestData(url='http://c.com', unique_key='', id='', user_data={'__crawlee': {'maxRetries': 4}}),
+                Request.from_url(url='http://c.com', user_data={'__crawlee': {'maxRetries': 4}}),
             ]
         ),
         max_request_retries=1,
@@ -145,12 +146,12 @@ async def test_calls_error_handler() -> None:
             raise RuntimeError('Arbitrary crash for testing purposes')
 
     @crawler.error_handler
-    async def error_handler(context: BasicCrawlingContext, error: Exception) -> RequestData:
+    async def error_handler(context: BasicCrawlingContext, error: Exception) -> Request:
         headers = context.request.headers or {}
         custom_retry_count = int(headers.get('custom_retry_count', '0'))
         calls.append((context, error, custom_retry_count))
 
-        return RequestData.model_validate(
+        return Request.model_validate(
             context.request.model_dump() | {'headers': headers | {'custom_retry_count': str(custom_retry_count + 1)}}
         )
 
