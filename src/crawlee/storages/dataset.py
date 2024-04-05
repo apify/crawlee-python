@@ -363,10 +363,10 @@ class Dataset(BaseStorage):
 
             if last_chunk_size + payload_size <= self._EFFECTIVE_LIMIT_SIZE:
                 current_chunk.append(payload)
-                last_chunk_size += payload_size + 1  # Add 1 byte for ',' separator.
+                last_chunk_size += payload_size + DigitalSize(1)  # Add 1 byte for ',' separator.
             else:
                 yield f'[{",".join(current_chunk)}]'
                 current_chunk = [payload]
-                last_chunk_size = payload_size + 2  # Add 2 bytes for [] wrapper.
+                last_chunk_size = payload_size + DigitalSize(2)  # Add 2 bytes for [] wrapper.
 
         yield f'[{",".join(current_chunk)}]'

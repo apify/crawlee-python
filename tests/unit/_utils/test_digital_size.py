@@ -43,19 +43,18 @@ def test_comparisons() -> None:
 
 
 def test_additions() -> None:
-    # Direct addition of DigitalSize instances
+    # Addition of DigitalSize instances
     size1 = DigitalSize(1024)
     size2 = DigitalSize(2048)
     assert (size1 + size2).bytes_ == 3072
 
     # Addition of DigitalSize instance and an int
-    assert (size1 + 1024).bytes_ == 2048
+    with pytest.raises(TypeError):
+        size1 + 1024
 
     # Addition of DigitalSize instance and an float
-    assert (size2 + 1024.0).bytes_ == 3072
-
-    # Test reflected addition
-    assert (1024 + size1).bytes_ == 2048
+    with pytest.raises(TypeError):
+        size2 + 123.45
 
 
 def test_subtractions() -> None:
@@ -68,19 +67,13 @@ def test_subtractions() -> None:
     with pytest.raises(ValueError, match='Resulting DigitalSize cannot be negative'):
         _ = size2 - size1
 
-    # Subtraction of an int from a DigitalSize
-    size3 = DigitalSize(3072)
-    assert (size3 - 1024).bytes_ == 2048
+    # Subtraction of DigitalSize instance and an int
+    with pytest.raises(TypeError):
+        size1 - 1024
 
-    # Subtraction of a float from a DigitalSize
-    assert (size3 - 1024.0).bytes_ == 2048
-
-    # Test reflected subtraction
-    assert (4096 - size3).bytes_ == 1024
-
-    # Reflected subtraction resulting in a negative value raises ValueError
-    with pytest.raises(ValueError, match='Resulting DigitalSize cannot be negative'):
-        _ = 512 - size3
+    # Subtraction of DigitalSize instance and an float
+    with pytest.raises(TypeError):
+        size2 - 123.45
 
 
 def test_multiplication() -> None:

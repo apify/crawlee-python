@@ -58,51 +58,50 @@ class DigitalSize:
         return f'{self.bytes_} B'
 
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, DigitalSize):
-            return NotImplemented
-        return self.bytes_ == other.bytes_
+        if isinstance(other, DigitalSize):
+            return self.bytes_ == other.bytes_
+        return NotImplemented
 
     def __lt__(self, other: object) -> bool:
-        if not isinstance(other, DigitalSize):
-            return NotImplemented
-        return self.bytes_ < other.bytes_
+        if isinstance(other, DigitalSize):
+            return self.bytes_ < other.bytes_
+        return NotImplemented
 
     def __le__(self, other: object) -> bool:
-        if not isinstance(other, DigitalSize):
-            return NotImplemented
-        return self.bytes_ <= other.bytes_
+        if isinstance(other, DigitalSize):
+            return self.bytes_ <= other.bytes_
+        return NotImplemented
 
     def __gt__(self, other: object) -> bool:
-        if not isinstance(other, DigitalSize):
-            return NotImplemented
-        return self.bytes_ > other.bytes_
+        if isinstance(other, DigitalSize):
+            return self.bytes_ > other.bytes_
+        return NotImplemented
 
     def __ge__(self, other: object) -> bool:
-        if not isinstance(other, DigitalSize):
-            return NotImplemented
-        return self.bytes_ >= other.bytes_
+        if isinstance(other, DigitalSize):
+            return self.bytes_ >= other.bytes_
+        return NotImplemented
 
     def __add__(self, other: object) -> DigitalSize:
         if isinstance(other, DigitalSize):
             return DigitalSize(self.bytes_ + other.bytes_)
-        if isinstance(other, (int, float)):
-            return DigitalSize(self.bytes_ + int(other))
         return NotImplemented
 
     def __sub__(self, other: object) -> DigitalSize:
         if isinstance(other, DigitalSize):
             result = self.bytes_ - other.bytes_
-        elif isinstance(other, (int, float)):
-            result = self.bytes_ - int(other)
-        else:
-            return NotImplemented
-        if result < 0:
-            raise ValueError('Resulting DigitalSize cannot be negative')
-        return DigitalSize(result)
+            if result < 0:
+                raise ValueError('Resulting DigitalSize cannot be negative')
+            return DigitalSize(result)
+        return NotImplemented
 
     def __mul__(self, other: object) -> DigitalSize:
+        if isinstance(other, DigitalSize):
+            return DigitalSize(self.bytes_ * other.bytes_)
+
         if isinstance(other, (int, float)):
             return DigitalSize(int(self.bytes_ * other))
+
         return NotImplemented
 
     def __truediv__(self, other: object) -> float:
@@ -116,17 +115,6 @@ class DigitalSize:
                 raise ZeroDivisionError('Cannot divide by zero')
             return self.bytes_ / other
 
-        return NotImplemented
-
-    def __radd__(self, other: object) -> DigitalSize:
-        return self.__add__(other)
-
-    def __rsub__(self, other: object) -> DigitalSize:
-        if isinstance(other, (int, float)):
-            result = int(other) - self.bytes_
-            if result < 0:
-                raise ValueError('Resulting DigitalSize cannot be negative')
-            return DigitalSize(result)
         return NotImplemented
 
     def __rmul__(self, other: object) -> DigitalSize:
