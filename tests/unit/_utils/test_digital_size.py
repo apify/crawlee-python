@@ -4,11 +4,11 @@ from crawlee._utils.digital_size import DigitalSize
 
 
 def test_initializations() -> None:
-    assert DigitalSize(1024).bytes_ == 1024
-    assert DigitalSize.from_kb(1).bytes_ == 1024
-    assert DigitalSize.from_mb(1).bytes_ == 1024**2
-    assert DigitalSize.from_gb(1).bytes_ == 1024**3
-    assert DigitalSize.from_tb(1).bytes_ == 1024**4
+    assert DigitalSize(1024).bytes == 1024
+    assert DigitalSize.from_kb(1).bytes == 1024
+    assert DigitalSize.from_mb(1).bytes == 1024**2
+    assert DigitalSize.from_gb(1).bytes == 1024**3
+    assert DigitalSize.from_tb(1).bytes == 1024**4
 
     with pytest.raises(ValueError, match='DigitalSize cannot be negative'):
         DigitalSize(-1)
@@ -46,7 +46,7 @@ def test_additions() -> None:
     # Addition of DigitalSize instances
     size1 = DigitalSize(1024)
     size2 = DigitalSize(2048)
-    assert (size1 + size2).bytes_ == 3072
+    assert (size1 + size2).bytes == 3072
 
     # Addition of DigitalSize instance and an int
     with pytest.raises(TypeError):
@@ -61,7 +61,7 @@ def test_subtractions() -> None:
     # Direct subtraction of DigitalSize instances
     size1 = DigitalSize(2048)
     size2 = DigitalSize(1024)
-    assert (size1 - size2).bytes_ == 1024
+    assert (size1 - size2).bytes == 1024
 
     # Subtraction resulting in a negative value raises ValueError
     with pytest.raises(ValueError, match='Resulting DigitalSize cannot be negative'):
@@ -80,17 +80,17 @@ def test_multiplication() -> None:
     # Multiplication of DigitalSize by an int
     size = DigitalSize(1024)
     result = size * 2
-    assert result.bytes_ == 2048
+    assert result.bytes == 2048
 
     # Multiplication of DigitalSize by a float
     size_float = DigitalSize(1024)
     result_float = size_float * 1.5
-    assert result_float.bytes_ == 1536
+    assert result_float.bytes == 1536
 
     # Test reflected multiplication
     size_reflected = DigitalSize(1024)
     reflected_result = 3 * size_reflected
-    assert reflected_result.bytes_ == 3072
+    assert reflected_result.bytes == 3072
 
 
 def test_divisions() -> None:

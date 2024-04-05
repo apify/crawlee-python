@@ -322,7 +322,7 @@ class Snapshotter:
 
         # Log a warning if current memory usage exceeds the critical overload threshold
         if current_memory_usage_size > overload_memory_threshold_size:
-            memory_usage_percentage = round((current_memory_usage_size.bytes_ / self._max_memory_size.bytes_) * 100)
+            memory_usage_percentage = round((current_memory_usage_size.bytes / self._max_memory_size.bytes) * 100)
             logger.warning(
                 f'Memory is critically overloaded. Using {current_memory_usage_size} of '
                 f'{self._max_memory_size} ({memory_usage_percentage}%). '

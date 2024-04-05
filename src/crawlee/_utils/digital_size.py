@@ -12,10 +12,10 @@ _BYTES_PER_TB = _BYTES_PER_KB**4
 class DigitalSize:
     """Represents a digital size."""
 
-    bytes_: int
+    bytes: int
 
     def __post_init__(self) -> None:
-        if self.bytes_ < 0:
+        if self.bytes < 0:
             raise ValueError('DigitalSize cannot be negative')
 
     @classmethod
@@ -35,61 +35,61 @@ class DigitalSize:
         return cls(int(tb * _BYTES_PER_TB))
 
     def to_kb(self) -> float:
-        return self.bytes_ / _BYTES_PER_KB
+        return self.bytes / _BYTES_PER_KB
 
     def to_mb(self) -> float:
-        return self.bytes_ / _BYTES_PER_MB
+        return self.bytes / _BYTES_PER_MB
 
     def to_gb(self) -> float:
-        return self.bytes_ / _BYTES_PER_GB
+        return self.bytes / _BYTES_PER_GB
 
     def to_tb(self) -> float:
-        return self.bytes_ / _BYTES_PER_TB
+        return self.bytes / _BYTES_PER_TB
 
     def __str__(self) -> str:
-        if self.bytes_ >= _BYTES_PER_TB:
+        if self.bytes >= _BYTES_PER_TB:
             return f'{self.to_tb():.2f} TB'
-        if self.bytes_ >= _BYTES_PER_GB:
+        if self.bytes >= _BYTES_PER_GB:
             return f'{self.to_gb():.2f} GB'
-        if self.bytes_ >= _BYTES_PER_MB:
+        if self.bytes >= _BYTES_PER_MB:
             return f'{self.to_mb():.2f} MB'
-        if self.bytes_ >= _BYTES_PER_KB:
+        if self.bytes >= _BYTES_PER_KB:
             return f'{self.to_kb():.2f} KB'
-        return f'{self.bytes_} B'
+        return f'{self.bytes} B'
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, DigitalSize):
-            return self.bytes_ == other.bytes_
+            return self.bytes == other.bytes
         return NotImplemented
 
     def __lt__(self, other: object) -> bool:
         if isinstance(other, DigitalSize):
-            return self.bytes_ < other.bytes_
+            return self.bytes < other.bytes
         return NotImplemented
 
     def __le__(self, other: object) -> bool:
         if isinstance(other, DigitalSize):
-            return self.bytes_ <= other.bytes_
+            return self.bytes <= other.bytes
         return NotImplemented
 
     def __gt__(self, other: object) -> bool:
         if isinstance(other, DigitalSize):
-            return self.bytes_ > other.bytes_
+            return self.bytes > other.bytes
         return NotImplemented
 
     def __ge__(self, other: object) -> bool:
         if isinstance(other, DigitalSize):
-            return self.bytes_ >= other.bytes_
+            return self.bytes >= other.bytes
         return NotImplemented
 
     def __add__(self, other: object) -> DigitalSize:
         if isinstance(other, DigitalSize):
-            return DigitalSize(self.bytes_ + other.bytes_)
+            return DigitalSize(self.bytes + other.bytes)
         return NotImplemented
 
     def __sub__(self, other: object) -> DigitalSize:
         if isinstance(other, DigitalSize):
-            result = self.bytes_ - other.bytes_
+            result = self.bytes - other.bytes
             if result < 0:
                 raise ValueError('Resulting DigitalSize cannot be negative')
             return DigitalSize(result)
@@ -97,23 +97,23 @@ class DigitalSize:
 
     def __mul__(self, other: object) -> DigitalSize:
         if isinstance(other, DigitalSize):
-            return DigitalSize(self.bytes_ * other.bytes_)
+            return DigitalSize(self.bytes * other.bytes)
 
         if isinstance(other, (int, float)):
-            return DigitalSize(int(self.bytes_ * other))
+            return DigitalSize(int(self.bytes * other))
 
         return NotImplemented
 
     def __truediv__(self, other: object) -> float:
         if isinstance(other, DigitalSize):
-            if other.bytes_ == 0:
+            if other.bytes == 0:
                 raise ZeroDivisionError('Cannot divide by zero')
-            return self.bytes_ / other.bytes_
+            return self.bytes / other.bytes
 
         if isinstance(other, (int, float)):
             if other == 0:
                 raise ZeroDivisionError('Cannot divide by zero')
-            return self.bytes_ / other
+            return self.bytes / other
 
         return NotImplemented
 
