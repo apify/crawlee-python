@@ -96,9 +96,6 @@ class ByteSize:
         return NotImplemented
 
     def __mul__(self, other: object) -> ByteSize:
-        if isinstance(other, ByteSize):
-            return ByteSize(self.bytes * other.bytes)
-
         if isinstance(other, (int, float)):
             return ByteSize(int(self.bytes * other))
 
@@ -109,11 +106,6 @@ class ByteSize:
             if other.bytes == 0:
                 raise ZeroDivisionError('Cannot divide by zero')
             return self.bytes / other.bytes
-
-        if isinstance(other, (int, float)):
-            if other == 0:
-                raise ZeroDivisionError('Cannot divide by zero')
-            return self.bytes / other
 
         return NotImplemented
 

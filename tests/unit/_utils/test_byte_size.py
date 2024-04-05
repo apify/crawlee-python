@@ -94,20 +94,14 @@ def test_multiplication() -> None:
 
 
 def test_divisions() -> None:
-    # Division of ByteSize by an int
-    size = ByteSize(2048)
-    assert (size / 2) == 1024
-
     # Division of ByteSize by another ByteSize
     size1 = ByteSize(2048)
     size2 = ByteSize(1024)
     assert (size1 / size2) == 2
 
-    # Division by zero with an int should raise ZeroDivisionError
-    with pytest.raises(ZeroDivisionError):
-        _ = size / 0
-
     # Division by zero when the divisor is a ByteSize with zero bytes
-    size_zero = ByteSize(0)
     with pytest.raises(ZeroDivisionError):
-        _ = size1 / size_zero
+        _ = size1 / ByteSize(0)
+
+    # Division of ByteSize - multiplying by a float
+    assert (size1 * 0.5).bytes == 1024
