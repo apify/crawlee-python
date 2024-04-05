@@ -35,7 +35,7 @@ from crawlee.storages.types import (
 )
 
 if TYPE_CHECKING:
-    from crawlee.storage_clients.memory_storage_client import MemoryStorageClient
+    from crawlee.storage_clients import MemoryStorageClient
 
 logger = getLogger(__name__)
 

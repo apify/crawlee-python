@@ -1,3 +1,5 @@
+# Inspiration: https://github.com/apify/crawlee/blob/v3.8.2/packages/types/src/storages.ts#L314:L328
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -44,19 +46,3 @@ class BaseStorageClient(ABC):
     @abstractmethod
     def request_queues(self) -> RequestQueueCollectionClient:
         """Gets a client for request queue collection operations."""
-
-    # @abstractmethod
-    # async def purge(self) -> None:
-    #     pass
-
-    # @abstractmethod
-    # def teardown(self) -> None:
-    #     pass
-
-    # @abstractmethod
-    # def set_status_message(self, message: str) -> None:
-    #     pass
-
-    # @abstractmethod
-    # def stats(self) -> dict:
-    #     pass

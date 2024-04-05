@@ -36,7 +36,7 @@ from crawlee.storages.types import (
 from crawlee.types import Request
 
 if TYPE_CHECKING:
-    from crawlee.storage_clients.memory_storage_client import MemoryStorageClient
+    from crawlee.storage_clients import MemoryStorageClient
 
 
 class RequestQueueClient(BaseResourceClient):

@@ -18,7 +18,7 @@ from crawlee.resource_clients.base_resource_client import BaseResourceClient
 from crawlee.storages.types import DatasetResourceInfo, ListPage, StorageTypes
 
 if TYPE_CHECKING:
-    from crawlee.storage_clients.memory_storage_client import MemoryStorageClient
+    from crawlee.storage_clients import MemoryStorageClient
     from crawlee.storages.types import JSONSerializable
 
 
