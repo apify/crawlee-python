@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Callable
 import pytest
 
 from crawlee._utils.env_vars import CrawleeEnvVars
-from crawlee.memory_storage import MemoryStorageClient
+from crawlee.storage_clients import MemoryStorageClient
 from crawlee.storages.dataset import Dataset
 from crawlee.storages.key_value_store import KeyValueStore
 from crawlee.storages.request_queue import RequestQueue

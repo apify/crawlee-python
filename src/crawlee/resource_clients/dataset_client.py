@@ -14,11 +14,11 @@ from typing_extensions import override
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import raise_on_duplicate_storage, raise_on_non_existing_storage
 from crawlee._utils.file import force_rename, json_dumps, persist_metadata_if_enabled
-from crawlee.memory_storage.base_resource_client import BaseResourceClient
+from crawlee.resource_clients.base_resource_client import BaseResourceClient
 from crawlee.storages.types import DatasetResourceInfo, ListPage, StorageTypes
 
 if TYPE_CHECKING:
-    from crawlee.memory_storage.memory_storage_client import MemoryStorageClient
+    from crawlee.storage_clients.memory_storage_client import MemoryStorageClient
     from crawlee.storages.types import JSONSerializable
 
 
@@ -144,11 +144,6 @@ class DatasetClient(BaseResourceClient):
 
     @override
     async def get(self) -> DatasetResourceInfo | None:
-        """Retrieve the dataset.
-
-        Returns:
-            The retrieved dataset, or None, if it does not exist
-        """
         found = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
             id_=self.id,

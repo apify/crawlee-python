@@ -10,7 +10,8 @@ import pytest
 from crawlee.types import Request
 
 if TYPE_CHECKING:
-    from crawlee.memory_storage import MemoryStorageClient, RequestQueueClient
+    from crawlee.resource_clients import RequestQueueClient
+    from crawlee.storage_clients import MemoryStorageClient
 
 
 @pytest.fixture()
@@ -21,7 +22,7 @@ async def request_queue_client(memory_storage_client: MemoryStorageClient) -> Re
 
 
 async def test_nonexistent(memory_storage_client: MemoryStorageClient) -> None:
-    request_queue_client = memory_storage_client.request_queue(request_queue_id='nonexistent-id')
+    request_queue_client = memory_storage_client.request_queue(id_='nonexistent-id')
     assert await request_queue_client.get() is None
     with pytest.raises(ValueError, match='Request queue with id "nonexistent-id" does not exist.'):
         await request_queue_client.update(name='test-update')

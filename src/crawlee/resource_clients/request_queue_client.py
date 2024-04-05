@@ -26,7 +26,7 @@ from crawlee._utils.file import (
     persist_metadata_if_enabled,
 )
 from crawlee._utils.requests import unique_key_to_request_id
-from crawlee.memory_storage.base_resource_client import BaseResourceClient
+from crawlee.resource_clients.base_resource_client import BaseResourceClient
 from crawlee.storages.types import (
     RequestQueueHeadResponse,
     RequestQueueOperationInfo,
@@ -36,7 +36,7 @@ from crawlee.storages.types import (
 from crawlee.types import Request
 
 if TYPE_CHECKING:
-    from crawlee.memory_storage.memory_storage_client import MemoryStorageClient
+    from crawlee.storage_clients.memory_storage_client import MemoryStorageClient
 
 
 class RequestQueueClient(BaseResourceClient):
@@ -157,11 +157,6 @@ class RequestQueueClient(BaseResourceClient):
 
     @override
     async def get(self) -> RequestQueueResourceInfo | None:
-        """Retrieve the request queue.
-
-        Returns:
-            The retrieved request queue, or None, if it does not exist
-        """
         found = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
             id_=self.id,
