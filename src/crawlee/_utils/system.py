@@ -8,6 +8,8 @@ from logging import getLogger
 
 import psutil
 
+from crawlee._utils.byte_size import ByteSize
+
 logger = getLogger(__name__)
 
 
@@ -29,13 +31,13 @@ class MemoryInfo:
     """Information about the memory usage.
 
     Args:
-        total_bytes: Total memory available in the system.
-        current_bytes: Memory usage of the current Python process and its children.
+        total_size: Total memory available in the system.
+        current_size: Memory usage of the current Python process and its children.
         created_at: The time at which the measurement was taken.
     """
 
-    total_bytes: int
-    current_bytes: int
+    total_size: ByteSize
+    current_size: ByteSize
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -60,14 +62,17 @@ def get_memory_info() -> MemoryInfo:
 
     # Retrieve the Resident Set Size (RSS) of the current process. RSS is the portion of memory
     # occupied by a process that is held in RAM.
-    current_bytes = int(current_process.memory_info().rss)
+    current_size_bytes = int(current_process.memory_info().rss)
 
     for child in current_process.children(recursive=True):
         # Ignore any NoSuchProcess exception that might occur if a child process ends before we retrieve
         # its memory usage.
         with suppress(psutil.NoSuchProcess):
-            current_bytes += int(child.memory_info().rss)
+            current_size_bytes += int(child.memory_info().rss)
 
-    virtual_memory = psutil.virtual_memory()
+    total_size_bytes = psutil.virtual_memory().total
 
-    return MemoryInfo(total_bytes=virtual_memory.total, current_bytes=current_bytes)
+    return MemoryInfo(
+        total_size=ByteSize(total_size_bytes),
+        current_size=ByteSize(current_size_bytes),
+    )

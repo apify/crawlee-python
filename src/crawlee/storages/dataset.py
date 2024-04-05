@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import csv
 import io
-import math
 from typing import TYPE_CHECKING, AsyncIterator
 
 from typing_extensions import override
 
+from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.file import json_dumps
 from crawlee.storages.base_storage import BaseStorage
 from crawlee.storages.key_value_store import KeyValueStore
@@ -36,14 +36,14 @@ class Dataset(BaseStorage):
         dataset = await Dataset.open(id_='my_dataset_id')
     """
 
-    _MAX_PAYLOAD_SIZE_BYTES = 9437184  # 9 MB
-    """Maximum size in bytes for a single payload."""
+    _MAX_PAYLOAD_SIZE = ByteSize.from_mb(9)
+    """Maximum size for a single payload."""
 
     _SAFETY_BUFFER_PERCENT = 0.01 / 100  # 0.01%
     """Percentage buffer to reduce payload limit slightly for safety."""
 
-    _EFFECTIVE_LIMIT_BYTES = _MAX_PAYLOAD_SIZE_BYTES - math.ceil(_MAX_PAYLOAD_SIZE_BYTES * _SAFETY_BUFFER_PERCENT)
-    """Calculated payload limit considering safety buffer, in bytes."""
+    _EFFECTIVE_LIMIT_SIZE = _MAX_PAYLOAD_SIZE - (_MAX_PAYLOAD_SIZE * _SAFETY_BUFFER_PERCENT)
+    """Calculated payload limit considering safety buffer."""
 
     def __init__(
         self,
@@ -335,11 +335,9 @@ class Dataset(BaseStorage):
         except Exception as exc:
             raise ValueError(f'Data item{s}is not serializable to JSON.') from exc
 
-        length_bytes = len(payload.encode('utf-8'))
-        if length_bytes > self._EFFECTIVE_LIMIT_BYTES:
-            raise ValueError(
-                f'Data item{s}is too large (size: {length_bytes} bytes, limit: {self._EFFECTIVE_LIMIT_BYTES} bytes)'
-            )
+        payload_size = ByteSize(len(payload.encode('utf-8')))
+        if payload_size > self._EFFECTIVE_LIMIT_SIZE:
+            raise ValueError(f'Data item{s}is too large (size: {payload_size}, limit: {self._EFFECTIVE_LIMIT_SIZE})')
 
         return payload
 
@@ -347,7 +345,7 @@ class Dataset(BaseStorage):
         """Yields chunks of JSON arrays composed of input strings, respecting a size limit.
 
         Groups an iterable of JSON string payloads into larger JSON arrays, ensuring the total size
-        of each array does not exceed `EFFECTIVE_LIMIT_BYTES`. Each output is a JSON array string that
+        of each array does not exceed `EFFECTIVE_LIMIT_SIZE`. Each output is a JSON array string that
         contains as many payloads as possible without breaching the size threshold, maintaining the
         order of the original payloads. Assumes individual items are below the size limit.
 
@@ -357,18 +355,18 @@ class Dataset(BaseStorage):
         Yields:
             Strings representing JSON arrays of payloads, each staying within the size limit.
         """
-        last_chunk_bytes = 2  # Add 2 bytes for [] wrapper.
+        last_chunk_size = ByteSize(2)  # Add 2 bytes for [] wrapper.
         current_chunk = []
 
         async for payload in items:
-            length_bytes = len(payload.encode('utf-8'))
+            payload_size = ByteSize(len(payload.encode('utf-8')))
 
-            if last_chunk_bytes + length_bytes <= self._EFFECTIVE_LIMIT_BYTES:
+            if last_chunk_size + payload_size <= self._EFFECTIVE_LIMIT_SIZE:
                 current_chunk.append(payload)
-                last_chunk_bytes += length_bytes + 1  # Add 1 byte for ',' separator.
+                last_chunk_size += payload_size + ByteSize(1)  # Add 1 byte for ',' separator.
             else:
                 yield f'[{",".join(current_chunk)}]'
                 current_chunk = [payload]
-                last_chunk_bytes = length_bytes + 2  # Add 2 bytes for [] wrapper.
+                last_chunk_size = payload_size + ByteSize(2)  # Add 2 bytes for [] wrapper.
 
         yield f'[{",".join(current_chunk)}]'

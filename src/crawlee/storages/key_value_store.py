@@ -94,8 +94,8 @@ class KeyValueStore(BaseStorage):
             exclusive_start_key: All keys up to this one (including) are skipped from the result.
 
         Yields:
-            An object, where `key` is the record key, and `info` is an object that
-                contains a single property `size` indicating size of the record in bytes.
+            An object, where `key` is the record key, and `info` is an object that contains a single property `size`
+                indicating size of the record.
         """
         while True:
             list_keys = await self._key_value_store_client.list_keys(exclusive_start_key=exclusive_start_key)
