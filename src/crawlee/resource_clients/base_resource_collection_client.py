@@ -4,11 +4,11 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 from crawlee._utils.file import persist_metadata_if_enabled
-from crawlee.memory_storage.base_resource_client import BaseResourceClient
+from crawlee.resource_clients.base_resource_client import BaseResourceClient
 from crawlee.storages.types import BaseResourceInfo, ListPage
 
 if TYPE_CHECKING:
-    from crawlee.memory_storage.memory_storage_client import MemoryStorageClient
+    from crawlee.storage_clients import MemoryStorageClient
 
 ResourceClientType = TypeVar('ResourceClientType', bound=BaseResourceClient, contravariant=True)  # noqa: PLC0105
 

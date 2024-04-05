@@ -28,15 +28,3 @@ def compute_weighted_avg(values: list[float], weights: list[float]) -> float:
         raise ValueError('Total weight cannot be zero')
 
     return result / total_weight
-
-
-def to_mb(bytes_: int) -> int:
-    """Converts bytes to megabytes (MB).
-
-    Args:
-        bytes_: The number of bytes to convert.
-
-    Returns:
-        int: The equivalent size in megabytes.
-    """
-    return round(bytes_ / (1024**2))

@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 if TYPE_CHECKING:
-    from crawlee.memory_storage import DatasetClient, MemoryStorageClient
+    from crawlee.resource_clients import DatasetClient
+    from crawlee.storage_clients import MemoryStorageClient
 
 
 @pytest.fixture()
@@ -18,7 +19,7 @@ async def dataset_client(memory_storage_client: MemoryStorageClient) -> DatasetC
 
 
 async def test_nonexistent(memory_storage_client: MemoryStorageClient) -> None:
-    dataset_client = memory_storage_client.dataset(dataset_id='nonexistent-id')
+    dataset_client = memory_storage_client.dataset(id_='nonexistent-id')
     assert await dataset_client.get() is None
     with pytest.raises(ValueError, match='Dataset with id "nonexistent-id" does not exist.'):
         await dataset_client.update(name='test-update')
