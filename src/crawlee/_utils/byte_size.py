@@ -9,29 +9,29 @@ _BYTES_PER_TB = _BYTES_PER_KB**4
 
 
 @dataclass(frozen=True)
-class DigitalSize:
-    """Represents a digital size."""
+class ByteSize:
+    """Represents a byte size."""
 
     bytes: int
 
     def __post_init__(self) -> None:
         if self.bytes < 0:
-            raise ValueError('DigitalSize cannot be negative')
+            raise ValueError('ByteSize cannot be negative')
 
     @classmethod
-    def from_kb(cls, kb: float) -> DigitalSize:
+    def from_kb(cls, kb: float) -> ByteSize:
         return cls(int(kb * _BYTES_PER_KB))
 
     @classmethod
-    def from_mb(cls, mb: float) -> DigitalSize:
+    def from_mb(cls, mb: float) -> ByteSize:
         return cls(int(mb * _BYTES_PER_MB))
 
     @classmethod
-    def from_gb(cls, gb: float) -> DigitalSize:
+    def from_gb(cls, gb: float) -> ByteSize:
         return cls(int(gb * _BYTES_PER_GB))
 
     @classmethod
-    def from_tb(cls, tb: float) -> DigitalSize:
+    def from_tb(cls, tb: float) -> ByteSize:
         return cls(int(tb * _BYTES_PER_TB))
 
     def to_kb(self) -> float:
@@ -58,54 +58,54 @@ class DigitalSize:
         return f'{self.bytes} B'
 
     def __eq__(self, other: object) -> bool:
-        if isinstance(other, DigitalSize):
+        if isinstance(other, ByteSize):
             return self.bytes == other.bytes
         return NotImplemented
 
     def __lt__(self, other: object) -> bool:
-        if isinstance(other, DigitalSize):
+        if isinstance(other, ByteSize):
             return self.bytes < other.bytes
         return NotImplemented
 
     def __le__(self, other: object) -> bool:
-        if isinstance(other, DigitalSize):
+        if isinstance(other, ByteSize):
             return self.bytes <= other.bytes
         return NotImplemented
 
     def __gt__(self, other: object) -> bool:
-        if isinstance(other, DigitalSize):
+        if isinstance(other, ByteSize):
             return self.bytes > other.bytes
         return NotImplemented
 
     def __ge__(self, other: object) -> bool:
-        if isinstance(other, DigitalSize):
+        if isinstance(other, ByteSize):
             return self.bytes >= other.bytes
         return NotImplemented
 
-    def __add__(self, other: object) -> DigitalSize:
-        if isinstance(other, DigitalSize):
-            return DigitalSize(self.bytes + other.bytes)
+    def __add__(self, other: object) -> ByteSize:
+        if isinstance(other, ByteSize):
+            return ByteSize(self.bytes + other.bytes)
         return NotImplemented
 
-    def __sub__(self, other: object) -> DigitalSize:
-        if isinstance(other, DigitalSize):
+    def __sub__(self, other: object) -> ByteSize:
+        if isinstance(other, ByteSize):
             result = self.bytes - other.bytes
             if result < 0:
-                raise ValueError('Resulting DigitalSize cannot be negative')
-            return DigitalSize(result)
+                raise ValueError('Resulting ByteSize cannot be negative')
+            return ByteSize(result)
         return NotImplemented
 
-    def __mul__(self, other: object) -> DigitalSize:
-        if isinstance(other, DigitalSize):
-            return DigitalSize(self.bytes * other.bytes)
+    def __mul__(self, other: object) -> ByteSize:
+        if isinstance(other, ByteSize):
+            return ByteSize(self.bytes * other.bytes)
 
         if isinstance(other, (int, float)):
-            return DigitalSize(int(self.bytes * other))
+            return ByteSize(int(self.bytes * other))
 
         return NotImplemented
 
     def __truediv__(self, other: object) -> float:
-        if isinstance(other, DigitalSize):
+        if isinstance(other, ByteSize):
             if other.bytes == 0:
                 raise ZeroDivisionError('Cannot divide by zero')
             return self.bytes / other.bytes
@@ -117,5 +117,5 @@ class DigitalSize:
 
         return NotImplemented
 
-    def __rmul__(self, other: object) -> DigitalSize:
+    def __rmul__(self, other: object) -> ByteSize:
         return self.__mul__(other)

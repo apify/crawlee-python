@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, AsyncIterator
 
 from typing_extensions import override
 
-from crawlee._utils.digital_size import DigitalSize
+from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.file import json_dumps
 from crawlee.storages.base_storage import BaseStorage
 from crawlee.storages.key_value_store import KeyValueStore
@@ -36,7 +36,7 @@ class Dataset(BaseStorage):
         dataset = await Dataset.open(id_='my_dataset_id')
     """
 
-    _MAX_PAYLOAD_SIZE = DigitalSize.from_mb(9)
+    _MAX_PAYLOAD_SIZE = ByteSize.from_mb(9)
     """Maximum size for a single payload."""
 
     _SAFETY_BUFFER_PERCENT = 0.01 / 100  # 0.01%
@@ -335,7 +335,7 @@ class Dataset(BaseStorage):
         except Exception as exc:
             raise ValueError(f'Data item{s}is not serializable to JSON.') from exc
 
-        payload_size = DigitalSize(len(payload.encode('utf-8')))
+        payload_size = ByteSize(len(payload.encode('utf-8')))
         if payload_size > self._EFFECTIVE_LIMIT_SIZE:
             raise ValueError(f'Data item{s}is too large (size: {payload_size}, limit: {self._EFFECTIVE_LIMIT_SIZE})')
 
@@ -355,18 +355,18 @@ class Dataset(BaseStorage):
         Yields:
             Strings representing JSON arrays of payloads, each staying within the size limit.
         """
-        last_chunk_size = DigitalSize(2)  # Add 2 bytes for [] wrapper.
+        last_chunk_size = ByteSize(2)  # Add 2 bytes for [] wrapper.
         current_chunk = []
 
         async for payload in items:
-            payload_size = DigitalSize(len(payload.encode('utf-8')))
+            payload_size = ByteSize(len(payload.encode('utf-8')))
 
             if last_chunk_size + payload_size <= self._EFFECTIVE_LIMIT_SIZE:
                 current_chunk.append(payload)
-                last_chunk_size += payload_size + DigitalSize(1)  # Add 1 byte for ',' separator.
+                last_chunk_size += payload_size + ByteSize(1)  # Add 1 byte for ',' separator.
             else:
                 yield f'[{",".join(current_chunk)}]'
                 current_chunk = [payload]
-                last_chunk_size = payload_size + DigitalSize(2)  # Add 2 bytes for [] wrapper.
+                last_chunk_size = payload_size + ByteSize(2)  # Add 2 bytes for [] wrapper.
 
         yield f'[{",".join(current_chunk)}]'

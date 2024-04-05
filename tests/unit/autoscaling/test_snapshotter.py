@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from crawlee._utils.digital_size import DigitalSize
+from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.system import CpuInfo, MemoryInfo
 from crawlee.autoscaling import Snapshotter
 from crawlee.autoscaling.types import CpuSnapshot, EventLoopSnapshot, Snapshot
@@ -26,8 +26,8 @@ def event_system_data_info() -> EventSystemInfoData:
     return EventSystemInfoData(
         cpu_info=CpuInfo(used_ratio=0.5),
         memory_info=MemoryInfo(
-            total_size=DigitalSize.from_gb(8),
-            current_size=DigitalSize.from_gb(4),
+            total_size=ByteSize.from_gb(8),
+            current_size=ByteSize.from_gb(4),
         ),
     )
 
@@ -175,9 +175,9 @@ def test_memory_load_evaluation_logs_warning_on_high_usage(
 ) -> None:
     mock_logger_warn = MagicMock()
     monkeypatch.setattr(getLogger('crawlee.autoscaling.snapshotter'), 'warning', mock_logger_warn)
-    snapshotter._max_memory_size = DigitalSize.from_gb(8)
+    snapshotter._max_memory_size = ByteSize.from_gb(8)
 
-    high_memory_usage = DigitalSize.from_gb(8) * 0.9  # 90% of 8 GB
+    high_memory_usage = ByteSize.from_gb(8) * 0.9  # 90% of 8 GB
 
     snapshotter._evaluate_memory_load(
         current_memory_usage_size=high_memory_usage,
@@ -202,9 +202,9 @@ def test_memory_load_evaluation_silent_on_acceptable_usage(
 ) -> None:
     mock_logger_warn = MagicMock()
     monkeypatch.setattr(getLogger('crawlee.autoscaling.snapshotter'), 'warning', mock_logger_warn)
-    snapshotter._max_memory_size = DigitalSize.from_gb(8)
+    snapshotter._max_memory_size = ByteSize.from_gb(8)
 
-    low_memory_usage = DigitalSize.from_gb(8) * 0.8  # 80% of 8 GB
+    low_memory_usage = ByteSize.from_gb(8) * 0.8  # 80% of 8 GB
 
     snapshotter._evaluate_memory_load(
         current_memory_usage_size=low_memory_usage,

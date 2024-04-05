@@ -8,7 +8,7 @@ from logging import getLogger
 
 import psutil
 
-from crawlee._utils.digital_size import DigitalSize
+from crawlee._utils.byte_size import ByteSize
 
 logger = getLogger(__name__)
 
@@ -36,8 +36,8 @@ class MemoryInfo:
         created_at: The time at which the measurement was taken.
     """
 
-    total_size: DigitalSize
-    current_size: DigitalSize
+    total_size: ByteSize
+    current_size: ByteSize
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -73,6 +73,6 @@ def get_memory_info() -> MemoryInfo:
     total_size_bytes = psutil.virtual_memory().total
 
     return MemoryInfo(
-        total_size=DigitalSize(total_size_bytes),
-        current_size=DigitalSize(current_size_bytes),
+        total_size=ByteSize(total_size_bytes),
+        current_size=ByteSize(current_size_bytes),
     )

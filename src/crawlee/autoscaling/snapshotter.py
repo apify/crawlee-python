@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, cast
 
 import psutil
 
-from crawlee._utils.digital_size import DigitalSize
+from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee.autoscaling.types import ClientSnapshot, CpuSnapshot, EventLoopSnapshot, MemorySnapshot, Snapshot
 from crawlee.events.types import Event, EventSystemInfoData
@@ -37,7 +37,7 @@ class Snapshotter:
         event_loop_snapshot_interval: timedelta = timedelta(milliseconds=500),
         client_snapshot_interval: timedelta = timedelta(milliseconds=1000),
         max_used_cpu_ratio: float = 0.95,
-        max_memory_size: DigitalSize | None = None,
+        max_memory_size: ByteSize | None = None,
         max_used_memory_ratio: float = 0.7,
         max_event_loop_delay: timedelta = timedelta(milliseconds=50),
         max_client_errors: int = 1,
@@ -111,10 +111,10 @@ class Snapshotter:
         self._timestamp_of_last_memory_warning: datetime = datetime.now(timezone.utc) - timedelta(hours=1)
 
     @staticmethod
-    def _get_default_max_memory_size() -> DigitalSize:
+    def _get_default_max_memory_size() -> ByteSize:
         """Default `memory_max_size` is 1/4 of the total system memory."""
         max_memory_size_in_bytes = int(psutil.virtual_memory().total * 0.25)
-        max_memory_size = DigitalSize(max_memory_size_in_bytes)
+        max_memory_size = ByteSize(max_memory_size_in_bytes)
         logger.info(f'Setting max_memory_size of this run to {max_memory_size}.')
         return max_memory_size
 
@@ -305,7 +305,7 @@ class Snapshotter:
         else:
             snapshots.clear()
 
-    def _evaluate_memory_load(self, current_memory_usage_size: DigitalSize, snapshot_timestamp: datetime) -> None:
+    def _evaluate_memory_load(self, current_memory_usage_size: ByteSize, snapshot_timestamp: datetime) -> None:
         """Evaluates and logs critical memory load conditions based on the system information.
 
         Args:

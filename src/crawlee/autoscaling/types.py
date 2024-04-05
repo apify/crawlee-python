@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
-    from crawlee._utils.digital_size import DigitalSize
+    from crawlee._utils.byte_size import ByteSize
 
 
 @dataclass
@@ -99,9 +99,9 @@ class MemorySnapshot:
         created_at: The time at which the measurement was taken.
     """
 
-    total_size: DigitalSize
-    current_size: DigitalSize
-    max_memory_size: DigitalSize
+    total_size: ByteSize
+    current_size: ByteSize
+    max_memory_size: ByteSize
     max_used_memory_ratio: float
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
