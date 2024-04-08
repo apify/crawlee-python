@@ -70,8 +70,10 @@ class Request(BaseRequestData):
     id: str
 
     json_: str | None = None  # TODO: get rid of this
+    # https://github.com/apify/crawlee-py/issues/94
 
     order_no: Decimal | None = None  # TODO: get rid of this
+    # https://github.com/apify/crawlee-py/issues/94
 
     @classmethod
     def from_url(
