@@ -2,17 +2,22 @@ from __future__ import annotations
 
 import asyncio
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar, cast
+from typing import TYPE_CHECKING, Generic, TypeVar, cast
 
 from typing_extensions import Self
 
 from crawlee.config import Config
-from crawlee.resource_clients import BaseResourceClient, BaseResourceCollectionClient
-from crawlee.storage_client_manager import StorageClientManager
-from crawlee.storage_clients import MemoryStorageClient
 
-BaseResourceClientType = TypeVar('BaseResourceClientType', bound=BaseResourceClient)
-BaseResourceCollectionClientType = TypeVar('BaseResourceCollectionClientType', bound=BaseResourceCollectionClient)
+if TYPE_CHECKING:
+    from crawlee.resource_clients.base_resource_client import BaseResourceClient
+    from crawlee.resource_clients.base_resource_collection_client import BaseResourceCollectionClient
+    from crawlee.storage_clients import MemoryStorageClient
+
+    BaseResourceClientType = TypeVar('BaseResourceClientType', bound=BaseResourceClient)
+    BaseResourceCollectionClientType = TypeVar('BaseResourceCollectionClientType', bound=BaseResourceCollectionClient)
+else:
+    BaseResourceClientType = TypeVar('BaseResourceClientType')
+    BaseResourceCollectionClientType = TypeVar('BaseResourceCollectionClientType')
 
 
 class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionClientType]):
@@ -71,6 +76,9 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
         Returns:
             The opened or retrieved storage instance.
         """
+        from crawlee.storage_client_manager import StorageClientManager
+        from crawlee.storage_clients import MemoryStorageClient
+
         cls._ensure_class_initialized()
 
         if cls.cache_by_id is None:
