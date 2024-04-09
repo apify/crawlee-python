@@ -23,7 +23,7 @@ async def wait_for(
     If the wait times out, TimeoutError is raised and the future is cancelled.
     Optionally retry on error.
 
-    Parameters:
+    Args:
         operation: A function that returns the future to wait for
         timeout: How long should we wait before cancelling the future
         timeout_message: Message to be included in the TimeoutError in case of timeout

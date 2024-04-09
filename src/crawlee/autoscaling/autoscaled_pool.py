@@ -140,8 +140,7 @@ class AutoscaledPool:
 
         self._desired_concurrency_ratio = desired_concurrency_ratio
 
-        if concurrency_settings is None:
-            concurrency_settings = ConcurrencySettings()
+        concurrency_settings = concurrency_settings or ConcurrencySettings()
 
         self._desired_concurrency = (
             concurrency_settings.desired_concurrency

@@ -15,6 +15,6 @@ class BasicCrawlingContext:
     request: Request
 
 
-@dataclass
+@dataclass(frozen=True)
 class FinalStatistics:
     """Statistics about a crawler run."""

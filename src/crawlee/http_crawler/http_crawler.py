@@ -31,7 +31,7 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
     ) -> None:
         """Initialize the HttpCrawler.
 
-        Parameters:
+        Args:
             router: A callable to which request handling is delegated
             request_provider: Provides requests to be processed
             concurrency_settings: Allows fine-tuning concurrency levels

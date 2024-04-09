@@ -51,4 +51,5 @@ class Router(Generic[TCrawlingContext]):
 
             return await self._default_handler(context)
 
-        return await self._handlers_by_label[context.request.label](context)
+        handler = self._handlers_by_label[context.request.label]
+        return await handler(context)
