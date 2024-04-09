@@ -15,12 +15,13 @@ from crawlee._utils.requests import unique_key_to_request_id
 from crawlee.storages.base_storage import BaseStorage
 from crawlee.storages.request_provider import RequestProvider
 from crawlee.storages.types import BaseResourceInfo, RequestQueueOperationInfo, RequestQueueSnapshot
+from crawlee.types import Request
 
 if TYPE_CHECKING:
     from crawlee.config import Config
     from crawlee.resource_clients import RequestQueueClient, RequestQueueCollectionClient
     from crawlee.storage_clients import MemoryStorageClient
-    from crawlee.types import BaseRequestData, Request
+    from crawlee.types import BaseRequestData
 
 logger = getLogger(__name__)
 
