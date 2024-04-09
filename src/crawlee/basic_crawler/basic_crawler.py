@@ -14,10 +14,7 @@ from crawlee.autoscaling.snapshotter import Snapshotter
 from crawlee.autoscaling.system_status import SystemStatus
 from crawlee.basic_crawler.context_pipeline import ContextPipeline, RequestHandlerError
 from crawlee.basic_crawler.router import Router
-from crawlee.basic_crawler.types import (
-    BasicCrawlingContext,
-    FinalStatistics,
-)
+from crawlee.basic_crawler.types import BasicCrawlingContext, FinalStatistics
 from crawlee.config import Config
 from crawlee.events.local_event_manager import LocalEventManager
 from crawlee.types import BaseRequestData, Request, RequestState
@@ -51,22 +48,23 @@ class BasicCrawler(Generic[TCrawlingContext]):
     def __init__(
         self,
         *,
+        request_provider: RequestProvider,
         router: Callable[[TCrawlingContext], Awaitable[None]] | None = None,
-        _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         # TODO: make request_provider optional (and instantiate based on configuration if None is supplied)
         # https://github.com/apify/crawlee-py/issues/83
-        request_provider: RequestProvider,
         concurrency_settings: ConcurrencySettings | None = None,
         max_request_retries: int = 3,
         configuration: Config | None = None,
         request_handler_timeout: timedelta = timedelta(minutes=1),
+        _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
     ) -> None:
-        """Initialize the HttpCrawler.
+        """Initialize the BasicCrawler.
 
         Args:
-            router: A callable to which request handling is delegated
             request_provider: Provides requests to be processed
+            router: A callable to which request handling is delegated
             concurrency_settings: Allows fine-tuning concurrency levels
+            max_request_retries: Maximum amount of attempts at processing a request
             configuration: Crawler configuration
             request_handler_timeout: How long is a single request handler allowed to run
             _context_pipeline: Allows extending the request lifecycle and modifying the crawling context.
@@ -164,6 +162,49 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         return FinalStatistics()
 
+    async def _handle_request_error(self, crawling_context: TCrawlingContext, error: Exception) -> None:
+        max_request_retries = crawling_context.request.max_retries
+        if max_request_retries is None:
+            max_request_retries = self._max_request_retries
+
+        should_retry_request = (
+            not crawling_context.request.no_retry and (crawling_context.request.retry_count + 1) < max_request_retries
+        )
+
+        if should_retry_request:
+            request = crawling_context.request
+            request.retry_count += 1
+
+            if self._error_handler:
+                try:
+                    new_request = await self._error_handler(crawling_context, error)
+                except Exception as e:
+                    raise UserDefinedErrorHandlerError('Exception thrown in user-defined request error handler') from e
+                else:
+                    if new_request is not None:
+                        request = new_request
+
+            await self._request_provider.reclaim_request(request)
+        else:
+            await wait_for(
+                lambda: self._request_provider.mark_request_as_handled(crawling_context.request),
+                timeout=self._internal_timeout,
+                timeout_message='Marking request as handled timed out after '
+                f'{self._internal_timeout.total_seconds()} seconds',
+                logger=logger,
+                max_retries=3,
+            )
+            await self._handle_failed_request(crawling_context, error)
+
+    async def _handle_failed_request(self, crawling_context: TCrawlingContext, error: Exception) -> None:
+        logger.exception('Request failed and reached maximum retries', exc_info=error)
+
+        if self._failed_request_handler:
+            try:
+                await self._failed_request_handler(crawling_context, error)
+            except Exception as e:
+                raise UserDefinedErrorHandlerError('Exception thrown in user-defined failed request handler') from e
+
     async def __is_finished_function(self) -> bool:
         return await self._request_provider.is_finished()
 
@@ -194,7 +235,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 lambda: self.__run_request_handler(crawling_context),
                 timeout=self._request_handler_timeout,
                 timeout_message='Request handler timed out after '
-                 f'{self._request_handler_timeout.total_seconds()} seconds',
+                f'{self._request_handler_timeout.total_seconds()} seconds',
                 logger=logger,
             )
 
@@ -248,46 +289,3 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     async def __run_request_handler(self, crawling_context: BasicCrawlingContext) -> None:
         await self._context_pipeline(crawling_context, self.router)
-
-    async def _handle_request_error(self, crawling_context: TCrawlingContext, error: Exception) -> None:
-        max_request_retries = crawling_context.request.max_retries
-        if max_request_retries is None:
-            max_request_retries = self._max_request_retries
-
-        should_retry_request = (
-            not crawling_context.request.no_retry and (crawling_context.request.retry_count + 1) < max_request_retries
-        )
-
-        if should_retry_request:
-            request = crawling_context.request
-            request.retry_count += 1
-
-            if self._error_handler:
-                try:
-                    new_request = await self._error_handler(crawling_context, error)
-                except Exception as e:
-                    raise UserDefinedErrorHandlerError('Exception thrown in user-defined request error handler') from e
-                else:
-                    if new_request is not None:
-                        request = new_request
-
-            await self._request_provider.reclaim_request(request)
-        else:
-            await wait_for(
-                lambda: self._request_provider.mark_request_as_handled(crawling_context.request),
-                timeout=self._internal_timeout,
-                timeout_message='Marking request as handled timed out after '
-                f'{self._internal_timeout.total_seconds()} seconds',
-                logger=logger,
-                max_retries=3,
-            )
-            await self._handle_failed_request(crawling_context, error)
-
-    async def _handle_failed_request(self, crawling_context: TCrawlingContext, error: Exception) -> None:
-        logger.exception('Request failed and reached maximum retries', exc_info=error)
-
-        if self._failed_request_handler:
-            try:
-                await self._failed_request_handler(crawling_context, error)
-            except Exception as e:
-                raise UserDefinedErrorHandlerError('Exception thrown in user-defined failed request handler') from e
