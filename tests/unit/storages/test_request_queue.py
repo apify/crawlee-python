@@ -6,8 +6,8 @@ from typing import AsyncGenerator
 
 import pytest
 
+from crawlee.request import Request
 from crawlee.storages.request_queue import RequestQueue
-from crawlee.types import Request
 
 
 @pytest.fixture()

@@ -3,8 +3,8 @@ import pytest
 
 from crawlee.basic_crawler.basic_crawler import BasicCrawler, UserDefinedErrorHandlerError
 from crawlee.basic_crawler.types import BasicCrawlingContext
+from crawlee.request import Request
 from crawlee.storages import RequestList
-from crawlee.types import Request
 
 
 async def test_processes_requests() -> None:
@@ -151,9 +151,10 @@ async def test_calls_error_handler() -> None:
         custom_retry_count = int(headers.get('custom_retry_count', '0'))
         calls.append((context, error, custom_retry_count))
 
-        return Request.model_validate(
-            context.request.model_dump() | {'headers': headers | {'custom_retry_count': str(custom_retry_count + 1)}}
-        )
+        request = context.request.model_dump()
+        request['headers']['custom_retry_count'] = str(custom_retry_count + 1)
+
+        return Request.model_validate(request)
 
     await crawler.run()
 

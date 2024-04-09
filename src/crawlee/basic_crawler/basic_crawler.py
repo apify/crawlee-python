@@ -17,7 +17,7 @@ from crawlee.basic_crawler.router import Router
 from crawlee.basic_crawler.types import BasicCrawlingContext, FinalStatistics
 from crawlee.config import Config
 from crawlee.events.local_event_manager import LocalEventManager
-from crawlee.types import BaseRequestData, Request, RequestState
+from crawlee.request import BaseRequestData, Request, RequestState
 
 if TYPE_CHECKING:
     from crawlee.storages.request_provider import RequestProvider

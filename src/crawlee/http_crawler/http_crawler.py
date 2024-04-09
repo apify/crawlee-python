@@ -23,8 +23,8 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
     def __init__(
         self,
         *,
-        router: Callable[[HttpCrawlingContext], Awaitable[None]] | None = None,
         request_provider: RequestProvider,
+        router: Callable[[HttpCrawlingContext], Awaitable[None]] | None = None,
         concurrency_settings: ConcurrencySettings | None = None,
         configuration: Config | None = None,
         request_handler_timeout: timedelta | None = None,
@@ -32,8 +32,8 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
         """Initialize the HttpCrawler.
 
         Args:
-            router: A callable to which request handling is delegated
             request_provider: Provides requests to be processed
+            router: A callable to which request handling is delegated
             concurrency_settings: Allows fine-tuning concurrency levels
             configuration: Crawler configuration
             request_handler_timeout: How long is a single request handler allowed to run

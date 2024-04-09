@@ -150,7 +150,7 @@ class CrawleeRequestData(BaseModel):
     """Crawlee-specific configuration stored in the user_data."""
 
     max_retries: Annotated[int | None, Field(alias='maxRetries')] = None
-    """Maximum number of retries for this request. Allows to override the global `maxRequestRetries` option of
+    """Maximum number of retries for this request. Allows to override the global `max_request_retries` option of
     `BasicCrawler`."""
 
     enqueue_strategy: Annotated[str | None, Field(alias='enqueueStrategy')] = None

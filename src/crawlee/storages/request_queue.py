@@ -12,16 +12,16 @@ from typing_extensions import override
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.lru_cache import LRUCache
 from crawlee._utils.requests import unique_key_to_request_id
+from crawlee.request import Request
 from crawlee.storages.base_storage import BaseStorage
 from crawlee.storages.request_provider import RequestProvider
 from crawlee.storages.types import BaseResourceInfo, RequestQueueOperationInfo, RequestQueueSnapshot
-from crawlee.types import Request
 
 if TYPE_CHECKING:
     from crawlee.config import Config
+    from crawlee.request import BaseRequestData
     from crawlee.resource_clients import RequestQueueClient, RequestQueueCollectionClient
     from crawlee.storage_clients import MemoryStorageClient
-    from crawlee.types import BaseRequestData
 
 logger = getLogger(__name__)
 

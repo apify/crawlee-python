@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from crawlee.types import Request
+    from crawlee.request import Request
 
 
 @dataclass(frozen=True)

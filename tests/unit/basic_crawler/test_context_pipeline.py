@@ -6,7 +6,7 @@ import pytest
 
 from crawlee.basic_crawler.context_pipeline import ContextPipeline, RequestHandlerError
 from crawlee.basic_crawler.types import BasicCrawlingContext
-from crawlee.types import Request
+from crawlee.request import Request
 
 
 @dataclass(frozen=True)

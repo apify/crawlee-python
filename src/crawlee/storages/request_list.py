@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
+from crawlee.request import BaseRequestData, Request
 from crawlee.storages.request_provider import RequestProvider
-from crawlee.types import BaseRequestData, Request
 
 if TYPE_CHECKING:
     from datetime import timedelta

@@ -26,6 +26,7 @@ from crawlee._utils.file import (
     persist_metadata_if_enabled,
 )
 from crawlee._utils.requests import unique_key_to_request_id
+from crawlee.request import Request
 from crawlee.resource_clients.base_resource_client import BaseResourceClient
 from crawlee.storages.types import (
     RequestQueueHeadResponse,
@@ -33,7 +34,6 @@ from crawlee.storages.types import (
     RequestQueueResourceInfo,
     StorageTypes,
 )
-from crawlee.types import Request
 
 if TYPE_CHECKING:
     from crawlee.storage_clients import MemoryStorageClient

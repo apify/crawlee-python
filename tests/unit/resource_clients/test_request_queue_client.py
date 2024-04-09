@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from crawlee.types import Request
+from crawlee.request import Request
 
 if TYPE_CHECKING:
     from crawlee.resource_clients import RequestQueueClient

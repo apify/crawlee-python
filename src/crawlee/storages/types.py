@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar, Union
 if TYPE_CHECKING:
     from datetime import datetime
 
-    from crawlee.types import Request
+    from crawlee.request import Request
 
 T = TypeVar('T')
 
