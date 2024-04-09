@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from crawlee.config import Config
     from crawlee.resource_clients import RequestQueueClient, RequestQueueCollectionClient
     from crawlee.storage_clients import MemoryStorageClient
-    from crawlee.types import Request
+    from crawlee.types import BaseRequestData, Request
 
 logger = getLogger(__name__)
 
@@ -200,6 +200,21 @@ class RequestQueue(BaseStorage, RequestProvider):
             self._maybe_add_request_to_queue_head(request_id, forefront=forefront)
 
         return queue_operation_info
+
+    @override
+    async def add_requests_batched(
+        self,
+        requests: list[BaseRequestData | Request],
+        *,
+        batch_size: int,
+        wait_for_all_requests_to_be_added: bool,
+        wait_time_between_batches: timedelta,
+    ) -> None:
+        for request in requests:
+            if isinstance(request, Request):
+                await self.add_request(request)
+            else:
+                await self.add_request(Request.from_base_request_data(request))
 
     async def get_request(self, request_id: str) -> Request | None:
         """Retrieve a request from the queue.
@@ -413,6 +428,14 @@ class RequestQueue(BaseStorage, RequestProvider):
             Object returned by calling the GET request queue API endpoint.
         """
         return await self._request_queue_client.get()
+
+    @override
+    async def get_handled_count(self) -> int:
+        return self._assumed_handled_count
+
+    @override
+    async def get_total_count(self) -> int:
+        return self._assumed_total_count
 
     async def ensure_head_is_non_empty(
         self,

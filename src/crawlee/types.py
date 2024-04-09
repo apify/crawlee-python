@@ -89,6 +89,11 @@ class Request(BaseRequestData):
         id_ = id_ or unique_key_to_request_id(unique_key)
         return cls(url=url, unique_key=unique_key, id=id_, **kwargs)
 
+    @classmethod
+    def from_base_request_data(cls, base_request_data: BaseRequestData, *, id_: str | None = None) -> Self:
+        """Create a complete Request object based on a BaseRequestData instance."""
+        return cls(**base_request_data.model_dump(), id=id_ or unique_key_to_request_id(base_request_data.unique_key))
+
     @property
     def crawlee_data(self) -> CrawleeRequestData:
         """Crawlee-specific configuration stored in the user_data."""

@@ -199,7 +199,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             )
 
             await wait_for(
-                lambda: self._request_provider.mark_request_handled(request),
+                lambda: self._request_provider.mark_request_as_handled(request),
                 timeout=self._internal_timeout,
                 timeout_message='Marking request as handled timed out after '
                 f'{self._internal_timeout.total_seconds()} seconds',
@@ -274,7 +274,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             await self._request_provider.reclaim_request(request)
         else:
             await wait_for(
-                lambda: self._request_provider.mark_request_handled(crawling_context.request),
+                lambda: self._request_provider.mark_request_as_handled(crawling_context.request),
                 timeout=self._internal_timeout,
                 timeout_message='Marking request as handled timed out after '
                 f'{self._internal_timeout.total_seconds()} seconds',

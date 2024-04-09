@@ -69,7 +69,7 @@ class RequestList(RequestProvider):
         self._in_progress.remove(request.id)
 
     @override
-    async def mark_request_handled(self, request: Request) -> None:
+    async def mark_request_as_handled(self, request: Request) -> None:
         self._handled_count += 1
         self._in_progress.remove(request.id)
 
@@ -80,12 +80,12 @@ class RequestList(RequestProvider):
     @override
     async def add_requests_batched(
         self,
-        requests: list[BaseRequestData],
+        requests: list[BaseRequestData | Request],
         *,
         batch_size: int,
         wait_for_all_requests_to_be_added: bool,
         wait_time_between_batches: timedelta,
     ) -> None:
         self._sources.extend(
-            Request(id=unique_key_to_request_id(request.unique_key), **request.model_dump()) for request in requests
+            request if isinstance(request, Request) else Request.from_base_request_data(request) for request in requests
         )

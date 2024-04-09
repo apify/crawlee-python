@@ -46,7 +46,7 @@ class RequestProvider(ABC):
         """
 
     @abstractmethod
-    async def mark_request_handled(self, request: Request) -> None:
+    async def mark_request_as_handled(self, request: Request) -> RequestQueueOperationInfo | None:
         """Marks a request as handled after a successful processing (or after giving up retrying)."""
 
     @abstractmethod
@@ -56,7 +56,7 @@ class RequestProvider(ABC):
     @abstractmethod
     async def add_requests_batched(
         self,
-        requests: list[BaseRequestData],
+        requests: list[BaseRequestData | Request],
         *,
         batch_size: int,
         wait_for_all_requests_to_be_added: bool,
