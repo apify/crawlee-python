@@ -8,7 +8,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
-class Config(BaseSettings):
+class Configuration(BaseSettings):
     """Configuration of the Crawler.
 
     Args:

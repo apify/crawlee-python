@@ -18,7 +18,7 @@ from crawlee.storages.request_provider import RequestProvider
 from crawlee.storages.types import BaseResourceInfo, RequestQueueOperationInfo, RequestQueueSnapshot
 
 if TYPE_CHECKING:
-    from crawlee.config import Config
+    from crawlee.configuration import Configuration
     from crawlee.request import BaseRequestData
     from crawlee.resource_clients import RequestQueueClient, RequestQueueCollectionClient
     from crawlee.storage_clients import MemoryStorageClient
@@ -74,10 +74,10 @@ class RequestQueue(BaseStorage, RequestProvider):
         self,
         id_: str,
         name: str | None,
-        config: Config,
+        configuration: Configuration,
         client: MemoryStorageClient,
     ) -> None:
-        super().__init__(id_=id_, name=name, client=client, config=config)
+        super().__init__(id_=id_, name=name, client=client, configuration=configuration)
 
         self._client_key = crypto_random_object_id()
         self._internal_timeout_seconds = 5 * 60
@@ -98,9 +98,9 @@ class RequestQueue(BaseStorage, RequestProvider):
         *,
         id_: str | None = None,
         name: str | None = None,
-        config: Config | None = None,
+        configuration: Configuration | None = None,
     ) -> RequestQueue:
-        rq = await super().open(id_=id_, name=name, config=config)
+        rq = await super().open(id_=id_, name=name, configuration=configuration)
         await rq.ensure_head_is_non_empty()
         return rq
 
@@ -111,8 +111,8 @@ class RequestQueue(BaseStorage, RequestProvider):
 
     @classmethod
     @override
-    def _get_default_id(cls, config: Config) -> str:
-        return config.default_request_queue_id
+    def _get_default_id(cls, configuration: Configuration) -> str:
+        return configuration.default_request_queue_id
 
     @classmethod
     @override

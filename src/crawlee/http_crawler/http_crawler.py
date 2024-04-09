@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
     from crawlee.autoscaling.autoscaled_pool import ConcurrencySettings
     from crawlee.basic_crawler.types import BasicCrawlingContext
-    from crawlee.config import Config
+    from crawlee.configuration import Configuration
     from crawlee.storages.request_provider import RequestProvider
 
 
@@ -26,7 +26,7 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
         request_provider: RequestProvider,
         router: Callable[[HttpCrawlingContext], Awaitable[None]] | None = None,
         concurrency_settings: ConcurrencySettings | None = None,
-        configuration: Config | None = None,
+        configuration: Configuration | None = None,
         request_handler_timeout: timedelta | None = None,
     ) -> None:
         """Initialize the HttpCrawler.

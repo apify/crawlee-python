@@ -15,7 +15,7 @@ from crawlee.autoscaling.system_status import SystemStatus
 from crawlee.basic_crawler.context_pipeline import ContextPipeline, RequestHandlerError
 from crawlee.basic_crawler.router import Router
 from crawlee.basic_crawler.types import BasicCrawlingContext, FinalStatistics
-from crawlee.config import Config
+from crawlee.configuration import Configuration
 from crawlee.events.local_event_manager import LocalEventManager
 from crawlee.request import BaseRequestData, Request, RequestState
 
@@ -54,7 +54,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         # https://github.com/apify/crawlee-py/issues/83
         concurrency_settings: ConcurrencySettings | None = None,
         max_request_retries: int = 3,
-        configuration: Config | None = None,
+        configuration: Configuration | None = None,
         request_handler_timeout: timedelta = timedelta(minutes=1),
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
     ) -> None:
@@ -86,7 +86,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._max_request_retries = max_request_retries
 
         self._request_provider = request_provider
-        self._configuration = configuration or Config()
+        self._configuration = configuration or Configuration()
 
         self._request_handler_timeout = request_handler_timeout
         self._internal_timeout = (
