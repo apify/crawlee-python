@@ -63,7 +63,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
     ) -> None:
         """Initialize the HttpCrawler.
 
-        Parameters:
+        Args:
             router: A callable to which request handling is delegated
             request_provider: Provides requests to be processed
             concurrency_settings: Allows fine-tuning concurrency levels
@@ -194,7 +194,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 lambda: self.__run_request_handler(crawling_context),
                 timeout=self._request_handler_timeout,
                 timeout_message='Request handler timed out after '
-                'f{self._request_handler_timeout.total_seconds()} seconds',
+                 f'{self._request_handler_timeout.total_seconds()} seconds',
                 logger=logger,
             )
 

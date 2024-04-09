@@ -3,7 +3,7 @@ import pytest
 
 from crawlee.basic_crawler.basic_crawler import BasicCrawler, UserDefinedErrorHandlerError
 from crawlee.basic_crawler.types import BasicCrawlingContext
-from crawlee.storages.request_list import RequestList
+from crawlee.storages import RequestList
 from crawlee.types import Request
 
 

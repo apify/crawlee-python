@@ -18,7 +18,7 @@ class RequestList(RequestProvider):
     def __init__(self, sources: list[str | Request] | None = None, name: str | None = None) -> None:
         """Initialize the RequestList.
 
-        Parameters:
+        Args:
             sources: the URLs (or crawling requests) to crawl
             name: a name of the request list
         """
