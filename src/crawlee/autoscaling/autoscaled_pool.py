@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import math
 from contextlib import suppress
-from dataclasses import dataclass
 from datetime import timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING, Awaitable, Callable
@@ -22,27 +21,30 @@ class AbortError(Exception):
     """Raised when an AutoscaledPool run is aborted. Not for direct use."""
 
 
-@dataclass(frozen=True)
 class ConcurrencySettings:
     """Concurrency settings for AutoscaledPool."""
 
-    desired_concurrency: int | None = None
-    """The desired number of tasks that should be running parallel on the start of the pool, if there is a large enough
-    supply of them. By default, it is `min_concurrency`."""
+    def __init__(
+        self,
+        min_concurrency: int = 1,
+        max_concurrency: int = 200,
+        max_tasks_per_minute: float = math.inf,
+        desired_concurrency: int | None = None,
+    ) -> None:
+        """Initialize the ConcurrencySettings.
 
-    min_concurrency: int = 1
-    """The minimum number of tasks running in parallel. If you set this value too high with respect to the available
-    system memory and CPU, your code might run extremely slow or crash."""
+        Args:
+            min_concurrency: The minimum number of tasks running in parallel. If you set this value too high
+                with respect to the available system memory and CPU, your code might run extremely slow or crash.
 
-    max_concurrency: int = 200
-    """The maximum number of tasks running in parallel."""
+            max_concurrency: The maximum number of tasks running in parallel.
 
-    max_tasks_per_minute: int | None = None
-    """The maximum number of tasks per minute the pool can run. By default, this is set to `Infinity`, but you can pass
-    any positive, non-zero integer."""
+            max_tasks_per_minute: The maximum number of tasks per minute the pool can run. By default, this is set
+                to infinity, but you can pass any positive, non-zero number.
 
-    def __post_init__(self) -> None:
-        """Validate the settings."""
+            desired_concurrency: The desired number of tasks that should be running parallel on the start of the pool,
+                if there is a large enough supply of them. By default, it is `min_concurrency`.
+        """
         if self.desired_concurrency is not None and self.desired_concurrency < 1:
             raise ValueError('desired_concurrency must be 1 or larger')
 
@@ -52,8 +54,13 @@ class ConcurrencySettings:
         if self.max_concurrency < self.min_concurrency:
             raise ValueError('max_concurrency cannot be less than min_concurrency')
 
-        if self.max_tasks_per_minute is not None and self.max_tasks_per_minute <= 0:
+        if self.max_tasks_per_minute <= 0:
             raise ValueError('max_tasks_per_minute must be positive')
+
+        self.min_concurrency: int = min_concurrency
+        self.max_concurrency: int = max_concurrency
+        self.desired_concurrency: int = desired_concurrency if desired_concurrency is not None else min_concurrency
+        self.max_tasks_per_minute: float = max_tasks_per_minute
 
 
 class AutoscaledPool:
@@ -142,11 +149,7 @@ class AutoscaledPool:
 
         concurrency_settings = concurrency_settings or ConcurrencySettings()
 
-        self._desired_concurrency = (
-            concurrency_settings.desired_concurrency
-            if concurrency_settings.desired_concurrency is not None
-            else concurrency_settings.min_concurrency
-        )
+        self._desired_concurrency = concurrency_settings.desired_concurrency
         self._max_concurrency = concurrency_settings.max_concurrency
         self._min_concurrency = concurrency_settings.min_concurrency
 
@@ -285,7 +288,7 @@ class AutoscaledPool:
                     worker_task.add_done_callback(lambda task: self._reap_worker_task(task))
                     self._worker_tasks.append(worker_task)
 
-                    if self._max_tasks_per_minute is not None:
+                    if math.isfinite(self._max_tasks_per_minute):
                         await asyncio.sleep(60 / self._max_tasks_per_minute)
 
                     continue
