@@ -48,7 +48,9 @@ python = "^3.9"
 aiofiles = "^23.2.1"
 aioshutil = "^1.3"
 colorama = "^0.4.6"
+docutils = "^0.20.1" # HACK - prevent poetry from resolving version to 0.21.post1 which does not exist
 eval-type-backport = "^0.1.3"
+httpx = "^0.27.0"
 more_itertools = "^10.2.0"
 psutil = "^5.9.8"
 pydantic = "^2.6.3"
@@ -145,6 +147,9 @@ convention = "google"
 
 [tool.ruff.lint.isort]
 known-local-folder = ["crawlee"]
+
+[tool.ruff.lint.pylint]
+max-branches = 18
 
 [tool.pytest.ini_options]
 addopts = "-ra"

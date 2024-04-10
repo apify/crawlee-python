@@ -63,7 +63,7 @@ class BaseResourceClient(ABC):
         """Create a new resource client from a directory."""
 
     @classmethod
-    def find_or_create_client_by_id_or_name(  # noqa: PLR0912
+    def find_or_create_client_by_id_or_name(
         cls,
         memory_storage_client: MemoryStorageClient,
         id_: str | None = None,

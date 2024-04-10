@@ -12,19 +12,21 @@ from typing_extensions import override
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.lru_cache import LRUCache
 from crawlee._utils.requests import unique_key_to_request_id
+from crawlee.request import Request
 from crawlee.storages.base_storage import BaseStorage
+from crawlee.storages.request_provider import RequestProvider
 from crawlee.storages.types import BaseResourceInfo, RequestQueueOperationInfo, RequestQueueSnapshot
 
 if TYPE_CHECKING:
-    from crawlee.config import Config
+    from crawlee.configuration import Configuration
+    from crawlee.request import BaseRequestData
     from crawlee.resource_clients import RequestQueueClient, RequestQueueCollectionClient
     from crawlee.storage_clients import MemoryStorageClient
-    from crawlee.types import Request
 
 logger = getLogger(__name__)
 
 
-class RequestQueue(BaseStorage):
+class RequestQueue(BaseStorage, RequestProvider):
     """Represents a queue storage for HTTP requests to crawl.
 
     Manages a queue of requests with unique URLs for structured deep web crawling with support for both breadth-first
@@ -72,10 +74,10 @@ class RequestQueue(BaseStorage):
         self,
         id_: str,
         name: str | None,
-        config: Config,
+        configuration: Configuration,
         client: MemoryStorageClient,
     ) -> None:
-        super().__init__(id_=id_, name=name, client=client, config=config)
+        super().__init__(id_=id_, name=name, client=client, configuration=configuration)
 
         self._client_key = crypto_random_object_id()
         self._internal_timeout_seconds = 5 * 60
@@ -96,9 +98,9 @@ class RequestQueue(BaseStorage):
         *,
         id_: str | None = None,
         name: str | None = None,
-        config: Config | None = None,
+        configuration: Configuration | None = None,
     ) -> RequestQueue:
-        rq = await super().open(id_=id_, name=name, config=config)
+        rq = await super().open(id_=id_, name=name, configuration=configuration)
         await rq.ensure_head_is_non_empty()
         return rq
 
@@ -109,8 +111,8 @@ class RequestQueue(BaseStorage):
 
     @classmethod
     @override
-    def _get_default_id(cls, config: Config) -> str:
-        return config.default_request_queue_id
+    def _get_default_id(cls, configuration: Configuration) -> str:
+        return configuration.default_request_queue_id
 
     @classmethod
     @override
@@ -171,11 +173,11 @@ class RequestQueue(BaseStorage):
         cached_info = self._requests_cache.get(cache_key)
 
         if cached_info:
-            request.id_ = cached_info['id']
+            request.id = cached_info['id']
             # We may assume that if request is in local cache then also the information if the request was already
             # handled is there because just one client should be using one queue.
             return RequestQueueOperationInfo(
-                request_id=request.id_,
+                request_id=request.id,
                 request_unique_key=request.unique_key,
                 was_already_present=True,
                 was_already_handled=cached_info['wasAlreadyHandled'],
@@ -199,6 +201,21 @@ class RequestQueue(BaseStorage):
             self._maybe_add_request_to_queue_head(request_id, forefront=forefront)
 
         return queue_operation_info
+
+    @override
+    async def add_requests_batched(
+        self,
+        requests: list[BaseRequestData | Request],
+        *,
+        batch_size: int,
+        wait_for_all_requests_to_be_added: bool,
+        wait_time_between_batches: timedelta,
+    ) -> None:
+        for request in requests:
+            if isinstance(request, Request):
+                await self.add_request(request)
+            else:
+                await self.add_request(Request.from_base_request_data(request))
 
     async def get_request(self, request_id: str) -> Request | None:
         """Retrieve a request from the queue.
@@ -303,8 +320,8 @@ class RequestQueue(BaseStorage):
         """
         self._last_activity = datetime.now(timezone.utc)
 
-        if request.id_ not in self._in_progress:
-            logger.debug(f'Cannot mark request (ID: {request.id_}) as handled, because it is not in progress!')
+        if request.id not in self._in_progress:
+            logger.debug(f'Cannot mark request (ID: {request.id}) as handled, because it is not in progress!')
             return None
 
         if request.handled_at is None:
@@ -313,8 +330,8 @@ class RequestQueue(BaseStorage):
         queue_operation_info = await self._request_queue_client.update_request(request)
         queue_operation_info.request_unique_key = request.unique_key
 
-        self._in_progress.remove(request.id_)
-        self._recently_handled[request.id_] = True
+        self._in_progress.remove(request.id)
+        self._recently_handled[request.id] = True
 
         if not queue_operation_info.was_already_handled:
             self._assumed_handled_count += 1
@@ -341,8 +358,8 @@ class RequestQueue(BaseStorage):
         """
         self._last_activity = datetime.now(timezone.utc)
 
-        if request.id_ not in self._in_progress:
-            logger.debug(f'Cannot reclaim request (ID: {request.id_}), because it is not in progress!')
+        if request.id not in self._in_progress:
+            logger.debug(f'Cannot reclaim request (ID: {request.id}), because it is not in progress!')
             return None
 
         # TODO: If request hasn't been changed since the last getRequest(), we don't need to call updateRequest()
@@ -356,13 +373,13 @@ class RequestQueue(BaseStorage):
         # updated data. This is to compensate for the limitation of DynamoDB, where writes might not be immediately
         # visible to subsequent reads.
         def callback() -> None:
-            if request.id_ not in self._in_progress:
-                logger.debug(f'The request (ID: {request.id_}) is no longer marked as in progress in the queue?!')
+            if request.id not in self._in_progress:
+                logger.debug(f'The request (ID: {request.id}) is no longer marked as in progress in the queue?!')
                 return
 
-            self._in_progress.remove(request.id_)
+            self._in_progress.remove(request.id)
             # Performance optimization: add request straight to head if possible
-            self._maybe_add_request_to_queue_head(request.id_, forefront=forefront)
+            self._maybe_add_request_to_queue_head(request.id, forefront=forefront)
 
         asyncio.get_running_loop().call_later(self._STORAGE_CONSISTENCY_DELAY.total_seconds(), callback)
         return queue_operation_info
@@ -412,6 +429,14 @@ class RequestQueue(BaseStorage):
             Object returned by calling the GET request queue API endpoint.
         """
         return await self._request_queue_client.get()
+
+    @override
+    async def get_handled_count(self) -> int:
+        return self._assumed_handled_count
+
+    @override
+    async def get_total_count(self) -> int:
+        return self._assumed_total_count
 
     async def ensure_head_is_non_empty(
         self,
@@ -520,18 +545,18 @@ class RequestQueue(BaseStorage):
         for request in list_head_items:
             # Queue head index might be behind the main table, so ensure we don't recycle requests
             if (
-                not request.id_
+                not request.id
                 or not request.unique_key
-                or request.id_ in self._in_progress
-                or self._recently_handled.get(request.id_)
+                or request.id in self._in_progress
+                or self._recently_handled.get(request.id)
             ):
                 continue
 
-            self._queue_head_dict[request.id_] = request.id_
+            self._queue_head_dict[request.id] = request.id
             self._cache_request(
                 cache_key=unique_key_to_request_id(request.unique_key),
                 operation_info=RequestQueueOperationInfo(
-                    request_id=request.id_,
+                    request_id=request.id,
                     was_already_handled=False,
                     was_already_present=True,
                     request_unique_key=request.unique_key,

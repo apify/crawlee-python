@@ -12,7 +12,7 @@ from crawlee.storages.base_storage import BaseStorage
 from crawlee.storages.key_value_store import KeyValueStore
 
 if TYPE_CHECKING:
-    from crawlee.config import Config
+    from crawlee.configuration import Configuration
     from crawlee.resource_clients import DatasetClient, DatasetCollectionClient
     from crawlee.storage_clients import MemoryStorageClient
     from crawlee.storages.types import DatasetResourceInfo, JSONSerializable, ListPage
@@ -50,10 +50,10 @@ class Dataset(BaseStorage):
         self,
         id_: str,
         name: str | None,
-        config: Config,
+        configuration: Configuration,
         client: MemoryStorageClient,
     ) -> None:
-        super().__init__(id_=id_, name=name, client=client, config=config)
+        super().__init__(id_=id_, name=name, client=client, configuration=configuration)
         self._dataset_client = client.dataset(self.id)
 
     @classmethod
@@ -63,8 +63,8 @@ class Dataset(BaseStorage):
 
     @classmethod
     @override
-    def _get_default_id(cls, config: Config) -> str:
-        return config.default_dataset_id
+    def _get_default_id(cls, configuration: Configuration) -> str:
+        return configuration.default_dataset_id
 
     @classmethod
     @override

@@ -61,7 +61,7 @@ class SystemInfo:
         stats = {
             'cpu': self.cpu_info.actual_ratio,
             'mem': self.memory_info.actual_ratio,
-            'event_lopp': self.event_loop_info.actual_ratio,
+            'event_loop': self.event_loop_info.actual_ratio,
             'client_info': self.client_info.actual_ratio,
         }
         return '; '.join(f'{name} = {ratio}' for name, ratio in stats.items())

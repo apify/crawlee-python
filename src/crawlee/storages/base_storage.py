@@ -2,17 +2,22 @@ from __future__ import annotations
 
 import asyncio
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar, cast
+from typing import TYPE_CHECKING, Generic, TypeVar, cast
 
 from typing_extensions import Self
 
-from crawlee.config import Config
-from crawlee.resource_clients import BaseResourceClient, BaseResourceCollectionClient
-from crawlee.storage_client_manager import StorageClientManager
-from crawlee.storage_clients import MemoryStorageClient
+from crawlee.configuration import Configuration
 
-BaseResourceClientType = TypeVar('BaseResourceClientType', bound=BaseResourceClient)
-BaseResourceCollectionClientType = TypeVar('BaseResourceCollectionClientType', bound=BaseResourceCollectionClient)
+if TYPE_CHECKING:
+    from crawlee.resource_clients.base_resource_client import BaseResourceClient
+    from crawlee.resource_clients.base_resource_collection_client import BaseResourceCollectionClient
+    from crawlee.storage_clients import MemoryStorageClient
+
+    BaseResourceClientType = TypeVar('BaseResourceClientType', bound=BaseResourceClient)
+    BaseResourceCollectionClientType = TypeVar('BaseResourceCollectionClientType', bound=BaseResourceCollectionClient)
+else:
+    BaseResourceClientType = TypeVar('BaseResourceClientType')
+    BaseResourceCollectionClientType = TypeVar('BaseResourceCollectionClientType')
 
 
 class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionClientType]):
@@ -27,7 +32,7 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
         self,
         id_: str,
         name: str | None,
-        config: Config,
+        configuration: Configuration,
         client: MemoryStorageClient,
     ) -> None:
         """Create a new instance.
@@ -35,19 +40,24 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
         Args:
             id_: ID of the storage.
             name: Name of the storage.
-            config: The configuration settings.
+            configuration: The configuration settings.
             client: The underlying storage client to be used.
         """
         self.id = id_
-        self.name = name
-        self._config = config
+        self._name = name
+        self._configuration = configuration
         self._storage_client = client
+
+    @property
+    def name(self) -> str | None:
+        """Name of the storage."""
+        return self._name
 
     @classmethod
     async def open(
         cls,
         *,
-        config: Config | None = None,
+        configuration: Configuration | None = None,
         id_: str | None = None,
         name: str | None = None,
     ) -> Self:
@@ -61,11 +71,14 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
         Args:
             id_: Identifier for the specific storage to open. An error is raised if no matching storage is found.
             name: Name for the specific storage to open or create.
-            config: Configuration instance to use. If omitted, the global configuration is applied.
+            configuration: Configuration instance to use. If omitted, the global configuration is applied.
 
         Returns:
             The opened or retrieved storage instance.
         """
+        from crawlee.storage_client_manager import StorageClientManager
+        from crawlee.storage_clients import MemoryStorageClient
+
         cls._ensure_class_initialized()
 
         if cls.cache_by_id is None:
@@ -77,7 +90,7 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
         if id_ and name:
             raise ValueError("Either 'id_' or 'name' must be provided, not both.")
 
-        used_config = config or Config()
+        used_config = configuration or Configuration()
         used_client = StorageClientManager.get_storage_client()
 
         is_default_storage_on_local = False
@@ -123,7 +136,7 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
             storage = cls(
                 id_=storage_info.id,
                 name=storage_info.name,
-                config=used_config,
+                configuration=used_config,
                 client=used_client,
             )
 
@@ -141,7 +154,7 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
 
     @classmethod
     @abstractmethod
-    def _get_default_id(cls, config: Config) -> str:
+    def _get_default_id(cls, configuration: Configuration) -> str:
         """Get the default storage ID."""
 
     @classmethod

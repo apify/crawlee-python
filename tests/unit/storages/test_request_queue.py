@@ -6,8 +6,8 @@ from typing import AsyncGenerator
 
 import pytest
 
+from crawlee.request import Request
 from crawlee.storages.request_queue import RequestQueue
-from crawlee.types import Request
 
 
 @pytest.fixture()
@@ -57,8 +57,8 @@ async def test_drop() -> None:
 async def test_get_request(request_queue: RequestQueue) -> None:
     request = Request.from_url('https://example.com')
     add_request_info = await request_queue.add_request(request)
-    assert request.id_ == add_request_info.request_id
-    request_2 = await request_queue.get_request(request.id_)
+    assert request.id == add_request_info.request_id
+    request_2 = await request_queue.get_request(request.id)
     assert request_2 is not None
     assert request == request_2
 
@@ -81,7 +81,7 @@ async def test_add_fetch_handle_request(request_queue: RequestQueue) -> None:
     queue_operation_info = await request_queue.mark_request_as_handled(next_request)
 
     assert queue_operation_info is not None
-    assert queue_operation_info.request_id == request.id_
+    assert queue_operation_info.request_id == request.id
     assert queue_operation_info.request_unique_key == request.unique_key
     assert await request_queue.is_finished() is True
 
@@ -102,5 +102,5 @@ async def test_reclaim_request(request_queue: RequestQueue) -> None:
     next_again = await request_queue.fetch_next_request()
 
     assert next_again is not None
-    assert next_again.id_ == request.id_
+    assert next_again.id == request.id
     assert next_again.unique_key == request.unique_key

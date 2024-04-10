@@ -8,7 +8,7 @@ from crawlee.storages.base_storage import BaseStorage
 from crawlee.storages.types import KeyValueStoreRecordInfo
 
 if TYPE_CHECKING:
-    from crawlee.config import Config
+    from crawlee.configuration import Configuration
     from crawlee.resource_clients import KeyValueStoreClient, KeyValueStoreCollectionClient
     from crawlee.storage_clients import MemoryStorageClient
 
@@ -40,10 +40,10 @@ class KeyValueStore(BaseStorage):
         self,
         id_: str,
         name: str | None,
-        config: Config,
+        configuration: Configuration,
         client: MemoryStorageClient,
     ) -> None:
-        super().__init__(id_=id_, name=name, client=client, config=config)
+        super().__init__(id_=id_, name=name, client=client, configuration=configuration)
         self._key_value_store_client = client.key_value_store(self.id)
 
     @classmethod
@@ -53,8 +53,8 @@ class KeyValueStore(BaseStorage):
 
     @classmethod
     @override
-    def _get_default_id(cls, config: Config) -> str:
-        return config.default_key_value_store_id
+    def _get_default_id(cls, configuration: Configuration) -> str:
+        return configuration.default_key_value_store_id
 
     @classmethod
     @override
