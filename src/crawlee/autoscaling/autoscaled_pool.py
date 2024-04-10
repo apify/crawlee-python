@@ -45,16 +45,16 @@ class ConcurrencySettings:
             desired_concurrency: The desired number of tasks that should be running parallel on the start of the pool,
                 if there is a large enough supply of them. By default, it is `min_concurrency`.
         """
-        if self.desired_concurrency is not None and self.desired_concurrency < 1:
+        if desired_concurrency is not None and desired_concurrency < 1:
             raise ValueError('desired_concurrency must be 1 or larger')
 
-        if self.min_concurrency < 1:
+        if min_concurrency < 1:
             raise ValueError('min_concurrency must be 1 or larger')
 
-        if self.max_concurrency < self.min_concurrency:
+        if max_concurrency < min_concurrency:
             raise ValueError('max_concurrency cannot be less than min_concurrency')
 
-        if self.max_tasks_per_minute <= 0:
+        if max_tasks_per_minute <= 0:
             raise ValueError('max_tasks_per_minute must be positive')
 
         self.min_concurrency: int = min_concurrency
