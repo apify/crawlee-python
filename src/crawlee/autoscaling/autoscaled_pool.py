@@ -28,7 +28,7 @@ class ConcurrencySettings:
         self,
         min_concurrency: int = 1,
         max_concurrency: int = 200,
-        max_tasks_per_minute: float = math.inf,
+        max_tasks_per_minute: float = float('inf'),
         desired_concurrency: int | None = None,
     ) -> None:
         """Initialize the ConcurrencySettings.
