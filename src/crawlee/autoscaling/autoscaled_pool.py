@@ -57,10 +57,10 @@ class ConcurrencySettings:
         if max_tasks_per_minute <= 0:
             raise ValueError('max_tasks_per_minute must be positive')
 
-        self.min_concurrency: int = min_concurrency
-        self.max_concurrency: int = max_concurrency
-        self.desired_concurrency: int = desired_concurrency if desired_concurrency is not None else min_concurrency
-        self.max_tasks_per_minute: float = max_tasks_per_minute
+        self.min_concurrency = min_concurrency
+        self.max_concurrency = max_concurrency
+        self.desired_concurrency = desired_concurrency if desired_concurrency is not None else min_concurrency
+        self.max_tasks_per_minute = max_tasks_per_minute
 
 
 class AutoscaledPool:
