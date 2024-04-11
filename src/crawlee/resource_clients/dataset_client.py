@@ -108,12 +108,13 @@ class DatasetClient(BaseResourceClient):
                     # We have found the dataset's metadata file, build out information based on it
                     with open(os.path.join(storage_directory, entry.name), encoding='utf-8') as f:
                         metadata = json.load(f)
-                    id_ = metadata['id']
-                    name = metadata['name']
-                    item_count = metadata['itemCount']
-                    created_at = datetime.fromisoformat(metadata['createdAt'])
-                    accessed_at = datetime.fromisoformat(metadata['accessedAt'])
-                    modified_at = datetime.fromisoformat(metadata['modifiedAt'])
+
+                    id_ = metadata.get('id')
+                    name = metadata.get('name')
+                    item_count = metadata.get('item_count')
+                    created_at = datetime.fromisoformat(metadata.get('created_at'))
+                    accessed_at = datetime.fromisoformat(metadata.get('accessed_at'))
+                    modified_at = datetime.fromisoformat(metadata.get('modified_at'))
 
                     continue
 

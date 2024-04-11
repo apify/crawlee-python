@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 
 from crawlee._utils.byte_size import ByteSize

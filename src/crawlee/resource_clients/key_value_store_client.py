@@ -111,9 +111,9 @@ class KeyValueStoreClient(BaseResourceClient):
                 metadata = json.load(f)
             id_ = metadata['id']
             name = metadata['name']
-            created_at = datetime.fromisoformat(metadata['createdAt'])
-            accessed_at = datetime.fromisoformat(metadata['accessedAt'])
-            modified_at = datetime.fromisoformat(metadata['modifiedAt'])
+            created_at = datetime.fromisoformat(metadata['created_at'])
+            accessed_at = datetime.fromisoformat(metadata['accessed_at'])
+            modified_at = datetime.fromisoformat(metadata['modified_at'])
 
         new_client = KeyValueStoreClient(
             base_storage_directory=memory_storage_client.key_value_stores_directory,

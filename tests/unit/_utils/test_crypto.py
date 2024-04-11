@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from crawlee._utils.crypto import compute_short_hash, crypto_random_object_id
 
 

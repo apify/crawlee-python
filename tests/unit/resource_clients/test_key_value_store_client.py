@@ -90,7 +90,7 @@ async def test_update(key_value_store_client: KeyValueStoreClient) -> None:
     updated_kvs_info = await key_value_store_client.update(name=new_kvs_name)
     assert os.path.exists(os.path.join(old_kvs_directory, 'test.json')) is False
     assert os.path.exists(os.path.join(new_kvs_directory, 'test.json')) is True
-    # Only modifiedAt and accessedAt should be different
+    # Only modified_at and accessed_at should be different
     assert old_kvs_info.created_at == updated_kvs_info.created_at
     assert old_kvs_info.modified_at != updated_kvs_info.modified_at
     assert old_kvs_info.accessed_at != updated_kvs_info.accessed_at
@@ -401,9 +401,9 @@ async def test_reads_correct_metadata(memory_storage_client: MemoryStorageClient
     store_metadata = {
         'id': crypto_random_object_id(),
         'name': None,
-        'accessedAt': datetime.now(timezone.utc),
-        'createdAt': datetime.now(timezone.utc),
-        'modifiedAt': datetime.now(timezone.utc),
+        'accessed_at': datetime.now(timezone.utc),
+        'created_at': datetime.now(timezone.utc),
+        'modified_at': datetime.now(timezone.utc),
         'userId': '1',
     }
 

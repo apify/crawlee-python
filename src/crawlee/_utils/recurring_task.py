@@ -27,21 +27,17 @@ class RecurringTask:
 
     async def _wrapper(self) -> None:
         """Internal method that repeatedly executes the provided function with the specified delay."""
-        logger.debug('Calling RecurringTask._wrapper()...')
         sleep_time_secs = self.delay.total_seconds()
         while True:
-            logger.debug('RecurringTask._wrapper(): calling self.func()...')
             await self.func() if asyncio.iscoroutinefunction(self.func) else self.func()
             await asyncio.sleep(sleep_time_secs)
 
     def start(self) -> None:
         """Start the recurring task execution."""
-        logger.debug('Calling RecurringTask.start()...')
         self.task = asyncio.create_task(self._wrapper(), name=f'Task-recurring-{self.func.__name__}')
 
     async def stop(self) -> None:
         """Stop the recurring task execution."""
-        logger.debug('Calling RecurringTask.stop()...')
         if self.task:
             self.task.cancel()
             # Ensure the task has a chance to properly handle the cancellation and any potential exceptions.

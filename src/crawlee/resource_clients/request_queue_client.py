@@ -125,9 +125,9 @@ class RequestQueueClient(BaseResourceClient):
 
                     id_ = metadata['id']
                     name = metadata['name']
-                    created_at = datetime.fromisoformat(metadata['createdAt'])
-                    accessed_at = datetime.fromisoformat(metadata['accessedAt'])
-                    modified_at = datetime.fromisoformat(metadata['modifiedAt'])
+                    created_at = datetime.fromisoformat(metadata['created_at'])
+                    accessed_at = datetime.fromisoformat(metadata['accessed_at'])
+                    modified_at = datetime.fromisoformat(metadata['modified_at'])
                     handled_request_count = metadata['handledRequestCount']
                     pending_request_count = metadata['pendingRequestCount']
                     continue
