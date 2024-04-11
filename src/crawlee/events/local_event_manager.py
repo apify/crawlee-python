@@ -25,7 +25,6 @@ class LocalEventManager(EventManager):
         self,
         *,
         system_info_interval: timedelta = timedelta(seconds=60),
-        close_timeout: timedelta | None = None,
     ) -> None:
         """Create a new instance.
 
@@ -33,10 +32,7 @@ class LocalEventManager(EventManager):
             system_info_interval: Interval at which `SystemInfo` events are emitted.
             close_timeout: Optional timeout for closing the event manager.
         """
-        logger.debug('Calling LocalEventManager.__init__()...')
-
         self._system_info_interval = system_info_interval
-        self._close_timeout = close_timeout
 
         # Recurring task for emitting system info events.
         self._emit_system_info_event_rec_task: RecurringTask | None = None
@@ -48,12 +44,14 @@ class LocalEventManager(EventManager):
 
         It starts emitting system info events at regular intervals.
         """
-        logger.debug('Calling LocalEventManager.__aenter__()...')
+        await super().__aenter__()
+
         self._emit_system_info_event_rec_task = RecurringTask(
             func=self._emit_system_info_event,
             delay=self._system_info_interval,
         )
         self._emit_system_info_event_rec_task.start()
+
         return self
 
     async def __aexit__(
@@ -66,17 +64,13 @@ class LocalEventManager(EventManager):
 
         It stops emitting system info events and closes the event manager.
         """
-        logger.debug('Calling LocalEventManager.__aexit__()...')
-
         if self._emit_system_info_event_rec_task is not None:
             await self._emit_system_info_event_rec_task.stop()
 
-        await super().close(timeout=self._close_timeout)
+        await super().__aexit__(exc_type, exc_value, exc_traceback)
 
     async def _emit_system_info_event(self) -> None:
         """Emits a system info event with the current CPU and memory usage."""
-        logger.debug('Calling LocalEventManager._emit_system_info_event()...')
-
         cpu_info = await asyncio.to_thread(get_cpu_info)
         memory_info = await asyncio.to_thread(get_memory_info)
 

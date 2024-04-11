@@ -13,6 +13,7 @@ from pyee.asyncio import AsyncIOEventEmitter
 
 if TYPE_CHECKING:
     from datetime import timedelta
+    from types import TracebackType
 
     from crawlee.events.types import Event, EventData, Listener, WrappedListener
 
@@ -26,8 +27,13 @@ class EventManager:
     their execution. It is built on top of the `pyee.asyncio.AsyncIOEventEmitter` class.
     """
 
-    def __init__(self) -> None:
-        logger.debug('Calling EventManager.__init__()...')
+    def __init__(self, close_timeout: timedelta | None = None) -> None:
+        """Create a new instance.
+
+        Args:
+            close_timeout: Optional timeout after which the pending event listeners are canceled.
+        """
+        self._close_timeout = close_timeout
 
         # Asynchronous event emitter for handle events and invoke the event listeners.
         self._event_emitter = AsyncIOEventEmitter()
@@ -41,6 +47,25 @@ class EventManager:
             lambda: defaultdict(list),
         )
 
+    async def __aenter__(self) -> EventManager:
+        """Initializes the event manager upon entering the async context."""
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        exc_traceback: TracebackType | None,
+    ) -> None:
+        """Closes the local event manager upon exiting the async context.
+
+        This will stop listening for the events, and it will wait for all the event listeners to finish.
+        """
+        await self._wait_for_all_listeners_to_complete(timeout=self._close_timeout)
+        self._event_emitter.remove_all_listeners()
+        self._listener_tasks.clear()
+        self._listeners_to_wrappers.clear()
+
     def on(self, *, event: Event, listener: Listener) -> None:
         """Add an event listener to the event manager.
 
@@ -48,12 +73,8 @@ class EventManager:
             event: The Actor event for which to listen to.
             listener: The function (sync or async) which is to be called when the event is emitted.
         """
-        logger.debug('Calling EventManager.on()...')
-
         @wraps(listener)
         async def listener_wrapper(event_data: EventData) -> None:
-            logger.debug('Calling EventManager.on.listener_wrapper()...')
-
             # If the listener is a coroutine function, just call it, otherwise, run it in a separate thread
             # to avoid blocking the event loop
             coro = (
@@ -92,8 +113,6 @@ class EventManager:
             listener: The listener which is supposed to be removed. If not passed, all listeners of this event
                 are removed.
         """
-        logger.debug('Calling EventManager.off()...')
-
         if listener:
             for listener_wrapper in self._listeners_to_wrappers[event][listener]:
                 self._event_emitter.remove_listener(event.value, listener_wrapper)
@@ -109,22 +128,7 @@ class EventManager:
             event: The event which will be emitted.
             event_data: The data which will be passed to the event listeners.
         """
-        logger.debug('Calling EventManager.emit()...')
         self._event_emitter.emit(event.value, event_data)
-
-    async def close(self, *, timeout: timedelta | None = None) -> None:
-        """Close the event manager.
-
-        This will stop listening for the events, and it will wait for all the event listeners to finish.
-
-        Args:
-            timeout: Optional timeout after which the pending event listeners are canceled.
-        """
-        logger.debug('Calling EventManager.close()...')
-        await self._wait_for_all_listeners_to_complete(timeout=timeout)
-        self._event_emitter.remove_all_listeners()
-        self._listener_tasks.clear()
-        self._listeners_to_wrappers.clear()
 
     async def _wait_for_all_listeners_to_complete(self, *, timeout: timedelta | None = None) -> None:
         """Wait for all currently executing event listeners to complete.
@@ -133,8 +137,6 @@ class EventManager:
             timeout: The maximum time to wait for the event listeners to finish. If they do not complete within
                 the specified timeout, they will be canceled.
         """
-        logger.debug('Calling EventManager.wait_for_all_listeners_to_complete()...')
-
         async def wait_for_listeners() -> None:
             """Gathers all listener tasks and awaits their completion, logging any exceptions encountered."""
             results = await asyncio.gather(*self._listener_tasks, return_exceptions=True)

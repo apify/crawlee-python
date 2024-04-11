@@ -17,6 +17,7 @@ class Event(Enum):
     MIGRATING = 'migrating'
     ABORTING = 'aborting'
     EXIT = 'exit'
+    SESSION_RETIRED = 'sessionRetired'
 
 
 @dataclass
