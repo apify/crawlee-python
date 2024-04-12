@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 from datetime import datetime, timezone
+from logging import getLogger
 from typing import TYPE_CHECKING, Any, AsyncIterator
 
 import aiofiles
@@ -20,6 +21,8 @@ from crawlee.storages.types import DatasetResourceInfo, ListPage, StorageTypes
 if TYPE_CHECKING:
     from crawlee.storage_clients import MemoryStorageClient
     from crawlee.storages.types import JSONSerializable
+
+logger = getLogger(__name__)
 
 
 class DatasetClient(BaseResourceClient):
@@ -92,41 +95,45 @@ class DatasetClient(BaseResourceClient):
         name: str | None = None,
     ) -> DatasetClient:
         item_count = 0
-        created_at = datetime.now(timezone.utc)
-        accessed_at = datetime.now(timezone.utc)
-        modified_at = datetime.now(timezone.utc)
-        entries: dict[str, dict] = {}
+        created_at: datetime | None = datetime.now(timezone.utc)
+        accessed_at: datetime | None = datetime.now(timezone.utc)
+        modified_at: datetime | None = datetime.now(timezone.utc)
 
+        # Load metadata if it exists
+        metadata_filepath = os.path.join(storage_directory, '__metadata__.json')
+
+        if os.path.exists(metadata_filepath):
+            with open(metadata_filepath, encoding='utf-8') as f:
+                json_content = json.load(f)
+                metadata = DatasetResourceInfo(**json_content)
+
+            id_ = metadata.id
+            name = metadata.name
+            item_count = metadata.item_count
+            created_at = metadata.created_at
+            accessed_at = metadata.accessed_at
+            modified_at = metadata.modified_at
+
+        # Load dataset entries
+        entries: dict[str, dict] = {}
         has_seen_metadata_file = False
 
-        # Access the dataset folder
         for entry in os.scandir(storage_directory):
             if entry.is_file():
                 if entry.name == '__metadata__.json':
                     has_seen_metadata_file = True
-
-                    # We have found the dataset's metadata file, build out information based on it
-                    with open(os.path.join(storage_directory, entry.name), encoding='utf-8') as f:
-                        metadata = json.load(f)
-
-                    id_ = metadata.get('id')
-                    name = metadata.get('name')
-                    item_count = metadata.get('item_count')
-                    created_at = datetime.fromisoformat(metadata.get('created_at'))
-                    accessed_at = datetime.fromisoformat(metadata.get('accessed_at'))
-                    modified_at = datetime.fromisoformat(metadata.get('modified_at'))
-
                     continue
 
                 with open(os.path.join(storage_directory, entry.name), encoding='utf-8') as f:
                     entry_content = json.load(f)
-                entry_name = entry.name.split('.')[0]
 
+                entry_name = entry.name.split('.')[0]
                 entries[entry_name] = entry_content
 
                 if not has_seen_metadata_file:
                     item_count += 1
 
+        # Create new dataset client
         new_client = DatasetClient(
             base_storage_directory=memory_storage_client.datasets_directory,
             memory_storage_client=memory_storage_client,
@@ -138,9 +145,7 @@ class DatasetClient(BaseResourceClient):
             item_count=item_count,
         )
 
-        for entry_id, content in entries.items():
-            new_client.dataset_entries[entry_id] = content
-
+        new_client.dataset_entries = entries
         return new_client
 
     @override

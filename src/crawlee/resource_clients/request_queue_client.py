@@ -113,32 +113,40 @@ class RequestQueueClient(BaseResourceClient):
         modified_at = datetime.now(timezone.utc)
         handled_request_count = 0
         pending_request_count = 0
-        entries: list[dict] = []
 
-        # Access the request queue folder
+        # Load metadata if it exists
+        metadata_filepath = os.path.join(storage_directory, '__metadata__.json')
+
+        if os.path.exists(metadata_filepath):
+            with open(metadata_filepath, encoding='utf-8') as f:
+                metadata = json.load(f)
+
+            id_ = metadata['id']
+            name = metadata['name']
+            created_at = datetime.fromisoformat(metadata['created_at'])
+            accessed_at = datetime.fromisoformat(metadata['accessed_at'])
+            modified_at = datetime.fromisoformat(metadata['modified_at'])
+            handled_request_count = metadata['handled_request_count']
+            pending_request_count = metadata['pending_request_count']
+
+        # Load request entries
+        entries: dict[str, Request] = {}
+
         for entry in os.scandir(storage_directory):
             if entry.is_file():
                 if entry.name == '__metadata__.json':
-                    # We have found the queue's metadata file, build out information based on it
-                    with open(os.path.join(storage_directory, entry.name), encoding='utf-8') as f:
-                        metadata = json.load(f)
-
-                    id_ = metadata['id']
-                    name = metadata['name']
-                    created_at = datetime.fromisoformat(metadata['created_at'])
-                    accessed_at = datetime.fromisoformat(metadata['accessed_at'])
-                    modified_at = datetime.fromisoformat(metadata['modified_at'])
-                    handled_request_count = metadata['handledRequestCount']
-                    pending_request_count = metadata['pendingRequestCount']
                     continue
 
                 with open(os.path.join(storage_directory, entry.name), encoding='utf-8') as f:
-                    request = json.load(f)
-                    if request.order_no:
-                        request.order_no = Decimal(request.order_no)
-                entries.append(request)
+                    request = Request(**json.load(f))
+                    order_no = request.order_no
+                    if order_no:
+                        request.order_no = Decimal(order_no)
 
-        new_client = cls(
+                entries[request.id] = request
+
+        # Create new RQ client
+        new_client = RequestQueueClient(
             base_storage_directory=memory_storage_client.request_queues_directory,
             memory_storage_client=memory_storage_client,
             id_=id_,
@@ -150,9 +158,7 @@ class RequestQueueClient(BaseResourceClient):
             pending_request_count=pending_request_count,
         )
 
-        for request in entries:
-            new_client.requests[request['id']] = request
-
+        new_client.requests = entries
         return new_client
 
     @override
@@ -492,7 +498,7 @@ class RequestQueueClient(BaseResourceClient):
         # Write the request to the file
         file_path = os.path.join(entity_directory, f'{request.id}.json')
         async with aiofiles.open(file_path, mode='wb') as f:
-            s = await json_dumps(request)
+            s = await json_dumps(request.__dict__)
             await f.write(s.encode('utf-8'))
 
     async def _delete_request_file_from_storage(self, *, request_id: str, entity_directory: str) -> None:
