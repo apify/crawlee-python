@@ -95,9 +95,9 @@ class DatasetClient(BaseResourceClient):
         name: str | None = None,
     ) -> DatasetClient:
         item_count = 0
-        created_at: datetime | None = datetime.now(timezone.utc)
-        accessed_at: datetime | None = datetime.now(timezone.utc)
-        modified_at: datetime | None = datetime.now(timezone.utc)
+        created_at = datetime.now(timezone.utc)
+        accessed_at = datetime.now(timezone.utc)
+        modified_at = datetime.now(timezone.utc)
 
         # Load metadata if it exists
         metadata_filepath = os.path.join(storage_directory, '__metadata__.json')
@@ -105,14 +105,14 @@ class DatasetClient(BaseResourceClient):
         if os.path.exists(metadata_filepath):
             with open(metadata_filepath, encoding='utf-8') as f:
                 json_content = json.load(f)
-                metadata = DatasetResourceInfo(**json_content)
+                resource_info = DatasetResourceInfo(**json_content)
 
-            id_ = metadata.id
-            name = metadata.name
-            item_count = metadata.item_count
-            created_at = metadata.created_at
-            accessed_at = metadata.accessed_at
-            modified_at = metadata.modified_at
+            id_ = resource_info.id
+            name = resource_info.name
+            item_count = resource_info.item_count
+            created_at = resource_info.created_at
+            accessed_at = resource_info.accessed_at
+            modified_at = resource_info.modified_at
 
         # Load dataset entries
         entries: dict[str, dict] = {}
@@ -145,7 +145,7 @@ class DatasetClient(BaseResourceClient):
             item_count=item_count,
         )
 
-        new_client.dataset_entries = entries
+        new_client.dataset_entries.update(entries)
         return new_client
 
     @override

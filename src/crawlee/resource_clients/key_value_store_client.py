@@ -110,13 +110,14 @@ class KeyValueStoreClient(BaseResourceClient):
 
         if os.path.exists(metadata_filepath):
             with open(metadata_filepath, encoding='utf-8') as f:
-                metadata = json.load(f)
+                json_content = json.load(f)
+                resource_info = KeyValueStoreResourceInfo(**json_content)
 
-            id_ = metadata['id']
-            name = metadata['name']
-            created_at = datetime.fromisoformat(metadata['created_at'])
-            accessed_at = datetime.fromisoformat(metadata['accessed_at'])
-            modified_at = datetime.fromisoformat(metadata['modified_at'])
+            id_ = resource_info.id
+            name = resource_info.name
+            created_at = resource_info.created_at
+            accessed_at = resource_info.accessed_at
+            modified_at = resource_info.modified_at
 
         # Create new KVS client
         new_client = KeyValueStoreClient(

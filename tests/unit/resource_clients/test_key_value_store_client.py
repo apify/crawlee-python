@@ -404,7 +404,7 @@ async def test_reads_correct_metadata(memory_storage_client: MemoryStorageClient
         'accessed_at': datetime.now(timezone.utc),
         'created_at': datetime.now(timezone.utc),
         'modified_at': datetime.now(timezone.utc),
-        'userId': '1',
+        'user_id': '1',
     }
 
     # Write the store metadata to disk
