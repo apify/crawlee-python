@@ -22,7 +22,6 @@ async def session_pool(event_manager: EventManager) -> AsyncGenerator[SessionPoo
         yield sp
 
 
-@pytest.mark.only()
 async def test_get_session_simple(session_pool: SessionPool) -> None:
     assert session_pool.session_count == session_pool._max_pool_size
 

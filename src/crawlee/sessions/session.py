@@ -2,61 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
-from typing import Any, ClassVar
-
-from dateutil import parser
-from pydantic import BaseModel, field_validator
+from typing import ClassVar
 
 from crawlee._utils.crypto import crypto_random_object_id
+from crawlee.sessions.models import CookieJar, SessionModel, UserData
 
 logger = getLogger(__name__)
-
-
-@dataclass
-class UserData:
-    # TODO: implement user data
-    pass
-
-
-class _SessionModel(BaseModel):
-    id: str
-    max_age: timedelta
-    user_data: UserData
-    max_error_score: float
-    error_score_decrement: float
-    created_at: datetime
-    usage_count: int
-    max_usage_count: int
-    error_score: float
-    cookie_jar: dict
-    blocked_status_codes: list[int]
-
-    @field_validator('max_age', mode='before')
-    def parse_max_age(cls, v: Any) -> timedelta:  # noqa: N805
-        if isinstance(v, timedelta):
-            return v
-
-        if isinstance(v, str):
-            try:
-                parsed_time = parser.parse(v)
-                return timedelta(hours=parsed_time.hour, minutes=parsed_time.minute, seconds=parsed_time.second)
-            except ValueError as exc:
-                raise ValueError(f"Invalid time format for max_age. Expected 'HH:MM:SS', got {v}") from exc
-
-        raise ValueError('Invalid data type for max_age')
-
-    @field_validator('created_at', mode='before')
-    def parse_created_at(cls, v: Any) -> datetime:  # noqa: N805
-        if isinstance(v, str):
-            return datetime.fromisoformat(v)
-
-        if isinstance(v, datetime):
-            return v
-
-        raise ValueError('Invalid data type for created_at')
 
 
 class Session:
@@ -83,7 +36,7 @@ class Session:
         usage_count: int = 0,
         max_usage_count: int = 50,
         error_score: float = 0.0,
-        cookie_jar: dict | None = None,
+        cookie_jar: CookieJar | None = None,
         blocked_status_codes: list | None = None,
     ) -> None:
         self._id = id or crypto_random_object_id(length=10)
@@ -95,17 +48,16 @@ class Session:
         self._usage_count = usage_count
         self._max_usage_count = max_usage_count
         self._error_score = error_score
-        self._cookie_jar = cookie_jar or {}
+        self._cookie_jar = cookie_jar or CookieJar()
         self._blocked_status_codes = blocked_status_codes or self._DEFAULT_BLOCKED_STATUS_CODES
 
     @classmethod
-    def from_kwargs(cls, **kwargs: Any) -> Session:
-        """Creates a session from a dictionary."""
-        model = _SessionModel(**kwargs)
+    def from_model(cls, model: SessionModel) -> Session:
+        """Create a new instance from a model."""
         return cls(**model.model_dump())
 
     def __repr__(self) -> str:
-        """Returns a string representation of the session."""
+        """Returns a string representation."""
         return f'<{self.__class__.__name__} {self.get_state()}>'
 
     @property
@@ -138,9 +90,9 @@ class Session:
         """Indicates whether the session can be used for next requests."""
         return not (self.is_blocked and self.is_expired and self.is_max_usage_count_reached)
 
-    def get_state(self) -> dict:
+    def get_state(self, *, as_dict: bool = False) -> SessionModel | dict:
         """Returns the session state for persistence."""
-        return _SessionModel(
+        model = SessionModel(
             id=self._id,
             max_age=self._max_age,
             user_data=self._user_data,
@@ -152,7 +104,10 @@ class Session:
             error_score=self._error_score,
             cookie_jar=self._cookie_jar,
             blocked_status_codes=self._blocked_status_codes,
-        ).model_dump()
+        )
+        if as_dict:
+            return model.model_dump()
+        return model
 
     def mark_good(self) -> None:
         """Marks the session as good after a successful session usage."""
@@ -177,6 +132,29 @@ class Session:
         self._error_score += 1
         self._usage_count += 1
         self._maybe_self_retire()
+
+    def retire_on_blocked_status_codes(
+        self,
+        *,
+        status_code: int,
+        additional_blocked_status_codes: list[int] | None = None,
+    ) -> bool:
+        """Retires the session when certain status codes are received.
+
+        Args:
+            status_code: HTTP status code.
+            additional_blocked_status_codes: Custom HTTP status codes that means blocking on particular website.
+
+        Returns:
+            True if the session was retired, False otherwise.
+        """
+        blocked_status_codes = self._blocked_status_codes + (additional_blocked_status_codes or [])
+
+        if status_code in blocked_status_codes:
+            self.retire()
+            return True
+
+        return False
 
     def _maybe_self_retire(self) -> None:
         """Retires the session if it's not usable anymore."""
@@ -211,29 +189,6 @@ class Session:
     # def get_cookies(self) -> dict:
     #     """Returns cookies in a format compatible with puppeteer/playwright."""
     #     return self.cookie_jar
-
-    def retire_on_blocked_status_codes(
-        self,
-        *,
-        status_code: int,
-        additional_blocked_status_codes: list[int] | None = None,
-    ) -> bool:
-        """Retires the session when certain status codes are received.
-
-        Args:
-            status_code: HTTP status code.
-            additional_blocked_status_codes: Custom HTTP status codes that means blocking on particular website.
-
-        Returns:
-            True if the session was retired, False otherwise.
-        """
-        blocked_status_codes = self._blocked_status_codes + (additional_blocked_status_codes or [])
-
-        if status_code in blocked_status_codes:
-            self.retire()
-            return True
-
-        return False
 
     # TODO: set cookies from response method?
     # TODO: get cookies as string method?
