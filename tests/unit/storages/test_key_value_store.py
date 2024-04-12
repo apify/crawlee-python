@@ -33,6 +33,24 @@ async def test_open() -> None:
         await KeyValueStore.open(id_='dummy-name')
 
 
+async def test_consistency_accross_two_clients() -> None:
+    kvs = await KeyValueStore.open(name='my-kvs')
+    await kvs.set_value('key', 'value')
+
+    kvs_by_id = await KeyValueStore.open(id_=kvs.id)
+    await kvs_by_id.set_value('key2', 'value2')
+
+    assert (await kvs.get_value('key')) == 'value'
+    assert (await kvs.get_value('key2')) == 'value2'
+
+    assert (await kvs_by_id.get_value('key')) == 'value'
+    assert (await kvs_by_id.get_value('key2')) == 'value2'
+
+    await kvs.drop()
+    with pytest.raises(RuntimeError, match='Storage with provided ID was not found'):
+        await kvs_by_id.drop()
+
+
 async def test_same_references() -> None:
     kvs1 = await KeyValueStore.open()
     kvs2 = await KeyValueStore.open()

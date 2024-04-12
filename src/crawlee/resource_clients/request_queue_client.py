@@ -501,7 +501,7 @@ class RequestQueueClient(BaseResourceClient):
         # Write the request to the file
         file_path = os.path.join(entity_directory, f'{request.id}.json')
         async with aiofiles.open(file_path, mode='wb') as f:
-            s = await json_dumps(request.__dict__)
+            s = await json_dumps(request.model_dump())
             await f.write(s.encode('utf-8'))
 
     async def _delete_request_file_from_storage(self, *, request_id: str, entity_directory: str) -> None:
