@@ -1,13 +1,12 @@
-# ruff: noqa: TCH001, TCH003
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Generic, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, Union
 
-from crawlee.request import Request
+if TYPE_CHECKING:
+    from crawlee.request import Request
 
 T = TypeVar('T')
 
