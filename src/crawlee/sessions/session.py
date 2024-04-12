@@ -86,6 +86,16 @@ class Session:
         return self._id
 
     @property
+    def error_score(self) -> float:
+        """Get the current error score."""
+        return self._error_score
+
+    @property
+    def usage_count(self) -> float:
+        """Get the current usage count."""
+        return self._usage_count
+
+    @property
     def expires_at(self) -> datetime:
         """Get the expiration datetime of the session."""
         return self._created_at + self._max_age
@@ -98,7 +108,7 @@ class Session:
     @property
     def is_expired(self) -> bool:
         """Indicate whether the session is expired based on the current time."""
-        return self.expires_at <= datetime.now(timezone.utc)
+        return datetime.now(timezone.utc) >= self.expires_at
 
     @property
     def is_max_usage_count_reached(self) -> bool:
@@ -108,7 +118,7 @@ class Session:
     @property
     def is_usable(self) -> bool:
         """Determine if the session is usable for next requests."""
-        return not (self.is_blocked and self.is_expired and self.is_max_usage_count_reached)
+        return not (self.is_blocked or self.is_expired or self.is_max_usage_count_reached)
 
     @overload
     def get_state(self, *, as_dict: Literal[True]) -> dict: ...
