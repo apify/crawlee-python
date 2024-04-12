@@ -6,7 +6,7 @@ import httpx
 
 from crawlee.basic_crawler.basic_crawler import BasicCrawler
 from crawlee.basic_crawler.context_pipeline import ContextPipeline
-from crawlee.http_crawler.types import HttpCrawlingContext
+from crawlee.http_crawler.types import HttpCrawlingContext, HttpCrawlResult
 
 if TYPE_CHECKING:
     from datetime import timedelta
@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from crawlee.autoscaling.autoscaled_pool import ConcurrencySettings
     from crawlee.basic_crawler.types import BasicCrawlingContext
     from crawlee.configuration import Configuration
+    from crawlee.request import Request
     from crawlee.storages.request_provider import RequestProvider
 
 
@@ -58,7 +59,12 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
     async def _make_http_request(
         self, crawling_context: BasicCrawlingContext
     ) -> AsyncGenerator[HttpCrawlingContext, None]:
-        response = await self._client.request(crawling_context.request.method, crawling_context.request.url)
-        response.raise_for_status()
+        result = await make_http_request(self._client, crawling_context.request)
+        yield HttpCrawlingContext(request=crawling_context.request, http_response=result.http_response)
 
-        yield HttpCrawlingContext(request=crawling_context.request, http_response=response)
+
+async def make_http_request(client: httpx.AsyncClient, request: Request) -> HttpCrawlResult:
+    """Perform a request using `httpx`."""
+    response = await client.request(request.method, request.url)
+    response.raise_for_status()
+    return HttpCrawlResult(http_response=response)
