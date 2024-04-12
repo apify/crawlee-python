@@ -1,8 +1,12 @@
-from dataclasses import dataclass
+from __future__ import annotations
 
-from httpx import Response
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from crawlee.basic_crawler.types import BasicCrawlingContext
+
+if TYPE_CHECKING:
+    from httpx import Response
 
 
 @dataclass(frozen=True)

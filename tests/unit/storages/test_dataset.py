@@ -34,6 +34,21 @@ async def test_open() -> None:
         await Dataset.open(id_='dummy-name')
 
 
+async def test_consistency_accross_two_clients() -> None:
+    dataset = await Dataset.open(name='my-dataset')
+    await dataset.push_data({'key': 'value'})
+
+    dataset_by_id = await Dataset.open(id_=dataset.id)
+    await dataset_by_id.push_data({'key2': 'value2'})
+
+    assert (await dataset.get_data()).items == [{'key': 'value'}, {'key2': 'value2'}]
+    assert (await dataset_by_id.get_data()).items == [{'key': 'value'}, {'key2': 'value2'}]
+
+    await dataset.drop()
+    with pytest.raises(RuntimeError, match='Storage with provided ID was not found'):
+        await dataset_by_id.drop()
+
+
 async def test_same_references() -> None:
     dataset1 = await Dataset.open()
     dataset2 = await Dataset.open()

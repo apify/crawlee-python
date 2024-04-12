@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from abc import ABC, abstractmethod
+from logging import getLogger
 from typing import TYPE_CHECKING, Generic, TypeVar, cast
 
 from typing_extensions import Self
@@ -18,6 +19,8 @@ if TYPE_CHECKING:
 else:
     BaseResourceClientType = TypeVar('BaseResourceClientType')
     BaseResourceCollectionClientType = TypeVar('BaseResourceCollectionClientType')
+
+logger = getLogger(__name__)
 
 
 class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionClientType]):
@@ -178,7 +181,13 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
 
     def _remove_from_cache(self) -> None:
         if self.__class__.cache_by_id is not None:
-            del self.__class__.cache_by_id[self.id]
+            try:
+                del self.__class__.cache_by_id[self.id]
+            except KeyError as exc:
+                raise RuntimeError(f'Storage with provided ID was not found ({self.id}).') from exc
 
         if self.name and self.__class__.cache_by_name is not None:
-            del self.__class__.cache_by_name[self.name]
+            try:
+                del self.__class__.cache_by_name[self.name]
+            except KeyError as exc:
+                raise RuntimeError(f'Storage with provided name was not found ({self.name}).') from exc

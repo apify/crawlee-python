@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Generic, TypeVar, Union
 
 if TYPE_CHECKING:
-    from datetime import datetime
-
     from crawlee.request import Request
 
 T = TypeVar('T')
@@ -96,6 +95,15 @@ class BaseResourceInfo:
     accessed_at: datetime
     created_at: datetime
     modified_at: datetime
+
+    def __post_init__(self) -> None:
+        """Convert string dates to datetime objects."""
+        if isinstance(self.accessed_at, str):  # type: ignore
+            self.accessed_at = datetime.fromisoformat(self.accessed_at)  # type: ignore
+        if isinstance(self.created_at, str):  # type: ignore
+            self.created_at = datetime.fromisoformat(self.created_at)  # type: ignore
+        if isinstance(self.modified_at, str):  # type: ignore
+            self.modified_at = datetime.fromisoformat(self.modified_at)  # type: ignore
 
 
 @dataclass

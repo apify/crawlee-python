@@ -64,7 +64,7 @@ async def test_update(dataset_client: DatasetClient) -> None:
     updated_dataset_info = await dataset_client.update(name=new_dataset_name)
     assert os.path.exists(os.path.join(old_dataset_directory, '000000001.json')) is False
     assert os.path.exists(os.path.join(new_dataset_directory, '000000001.json')) is True
-    # Only modifiedAt and accessedAt should be different
+    # Only modified_at and accessed_at should be different
     assert old_dataset_info.created_at == updated_dataset_info.created_at
     assert old_dataset_info.modified_at != updated_dataset_info.modified_at
     assert old_dataset_info.accessed_at != updated_dataset_info.accessed_at

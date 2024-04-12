@@ -56,7 +56,7 @@ async def test_update(request_queue_client: RequestQueueClient) -> None:
     updated_rq_info = await request_queue_client.update(name=new_rq_name)
     assert os.path.exists(os.path.join(old_rq_directory, 'fvwscO2UJLdr10B.json')) is False
     assert os.path.exists(os.path.join(new_rq_directory, 'fvwscO2UJLdr10B.json')) is True
-    # Only modifiedAt and accessedAt should be different
+    # Only modified_at and accessed_at should be different
     assert old_rq_info.created_at == updated_rq_info.created_at
     assert old_rq_info.modified_at != updated_rq_info.modified_at
     assert old_rq_info.accessed_at != updated_rq_info.accessed_at

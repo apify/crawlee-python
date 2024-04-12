@@ -36,6 +36,27 @@ async def test_open() -> None:
         await RequestQueue.open(id_='dummy-name')
 
 
+async def test_consistency_accross_two_clients() -> None:
+    request_apify = Request.from_url('https://apify.com')
+    request_crawlee = Request.from_url('https://crawlee.dev')
+
+    rq = await RequestQueue.open(name='my-rq')
+    await rq.add_request(request_apify)
+
+    rq_by_id = await RequestQueue.open(id_=rq.id)
+    await rq_by_id.add_request(request_crawlee)
+
+    assert await rq.get_total_count() == 2
+    assert await rq_by_id.get_total_count() == 2
+
+    assert await rq.fetch_next_request() == request_apify
+    assert await rq_by_id.fetch_next_request() == request_crawlee
+
+    await rq.drop()
+    with pytest.raises(RuntimeError, match='Storage with provided ID was not found'):
+        await rq_by_id.drop()
+
+
 async def test_same_references() -> None:
     rq1 = await RequestQueue.open()
     rq2 = await RequestQueue.open()

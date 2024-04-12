@@ -1,4 +1,7 @@
 # ruff: noqa: ARG001
+
+from __future__ import annotations
+
 import pytest
 
 from crawlee.basic_crawler.basic_crawler import BasicCrawler, UserDefinedErrorHandlerError
