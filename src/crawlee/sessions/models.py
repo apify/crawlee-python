@@ -10,18 +10,16 @@ from pydantic import BaseModel, field_validator
 
 @dataclass
 class CookieJar:
-    # TODO: implement this
-    pass
+    """CookieJar object represents a collection of cookies."""
 
 
 @dataclass
 class UserData:
-    # TODO: implement this
-    pass
+    """UserData object represents a collection of user data."""
 
 
 class SessionModel(BaseModel):
-    # TODO: document this
+    """Model for a Session object."""
 
     id: str
     max_age: timedelta
@@ -65,7 +63,7 @@ class SessionModel(BaseModel):
 
 
 class SessionPoolModel(BaseModel):
-    # TODO: implement this
+    """Model for a SessionPool object."""
 
     persistance_enabled: bool
     persist_state_kvs_name: str

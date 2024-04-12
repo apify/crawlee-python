@@ -1,10 +1,17 @@
 # Inspiration: https://github.com/apify/crawlee/blob/v3.9.0/packages/core/src/session_pool/session.ts
 
+# TODO:
+# - Implement UserData
+# - Implement Cookies
+#   - set cookies from response method?
+#   - get cookies as string method?
+#   - normalization? url?
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
-from typing import ClassVar
+from typing import ClassVar, Literal, overload
 
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee.sessions.models import CookieJar, SessionModel, UserData
@@ -58,7 +65,7 @@ class Session:
 
     def __repr__(self) -> str:
         """Returns a string representation."""
-        return f'<{self.__class__.__name__} {self.get_state()}>'
+        return f'<{self.__class__.__name__} {self.get_state(as_dict=False)}>'
 
     @property
     def id(self) -> str:
@@ -90,8 +97,14 @@ class Session:
         """Indicates whether the session can be used for next requests."""
         return not (self.is_blocked and self.is_expired and self.is_max_usage_count_reached)
 
+    @overload
+    def get_state(self, *, as_dict: Literal[True]) -> dict: ...
+
+    @overload
+    def get_state(self, *, as_dict: Literal[False]) -> SessionModel: ...
+
     def get_state(self, *, as_dict: bool = False) -> SessionModel | dict:
-        """Returns the session state for persistence."""
+        """Retrieves the current state of the session either as a model or as a dictionary."""
         model = SessionModel(
             id=self._id,
             max_age=self._max_age,
@@ -160,35 +173,3 @@ class Session:
         """Retires the session if it's not usable anymore."""
         if not self.is_usable:
             self.retire()
-
-    def set_cookies(self, cookies: dict) -> None:
-        """Saves an array with cookie objects to be used with the session.
-
-            The objects should be in the format that
-            [Puppeteer uses](https://pptr.dev/#?product=Puppeteer&version=v2.0.0&show=api-pagecookiesurls),
-            but you can also use this function to set cookies manually:
-
-        Args:
-            cookies (CookieTypes): _description_
-        """
-        # TODO: normalization? url?
-        # setCookies(cookies: CookieObject[], url: string) {
-        # const normalizedCookies = cookies.map((c) => browserPoolCookieToToughCookie(c, this.maxAgeSecs));
-        # this._setCookies(normalizedCookies, url);
-        # it seems cookies are set like a: url: cookies
-
-        # error_messages: list[str] = []
-        # try:
-        #     for cookie in cookies:
-        #         self._cookie_jar.set_cookie(cookie)
-        # except Exception as e:
-        #     error_messages.append(str(e))
-        # if error_messages:
-        #     logger.warning('Could not set cookies.', extra={'error_messages': error_messages})
-
-    # def get_cookies(self) -> dict:
-    #     """Returns cookies in a format compatible with puppeteer/playwright."""
-    #     return self.cookie_jar
-
-    # TODO: set cookies from response method?
-    # TODO: get cookies as string method?

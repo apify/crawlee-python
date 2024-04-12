@@ -1,10 +1,14 @@
 # Inspiration: https://github.com/apify/crawlee/blob/v3.9.0/packages/core/src/session_pool/session_pool.ts
 
+# TODO:
+# - max_listeners (default 20) ?
+# - create_session_function: Callable | None = None,
+
 from __future__ import annotations
 
 import random
 from logging import getLogger
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Callable, Literal, overload
 
 from crawlee.events.types import Event, EventPersistStateData
 from crawlee.sessions import Session
@@ -17,11 +21,6 @@ if TYPE_CHECKING:
     from crawlee.events import EventManager
 
 logger = getLogger(__name__)
-
-
-# TODO:
-# - max_listeners (default 20) ?
-# - create_session_function: Callable | None = None,
 
 
 class SessionPool:
@@ -71,25 +70,31 @@ class SessionPool:
 
     def __repr__(self) -> str:
         """Returns a string representation."""
-        return f'<{self.__class__.__name__} {self.get_state()}>'
+        return f'<{self.__class__.__name__} {self.get_state(as_dict=False)}>'
 
     @property
     def session_count(self) -> int:
-        """Return the number of sessions."""
+        """Returns the total number of sessions currently maintained in the pool."""
         return len(self._sessions)
 
     @property
     def usable_session_count(self) -> int:
-        """Return the number of usable sessions."""
+        """Returns the number of sessions that are currently usable."""
         return len([session for _, session in self._sessions.items() if session.is_usable])
 
     @property
     def retired_session_count(self) -> int:
-        """Return the number of retired sessions."""
+        """Returns the number of sessions that are no longer usable."""
         return self.session_count - self.usable_session_count
 
+    @overload
+    def get_state(self, *, as_dict: Literal[True]) -> dict: ...
+
+    @overload
+    def get_state(self, *, as_dict: Literal[False]) -> SessionPoolModel: ...
+
     def get_state(self, *, as_dict: bool = False) -> SessionPoolModel | dict:
-        """Return the state of the session pool."""
+        """Retrieves the current state of the pool either as a model or as a dictionary."""
         model = SessionPoolModel(
             persistance_enabled=self._persistance_enabled,
             persist_state_kvs_name=self._persist_state_kvs_name,
@@ -98,7 +103,7 @@ class SessionPool:
             session_count=self.session_count,
             usable_session_count=self.usable_session_count,
             retired_session_count=self.retired_session_count,
-            sessions=[session.get_state() for _, session in self._sessions.items()],  # type: ignore
+            sessions=[session.get_state(as_dict=False) for _, session in self._sessions.items()],
         )
         if as_dict:
             return model.model_dump()
@@ -176,6 +181,7 @@ class SessionPool:
     async def reset_store(self) -> None:
         """Reset the KVS where the pool state is persisted."""
         if not self._persistance_enabled:
+            logger.debug('Persistence is disabled; skipping the reset of the store.')
             return
 
         if not self._kvs:
@@ -185,7 +191,7 @@ class SessionPool:
         await self._kvs.set_value(key=self._persist_state_key, value=None)
 
     async def _create_new_session(self) -> Session:
-        """Create a new session."""
+        """Create a new session, add it to the pool and return it."""
         new_session = Session(**self._session_settings)
         self._sessions[new_session.id] = new_session
         return new_session
@@ -248,8 +254,4 @@ class SessionPool:
             return
 
         session_pool_state = self.get_state(as_dict=True)
-        if not isinstance(session_pool_state, dict):
-            logger.warning('SessionPool persisting failed: Invalid state format.')
-            return
-
         await self._kvs.set_value(key=self._persist_state_key, value=session_pool_state)
