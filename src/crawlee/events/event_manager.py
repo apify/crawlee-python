@@ -61,7 +61,7 @@ class EventManager:
 
         This will stop listening for the events, and it will wait for all the event listeners to finish.
         """
-        await self._wait_for_all_listeners_to_complete(timeout=self._close_timeout)
+        await self.wait_for_all_listeners_to_complete(timeout=self._close_timeout)
         self._event_emitter.remove_all_listeners()
         self._listener_tasks.clear()
         self._listeners_to_wrappers.clear()
@@ -130,7 +130,7 @@ class EventManager:
         """
         self._event_emitter.emit(event.value, event_data)
 
-    async def _wait_for_all_listeners_to_complete(self, *, timeout: timedelta | None = None) -> None:
+    async def wait_for_all_listeners_to_complete(self, *, timeout: timedelta | None = None) -> None:
         """Wait for all currently executing event listeners to complete.
 
         Args:

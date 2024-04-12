@@ -80,6 +80,12 @@ class Session:
         """Get a string representation."""
         return f'<{self.__class__.__name__} {self.get_state(as_dict=False)}>'
 
+    def __eq__(self, other: object) -> bool:
+        """Compare two sessions for equality."""
+        if not isinstance(other, Session):
+            return NotImplemented
+        return self.get_state(as_dict=True) == other.get_state(as_dict=True)
+
     @property
     def id(self) -> str:
         """Get the session ID."""
