@@ -69,22 +69,22 @@ class SessionPool:
         self._sessions: dict[str, Session] = {}
 
     def __repr__(self) -> str:
-        """Returns a string representation."""
+        """Get a string representation."""
         return f'<{self.__class__.__name__} {self.get_state(as_dict=False)}>'
 
     @property
     def session_count(self) -> int:
-        """Returns the total number of sessions currently maintained in the pool."""
+        """Get the total number of sessions currently maintained in the pool."""
         return len(self._sessions)
 
     @property
     def usable_session_count(self) -> int:
-        """Returns the number of sessions that are currently usable."""
+        """Get the number of sessions that are currently usable."""
         return len([session for _, session in self._sessions.items() if session.is_usable])
 
     @property
     def retired_session_count(self) -> int:
-        """Returns the number of sessions that are no longer usable."""
+        """Get the number of sessions that are no longer usable."""
         return self.session_count - self.usable_session_count
 
     @overload
@@ -94,7 +94,7 @@ class SessionPool:
     def get_state(self, *, as_dict: Literal[False]) -> SessionPoolModel: ...
 
     def get_state(self, *, as_dict: bool = False) -> SessionPoolModel | dict:
-        """Retrieves the current state of the pool either as a model or as a dictionary."""
+        """Retrieve the current state of the pool either as a model or as a dictionary."""
         model = SessionPoolModel(
             persistance_enabled=self._persistance_enabled,
             persist_state_kvs_name=self._persist_state_kvs_name,
@@ -210,7 +210,7 @@ class SessionPool:
         return self._sessions[key]
 
     def _remove_retired_sessions(self) -> None:
-        """Removes all sessions from the pool that are no longer usable."""
+        """Remove all sessions from the pool that are no longer usable."""
         self._sessions = {session_id: session for session_id, session in self._sessions.items() if session.is_usable}
 
     async def _try_to_restore_previos_state(self) -> bool:
