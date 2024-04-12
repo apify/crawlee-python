@@ -5,7 +5,7 @@ from typing import AsyncGenerator
 import pytest
 
 from crawlee.events import EventManager
-from crawlee.sessions import Session, SessionPool
+from crawlee.sessions import SessionPool
 
 mark = pytest.mark.only()
 
@@ -24,10 +24,13 @@ async def session_pool(event_manager: EventManager) -> AsyncGenerator[SessionPoo
 
 @pytest.mark.only()
 async def test_get_session_simple(session_pool: SessionPool) -> None:
-    session = await session_pool.get_session()
+    assert session_pool.session_count == session_pool._max_pool_size
 
-    assert isinstance(session, Session)
+    session = await session_pool.get_session()
+    assert session is not None
     assert session.is_usable is True
+
+    assert session_pool.session_count == session_pool._max_pool_size
 
 
 #
