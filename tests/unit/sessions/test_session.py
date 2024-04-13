@@ -7,8 +7,6 @@ import pytest
 from crawlee.sessions.models import CookieJar, UserData
 from crawlee.sessions.session import Session
 
-pytestmark = pytest.mark.only()
-
 
 @pytest.fixture()
 def session() -> Session:

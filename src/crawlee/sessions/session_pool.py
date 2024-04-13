@@ -90,28 +90,6 @@ class SessionPool:
         """Get the number of sessions that are no longer usable."""
         return self.session_count - self.usable_session_count
 
-    @overload
-    def get_state(self, *, as_dict: Literal[True]) -> dict: ...
-
-    @overload
-    def get_state(self, *, as_dict: Literal[False]) -> SessionPoolModel: ...
-
-    def get_state(self, *, as_dict: bool = False) -> SessionPoolModel | dict:
-        """Retrieve the current state of the pool either as a model or as a dictionary."""
-        model = SessionPoolModel(
-            persistance_enabled=self._persistance_enabled,
-            persist_state_kvs_name=self._persist_state_kvs_name,
-            persist_state_key=self._persist_state_key,
-            max_pool_size=self._max_pool_size,
-            session_count=self.session_count,
-            usable_session_count=self.usable_session_count,
-            retired_session_count=self.retired_session_count,
-            sessions=[session.get_state(as_dict=False) for _, session in self._sessions.items()],
-        )
-        if as_dict:
-            return model.model_dump()
-        return model
-
     async def __aenter__(self) -> SessionPool:
         """Initialize the pool upon entering the context manager."""
         if self._persistance_enabled and self._event_manager:
@@ -145,6 +123,39 @@ class SessionPool:
 
             # Persist the final state of the session pool.
             await self._persist_state(event_data=EventPersistStateData(is_migrating=False))
+
+    @overload
+    def get_state(self, *, as_dict: Literal[True]) -> dict: ...
+
+    @overload
+    def get_state(self, *, as_dict: Literal[False]) -> SessionPoolModel: ...
+
+    def get_state(self, *, as_dict: bool = False) -> SessionPoolModel | dict:
+        """Retrieve the current state of the pool either as a model or as a dictionary."""
+        model = SessionPoolModel(
+            persistance_enabled=self._persistance_enabled,
+            persist_state_kvs_name=self._persist_state_kvs_name,
+            persist_state_key=self._persist_state_key,
+            max_pool_size=self._max_pool_size,
+            session_count=self.session_count,
+            usable_session_count=self.usable_session_count,
+            retired_session_count=self.retired_session_count,
+            sessions=[session.get_state(as_dict=False) for _, session in self._sessions.items()],
+        )
+        if as_dict:
+            return model.model_dump()
+        return model
+
+    def add_session(self, session: Session) -> None:
+        """Add a specific session to the pool.
+
+        This is intened only for the cases when you want to add a session that was created outside of the pool.
+        Otherwise, the pool will create new sessions automatically.
+        """
+        if session.id in self._sessions:
+            logger.warning(f'Session with ID {session.id} already exists in the pool.')
+            return
+        self._sessions[session.id] = session
 
     async def get_session(self, *, session_id: str | None = None) -> Session | None:
         """Retrieve a session from the pool either by a specific ID or randomly.
