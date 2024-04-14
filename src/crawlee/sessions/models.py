@@ -1,6 +1,7 @@
+# ruff: noqa: TCH002 TCH003
+
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -8,29 +9,19 @@ from dateutil import parser
 from pydantic import BaseModel, field_validator
 
 
-@dataclass
-class CookieJar:
-    """CookieJar object represents a collection of cookies."""
-
-
-@dataclass
-class UserData:
-    """UserData object represents a collection of user data."""
-
-
 class SessionModel(BaseModel):
     """Model for a Session object."""
 
     id: str
     max_age: timedelta
-    user_data: UserData
+    user_data: dict
     max_error_score: float
     error_score_decrement: float
     created_at: datetime
     usage_count: int
     max_usage_count: int
     error_score: float
-    cookie_jar: CookieJar
+    cookies: dict
     blocked_status_codes: list[int]
 
     @field_validator('max_age', mode='before')

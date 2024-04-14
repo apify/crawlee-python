@@ -1,12 +1,5 @@
 # Inspiration: https://github.com/apify/crawlee/blob/v3.9.0/packages/core/src/session_pool/session.ts
 
-# TODO:
-# - Implement UserData
-# - Implement Cookies
-#   - set cookies from response method?
-#   - get cookies as string method?
-#   - normalization? url?
-
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -14,7 +7,7 @@ from logging import getLogger
 from typing import ClassVar, Literal, overload
 
 from crawlee._utils.crypto import crypto_random_object_id
-from crawlee.sessions.models import CookieJar, SessionModel, UserData
+from crawlee.sessions.models import SessionModel
 
 logger = getLogger(__name__)
 
@@ -34,14 +27,14 @@ class Session:
         self,
         id: str | None = None,  # noqa: A002
         max_age: timedelta = timedelta(minutes=50),
-        user_data: UserData | None = None,
+        user_data: dict | None = None,
         max_error_score: float = 3.0,
         error_score_decrement: float = 0.5,
         created_at: datetime | None = None,
         usage_count: int = 0,
         max_usage_count: int = 50,
         error_score: float = 0.0,
-        cookie_jar: CookieJar | None = None,
+        cookies: dict | None = None,
         blocked_status_codes: list | None = None,
     ) -> None:
         """Create a new instance.
@@ -56,19 +49,19 @@ class Session:
             usage_count: Number of times the session has been used.
             max_usage_count: Maximum allowable uses of the session before it is considered expired.
             error_score: Current error score of the session.
-            cookie_jar: Container for cookies associated with the session.
+            cookies: Cookies associated with the session.
             blocked_status_codes: HTTP status codes that indicate a session should be blocked.
         """
         self._id = id or crypto_random_object_id(length=10)
         self._max_age = max_age
-        self._user_data = user_data or UserData()
+        self._user_data = user_data or {}
         self._max_error_score = max_error_score
         self._error_score_decrement = error_score_decrement
         self._created_at = created_at or datetime.now(timezone.utc)
         self._usage_count = usage_count
         self._max_usage_count = max_usage_count
         self._error_score = error_score
-        self._cookie_jar = cookie_jar or CookieJar()
+        self._cookies = cookies or {}
         self._blocked_status_codes = blocked_status_codes or self._DEFAULT_BLOCKED_STATUS_CODES
 
     @classmethod
@@ -90,6 +83,16 @@ class Session:
     def id(self) -> str:
         """Get the session ID."""
         return self._id
+
+    @property
+    def user_data(self) -> dict:
+        """Get the user data."""
+        return self._user_data
+
+    @property
+    def cookies(self) -> dict:
+        """Get the cookies."""
+        return self._cookies
 
     @property
     def error_score(self) -> float:
@@ -144,7 +147,7 @@ class Session:
             usage_count=self._usage_count,
             max_usage_count=self._max_usage_count,
             error_score=self._error_score,
-            cookie_jar=self._cookie_jar,
+            cookies=self._cookies,
             blocked_status_codes=self._blocked_status_codes,
         )
         if as_dict:

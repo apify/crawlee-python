@@ -4,7 +4,6 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from crawlee.sessions.models import CookieJar, UserData
 from crawlee.sessions.session import Session
 
 
@@ -13,20 +12,23 @@ def session() -> Session:
     return Session(
         id='test_session',
         max_age=timedelta(minutes=30),
-        user_data=UserData(),
+        user_data={'user_key': 'user_value'},
         max_error_score=3.0,
         error_score_decrement=0.5,
         created_at=datetime.now(timezone.utc),
         usage_count=0,
         max_usage_count=10,
         error_score=0.0,
-        cookie_jar=CookieJar(),
+        cookies={'cookie_key': 'cookie_value'},
         blocked_status_codes=[401, 403, 429],
     )
 
 
 def test_session_init(session: Session) -> None:
+    """Verify that the session initializes correctly with the expected properties."""
     assert session.id == 'test_session'
+    assert session.user_data == {'user_key': 'user_value'}
+    assert session.cookies == {'cookie_key': 'cookie_value'}
     assert session.expires_at >= datetime.now(timezone.utc)
     assert not session.is_blocked
     assert not session.is_expired
@@ -35,6 +37,7 @@ def test_session_init(session: Session) -> None:
 
 
 def test_session_get_state(session: Session) -> None:
+    """Check if the session state is correctly retrievable in both dict and model forms."""
     session_state_dict = session.get_state(as_dict=True)
     assert session_state_dict['id'] == 'test_session'
 
@@ -100,6 +103,6 @@ def test_not_retire_on_not_block_status_code(session: Session) -> None:
 
 
 def test_session_expiration() -> None:
-    """Test the expiration logic of the session based on `max_age`."""
+    """Test the expiration logic of the session."""
     session = Session(created_at=datetime.now(timezone.utc) - timedelta(hours=1))
     assert session.is_expired
