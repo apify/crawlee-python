@@ -65,6 +65,8 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
 
 async def make_http_request(client: httpx.AsyncClient, request: Request) -> HttpCrawlResult:
     """Perform a request using `httpx`."""
-    response = await client.request(request.method, request.url)
+    response = await client.request(request.method, request.url, follow_redirects=True)
     response.raise_for_status()
+    request.loaded_url = str(response.url)
+
     return HttpCrawlResult(http_response=response)
