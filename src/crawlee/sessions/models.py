@@ -42,18 +42,6 @@ class SessionModel(BaseModel):
 
         raise ValueError('Invalid data type for max_age')
 
-    @field_validator('created_at', mode='before')
-    @classmethod
-    def parse_created_at(cls, value: Any) -> datetime:
-        """Try to parse `created_at` field into a datetime object."""
-        if isinstance(value, str):
-            return datetime.fromisoformat(value)
-
-        if isinstance(value, datetime):
-            return value
-
-        raise ValueError('Invalid data type for created_at')
-
 
 class SessionPoolModel(BaseModel):
     """Model for a SessionPool object."""
