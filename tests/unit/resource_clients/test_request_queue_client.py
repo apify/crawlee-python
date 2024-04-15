@@ -22,7 +22,7 @@ async def request_queue_client(memory_storage_client: MemoryStorageClient) -> Re
 
 
 async def test_nonexistent(memory_storage_client: MemoryStorageClient) -> None:
-    request_queue_client = memory_storage_client.request_queue(id_='nonexistent-id')
+    request_queue_client = memory_storage_client.request_queue(id='nonexistent-id')
     assert await request_queue_client.get() is None
     with pytest.raises(ValueError, match='Request queue with id "nonexistent-id" does not exist.'):
         await request_queue_client.update(name='test-update')

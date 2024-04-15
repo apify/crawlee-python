@@ -93,7 +93,7 @@ def raise_on_duplicate_storage(client_type: StorageTypes, key_name: str, value: 
     raise ValueError(f'{client_type} with {key_name} "{value}" already exists.')
 
 
-def raise_on_non_existing_storage(client_type: StorageTypes, id_: str | None) -> NoReturn:
+def raise_on_non_existing_storage(client_type: StorageTypes, id: str | None) -> NoReturn:
     """Raise an error indicating that a storage with the provided id does not exist."""
     client_type = maybe_extract_enum_member_value(client_type)
-    raise ValueError(f'{client_type} with id "{id_}" does not exist.')
+    raise ValueError(f'{client_type} with id "{id}" does not exist.')

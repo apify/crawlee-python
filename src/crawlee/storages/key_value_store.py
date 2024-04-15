@@ -28,22 +28,22 @@ class KeyValueStore(BaseStorage):
     `{STORE_ID}` is either "default" or specified by `CRAWLEE_DEFAULT_KEY_VALUE_STORE_ID`, `{KEY}` is the record key,
     and `{EXT}` is the MIME type.
 
-    To open a key-value store, use the class method `open`, providing either an `id_` or `name` along with optional
+    To open a key-value store, use the class method `open`, providing either an `id` or `name` along with optional
     `config`. If neither is provided, the default store for the crawler run is used. Opening a non-existent store by
-    `id_` raises an error, while a non-existent store by `name` is created.
+    `id` raises an error, while a non-existent store by `name` is created.
 
     Usage:
-        kvs = await KeyValueStore.open(id_='my_kvs_id')
+        kvs = await KeyValueStore.open(id='my_kvs_id')
     """
 
     def __init__(
         self,
-        id_: str,
+        id: str,
         name: str | None,
         configuration: Configuration,
         client: MemoryStorageClient,
     ) -> None:
-        super().__init__(id_=id_, name=name, client=client, configuration=configuration)
+        super().__init__(id=id, name=name, client=client, configuration=configuration)
         self._key_value_store_client = client.key_value_store(self.id)
 
     @classmethod
@@ -58,8 +58,8 @@ class KeyValueStore(BaseStorage):
 
     @classmethod
     @override
-    def _get_single_storage_client(cls, id_: str, client: MemoryStorageClient) -> KeyValueStoreClient:
-        return client.key_value_store(id_)
+    def _get_single_storage_client(cls, id: str, client: MemoryStorageClient) -> KeyValueStoreClient:
+        return client.key_value_store(id)
 
     @classmethod
     @override

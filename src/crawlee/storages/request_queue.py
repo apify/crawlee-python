@@ -43,7 +43,7 @@ class RequestQueue(BaseStorage, RequestProvider):
     and deleted.
 
     Usage:
-        rq = await RequestQueue.open(id_='my_rq_id')
+        rq = await RequestQueue.open(id='my_rq_id')
     """
 
     _API_PROCESSED_REQUESTS_DELAY = timedelta(seconds=10)
@@ -72,12 +72,12 @@ class RequestQueue(BaseStorage, RequestProvider):
 
     def __init__(
         self,
-        id_: str,
+        id: str,
         name: str | None,
         configuration: Configuration,
         client: MemoryStorageClient,
     ) -> None:
-        super().__init__(id_=id_, name=name, client=client, configuration=configuration)
+        super().__init__(id=id, name=name, client=client, configuration=configuration)
 
         self._client_key = crypto_random_object_id()
         self._internal_timeout_seconds = 5 * 60
@@ -96,11 +96,11 @@ class RequestQueue(BaseStorage, RequestProvider):
     async def open(
         cls,
         *,
-        id_: str | None = None,
+        id: str | None = None,
         name: str | None = None,
         configuration: Configuration | None = None,
     ) -> RequestQueue:
-        rq = await super().open(id_=id_, name=name, configuration=configuration)
+        rq = await super().open(id=id, name=name, configuration=configuration)
         await rq.ensure_head_is_non_empty()
         return rq
 
@@ -118,10 +118,10 @@ class RequestQueue(BaseStorage, RequestProvider):
     @override
     def _get_single_storage_client(
         cls,
-        id_: str,
+        id: str,
         client: MemoryStorageClient,
     ) -> RequestQueueClient:
-        return client.request_queue(id_)
+        return client.request_queue(id)
 
     @classmethod
     @override

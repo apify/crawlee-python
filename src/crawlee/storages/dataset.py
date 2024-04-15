@@ -29,12 +29,12 @@ class Dataset(BaseStorage):
     `{CRAWLEE_LOCAL_STORAGE_DIR}/datasets/{DATASET_ID}/{INDEX}.json`. Here, `{DATASET_ID}` is either "default" or
     a specific dataset ID, and `{INDEX}` represents the zero-based index of the item in the dataset.
 
-    To open a dataset, use the `open` class method with an `id_`, `name`, or `config`. If unspecified, the default
-    dataset for the current crawler run is used. Opening a non-existent dataset by `id_` raises an error, while
+    To open a dataset, use the `open` class method with an `id`, `name`, or `config`. If unspecified, the default
+    dataset for the current crawler run is used. Opening a non-existent dataset by `id` raises an error, while
     by `name`, it is created.
 
     Usage:
-        dataset = await Dataset.open(id_='my_dataset_id')
+        dataset = await Dataset.open(id='my_dataset_id')
     """
 
     _MAX_PAYLOAD_SIZE = ByteSize.from_mb(9)
@@ -48,12 +48,12 @@ class Dataset(BaseStorage):
 
     def __init__(
         self,
-        id_: str,
+        id: str,
         name: str | None,
         configuration: Configuration,
         client: MemoryStorageClient,
     ) -> None:
-        super().__init__(id_=id_, name=name, client=client, configuration=configuration)
+        super().__init__(id=id, name=name, client=client, configuration=configuration)
         self._dataset_client = client.dataset(self.id)
 
     @classmethod
@@ -68,8 +68,8 @@ class Dataset(BaseStorage):
 
     @classmethod
     @override
-    def _get_single_storage_client(cls, id_: str, client: MemoryStorageClient) -> DatasetClient:
-        return client.dataset(id_)
+    def _get_single_storage_client(cls, id: str, client: MemoryStorageClient) -> DatasetClient:
+        return client.dataset(id)
 
     @classmethod
     @override
@@ -290,7 +290,7 @@ class Dataset(BaseStorage):
 
             content_type: Either 'text/csv' or 'application/json'. Defaults to JSON.
         """
-        key_value_store = await KeyValueStore.open(id_=to_key_value_store_id, name=to_key_value_store_name)
+        key_value_store = await KeyValueStore.open(id=to_key_value_store_id, name=to_key_value_store_name)
         items: list[dict] = []
         limit = 1000
         offset = 0

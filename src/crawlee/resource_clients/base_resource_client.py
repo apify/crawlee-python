@@ -20,12 +20,12 @@ class BaseResourceClient(ABC):
         *,
         base_storage_directory: str,
         memory_storage_client: MemoryStorageClient,
-        id_: str | None = None,
+        id: str | None = None,
         name: str | None = None,
     ) -> None:
         self._base_storage_directory = base_storage_directory
         self._memory_storage_client = memory_storage_client
-        self.id = id_
+        self.id = id
         self.name = name
 
     @property
@@ -57,7 +57,7 @@ class BaseResourceClient(ABC):
         cls,
         storage_directory: str,
         memory_storage_client: MemoryStorageClient,
-        id_: str | None = None,
+        id: str | None = None,
         name: str | None = None,
     ) -> Self:
         """Create a new resource client from a directory."""
@@ -66,7 +66,7 @@ class BaseResourceClient(ABC):
     def find_or_create_client_by_id_or_name(
         cls,
         memory_storage_client: MemoryStorageClient,
-        id_: str | None = None,
+        id: str | None = None,
         name: str | None = None,
     ) -> Self | None:
         """Locates or creates a new storage client based on the given ID or name.
@@ -80,17 +80,17 @@ class BaseResourceClient(ABC):
 
         Args:
             memory_storage_client: The memory storage client used to store and retrieve storage clients.
-            id_: The unique identifier for the storage client. Defaults to None.
+            id: The unique identifier for the storage client. Defaults to None.
             name: The name of the storage client. Defaults to None.
 
         Raises:
-            ValueError: If both id_ and name are None.
+            ValueError: If both id and name are None.
 
         Returns:
             The found or created storage client, or None if no client could be found or created.
         """
-        if id_ is None and name is None:
-            raise ValueError('Either id_ or name must be specified.')
+        if id is None and name is None:
+            raise ValueError('Either id or name must be specified.')
 
         storage_client_cache = cls._get_storage_client_cache(memory_storage_client)
         storages_dir = cls._get_storages_dir(memory_storage_client)
@@ -100,7 +100,7 @@ class BaseResourceClient(ABC):
             (
                 storage_client
                 for storage_client in storage_client_cache
-                if storage_client.id == id_
+                if storage_client.id == id
                 or (storage_client.name and name and storage_client.name.lower() == name.lower())
             ),
             None,
@@ -127,27 +127,27 @@ class BaseResourceClient(ABC):
                     continue
                 with open(metadata_path, encoding='utf-8') as metadata_file:
                     metadata = json.load(metadata_file)
-                if id_ and id_ == metadata.get('id'):
+                if id and id == metadata.get('id'):
                     storage_path = entry.path
                     name = metadata.get(name)
                     break
                 if name and name == metadata.get('name'):
                     storage_path = entry.path
-                    id_ = metadata.get(id_)
+                    id = metadata.get(id)
                     break
 
         # As a last resort, try to check if the accessed storage is the default one,
         # and the folder has no metadata
         # TODO: make this respect the APIFY_DEFAULT_XXX_ID env var
         # https://github.com/apify/apify-sdk-python/issues/149
-        if id_ == 'default':
-            possible_storage_path = os.path.join(storages_dir, id_)
+        if id == 'default':
+            possible_storage_path = os.path.join(storages_dir, id)
             if os.access(possible_storage_path, os.F_OK):
                 storage_path = possible_storage_path
 
         if not storage_path:
             return None
 
-        resource_client = cls._create_from_directory(storage_path, memory_storage_client, id_, name)
+        resource_client = cls._create_from_directory(storage_path, memory_storage_client, id, name)
         storage_client_cache.append(resource_client)
         return resource_client
