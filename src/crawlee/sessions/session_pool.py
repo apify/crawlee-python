@@ -257,11 +257,7 @@ class SessionPool:
             logger.debug('SessionPool restoration skipped: No previous state found.')
             return False
 
-        if not isinstance(previous_state, dict):
-            logger.warning('SessionPool restoration failed: Invalid previous state format.')
-            return False
-
-        previous_session_pool = SessionPoolModel(**previous_state)
+        previous_session_pool = SessionPoolModel.model_validate(previous_state)
 
         for session_model in previous_session_pool.sessions:
             session = Session.from_model(model=session_model)
