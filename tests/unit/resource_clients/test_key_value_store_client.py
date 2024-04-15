@@ -35,7 +35,7 @@ async def key_value_store_client(memory_storage_client: MemoryStorageClient) -> 
 
 
 async def test_nonexistent(memory_storage_client: MemoryStorageClient) -> None:
-    kvs_client = memory_storage_client.key_value_store(id_='nonexistent-id')
+    kvs_client = memory_storage_client.key_value_store(id='nonexistent-id')
     assert await kvs_client.get() is None
 
     with pytest.raises(ValueError, match='Key-value store with id "nonexistent-id" does not exist.'):

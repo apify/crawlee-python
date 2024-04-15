@@ -86,11 +86,11 @@ class MemoryStorageClient(BaseStorageClient):
         return os.path.join(self._local_data_directory, 'request_queues')
 
     @override
-    def dataset(self, id_: str) -> DatasetClient:
+    def dataset(self, id: str) -> DatasetClient:
         return DatasetClient(
             base_storage_directory=self.datasets_directory,
             memory_storage_client=self,
-            id_=id_,
+            id=id,
         )
 
     @override
@@ -101,11 +101,11 @@ class MemoryStorageClient(BaseStorageClient):
         )
 
     @override
-    def key_value_store(self, id_: str) -> KeyValueStoreClient:
+    def key_value_store(self, id: str) -> KeyValueStoreClient:
         return KeyValueStoreClient(
             base_storage_directory=self.key_value_stores_directory,
             memory_storage_client=self,
-            id_=id_,
+            id=id,
         )
 
     @override
@@ -116,11 +116,11 @@ class MemoryStorageClient(BaseStorageClient):
         )
 
     @override
-    def request_queue(self, id_: str) -> RequestQueueClient:
+    def request_queue(self, id: str) -> RequestQueueClient:
         return RequestQueueClient(
             base_storage_directory=self.request_queues_directory,
             memory_storage_client=self,
-            id_=id_,
+            id=id,
         )
 
     @override

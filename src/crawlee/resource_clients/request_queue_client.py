@@ -47,7 +47,7 @@ class RequestQueueClient(BaseResourceClient):
         *,
         base_storage_directory: str,
         memory_storage_client: MemoryStorageClient,
-        id_: str | None = None,
+        id: str | None = None,
         name: str | None = None,
         created_at: datetime | None = None,
         accessed_at: datetime | None = None,
@@ -57,7 +57,7 @@ class RequestQueueClient(BaseResourceClient):
     ) -> None:
         self._base_storage_directory = base_storage_directory
         self._memory_storage_client = memory_storage_client
-        self.id = id_ or crypto_random_object_id()
+        self.id = id or crypto_random_object_id()
         self.name = name
         self._created_at = created_at or datetime.now(timezone.utc)
         self._accessed_at = accessed_at or datetime.now(timezone.utc)
@@ -105,7 +105,7 @@ class RequestQueueClient(BaseResourceClient):
         cls,
         storage_directory: str,
         memory_storage_client: MemoryStorageClient,
-        id_: str | None = None,
+        id: str | None = None,
         name: str | None = None,
     ) -> RequestQueueClient:
         created_at = datetime.now(timezone.utc)
@@ -122,7 +122,7 @@ class RequestQueueClient(BaseResourceClient):
                 json_content = json.load(f)
                 resource_info = RequestQueueResourceInfo(**json_content)
 
-            id_ = resource_info.id
+            id = resource_info.id
             name = resource_info.name
             created_at = resource_info.created_at
             accessed_at = resource_info.accessed_at
@@ -152,7 +152,7 @@ class RequestQueueClient(BaseResourceClient):
         new_client = RequestQueueClient(
             base_storage_directory=memory_storage_client.request_queues_directory,
             memory_storage_client=memory_storage_client,
-            id_=id_,
+            id=id,
             name=name,
             accessed_at=accessed_at,
             created_at=created_at,
@@ -168,7 +168,7 @@ class RequestQueueClient(BaseResourceClient):
     async def get(self) -> RequestQueueResourceInfo | None:
         found = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
-            id_=self.id,
+            id=self.id,
             name=self.name,
         )
 
@@ -191,7 +191,7 @@ class RequestQueueClient(BaseResourceClient):
         # Check by id
         existing_queue_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
-            id_=self.id,
+            id=self.id,
             name=self.name,
         )
 
@@ -258,7 +258,7 @@ class RequestQueueClient(BaseResourceClient):
         """
         existing_queue_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
-            id_=self.id,
+            id=self.id,
             name=self.name,
         )
 
@@ -312,7 +312,7 @@ class RequestQueueClient(BaseResourceClient):
         """
         existing_queue_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
-            id_=self.id,
+            id=self.id,
             name=self.name,
         )
 
@@ -367,7 +367,7 @@ class RequestQueueClient(BaseResourceClient):
         """
         existing_queue_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
-            id_=self.id,
+            id=self.id,
             name=self.name,
         )
 
@@ -397,7 +397,7 @@ class RequestQueueClient(BaseResourceClient):
         """
         existing_queue_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
-            id_=self.id,
+            id=self.id,
             name=self.name,
         )
 
@@ -451,7 +451,7 @@ class RequestQueueClient(BaseResourceClient):
         """
         existing_queue_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
-            id_=self.id,
+            id=self.id,
             name=self.name,
         )
 
@@ -547,16 +547,16 @@ class RequestQueueClient(BaseResourceClient):
 
     async def _create_internal_request(self, request: Request, forefront: bool | None) -> Request:
         order_no = self._calculate_order_no(request, forefront)
-        id_ = unique_key_to_request_id(request.unique_key)
+        id = unique_key_to_request_id(request.unique_key)
 
-        if request.id is not None and request.id != id_:
+        if request.id is not None and request.id != id:
             raise ValueError('Request ID does not match its unique_key.')
 
-        json_request = await json_dumps({**(request.__dict__), 'id': id_})
+        json_request = await json_dumps({**(request.__dict__), 'id': id})
         return Request(
             url=request.url,
             unique_key=request.unique_key,
-            id=id_,
+            id=id,
             method=request.method,
             retry_count=request.retry_count,
             order_no=order_no,

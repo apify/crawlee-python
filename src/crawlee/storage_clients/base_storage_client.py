@@ -24,7 +24,7 @@ class BaseStorageClient(ABC):
     """
 
     @abstractmethod
-    def dataset(self, id_: str) -> DatasetClient:
+    def dataset(self, id: str) -> DatasetClient:
         """Gets a client for a specific dataset by its ID."""
 
     @abstractmethod
@@ -32,7 +32,7 @@ class BaseStorageClient(ABC):
         """Gets a client for dataset collection operations."""
 
     @abstractmethod
-    def key_value_store(self, id_: str) -> KeyValueStoreClient:
+    def key_value_store(self, id: str) -> KeyValueStoreClient:
         """Gets a client for a specific key-value store by its ID."""
 
     @abstractmethod
@@ -40,7 +40,7 @@ class BaseStorageClient(ABC):
         """Gets a client for key-value store collection operations."""
 
     @abstractmethod
-    def request_queue(self, id_: str) -> RequestQueueClient:
+    def request_queue(self, id: str) -> RequestQueueClient:
         """Gets a client for a specific request queue by its ID."""
 
     @abstractmethod

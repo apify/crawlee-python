@@ -81,18 +81,18 @@ class Request(BaseRequestData):
         url: str,
         *,
         unique_key: str | None = None,
-        id_: str | None = None,
+        id: str | None = None,
         **kwargs: Any,
     ) -> Self:
         """Create a new `RequestData` instance from a URL."""
         unique_key = unique_key or compute_unique_key(url)
-        id_ = id_ or unique_key_to_request_id(unique_key)
-        return cls(url=url, unique_key=unique_key, id=id_, **kwargs)
+        id = id or unique_key_to_request_id(unique_key)
+        return cls(url=url, unique_key=unique_key, id=id, **kwargs)
 
     @classmethod
-    def from_base_request_data(cls, base_request_data: BaseRequestData, *, id_: str | None = None) -> Self:
+    def from_base_request_data(cls, base_request_data: BaseRequestData, *, id: str | None = None) -> Self:
         """Create a complete Request object based on a BaseRequestData instance."""
-        return cls(**base_request_data.model_dump(), id=id_ or unique_key_to_request_id(base_request_data.unique_key))
+        return cls(**base_request_data.model_dump(), id=id or unique_key_to_request_id(base_request_data.unique_key))
 
     @property
     def crawlee_data(self) -> CrawleeRequestData:

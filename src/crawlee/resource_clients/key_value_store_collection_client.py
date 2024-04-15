@@ -36,16 +36,16 @@ class KeyValueStoreCollectionClient(BaseResourceCollectionClient):
         *,
         name: str | None = None,
         schema: dict | None = None,
-        id_: str | None = None,
+        id: str | None = None,
     ) -> BaseResourceInfo:
         """Retrieve a named key-value store, or create a new one when it doesn't exist.
 
         Args:
             name: The name of the key-value store to retrieve or create.
             schema: The schema of the key-value store
-            id_: The id of the key-value store to retrieve or create.
+            id: The id of the key-value store to retrieve or create.
 
         Returns:
             The retrieved or newly-created key-value store.
         """
-        return await super().get_or_create(name=name, schema=schema, id_=id_)
+        return await super().get_or_create(name=name, schema=schema, id=id)

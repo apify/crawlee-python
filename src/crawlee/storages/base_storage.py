@@ -33,7 +33,7 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
 
     def __init__(
         self,
-        id_: str,
+        id: str,
         name: str | None,
         configuration: Configuration,
         client: MemoryStorageClient,
@@ -41,12 +41,12 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
         """Create a new instance.
 
         Args:
-            id_: ID of the storage.
+            id: ID of the storage.
             name: Name of the storage.
             configuration: The configuration settings.
             client: The underlying storage client to be used.
         """
-        self.id = id_
+        self.id = id
         self._name = name
         self._configuration = configuration
         self._storage_client = client
@@ -61,7 +61,7 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
         cls,
         *,
         configuration: Configuration | None = None,
-        id_: str | None = None,
+        id: str | None = None,
         name: str | None = None,
     ) -> Self:
         """Opens a storage instance based on provided identifiers or returns a previously opened instance from cache.
@@ -72,7 +72,7 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
         the default storage associated with the current actor run is utilized.
 
         Args:
-            id_: Identifier for the specific storage to open. An error is raised if no matching storage is found.
+            id: Identifier for the specific storage to open. An error is raised if no matching storage is found.
             name: Name for the specific storage to open or create.
             configuration: Configuration instance to use. If omitted, the global configuration is applied.
 
@@ -90,23 +90,23 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
         if cls.cache_by_name is None:
             raise AttributeError("The 'cache_by_name' attribute must not be None.")
 
-        if id_ and name:
-            raise ValueError("Either 'id_' or 'name' must be provided, not both.")
+        if id and name:
+            raise ValueError("Either 'id' or 'name' must be provided, not both.")
 
         used_config = configuration or Configuration()
         used_client = StorageClientManager.get_storage_client()
 
         is_default_storage_on_local = False
         # Fetch default ID if no ID or name was passed
-        if not id_ and not name:
+        if not id and not name:
             if isinstance(used_client, MemoryStorageClient):
                 is_default_storage_on_local = True
-            id_ = cls._get_default_id(used_config)
+            id = cls._get_default_id(used_config)
 
         # Try to get the storage instance from cache
         cached_storage = None
-        if id_:
-            cached_storage = cls.cache_by_id.get(id_)
+        if id:
+            cached_storage = cls.cache_by_id.get(id)
         elif name:
             cached_storage = cls.cache_by_name.get(name)
 
@@ -123,21 +123,21 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
 
         async with cls._storage_creating_lock:
             # Create the storage
-            if id_ and not is_default_storage_on_local:
-                single_storage_client = cls._get_single_storage_client(id_, used_client)
+            if id and not is_default_storage_on_local:
+                single_storage_client = cls._get_single_storage_client(id, used_client)
                 storage_info = await single_storage_client.get()
                 if not storage_info:
                     storage_label = cls._get_human_friendly_label()
-                    raise RuntimeError(f'{storage_label} with id "{id_}" does not exist!')
+                    raise RuntimeError(f'{storage_label} with id "{id}" does not exist!')
             elif is_default_storage_on_local:
                 storage_collection_client = cls._get_storage_collection_client(used_client)
-                storage_info = await storage_collection_client.get_or_create(name=name, id_=id_)
+                storage_info = await storage_collection_client.get_or_create(name=name, id=id)
             else:
                 storage_collection_client = cls._get_storage_collection_client(used_client)
                 storage_info = await storage_collection_client.get_or_create(name=name)
 
             storage = cls(
-                id_=storage_info.id,
+                id=storage_info.id,
                 name=storage_info.name,
                 configuration=used_config,
                 client=used_client,
@@ -162,7 +162,7 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
 
     @classmethod
     @abstractmethod
-    def _get_single_storage_client(cls, id_: str, client: MemoryStorageClient) -> BaseResourceClientType:
+    def _get_single_storage_client(cls, id: str, client: MemoryStorageClient) -> BaseResourceClientType:
         """Get the single storage client for the given ID."""
 
     @classmethod

@@ -19,7 +19,7 @@ async def dataset_client(memory_storage_client: MemoryStorageClient) -> DatasetC
 
 
 async def test_nonexistent(memory_storage_client: MemoryStorageClient) -> None:
-    dataset_client = memory_storage_client.dataset(id_='nonexistent-id')
+    dataset_client = memory_storage_client.dataset(id='nonexistent-id')
     assert await dataset_client.get() is None
     with pytest.raises(ValueError, match='Dataset with id "nonexistent-id" does not exist.'):
         await dataset_client.update(name='test-update')

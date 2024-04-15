@@ -36,16 +36,16 @@ class DatasetCollectionClient(BaseResourceCollectionClient):
         *,
         name: str | None = None,
         schema: dict | None = None,
-        id_: str | None = None,
+        id: str | None = None,
     ) -> BaseResourceInfo:
         """Retrieve a named dataset, or create a new one when it doesn't exist.
 
         Args:
             name: The name of the dataset to retrieve or create.
             schema: The schema of the dataset
-            id_: ID of the dataset to retrieve or create
+            id: ID of the dataset to retrieve or create
 
         Returns:
             The retrieved or newly-created dataset.
         """
-        return await super().get_or_create(name=name, schema=schema, id_=id_)
+        return await super().get_or_create(name=name, schema=schema, id=id)

@@ -58,14 +58,14 @@ class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
         *,
         name: str | None = None,
         schema: dict | None = None,  # noqa: ARG002
-        id_: str | None = None,
+        id: str | None = None,
     ) -> BaseResourceInfo:
         """Retrieve a named storage, or create a new one when it doesn't exist.
 
         Args:
             name: The name of the storage to retrieve or create.
             schema: The schema of the storage
-            id_: ID of the storage to retrieve or create
+            id: ID of the storage to retrieve or create
 
         Returns:
             The retrieved or newly-created storage.
@@ -73,17 +73,17 @@ class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
         resource_client_class = self._client_class
         storage_client_cache = self._get_storage_client_cache()
 
-        if name or id_:
+        if name or id:
             found = resource_client_class.find_or_create_client_by_id_or_name(
                 memory_storage_client=self._memory_storage_client,
                 name=name,
-                id_=id_,
+                id=id,
             )
             if found:
                 return found.resource_info
 
         new_resource = resource_client_class(
-            id_=id_,
+            id=id,
             name=name,
             base_storage_directory=self._base_storage_directory,
             memory_storage_client=self._memory_storage_client,

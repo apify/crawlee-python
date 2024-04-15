@@ -17,7 +17,7 @@ async def dataset() -> AsyncGenerator[Dataset, None]:
 
 async def test_open() -> None:
     default_dataset = await Dataset.open()
-    default_dataset_by_id = await Dataset.open(id_=default_dataset.id)
+    default_dataset_by_id = await Dataset.open(id=default_dataset.id)
 
     assert default_dataset is default_dataset_by_id
 
@@ -26,19 +26,19 @@ async def test_open() -> None:
     assert default_dataset is not named_dataset
 
     with pytest.raises(RuntimeError, match='Dataset with id "nonexistent-id" does not exist!'):
-        await Dataset.open(id_='nonexistent-id')
+        await Dataset.open(id='nonexistent-id')
 
     # Test that when you try to open a dataset by ID and you use a name of an existing dataset,
     # it doesn't work
     with pytest.raises(RuntimeError, match='Dataset with id "dummy-name" does not exist!'):
-        await Dataset.open(id_='dummy-name')
+        await Dataset.open(id='dummy-name')
 
 
 async def test_consistency_accross_two_clients() -> None:
     dataset = await Dataset.open(name='my-dataset')
     await dataset.push_data({'key': 'value'})
 
-    dataset_by_id = await Dataset.open(id_=dataset.id)
+    dataset_by_id = await Dataset.open(id=dataset.id)
     await dataset_by_id.push_data({'key2': 'value2'})
 
     assert (await dataset.get_data()).items == [{'key': 'value'}, {'key2': 'value2'}]

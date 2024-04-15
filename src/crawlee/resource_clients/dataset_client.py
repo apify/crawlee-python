@@ -39,7 +39,7 @@ class DatasetClient(BaseResourceClient):
         *,
         base_storage_directory: str,
         memory_storage_client: MemoryStorageClient,
-        id_: str | None = None,
+        id: str | None = None,
         name: str | None = None,
         created_at: datetime | None = None,
         accessed_at: datetime | None = None,
@@ -48,7 +48,7 @@ class DatasetClient(BaseResourceClient):
     ) -> None:
         self._base_storage_directory = base_storage_directory
         self._memory_storage_client = memory_storage_client
-        self.id = id_ or crypto_random_object_id()
+        self.id = id or crypto_random_object_id()
         self.name = name
         self._created_at = created_at or datetime.now(timezone.utc)
         self._accessed_at = accessed_at or datetime.now(timezone.utc)
@@ -91,7 +91,7 @@ class DatasetClient(BaseResourceClient):
         cls,
         storage_directory: str,
         memory_storage_client: MemoryStorageClient,
-        id_: str | None = None,
+        id: str | None = None,
         name: str | None = None,
     ) -> DatasetClient:
         item_count = 0
@@ -107,7 +107,7 @@ class DatasetClient(BaseResourceClient):
                 json_content = json.load(f)
                 resource_info = DatasetResourceInfo(**json_content)
 
-            id_ = resource_info.id
+            id = resource_info.id
             name = resource_info.name
             item_count = resource_info.item_count
             created_at = resource_info.created_at
@@ -137,7 +137,7 @@ class DatasetClient(BaseResourceClient):
         new_client = DatasetClient(
             base_storage_directory=memory_storage_client.datasets_directory,
             memory_storage_client=memory_storage_client,
-            id_=id_,
+            id=id,
             name=name,
             created_at=created_at,
             accessed_at=accessed_at,
@@ -152,7 +152,7 @@ class DatasetClient(BaseResourceClient):
     async def get(self) -> DatasetResourceInfo | None:
         found = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
-            id_=self.id,
+            id=self.id,
             name=self.name,
         )
 
@@ -175,7 +175,7 @@ class DatasetClient(BaseResourceClient):
         # Check by id
         existing_dataset_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
-            id_=self.id,
+            id=self.id,
             name=self.name,
         )
 
@@ -282,7 +282,7 @@ class DatasetClient(BaseResourceClient):
         # Check by id
         existing_dataset_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
-            id_=self.id,
+            id=self.id,
             name=self.name,
         )
 
@@ -403,7 +403,7 @@ class DatasetClient(BaseResourceClient):
         # Check by id
         existing_dataset_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
-            id_=self.id,
+            id=self.id,
             name=self.name,
         )
 
@@ -420,7 +420,7 @@ class DatasetClient(BaseResourceClient):
             existing_dataset_by_id.dataset_entries[idx] = entry
             added_ids.append(idx)
 
-        data_entries = [(id_, existing_dataset_by_id.dataset_entries[id_]) for id_ in added_ids]
+        data_entries = [(id, existing_dataset_by_id.dataset_entries[id]) for id in added_ids]
 
         async with existing_dataset_by_id.file_operation_lock:
             await existing_dataset_by_id.update_timestamps(has_been_modified=True)

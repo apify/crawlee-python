@@ -48,7 +48,7 @@ class KeyValueStoreClient(BaseResourceClient):
         *,
         base_storage_directory: str,
         memory_storage_client: MemoryStorageClient,
-        id_: str | None = None,
+        id: str | None = None,
         name: str | None = None,
         created_at: datetime | None = None,
         accessed_at: datetime | None = None,
@@ -56,7 +56,7 @@ class KeyValueStoreClient(BaseResourceClient):
     ) -> None:
         self._base_storage_directory = base_storage_directory
         self._memory_storage_client = memory_storage_client
-        self.id = id_ or crypto_random_object_id()
+        self.id = id or crypto_random_object_id()
         self.name = name
         self._created_at = created_at or datetime.now(timezone.utc)
         self._accessed_at = accessed_at or datetime.now(timezone.utc)
@@ -98,7 +98,7 @@ class KeyValueStoreClient(BaseResourceClient):
         cls,
         storage_directory: str,
         memory_storage_client: MemoryStorageClient,
-        id_: str | None = None,
+        id: str | None = None,
         name: str | None = None,
     ) -> KeyValueStoreClient:
         created_at = datetime.now(timezone.utc)
@@ -113,7 +113,7 @@ class KeyValueStoreClient(BaseResourceClient):
                 json_content = json.load(f)
                 resource_info = KeyValueStoreResourceInfo(**json_content)
 
-            id_ = resource_info.id
+            id = resource_info.id
             name = resource_info.name
             created_at = resource_info.created_at
             accessed_at = resource_info.accessed_at
@@ -123,7 +123,7 @@ class KeyValueStoreClient(BaseResourceClient):
         new_client = KeyValueStoreClient(
             base_storage_directory=memory_storage_client.key_value_stores_directory,
             memory_storage_client=memory_storage_client,
-            id_=id_,
+            id=id,
             name=name,
             accessed_at=accessed_at,
             created_at=created_at,
@@ -197,7 +197,7 @@ class KeyValueStoreClient(BaseResourceClient):
     async def get(self) -> KeyValueStoreResourceInfo | None:
         found = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
-            id_=self.id,
+            id=self.id,
             name=self.name,
         )
 
@@ -220,7 +220,7 @@ class KeyValueStoreClient(BaseResourceClient):
         # Check by id
         existing_store_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
-            id_=self.id,
+            id=self.id,
             name=self.name,
         )
 
@@ -293,7 +293,7 @@ class KeyValueStoreClient(BaseResourceClient):
         # Check by id
         existing_store_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
-            id_=self.id,
+            id=self.id,
             name=self.name,
         )
 
@@ -353,7 +353,7 @@ class KeyValueStoreClient(BaseResourceClient):
         # Check by id
         existing_store_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
-            id_=self.id,
+            id=self.id,
             name=self.name,
         )
 
@@ -419,7 +419,7 @@ class KeyValueStoreClient(BaseResourceClient):
         # Check by id
         existing_store_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
-            id_=self.id,
+            id=self.id,
             name=self.name,
         )
 
@@ -494,7 +494,7 @@ class KeyValueStoreClient(BaseResourceClient):
         # Check by id
         existing_store_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
-            id_=self.id,
+            id=self.id,
             name=self.name,
         )
 

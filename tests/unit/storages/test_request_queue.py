@@ -19,7 +19,7 @@ async def request_queue() -> AsyncGenerator[RequestQueue, None]:
 
 async def test_open() -> None:
     default_request_queue = await RequestQueue.open()
-    default_request_queue_by_id = await RequestQueue.open(id_=default_request_queue.id)
+    default_request_queue_by_id = await RequestQueue.open(id=default_request_queue.id)
 
     assert default_request_queue is default_request_queue_by_id
 
@@ -28,12 +28,12 @@ async def test_open() -> None:
     assert default_request_queue is not named_request_queue
 
     with pytest.raises(RuntimeError, match='Request queue with id "nonexistent-id" does not exist!'):
-        await RequestQueue.open(id_='nonexistent-id')
+        await RequestQueue.open(id='nonexistent-id')
 
     # Test that when you try to open a request queue by ID and you use a name of an existing request queue,
     # it doesn't work
     with pytest.raises(RuntimeError, match='Request queue with id "dummy-name" does not exist!'):
-        await RequestQueue.open(id_='dummy-name')
+        await RequestQueue.open(id='dummy-name')
 
 
 async def test_consistency_accross_two_clients() -> None:
@@ -43,7 +43,7 @@ async def test_consistency_accross_two_clients() -> None:
     rq = await RequestQueue.open(name='my-rq')
     await rq.add_request(request_apify)
 
-    rq_by_id = await RequestQueue.open(id_=rq.id)
+    rq_by_id = await RequestQueue.open(id=rq.id)
     await rq_by_id.add_request(request_crawlee)
 
     assert await rq.get_total_count() == 2
