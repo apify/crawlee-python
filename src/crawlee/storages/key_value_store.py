@@ -46,17 +46,6 @@ class KeyValueStore(BaseStorage):
         super().__init__(id_=id_, name=name, client=client, configuration=configuration)
         self._key_value_store_client = client.key_value_store(self.id)
 
-    # @classmethod
-    # @override
-    # async def open(
-    #     cls,
-    #     *,
-    #     id_: str | None = None,
-    #     name: str | None = None,
-    #     configuration: Configuration | None = None,
-    # ) -> KeyValueStore:
-    #     return await super().open(id_=id_, name=name, configuration=configuration)
-
     @classmethod
     @override
     def _get_human_friendly_label(cls) -> str:

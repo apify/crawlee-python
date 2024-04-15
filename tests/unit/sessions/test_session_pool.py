@@ -37,12 +37,14 @@ async def session_pool() -> AsyncGenerator[SessionPool, None]:
 
 
 async def test_session_pool_init(session_pool: SessionPool) -> None:
+    """Ensure that the session pool initializes correctly with predefined parameters."""
     assert session_pool.session_count == MAX_POOL_SIZE
     assert session_pool.usable_session_count == MAX_POOL_SIZE
     assert session_pool.retired_session_count == 0
 
 
 async def test_add_session(session_pool: SessionPool) -> None:
+    """Test adding sessions to the session pool increases session counts appropriately."""
     session_01 = Session(id='test_session_01')
     session_02 = Session(id='test_session_02')
     session_pool.add_session(session=session_01)
@@ -53,16 +55,21 @@ async def test_add_session(session_pool: SessionPool) -> None:
 
 
 async def test_add_session_duplicate(caplog: pytest.LogCaptureFixture, session_pool: SessionPool) -> None:
+    """Verify that adding a duplicate session logs a warning and does not increase count."""
     session_01 = Session(id='test_session_01')
     session_02 = Session(id='test_session_01')
 
     session_pool.add_session(session=session_01)
+    assert session_pool.session_count == MAX_POOL_SIZE + 1
 
     with caplog.at_level(logging.WARNING):
         session_pool.add_session(session=session_02)
 
+    assert session_pool.session_count == MAX_POOL_SIZE + 1
+
 
 async def test_get_session(session_pool: SessionPool) -> None:
+    """Check retrieval of a session from the pool and verify its properties."""
     session = await session_pool.get_session()
     assert session is not None
     assert session.expires_at >= datetime.now(timezone.utc)
@@ -73,6 +80,7 @@ async def test_get_session(session_pool: SessionPool) -> None:
 
 
 async def test_get_session_no_usable(caplog: pytest.LogCaptureFixture, session_pool: SessionPool) -> None:
+    """Ensure that retrieval of a non-existent or retired session returns None and logs warning."""
     session = await session_pool.get_session(session_id='non_existent')
     assert session is None
 
@@ -87,7 +95,21 @@ async def test_get_session_no_usable(caplog: pytest.LogCaptureFixture, session_p
         assert session is None
 
 
+async def test_create_session_function() -> None:
+    """Validate that a session created via a custom function works and has the expected fields set."""
+    user_data = {'created_by': 'test_create_session_function'}
+    async with SessionPool(
+        max_pool_size=MAX_POOL_SIZE,
+        persistance_enabled=False,
+        create_session_function=lambda: Session(user_data=user_data),
+    ) as sp:
+        session = await sp.get_session()
+        assert session is not None
+        assert session.user_data == user_data
+
+
 async def test_session_pool_persist(event_manager: EventManager, kvs: KeyValueStore) -> None:
+    """Test persistence of session pool state to KVS and validate stored data integrity."""
     async with SessionPool(
         max_pool_size=MAX_POOL_SIZE,
         event_manager=event_manager,
@@ -117,6 +139,7 @@ async def test_session_pool_persist(event_manager: EventManager, kvs: KeyValueSt
 
 
 async def test_session_pool_persist_and_restore(event_manager: EventManager, kvs: KeyValueStore) -> None:
+    """Check session pool's ability to persist its state and then restore it accurately after reset."""
     async with SessionPool(
         max_pool_size=MAX_POOL_SIZE,
         event_manager=event_manager,

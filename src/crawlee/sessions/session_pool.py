@@ -1,9 +1,5 @@
 # Inspiration: https://github.com/apify/crawlee/blob/v3.9.0/packages/core/src/session_pool/session_pool.ts
 
-# TODO:
-# - max_listeners (default 20) ?
-# - create_session_function: Callable | None = None,
-
 from __future__ import annotations
 
 import random
@@ -22,6 +18,8 @@ if TYPE_CHECKING:
 
 logger = getLogger(__name__)
 
+CreateSessionFunctionType = Callable[[], Session]
+
 
 class SessionPool:
     """Session pool is a pool of sessions that are rotated based on the usage count or age."""
@@ -31,7 +29,7 @@ class SessionPool:
         *,
         max_pool_size: int = 1000,
         create_session_settings: dict | None = None,
-        create_session_function: Callable | None = None,
+        create_session_function: CreateSessionFunctionType | None = None,
         event_manager: EventManager | None = None,
         persistance_enabled: bool = False,
         persist_state_kvs_name: str = 'default',
@@ -46,7 +44,8 @@ class SessionPool:
                 If None, default settings will be used.
 
             create_session_function: A callable to create new session instances.
-                If None, a default session settings will be used.
+                If None, a default session settings will be used. If both `create_session_settings` and this attribute
+                are provided, the `create_session_function` will take precedence.
 
             event_manager: The event manager to handle events like persist state.
 
@@ -210,7 +209,10 @@ class SessionPool:
 
     async def _create_new_session(self) -> Session:
         """Create a new session, add it to the pool and return it."""
-        new_session = Session(**self._session_settings)
+        if self._create_session_function:
+            new_session = self._create_session_function()
+        else:
+            new_session = Session(**self._session_settings)
         self._sessions[new_session.id] = new_session
         return new_session
 
