@@ -94,11 +94,7 @@ class Snapshotter:
         self._reserve_memory_ratio = reserve_memory_ratio
         self._memory_warning_cooldown_period = memory_warning_cooldown_period
         self._client_rate_limit_error_retry_count = client_rate_limit_error_retry_count
-
-        if max_memory_size is None:
-            self._max_memory_size = self._get_default_max_memory_size()
-        else:
-            self._max_memory_size = max_memory_size
+        self._max_memory_size = max_memory_size or self._get_default_max_memory_size()
 
         self._cpu_snapshots: list[CpuSnapshot] = []
         self._event_loop_snapshots: list[EventLoopSnapshot] = []
