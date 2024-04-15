@@ -56,15 +56,3 @@ class SessionPoolModel(BaseModel):
     usable_session_count: Annotated[int, Field(alias='usableSessionCount')]
     retired_session_count: Annotated[int, Field(alias='retiredSessionCount')]
     sessions: Annotated[list[SessionModel], Field(alias='sessions')]
-
-    @field_validator('sessions', mode='before')
-    @classmethod
-    def parse_sessions(cls, value: Any) -> list[SessionModel]:
-        """Try to parse `sessions` field into a list of SessionModel objects."""
-        if isinstance(value, list) and all(isinstance(item, SessionModel) for item in value):
-            return value
-
-        if isinstance(value, list) and all(isinstance(item, dict) for item in value):
-            return [SessionModel(**session) for session in value]
-
-        raise ValueError('Invalid data type for created_at')
