@@ -81,7 +81,7 @@ async def test_get_session(session_pool: SessionPool) -> None:
 
 async def test_get_session_no_usable(caplog: pytest.LogCaptureFixture, session_pool: SessionPool) -> None:
     """Ensure that retrieval of a non-existent or retired session returns None and logs warning."""
-    session = await session_pool.get_session(session_id='non_existent')
+    session = await session_pool.get_session_by_id('non_existent')
     assert session is None
 
     session = Session(id='test_session_not_usable')
@@ -91,7 +91,7 @@ async def test_get_session_no_usable(caplog: pytest.LogCaptureFixture, session_p
     assert session_pool.session_count == MAX_POOL_SIZE + 1
 
     with caplog.at_level(logging.WARNING):
-        session = await session_pool.get_session(session_id='test_session_not_usable')
+        session = await session_pool.get_session_by_id('test_session_not_usable')
         assert session is None
 
 
@@ -134,7 +134,7 @@ async def test_session_pool_persist(event_manager: EventManager, kvs: KeyValueSt
         # Check if all the sessions are correctly persisted
         for session_model in sp_model.sessions:
             kvs_session = Session.from_model(model=session_model)
-            session = await sp.get_session(session_id=kvs_session.id)
+            session = await sp.get_session_by_id(kvs_session.id)
             assert kvs_session == session
 
 

@@ -160,36 +160,16 @@ class SessionPool:
             return
         self._sessions[session.id] = session
 
-    async def get_session(self, *, session_id: str | None = None) -> Session | None:
-        """Retrieve a session from the pool either by a specific ID or randomly.
+    async def get_session(self) -> Session:
+        """Retrieve a random session from the pool.
 
-        This method first ensures the session pool is at its maximum capacity. It then tries to retrieve a specific
-        session by ID if provided. Otherwise, a random session is returned. If the random session is not usable,
+        This method first ensures the session pool is at its maximum capacity. If the random session is not usable,
         retired sessions are removed and a new session is created and returned.
 
-        Args:
-            session_id: The ID of the session to retrieve.
-
         Returns:
-            The session object if found and usable, otherwise `None`.
+            The session object.
         """
         await self._fill_sessions_to_max()
-
-        # If an session ID was provided, try to get the session by ID
-        if session_id:
-            session = self._sessions.get(session_id)
-
-            if not session:
-                logger.warning(f'Session with ID {session_id} not found.')
-                return None
-
-            if not session.is_usable:
-                logger.warning(f'Session with ID {session_id} is not usable.')
-                return None
-
-            return session
-
-        # If no ID was provided, get a random session
         session = self._get_random_session()
 
         if session.is_usable:
@@ -198,6 +178,31 @@ class SessionPool:
         # If the random session is not usable, clean up and create a new session
         self._remove_retired_sessions()
         return await self._create_new_session()
+
+    async def get_session_by_id(self, session_id: str) -> Session | None:
+        """Retrieve a session by ID from the pool.
+
+        This method first ensures the session pool is at its maximum capacity. It then tries to retrieve a specific
+        session by ID. If the session is not found or not usable, `None` is returned.
+
+        Args:
+            session_id: The ID of the session to retrieve.
+
+        Returns:
+            The session object if found and usable, otherwise `None`.
+        """
+        await self._fill_sessions_to_max()
+        session = self._sessions.get(session_id)
+
+        if not session:
+            logger.warning(f'Session with ID {session_id} not found.')
+            return None
+
+        if not session.is_usable:
+            logger.warning(f'Session with ID {session_id} is not usable.')
+            return None
+
+        return session
 
     async def reset_store(self) -> None:
         """Reset the KVS where the pool state is persisted."""
