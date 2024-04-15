@@ -31,25 +31,26 @@ class SessionPool:
         create_session_settings: dict | None = None,
         create_session_function: CreateSessionFunctionType | None = None,
         event_manager: EventManager | None = None,
-        persistance_enabled: bool = False,
+        persistence_enabled: bool = False,
         persist_state_kvs_name: str = 'default',
         persist_state_key: str = 'CRAWLEE_SESSION_POOL_STATE',
     ) -> None:
         """Create a new instance.
 
         Args:
-            max_pool_size: Maximum number of sessions to maintain in the pool.
+            max_pool_size: Maximum number of sessions to maintain in the pool. You can add more sessions to the pool
+                by using the `add_session` method.
 
-            create_session_settings: Settings for creating new session instances.
-                If None, default settings will be used.
+            create_session_settings: Settings for creating new session instances. If None, default settings will
+                be used. Do not set it if you are providing a `create_session_function`.
 
-            create_session_function: A callable to create new session instances.
-                If None, a default session settings will be used. If both `create_session_settings` and this attribute
-                are provided, the `create_session_function` will take precedence.
+            create_session_function: A callable to create new session instances. If None, a default session settings
+                will be used. Do not set it if you are providing `create_session_settings`.
 
             event_manager: The event manager to handle events like persist state.
 
-            persistance_enabled: Flag to enable or disable state persistence of the pool.
+            persistence_enabled: Flag to enable or disable state persistence of the pool. If it is enabled, make sure
+                to provide an event manager to handle the events.
 
             persist_state_kvs_name: The name of the `KeyValueStore` used for state persistence.
 
@@ -59,12 +60,15 @@ class SessionPool:
         self._session_settings = create_session_settings or {}
         self._create_session_function = create_session_function
         self._event_manager = event_manager
-        self._persistance_enabled = persistance_enabled
+        self._persistence_enabled = persistence_enabled
         self._persist_state_kvs_name = persist_state_kvs_name
         self._persist_state_key = persist_state_key
 
-        if not self._event_manager:
-            logger.warning('Event manager not provided: persistence will not work, turning it off.')
+        if self._create_session_function and self._session_settings:
+            raise ValueError('Both `create_session_settings` and `create_session_function` cannot be provided.')
+
+        if self._persistence_enabled and not self._event_manager:
+            raise ValueError('Persistence is enabled, but no event manager was provided.')
 
         # Internal non-configurable attributes
         self._kvs: KeyValueStore | None = None
@@ -91,11 +95,11 @@ class SessionPool:
 
     async def __aenter__(self) -> SessionPool:
         """Initialize the pool upon entering the context manager."""
-        if self._persistance_enabled and self._event_manager:
+        if self._persistence_enabled and self._event_manager:
             self._kvs = await KeyValueStore.open(name=self._persist_state_kvs_name)
 
             # Attempt to restore the previously persisted state.
-            was_restored = await self._try_to_restore_previos_state()
+            was_restored = await self._try_to_restore_previous_state()
 
             # If the pool could not be restored, initialize it with new sessions.
             if not was_restored:
@@ -116,7 +120,7 @@ class SessionPool:
         exc_traceback: TracebackType | None,
     ) -> None:
         """Deinitialize the pool upon exiting the context manager."""
-        if self._persistance_enabled and self._event_manager:
+        if self._persistence_enabled and self._event_manager:
             # Remove the event listener for state persistence.
             self._event_manager.off(event=Event.PERSIST_STATE, listener=self._persist_state)
 
@@ -132,7 +136,7 @@ class SessionPool:
     def get_state(self, *, as_dict: bool = False) -> SessionPoolModel | dict:
         """Retrieve the current state of the pool either as a model or as a dictionary."""
         model = SessionPoolModel(
-            persistance_enabled=self._persistance_enabled,
+            persistence_enabled=self._persistence_enabled,
             persist_state_kvs_name=self._persist_state_kvs_name,
             persist_state_key=self._persist_state_key,
             max_pool_size=self._max_pool_size,
@@ -197,7 +201,7 @@ class SessionPool:
 
     async def reset_store(self) -> None:
         """Reset the KVS where the pool state is persisted."""
-        if not self._persistance_enabled:
+        if not self._persistence_enabled:
             logger.debug('Persistence is disabled; skipping the reset of the store.')
             return
 
@@ -233,9 +237,9 @@ class SessionPool:
         """Remove all sessions from the pool that are no longer usable."""
         self._sessions = {session_id: session for session_id, session in self._sessions.items() if session.is_usable}
 
-    async def _try_to_restore_previos_state(self) -> bool:
+    async def _try_to_restore_previous_state(self) -> bool:
         """Try to restore the previous state of the pool from the KVS."""
-        if not self._persistance_enabled:
+        if not self._persistence_enabled:
             logger.warning('Persistence is disabled, however, the state restoration was triggered.')
 
         if not self._kvs:
@@ -265,7 +269,7 @@ class SessionPool:
         """Persist the state of the pool in the KVS."""
         logger.debug(f'Persisting state of the SessionPool (event_data={event_data}).')
 
-        if not self._persistance_enabled:
+        if not self._persistence_enabled:
             logger.warning('Persistence is disabled, however, the state persistence event was triggered.')
 
         if not self._kvs:

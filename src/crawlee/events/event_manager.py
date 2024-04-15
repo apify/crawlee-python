@@ -73,6 +73,7 @@ class EventManager:
             event: The Actor event for which to listen to.
             listener: The function (sync or async) which is to be called when the event is emitted.
         """
+
         @wraps(listener)
         async def listener_wrapper(event_data: EventData) -> None:
             # If the listener is a coroutine function, just call it, otherwise, run it in a separate thread
@@ -137,6 +138,7 @@ class EventManager:
             timeout: The maximum time to wait for the event listeners to finish. If they do not complete within
                 the specified timeout, they will be canceled.
         """
+
         async def wait_for_listeners() -> None:
             """Gathers all listener tasks and awaits their completion, logging any exceptions encountered."""
             results = await asyncio.gather(*self._listener_tasks, return_exceptions=True)

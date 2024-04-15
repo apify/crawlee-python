@@ -32,7 +32,7 @@ async def event_manager() -> AsyncGenerator[EventManager, None]:
 
 @pytest.fixture()
 async def session_pool() -> AsyncGenerator[SessionPool, None]:
-    async with SessionPool(max_pool_size=MAX_POOL_SIZE, persistance_enabled=False) as sp:
+    async with SessionPool(max_pool_size=MAX_POOL_SIZE, persistence_enabled=False) as sp:
         yield sp
 
 
@@ -100,7 +100,7 @@ async def test_create_session_function() -> None:
     user_data = {'created_by': 'test_create_session_function'}
     async with SessionPool(
         max_pool_size=MAX_POOL_SIZE,
-        persistance_enabled=False,
+        persistence_enabled=False,
         create_session_function=lambda: Session(user_data=user_data),
     ) as sp:
         session = await sp.get_session()
@@ -113,7 +113,7 @@ async def test_session_pool_persist(event_manager: EventManager, kvs: KeyValueSt
     async with SessionPool(
         max_pool_size=MAX_POOL_SIZE,
         event_manager=event_manager,
-        persistance_enabled=True,
+        persistence_enabled=True,
         persist_state_kvs_name=KVS_NAME,
         persist_state_key=PERSIST_STATE_KEY,
     ) as sp:
@@ -143,7 +143,7 @@ async def test_session_pool_persist_and_restore(event_manager: EventManager, kvs
     async with SessionPool(
         max_pool_size=MAX_POOL_SIZE,
         event_manager=event_manager,
-        persistance_enabled=True,
+        persistence_enabled=True,
         persist_state_kvs_name=KVS_NAME,
         persist_state_key=PERSIST_STATE_KEY,
     ) as _:
@@ -154,7 +154,7 @@ async def test_session_pool_persist_and_restore(event_manager: EventManager, kvs
     async with SessionPool(
         max_pool_size=MAX_POOL_SIZE,
         event_manager=event_manager,
-        persistance_enabled=True,
+        persistence_enabled=True,
         persist_state_kvs_name=KVS_NAME,
         persist_state_key=PERSIST_STATE_KEY,
     ) as sp:

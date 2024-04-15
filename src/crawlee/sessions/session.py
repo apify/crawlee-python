@@ -25,6 +25,7 @@ class Session:
 
     def __init__(
         self,
+        *,
         id: str | None = None,  # noqa: A002
         max_age: timedelta = timedelta(minutes=50),
         user_data: dict | None = None,
@@ -159,7 +160,7 @@ class Session:
         self._usage_count += 1
 
         if self._error_score > 0:
-            self._error_score -= self._error_score_decrement
+            self._error_score = max(0, self._error_score - self._error_score_decrement)
 
         # Retire the session if it is not usable anymore
         if not self.is_usable:
