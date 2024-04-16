@@ -229,7 +229,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             return
 
         # TODO: fetch session from the session pool
-        # https://github.com/apify/crawlee-py/issues/78
+        # https://github.com/apify/crawlee-py/issues/110
 
         crawling_context = BasicCrawlingContext(request=request)
 

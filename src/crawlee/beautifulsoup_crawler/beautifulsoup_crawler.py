@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import timedelta
-from typing import TYPE_CHECKING, AsyncGenerator, Awaitable, Callable, Literal
+from typing import TYPE_CHECKING, AsyncGenerator, Awaitable, Callable, Iterable, Literal
 
 import httpx
 
@@ -33,12 +33,36 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
         concurrency_settings: ConcurrencySettings | None = None,
         configuration: Configuration | None = None,
         request_handler_timeout: timedelta | None = None,
+        additional_http_error_status_codes: Iterable[int] = (),
+        ignore_http_error_status_codes: Iterable[int] = (),
     ) -> None:
-        """Initialize the BeautifulSoupCrawler."""
+        """Initialize the BeautifulSoupCrawler.
+
+        Args:
+            parser: The type of parser that should be used by BeautifulSoup
+
+            request_provider: Provides requests to be processed
+
+            router: A callable to which request handling is delegated
+
+            concurrency_settings: Allows fine-tuning concurrency levels
+
+            configuration: Crawler configuration
+
+            request_handler_timeout: How long is a single request handler allowed to run
+
+            additional_http_error_status_codes: HTTP status codes that should be considered errors (and trigger a retry)
+
+            ignore_http_error_status_codes: HTTP status codes that are normally considered errors but we want to treat
+                                            them as successful
+        """
         context_pipeline = ContextPipeline().compose(self._make_http_request).compose(self._parse_http_response)
 
         self._client = httpx.AsyncClient()
         self._parser = parser
+
+        self._additional_http_error_status_codes = set(additional_http_error_status_codes)
+        self._ignore_http_error_status_codes = set(ignore_http_error_status_codes)
 
         basic_crawler_kwargs = {}
 
@@ -55,7 +79,13 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
         )
 
     async def _make_http_request(self, context: BasicCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
-        result = await make_http_request(self._client, context.request)
+        result = await make_http_request(
+            self._client,
+            context.request,
+            additional_http_error_status_codes=self._additional_http_error_status_codes,
+            ignore_http_error_status_codes=self._ignore_http_error_status_codes,
+        )
+
         yield HttpCrawlingContext(request=context.request, http_response=result.http_response)
 
     async def _parse_http_response(
