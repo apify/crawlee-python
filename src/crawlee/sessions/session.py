@@ -26,7 +26,7 @@ class Session:
     def __init__(
         self,
         *,
-        id: str | None = None,  # noqa: A002
+        id: str | None = None,
         max_age: timedelta = timedelta(minutes=50),
         user_data: dict | None = None,
         max_error_score: float = 3.0,
