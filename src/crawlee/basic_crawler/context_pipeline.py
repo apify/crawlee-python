@@ -18,6 +18,28 @@ class RequestHandlerError(Exception, Generic[TCrawlingContext]):
         self.crawling_context = crawling_context
 
 
+class ContextPipelineInitializationError(Exception):
+    """Wraps an exception thrown in the initialization step of a context pipeline middleware.
+
+    We may not have the complete context at this point, so only `BasicCrawlingContext` is provided.
+    """
+
+    def __init__(self, wrapped_exception: Exception, crawling_context: BasicCrawlingContext) -> None:
+        self.wrapped_exception = wrapped_exception
+        self.crawling_context = crawling_context
+
+
+class ContextPipelineFinalizationError(Exception):
+    """Wraps an exception thrown in the finalization step of a context pipeline middleware.
+
+    We may not have the complete context at this point, so only `BasicCrawlingContext` is provided.
+    """
+
+    def __init__(self, wrapped_exception: Exception, crawling_context: BasicCrawlingContext) -> None:
+        self.wrapped_exception = wrapped_exception
+        self.crawling_context = crawling_context
+
+
 class ContextPipeline(Generic[TCrawlingContext]):
     """Encapsulates the logic of gradually enhancing the crawling context with additional information and utilities.
 
@@ -55,29 +77,34 @@ class ContextPipeline(Generic[TCrawlingContext]):
         chain = list(self._middleware_chain())
         cleanup_stack = list[AsyncGenerator]()
 
-        for member in reversed(chain):
-            if member._middleware:  # noqa: SLF001
-                middleware_instance = member._middleware(crawling_context)  # noqa: SLF001
+        try:
+            for member in reversed(chain):
+                if member._middleware:  # noqa: SLF001
+                    middleware_instance = member._middleware(crawling_context)  # noqa: SLF001
+                    try:
+                        result = await middleware_instance.__anext__()
+                    except StopAsyncIteration as e:
+                        raise RuntimeError('The middleware did not yield') from e
+                    except Exception as e:
+                        raise ContextPipelineInitializationError(e, crawling_context) from e
+
+                    crawling_context = result
+                    cleanup_stack.append(middleware_instance)
+
+            try:
+                await final_context_consumer(cast(TCrawlingContext, crawling_context))
+            except Exception as e:
+                raise RequestHandlerError(e, crawling_context) from e
+        finally:
+            for middleware_instance in reversed(cleanup_stack):
                 try:
                     result = await middleware_instance.__anext__()
-                except StopAsyncIteration as e:
-                    raise RuntimeError('The middleware did not yield') from e
-
-                crawling_context = result
-                cleanup_stack.append(middleware_instance)
-
-        try:
-            await final_context_consumer(cast(TCrawlingContext, crawling_context))
-        except Exception as e:
-            raise RequestHandlerError(e, crawling_context) from e
-
-        for middleware_instance in reversed(cleanup_stack):
-            try:
-                result = await middleware_instance.__anext__()
-            except StopAsyncIteration:  # noqa: PERF203
-                pass
-            else:
-                raise RuntimeError('The middleware yielded more than once')
+                except StopAsyncIteration:  # noqa: PERF203
+                    pass
+                except Exception as e:
+                    raise ContextPipelineFinalizationError(e, crawling_context) from e
+                else:
+                    raise RuntimeError('The middleware yielded more than once')
 
     def compose(
         self,
