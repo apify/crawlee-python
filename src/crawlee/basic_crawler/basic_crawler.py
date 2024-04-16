@@ -12,7 +12,11 @@ from crawlee._utils.wait import wait_for
 from crawlee.autoscaling import AutoscaledPool, ConcurrencySettings
 from crawlee.autoscaling.snapshotter import Snapshotter
 from crawlee.autoscaling.system_status import SystemStatus
-from crawlee.basic_crawler.context_pipeline import ContextPipeline, RequestHandlerError
+from crawlee.basic_crawler.context_pipeline import (
+    ContextPipeline,
+    ContextPipelineInitializationError,
+    RequestHandlerError,
+)
 from crawlee.basic_crawler.router import Router
 from crawlee.basic_crawler.types import BasicCrawlingContext, FinalStatistics
 from crawlee.configuration import Configuration
@@ -162,16 +166,17 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         return FinalStatistics()
 
-    async def _handle_request_error(self, crawling_context: TCrawlingContext, error: Exception) -> None:
+    def _should_retry_request(self, crawling_context: BasicCrawlingContext) -> bool:
         max_request_retries = crawling_context.request.max_retries
         if max_request_retries is None:
             max_request_retries = self._max_request_retries
 
-        should_retry_request = (
+        return (
             not crawling_context.request.no_retry and (crawling_context.request.retry_count + 1) < max_request_retries
         )
 
-        if should_retry_request:
+    async def _handle_request_error(self, crawling_context: TCrawlingContext, error: Exception) -> None:
+        if self._should_retry_request(crawling_context):
             request = crawling_context.request
             request.retry_count += 1
 
@@ -240,7 +245,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             )
 
             await wait_for(
-                lambda: self._request_provider.mark_request_as_handled(request),
+                lambda: self._request_provider.mark_request_as_handled(crawling_context.request),
                 timeout=self._internal_timeout,
                 timeout_message='Marking request as handled timed out after '
                 f'{self._internal_timeout.total_seconds()} seconds',
@@ -279,6 +284,28 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 )
                 request.state = RequestState.ERROR
                 raise
+        except ContextPipelineInitializationError as initialization_error:
+            if self._should_retry_request(crawling_context):
+                logger.debug(
+                    'An exception occured during the initialization of crawling context, a retry is in order',
+                    exc_info=initialization_error,
+                )
+
+                request = crawling_context.request
+                request.retry_count += 1
+                request.state = RequestState.DONE
+                await self._request_provider.reclaim_request(request)
+            else:
+                logger.exception('Request failed and reached maximum retries', exc_info=initialization_error)
+
+                await wait_for(
+                   lambda: self._request_provider.mark_request_as_handled(crawling_context.request),
+                   timeout=self._internal_timeout,
+                   timeout_message='Marking request as handled timed out after '
+                   f'{self._internal_timeout.total_seconds()} seconds',
+                   logger=logger,
+                   max_retries=3,
+                )
         except Exception as internal_error:
             logger.exception(
                 'An exception occurred during handling of a request. This places the crawler '

@@ -31,7 +31,7 @@ async def server() -> AsyncGenerator[respx.MockRouter, None]:
             200,
             text="""<html>
                 <head>
-                    <title>Hello</title
+                    <title>Hello</title>
                 </head>
                 <body>Hello world</body>
             </html>""",
@@ -39,6 +39,24 @@ async def server() -> AsyncGenerator[respx.MockRouter, None]:
 
         mock.get('/redirect', name='redirect_endpoint').return_value = Response(
             301, headers={'Location': 'https://test.io/html'}
+        )
+
+        mock.get('/404', name='404_endpoint').return_value = Response(
+            404,
+            text="""<html>
+                <head>
+                    <title>Not found</title>
+                </head>
+            </html>""",
+        )
+
+        mock.get('/500', name='500_endpoint').return_value = Response(
+            500,
+            text="""<html>
+                <head>
+                    <title>Internal server error</title>
+                </head>
+            </html>""",
         )
 
         yield mock
@@ -65,3 +83,24 @@ async def test_handles_redirects(
 
     assert server['redirect_endpoint'].called
     assert server['html_endpoint'].called
+
+
+async def test_handles_client_errors(
+    crawler: HttpCrawler, mock_request_handler: AsyncMock, server: respx.MockRouter
+) -> None:
+    await crawler.add_requests(['https://test.io/404'])
+    await crawler.run()
+
+    mock_request_handler.assert_called_once()
+    assert mock_request_handler.call_args[0][0].request.loaded_url == 'https://test.io/404'
+    assert server['404_endpoint'].called
+
+
+async def test_handles_server_error(
+    crawler: HttpCrawler, mock_request_handler: AsyncMock, server: respx.MockRouter
+) -> None:
+    await crawler.add_requests(['https://test.io/500'])
+    await crawler.run()
+
+    mock_request_handler.assert_not_called()
+    assert server['500_endpoint'].called
