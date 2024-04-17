@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
+
+T = TypeVar('T')
 
 
 class BaseStorageMetadata(BaseModel):
@@ -77,3 +79,23 @@ class KeyValueStoreRecordMetadata(BaseModel):
 
 #     key: Annotated[str, Field(alias='key')]
 #     size: Annotated[int, Field(alias='size')]
+
+
+class ListPage(BaseModel, Generic[T]):
+    """A single page of items returned from a list() method.
+
+    Args:
+        items: List of returned objects on this page.
+        count: Count of the returned objects on this page.
+        offset: The offset of the first object specified in the API call.
+        limit: The limit on the number of returned objects specified in the API call.
+        total: Total number of objects matching the API call criteria.
+        desc: Whether the listing is descending or not.
+    """
+
+    items: Annotated[list[T], Field(default_factory=list)]
+    count: Annotated[int, Field(default=0)]
+    offset: Annotated[int, Field(default=0)]
+    limit: Annotated[int, Field(default=0)]
+    total: Annotated[int, Field(default=0)]
+    desc: Annotated[bool, Field(default=False)]

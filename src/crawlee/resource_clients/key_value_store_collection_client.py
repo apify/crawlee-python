@@ -8,8 +8,7 @@ from crawlee.resource_clients.base_resource_collection_client import BaseResourc
 from crawlee.resource_clients.key_value_store_client import KeyValueStoreClient
 
 if TYPE_CHECKING:
-    from crawlee.storages.models import BaseStorageMetadata
-    from crawlee.storages.types import ListPage
+    from crawlee.storages.models import BaseStorageMetadata, ListPage
 
 
 class KeyValueStoreCollectionClient(BaseResourceCollectionClient):

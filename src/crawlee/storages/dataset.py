@@ -15,8 +15,9 @@ if TYPE_CHECKING:
     from crawlee.configuration import Configuration
     from crawlee.resource_clients import DatasetClient, DatasetCollectionClient
     from crawlee.storage_clients import MemoryStorageClient
-    from crawlee.storages.models import DatasetMetadata
-    from crawlee.storages.types import JSONSerializable, ListPage
+    from crawlee.storages.models import DatasetMetadata, ListPage
+    from crawlee.storages.types import JSONSerializable
+
 
 class Dataset(BaseStorage):
     """Represents an append-only structured storage, ideal for tabular data akin to database tables.

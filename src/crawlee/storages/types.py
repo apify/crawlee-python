@@ -133,33 +133,33 @@ class RequestQueueHeadResponse:
 #     resource_directory: str
 
 
-@dataclass
-class ListPage(Generic[T]):
-    """A single page of items returned from a list() method.
+# @dataclass
+# class ListPage(Generic[T]):
+#     """A single page of items returned from a list() method.
 
-    Args:
-        items: List of returned objects on this page.
-        count: Count of the returned objects on this page.
-        offset: The limit on the number of returned objects offset specified in the API call.
-        limit: The offset of the first object specified in the API call.
-        total: Total number of objects matching the API call criteria.
-        desc: Whether the listing is descending or not.
-    """
+#     Args:
+#         items: List of returned objects on this page.
+#         count: Count of the returned objects on this page.
+#         offset: The limit on the number of returned objects offset specified in the API call.
+#         limit: The offset of the first object specified in the API call.
+#         total: Total number of objects matching the API call criteria.
+#         desc: Whether the listing is descending or not.
+#     """
 
-    items: list[T]
-    count: int
-    offset: int
-    limit: int
-    total: int
-    desc: bool
+#     items: list[T]
+#     count: int
+#     offset: int
+#     limit: int
+#     total: int
+#     desc: bool
 
-    @classmethod
-    def from_dict(cls, data: dict) -> ListPage:
-        """Initialize a new instance from the API response data."""
-        items = data.get('items', [])
-        offset = data.get('offset', 0)
-        limit = data.get('limit', 0)
-        count = data.get('count', len(items))
-        total = data.get('total', offset + count)
-        desc = data.get('desc', False)
-        return cls(items=items, count=count, offset=offset, limit=limit, total=total, desc=desc)
+#     @classmethod
+#     def from_dict(cls, data: dict) -> ListPage:
+#         """Initialize a new instance from the API response data."""
+#         items = data.get('items', [])
+#         offset = data.get('offset', 0)
+#         limit = data.get('limit', 0)
+#         count = data.get('count', len(items))
+#         total = data.get('total', offset + count)
+#         desc = data.get('desc', False)
+#         return cls(items=items, count=count, offset=offset, limit=limit, total=total, desc=desc)
