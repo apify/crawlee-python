@@ -10,7 +10,12 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True)
-class HttpCrawlingContext(BasicCrawlingContext):
-    """HTTP crawling context."""
+class HttpCrawlResult:
+    """Result of loading a page with raw HTTP."""
 
     http_response: Response
+
+
+@dataclass(frozen=True)
+class HttpCrawlingContext(BasicCrawlingContext, HttpCrawlResult):
+    """HTTP crawling context."""

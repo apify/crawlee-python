@@ -6,7 +6,12 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from crawlee.basic_crawler.context_pipeline import ContextPipeline, RequestHandlerError
+from crawlee.basic_crawler.context_pipeline import (
+    ContextPipeline,
+    ContextPipelineFinalizationError,
+    ContextPipelineInitializationError,
+    RequestHandlerError,
+)
 from crawlee.basic_crawler.types import BasicCrawlingContext
 from crawlee.request import Request
 
@@ -71,3 +76,47 @@ async def test_wraps_consumer_errors() -> None:
 
     with pytest.raises(RequestHandlerError):
         await pipeline(context, consumer)
+
+
+async def test_handles_exceptions_in_middleware_initialization() -> None:
+    consumer = AsyncMock()
+    cleanup = AsyncMock()
+
+    async def step_1(context: BasicCrawlingContext) -> AsyncGenerator[BasicCrawlingContext, None]:
+        yield context
+        await cleanup()
+
+    async def step_2(context: BasicCrawlingContext) -> AsyncGenerator[BasicCrawlingContext, None]:
+        raise RuntimeError('Crash during middleware initialization')
+        yield context  # type: ignore[unreachable]
+
+    pipeline = ContextPipeline().compose(step_1).compose(step_2)
+    context = BasicCrawlingContext(request=Request.from_url(url='aaa'))
+
+    with pytest.raises(ContextPipelineInitializationError):
+        await pipeline(context, consumer)
+
+    assert not consumer.called
+    assert cleanup.called
+
+
+async def test_handles_exceptions_in_middleware_finalization() -> None:
+    consumer = AsyncMock()
+    cleanup = AsyncMock()
+
+    async def step_1(context: BasicCrawlingContext) -> AsyncGenerator[BasicCrawlingContext, None]:
+        yield context
+        await cleanup()
+
+    async def step_2(context: BasicCrawlingContext) -> AsyncGenerator[BasicCrawlingContext, None]:
+        yield context
+        raise RuntimeError('Crash during middleware finalization')
+
+    pipeline = ContextPipeline().compose(step_1).compose(step_2)
+    context = BasicCrawlingContext(request=Request.from_url(url='aaa'))
+
+    with pytest.raises(ContextPipelineFinalizationError):
+        await pipeline(context, consumer)
+
+    assert consumer.called
+    assert not cleanup.called
