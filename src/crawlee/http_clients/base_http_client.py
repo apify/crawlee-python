@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Iterable, Protocol
 
 if TYPE_CHECKING:
-    import httpx
+    from httpx import Headers  # Type from `httpx` is used here because it is lightweight and convenient
 
     from crawlee.request import Request
 
@@ -21,7 +21,7 @@ class HttpResponse(Protocol):
         """HTTP status code of the response (https://developer.mozilla.org/en-US/docs/Web/HTTP/Status)."""
 
     @property
-    def headers(self) -> httpx.Headers:  # Type from `httpx` is used here because it is lightweight and convenient
+    def headers(self) -> Headers:
         """Response headers."""
 
 
@@ -46,4 +46,8 @@ class BaseHttpClient(ABC):
 
     @abstractmethod
     async def crawl(self, request: Request) -> HttpCrawlingResult:
+        """Perform a crawl of an URL."""
+
+    @abstractmethod
+    async def send_request(self, url: str, *, method: str, headers: Headers | dict[str, str]) -> HttpResponse:
         """Perform an HTTP request."""

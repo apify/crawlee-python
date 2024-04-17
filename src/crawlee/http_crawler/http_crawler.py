@@ -76,4 +76,8 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
     ) -> AsyncGenerator[HttpCrawlingContext, None]:
         result = await self._http_client.crawl(crawling_context.request)
 
-        yield HttpCrawlingContext(request=crawling_context.request, http_response=result.http_response)
+        yield HttpCrawlingContext(
+            request=crawling_context.request,
+            send_request=crawling_context.send_request,
+            http_response=result.http_response,
+        )

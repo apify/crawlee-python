@@ -6,6 +6,7 @@ from functools import partial
 from logging import getLogger
 from typing import TYPE_CHECKING, Awaitable, Callable, Generic, Union, cast
 
+import httpx
 from typing_extensions import TypeVar
 
 from crawlee._utils.wait import wait_for
@@ -18,14 +19,14 @@ from crawlee.basic_crawler.context_pipeline import (
     RequestHandlerError,
 )
 from crawlee.basic_crawler.router import Router
-from crawlee.basic_crawler.types import BasicCrawlingContext, FinalStatistics
+from crawlee.basic_crawler.types import BasicCrawlingContext, FinalStatistics, SendRequestFunction
 from crawlee.configuration import Configuration
 from crawlee.events.local_event_manager import LocalEventManager
 from crawlee.http_clients.httpx_client import HttpxClient
 from crawlee.request import BaseRequestData, Request, RequestState
 
 if TYPE_CHECKING:
-    from crawlee.http_clients.base_http_client import BaseHttpClient
+    from crawlee.http_clients.base_http_client import BaseHttpClient, HttpResponse
     from crawlee.storages.request_provider import RequestProvider
 
 
@@ -216,6 +217,12 @@ class BasicCrawler(Generic[TCrawlingContext]):
             except Exception as e:
                 raise UserDefinedErrorHandlerError('Exception thrown in user-defined failed request handler') from e
 
+    def _prepare_send_request_function(self) -> SendRequestFunction:
+        async def send_request(url: str, *, method: str, headers: dict[str, str]) -> HttpResponse:
+            return await self._http_client.send_request(url, method=method, headers=httpx.Headers(headers))
+
+        return send_request
+
     async def __is_finished_function(self) -> bool:
         return await self._request_provider.is_finished()
 
@@ -237,7 +244,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         # TODO: fetch session from the session pool
         # https://github.com/apify/crawlee-py/issues/110
 
-        crawling_context = BasicCrawlingContext(request=request)
+        crawling_context = BasicCrawlingContext(request=request, send_request=self._prepare_send_request_function())
 
         try:
             request.state = RequestState.REQUEST_HANDLER

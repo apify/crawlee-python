@@ -85,7 +85,9 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
     async def _make_http_request(self, context: BasicCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
         result = await self._http_client.crawl(context.request)
 
-        yield HttpCrawlingContext(request=context.request, http_response=result.http_response)
+        yield HttpCrawlingContext(
+            request=context.request, send_request=context.send_request, http_response=result.http_response
+        )
 
     async def _parse_http_response(
         self, context: HttpCrawlingContext
@@ -93,4 +95,6 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
         from bs4 import BeautifulSoup
 
         soup = await asyncio.to_thread(lambda: BeautifulSoup(context.http_response.read(), self._parser))
-        yield BeautifulSoupCrawlingContext(request=context.request, http_response=context.http_response, soup=soup)
+        yield BeautifulSoupCrawlingContext(
+            request=context.request, send_request=context.send_request, http_response=context.http_response, soup=soup
+        )
