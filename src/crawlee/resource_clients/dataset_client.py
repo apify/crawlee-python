@@ -361,7 +361,6 @@ class DatasetClient(BaseResourceClient):
         Yields:
             An asynchronous iterator of dictionary objects, each representing a dataset item after applying
             the specified filters and transformations.
-
         """
         cache_size = 1000
         first_item = offset
@@ -473,7 +472,7 @@ class DatasetClient(BaseResourceClient):
             self._modified_at = datetime.now(timezone.utc)
 
         dataset_info = self.resource_info
-        dataset_info_as_dict = dataset_info.__dict__
+        dataset_info_as_dict = dataset_info.model_dump()
 
         await persist_metadata_if_enabled(
             data=dataset_info_as_dict,

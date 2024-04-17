@@ -520,7 +520,7 @@ class RequestQueueClient(BaseResourceClient):
             self._modified_at = datetime.now(timezone.utc)
 
         request_queue_info = self.resource_info
-        request_queue_info_as_dict = request_queue_info.__dict__
+        request_queue_info_as_dict = request_queue_info.model_dump()
 
         await persist_metadata_if_enabled(
             data=request_queue_info_as_dict,
@@ -543,7 +543,7 @@ class RequestQueueClient(BaseResourceClient):
         if request.id is not None and request.id != id:
             raise ValueError('Request ID does not match its unique_key.')
 
-        json_request = await json_dumps({**(request.__dict__), 'id': id})
+        json_request = await json_dumps({**(request.model_dump()), 'id': id})
         return Request(
             url=request.url,
             unique_key=request.unique_key,

@@ -487,7 +487,7 @@ class KeyValueStoreClient(BaseResourceClient):
             self._modified_at = datetime.now(timezone.utc)
 
         kv_store_info = self.resource_info
-        kv_store_info_as_dict = kv_store_info.__dict__
+        kv_store_info_as_dict = kv_store_info.model_dump()
 
         await persist_metadata_if_enabled(
             data=kv_store_info_as_dict,
