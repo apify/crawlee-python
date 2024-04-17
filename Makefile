@@ -10,7 +10,7 @@ clean:
 
 install-dev:
 	python3 -m pip install --upgrade pip poetry
-    poetry install --all-extras
+	poetry install --all-extras
 	poetry run pre-commit install
 
 lint:
