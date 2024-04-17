@@ -17,11 +17,11 @@ from crawlee._utils.data_processing import raise_on_duplicate_storage, raise_on_
 from crawlee._utils.file import force_rename, json_dumps, persist_metadata_if_enabled
 from crawlee.resource_clients.base_resource_client import BaseResourceClient
 from crawlee.storages.models import DatasetMetadata, ListPage
-from crawlee.storages.types import StorageTypes
+from crawlee.types import StorageTypes
 
 if TYPE_CHECKING:
     from crawlee.storage_clients import MemoryStorageClient
-    from crawlee.storages.types import JSONSerializable
+    from crawlee.types import JSONSerializable
 
 logger = getLogger(__name__)
 

@@ -26,13 +26,14 @@ from crawlee._utils.file import (
     persist_metadata_if_enabled,
 )
 from crawlee.resource_clients.base_resource_client import BaseResourceClient
-from crawlee.storages.models import KeyValueStoreMetadata, KeyValueStoreRecordMetadata
-from crawlee.storages.types import (
+from crawlee.storages.models import (
     KeyValueStoreListKeysOutput,
+    KeyValueStoreMetadata,
     KeyValueStoreRecord,
     KeyValueStoreRecordInfo,
-    StorageTypes,
+    KeyValueStoreRecordMetadata,
 )
+from crawlee.types import StorageTypes
 
 if TYPE_CHECKING:
     from crawlee.storage_clients import MemoryStorageClient
@@ -398,17 +399,14 @@ class KeyValueStoreClient(BaseResourceClient):
 
         async with existing_store_by_id.file_operation_lock:
             await existing_store_by_id.update_timestamps(has_been_modified=True)
-            record = KeyValueStoreRecord(
-                key=key,
-                value=value,
-                content_type=content_type,
-            )
+            record = KeyValueStoreRecord(key=key, value=value, content_type=content_type, filename=None)
 
             old_record = existing_store_by_id.records.get(key)
             existing_store_by_id.records[key] = record
 
             if self._memory_storage_client.persist_storage:
                 record_filename = self._filename_from_record(record)
+                record.filename = record_filename
 
                 if old_record is not None and self._filename_from_record(old_record) != record_filename:
                     await existing_store_by_id.delete_persisted_record(old_record)
@@ -522,6 +520,7 @@ class KeyValueStoreClient(BaseResourceClient):
             key=stored_record.key,
             value=stored_record.value,
             content_type=stored_record.content_type,
+            filename=stored_record.filename,
         )
 
         if not as_bytes:

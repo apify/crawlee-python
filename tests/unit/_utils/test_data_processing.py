@@ -16,7 +16,7 @@ from crawlee._utils.data_processing import (
     raise_on_duplicate_storage,
     raise_on_non_existing_storage,
 )
-from crawlee.storages.types import StorageTypes
+from crawlee.types import StorageTypes
 
 
 @pytest.mark.parametrize(

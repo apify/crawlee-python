@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from crawlee.resource_clients import DatasetClient, DatasetCollectionClient
     from crawlee.storage_clients import MemoryStorageClient
     from crawlee.storages.models import DatasetMetadata, ListPage
-    from crawlee.storages.types import JSONSerializable
+    from crawlee.types import JSONSerializable
 
 
 class Dataset(BaseStorage):

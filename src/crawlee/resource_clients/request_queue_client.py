@@ -24,7 +24,7 @@ from crawlee._utils.requests import unique_key_to_request_id
 from crawlee.request import Request
 from crawlee.resource_clients.base_resource_client import BaseResourceClient
 from crawlee.storages.models import RequestQueueHeadResponse, RequestQueueMetadata, RequestQueueOperationInfo
-from crawlee.storages.types import StorageTypes
+from crawlee.types import StorageTypes
 
 if TYPE_CHECKING:
     from crawlee.storage_clients import MemoryStorageClient

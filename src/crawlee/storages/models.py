@@ -1,9 +1,9 @@
-# ruff: noqa: TCH003
+# ruff: noqa: TCH001, TCH002, TCH003
 
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Generic, TypeVar
+from typing import Annotated, Any, Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -54,6 +54,17 @@ class RequestQueueMetadata(BaseStorageMetadata):
     resource_directory: Annotated[str, Field(alias='resourceDirectory')]
 
 
+class KeyValueStoreRecord(BaseModel):
+    """Model for a key-value store record."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    key: Annotated[str, Field(alias='key')]
+    value: Annotated[Any, Field(alias='value')]
+    content_type: Annotated[str | None, Field(alias='contentType', default=None)]
+    filename: Annotated[str | None, Field(alias='filename', default=None)]
+
+
 class KeyValueStoreRecordMetadata(BaseModel):
     """Model for a key-value store record metadata."""
 
@@ -63,24 +74,26 @@ class KeyValueStoreRecordMetadata(BaseModel):
     content_type: Annotated[str, Field(alias='contentType')]
 
 
-# class KeyValueStoreRecord(BaseModel):
-#     """Model for a key-value store record."""
+class KeyValueStoreRecordInfo(BaseModel):
+    """Model for a key-value store record info."""
 
-#     model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True)
 
-#     key: Annotated[str, Field(alias='key')]
-#     value: Annotated[Any, Field(alias='value')]
-#     content_type: Annotated[str | None, Field(alias='contentType', default=None)]
-#     filename: Annotated[str | None, Field(alias='filename', default=None)]
+    key: Annotated[str, Field(alias='key')]
+    size: Annotated[int, Field(alias='size')]
 
 
-# class KeyValueStoreRecordInfo(BaseModel):
-#     """Model for a key-value store record info."""
+class KeyValueStoreListKeysOutput(BaseModel, Generic[T]):
+    """Represents the output of listing keys in the key-value store."""
 
-#     model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True)
 
-#     key: Annotated[str, Field(alias='key')]
-#     size: Annotated[int, Field(alias='size')]
+    count: Annotated[int, Field(alias='count')]
+    limit: Annotated[int, Field(alias='limit')]
+    is_truncated: Annotated[bool, Field(alias='isTruncated')]
+    items: Annotated[list[T], Field(alias='items', default_factory=list)]
+    exclusive_start_key: Annotated[str | None, Field(alias='exclusiveStartKey', default=None)]
+    next_exclusive_start_key: Annotated[str | None, Field(alias='nextExclusiveStartKey', default=None)]
 
 
 class RequestQueueOperationInfo(BaseModel):

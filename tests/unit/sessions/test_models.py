@@ -104,6 +104,6 @@ def test_create_session_pool_with_args_sessions(session_args_camel: dict, sessio
         session_count=0,
         usable_session_count=0,
         retired_session_count=0,
-        sessions=[session_args_camel, session_args_snake],  # type: ignore
+        sessions=[session_args_camel, session_args_snake],
     )
     session_pool_camel.sessions = [SessionModel(**session_args_camel), SessionModel(**session_args_snake)]

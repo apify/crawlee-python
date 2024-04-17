@@ -10,6 +10,7 @@ from crawlee.resource_clients.request_queue_client import RequestQueueClient
 if TYPE_CHECKING:
     from crawlee.storages.models import BaseStorageMetadata, ListPage
 
+
 class RequestQueueCollectionClient(BaseResourceCollectionClient):
     """Sub-client for manipulating request queues."""
 
