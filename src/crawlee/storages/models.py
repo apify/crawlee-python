@@ -84,7 +84,7 @@ class KeyValueStoreRecordInfo(BaseModel):
 
 
 class KeyValueStoreListKeysOutput(BaseModel, Generic[T]):
-    """Represents the output of listing keys in the key-value store."""
+    """Model for listing keys in the key-value store."""
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -97,7 +97,7 @@ class KeyValueStoreListKeysOutput(BaseModel, Generic[T]):
 
 
 class RequestQueueOperationInfo(BaseModel):
-    """Result of adding a request to the queue."""
+    """Model for the request queue operation info."""
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -108,7 +108,7 @@ class RequestQueueOperationInfo(BaseModel):
 
 
 class RequestQueueSnapshot(BaseModel):
-    """Information about the head of the request queue."""
+    """Model for the request queue snapshot."""
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -120,7 +120,7 @@ class RequestQueueSnapshot(BaseModel):
 
 
 class RequestQueueHeadResponse(BaseModel):
-    """Response for getting the head of the request queue."""
+    """Model for the request queue head response."""
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -131,7 +131,7 @@ class RequestQueueHeadResponse(BaseModel):
 
 
 class ListPage(BaseModel, Generic[T]):
-    """A single page of items returned from a list() method.
+    """Model for a single page of items returned from a list() method.
 
     Args:
         items: List of returned objects on this page.
