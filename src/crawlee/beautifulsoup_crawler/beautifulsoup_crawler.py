@@ -54,7 +54,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
             additional_http_error_status_codes: HTTP status codes that should be considered errors (and trigger a retry)
 
             ignore_http_error_status_codes: HTTP status codes that are normally considered errors but we want to treat
-                                            them as successful
+                them as successful
         """
         context_pipeline = ContextPipeline().compose(self._make_http_request).compose(self._parse_http_response)
 

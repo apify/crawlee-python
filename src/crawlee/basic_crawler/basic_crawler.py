@@ -299,12 +299,12 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 logger.exception('Request failed and reached maximum retries', exc_info=initialization_error)
 
                 await wait_for(
-                   lambda: self._request_provider.mark_request_as_handled(crawling_context.request),
-                   timeout=self._internal_timeout,
-                   timeout_message='Marking request as handled timed out after '
-                   f'{self._internal_timeout.total_seconds()} seconds',
-                   logger=logger,
-                   max_retries=3,
+                    lambda: self._request_provider.mark_request_as_handled(crawling_context.request),
+                    timeout=self._internal_timeout,
+                    timeout_message='Marking request as handled timed out after '
+                    f'{self._internal_timeout.total_seconds()} seconds',
+                    logger=logger,
+                    max_retries=3,
                 )
         except Exception as internal_error:
             logger.exception(
