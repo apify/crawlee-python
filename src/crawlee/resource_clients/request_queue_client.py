@@ -19,21 +19,12 @@ from crawlee._utils.data_processing import (
     raise_on_duplicate_storage,
     raise_on_non_existing_storage,
 )
-from crawlee._utils.file import (
-    force_remove,
-    force_rename,
-    json_dumps,
-    persist_metadata_if_enabled,
-)
+from crawlee._utils.file import force_remove, force_rename, json_dumps, persist_metadata_if_enabled
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee.request import Request
 from crawlee.resource_clients.base_resource_client import BaseResourceClient
-from crawlee.storages.models import RequestQueueMetadata
-from crawlee.storages.types import (
-    RequestQueueHeadResponse,
-    RequestQueueOperationInfo,
-    StorageTypes,
-)
+from crawlee.storages.models import RequestQueueHeadResponse, RequestQueueMetadata, RequestQueueOperationInfo
+from crawlee.storages.types import StorageTypes
 
 if TYPE_CHECKING:
     from crawlee.storage_clients import MemoryStorageClient

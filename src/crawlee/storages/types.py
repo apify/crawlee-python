@@ -1,12 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, Union
-
-if TYPE_CHECKING:
-    from crawlee.request import Request
+from typing import Any, Generic, TypeVar, Union
 
 T = TypeVar('T')
 
@@ -53,113 +49,3 @@ class KeyValueStoreListKeysOutput(Generic[T]):
     items: list[T] = field(default_factory=list)
     exclusive_start_key: str | None = None
     next_exclusive_start_key: str | None = None
-
-
-@dataclass
-class RequestQueueOperationInfo:
-    """Result of adding a request to the queue."""
-
-    request_id: str
-    request_unique_key: str
-    was_already_present: bool
-    was_already_handled: bool
-
-
-@dataclass
-class RequestQueueSnapshot:
-    """Information about the head of the request queue."""
-
-    was_limit_reached: bool
-    prev_limit: int
-    queue_modified_at: datetime
-    query_started_at: datetime
-    had_multiple_clients: bool
-
-
-@dataclass
-class RequestQueueHeadResponse:
-    """Response for getting the head of the request queue."""
-
-    limit: int | None
-    had_multiple_clients: bool
-    queue_modified_at: datetime
-    items: list[Request] = field(default_factory=list)
-
-
-# @dataclass
-# class BaseStorageMetadata:
-#     """Base class for resource information."""
-
-#     id: str
-#     name: str
-#     accessed_at: datetime
-#     created_at: datetime
-#     modified_at: datetime
-
-#     def __post_init__(self) -> None:
-#         """Convert string dates to datetime objects."""
-#         if isinstance(self.accessed_at, str):  # type: ignore
-#             self.accessed_at = datetime.fromisoformat(self.accessed_at)  # type: ignore
-#         if isinstance(self.created_at, str):  # type: ignore
-#             self.created_at = datetime.fromisoformat(self.created_at)  # type: ignore
-#         if isinstance(self.modified_at, str):  # type: ignore
-#             self.modified_at = datetime.fromisoformat(self.modified_at)  # type: ignore
-
-
-# @dataclass
-# class DatasetMetadata(BaseStorageMetadata):
-#     """Dataset resource information."""
-
-#     item_count: int
-
-
-# @dataclass
-# class KeyValueStoreResourceInfo(BaseStorageMetadata):
-#     """Key-value store resource information."""
-
-#     user_id: str
-
-
-# @dataclass
-# class RequestQueueMetadata(BaseStorageMetadata):
-#     """Resource information."""
-
-#     had_multiple_clients: bool
-#     handled_request_count: int
-#     pending_request_count: int
-#     stats: dict[str, Any]
-#     total_request_count: int
-#     user_id: str
-#     resource_directory: str
-
-
-# @dataclass
-# class ListPage(Generic[T]):
-#     """A single page of items returned from a list() method.
-
-#     Args:
-#         items: List of returned objects on this page.
-#         count: Count of the returned objects on this page.
-#         offset: The limit on the number of returned objects offset specified in the API call.
-#         limit: The offset of the first object specified in the API call.
-#         total: Total number of objects matching the API call criteria.
-#         desc: Whether the listing is descending or not.
-#     """
-
-#     items: list[T]
-#     count: int
-#     offset: int
-#     limit: int
-#     total: int
-#     desc: bool
-
-#     @classmethod
-#     def from_dict(cls, data: dict) -> ListPage:
-#         """Initialize a new instance from the API response data."""
-#         items = data.get('items', [])
-#         offset = data.get('offset', 0)
-#         limit = data.get('limit', 0)
-#         count = data.get('count', len(items))
-#         total = data.get('total', offset + count)
-#         desc = data.get('desc', False)
-#         return cls(items=items, count=count, offset=offset, limit=limit, total=total, desc=desc)

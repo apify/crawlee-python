@@ -7,6 +7,8 @@ from typing import Annotated, Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from crawlee.request import Request
+
 T = TypeVar('T')
 
 
@@ -81,6 +83,40 @@ class KeyValueStoreRecordMetadata(BaseModel):
 #     size: Annotated[int, Field(alias='size')]
 
 
+class RequestQueueOperationInfo(BaseModel):
+    """Result of adding a request to the queue."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    request_id: Annotated[str, Field(alias='requestId')]
+    request_unique_key: Annotated[str, Field(alias='requestUniqueKey')]
+    was_already_present: Annotated[bool, Field(alias='wasAlreadyPresent')]
+    was_already_handled: Annotated[bool, Field(alias='wasAlreadyHandled')]
+
+
+class RequestQueueSnapshot(BaseModel):
+    """Information about the head of the request queue."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    was_limit_reached: Annotated[bool, Field(alias='wasLimitReached')]
+    prev_limit: Annotated[int, Field(alias='prevLimit')]
+    queue_modified_at: Annotated[datetime, Field(alias='queueModifiedAt')]
+    query_started_at: Annotated[datetime, Field(alias='queryStartedAt')]
+    had_multiple_clients: Annotated[bool, Field(alias='hadMultipleClients')]
+
+
+class RequestQueueHeadResponse(BaseModel):
+    """Response for getting the head of the request queue."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    limit: Annotated[int | None, Field(alias='limit', default=None)]
+    had_multiple_clients: Annotated[bool, Field(alias='hadMultipleClients')]
+    queue_modified_at: Annotated[datetime, Field(alias='queueModifiedAt')]
+    items: Annotated[list[Request], Field(alias='items', default_factory=list)]
+
+
 class ListPage(BaseModel, Generic[T]):
     """A single page of items returned from a list() method.
 
@@ -92,6 +128,8 @@ class ListPage(BaseModel, Generic[T]):
         total: Total number of objects matching the API call criteria.
         desc: Whether the listing is descending or not.
     """
+
+    model_config = ConfigDict(populate_by_name=True)
 
     items: Annotated[list[T], Field(default_factory=list)]
     count: Annotated[int, Field(default=0)]

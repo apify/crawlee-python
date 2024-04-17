@@ -14,8 +14,8 @@ from crawlee._utils.lru_cache import LRUCache
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee.request import Request
 from crawlee.storages.base_storage import BaseStorage
+from crawlee.storages.models import RequestQueueOperationInfo, RequestQueueSnapshot
 from crawlee.storages.request_provider import RequestProvider
-from crawlee.storages.types import RequestQueueOperationInfo, RequestQueueSnapshot
 
 if TYPE_CHECKING:
     from crawlee.configuration import Configuration
