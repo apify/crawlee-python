@@ -72,8 +72,8 @@ class KeyValueStoreRecordMetadata(BaseModel):
     content_type: Annotated[str, Field(alias='contentType')]
 
 
-class KeyValueStoreRecordInfo(BaseModel):
-    """Model for a key-value store record info."""
+class KeyValueStoreKeyInfo(BaseModel):
+    """Model for a key-value store key info."""
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -81,7 +81,7 @@ class KeyValueStoreRecordInfo(BaseModel):
     size: Annotated[int, Field(alias='size')]
 
 
-class KeyValueStoreListKeysOutput(BaseModel):
+class KeyValueStoreListKeysPage(BaseModel):
     """Model for listing keys in the key-value store."""
 
     model_config = ConfigDict(populate_by_name=True)
@@ -89,7 +89,7 @@ class KeyValueStoreListKeysOutput(BaseModel):
     count: Annotated[int, Field(alias='count')]
     limit: Annotated[int, Field(alias='limit')]
     is_truncated: Annotated[bool, Field(alias='isTruncated')]
-    items: Annotated[list[KeyValueStoreRecord], Field(alias='items', default_factory=list)]
+    items: Annotated[list[KeyValueStoreKeyInfo], Field(alias='items', default_factory=list)]
     exclusive_start_key: Annotated[str | None, Field(alias='exclusiveStartKey', default=None)]
     next_exclusive_start_key: Annotated[str | None, Field(alias='nextExclusiveStartKey', default=None)]
 
@@ -128,7 +128,7 @@ class RequestQueueHead(BaseModel):
     items: Annotated[list[Request], Field(alias='items', default_factory=list)]
 
 
-class BaseStorageListPage(BaseModel):
+class BaseListPage(BaseModel):
     """Model for a single page of storage items returned from a collection list method.
 
     Args:
@@ -148,7 +148,7 @@ class BaseStorageListPage(BaseModel):
     desc: Annotated[bool, Field(default=False)]
 
 
-class DatasetListPage(BaseStorageListPage):
+class DatasetsListPage(BaseListPage):
     """Model for a single page of dataset items returned from a collection list method.
 
     Args:
@@ -158,7 +158,7 @@ class DatasetListPage(BaseStorageListPage):
     items: Annotated[list[DatasetMetadata], Field(default_factory=list)]
 
 
-class KeyValueStoreListPage(BaseStorageListPage):
+class KeyValueStoresListPage(BaseListPage):
     """Model for a single page of key-value store items returned from a collection list method.
 
     Args:
@@ -168,7 +168,7 @@ class KeyValueStoreListPage(BaseStorageListPage):
     items: Annotated[list[KeyValueStoreMetadata], Field(default_factory=list)]
 
 
-class RequestQueueListPage(BaseStorageListPage):
+class RequestQueuesListPage(BaseListPage):
     """Model for a single page of request queue items returned from a collection list method.
 
     Args:
@@ -176,3 +176,13 @@ class RequestQueueListPage(BaseStorageListPage):
     """
 
     items: Annotated[list[RequestQueueMetadata], Field(default_factory=list)]
+
+
+class DatasetItemsListPage(BaseListPage):
+    """Model for a single page of dataset items returned from a collection list method.
+
+    Args:
+        items: List of returned dataset items on this page.
+    """
+
+    items: Annotated[list[dict], Field(default_factory=list)]

@@ -6,7 +6,7 @@ from typing_extensions import override
 
 from crawlee.resource_clients.base_resource_collection_client import BaseResourceCollectionClient
 from crawlee.resource_clients.dataset_client import DatasetClient
-from crawlee.storages.models import DatasetListPage
+from crawlee.storages.models import DatasetsListPage
 
 if TYPE_CHECKING:
     from crawlee.storages.models import BaseStorageMetadata
@@ -25,11 +25,11 @@ class DatasetCollectionClient(BaseResourceCollectionClient):
         return self._memory_storage_client.datasets_handled
 
     @override
-    async def list(self) -> DatasetListPage:
+    async def list(self) -> DatasetsListPage:
         storage_client_cache = self._get_storage_client_cache()
         items = [storage.resource_info for storage in storage_client_cache]
 
-        return DatasetListPage(
+        return DatasetsListPage(
             total=len(items),
             count=len(items),
             offset=0,

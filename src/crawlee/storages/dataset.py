@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from crawlee.configuration import Configuration
     from crawlee.resource_clients import DatasetClient, DatasetCollectionClient
     from crawlee.storage_clients import MemoryStorageClient
-    from crawlee.storages.models import DatasetListPage, DatasetMetadata
+    from crawlee.storages.models import DatasetItemsListPage, DatasetMetadata
     from crawlee.types import JSONSerializable
 
 
@@ -116,7 +116,7 @@ class Dataset(BaseStorage):
         skip_hidden: bool = False,
         flatten: list[str] | None = None,
         view: str | None = None,
-    ) -> DatasetListPage:
+    ) -> DatasetItemsListPage:
         """Retrieves dataset items based on filtering, sorting, and pagination parameters.
 
         This method allows customization of the data retrieval process from a dataset, supporting operations such as

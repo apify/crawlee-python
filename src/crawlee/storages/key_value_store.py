@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, AsyncIterator, TypeVar, overload
 from typing_extensions import override
 
 from crawlee.storages.base_storage import BaseStorage
-from crawlee.storages.models import KeyValueStoreRecordInfo
+from crawlee.storages.models import KeyValueStoreKeyInfo
 
 if TYPE_CHECKING:
     from crawlee.configuration import Configuration
@@ -88,7 +88,7 @@ class KeyValueStore(BaseStorage):
         record = await self._key_value_store_client.get_record(key)
         return record.value if record else default_value
 
-    async def iterate_keys(self, exclusive_start_key: str | None = None) -> AsyncIterator[KeyValueStoreRecordInfo]:
+    async def iterate_keys(self, exclusive_start_key: str | None = None) -> AsyncIterator[KeyValueStoreKeyInfo]:
         """Iterate over the keys in the key-value store.
 
         Args:
@@ -100,7 +100,7 @@ class KeyValueStore(BaseStorage):
         while True:
             list_keys = await self._key_value_store_client.list_keys(exclusive_start_key=exclusive_start_key)
             for item in list_keys.items:
-                yield KeyValueStoreRecordInfo(key=item.key, size=len(item.value))
+                yield KeyValueStoreKeyInfo(key=item.key, size=item.size)
 
             if not list_keys.is_truncated:
                 break

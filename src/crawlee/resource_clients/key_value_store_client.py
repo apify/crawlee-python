@@ -27,10 +27,10 @@ from crawlee._utils.file import (
 )
 from crawlee.resource_clients.base_resource_client import BaseResourceClient
 from crawlee.storages.models import (
-    KeyValueStoreListKeysOutput,
+    KeyValueStoreKeyInfo,
+    KeyValueStoreListKeysPage,
     KeyValueStoreMetadata,
     KeyValueStoreRecord,
-    KeyValueStoreRecordInfo,
     KeyValueStoreRecordMetadata,
 )
 from crawlee.types import StorageTypes
@@ -274,7 +274,7 @@ class KeyValueStoreClient(BaseResourceClient):
         *,
         limit: int = 1000,
         exclusive_start_key: str | None = None,
-    ) -> KeyValueStoreListKeysOutput:
+    ) -> KeyValueStoreListKeysPage:
         """List the keys in the key-value store.
 
         Args:
@@ -294,14 +294,14 @@ class KeyValueStoreClient(BaseResourceClient):
         if existing_store_by_id is None:
             raise_on_non_existing_storage(StorageTypes.KEY_VALUE_STORE, self.id)
 
-        items: list[KeyValueStoreRecordInfo] = []
+        items: list[KeyValueStoreKeyInfo] = []
 
         for record in existing_store_by_id.records.values():
             size = len(record.value)
-            items.append(KeyValueStoreRecordInfo(key=record.key, size=size))
+            items.append(KeyValueStoreKeyInfo(key=record.key, size=size))
 
         if len(items) == 0:
-            return KeyValueStoreListKeysOutput(
+            return KeyValueStoreListKeysPage(
                 count=len(items),
                 limit=limit,
                 exclusive_start_key=exclusive_start_key,
@@ -329,7 +329,7 @@ class KeyValueStoreClient(BaseResourceClient):
         async with existing_store_by_id.file_operation_lock:
             await existing_store_by_id.update_timestamps(has_been_modified=False)
 
-        return KeyValueStoreListKeysOutput(
+        return KeyValueStoreListKeysPage(
             count=len(items),
             limit=limit,
             exclusive_start_key=exclusive_start_key,

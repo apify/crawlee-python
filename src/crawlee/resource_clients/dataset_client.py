@@ -16,7 +16,7 @@ from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import raise_on_duplicate_storage, raise_on_non_existing_storage
 from crawlee._utils.file import force_rename, json_dumps, persist_metadata_if_enabled
 from crawlee.resource_clients.base_resource_client import BaseResourceClient
-from crawlee.storages.models import DatasetListPage, DatasetMetadata
+from crawlee.storages.models import DatasetItemsListPage, DatasetMetadata
 from crawlee.types import StorageTypes
 
 if TYPE_CHECKING:
@@ -245,7 +245,7 @@ class DatasetClient(BaseResourceClient):
         skip_hidden: bool = False,  # noqa: ARG002
         flatten: list[str] | None = None,  # noqa: ARG002
         view: str | None = None,  # noqa: ARG002
-    ) -> DatasetListPage:
+    ) -> DatasetItemsListPage:
         """Retrieves a paginated list of items from a dataset based on various filtering parameters.
 
         This method provides the flexibility to filter, sort, and modify the appearance of dataset items when listed.
@@ -309,7 +309,7 @@ class DatasetClient(BaseResourceClient):
             if desc:
                 items.reverse()
 
-            return DatasetListPage(
+            return DatasetItemsListPage(
                 count=len(items),
                 desc=desc or False,
                 items=items,
