@@ -100,7 +100,7 @@ class KeyValueStore(BaseStorage):
         while True:
             list_keys = await self._key_value_store_client.list_keys(exclusive_start_key=exclusive_start_key)
             for item in list_keys.items:
-                yield KeyValueStoreRecordInfo(key=item.key, size=item.size)
+                yield KeyValueStoreRecordInfo(key=item.key, size=len(item.value))
 
             if not list_keys.is_truncated:
                 break

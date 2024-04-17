@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 
 from crawlee._utils.file import persist_metadata_if_enabled
 from crawlee.resource_clients.base_resource_client import BaseResourceClient
-from crawlee.storages.models import BaseStorageMetadata, ListPage
 
 if TYPE_CHECKING:
     from crawlee.storage_clients import MemoryStorageClient
+    from crawlee.storages.models import BaseStorageListPage, BaseStorageMetadata
 
 ResourceClientType = TypeVar('ResourceClientType', bound=BaseResourceClient, contravariant=True)  # noqa: PLC0105
 
@@ -34,24 +34,13 @@ class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
     def _get_storage_client_cache(self) -> list[ResourceClientType]:
         """Get the storage client cache."""
 
-    async def list(self) -> ListPage:
+    @abstractmethod
+    async def list(self) -> BaseStorageListPage:
         """List the available storages.
 
         Returns:
             The list of available storages matching the specified filters.
         """
-        storage_client_cache = self._get_storage_client_cache()
-
-        items = [storage.resource_info for storage in storage_client_cache]
-
-        return ListPage(
-            total=len(items),
-            count=len(items),
-            offset=0,
-            limit=len(items),
-            desc=False,
-            items=sorted(items, key=lambda item: item.created_at),
-        )
 
     async def get_or_create(
         self,

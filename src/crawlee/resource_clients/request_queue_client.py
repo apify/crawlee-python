@@ -23,7 +23,7 @@ from crawlee._utils.file import force_remove, force_rename, json_dumps, persist_
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee.request import Request
 from crawlee.resource_clients.base_resource_client import BaseResourceClient
-from crawlee.storages.models import RequestQueueHeadResponse, RequestQueueMetadata, RequestQueueOperationInfo
+from crawlee.storages.models import RequestQueueHead, RequestQueueMetadata, RequestQueueOperationInfo
 from crawlee.types import StorageTypes
 
 if TYPE_CHECKING:
@@ -238,7 +238,7 @@ class RequestQueueClient(BaseResourceClient):
                 if os.path.exists(queue.resource_directory):
                     await aioshutil.rmtree(queue.resource_directory)
 
-    async def list_head(self, *, limit: int | None = None) -> RequestQueueHeadResponse:
+    async def list_head(self, *, limit: int | None = None) -> RequestQueueHead:
         """Retrieve a given number of requests from the beginning of the queue.
 
         Args:
@@ -279,7 +279,7 @@ class RequestQueueClient(BaseResourceClient):
 
             items = [request for item in requests if (request := self._json_to_request(item.json_))]
 
-            return RequestQueueHeadResponse(
+            return RequestQueueHead(
                 limit=limit,
                 had_multiple_clients=False,
                 queue_modified_at=existing_queue_by_id._modified_at,  # noqa: SLF001

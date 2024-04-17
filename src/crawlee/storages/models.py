@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Any, Generic, TypeVar
+from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from crawlee.request import Request
-
-T = TypeVar('T')
 
 
 class BaseStorageMetadata(BaseModel):
@@ -83,7 +81,7 @@ class KeyValueStoreRecordInfo(BaseModel):
     size: Annotated[int, Field(alias='size')]
 
 
-class KeyValueStoreListKeysOutput(BaseModel, Generic[T]):
+class KeyValueStoreListKeysOutput(BaseModel):
     """Model for listing keys in the key-value store."""
 
     model_config = ConfigDict(populate_by_name=True)
@@ -91,7 +89,7 @@ class KeyValueStoreListKeysOutput(BaseModel, Generic[T]):
     count: Annotated[int, Field(alias='count')]
     limit: Annotated[int, Field(alias='limit')]
     is_truncated: Annotated[bool, Field(alias='isTruncated')]
-    items: Annotated[list[T], Field(alias='items', default_factory=list)]
+    items: Annotated[list[KeyValueStoreRecord], Field(alias='items', default_factory=list)]
     exclusive_start_key: Annotated[str | None, Field(alias='exclusiveStartKey', default=None)]
     next_exclusive_start_key: Annotated[str | None, Field(alias='nextExclusiveStartKey', default=None)]
 
@@ -107,8 +105,8 @@ class RequestQueueOperationInfo(BaseModel):
     was_already_handled: Annotated[bool, Field(alias='wasAlreadyHandled')]
 
 
-class RequestQueueSnapshot(BaseModel):
-    """Model for the request queue snapshot."""
+class RequestQueueHeadState(BaseModel):
+    """Model for the request queue head state."""
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -119,8 +117,8 @@ class RequestQueueSnapshot(BaseModel):
     had_multiple_clients: Annotated[bool, Field(alias='hadMultipleClients')]
 
 
-class RequestQueueHeadResponse(BaseModel):
-    """Model for the request queue head response."""
+class RequestQueueHead(BaseModel):
+    """Model for the request queue head."""
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -130,11 +128,10 @@ class RequestQueueHeadResponse(BaseModel):
     items: Annotated[list[Request], Field(alias='items', default_factory=list)]
 
 
-class ListPage(BaseModel, Generic[T]):
-    """Model for a single page of items returned from a list() method.
+class BaseStorageListPage(BaseModel):
+    """Model for a single page of storage items returned from a collection list method.
 
     Args:
-        items: List of returned objects on this page.
         count: Count of the returned objects on this page.
         offset: The offset of the first object specified in the API call.
         limit: The limit on the number of returned objects specified in the API call.
@@ -144,9 +141,38 @@ class ListPage(BaseModel, Generic[T]):
 
     model_config = ConfigDict(populate_by_name=True)
 
-    items: Annotated[list[T], Field(default_factory=list)]
     count: Annotated[int, Field(default=0)]
     offset: Annotated[int, Field(default=0)]
     limit: Annotated[int, Field(default=0)]
     total: Annotated[int, Field(default=0)]
     desc: Annotated[bool, Field(default=False)]
+
+
+class DatasetListPage(BaseStorageListPage):
+    """Model for a single page of dataset items returned from a collection list method.
+
+    Args:
+        items: List of returned dataset items on this page.
+    """
+
+    items: Annotated[list[DatasetMetadata], Field(default_factory=list)]
+
+
+class KeyValueStoreListPage(BaseStorageListPage):
+    """Model for a single page of key-value store items returned from a collection list method.
+
+    Args:
+        items: List of returned key-value store items on this page.
+    """
+
+    items: Annotated[list[KeyValueStoreMetadata], Field(default_factory=list)]
+
+
+class RequestQueueListPage(BaseStorageListPage):
+    """Model for a single page of request queue items returned from a collection list method.
+
+    Args:
+        items: List of returned request queue items on this page.
+    """
+
+    items: Annotated[list[RequestQueueMetadata], Field(default_factory=list)]

@@ -6,9 +6,10 @@ from typing_extensions import override
 
 from crawlee.resource_clients.base_resource_collection_client import BaseResourceCollectionClient
 from crawlee.resource_clients.key_value_store_client import KeyValueStoreClient
+from crawlee.storages.models import KeyValueStoreListPage
 
 if TYPE_CHECKING:
-    from crawlee.storages.models import BaseStorageMetadata, ListPage
+    from crawlee.storages.models import BaseStorageMetadata
 
 
 class KeyValueStoreCollectionClient(BaseResourceCollectionClient):
@@ -23,13 +24,19 @@ class KeyValueStoreCollectionClient(BaseResourceCollectionClient):
     def _get_storage_client_cache(self) -> list[KeyValueStoreClient]:
         return self._memory_storage_client.key_value_stores_handled
 
-    async def list(self) -> ListPage:
-        """List the available key-value stores.
+    @override
+    async def list(self) -> KeyValueStoreListPage:
+        storage_client_cache = self._get_storage_client_cache()
+        items = [storage.resource_info for storage in storage_client_cache]
 
-        Returns:
-            The list of available key-value stores matching the specified filters.
-        """
-        return await super().list()
+        return KeyValueStoreListPage(
+            total=len(items),
+            count=len(items),
+            offset=0,
+            limit=len(items),
+            desc=False,
+            items=sorted(items, key=lambda item: item.created_at),
+        )
 
     async def get_or_create(
         self,

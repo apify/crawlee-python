@@ -6,9 +6,10 @@ from typing_extensions import override
 
 from crawlee.resource_clients.base_resource_collection_client import BaseResourceCollectionClient
 from crawlee.resource_clients.request_queue_client import RequestQueueClient
+from crawlee.storages.models import RequestQueueListPage
 
 if TYPE_CHECKING:
-    from crawlee.storages.models import BaseStorageMetadata, ListPage
+    from crawlee.storages.models import BaseStorageMetadata
 
 
 class RequestQueueCollectionClient(BaseResourceCollectionClient):
@@ -23,13 +24,19 @@ class RequestQueueCollectionClient(BaseResourceCollectionClient):
     def _get_storage_client_cache(self) -> list[RequestQueueClient]:
         return self._memory_storage_client.request_queues_handled
 
-    async def list(self) -> ListPage:
-        """List the available request queues.
+    @override
+    async def list(self) -> RequestQueueListPage:
+        storage_client_cache = self._get_storage_client_cache()
+        items = [storage.resource_info for storage in storage_client_cache]
 
-        Returns:
-            The list of available request queues matching the specified filters.
-        """
-        return await super().list()
+        return RequestQueueListPage(
+            total=len(items),
+            count=len(items),
+            offset=0,
+            limit=len(items),
+            desc=False,
+            items=sorted(items, key=lambda item: item.created_at),
+        )
 
     async def get_or_create(
         self,

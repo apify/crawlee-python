@@ -14,7 +14,7 @@ from crawlee._utils.lru_cache import LRUCache
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee.request import Request
 from crawlee.storages.base_storage import BaseStorage
-from crawlee.storages.models import RequestQueueOperationInfo, RequestQueueSnapshot
+from crawlee.storages.models import RequestQueueHeadState, RequestQueueOperationInfo
 from crawlee.storages.request_provider import RequestProvider
 
 if TYPE_CHECKING:
@@ -457,7 +457,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         if self._query_queue_head_task is None:
             self._query_queue_head_task = asyncio.Task(self._queue_query_head(limit))
 
-        queue_head: RequestQueueSnapshot = await self._query_queue_head_task
+        queue_head: RequestQueueHeadState = await self._query_queue_head_task
 
         # TODO: I feel this code below can be greatly simplified... (comes from TS implementation *wink*)
         # https://github.com/apify/apify-sdk-python/issues/142
@@ -537,7 +537,7 @@ class RequestQueue(BaseStorage, RequestProvider):
             'wasAlreadyHandled': operation_info.was_already_handled,
         }
 
-    async def _queue_query_head(self, limit: int) -> RequestQueueSnapshot:
+    async def _queue_query_head(self, limit: int) -> RequestQueueHeadState:
         query_started_at = datetime.now(timezone.utc)
 
         list_head = await self._request_queue_client.list_head(limit=limit)
@@ -567,7 +567,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         # This is needed so that the next call to _ensureHeadIsNonEmpty() will fetch the queue head again.
         self._query_queue_head_task = None
 
-        return RequestQueueSnapshot(
+        return RequestQueueHeadState(
             was_limit_reached=len(list_head.items) >= limit,
             prev_limit=limit,
             queue_modified_at=list_head.queue_modified_at,
