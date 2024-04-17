@@ -471,11 +471,8 @@ class DatasetClient(BaseResourceClient):
         if has_been_modified:
             self._modified_at = datetime.now(timezone.utc)
 
-        dataset_info = self.resource_info
-        dataset_info_as_dict = dataset_info.model_dump()
-
         await persist_metadata_if_enabled(
-            data=dataset_info_as_dict,
+            data=self.resource_info.model_dump(),
             entity_directory=self.resource_directory,
             write_metadata=self._memory_storage_client.write_metadata,
         )

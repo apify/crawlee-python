@@ -486,11 +486,8 @@ class KeyValueStoreClient(BaseResourceClient):
         if has_been_modified:
             self._modified_at = datetime.now(timezone.utc)
 
-        kv_store_info = self.resource_info
-        kv_store_info_as_dict = kv_store_info.model_dump()
-
         await persist_metadata_if_enabled(
-            data=kv_store_info_as_dict,
+            data=self.resource_info.model_dump(),
             entity_directory=self.resource_directory,
             write_metadata=self._memory_storage_client.write_metadata,
         )

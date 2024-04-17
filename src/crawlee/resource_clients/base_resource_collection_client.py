@@ -90,14 +90,11 @@ class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
         )
         storage_client_cache.append(new_resource)
 
-        resource_info = new_resource.resource_info
-        data = resource_info.model_dump() if isinstance(resource_info, BaseStorageMetadata) else resource_info
-
         # Write to the disk
         await persist_metadata_if_enabled(
-            data=data,
+            data=new_resource.resource_info.model_dump(),
             entity_directory=new_resource.resource_directory,  # type: ignore
             write_metadata=self._memory_storage_client.write_metadata,
         )
 
-        return resource_info
+        return new_resource.resource_info
