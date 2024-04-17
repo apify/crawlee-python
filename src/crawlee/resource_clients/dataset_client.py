@@ -16,7 +16,8 @@ from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import raise_on_duplicate_storage, raise_on_non_existing_storage
 from crawlee._utils.file import force_rename, json_dumps, persist_metadata_if_enabled
 from crawlee.resource_clients.base_resource_client import BaseResourceClient
-from crawlee.storages.types import DatasetResourceInfo, ListPage, StorageTypes
+from crawlee.storages.models import DatasetMetadata
+from crawlee.storages.types import ListPage, StorageTypes
 
 if TYPE_CHECKING:
     from crawlee.storage_clients import MemoryStorageClient
@@ -61,9 +62,9 @@ class DatasetClient(BaseResourceClient):
 
     @property
     @override
-    def resource_info(self) -> DatasetResourceInfo:
+    def resource_info(self) -> DatasetMetadata:
         """Get the resource info for the dataset client."""
-        return DatasetResourceInfo(
+        return DatasetMetadata(
             id=str(self.id),
             name=str(self.name),
             accessed_at=self._accessed_at,
@@ -105,7 +106,7 @@ class DatasetClient(BaseResourceClient):
         if os.path.exists(metadata_filepath):
             with open(metadata_filepath, encoding='utf-8') as f:
                 json_content = json.load(f)
-                resource_info = DatasetResourceInfo(**json_content)
+                resource_info = DatasetMetadata(**json_content)
 
             id = resource_info.id
             name = resource_info.name
@@ -149,7 +150,7 @@ class DatasetClient(BaseResourceClient):
         return new_client
 
     @override
-    async def get(self) -> DatasetResourceInfo | None:
+    async def get(self) -> DatasetMetadata | None:
         found = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
             id=self.id,
@@ -163,7 +164,7 @@ class DatasetClient(BaseResourceClient):
 
         return None
 
-    async def update(self, *, name: str | None = None) -> DatasetResourceInfo:
+    async def update(self, *, name: str | None = None) -> DatasetMetadata:
         """Update the dataset with specified fields.
 
         Args:

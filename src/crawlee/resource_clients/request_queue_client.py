@@ -28,10 +28,10 @@ from crawlee._utils.file import (
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee.request import Request
 from crawlee.resource_clients.base_resource_client import BaseResourceClient
+from crawlee.storages.models import RequestQueueMetadata
 from crawlee.storages.types import (
     RequestQueueHeadResponse,
     RequestQueueOperationInfo,
-    RequestQueueResourceInfo,
     StorageTypes,
 )
 
@@ -72,9 +72,9 @@ class RequestQueueClient(BaseResourceClient):
 
     @property
     @override
-    def resource_info(self) -> RequestQueueResourceInfo:
+    def resource_info(self) -> RequestQueueMetadata:
         """Get the resource info for the request queue client."""
-        return RequestQueueResourceInfo(
+        return RequestQueueMetadata(
             id=str(self.id),
             name=str(self.name),
             accessed_at=self._accessed_at,
@@ -120,7 +120,7 @@ class RequestQueueClient(BaseResourceClient):
         if os.path.exists(metadata_filepath):
             with open(metadata_filepath, encoding='utf-8') as f:
                 json_content = json.load(f)
-                resource_info = RequestQueueResourceInfo(**json_content)
+                resource_info = RequestQueueMetadata(**json_content)
 
             id = resource_info.id
             name = resource_info.name
@@ -165,7 +165,7 @@ class RequestQueueClient(BaseResourceClient):
         return new_client
 
     @override
-    async def get(self) -> RequestQueueResourceInfo | None:
+    async def get(self) -> RequestQueueMetadata | None:
         found = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
             id=self.id,
@@ -179,7 +179,7 @@ class RequestQueueClient(BaseResourceClient):
 
         return None
 
-    async def update(self, *, name: str | None = None) -> RequestQueueResourceInfo:
+    async def update(self, *, name: str | None = None) -> RequestQueueMetadata:
         """Update the request queue with specified fields.
 
         Args:

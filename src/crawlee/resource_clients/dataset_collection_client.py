@@ -8,7 +8,8 @@ from crawlee.resource_clients.base_resource_collection_client import BaseResourc
 from crawlee.resource_clients.dataset_client import DatasetClient
 
 if TYPE_CHECKING:
-    from crawlee.storages.types import BaseResourceInfo, ListPage
+    from crawlee.storages.models import BaseStorageMetadata
+    from crawlee.storages.types import ListPage
 
 
 class DatasetCollectionClient(BaseResourceCollectionClient):
@@ -37,7 +38,7 @@ class DatasetCollectionClient(BaseResourceCollectionClient):
         name: str | None = None,
         schema: dict | None = None,
         id: str | None = None,
-    ) -> BaseResourceInfo:
+    ) -> BaseStorageMetadata:
         """Retrieve a named dataset, or create a new one when it doesn't exist.
 
         Args:

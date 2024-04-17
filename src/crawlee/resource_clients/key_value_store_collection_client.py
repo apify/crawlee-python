@@ -8,7 +8,8 @@ from crawlee.resource_clients.base_resource_collection_client import BaseResourc
 from crawlee.resource_clients.key_value_store_client import KeyValueStoreClient
 
 if TYPE_CHECKING:
-    from crawlee.storages.types import BaseResourceInfo, ListPage
+    from crawlee.storages.models import BaseStorageMetadata
+    from crawlee.storages.types import ListPage
 
 
 class KeyValueStoreCollectionClient(BaseResourceCollectionClient):
@@ -37,7 +38,7 @@ class KeyValueStoreCollectionClient(BaseResourceCollectionClient):
         name: str | None = None,
         schema: dict | None = None,
         id: str | None = None,
-    ) -> BaseResourceInfo:
+    ) -> BaseStorageMetadata:
         """Retrieve a named key-value store, or create a new one when it doesn't exist.
 
         Args:

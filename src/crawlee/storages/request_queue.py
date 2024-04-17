@@ -15,13 +15,14 @@ from crawlee._utils.requests import unique_key_to_request_id
 from crawlee.request import Request
 from crawlee.storages.base_storage import BaseStorage
 from crawlee.storages.request_provider import RequestProvider
-from crawlee.storages.types import BaseResourceInfo, RequestQueueOperationInfo, RequestQueueSnapshot
+from crawlee.storages.types import RequestQueueOperationInfo, RequestQueueSnapshot
 
 if TYPE_CHECKING:
     from crawlee.configuration import Configuration
     from crawlee.request import BaseRequestData
     from crawlee.resource_clients import RequestQueueClient, RequestQueueCollectionClient
     from crawlee.storage_clients import MemoryStorageClient
+    from crawlee.storages.models import BaseStorageMetadata
 
 logger = getLogger(__name__)
 
@@ -422,7 +423,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         await self._request_queue_client.delete()
         self._remove_from_cache()
 
-    async def get_info(self) -> BaseResourceInfo | None:
+    async def get_info(self) -> BaseStorageMetadata | None:
         """Get an object containing general information about the request queue.
 
         Returns:

@@ -8,8 +8,8 @@ from crawlee.resource_clients.base_resource_collection_client import BaseResourc
 from crawlee.resource_clients.request_queue_client import RequestQueueClient
 
 if TYPE_CHECKING:
-    from crawlee.storages.types import BaseResourceInfo, ListPage
-
+    from crawlee.storages.models import BaseStorageMetadata
+    from crawlee.storages.types import ListPage
 
 class RequestQueueCollectionClient(BaseResourceCollectionClient):
     """Sub-client for manipulating request queues."""
@@ -37,7 +37,7 @@ class RequestQueueCollectionClient(BaseResourceCollectionClient):
         name: str | None = None,
         schema: dict | None = None,
         id: str | None = None,
-    ) -> BaseResourceInfo:
+    ) -> BaseStorageMetadata:
         """Retrieve a named request queue, or create a new one when it doesn't exist.
 
         Args:

@@ -26,11 +26,11 @@ from crawlee._utils.file import (
     persist_metadata_if_enabled,
 )
 from crawlee.resource_clients.base_resource_client import BaseResourceClient
+from crawlee.storages.models import KeyValueStoreMetadata, KeyValueStoreRecordMetadata
 from crawlee.storages.types import (
     KeyValueStoreListKeysOutput,
     KeyValueStoreRecord,
     KeyValueStoreRecordInfo,
-    KeyValueStoreResourceInfo,
     StorageTypes,
 )
 
@@ -54,10 +54,11 @@ class KeyValueStoreClient(BaseResourceClient):
         accessed_at: datetime | None = None,
         modified_at: datetime | None = None,
     ) -> None:
-        self._base_storage_directory = base_storage_directory
-        self._memory_storage_client = memory_storage_client
         self.id = id or crypto_random_object_id()
         self.name = name
+
+        self._base_storage_directory = base_storage_directory
+        self._memory_storage_client = memory_storage_client
         self._created_at = created_at or datetime.now(timezone.utc)
         self._accessed_at = accessed_at or datetime.now(timezone.utc)
         self._modified_at = modified_at or datetime.now(timezone.utc)
@@ -68,9 +69,9 @@ class KeyValueStoreClient(BaseResourceClient):
 
     @property
     @override
-    def resource_info(self) -> KeyValueStoreResourceInfo:
+    def resource_info(self) -> KeyValueStoreMetadata:
         """Get the resource info for the key-value store client."""
-        return KeyValueStoreResourceInfo(
+        return KeyValueStoreMetadata(
             id=str(self.id),
             name=str(self.name),
             accessed_at=self._accessed_at,
@@ -86,10 +87,7 @@ class KeyValueStoreClient(BaseResourceClient):
 
     @classmethod
     @override
-    def _get_storage_client_cache(
-        cls,
-        memory_storage_client: MemoryStorageClient,
-    ) -> list[KeyValueStoreClient]:
+    def _get_storage_client_cache(cls, memory_storage_client: MemoryStorageClient) -> list[KeyValueStoreClient]:
         return memory_storage_client.key_value_stores_handled
 
     @classmethod
@@ -111,7 +109,7 @@ class KeyValueStoreClient(BaseResourceClient):
         if os.path.exists(metadata_filepath):
             with open(metadata_filepath, encoding='utf-8') as f:
                 json_content = json.load(f)
-                resource_info = KeyValueStoreResourceInfo(**json_content)
+                resource_info = KeyValueStoreMetadata(**json_content)
 
             id = resource_info.id
             name = resource_info.name
@@ -130,7 +128,7 @@ class KeyValueStoreClient(BaseResourceClient):
             modified_at=modified_at,
         )
 
-        # Scan the key value store folder, check each entry in there and parse it as a store record
+        # Scan the KVS folder, check each entry in there and parse it as a store record
         for entry in os.scandir(storage_directory):
             if not entry.is_file():
                 continue
@@ -139,23 +137,15 @@ class KeyValueStoreClient(BaseResourceClient):
             if entry.name.endswith('__metadata__.json'):
                 continue
 
-            with open(os.path.join(storage_directory, entry.name), 'rb') as f:
-                file_content = f.read()
-
             # Try checking if this file has a metadata file associated with it
-            metadata = None
-            if os.path.exists(os.path.join(storage_directory, entry.name + '.__metadata__.json')):
-                with open(
-                    os.path.join(storage_directory, entry.name + '.__metadata__.json'), encoding='utf-8'
-                ) as metadata_file:
+            record_metadata = None
+            record_metadata_filepath = os.path.join(storage_directory, f'{entry.name}.__metadata__.json')
+
+            if os.path.exists(record_metadata_filepath):
+                with open(record_metadata_filepath, encoding='utf-8') as metadata_file:
                     try:
-                        metadata = json.load(metadata_file)
-
-                        if metadata.get('key') is None:
-                            raise ValueError('Metadata missing required "key".')  # noqa: TRY301
-
-                        if metadata.get('contentType') is None:
-                            raise ValueError('Metadata missing required "contentType".')  # noqa: TRY301
+                        json_content = json.load(metadata_file)
+                        record_metadata = KeyValueStoreRecordMetadata(**json_content)
 
                     except Exception:
                         logger.warning(
@@ -164,29 +154,32 @@ class KeyValueStoreClient(BaseResourceClient):
                             exc_info=True,
                         )
 
-            if not metadata:
+            if not record_metadata:
                 content_type, _ = mimetypes.guess_type(entry.name)
                 if content_type is None:
                     content_type = 'application/octet-stream'
 
-                metadata = {
-                    'key': pathlib.Path(entry.name).stem,
-                    'contentType': content_type,
-                }
+                record_metadata = KeyValueStoreRecordMetadata(
+                    key=pathlib.Path(entry.name).stem,
+                    content_type=content_type,
+                )
+
+            with open(os.path.join(storage_directory, entry.name), 'rb') as f:
+                file_content = f.read()
 
             try:
-                maybe_parse_body(file_content, metadata['contentType'])
+                maybe_parse_body(file_content, record_metadata.content_type)
             except Exception:
-                metadata['contentType'] = 'application/octet-stream'
+                record_metadata.content_type = 'application/octet-stream'
                 logger.warning(
-                    f"""Key-value store entry "{metadata['key']}" for store {name or id} could not be parsed."""
+                    f'Key-value store entry "{record_metadata.key}" for store {name or id} could not be parsed.'
                     'The entry will be assumed as binary.',
                     exc_info=True,
                 )
 
-            new_client.records[metadata['key']] = KeyValueStoreRecord(
-                key=metadata['key'],
-                content_type=metadata['contentType'],
+            new_client.records[record_metadata.key] = KeyValueStoreRecord(
+                key=record_metadata.key,
+                content_type=record_metadata.content_type,
                 filename=entry.name,
                 value=file_content,
             )
@@ -194,7 +187,7 @@ class KeyValueStoreClient(BaseResourceClient):
         return new_client
 
     @override
-    async def get(self) -> KeyValueStoreResourceInfo | None:
+    async def get(self) -> KeyValueStoreMetadata | None:
         found = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
             id=self.id,
@@ -208,7 +201,7 @@ class KeyValueStoreClient(BaseResourceClient):
 
         return None
 
-    async def update(self, *, name: str | None = None) -> KeyValueStoreResourceInfo:
+    async def update(self, *, name: str | None = None) -> KeyValueStoreMetadata:
         """Update the key-value store with specified fields.
 
         Args:
@@ -344,44 +337,6 @@ class KeyValueStoreClient(BaseResourceClient):
             items=limited_items,
         )
 
-    async def _get_record_internal(
-        self,
-        key: str,
-        *,
-        as_bytes: bool = False,
-    ) -> KeyValueStoreRecord | None:
-        # Check by id
-        existing_store_by_id = self.find_or_create_client_by_id_or_name(
-            memory_storage_client=self._memory_storage_client,
-            id=self.id,
-            name=self.name,
-        )
-
-        if existing_store_by_id is None:
-            raise_on_non_existing_storage(StorageTypes.KEY_VALUE_STORE, self.id)
-
-        stored_record = existing_store_by_id.records.get(key)
-
-        if stored_record is None:
-            return None
-
-        record = KeyValueStoreRecord(
-            key=stored_record.key,
-            value=stored_record.value,
-            content_type=stored_record.content_type,
-        )
-
-        if not as_bytes:
-            try:
-                record.value = maybe_parse_body(record.value, str(record.content_type))
-            except ValueError:
-                logger.exception('Error parsing key-value store record')
-
-        async with existing_store_by_id.file_operation_lock:
-            await existing_store_by_id.update_timestamps(has_been_modified=False)
-
-        return record
-
     async def get_record(self, key: str) -> KeyValueStoreRecord | None:
         """Retrieve the given record from the key-value store.
 
@@ -465,13 +420,14 @@ class KeyValueStoreClient(BaseResourceClient):
         store_directory = self.resource_directory
         record_filename = self._filename_from_record(record)
         record.filename = record_filename
+        record.content_type = record.content_type or 'application/octet-stream'
 
         # Ensure the directory for the entity exists
         await makedirs(store_directory, exist_ok=True)
 
         # Create files for the record
         record_path = os.path.join(store_directory, record_filename)
-        record_metadata_path = os.path.join(store_directory, record_filename + '.__metadata__.json')
+        record_metadata_path = os.path.join(store_directory, f'{record_filename}.__metadata__.json')
 
         # Convert to bytes if string
         if isinstance(record.value, str):
@@ -482,8 +438,8 @@ class KeyValueStoreClient(BaseResourceClient):
 
         if self._memory_storage_client.write_metadata:
             async with aiofiles.open(record_metadata_path, mode='wb') as f:
-                s = await json_dumps({'key': record.key, 'contentType': record.content_type})
-                await f.write(s.encode('utf-8'))
+                record_metadata = KeyValueStoreRecordMetadata(key=record.key, content_type=record.content_type)
+                await f.write(record_metadata.model_dump_json(indent=2).encode('utf-8'))
 
     async def delete_record(self, key: str) -> None:
         """Delete the specified record from the key-value store.
@@ -540,6 +496,44 @@ class KeyValueStoreClient(BaseResourceClient):
             entity_directory=self.resource_directory,
             write_metadata=self._memory_storage_client.write_metadata,
         )
+
+    async def _get_record_internal(
+        self,
+        key: str,
+        *,
+        as_bytes: bool = False,
+    ) -> KeyValueStoreRecord | None:
+        # Check by id
+        existing_store_by_id = self.find_or_create_client_by_id_or_name(
+            memory_storage_client=self._memory_storage_client,
+            id=self.id,
+            name=self.name,
+        )
+
+        if existing_store_by_id is None:
+            raise_on_non_existing_storage(StorageTypes.KEY_VALUE_STORE, self.id)
+
+        stored_record = existing_store_by_id.records.get(key)
+
+        if stored_record is None:
+            return None
+
+        record = KeyValueStoreRecord(
+            key=stored_record.key,
+            value=stored_record.value,
+            content_type=stored_record.content_type,
+        )
+
+        if not as_bytes:
+            try:
+                record.value = maybe_parse_body(record.value, str(record.content_type))
+            except ValueError:
+                logger.exception('Error parsing key-value store record')
+
+        async with existing_store_by_id.file_operation_lock:
+            await existing_store_by_id.update_timestamps(has_been_modified=False)
+
+        return record
 
     def _filename_from_record(self, record: KeyValueStoreRecord) -> str:
         if record.filename is not None:

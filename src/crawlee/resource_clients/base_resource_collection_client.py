@@ -5,7 +5,8 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 
 from crawlee._utils.file import persist_metadata_if_enabled
 from crawlee.resource_clients.base_resource_client import BaseResourceClient
-from crawlee.storages.types import BaseResourceInfo, ListPage
+from crawlee.storages.models import BaseStorageMetadata
+from crawlee.storages.types import ListPage
 
 if TYPE_CHECKING:
     from crawlee.storage_clients import MemoryStorageClient
@@ -59,7 +60,7 @@ class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
         name: str | None = None,
         schema: dict | None = None,  # noqa: ARG002
         id: str | None = None,
-    ) -> BaseResourceInfo:
+    ) -> BaseStorageMetadata:
         """Retrieve a named storage, or create a new one when it doesn't exist.
 
         Args:
@@ -91,7 +92,7 @@ class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
         storage_client_cache.append(new_resource)
 
         resource_info = new_resource.resource_info
-        data = resource_info.__dict__ if isinstance(resource_info, BaseResourceInfo) else resource_info
+        data = resource_info.model_dump() if isinstance(resource_info, BaseStorageMetadata) else resource_info
 
         # Write to the disk
         await persist_metadata_if_enabled(

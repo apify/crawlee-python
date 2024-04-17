@@ -15,8 +15,8 @@ if TYPE_CHECKING:
     from crawlee.configuration import Configuration
     from crawlee.resource_clients import DatasetClient, DatasetCollectionClient
     from crawlee.storage_clients import MemoryStorageClient
-    from crawlee.storages.types import DatasetResourceInfo, JSONSerializable, ListPage
-
+    from crawlee.storages.models import DatasetMetadata
+    from crawlee.storages.types import JSONSerializable, ListPage
 
 class Dataset(BaseStorage):
     """Represents an append-only structured storage, ideal for tabular data akin to database tables.
@@ -211,7 +211,7 @@ class Dataset(BaseStorage):
             content_type='text/csv',
         )
 
-    async def get_info(self) -> DatasetResourceInfo | None:
+    async def get_info(self) -> DatasetMetadata | None:
         """Get an object containing general information about the dataset.
 
         Returns:
