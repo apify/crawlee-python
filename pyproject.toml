@@ -56,9 +56,9 @@ psutil = "^5.9.8"
 pydantic = "^2.6.3"
 pydantic-settings = "^2.2.1"
 pyee = "^11.1.0"
+python-dateutil = "^2.9.0"
 sortedcollections = "^2.1.0"
 typing-extensions = "^4.1.0"
-python-dateutil = "^2.9.0"
 
 [tool.poetry.group.dev.dependencies]
 build = "~1.2.0"

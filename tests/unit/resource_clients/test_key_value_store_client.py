@@ -284,7 +284,7 @@ async def test_writes_correct_metadata(
     # Check that everything was written correctly, both the data and metadata
     storage_path = os.path.join(memory_storage_client.key_value_stores_directory, key_value_store_name)
     item_path = os.path.join(storage_path, expected_output['filename'])
-    item_metadata_path = os.path.join(storage_path, f'{expected_output['filename']}.__metadata__.json')
+    item_metadata_path = os.path.join(storage_path, f'{expected_output["filename"]}.__metadata__.json')
 
     assert os.path.exists(item_path)
     assert os.path.exists(item_metadata_path)
