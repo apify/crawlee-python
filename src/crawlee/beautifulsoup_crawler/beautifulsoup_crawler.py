@@ -9,7 +9,7 @@ import httpx
 from crawlee.basic_crawler.basic_crawler import BasicCrawler
 from crawlee.basic_crawler.context_pipeline import ContextPipeline
 from crawlee.beautifulsoup_crawler.types import BeautifulSoupCrawlingContext
-from crawlee.http_crawler.http_crawler import make_http_request
+from crawlee.http_clients.httpx_client import HttpxClient
 from crawlee.http_crawler.types import HttpCrawlingContext
 
 if TYPE_CHECKING:
@@ -74,17 +74,16 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
             router=router,
             concurrency_settings=concurrency_settings,
             configuration=configuration,
+            http_client=HttpxClient(
+                additional_http_error_status_codes=additional_http_error_status_codes,
+                ignore_http_error_status_codes=ignore_http_error_status_codes,
+            ),
             _context_pipeline=context_pipeline,
             **basic_crawler_kwargs,  # type: ignore
         )
 
     async def _make_http_request(self, context: BasicCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
-        result = await make_http_request(
-            self._client,
-            context.request,
-            additional_http_error_status_codes=self._additional_http_error_status_codes,
-            ignore_http_error_status_codes=self._ignore_http_error_status_codes,
-        )
+        result = await self._http_client.crawl(context.request)
 
         yield HttpCrawlingContext(request=context.request, http_response=result.http_response)
 

@@ -21,9 +21,11 @@ from crawlee.basic_crawler.router import Router
 from crawlee.basic_crawler.types import BasicCrawlingContext, FinalStatistics
 from crawlee.configuration import Configuration
 from crawlee.events.local_event_manager import LocalEventManager
+from crawlee.http_clients.httpx_client import HttpxClient
 from crawlee.request import BaseRequestData, Request, RequestState
 
 if TYPE_CHECKING:
+    from crawlee.http_clients.base_http_client import BaseHttpClient
     from crawlee.storages.request_provider import RequestProvider
 
 
@@ -56,6 +58,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         router: Callable[[TCrawlingContext], Awaitable[None]] | None = None,
         # TODO: make request_provider optional (and instantiate based on configuration if None is supplied)
         # https://github.com/apify/crawlee-py/issues/83
+        http_client: BaseHttpClient | None = None,
         concurrency_settings: ConcurrencySettings | None = None,
         max_request_retries: int = 3,
         configuration: Configuration | None = None,
@@ -67,6 +70,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         Args:
             request_provider: Provides requests to be processed
             router: A callable to which request handling is delegated
+            http_client: HTTP client to be used for `BasicCrawlingContext.send_request` and HTTP-only crawling.
             concurrency_settings: Allows fine-tuning concurrency levels
             max_request_retries: Maximum amount of attempts at processing a request
             configuration: Crawler configuration
@@ -81,6 +85,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
         elif router is not None:
             self._router = None
             self.router.default_handler(router)
+
+        self._http_client = http_client or HttpxClient()
 
         self._context_pipeline = _context_pipeline or ContextPipeline()
 
