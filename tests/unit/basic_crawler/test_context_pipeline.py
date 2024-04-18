@@ -30,7 +30,7 @@ async def test_calls_consumer_without_middleware() -> None:
     consumer = AsyncMock()
 
     pipeline = ContextPipeline()
-    context = BasicCrawlingContext(request=Request.from_url(url='aaa'))
+    context = BasicCrawlingContext(request=Request.from_url(url='aaa'), send_request=AsyncMock())
 
     await pipeline(context, consumer)
 
@@ -46,17 +46,17 @@ async def test_calls_consumers_and_middlewares() -> None:
 
     async def middleware_a(context: BasicCrawlingContext) -> AsyncGenerator[EnhancedCrawlingContext, None]:
         events.append('middleware_a_in')
-        yield EnhancedCrawlingContext(request=context.request, foo='foo')
+        yield EnhancedCrawlingContext(request=context.request, foo='foo', send_request=AsyncMock())
         events.append('middleware_a_out')
 
     async def middleware_b(context: EnhancedCrawlingContext) -> AsyncGenerator[MoreEnhancedCrawlingContext, None]:
         events.append('middleware_b_in')
-        yield MoreEnhancedCrawlingContext(request=context.request, foo=context.foo, bar=4)
+        yield MoreEnhancedCrawlingContext(request=context.request, foo=context.foo, bar=4, send_request=AsyncMock())
         events.append('middleware_b_out')
 
     pipeline = ContextPipeline[BasicCrawlingContext]().compose(middleware_a).compose(middleware_b)
 
-    context = BasicCrawlingContext(request=Request.from_url(url='aaa'))
+    context = BasicCrawlingContext(request=Request.from_url(url='aaa'), send_request=AsyncMock())
     await pipeline(context, consumer)
 
     assert events == [
@@ -72,7 +72,7 @@ async def test_wraps_consumer_errors() -> None:
     consumer = AsyncMock(side_effect=RuntimeError('Arbitrary crash for testing purposes'))
 
     pipeline = ContextPipeline()
-    context = BasicCrawlingContext(request=Request.from_url(url='aaa'))
+    context = BasicCrawlingContext(request=Request.from_url(url='aaa'), send_request=AsyncMock())
 
     with pytest.raises(RequestHandlerError):
         await pipeline(context, consumer)
@@ -91,7 +91,7 @@ async def test_handles_exceptions_in_middleware_initialization() -> None:
         yield context  # type: ignore[unreachable]
 
     pipeline = ContextPipeline().compose(step_1).compose(step_2)
-    context = BasicCrawlingContext(request=Request.from_url(url='aaa'))
+    context = BasicCrawlingContext(request=Request.from_url(url='aaa'), send_request=AsyncMock())
 
     with pytest.raises(ContextPipelineInitializationError):
         await pipeline(context, consumer)
@@ -113,7 +113,7 @@ async def test_handles_exceptions_in_middleware_finalization() -> None:
         raise RuntimeError('Crash during middleware finalization')
 
     pipeline = ContextPipeline().compose(step_1).compose(step_2)
-    context = BasicCrawlingContext(request=Request.from_url(url='aaa'))
+    context = BasicCrawlingContext(request=Request.from_url(url='aaa'), send_request=AsyncMock())
 
     with pytest.raises(ContextPipelineFinalizationError):
         await pipeline(context, consumer)

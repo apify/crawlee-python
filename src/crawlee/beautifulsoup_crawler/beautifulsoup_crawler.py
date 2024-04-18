@@ -9,7 +9,7 @@ import httpx
 from crawlee.basic_crawler.basic_crawler import BasicCrawler
 from crawlee.basic_crawler.context_pipeline import ContextPipeline
 from crawlee.beautifulsoup_crawler.types import BeautifulSoupCrawlingContext
-from crawlee.http_crawler.http_crawler import make_http_request
+from crawlee.http_clients.httpx_client import HttpxClient
 from crawlee.http_crawler.types import HttpCrawlingContext
 
 if TYPE_CHECKING:
@@ -61,9 +61,6 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
         self._client = httpx.AsyncClient()
         self._parser = parser
 
-        self._additional_http_error_status_codes = set(additional_http_error_status_codes)
-        self._ignore_http_error_status_codes = set(ignore_http_error_status_codes)
-
         basic_crawler_kwargs = {}
 
         if request_handler_timeout is not None:
@@ -74,19 +71,20 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
             router=router,
             concurrency_settings=concurrency_settings,
             configuration=configuration,
+            http_client=HttpxClient(
+                additional_http_error_status_codes=additional_http_error_status_codes,
+                ignore_http_error_status_codes=ignore_http_error_status_codes,
+            ),
             _context_pipeline=context_pipeline,
             **basic_crawler_kwargs,  # type: ignore
         )
 
     async def _make_http_request(self, context: BasicCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
-        result = await make_http_request(
-            self._client,
-            context.request,
-            additional_http_error_status_codes=self._additional_http_error_status_codes,
-            ignore_http_error_status_codes=self._ignore_http_error_status_codes,
-        )
+        result = await self._http_client.crawl(context.request)
 
-        yield HttpCrawlingContext(request=context.request, http_response=result.http_response)
+        yield HttpCrawlingContext(
+            request=context.request, send_request=context.send_request, http_response=result.http_response
+        )
 
     async def _parse_http_response(
         self, context: HttpCrawlingContext
@@ -94,4 +92,6 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
         from bs4 import BeautifulSoup
 
         soup = await asyncio.to_thread(lambda: BeautifulSoup(context.http_response.read(), self._parser))
-        yield BeautifulSoupCrawlingContext(request=context.request, http_response=context.http_response, soup=soup)
+        yield BeautifulSoupCrawlingContext(
+            request=context.request, send_request=context.send_request, http_response=context.http_response, soup=soup
+        )

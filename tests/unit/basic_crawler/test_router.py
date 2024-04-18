@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -11,7 +11,7 @@ from crawlee.request import Request
 
 class MockContext(BasicCrawlingContext):
     def __init__(self, *, label: str | None) -> None:
-        super().__init__(request=Request.from_url(url='42', user_data={'label': label}))
+        super().__init__(request=Request.from_url(url='42', user_data={'label': label}), send_request=AsyncMock())
 
 
 async def test_router_no_handlers() -> None:

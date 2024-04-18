@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, AsyncGenerator, Awaitable, Callable, Iterable
 
-import httpx
-
 from crawlee.basic_crawler.basic_crawler import BasicCrawler
 from crawlee.basic_crawler.context_pipeline import ContextPipeline
-from crawlee.http_crawler.types import HttpCrawlingContext, HttpCrawlResult
+from crawlee.http_clients.httpx_client import HttpxClient
+from crawlee.http_crawler.types import HttpCrawlingContext
 
 if TYPE_CHECKING:
     from datetime import timedelta
@@ -14,7 +13,6 @@ if TYPE_CHECKING:
     from crawlee.autoscaling.autoscaled_pool import ConcurrencySettings
     from crawlee.basic_crawler.types import BasicCrawlingContext
     from crawlee.configuration import Configuration
-    from crawlee.request import Request
     from crawlee.storages.request_provider import RequestProvider
 
 
@@ -51,15 +49,11 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
                 them as successful
         """
         context_pipeline = ContextPipeline().compose(self._make_http_request)
-        self._client = httpx.AsyncClient()
 
         basic_crawler_kwargs = {}
 
         if request_handler_timeout is not None:
             basic_crawler_kwargs['request_handler_timeout'] = request_handler_timeout
-
-        self._additional_http_error_status_codes = set(additional_http_error_status_codes)
-        self._ignore_http_error_status_codes = set(ignore_http_error_status_codes)
 
         super().__init__(
             router=router,
@@ -67,49 +61,20 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
             request_provider=request_provider,
             concurrency_settings=concurrency_settings,
             configuration=configuration,
+            http_client=HttpxClient(
+                additional_http_error_status_codes=additional_http_error_status_codes,
+                ignore_http_error_status_codes=ignore_http_error_status_codes,
+            ),
             **basic_crawler_kwargs,  # type: ignore
         )
 
     async def _make_http_request(
         self, crawling_context: BasicCrawlingContext
     ) -> AsyncGenerator[HttpCrawlingContext, None]:
-        result = await make_http_request(
-            self._client,
-            crawling_context.request,
-            additional_http_error_status_codes=self._additional_http_error_status_codes,
-            ignore_http_error_status_codes=self._ignore_http_error_status_codes,
+        result = await self._http_client.crawl(crawling_context.request)
+
+        yield HttpCrawlingContext(
+            request=crawling_context.request,
+            send_request=crawling_context.send_request,
+            http_response=result.http_response,
         )
-
-        yield HttpCrawlingContext(request=crawling_context.request, http_response=result.http_response)
-
-
-async def make_http_request(
-    client: httpx.AsyncClient,
-    request: Request,
-    *,
-    additional_http_error_status_codes: set[int] | None = None,
-    ignore_http_error_status_codes: set[int] | None = None,
-) -> HttpCrawlResult:
-    """Perform a request using `httpx`."""
-    response = await client.request(request.method, request.url, follow_redirects=True)
-
-    exclude_error = (
-        ignore_http_error_status_codes is not None and response.status_code in ignore_http_error_status_codes
-    )
-    include_error = additional_http_error_status_codes and response.status_code in additional_http_error_status_codes
-
-    if (response.is_server_error and not exclude_error) or include_error:
-        if include_error:
-            raise httpx.HTTPStatusError(
-                f'Status code {response.status_code} (user-configured to be an error) returned',
-                request=response.request,
-                response=response,
-            )
-
-        raise httpx.HTTPStatusError(
-            f'Status code {response.status_code} returned', request=response.request, response=response
-        )
-
-    request.loaded_url = str(response.url)
-
-    return HttpCrawlResult(http_response=response)
