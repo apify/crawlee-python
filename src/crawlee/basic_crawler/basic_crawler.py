@@ -218,7 +218,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 raise UserDefinedErrorHandlerError('Exception thrown in user-defined failed request handler') from e
 
     def _prepare_send_request_function(self) -> SendRequestFunction:
-        async def send_request(url: str, *, method: str, headers: dict[str, str]) -> HttpResponse:
+        async def send_request(url: str, *, method: str = 'get', headers: dict[str, str] | None = None) -> HttpResponse:
             return await self._http_client.send_request(url, method=method, headers=httpx.Headers(headers))
 
         return send_request

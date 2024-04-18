@@ -12,7 +12,9 @@ if TYPE_CHECKING:
 class SendRequestFunction(Protocol):
     """Type of a function for performing an HTTP request."""
 
-    def __call__(self, url: str, *, method: str, headers: dict[str, str]) -> Coroutine[None, None, HttpResponse]: ...  # noqa: D102
+    def __call__(  # noqa: D102
+        self, url: str, *, method: str = 'get', headers: dict[str, str] | None = None
+    ) -> Coroutine[None, None, HttpResponse]: ...
 
 
 @dataclass(frozen=True)

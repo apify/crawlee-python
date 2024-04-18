@@ -1,13 +1,19 @@
 # ruff: noqa: ARG001
-
 from __future__ import annotations
 
+import json
+from typing import TYPE_CHECKING, Any
+
 import pytest
+from httpx import Headers, Response
 
 from crawlee.basic_crawler.basic_crawler import BasicCrawler, UserDefinedErrorHandlerError
 from crawlee.basic_crawler.types import BasicCrawlingContext
 from crawlee.request import Request
 from crawlee.storages import RequestList
+
+if TYPE_CHECKING:
+    import respx
 
 
 async def test_processes_requests() -> None:
@@ -229,3 +235,33 @@ async def test_handles_error_in_failed_request_handler() -> None:
 
     with pytest.raises(UserDefinedErrorHandlerError):
         await crawler.run()
+
+
+async def test_send_request_works(respx_mock: respx.MockRouter) -> None:
+    respx_mock.get('http://b.com', name='test_endpoint').return_value = Response(
+        status_code=200, json={'hello': 'world'}
+    )
+
+    response_body: Any = None
+    response_headers: Headers | None = None
+
+    crawler = BasicCrawler(
+        request_provider=RequestList(['http://a.com']),
+        max_request_retries=3,
+    )
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        nonlocal response_body, response_headers
+
+        response = await context.send_request('http://b.com')
+        response_body = response.read()
+        response_headers = response.headers
+
+    await crawler.run()
+    assert respx_mock['test_endpoint'].called
+
+    assert json.loads(response_body) == {'hello': 'world'}
+
+    assert response_headers is not None
+    assert response_headers.get('content-type').endswith('/json')
