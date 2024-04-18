@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Coroutine, Protocol
 from typing_extensions import NotRequired, TypedDict, Unpack
 
 if TYPE_CHECKING:
+    from crawlee.globs import Glob
     from crawlee.http_clients.base_http_client import HttpResponse
     from crawlee.request import Request
 
@@ -30,8 +31,8 @@ class AddRequestsFunctionKwargs(TypedDict):
     limit: NotRequired[int]
     base_url: NotRequired[str]
     strategy: NotRequired[EnqueueStrategy]
-    include: NotRequired[list[re.Pattern]]
-    exclude: NotRequired[list[re.Pattern]]
+    include: NotRequired[list[re.Pattern | Glob]]
+    exclude: NotRequired[list[re.Pattern | Glob]]
 
 
 class AddRequestsFunction(Protocol):
