@@ -55,9 +55,6 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
         if request_handler_timeout is not None:
             basic_crawler_kwargs['request_handler_timeout'] = request_handler_timeout
 
-        self._additional_http_error_status_codes = set(additional_http_error_status_codes)
-        self._ignore_http_error_status_codes = set(ignore_http_error_status_codes)
-
         super().__init__(
             router=router,
             _context_pipeline=context_pipeline,

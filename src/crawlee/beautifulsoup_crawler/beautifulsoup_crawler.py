@@ -61,9 +61,6 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
         self._client = httpx.AsyncClient()
         self._parser = parser
 
-        self._additional_http_error_status_codes = set(additional_http_error_status_codes)
-        self._ignore_http_error_status_codes = set(ignore_http_error_status_codes)
-
         basic_crawler_kwargs = {}
 
         if request_handler_timeout is not None:
