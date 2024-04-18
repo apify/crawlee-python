@@ -12,6 +12,7 @@ import pytest
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import maybe_parse_body
 from crawlee._utils.file import json_dumps
+from crawlee.storages.models import KeyValueStoreMetadata, KeyValueStoreRecordMetadata
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -210,228 +211,226 @@ async def test_delete_record(key_value_store_client: KeyValueStoreClient) -> Non
 
 
 @pytest.mark.parametrize(
-    'test_case',
+    ('input_data', 'expected_output'),
     [
-        {
-            'input': {'key': 'image', 'value': TINY_PNG, 'contentType': None},
-            'expectedOutput': {'filename': 'image', 'key': 'image', 'contentType': 'application/octet-stream'},
-        },
-        {
-            'input': {'key': 'image', 'value': TINY_PNG, 'contentType': 'image/png'},
-            'expectedOutput': {'filename': 'image.png', 'key': 'image', 'contentType': 'image/png'},
-        },
-        {
-            'input': {'key': 'image.png', 'value': TINY_PNG, 'contentType': None},
-            'expectedOutput': {'filename': 'image.png', 'key': 'image.png', 'contentType': 'application/octet-stream'},
-        },
-        {
-            'input': {'key': 'image.png', 'value': TINY_PNG, 'contentType': 'image/png'},
-            'expectedOutput': {'filename': 'image.png', 'key': 'image.png', 'contentType': 'image/png'},
-        },
-        {
-            'input': {'key': 'data', 'value': TINY_DATA, 'contentType': None},
-            'expectedOutput': {'filename': 'data.json', 'key': 'data', 'contentType': 'application/json'},
-        },
-        {
-            'input': {'key': 'data', 'value': TINY_DATA, 'contentType': 'application/json'},
-            'expectedOutput': {'filename': 'data.json', 'key': 'data', 'contentType': 'application/json'},
-        },
-        {
-            'input': {'key': 'data.json', 'value': TINY_DATA, 'contentType': None},
-            'expectedOutput': {'filename': 'data.json', 'key': 'data.json', 'contentType': 'application/json'},
-        },
-        {
-            'input': {'key': 'data.json', 'value': TINY_DATA, 'contentType': 'application/json'},
-            'expectedOutput': {'filename': 'data.json', 'key': 'data.json', 'contentType': 'application/json'},
-        },
-        {
-            'input': {'key': 'text', 'value': TINY_TEXT, 'contentType': None},
-            'expectedOutput': {'filename': 'text.txt', 'key': 'text', 'contentType': 'text/plain'},
-        },
-        {
-            'input': {'key': 'text', 'value': TINY_TEXT, 'contentType': 'text/plain'},
-            'expectedOutput': {'filename': 'text.txt', 'key': 'text', 'contentType': 'text/plain'},
-        },
-        {
-            'input': {'key': 'text.txt', 'value': TINY_TEXT, 'contentType': None},
-            'expectedOutput': {'filename': 'text.txt', 'key': 'text.txt', 'contentType': 'text/plain'},
-        },
-        {
-            'input': {'key': 'text.txt', 'value': TINY_TEXT, 'contentType': 'text/plain'},
-            'expectedOutput': {'filename': 'text.txt', 'key': 'text.txt', 'contentType': 'text/plain'},
-        },
+        (
+            {'key': 'image', 'value': TINY_PNG, 'contentType': None},
+            {'filename': 'image', 'key': 'image', 'contentType': 'application/octet-stream'},
+        ),
+        (
+            {'key': 'image', 'value': TINY_PNG, 'contentType': 'image/png'},
+            {'filename': 'image.png', 'key': 'image', 'contentType': 'image/png'},
+        ),
+        (
+            {'key': 'image.png', 'value': TINY_PNG, 'contentType': None},
+            {'filename': 'image.png', 'key': 'image.png', 'contentType': 'application/octet-stream'},
+        ),
+        (
+            {'key': 'image.png', 'value': TINY_PNG, 'contentType': 'image/png'},
+            {'filename': 'image.png', 'key': 'image.png', 'contentType': 'image/png'},
+        ),
+        (
+            {'key': 'data', 'value': TINY_DATA, 'contentType': None},
+            {'filename': 'data.json', 'key': 'data', 'contentType': 'application/json'},
+        ),
+        (
+            {'key': 'data', 'value': TINY_DATA, 'contentType': 'application/json'},
+            {'filename': 'data.json', 'key': 'data', 'contentType': 'application/json'},
+        ),
+        (
+            {'key': 'data.json', 'value': TINY_DATA, 'contentType': None},
+            {'filename': 'data.json', 'key': 'data.json', 'contentType': 'application/json'},
+        ),
+        (
+            {'key': 'data.json', 'value': TINY_DATA, 'contentType': 'application/json'},
+            {'filename': 'data.json', 'key': 'data.json', 'contentType': 'application/json'},
+        ),
+        (
+            {'key': 'text', 'value': TINY_TEXT, 'contentType': None},
+            {'filename': 'text.txt', 'key': 'text', 'contentType': 'text/plain'},
+        ),
+        (
+            {'key': 'text', 'value': TINY_TEXT, 'contentType': 'text/plain'},
+            {'filename': 'text.txt', 'key': 'text', 'contentType': 'text/plain'},
+        ),
+        (
+            {'key': 'text.txt', 'value': TINY_TEXT, 'contentType': None},
+            {'filename': 'text.txt', 'key': 'text.txt', 'contentType': 'text/plain'},
+        ),
+        (
+            {'key': 'text.txt', 'value': TINY_TEXT, 'contentType': 'text/plain'},
+            {'filename': 'text.txt', 'key': 'text.txt', 'contentType': 'text/plain'},
+        ),
     ],
 )
-async def test_writes_correct_metadata(memory_storage_client: MemoryStorageClient, test_case: dict) -> None:
-    test_input = test_case['input']
-    expected_output = test_case['expectedOutput']
+async def test_writes_correct_metadata(
+    memory_storage_client: MemoryStorageClient,
+    input_data: dict,
+    expected_output: dict,
+) -> None:
     key_value_store_name = crypto_random_object_id()
 
-    # Write the input data to the key-value store
-    store_details = await memory_storage_client.key_value_stores().get_or_create(name=key_value_store_name)
-    key_value_store_client = memory_storage_client.key_value_store(store_details.id)
-    await key_value_store_client.set_record(
-        test_input['key'], test_input['value'], content_type=test_input['contentType']
+    # Get KVS client
+    kvs_info = await memory_storage_client.key_value_stores().get_or_create(name=key_value_store_name)
+    kvs_client = memory_storage_client.key_value_store(kvs_info.id)
+
+    # Write the test input item to the store
+    await kvs_client.set_record(
+        key=input_data['key'],
+        value=input_data['value'],
+        content_type=input_data['contentType'],
     )
 
     # Check that everything was written correctly, both the data and metadata
     storage_path = os.path.join(memory_storage_client.key_value_stores_directory, key_value_store_name)
     item_path = os.path.join(storage_path, expected_output['filename'])
-    metadata_path = os.path.join(storage_path, expected_output['filename'] + '.__metadata__.json')
+    item_metadata_path = os.path.join(storage_path, f'{expected_output["filename"]}.__metadata__.json')
 
     assert os.path.exists(item_path)
-    assert os.path.exists(metadata_path)
+    assert os.path.exists(item_metadata_path)
 
+    # Test the actual value of the item
     with open(item_path, 'rb') as item_file:  # noqa: ASYNC101
         actual_value = maybe_parse_body(item_file.read(), expected_output['contentType'])
-        assert actual_value == test_input['value']
+        assert actual_value == input_data['value']
 
-    with open(metadata_path, encoding='utf-8') as metadata_file:  # noqa: ASYNC101
-        metadata = json.load(metadata_file)
-        assert metadata['key'] == expected_output['key']
-        assert expected_output['contentType'] in metadata['contentType']
+    # Test the actual metadata of the item
+    with open(item_metadata_path, encoding='utf-8') as metadata_file:  # noqa: ASYNC101
+        json_content = json.load(metadata_file)
+        metadata = KeyValueStoreRecordMetadata(**json_content)
+        assert metadata.key == expected_output['key']
+        assert expected_output['contentType'] in metadata.content_type
 
 
 @pytest.mark.parametrize(
-    'test_case',
+    ('input_data', 'expected_output'),
     [
-        {
-            'input': {'filename': 'image', 'value': TINY_PNG, 'metadata': None},
-            'expectedOutput': {'key': 'image', 'filename': 'image', 'contentType': 'application/octet-stream'},
-        },
-        {
-            'input': {'filename': 'image.png', 'value': TINY_PNG, 'metadata': None},
-            'expectedOutput': {'key': 'image', 'filename': 'image.png', 'contentType': 'image/png'},
-        },
-        {
-            'input': {
+        (
+            {'filename': 'image', 'value': TINY_PNG, 'metadata': None},
+            {'key': 'image', 'filename': 'image', 'contentType': 'application/octet-stream'},
+        ),
+        (
+            {'filename': 'image.png', 'value': TINY_PNG, 'metadata': None},
+            {'key': 'image', 'filename': 'image.png', 'contentType': 'image/png'},
+        ),
+        (
+            {
                 'filename': 'image',
                 'value': TINY_PNG,
                 'metadata': {'key': 'image', 'contentType': 'application/octet-stream'},
             },
-            'expectedOutput': {'key': 'image', 'contentType': 'application/octet-stream'},
-        },
-        {
-            'input': {'filename': 'image', 'value': TINY_PNG, 'metadata': {'key': 'image', 'contentType': 'image/png'}},
-            'expectedOutput': {'key': 'image', 'filename': 'image', 'contentType': 'image/png'},
-        },
-        {
-            'input': {
+            {'key': 'image', 'contentType': 'application/octet-stream'},
+        ),
+        (
+            {'filename': 'image', 'value': TINY_PNG, 'metadata': {'key': 'image', 'contentType': 'image/png'}},
+            {'key': 'image', 'filename': 'image', 'contentType': 'image/png'},
+        ),
+        (
+            {
                 'filename': 'image.png',
                 'value': TINY_PNG,
                 'metadata': {'key': 'image.png', 'contentType': 'application/octet-stream'},
             },
-            'expectedOutput': {'key': 'image.png', 'contentType': 'application/octet-stream'},
-        },
-        {
-            'input': {
-                'filename': 'image.png',
-                'value': TINY_PNG,
-                'metadata': {'key': 'image.png', 'contentType': 'image/png'},
-            },
-            'expectedOutput': {'key': 'image.png', 'contentType': 'image/png'},
-        },
-        {
-            'input': {
-                'filename': 'image.png',
-                'value': TINY_PNG,
-                'metadata': {'key': 'image', 'contentType': 'image/png'},
-            },
-            'expectedOutput': {'key': 'image', 'contentType': 'image/png'},
-        },
-        {
-            'input': {'filename': 'input', 'value': TINY_BYTES, 'metadata': None},
-            'expectedOutput': {'key': 'input', 'contentType': 'application/octet-stream'},
-        },
-        {
-            'input': {'filename': 'input.json', 'value': TINY_DATA, 'metadata': None},
-            'expectedOutput': {'key': 'input', 'contentType': 'application/json'},
-        },
-        {
-            'input': {'filename': 'input.txt', 'value': TINY_TEXT, 'metadata': None},
-            'expectedOutput': {'key': 'input', 'contentType': 'text/plain'},
-        },
-        {
-            'input': {'filename': 'input.bin', 'value': TINY_BYTES, 'metadata': None},
-            'expectedOutput': {'key': 'input', 'contentType': 'application/octet-stream'},
-        },
-        {
-            'input': {
+            {'key': 'image.png', 'contentType': 'application/octet-stream'},
+        ),
+        (
+            {'filename': 'image.png', 'value': TINY_PNG, 'metadata': {'key': 'image.png', 'contentType': 'image/png'}},
+            {'key': 'image.png', 'contentType': 'image/png'},
+        ),
+        (
+            {'filename': 'image.png', 'value': TINY_PNG, 'metadata': {'key': 'image', 'contentType': 'image/png'}},
+            {'key': 'image', 'contentType': 'image/png'},
+        ),
+        (
+            {'filename': 'input', 'value': TINY_BYTES, 'metadata': None},
+            {'key': 'input', 'contentType': 'application/octet-stream'},
+        ),
+        (
+            {'filename': 'input.json', 'value': TINY_DATA, 'metadata': None},
+            {'key': 'input', 'contentType': 'application/json'},
+        ),
+        (
+            {'filename': 'input.txt', 'value': TINY_TEXT, 'metadata': None},
+            {'key': 'input', 'contentType': 'text/plain'},
+        ),
+        (
+            {'filename': 'input.bin', 'value': TINY_BYTES, 'metadata': None},
+            {'key': 'input', 'contentType': 'application/octet-stream'},
+        ),
+        (
+            {
                 'filename': 'input',
                 'value': TINY_BYTES,
                 'metadata': {'key': 'input', 'contentType': 'application/octet-stream'},
             },
-            'expectedOutput': {'key': 'input', 'contentType': 'application/octet-stream'},
-        },
-        {
-            'input': {
+            {'key': 'input', 'contentType': 'application/octet-stream'},
+        ),
+        (
+            {
                 'filename': 'input.json',
                 'value': TINY_DATA,
                 'metadata': {'key': 'input', 'contentType': 'application/json'},
             },
-            'expectedOutput': {'key': 'input', 'contentType': 'application/json'},
-        },
-        {
-            'input': {
-                'filename': 'input.txt',
-                'value': TINY_TEXT,
-                'metadata': {'key': 'input', 'contentType': 'text/plain'},
-            },
-            'expectedOutput': {'key': 'input', 'contentType': 'text/plain'},
-        },
-        {
-            'input': {
+            {'key': 'input', 'contentType': 'application/json'},
+        ),
+        (
+            {'filename': 'input.txt', 'value': TINY_TEXT, 'metadata': {'key': 'input', 'contentType': 'text/plain'}},
+            {'key': 'input', 'contentType': 'text/plain'},
+        ),
+        (
+            {
                 'filename': 'input.bin',
                 'value': TINY_BYTES,
                 'metadata': {'key': 'input', 'contentType': 'application/octet-stream'},
             },
-            'expectedOutput': {'key': 'input', 'contentType': 'application/octet-stream'},
-        },
+            {'key': 'input', 'contentType': 'application/octet-stream'},
+        ),
     ],
 )
-async def test_reads_correct_metadata(memory_storage_client: MemoryStorageClient, test_case: dict) -> None:
-    test_input = test_case['input']
-    expected_output = test_case['expectedOutput']
+async def test_reads_correct_metadata(
+    memory_storage_client: MemoryStorageClient,
+    input_data: dict,
+    expected_output: dict,
+) -> None:
     key_value_store_name = crypto_random_object_id()
 
     # Ensure the directory for the store exists
     storage_path = os.path.join(memory_storage_client.key_value_stores_directory, key_value_store_name)
     os.makedirs(storage_path, exist_ok=True)
 
-    store_metadata = {
-        'id': crypto_random_object_id(),
-        'name': None,
-        'accessed_at': datetime.now(timezone.utc),
-        'created_at': datetime.now(timezone.utc),
-        'modified_at': datetime.now(timezone.utc),
-        'user_id': '1',
-    }
+    store_metadata = KeyValueStoreMetadata(
+        id=crypto_random_object_id(),
+        name='',
+        accessed_at=datetime.now(timezone.utc),
+        created_at=datetime.now(timezone.utc),
+        modified_at=datetime.now(timezone.utc),
+        user_id='1',
+    )
 
     # Write the store metadata to disk
-    store_metadata_path = os.path.join(storage_path, '__metadata__.json')
-    with open(store_metadata_path, mode='wb') as store_metadata_file:  # noqa: ASYNC101
-        s = await json_dumps(store_metadata)
-        store_metadata_file.write(s.encode('utf-8'))
+    storage_metadata_path = os.path.join(storage_path, '__metadata__.json')
+    with open(storage_metadata_path, mode='wb') as f:  # noqa: ASYNC101
+        f.write(store_metadata.model_dump_json().encode('utf-8'))
 
     # Write the test input item to the disk
-    item_path = os.path.join(storage_path, test_input['filename'])
+    item_path = os.path.join(storage_path, input_data['filename'])
     with open(item_path, 'wb') as item_file:  # noqa: ASYNC101
-        if isinstance(test_input['value'], bytes):
-            item_file.write(test_input['value'])
-        elif isinstance(test_input['value'], str):
-            item_file.write(test_input['value'].encode('utf-8'))
+        if isinstance(input_data['value'], bytes):
+            item_file.write(input_data['value'])
+        elif isinstance(input_data['value'], str):
+            item_file.write(input_data['value'].encode('utf-8'))
         else:
-            s = await json_dumps(test_input['value'])
+            s = await json_dumps(input_data['value'])
             item_file.write(s.encode('utf-8'))
 
     # Optionally write the metadata to disk if there is some
-    if test_input['metadata'] is not None:
-        metadata_path = os.path.join(storage_path, test_input['filename'] + '.__metadata__.json')
-        with open(metadata_path, 'w', encoding='utf-8') as metadata_file:  # noqa: ASYNC101
+    if input_data['metadata'] is not None:
+        storage_metadata_path = os.path.join(storage_path, input_data['filename'] + '.__metadata__.json')
+        with open(storage_metadata_path, 'w', encoding='utf-8') as metadata_file:  # noqa: ASYNC101
             s = await json_dumps(
                 {
-                    'key': test_input['metadata']['key'],
-                    'contentType': test_input['metadata']['contentType'],
+                    'key': input_data['metadata']['key'],
+                    'contentType': input_data['metadata']['contentType'],
                 }
             )
             metadata_file.write(s)
@@ -446,4 +445,4 @@ async def test_reads_correct_metadata(memory_storage_client: MemoryStorageClient
 
     assert actual_record.key == expected_output['key']
     assert actual_record.content_type == expected_output['contentType']
-    assert actual_record.value == test_input['value']
+    assert actual_record.value == input_data['value']

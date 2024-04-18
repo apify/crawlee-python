@@ -6,9 +6,10 @@ from typing_extensions import override
 
 from crawlee.resource_clients.base_resource_collection_client import BaseResourceCollectionClient
 from crawlee.resource_clients.dataset_client import DatasetClient
+from crawlee.storages.models import DatasetsListPage
 
 if TYPE_CHECKING:
-    from crawlee.storages.types import BaseResourceInfo, ListPage
+    from crawlee.storages.models import BaseStorageMetadata
 
 
 class DatasetCollectionClient(BaseResourceCollectionClient):
@@ -23,13 +24,19 @@ class DatasetCollectionClient(BaseResourceCollectionClient):
     def _get_storage_client_cache(self) -> list[DatasetClient]:
         return self._memory_storage_client.datasets_handled
 
-    async def list(self) -> ListPage:
-        """List the available datasets.
+    @override
+    async def list(self) -> DatasetsListPage:
+        storage_client_cache = self._get_storage_client_cache()
+        items = [storage.resource_info for storage in storage_client_cache]
 
-        Returns:
-            The list of available datasets matching the specified filters.
-        """
-        return await super().list()
+        return DatasetsListPage(
+            total=len(items),
+            count=len(items),
+            offset=0,
+            limit=len(items),
+            desc=False,
+            items=sorted(items, key=lambda item: item.created_at),
+        )
 
     async def get_or_create(
         self,
@@ -37,7 +44,7 @@ class DatasetCollectionClient(BaseResourceCollectionClient):
         name: str | None = None,
         schema: dict | None = None,
         id: str | None = None,
-    ) -> BaseResourceInfo:
+    ) -> BaseStorageMetadata:
         """Retrieve a named dataset, or create a new one when it doesn't exist.
 
         Args:

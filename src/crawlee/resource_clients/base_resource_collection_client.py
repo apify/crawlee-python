@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 
 from crawlee._utils.file import persist_metadata_if_enabled
 from crawlee.resource_clients.base_resource_client import BaseResourceClient
-from crawlee.storages.types import BaseResourceInfo, ListPage
 
 if TYPE_CHECKING:
     from crawlee.storage_clients import MemoryStorageClient
+    from crawlee.storages.models import BaseListPage, BaseStorageMetadata
 
 ResourceClientType = TypeVar('ResourceClientType', bound=BaseResourceClient, contravariant=True)  # noqa: PLC0105
 
@@ -34,24 +34,13 @@ class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
     def _get_storage_client_cache(self) -> list[ResourceClientType]:
         """Get the storage client cache."""
 
-    async def list(self) -> ListPage:
+    @abstractmethod
+    async def list(self) -> BaseListPage:
         """List the available storages.
 
         Returns:
             The list of available storages matching the specified filters.
         """
-        storage_client_cache = self._get_storage_client_cache()
-
-        items = [storage.resource_info for storage in storage_client_cache]
-
-        return ListPage(
-            total=len(items),
-            count=len(items),
-            offset=0,
-            limit=len(items),
-            desc=False,
-            items=sorted(items, key=lambda item: item.created_at),
-        )
 
     async def get_or_create(
         self,
@@ -59,7 +48,7 @@ class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
         name: str | None = None,
         schema: dict | None = None,  # noqa: ARG002
         id: str | None = None,
-    ) -> BaseResourceInfo:
+    ) -> BaseStorageMetadata:
         """Retrieve a named storage, or create a new one when it doesn't exist.
 
         Args:
@@ -90,14 +79,11 @@ class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
         )
         storage_client_cache.append(new_resource)
 
-        resource_info = new_resource.resource_info
-        data = resource_info.__dict__ if isinstance(resource_info, BaseResourceInfo) else resource_info
-
         # Write to the disk
         await persist_metadata_if_enabled(
-            data=data,
+            data=new_resource.resource_info.model_dump(),
             entity_directory=new_resource.resource_directory,  # type: ignore
             write_metadata=self._memory_storage_client.write_metadata,
         )
 
-        return resource_info
+        return new_resource.resource_info

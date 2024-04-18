@@ -15,7 +15,8 @@ if TYPE_CHECKING:
     from crawlee.configuration import Configuration
     from crawlee.resource_clients import DatasetClient, DatasetCollectionClient
     from crawlee.storage_clients import MemoryStorageClient
-    from crawlee.storages.types import DatasetResourceInfo, JSONSerializable, ListPage
+    from crawlee.storages.models import DatasetItemsListPage, DatasetMetadata
+    from crawlee.types import JSONSerializable
 
 
 class Dataset(BaseStorage):
@@ -115,7 +116,7 @@ class Dataset(BaseStorage):
         skip_hidden: bool = False,
         flatten: list[str] | None = None,
         view: str | None = None,
-    ) -> ListPage:
+    ) -> DatasetItemsListPage:
         """Retrieves dataset items based on filtering, sorting, and pagination parameters.
 
         This method allows customization of the data retrieval process from a dataset, supporting operations such as
@@ -135,7 +136,7 @@ class Dataset(BaseStorage):
             view: Specifies the dataset view to be used.
 
         Returns:
-            ListPage containing filtered and paginated dataset items.
+            List page containing filtered and paginated dataset items.
         """
         # TODO: Improve error handling here
         # https://github.com/apify/apify-sdk-python/issues/140
@@ -211,7 +212,7 @@ class Dataset(BaseStorage):
             content_type='text/csv',
         )
 
-    async def get_info(self) -> DatasetResourceInfo | None:
+    async def get_info(self) -> DatasetMetadata | None:
         """Get an object containing general information about the dataset.
 
         Returns:

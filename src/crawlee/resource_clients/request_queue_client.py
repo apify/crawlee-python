@@ -19,21 +19,12 @@ from crawlee._utils.data_processing import (
     raise_on_duplicate_storage,
     raise_on_non_existing_storage,
 )
-from crawlee._utils.file import (
-    force_remove,
-    force_rename,
-    json_dumps,
-    persist_metadata_if_enabled,
-)
+from crawlee._utils.file import force_remove, force_rename, json_dumps, persist_metadata_if_enabled
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee.request import Request
 from crawlee.resource_clients.base_resource_client import BaseResourceClient
-from crawlee.storages.types import (
-    RequestQueueHeadResponse,
-    RequestQueueOperationInfo,
-    RequestQueueResourceInfo,
-    StorageTypes,
-)
+from crawlee.storages.models import RequestQueueHead, RequestQueueMetadata, RequestQueueOperationInfo
+from crawlee.types import StorageTypes
 
 if TYPE_CHECKING:
     from crawlee.storage_clients import MemoryStorageClient
@@ -72,9 +63,9 @@ class RequestQueueClient(BaseResourceClient):
 
     @property
     @override
-    def resource_info(self) -> RequestQueueResourceInfo:
+    def resource_info(self) -> RequestQueueMetadata:
         """Get the resource info for the request queue client."""
-        return RequestQueueResourceInfo(
+        return RequestQueueMetadata(
             id=str(self.id),
             name=str(self.name),
             accessed_at=self._accessed_at,
@@ -120,7 +111,7 @@ class RequestQueueClient(BaseResourceClient):
         if os.path.exists(metadata_filepath):
             with open(metadata_filepath, encoding='utf-8') as f:
                 json_content = json.load(f)
-                resource_info = RequestQueueResourceInfo(**json_content)
+                resource_info = RequestQueueMetadata(**json_content)
 
             id = resource_info.id
             name = resource_info.name
@@ -165,7 +156,7 @@ class RequestQueueClient(BaseResourceClient):
         return new_client
 
     @override
-    async def get(self) -> RequestQueueResourceInfo | None:
+    async def get(self) -> RequestQueueMetadata | None:
         found = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
             id=self.id,
@@ -179,7 +170,7 @@ class RequestQueueClient(BaseResourceClient):
 
         return None
 
-    async def update(self, *, name: str | None = None) -> RequestQueueResourceInfo:
+    async def update(self, *, name: str | None = None) -> RequestQueueMetadata:
         """Update the request queue with specified fields.
 
         Args:
@@ -247,7 +238,7 @@ class RequestQueueClient(BaseResourceClient):
                 if os.path.exists(queue.resource_directory):
                     await aioshutil.rmtree(queue.resource_directory)
 
-    async def list_head(self, *, limit: int | None = None) -> RequestQueueHeadResponse:
+    async def list_head(self, *, limit: int | None = None) -> RequestQueueHead:
         """Retrieve a given number of requests from the beginning of the queue.
 
         Args:
@@ -288,7 +279,7 @@ class RequestQueueClient(BaseResourceClient):
 
             items = [request for item in requests if (request := self._json_to_request(item.json_))]
 
-            return RequestQueueHeadResponse(
+            return RequestQueueHead(
                 limit=limit,
                 had_multiple_clients=False,
                 queue_modified_at=existing_queue_by_id._modified_at,  # noqa: SLF001
@@ -528,11 +519,8 @@ class RequestQueueClient(BaseResourceClient):
         if has_been_modified:
             self._modified_at = datetime.now(timezone.utc)
 
-        request_queue_info = self.resource_info
-        request_queue_info_as_dict = request_queue_info.__dict__
-
         await persist_metadata_if_enabled(
-            data=request_queue_info_as_dict,
+            data=self.resource_info.model_dump(),
             entity_directory=self.resource_directory,
             write_metadata=self._memory_storage_client.write_metadata,
         )
@@ -552,7 +540,7 @@ class RequestQueueClient(BaseResourceClient):
         if request.id is not None and request.id != id:
             raise ValueError('Request ID does not match its unique_key.')
 
-        json_request = await json_dumps({**(request.__dict__), 'id': id})
+        json_request = await json_dumps({**(request.model_dump()), 'id': id})
         return Request(
             url=request.url,
             unique_key=request.unique_key,
