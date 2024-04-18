@@ -42,7 +42,7 @@ class BaseHttpClient(ABC):
         ignore_http_error_status_codes: Iterable[int] = (),
     ) -> None:
         self._additional_http_error_status_codes = set(additional_http_error_status_codes)
-        self._ignore_http_error_status_codes = ignore_http_error_status_codes
+        self._ignore_http_error_status_codes = set(ignore_http_error_status_codes)
 
     @abstractmethod
     async def crawl(self, request: Request) -> HttpCrawlingResult:
