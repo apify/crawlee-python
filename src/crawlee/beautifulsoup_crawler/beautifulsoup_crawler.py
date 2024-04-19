@@ -2,21 +2,23 @@ from __future__ import annotations
 
 import asyncio
 from datetime import timedelta
-from typing import TYPE_CHECKING, AsyncGenerator, Awaitable, Callable, Iterable, Literal
+from typing import TYPE_CHECKING, Any, AsyncGenerator, Awaitable, Callable, Iterable, Literal
 
 import httpx
+from typing_extensions import Unpack
 
 from crawlee.basic_crawler.basic_crawler import BasicCrawler
 from crawlee.basic_crawler.context_pipeline import ContextPipeline
 from crawlee.beautifulsoup_crawler.types import BeautifulSoupCrawlingContext
 from crawlee.http_clients.httpx_client import HttpxClient
 from crawlee.http_crawler.types import HttpCrawlingContext
+from crawlee.request import BaseRequestData
 
 if TYPE_CHECKING:
     from datetime import timedelta
 
     from crawlee.autoscaling.autoscaled_pool import ConcurrencySettings
-    from crawlee.basic_crawler.types import BasicCrawlingContext
+    from crawlee.basic_crawler.types import AddRequestsFunctionKwargs, BasicCrawlingContext
     from crawlee.configuration import Configuration
     from crawlee.storages.request_provider import RequestProvider
 
@@ -92,13 +94,30 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
     async def _parse_http_response(
         self, context: HttpCrawlingContext
     ) -> AsyncGenerator[BeautifulSoupCrawlingContext, None]:
-        from bs4 import BeautifulSoup
+        from bs4 import BeautifulSoup, Tag
 
         soup = await asyncio.to_thread(lambda: BeautifulSoup(context.http_response.read(), self._parser))
+
+        async def enqueue_links(
+            *,
+            selector: str = 'a',
+            label: str | None = None,
+            user_data: dict[str, Any] | None = None,
+            **kwargs: Unpack[AddRequestsFunctionKwargs],
+        ) -> None:
+            requests = list[BaseRequestData]()
+            for link in soup.find_all(selector):
+                link: Tag
+                if (href := link.attrs.get('href')) is not None:
+                    requests.append(BaseRequestData.from_url(href))
+
+            await context.add_requests(requests, **kwargs)
+
         yield BeautifulSoupCrawlingContext(
             request=context.request,
             send_request=context.send_request,
             add_requests=context.add_requests,
+            enqueue_links=enqueue_links,
             http_response=context.http_response,
             soup=soup,
         )

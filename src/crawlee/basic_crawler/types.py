@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Coroutine, Protocol
+from typing import TYPE_CHECKING, Any, Coroutine, Protocol, Sequence
 
 from typing_extensions import NotRequired, TypedDict, Unpack
 
@@ -37,7 +37,7 @@ class AddRequestsFunction(Protocol):
     """Type of a function for adding URLs to the request queue with optional filtering."""
 
     def __call__(  # noqa: D102
-        self, requests: list[str | BaseRequestData], **kwargs: Unpack[AddRequestsFunctionKwargs]
+        self, requests: Sequence[str | BaseRequestData], **kwargs: Unpack[AddRequestsFunctionKwargs]
     ) -> Coroutine[None, None, None]: ...
 
 
@@ -47,7 +47,7 @@ class EnqueueLinksFunction(Protocol):
     def __call__(  # noqa: D102
         self,
         *,
-        selector: str,
+        selector: str = 'a',
         label: str | None = None,
         user_data: dict[str, Any] | None = None,
         **kwargs: Unpack[AddRequestsFunctionKwargs],
@@ -79,7 +79,7 @@ class FinalStatistics:
 class AddRequestsFunctionCall(AddRequestsFunctionKwargs):
     """Record of a call to `add_requests1."""
 
-    requests: list[str | BaseRequestData]
+    requests: Sequence[str | BaseRequestData]
 
 
 @dataclass()
@@ -89,7 +89,7 @@ class RequestHandlerRunResult:
     add_requests_calls: list[AddRequestsFunctionCall] = field(default_factory=list)
 
     async def add_requests(
-        self, requests: list[str | BaseRequestData], **kwargs: Unpack[AddRequestsFunctionKwargs]
+        self, requests: Sequence[str | BaseRequestData], **kwargs: Unpack[AddRequestsFunctionKwargs]
     ) -> None:
         """Track a call to the `add_requests` context helper."""
         self.add_requests_calls.append(AddRequestsFunctionCall(requests=requests, **kwargs))

@@ -235,16 +235,27 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         return send_request
 
-    async def _commit_request_handler_result(self, result: RequestHandlerRunResult) -> None:
+    async def _commit_request_handler_result(
+        self, context: BasicCrawlingContext, result: RequestHandlerRunResult
+    ) -> None:
         request_provider = await self.get_request_provider()
+        origin = httpx.URL(context.request.loaded_url or context.request.url)
 
         for call in result.add_requests_calls:
-            # TODO: handle strategy, limit, include/exclude, etc.
+            requests = list[BaseRequestData]()
+
+            for request in call['requests']:
+                # TODO: handle strategy, limit, include/exclude, etc.
+                request_model = request if isinstance(request, BaseRequestData) else BaseRequestData.from_url(request)
+                destination = httpx.URL(request_model.url)
+                if destination.is_relative_url:
+                    base_url = httpx.URL(call.get('base_url', origin))
+                    request_model.url = str(base_url.join(destination))
+
+                requests.append(request_model)
+
             await request_provider.add_requests_batched(
-                requests=[
-                    request if isinstance(request, BaseRequestData) else BaseRequestData.from_url(request)
-                    for request in call['requests']
-                ],
+                requests=requests,
                 wait_for_all_requests_to_be_added=False,
             )
 
@@ -290,7 +301,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 logger=logger,
             )
 
-            await self._commit_request_handler_result(result)
+            await self._commit_request_handler_result(crawling_context, result)
 
             await wait_for(
                 lambda: request_provider.mark_request_as_handled(crawling_context.request),
