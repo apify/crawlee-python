@@ -7,6 +7,8 @@ from typing import Sequence
 
 
 class Glob:
+    """Wraps a glob pattern (supports the `*`, `**`, `?` wildcards)."""
+
     def __init__(self, glob: str) -> None:
         self.glob = glob
         self.regexp = re.compile(_translate(self.glob))
