@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Coroutine, Protocol
 
@@ -11,7 +11,7 @@ from typing_extensions import NotRequired, TypedDict, Unpack
 if TYPE_CHECKING:
     from crawlee.globs import Glob
     from crawlee.http_clients.base_http_client import HttpResponse
-    from crawlee.request import Request
+    from crawlee.request import BaseRequestData, Request
 
 
 class EnqueueStrategy(str, Enum):
@@ -26,8 +26,6 @@ class EnqueueStrategy(str, Enum):
 class AddRequestsFunctionKwargs(TypedDict):
     """Keyword arguments type for AddRequestsFunction."""
 
-    label: NotRequired[str]
-    user_data: NotRequired[dict[str, Any]]
     limit: NotRequired[int]
     base_url: NotRequired[str]
     strategy: NotRequired[EnqueueStrategy]
@@ -39,7 +37,7 @@ class AddRequestsFunction(Protocol):
     """Type of a function for adding URLs to the request queue with optional filtering."""
 
     def __call__(  # noqa: D102
-        self, urls: list[str], **kwargs: Unpack[AddRequestsFunctionKwargs]
+        self, requests: list[str | BaseRequestData], **kwargs: Unpack[AddRequestsFunctionKwargs]
     ) -> Coroutine[None, None, None]: ...
 
 
@@ -47,7 +45,12 @@ class EnqueueLinksFunction(Protocol):
     """Type of a function for enqueueing links based on a selector."""
 
     def __call__(  # noqa: D102
-        self, *, selector: str, **kwargs: Unpack[AddRequestsFunctionKwargs]
+        self,
+        *,
+        selector: str,
+        label: str | None = None,
+        user_data: dict[str, Any] | None = None,
+        **kwargs: Unpack[AddRequestsFunctionKwargs],
     ) -> Coroutine[None, None, None]: ...
 
 
@@ -71,3 +74,22 @@ class BasicCrawlingContext:
 @dataclass(frozen=True)
 class FinalStatistics:
     """Statistics about a crawler run."""
+
+
+class AddRequestsFunctionCall(AddRequestsFunctionKwargs):
+    """Record of a call to `add_requests1."""
+
+    requests: list[str | BaseRequestData]
+
+
+@dataclass()
+class RequestHandlerRunResult:
+    """Record of calls to storage-related context helpers."""
+
+    add_requests_calls: list[AddRequestsFunctionCall] = field(default_factory=list)
+
+    async def add_requests(
+        self, requests: list[str | BaseRequestData], **kwargs: Unpack[AddRequestsFunctionKwargs]
+    ) -> None:
+        """Track a call to the `add_requests` context helper."""
+        self.add_requests_calls.append(AddRequestsFunctionCall(requests=requests, **kwargs))

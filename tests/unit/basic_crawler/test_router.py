@@ -11,7 +11,11 @@ from crawlee.request import Request
 
 class MockContext(BasicCrawlingContext):
     def __init__(self, *, label: str | None) -> None:
-        super().__init__(request=Request.from_url(url='42', user_data={'label': label}), send_request=AsyncMock())
+        super().__init__(
+            request=Request.from_url(url='42', user_data={'label': label}),
+            send_request=AsyncMock(),
+            add_requests=AsyncMock(),
+        )
 
 
 async def test_router_no_handlers() -> None:

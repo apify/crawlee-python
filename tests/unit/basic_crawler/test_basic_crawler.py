@@ -3,13 +3,14 @@ from __future__ import annotations
 
 import json
 from typing import TYPE_CHECKING, Any
+from unittest.mock import Mock
 
 import pytest
 from httpx import Headers, Response
 
 from crawlee.basic_crawler.basic_crawler import BasicCrawler, UserDefinedErrorHandlerError
 from crawlee.basic_crawler.types import BasicCrawlingContext
-from crawlee.request import Request
+from crawlee.request import BaseRequestData, Request
 from crawlee.storages import RequestList
 
 if TYPE_CHECKING:
@@ -265,3 +266,24 @@ async def test_send_request_works(respx_mock: respx.MockRouter) -> None:
 
     assert response_headers is not None
     assert response_headers.get('content-type').endswith('/json')
+
+
+async def test_add_requests_works() -> None:
+    visit = Mock()
+
+    crawler = BasicCrawler(
+        request_provider=RequestList(['http://a.com']),
+        max_request_retries=3,
+    )
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        visit(context.request.url)
+
+        if context.request.url == 'http://a.com':
+            await context.add_requests([BaseRequestData.from_url('http://b.com'), 'http://c.com'])
+
+    await crawler.run()
+
+    visited = {call[0][0] for call in visit.call_args_list}
+    assert visited == {'http://a.com', 'http://b.com', 'http://c.com'}

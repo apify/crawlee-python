@@ -28,7 +28,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
         self,
         *,
         parser: Literal['html.parser', 'lxml', 'xml', 'html5lib'] = 'lxml',
-        request_provider: RequestProvider,
+        request_provider: RequestProvider | None = None,
         router: Callable[[BeautifulSoupCrawlingContext], Awaitable[None]] | None = None,
         concurrency_settings: ConcurrencySettings | None = None,
         configuration: Configuration | None = None,
@@ -83,7 +83,10 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
         result = await self._http_client.crawl(context.request)
 
         yield HttpCrawlingContext(
-            request=context.request, send_request=context.send_request, http_response=result.http_response
+            request=context.request,
+            send_request=context.send_request,
+            add_requests=context.add_requests,
+            http_response=result.http_response,
         )
 
     async def _parse_http_response(
@@ -93,5 +96,9 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
 
         soup = await asyncio.to_thread(lambda: BeautifulSoup(context.http_response.read(), self._parser))
         yield BeautifulSoupCrawlingContext(
-            request=context.request, send_request=context.send_request, http_response=context.http_response, soup=soup
+            request=context.request,
+            send_request=context.send_request,
+            add_requests=context.add_requests,
+            http_response=context.http_response,
+            soup=soup,
         )

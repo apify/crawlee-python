@@ -208,9 +208,9 @@ class RequestQueue(BaseStorage, RequestProvider):
         self,
         requests: list[BaseRequestData | Request],
         *,
-        batch_size: int,
-        wait_for_all_requests_to_be_added: bool,
-        wait_time_between_batches: timedelta,
+        batch_size: int = 1000,
+        wait_for_all_requests_to_be_added: bool = False,
+        wait_time_between_batches: timedelta = timedelta(seconds=1),
     ) -> None:
         for request in requests:
             if isinstance(request, Request):

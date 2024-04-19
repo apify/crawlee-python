@@ -19,16 +19,21 @@ from crawlee.basic_crawler.context_pipeline import (
     RequestHandlerError,
 )
 from crawlee.basic_crawler.router import Router
-from crawlee.basic_crawler.types import BasicCrawlingContext, FinalStatistics, SendRequestFunction
+from crawlee.basic_crawler.types import (
+    BasicCrawlingContext,
+    FinalStatistics,
+    RequestHandlerRunResult,
+    SendRequestFunction,
+)
 from crawlee.configuration import Configuration
 from crawlee.events.local_event_manager import LocalEventManager
 from crawlee.http_clients.httpx_client import HttpxClient
 from crawlee.request import BaseRequestData, Request, RequestState
+from crawlee.storages.request_queue import RequestQueue
 
 if TYPE_CHECKING:
     from crawlee.http_clients.base_http_client import BaseHttpClient, HttpResponse
     from crawlee.storages.request_provider import RequestProvider
-
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Union[Request, None]]]
@@ -55,10 +60,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
     def __init__(
         self,
         *,
-        request_provider: RequestProvider,
+        request_provider: RequestProvider | None = None,
         router: Callable[[TCrawlingContext], Awaitable[None]] | None = None,
-        # TODO: make request_provider optional (and instantiate based on configuration if None is supplied)
-        # https://github.com/apify/crawlee-py/issues/83
         http_client: BaseHttpClient | None = None,
         concurrency_settings: ConcurrencySettings | None = None,
         max_request_retries: int = 3,
@@ -132,6 +135,13 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         self._router = router
 
+    async def get_request_provider(self) -> RequestProvider:
+        """Return the configured request provider. If none is configured, open and return the default request queue."""
+        if not self._request_provider:
+            self._request_provider = await RequestQueue.open()
+
+        return self._request_provider
+
     def error_handler(self, handler: ErrorHandler[TCrawlingContext]) -> ErrorHandler[TCrawlingContext]:
         """Decorator for configuring an error handler (called after a request handler error and before retrying)."""
         self._error_handler = handler
@@ -153,7 +163,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         wait_time_between_batches: timedelta = timedelta(0),
     ) -> None:
         """Add requests to the underlying queue."""
-        await self._request_provider.add_requests_batched(
+        await (await self.get_request_provider()).add_requests_batched(
             [
                 request if isinstance(request, BaseRequestData) else BaseRequestData.from_url(url=request)
                 for request in requests
@@ -183,6 +193,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
         )
 
     async def _handle_request_error(self, crawling_context: TCrawlingContext, error: Exception) -> None:
+        request_provider = await self.get_request_provider()
+
         if self._should_retry_request(crawling_context):
             request = crawling_context.request
             request.retry_count += 1
@@ -196,10 +208,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
                     if new_request is not None:
                         request = new_request
 
-            await self._request_provider.reclaim_request(request)
+            await request_provider.reclaim_request(request)
         else:
             await wait_for(
-                lambda: self._request_provider.mark_request_as_handled(crawling_context.request),
+                lambda: request_provider.mark_request_as_handled(crawling_context.request),
                 timeout=self._internal_timeout,
                 timeout_message='Marking request as handled timed out after '
                 f'{self._internal_timeout.total_seconds()} seconds',
@@ -223,15 +235,30 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         return send_request
 
+    async def _commit_request_handler_result(self, result: RequestHandlerRunResult) -> None:
+        request_provider = await self.get_request_provider()
+
+        for call in result.add_requests_calls:
+            # TODO: handle strategy, limit, include/exclude, etc.
+            await request_provider.add_requests_batched(
+                requests=[
+                    request if isinstance(request, BaseRequestData) else BaseRequestData.from_url(request)
+                    for request in call['requests']
+                ],
+                wait_for_all_requests_to_be_added=False,
+            )
+
     async def __is_finished_function(self) -> bool:
-        return await self._request_provider.is_finished()
+        return await (await self.get_request_provider()).is_finished()
 
     async def __is_task_ready_function(self) -> bool:
-        return not await self._request_provider.is_empty()
+        return not await (await self.get_request_provider()).is_empty()
 
     async def __run_task_function(self) -> None:
+        request_provider = await self.get_request_provider()
+
         request = await wait_for(
-            lambda: self._request_provider.fetch_next_request(),
+            lambda: request_provider.fetch_next_request(),
             timeout=self._internal_timeout,
             timeout_message=f'Fetching next request failed after {self._internal_timeout.total_seconds()} seconds',
             logger=logger,
@@ -244,7 +271,13 @@ class BasicCrawler(Generic[TCrawlingContext]):
         # TODO: fetch session from the session pool
         # https://github.com/apify/crawlee-py/issues/110
 
-        crawling_context = BasicCrawlingContext(request=request, send_request=self._prepare_send_request_function())
+        result = RequestHandlerRunResult()
+
+        crawling_context = BasicCrawlingContext(
+            request=request,
+            send_request=self._prepare_send_request_function(),
+            add_requests=result.add_requests,
+        )
 
         try:
             request.state = RequestState.REQUEST_HANDLER
@@ -257,8 +290,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 logger=logger,
             )
 
+            await self._commit_request_handler_result(result)
+
             await wait_for(
-                lambda: self._request_provider.mark_request_as_handled(crawling_context.request),
+                lambda: request_provider.mark_request_as_handled(crawling_context.request),
                 timeout=self._internal_timeout,
                 timeout_message='Marking request as handled timed out after '
                 f'{self._internal_timeout.total_seconds()} seconds',
@@ -307,12 +342,12 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 request = crawling_context.request
                 request.retry_count += 1
                 request.state = RequestState.DONE
-                await self._request_provider.reclaim_request(request)
+                await request_provider.reclaim_request(request)
             else:
                 logger.exception('Request failed and reached maximum retries', exc_info=initialization_error)
 
                 await wait_for(
-                    lambda: self._request_provider.mark_request_as_handled(crawling_context.request),
+                    lambda: request_provider.mark_request_as_handled(crawling_context.request),
                     timeout=self._internal_timeout,
                     timeout_message='Marking request as handled timed out after '
                     f'{self._internal_timeout.total_seconds()} seconds',
