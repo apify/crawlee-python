@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 if TYPE_CHECKING:
-    from crawlee.resource_clients import DatasetClient
-    from crawlee.storage_clients import MemoryStorageClient
+    from crawlee.memory_storage_client import MemoryStorageClient
+    from crawlee.memory_storage_client.dataset_client import DatasetClient
 
 
 @pytest.fixture()
@@ -33,9 +33,9 @@ async def test_nonexistent(memory_storage_client: MemoryStorageClient) -> None:
 
 
 async def test_not_implemented(dataset_client: DatasetClient) -> None:
-    with pytest.raises(NotImplementedError, match='This method is not supported in local memory storage.'):
+    with pytest.raises(NotImplementedError, match='This method is not supported in memory storage.'):
         await dataset_client.stream_items()
-    with pytest.raises(NotImplementedError, match='This method is not supported in local memory storage.'):
+    with pytest.raises(NotImplementedError, match='This method is not supported in memory storage.'):
         await dataset_client.get_items_as_bytes()
 
 

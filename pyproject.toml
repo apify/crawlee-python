@@ -158,7 +158,7 @@ builtins-ignorelist = ["id"]
 convention = "google"
 
 [tool.ruff.lint.isort]
-known-local-folder = ["crawlee"]
+known-first-party = ["crawlee"]
 
 [tool.ruff.lint.pylint]
 max-branches = 18

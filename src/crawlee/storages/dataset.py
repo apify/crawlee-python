@@ -10,12 +10,12 @@ from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.file import json_dumps
 from crawlee.storages.base_storage import BaseStorage
 from crawlee.storages.key_value_store import KeyValueStore
+from crawlee.storages.models import DatasetMetadata
 
 if TYPE_CHECKING:
+    from crawlee.base_storage_client import BaseDatasetClient, BaseDatasetCollectionClient, BaseStorageClient
     from crawlee.configuration import Configuration
-    from crawlee.resource_clients import DatasetClient, DatasetCollectionClient
-    from crawlee.storage_clients import MemoryStorageClient
-    from crawlee.storages.models import DatasetItemsListPage, DatasetMetadata
+    from crawlee.storages.models import DatasetItemsListPage
     from crawlee.types import JSONSerializable
 
 
@@ -52,7 +52,7 @@ class Dataset(BaseStorage):
         id: str,
         name: str | None,
         configuration: Configuration,
-        client: MemoryStorageClient,
+        client: BaseStorageClient,
     ) -> None:
         super().__init__(id=id, name=name, client=client, configuration=configuration)
         self._dataset_client = client.dataset(self.id)
@@ -69,12 +69,12 @@ class Dataset(BaseStorage):
 
     @classmethod
     @override
-    def _get_single_storage_client(cls, id: str, client: MemoryStorageClient) -> DatasetClient:
+    def _get_single_storage_client(cls, id: str, client: BaseStorageClient) -> BaseDatasetClient:
         return client.dataset(id)
 
     @classmethod
     @override
-    def _get_storage_collection_client(cls, client: MemoryStorageClient) -> DatasetCollectionClient:
+    def _get_storage_collection_client(cls, client: BaseStorageClient) -> BaseDatasetCollectionClient:
         return client.datasets()
 
     async def push_data(self, data: JSONSerializable) -> None:
@@ -218,9 +218,12 @@ class Dataset(BaseStorage):
         Returns:
             Object returned by calling the GET dataset API endpoint.
         """
-        return await self._dataset_client.get()
+        metadata = await self._dataset_client.get()
+        if isinstance(metadata, DatasetMetadata):
+            return metadata
+        return None
 
-    def iterate_items(
+    async def iterate_items(
         self,
         *,
         offset: int = 0,
@@ -253,7 +256,7 @@ class Dataset(BaseStorage):
         Yields:
             Each item from the dataset as a dictionary.
         """
-        return self._dataset_client.iterate_items(
+        async for item in self._dataset_client.iterate_items(  # type: ignore
             offset=offset,
             limit=limit,
             clean=clean,
@@ -263,7 +266,8 @@ class Dataset(BaseStorage):
             unwind=unwind,
             skip_empty=skip_empty,
             skip_hidden=skip_hidden,
-        )
+        ):
+            yield item
 
     async def drop(self) -> None:
         """Remove the dataset either from the Apify cloud storage or from the local directory."""

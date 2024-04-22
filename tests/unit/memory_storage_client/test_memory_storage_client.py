@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from crawlee._utils.env_vars import CrawleeEnvVars
-from crawlee.storage_clients import MemoryStorageClient
+from crawlee.memory_storage_client import MemoryStorageClient
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -138,10 +138,10 @@ async def test_purge_request_queues(tmp_path: Path) -> None:
 async def test_not_implemented_method(tmp_path: Path) -> None:
     ms = MemoryStorageClient(local_data_directory=str(tmp_path), write_metadata=True)
     ddt = ms.dataset('test')
-    with pytest.raises(NotImplementedError, match='This method is not supported in local memory storage.'):
+    with pytest.raises(NotImplementedError, match='This method is not supported in memory storage.'):
         await ddt.stream_items(item_format='json')
 
-    with pytest.raises(NotImplementedError, match='This method is not supported in local memory storage.'):
+    with pytest.raises(NotImplementedError, match='This method is not supported in memory storage.'):
         await ddt.stream_items(item_format='json')
 
 

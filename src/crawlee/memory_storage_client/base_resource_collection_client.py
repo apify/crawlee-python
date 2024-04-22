@@ -4,11 +4,11 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 from crawlee._utils.file import persist_metadata_if_enabled
-from crawlee.resource_clients.base_resource_client import BaseResourceClient
+from crawlee.memory_storage_client.base_resource_client import BaseResourceClient
 
 if TYPE_CHECKING:
-    from crawlee.storage_clients import MemoryStorageClient
-    from crawlee.storages.models import BaseListPage, BaseStorageMetadata
+    from crawlee.memory_storage_client import MemoryStorageClient
+    from crawlee.storages.models import BaseStorageMetadata
 
 ResourceClientType = TypeVar('ResourceClientType', bound=BaseResourceClient, contravariant=True)  # noqa: PLC0105
 
@@ -33,14 +33,6 @@ class BaseResourceCollectionClient(ABC, Generic[ResourceClientType]):
     @abstractmethod
     def _get_storage_client_cache(self) -> list[ResourceClientType]:
         """Get the storage client cache."""
-
-    @abstractmethod
-    async def list(self) -> BaseListPage:
-        """List the available storages.
-
-        Returns:
-            The list of available storages matching the specified filters.
-        """
 
     async def get_or_create(
         self,

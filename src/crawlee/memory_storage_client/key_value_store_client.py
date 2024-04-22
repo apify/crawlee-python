@@ -25,7 +25,8 @@ from crawlee._utils.file import (
     json_dumps,
     persist_metadata_if_enabled,
 )
-from crawlee.resource_clients.base_resource_client import BaseResourceClient
+from crawlee.base_storage_client import BaseKeyValueStoreClient
+from crawlee.memory_storage_client.base_resource_client import BaseResourceClient as MemoryBaseResourceClient
 from crawlee.storages.models import (
     KeyValueStoreKeyInfo,
     KeyValueStoreListKeysPage,
@@ -36,12 +37,12 @@ from crawlee.storages.models import (
 from crawlee.types import StorageTypes
 
 if TYPE_CHECKING:
-    from crawlee.storage_clients import MemoryStorageClient
+    from crawlee.memory_storage_client import MemoryStorageClient
 
 logger = getLogger(__name__)
 
 
-class KeyValueStoreClient(BaseResourceClient):
+class KeyValueStoreClient(BaseKeyValueStoreClient, MemoryBaseResourceClient):
     """Sub-client for manipulating a single key-value store."""
 
     def __init__(
@@ -202,15 +203,8 @@ class KeyValueStoreClient(BaseResourceClient):
 
         return None
 
+    @override
     async def update(self, *, name: str | None = None) -> KeyValueStoreMetadata:
-        """Update the key-value store with specified fields.
-
-        Args:
-            name: The new name for key-value store
-
-        Returns:
-            The updated key-value store
-        """
         # Check by id
         existing_store_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
@@ -255,8 +249,8 @@ class KeyValueStoreClient(BaseResourceClient):
 
         return existing_store_by_id.resource_info
 
+    @override
     async def delete(self) -> None:
-        """Delete the key-value store."""
         store = next(
             (store for store in self._memory_storage_client.key_value_stores_handled if store.id == self.id), None
         )
@@ -269,21 +263,13 @@ class KeyValueStoreClient(BaseResourceClient):
                 if os.path.exists(store.resource_directory):
                     await aioshutil.rmtree(store.resource_directory)
 
+    @override
     async def list_keys(
         self,
         *,
         limit: int = 1000,
         exclusive_start_key: str | None = None,
     ) -> KeyValueStoreListKeysPage:
-        """List the keys in the key-value store.
-
-        Args:
-            limit: Number of keys to be returned. Maximum value is 1000.
-            exclusive_start_key: All keys up to this one (including) are skipped from the result.
-
-        Returns:
-            The list of keys in the key-value store matching the given arguments.
-        """
         # Check by id
         existing_store_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
@@ -338,40 +324,20 @@ class KeyValueStoreClient(BaseResourceClient):
             items=limited_items,
         )
 
+    @override
     async def get_record(self, key: str) -> KeyValueStoreRecord | None:
-        """Retrieve the given record from the key-value store.
-
-        Args:
-            key: Key of the record to retrieve
-
-        Returns:
-            The requested record, or None, if the record does not exist
-        """
         return await self._get_record_internal(key)
 
+    @override
     async def get_record_as_bytes(self, key: str) -> KeyValueStoreRecord | None:
-        """Retrieve the given record from the key-value store, without parsing it.
-
-        Args:
-            key: Key of the record to retrieve
-
-        Returns:
-            The requested record, or None, if the record does not exist
-        """
         return await self._get_record_internal(key, as_bytes=True)
 
-    async def stream_record(self, _key: str) -> AsyncIterator[dict | None]:
-        """Stream the given record from the key-value store."""
-        raise NotImplementedError('This method is not supported in local memory storage.')
+    @override
+    async def stream_record(self, key: str) -> AsyncIterator[KeyValueStoreRecord | None]:
+        raise NotImplementedError('This method is not supported in memory storage.')
 
+    @override
     async def set_record(self, key: str, value: Any, content_type: str | None = None) -> None:
-        """Set a value to the given record in the key-value store.
-
-        Args:
-            key: The key of the record to save the value to
-            value: The value to save into the record
-            content_type: The content type of the saved value
-        """
         # Check by id
         existing_store_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
@@ -413,6 +379,27 @@ class KeyValueStoreClient(BaseResourceClient):
 
                 await existing_store_by_id.persist_record(record)
 
+    @override
+    async def delete_record(self, key: str) -> None:
+        # Check by id
+        existing_store_by_id = self.find_or_create_client_by_id_or_name(
+            memory_storage_client=self._memory_storage_client,
+            id=self.id,
+            name=self.name,
+        )
+
+        if existing_store_by_id is None:
+            raise_on_non_existing_storage(StorageTypes.KEY_VALUE_STORE, self.id)
+
+        record = existing_store_by_id.records.get(key)
+
+        if record is not None:
+            async with existing_store_by_id.file_operation_lock:
+                del existing_store_by_id.records[key]
+                await existing_store_by_id.update_timestamps(has_been_modified=True)
+                if self._memory_storage_client.persist_storage:
+                    await existing_store_by_id.delete_persisted_record(record)
+
     async def persist_record(self, record: KeyValueStoreRecord) -> None:
         """Persist the specified record to the key-value store."""
         store_directory = self.resource_directory
@@ -438,31 +425,6 @@ class KeyValueStoreClient(BaseResourceClient):
             async with aiofiles.open(record_metadata_path, mode='wb') as f:
                 record_metadata = KeyValueStoreRecordMetadata(key=record.key, content_type=record.content_type)
                 await f.write(record_metadata.model_dump_json(indent=2).encode('utf-8'))
-
-    async def delete_record(self, key: str) -> None:
-        """Delete the specified record from the key-value store.
-
-        Args:
-            key: The key of the record which to delete
-        """
-        # Check by id
-        existing_store_by_id = self.find_or_create_client_by_id_or_name(
-            memory_storage_client=self._memory_storage_client,
-            id=self.id,
-            name=self.name,
-        )
-
-        if existing_store_by_id is None:
-            raise_on_non_existing_storage(StorageTypes.KEY_VALUE_STORE, self.id)
-
-        record = existing_store_by_id.records.get(key)
-
-        if record is not None:
-            async with existing_store_by_id.file_operation_lock:
-                del existing_store_by_id.records[key]
-                await existing_store_by_id.update_timestamps(has_been_modified=True)
-                if self._memory_storage_client.persist_storage:
-                    await existing_store_by_id.delete_persisted_record(record)
 
     async def delete_persisted_record(self, record: KeyValueStoreRecord) -> None:
         """Delete the specified record from the key-value store."""

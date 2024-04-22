@@ -17,8 +17,8 @@ from crawlee.storages.models import KeyValueStoreMetadata, KeyValueStoreRecordMe
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from crawlee.resource_clients import KeyValueStoreClient
-    from crawlee.storage_clients import MemoryStorageClient
+    from crawlee.memory_storage_client import MemoryStorageClient
+    from crawlee.memory_storage_client.key_value_store_client import KeyValueStoreClient
 
 TINY_PNG = base64.b64decode(
     s='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVQYV2NgYAAAAAMAAWgmWQ0AAAAASUVORK5CYII=',
@@ -61,7 +61,7 @@ async def test_nonexistent(memory_storage_client: MemoryStorageClient) -> None:
 
 
 async def test_not_implemented(key_value_store_client: KeyValueStoreClient) -> None:
-    with pytest.raises(NotImplementedError, match='This method is not supported in local memory storage.'):
+    with pytest.raises(NotImplementedError, match='This method is not supported in memory storage.'):
         await key_value_store_client.stream_record('test')
 
 

@@ -21,16 +21,17 @@ from crawlee._utils.data_processing import (
 )
 from crawlee._utils.file import force_remove, force_rename, json_dumps, persist_metadata_if_enabled
 from crawlee._utils.requests import unique_key_to_request_id
+from crawlee.base_storage_client import BaseRequestQueueClient
+from crawlee.memory_storage_client.base_resource_client import BaseResourceClient
 from crawlee.request import Request
-from crawlee.resource_clients.base_resource_client import BaseResourceClient
 from crawlee.storages.models import RequestQueueHead, RequestQueueMetadata, RequestQueueOperationInfo
 from crawlee.types import StorageTypes
 
 if TYPE_CHECKING:
-    from crawlee.storage_clients import MemoryStorageClient
+    from crawlee.memory_storage_client import MemoryStorageClient
 
 
-class RequestQueueClient(BaseResourceClient):
+class RequestQueueClient(BaseRequestQueueClient, BaseResourceClient):
     """Sub-client for manipulating a single request queue."""
 
     def __init__(
@@ -170,15 +171,8 @@ class RequestQueueClient(BaseResourceClient):
 
         return None
 
+    @override
     async def update(self, *, name: str | None = None) -> RequestQueueMetadata:
-        """Update the request queue with specified fields.
-
-        Args:
-            name: The new name for the request queue
-
-        Returns:
-            The updated request queue
-        """
         # Check by id
         existing_queue_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
@@ -221,8 +215,8 @@ class RequestQueueClient(BaseResourceClient):
 
             return existing_queue_by_id.resource_info
 
+    @override
     async def delete(self) -> None:
-        """Delete the request queue."""
         queue = next(
             (queue for queue in self._memory_storage_client.request_queues_handled if queue.id == self.id),
             None,
@@ -238,15 +232,8 @@ class RequestQueueClient(BaseResourceClient):
                 if os.path.exists(queue.resource_directory):
                     await aioshutil.rmtree(queue.resource_directory)
 
+    @override
     async def list_head(self, *, limit: int | None = None) -> RequestQueueHead:
-        """Retrieve a given number of requests from the beginning of the queue.
-
-        Args:
-            limit: How many requests to retrieve
-
-        Returns:
-            The desired number of requests from the beginning of the queue.
-        """
         existing_queue_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
             id=self.id,
@@ -286,21 +273,17 @@ class RequestQueueClient(BaseResourceClient):
                 items=items,
             )
 
+    @override
+    async def list_and_lock_head(self, *, lock_secs: int, limit: int | None = None) -> dict:
+        raise NotImplementedError('This method is not supported in memory storage.')
+
+    @override
     async def add_request(
         self,
         request: Request,
         *,
         forefront: bool | None = None,
     ) -> RequestQueueOperationInfo:
-        """Add a request to the queue.
-
-        Args:
-            request: The request to add to the queue
-            forefront: Whether to add the request to the head or the end of the queue
-
-        Returns:
-            The added request.
-        """
         existing_queue_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
             id=self.id,
@@ -347,15 +330,8 @@ class RequestQueueClient(BaseResourceClient):
                 was_already_handled=False,
             )
 
+    @override
     async def get_request(self, request_id: str) -> Request | None:
-        """Retrieve a request from the queue.
-
-        Args:
-            request_id: ID of the request to retrieve
-
-        Returns:
-            The retrieved request, or None, if it did not exist.
-        """
         existing_queue_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
             id=self.id,
@@ -371,21 +347,13 @@ class RequestQueueClient(BaseResourceClient):
             request: Request = existing_queue_by_id.requests.get(request_id)
             return self._json_to_request(request.json_ if request is not None else None)
 
+    @override
     async def update_request(
         self,
         request: Request,
         *,
         forefront: bool | None = None,
     ) -> RequestQueueOperationInfo:
-        """Update a request in the queue.
-
-        Args:
-            request: The updated request
-            forefront: Whether to put the updated request in the beginning or the end of the queue
-
-        Returns:
-            The updated request
-        """
         existing_queue_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
             id=self.id,
@@ -434,12 +402,8 @@ class RequestQueueClient(BaseResourceClient):
                 was_already_handled=request_was_handled_before_update,
             )
 
+    @override
     async def delete_request(self, request_id: str) -> None:
-        """Delete a request from the queue.
-
-        Args:
-            request_id: ID of the request to delete.
-        """
         existing_queue_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
             id=self.id,
@@ -463,6 +427,60 @@ class RequestQueueClient(BaseResourceClient):
                     entity_directory=existing_queue_by_id.resource_directory,
                     request_id=request_id,
                 )
+
+    @override
+    async def prolong_request_lock(
+        self,
+        request_id: str,
+        *,
+        forefront: bool = False,
+        lock_secs: int,
+    ) -> dict:
+        raise NotImplementedError('This method is not supported in memory storage.')
+
+    @override
+    async def delete_request_lock(
+        self,
+        request_id: str,
+        *,
+        forefront: bool = False,
+    ) -> None:
+        raise NotImplementedError('This method is not supported in memory storage.')
+
+    @override
+    async def batch_add_requests(
+        self,
+        requests: list[Request],
+        *,
+        forefront: bool = False,
+    ) -> dict:
+        raise NotImplementedError('This method is not supported in memory storage.')
+
+    @override
+    async def batch_delete_requests(self, requests: list[Request]) -> dict:
+        raise NotImplementedError('This method is not supported in memory storage.')
+
+    @override
+    async def list_requests(
+        self,
+        *,
+        limit: int | None = None,
+        exclusive_start_id: str | None = None,
+    ) -> dict:
+        raise NotImplementedError('This method is not supported in memory storage.')
+
+    async def update_timestamps(self, *, has_been_modified: bool) -> None:
+        """Update the timestamps of the request queue."""
+        self._accessed_at = datetime.now(timezone.utc)
+
+        if has_been_modified:
+            self._modified_at = datetime.now(timezone.utc)
+
+        await persist_metadata_if_enabled(
+            data=self.resource_info.model_dump(),
+            entity_directory=self.resource_directory,
+            write_metadata=self._memory_storage_client.write_metadata,
+        )
 
     async def _persist_single_request_to_storage(
         self,
@@ -511,19 +529,6 @@ class RequestQueueClient(BaseResourceClient):
 
         file_path = os.path.join(entity_directory, f'{request_id}.json')
         await force_remove(file_path)
-
-    async def update_timestamps(self, *, has_been_modified: bool) -> None:
-        """Update the timestamps of the request queue."""
-        self._accessed_at = datetime.now(timezone.utc)
-
-        if has_been_modified:
-            self._modified_at = datetime.now(timezone.utc)
-
-        await persist_metadata_if_enabled(
-            data=self.resource_info.model_dump(),
-            entity_directory=self.resource_directory,
-            write_metadata=self._memory_storage_client.write_metadata,
-        )
 
     def _json_to_request(self, request_json: str | None) -> Request | None:
         if request_json is None:

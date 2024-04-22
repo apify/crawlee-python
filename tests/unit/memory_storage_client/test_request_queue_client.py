@@ -10,8 +10,8 @@ import pytest
 from crawlee.request import Request
 
 if TYPE_CHECKING:
-    from crawlee.resource_clients import RequestQueueClient
-    from crawlee.storage_clients import MemoryStorageClient
+    from crawlee.memory_storage_client import MemoryStorageClient
+    from crawlee.memory_storage_client.request_queue_client import RequestQueueClient
 
 
 @pytest.fixture()
