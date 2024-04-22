@@ -81,7 +81,7 @@ class SystemStatus:
         Returns:
             An object representing the current system status.
         """
-        return self._get_system_info(self._max_snapshot_age)
+        return self._get_system_info(sample_duration=self._max_snapshot_age)
 
     def get_historical_system_info(self) -> SystemInfo:
         """Retrieves and evaluates the historical status of system resources.
@@ -94,7 +94,7 @@ class SystemStatus:
         """
         return self._get_system_info()
 
-    def _get_system_info(self, sample_duration: timedelta | None = None) -> SystemInfo:
+    def _get_system_info(self, *, sample_duration: timedelta | None = None) -> SystemInfo:
         """Get system information based on the overload state of different resources within a specified duration.
 
         Args:
@@ -182,6 +182,9 @@ class SystemStatus:
         if not sample:
             return LoadRatioInfo(limit_ratio=threshold, actual_ratio=0)
 
+        if len(sample) == 1:
+            return LoadRatioInfo(limit_ratio=threshold, actual_ratio=float(sample[0].is_overloaded))
+
         weights, values = [], []
 
         for previous, current in pairwise(sample):
@@ -192,8 +195,7 @@ class SystemStatus:
 
         try:
             weighted_avg = compute_weighted_avg(values, weights)
-        except ValueError:
-            logger.warning('Total weight cannot be zero')
-            return LoadRatioInfo(limit_ratio=threshold, actual_ratio=0)
+        except ValueError as exc:
+            raise ValueError('Failed to compute weighted average for the sample.') from exc
 
         return LoadRatioInfo(limit_ratio=threshold, actual_ratio=round(weighted_avg, 3))
