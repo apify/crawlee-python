@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Sequence
 from unittest.mock import Mock
 
 import pytest
@@ -10,6 +11,7 @@ from httpx import Headers, Response
 
 from crawlee.basic_crawler.basic_crawler import BasicCrawler, UserDefinedErrorHandlerError
 from crawlee.basic_crawler.types import BasicCrawlingContext
+from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.request import BaseRequestData, Request
 from crawlee.storages import RequestList
 
@@ -287,3 +289,48 @@ async def test_add_requests_works() -> None:
 
     visited = {call[0][0] for call in visit.call_args_list}
     assert visited == {'http://a.com', 'http://b.com', 'http://c.com'}
+
+
+@dataclass
+class EnqueueStrategyTestInput:
+    strategy: EnqueueStrategy | None
+    expected_urls: Sequence[str]
+
+    URLS: Sequence[str] = (
+        'https://someplace.com/index.html',
+        'http://someplace.com/index.html',
+        'https://blog.someplace.com/index.html',
+        'https://other.place.com/index.html',
+    )
+
+
+@pytest.mark.parametrize(
+    'test_input',
+    argvalues=[
+        EnqueueStrategyTestInput(strategy=None, expected_urls=EnqueueStrategyTestInput.URLS),
+        EnqueueStrategyTestInput(strategy=EnqueueStrategy.ALL, expected_urls=EnqueueStrategyTestInput.URLS),
+        EnqueueStrategyTestInput(strategy=EnqueueStrategy.SAME_DOMAIN, expected_urls=EnqueueStrategyTestInput.URLS[:3]),
+        EnqueueStrategyTestInput(
+            strategy=EnqueueStrategy.SAME_HOSTNAME, expected_urls=EnqueueStrategyTestInput.URLS[:2]
+        ),
+        EnqueueStrategyTestInput(strategy=EnqueueStrategy.SAME_ORIGIN, expected_urls=EnqueueStrategyTestInput.URLS[:1]),
+    ],
+)
+async def test_enqueue_strategy(test_input: EnqueueStrategyTestInput) -> None:
+    visit = Mock()
+    crawler = BasicCrawler(request_provider=RequestList(['https://someplace.com']))
+
+    @crawler.router.default_handler
+    async def default_handler(context: BasicCrawlingContext) -> None:
+        await context.add_requests(
+            [BaseRequestData.from_url(url, label='a') for url in test_input.URLS], strategy=test_input.strategy
+        )
+
+    @crawler.router.handler('a')
+    async def handler(context: BasicCrawlingContext) -> None:
+        visit(context.request.url)
+
+    await crawler.run()
+
+    visited = {call[0][0] for call in visit.call_args_list}
+    assert visited == set(test_input.expected_urls)

@@ -1,13 +1,15 @@
 # Inspiration: https://github.com/apify/crawlee/blob/v3.7.3/packages/basic-crawler/src/internals/basic-crawler.ts
 from __future__ import annotations
 
+import tempfile
 from datetime import timedelta
 from functools import partial
 from logging import getLogger
-from typing import TYPE_CHECKING, Awaitable, Callable, Generic, Union, cast
+from typing import TYPE_CHECKING, AsyncGenerator, Awaitable, Callable, Generic, Union, cast
 
 import httpx
-from typing_extensions import TypeVar
+from tldextract import TLDExtract
+from typing_extensions import TypeVar, assert_never
 
 from crawlee._utils.wait import wait_for
 from crawlee.autoscaling import AutoscaledPool, ConcurrencySettings
@@ -16,6 +18,7 @@ from crawlee.autoscaling.system_status import SystemStatus
 from crawlee.basic_crawler.context_pipeline import (
     ContextPipeline,
     ContextPipelineInitializationError,
+    ContextPipelineInterruptedError,
     RequestHandlerError,
 )
 from crawlee.basic_crawler.router import Router
@@ -26,6 +29,7 @@ from crawlee.basic_crawler.types import (
     SendRequestFunction,
 )
 from crawlee.configuration import Configuration
+from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.events.local_event_manager import LocalEventManager
 from crawlee.http_clients.httpx_client import HttpxClient
 from crawlee.request import BaseRequestData, Request, RequestState
@@ -92,7 +96,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         self._http_client = http_client or HttpxClient()
 
-        self._context_pipeline = _context_pipeline or ContextPipeline()
+        self._context_pipeline = (_context_pipeline or ContextPipeline()).compose(self._check_url_after_redirects)
 
         self._error_handler: ErrorHandler[TCrawlingContext] | None = None
         self._failed_request_handler: FailedRequestHandler[TCrawlingContext] | None = None
@@ -108,6 +112,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
             if self._configuration.internal_timeout is not None
             else max(2 * request_handler_timeout, timedelta(minutes=5))
         )
+
+        self._tld_extractor = TLDExtract(cache_dir=tempfile.TemporaryDirectory().name)
 
         self._event_manager = LocalEventManager()  # TODO: switch based on configuration
         # https://github.com/apify/crawlee-py/issues/83
@@ -192,6 +198,39 @@ class BasicCrawler(Generic[TCrawlingContext]):
             not crawling_context.request.no_retry and (crawling_context.request.retry_count + 1) < max_request_retries
         )
 
+    async def _check_url_after_redirects(
+        self, crawling_context: TCrawlingContext
+    ) -> AsyncGenerator[TCrawlingContext, None]:
+        if crawling_context.request.loaded_url is not None and not self._check_enqueue_strategy(
+            httpx.URL(crawling_context.request.url),
+            httpx.URL(crawling_context.request.loaded_url),
+            crawling_context.request.enqueue_strategy,
+        ):
+            raise ContextPipelineInterruptedError(
+                f'Skipping URL {crawling_context.request.loaded_url} (redirected from {crawling_context.request.url})'
+            )
+
+        yield crawling_context
+
+    def _check_enqueue_strategy(
+        self, target_url: httpx.URL, origin_url: httpx.URL, strategy: EnqueueStrategy | None
+    ) -> bool:
+        if strategy == EnqueueStrategy.SAME_HOSTNAME:
+            return target_url.host == origin_url.host
+
+        if strategy == EnqueueStrategy.SAME_DOMAIN:
+            origin_domain = self._tld_extractor.extract_str(origin_url.host).domain
+            target_domain = self._tld_extractor.extract_str(target_url.host).domain
+            return origin_domain == target_domain
+
+        if strategy == EnqueueStrategy.SAME_ORIGIN:
+            return target_url.host == origin_url.host and target_url.scheme == origin_url.scheme
+
+        if strategy is None or strategy == EnqueueStrategy.ALL:
+            return True
+
+        assert_never()
+
     async def _handle_request_error(self, crawling_context: TCrawlingContext, error: Exception) -> None:
         request_provider = await self.get_request_provider()
 
@@ -245,14 +284,15 @@ class BasicCrawler(Generic[TCrawlingContext]):
             requests = list[BaseRequestData]()
 
             for request in call['requests']:
-                # TODO: handle strategy, limit, include/exclude, etc.
+                # TODO: handle deduplication, limit, include/exclude, etc.
                 request_model = request if isinstance(request, BaseRequestData) else BaseRequestData.from_url(request)
                 destination = httpx.URL(request_model.url)
                 if destination.is_relative_url:
                     base_url = httpx.URL(call.get('base_url', origin))
                     request_model.url = str(base_url.join(destination))
 
-                requests.append(request_model)
+                if self._check_enqueue_strategy(destination, origin, call.get('strategy')):
+                    requests.append(request_model)
 
             await request_provider.add_requests_batched(
                 requests=requests,
@@ -343,6 +383,17 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 )
                 request.state = RequestState.ERROR
                 raise
+        except ContextPipelineInterruptedError as interruped_error:
+            logger.debug('The context pipeline was interrupted', exc_info=interruped_error)
+
+            await wait_for(
+                lambda: request_provider.mark_request_as_handled(crawling_context.request),
+                timeout=self._internal_timeout,
+                timeout_message='Marking request as handled timed out after '
+                f'{self._internal_timeout.total_seconds()} seconds',
+                logger=logger,
+                max_retries=3,
+            )
         except ContextPipelineInitializationError as initialization_error:
             if self._should_retry_request(crawling_context):
                 logger.debug(

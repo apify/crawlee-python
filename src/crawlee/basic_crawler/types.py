@@ -3,24 +3,15 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import TYPE_CHECKING, Any, Coroutine, Protocol, Sequence
 
 from typing_extensions import NotRequired, TypedDict, Unpack
 
 if TYPE_CHECKING:
+    from crawlee.enqueue_strategy import EnqueueStrategy
     from crawlee.globs import Glob
     from crawlee.http_clients.base_http_client import HttpResponse
     from crawlee.request import BaseRequestData, Request
-
-
-class EnqueueStrategy(str, Enum):
-    """Strategy for deciding which links should be followed and which ones should be ignored."""
-
-    ALL = 'all'
-    SAME_DOMAIN = 'same-domain'
-    SAME_HOSTNAME = 'same-hostname'
-    SAME_ORIGIN = 'same-origin'
 
 
 class AddRequestsFunctionKwargs(TypedDict):
@@ -28,7 +19,7 @@ class AddRequestsFunctionKwargs(TypedDict):
 
     limit: NotRequired[int]
     base_url: NotRequired[str]
-    strategy: NotRequired[EnqueueStrategy]
+    strategy: NotRequired[EnqueueStrategy | None]
     include: NotRequired[list[re.Pattern | Glob]]
     exclude: NotRequired[list[re.Pattern | Glob]]
 
@@ -77,7 +68,7 @@ class FinalStatistics:
 
 
 class AddRequestsFunctionCall(AddRequestsFunctionKwargs):
-    """Record of a call to `add_requests1."""
+    """Record of a call to `add_requests`."""
 
     requests: Sequence[str | BaseRequestData]
 

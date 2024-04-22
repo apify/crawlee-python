@@ -29,6 +29,10 @@ class ContextPipelineInitializationError(Exception):
         self.crawling_context = crawling_context
 
 
+class ContextPipelineInterruptedError(Exception):
+    """May be thrown in the initialization phase of a middleware to signal that the request should not be processed."""
+
+
 class ContextPipelineFinalizationError(Exception):
     """Wraps an exception thrown in the finalization step of a context pipeline middleware.
 
@@ -85,6 +89,8 @@ class ContextPipeline(Generic[TCrawlingContext]):
                         result = await middleware_instance.__anext__()
                     except StopAsyncIteration as e:
                         raise RuntimeError('The middleware did not yield') from e
+                    except ContextPipelineInterruptedError:
+                        raise
                     except Exception as e:
                         raise ContextPipelineInitializationError(e, crawling_context) from e
 
@@ -101,6 +107,8 @@ class ContextPipeline(Generic[TCrawlingContext]):
                     result = await middleware_instance.__anext__()
                 except StopAsyncIteration:  # noqa: PERF203
                     pass
+                except ContextPipelineInterruptedError as e:
+                    raise RuntimeError('Invalid state - pipeline interrupted in the finalization step') from e
                 except Exception as e:
                     raise ContextPipelineFinalizationError(e, crawling_context) from e
                 else:
