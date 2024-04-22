@@ -284,7 +284,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
             requests = list[BaseRequestData]()
 
             for request in call['requests']:
-                # TODO: handle deduplication, limit, include/exclude, etc.
+                if (limit := call.get('limit')) is not None and len(requests) >= limit:
+                    break
+
+                # TODO: handle deduplication, include/exclude, etc.
                 request_model = request if isinstance(request, BaseRequestData) else BaseRequestData.from_url(request)
                 destination = httpx.URL(request_model.url)
                 if destination.is_relative_url:
