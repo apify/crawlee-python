@@ -1,6 +1,7 @@
 # Inspiration: https://github.com/apify/crawlee/blob/v3.7.3/packages/basic-crawler/src/internals/basic-crawler.ts
 from __future__ import annotations
 
+from contextlib import AsyncExitStack
 from datetime import timedelta
 from functools import partial
 from logging import getLogger
@@ -24,6 +25,8 @@ from crawlee.configuration import Configuration
 from crawlee.events.local_event_manager import LocalEventManager
 from crawlee.http_clients.httpx_client import HttpxClient
 from crawlee.request import BaseRequestData, Request, RequestState
+from crawlee.sessions import SessionPool
+from crawlee.sessions.session import Session
 
 if TYPE_CHECKING:
     from crawlee.http_clients.base_http_client import BaseHttpClient, HttpResponse
@@ -64,6 +67,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
         max_request_retries: int = 3,
         configuration: Configuration | None = None,
         request_handler_timeout: timedelta = timedelta(minutes=1),
+        session_pool: SessionPool | None = None,
+        use_session_pool: bool = True,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
     ) -> None:
         """Initialize the BasicCrawler.
@@ -76,6 +81,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
             max_request_retries: Maximum amount of attempts at processing a request
             configuration: Crawler configuration
             request_handler_timeout: How long is a single request handler allowed to run
+            use_session_pool: Enables using the session pool for crawling
+            session_pool: A preconfigured SessionPool instance if you wish to use non-default configuration
             _context_pipeline: Allows extending the request lifecycle and modifying the crawling context.
                 This parameter is meant to be used by child classes, not when BasicCrawler is instantiated directly.
         """
@@ -117,6 +124,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
             concurrency_settings=concurrency_settings,
         )
 
+        self._use_session_pool = use_session_pool
+        self._session_pool: SessionPool = session_pool or SessionPool()
+
     @property
     def router(self) -> Router[TCrawlingContext]:
         """The router used to handle each individual crawling request."""
@@ -131,6 +141,20 @@ class BasicCrawler(Generic[TCrawlingContext]):
             raise RuntimeError('A router is already set')
 
         self._router = router
+
+    async def _get_session(self) -> Session | None:
+        """If session pool is being used, try to take a session from it."""
+        if not self._use_session_pool:
+            return None
+
+        return await wait_for(
+            self._session_pool.get_session,
+            timeout=self._internal_timeout,
+            timeout_message='Fetching a session from the pool timed out after '
+            f'{self._internal_timeout.total_seconds()} seconds',
+            max_retries=3,
+            logger=logger,
+        )
 
     def error_handler(self, handler: ErrorHandler[TCrawlingContext]) -> ErrorHandler[TCrawlingContext]:
         """Decorator for configuring an error handler (called after a request handler error and before retrying)."""
@@ -168,7 +192,13 @@ class BasicCrawler(Generic[TCrawlingContext]):
         if requests is not None:
             await self.add_requests(requests)
 
-        async with self._event_manager, self._snapshotter:
+        async with AsyncExitStack() as exit_stack:
+            await exit_stack.enter_async_context(self._event_manager)
+            await exit_stack.enter_async_context(self._snapshotter)
+
+            if self._use_session_pool:
+                await exit_stack.enter_async_context(self._session_pool)
+
             await self._pool.run()
 
         return FinalStatistics()
@@ -217,7 +247,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             except Exception as e:
                 raise UserDefinedErrorHandlerError('Exception thrown in user-defined failed request handler') from e
 
-    def _prepare_send_request_function(self) -> SendRequestFunction:
+    def _prepare_send_request_function(self, session: Session | None) -> SendRequestFunction:
         async def send_request(url: str, *, method: str = 'get', headers: dict[str, str] | None = None) -> HttpResponse:
             return await self._http_client.send_request(url, method=method, headers=httpx.Headers(headers))
 
@@ -241,10 +271,13 @@ class BasicCrawler(Generic[TCrawlingContext]):
         if request is None:
             return
 
-        # TODO: fetch session from the session pool
-        # https://github.com/apify/crawlee-py/issues/110
+        session = await self._get_session()
 
-        crawling_context = BasicCrawlingContext(request=request, send_request=self._prepare_send_request_function())
+        crawling_context = BasicCrawlingContext(
+            request=request,
+            session=session,
+            send_request=self._prepare_send_request_function(session),
+        )
 
         try:
             request.state = RequestState.REQUEST_HANDLER

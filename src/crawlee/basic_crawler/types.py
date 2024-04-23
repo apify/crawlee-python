@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Coroutine, Protocol
 if TYPE_CHECKING:
     from crawlee.http_clients.base_http_client import HttpResponse
     from crawlee.request import Request
+    from crawlee.sessions.session import Session
 
 
 class SendRequestFunction(Protocol):
@@ -22,6 +23,7 @@ class BasicCrawlingContext:
     """Basic crawling context intended to be extended by crawlers."""
 
     request: Request
+    session: Session | None
     send_request: SendRequestFunction
 
 
