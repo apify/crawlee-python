@@ -1,4 +1,4 @@
-.PHONY: clean install-dev build lint type-check unit-tests unit-tests-cov integration-tests check-code format check-version-conflict check-changelog-entry
+.PHONY: clean install-dev build-and-publish-to-pypi lint type-check unit-tests unit-tests-cov integration-tests check-code format check-version-conflict check-changelog-entry
 
 DIRS_WITH_CODE = src tests scripts
 
