@@ -9,6 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write  # Required for OIDC authentication.
     environment:
       name: pypi
       url: https://pypi.org/project/crawlee
@@ -43,9 +44,13 @@ jobs:
         if: steps.determine-release-type.outputs.release_type != 'final'
         run: python ./scripts/update_version_for_prerelease.py ${{ steps.determine-release-type.outputs.release_type }}
 
-      # Builds and publishes the package to PyPI, using OIDC for PyPI authentication.
-      - name: Build & publish package to PyPI
-        run: poetry publish --build --no-interaction -vv
+      # Builds the package.
+      - name: Build package
+        run: make build
+
+      # Publishes the package to PyPI using PyPA official GitHub action with OIDC authentication.
+      - name: Publish package to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
 
       # If this workflow is not triggered by a GitHub release event, manually create and push a Git tag.
       - name: Create Git tag with the published version
