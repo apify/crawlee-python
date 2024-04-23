@@ -10,8 +10,9 @@ import pytest
 from httpx import Headers, Response
 
 from crawlee.basic_crawler.basic_crawler import BasicCrawler, UserDefinedErrorHandlerError
-from crawlee.basic_crawler.types import BasicCrawlingContext
+from crawlee.basic_crawler.types import AddRequestsFunctionKwargs, BasicCrawlingContext
 from crawlee.enqueue_strategy import EnqueueStrategy
+from crawlee.globs import Glob
 from crawlee.request import BaseRequestData, Request
 from crawlee.storages import RequestList
 
@@ -270,63 +271,121 @@ async def test_send_request_works(respx_mock: respx.MockRouter) -> None:
     assert response_headers.get('content-type').endswith('/json')
 
 
-async def test_add_requests_works() -> None:
-    visit = Mock()
-
-    crawler = BasicCrawler(
-        request_provider=RequestList(['http://a.com']),
-        max_request_retries=3,
-    )
-
-    @crawler.router.default_handler
-    async def handler(context: BasicCrawlingContext) -> None:
-        visit(context.request.url)
-
-        if context.request.url == 'http://a.com':
-            await context.add_requests([BaseRequestData.from_url('http://b.com'), 'http://c.com'])
-
-    await crawler.run()
-
-    visited = {call[0][0] for call in visit.call_args_list}
-    assert visited == {'http://a.com', 'http://b.com', 'http://c.com'}
-
-
 @dataclass
-class EnqueueStrategyTestInput:
-    strategy: EnqueueStrategy | None
+class AddRequestsTestInput:
+    start_url: str
+    requests: Sequence[str | BaseRequestData]
     expected_urls: Sequence[str]
+    kwargs: AddRequestsFunctionKwargs
 
-    URLS: Sequence[str] = (
-        'https://someplace.com/index.html',
-        'http://someplace.com/index.html',
-        'https://blog.someplace.com/index.html',
-        'https://other.place.com/index.html',
-    )
+
+STRATEGY_TEST_URLS = (
+    'https://someplace.com/index.html',
+    'http://someplace.com/index.html',
+    'https://blog.someplace.com/index.html',
+    'https://other.place.com/index.html',
+)
+
+INCLUDE_TEST_URLS = (
+    'https://someplace.com',
+    'https://someplace.com/blog/category/cats',
+    'https://someplace.com/blog/category/boots',
+    'https://someplace.com/blog/archive/index.html',
+    'https://someplace.com/blog/archive/cats',
+)
 
 
 @pytest.mark.parametrize(
     'test_input',
     argvalues=[
-        EnqueueStrategyTestInput(strategy=None, expected_urls=EnqueueStrategyTestInput.URLS),
-        EnqueueStrategyTestInput(strategy=EnqueueStrategy.ALL, expected_urls=EnqueueStrategyTestInput.URLS),
-        EnqueueStrategyTestInput(strategy=EnqueueStrategy.SAME_DOMAIN, expected_urls=EnqueueStrategyTestInput.URLS[:3]),
-        EnqueueStrategyTestInput(
-            strategy=EnqueueStrategy.SAME_HOSTNAME, expected_urls=EnqueueStrategyTestInput.URLS[:2]
+        # Basic use case
+        AddRequestsTestInput(
+            start_url='https://a.com',
+            requests=[
+                'https://a.com',
+                BaseRequestData.from_url('http://b.com'),
+                'http://c.com',
+            ],
+            kwargs={},
+            expected_urls=['https://a.com', 'http://b.com', 'http://c.com'],
         ),
-        EnqueueStrategyTestInput(strategy=EnqueueStrategy.SAME_ORIGIN, expected_urls=EnqueueStrategyTestInput.URLS[:1]),
+        # Enqueue strategy
+        AddRequestsTestInput(
+            start_url=STRATEGY_TEST_URLS[0],
+            requests=STRATEGY_TEST_URLS,
+            kwargs=AddRequestsFunctionKwargs(strategy=None),
+            expected_urls=STRATEGY_TEST_URLS,
+        ),
+        AddRequestsTestInput(
+            start_url=STRATEGY_TEST_URLS[0],
+            requests=STRATEGY_TEST_URLS,
+            kwargs=AddRequestsFunctionKwargs(strategy=EnqueueStrategy.ALL),
+            expected_urls=STRATEGY_TEST_URLS,
+        ),
+        AddRequestsTestInput(
+            start_url=STRATEGY_TEST_URLS[0],
+            requests=STRATEGY_TEST_URLS,
+            kwargs=AddRequestsFunctionKwargs(strategy=EnqueueStrategy.SAME_DOMAIN),
+            expected_urls=STRATEGY_TEST_URLS[:3],
+        ),
+        AddRequestsTestInput(
+            start_url=STRATEGY_TEST_URLS[0],
+            requests=STRATEGY_TEST_URLS,
+            kwargs=AddRequestsFunctionKwargs(strategy=EnqueueStrategy.SAME_HOSTNAME),
+            expected_urls=STRATEGY_TEST_URLS[:2],
+        ),
+        AddRequestsTestInput(
+            start_url=STRATEGY_TEST_URLS[0],
+            requests=STRATEGY_TEST_URLS,
+            kwargs=AddRequestsFunctionKwargs(strategy=EnqueueStrategy.SAME_ORIGIN),
+            expected_urls=STRATEGY_TEST_URLS[:1],
+        ),
+        # Include/exclude
+        AddRequestsTestInput(
+            start_url=INCLUDE_TEST_URLS[0],
+            requests=INCLUDE_TEST_URLS,
+            kwargs=AddRequestsFunctionKwargs(include=[Glob('https://someplace.com/**/cats')]),
+            expected_urls=[INCLUDE_TEST_URLS[1], INCLUDE_TEST_URLS[4]],
+        ),
+        AddRequestsTestInput(
+            start_url=INCLUDE_TEST_URLS[0],
+            requests=INCLUDE_TEST_URLS,
+            kwargs=AddRequestsFunctionKwargs(exclude=[Glob('https://someplace.com/**/cats')]),
+            expected_urls=[INCLUDE_TEST_URLS[0], INCLUDE_TEST_URLS[2], INCLUDE_TEST_URLS[3]],
+        ),
+        AddRequestsTestInput(
+            start_url=INCLUDE_TEST_URLS[0],
+            requests=INCLUDE_TEST_URLS,
+            kwargs=AddRequestsFunctionKwargs(
+                include=[Glob('https://someplace.com/**/cats')], exclude=[Glob('https://**/archive/**')]
+            ),
+            expected_urls=[INCLUDE_TEST_URLS[1]],
+        ),
+    ],
+    ids=[
+        'basic',
+        'enqueue_strategy_1',
+        'enqueue_strategy_2',
+        'enqueue_strategy_3',
+        'enqueue_strategy_4',
+        'enqueue_strategy_5',
+        'include_exclude_1',
+        'include_exclude_2',
+        'include_exclude_3',
     ],
 )
-async def test_enqueue_strategy(test_input: EnqueueStrategyTestInput) -> None:
+async def test_enqueue_strategy(test_input: AddRequestsTestInput) -> None:
     visit = Mock()
-    crawler = BasicCrawler(request_provider=RequestList(['https://someplace.com']))
+    crawler = BasicCrawler(request_provider=RequestList([Request.from_url('https://someplace.com', label='start')]))
 
-    @crawler.router.default_handler
+    @crawler.router.handler('start')
     async def default_handler(context: BasicCrawlingContext) -> None:
         await context.add_requests(
-            [BaseRequestData.from_url(url, label='a') for url in test_input.URLS], strategy=test_input.strategy
+            test_input.requests,
+            **test_input.kwargs,
         )
 
-    @crawler.router.handler('a')
+    @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
         visit(context.request.url)
 

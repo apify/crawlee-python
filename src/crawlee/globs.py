@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import fnmatch
 import os
 import re
 from typing import Sequence
@@ -11,7 +10,7 @@ class Glob:
 
     def __init__(self, glob: str) -> None:
         self.glob = glob
-        self.regexp = re.compile(_translate(self.glob))
+        self.regexp = re.compile(_translate(self.glob, recursive=True))
 
 
 def _translate(
@@ -64,8 +63,79 @@ def _translate(
             if part:
                 if not include_hidden and part[0] in '*?':
                     results.append(r'(?!\.)')
-                results.extend(fnmatch._translate(part, f'{not_sep}*', not_sep))  # type: ignore  # noqa: SLF001
+                results.extend(_fnmatch_translate(part, f'{not_sep}*', not_sep))
             if idx < last_part_idx:
                 results.append(any_sep)
     res = ''.join(results)
     return rf'(?s:{res})\Z'
+
+
+def _fnmatch_translate(pat: str, star: str, question_mark: str) -> list[str]:  # noqa: PLR0912
+    """Copy of fnmatch._translate from Python 3.13."""
+    res = list[str]()
+    add = res.append
+    i, n = 0, len(pat)
+    while i < n:
+        c = pat[i]
+        i = i + 1
+        if c == '*':
+            # compress consecutive `*` into one
+            if (not res) or res[-1] is not star:
+                add(star)
+        elif c == '?':
+            add(question_mark)
+        elif c == '[':
+            j = i
+            if j < n and pat[j] == '!':
+                j = j + 1
+            if j < n and pat[j] == ']':
+                j = j + 1
+            while j < n and pat[j] != ']':
+                j = j + 1
+            if j >= n:
+                add('\\[')
+            else:
+                stuff = pat[i:j]
+                if '-' not in stuff:
+                    stuff = stuff.replace('\\', r'\\')
+                else:
+                    chunks = []
+                    k = i + 2 if pat[i] == '!' else i + 1
+                    while True:
+                        k = pat.find('-', k, j)
+                        if k < 0:
+                            break
+                        chunks.append(pat[i:k])
+                        i = k + 1
+                        k = k + 3
+                    chunk = pat[i:j]
+                    if chunk:
+                        chunks.append(chunk)
+                    else:
+                        chunks[-1] += '-'
+                    # Remove empty ranges -- invalid in RE.
+                    for k in range(len(chunks) - 1, 0, -1):
+                        if chunks[k - 1][-1] > chunks[k][0]:
+                            chunks[k - 1] = chunks[k - 1][:-1] + chunks[k][1:]
+                            del chunks[k]
+                    # Escape backslashes and hyphens for set difference (--).
+                    # Hyphens that create ranges shouldn't be escaped.
+                    stuff = '-'.join(s.replace('\\', r'\\').replace('-', r'\-') for s in chunks)
+                # Escape set operations (&&, ~~ and ||).
+                stuff = re.sub(r'([&~|])', r'\\\1', stuff)
+                i = j + 1
+                if not stuff:
+                    # Empty range: never match.
+                    add('(?!)')
+                elif stuff == '!':
+                    # Negated empty range: match any character.
+                    add('.')
+                else:
+                    if stuff[0] == '!':
+                        stuff = '^' + stuff[1:]
+                    elif stuff[0] in ('^', '['):
+                        stuff = '\\' + stuff
+                    add(f'[{stuff}]')
+        else:
+            add(re.escape(c))
+    return res

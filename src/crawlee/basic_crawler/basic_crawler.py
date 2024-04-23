@@ -5,7 +5,7 @@ import tempfile
 from datetime import timedelta
 from functools import partial
 from logging import getLogger
-from typing import TYPE_CHECKING, AsyncGenerator, Awaitable, Callable, Generic, Union, cast
+from typing import TYPE_CHECKING, AsyncGenerator, Awaitable, Callable, Generic, Sequence, Union, cast
 
 import httpx
 from tldextract import TLDExtract
@@ -31,11 +31,14 @@ from crawlee.basic_crawler.types import (
 from crawlee.configuration import Configuration
 from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.events.local_event_manager import LocalEventManager
+from crawlee.globs import Glob
 from crawlee.http_clients.httpx_client import HttpxClient
 from crawlee.request import BaseRequestData, Request, RequestState
 from crawlee.storages.request_queue import RequestQueue
 
 if TYPE_CHECKING:
+    import re
+
     from crawlee.http_clients.base_http_client import BaseHttpClient, HttpResponse
     from crawlee.storages.request_provider import RequestProvider
 
@@ -231,6 +234,32 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         assert_never()
 
+    def _check_url_patterns(
+        self,
+        target_url: httpx.URL,
+        include: Sequence[re.Pattern | Glob] | None,
+        exclude: Sequence[re.Pattern | Glob] | None,
+    ) -> bool:
+        if exclude is not None:
+            for pattern in exclude:
+                if isinstance(pattern, Glob):
+                    pattern = pattern.regexp  # noqa: PLW2901
+
+                if pattern.match(str(target_url)) is not None:
+                    return False
+
+        if include is None:
+            return True
+
+        for pattern in include:
+            if isinstance(pattern, Glob):
+                pattern = pattern.regexp  # noqa: PLW2901
+
+            if pattern.match(str(target_url)) is not None:
+                return True
+
+        return False
+
     async def _handle_request_error(self, crawling_context: TCrawlingContext, error: Exception) -> None:
         request_provider = await self.get_request_provider()
 
@@ -287,14 +316,15 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 if (limit := call.get('limit')) is not None and len(requests) >= limit:
                     break
 
-                # TODO: handle deduplication, include/exclude, etc.
                 request_model = request if isinstance(request, BaseRequestData) else BaseRequestData.from_url(request)
                 destination = httpx.URL(request_model.url)
                 if destination.is_relative_url:
                     base_url = httpx.URL(call.get('base_url', origin))
                     request_model.url = str(base_url.join(destination))
 
-                if self._check_enqueue_strategy(destination, origin, call.get('strategy')):
+                if self._check_enqueue_strategy(destination, origin, call.get('strategy')) and self._check_url_patterns(
+                    destination, call.get('include', None), call.get('exclude', None)
+                ):
                     requests.append(request_model)
 
             await request_provider.add_requests_batched(
