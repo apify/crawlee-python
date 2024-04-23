@@ -1,4 +1,4 @@
-.PHONY: clean install-dev lint type-check unit-tests unit-tests-cov integration-tests check-code format check-version-conflict check-changelog-entry
+.PHONY: clean install-dev build-and-publish-to-pypi lint type-check unit-tests unit-tests-cov integration-tests check-code format check-version-conflict check-changelog-entry
 
 DIRS_WITH_CODE = src tests scripts
 
@@ -12,6 +12,12 @@ install-dev:
 	python3 -m pip install --upgrade pip poetry
 	poetry install --all-extras
 	poetry run pre-commit install
+
+# APIFY_PYPI_TOKEN_CRAWLEE is expected to be set in the environment
+build-and-publish-to-pypi:
+	rm -rf dist
+	poetry config pypi-token.pypi "${APIFY_PYPI_TOKEN_CRAWLEE}"
+	poetry publish --build --no-interaction -vv
 
 lint:
 	poetry run ruff check $(DIRS_WITH_CODE)

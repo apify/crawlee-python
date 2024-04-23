@@ -43,7 +43,7 @@ def set_current_package_version(version: str) -> None:
 
 
 # Load the version numbers of the currently published versions from PyPI
-def get_published_package_versions() -> list:
+def get_published_package_versions() -> list[str]:
     package_info_url = f'https://pypi.org/pypi/{PACKAGE_NAME}/json'
     try:
         package_data = json.load(urlopen(package_info_url))  # noqa: S310
