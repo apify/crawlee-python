@@ -43,11 +43,6 @@ jobs:
         if: steps.determine-release-type.outputs.release_type != 'final'
         run: python ./scripts/update_version_for_prerelease.py ${{ steps.determine-release-type.outputs.release_type }}
 
-      # - name: Set up PyPI token
-      #   run: poetry config pypi-token.pypi "$APIFY_PYPI_TOKEN_CRAWLEE"
-      #   env:
-      #     APIFY_PYPI_TOKEN_CRAWLEE: ${{ secrets.APIFY_PYPI_TOKEN_CRAWLEE }}
-
       # Builds and publishes the package to PyPI, using environment variables for PyPI authentication.
       - name: Build & publish package to PyPI
         run: make build-and-publish-to-pypi
