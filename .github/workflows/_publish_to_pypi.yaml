@@ -43,11 +43,9 @@ jobs:
         if: steps.determine-release-type.outputs.release_type != 'final'
         run: python ./scripts/update_version_for_prerelease.py ${{ steps.determine-release-type.outputs.release_type }}
 
-      # Builds and publishes the package to PyPI, using environment variables for PyPI authentication.
+      # Builds and publishes the package to PyPI, using OIDC for PyPI authentication.
       - name: Build & publish package to PyPI
-        run: make build-and-publish-to-pypi
-        env:
-          APIFY_PYPI_TOKEN_CRAWLEE: ${{ secrets.APIFY_PYPI_TOKEN_CRAWLEE }}
+        run: poetry publish --build --no-interaction -vv
 
       # If this workflow is not triggered by a GitHub release event, manually create and push a Git tag.
       - name: Create Git tag with the published version
