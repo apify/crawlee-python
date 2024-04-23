@@ -4,10 +4,8 @@ on:
   # Trigger code checks on opening a new pull request.
   pull_request_target:
 
-  # Trigger code checks on push to the master branch.
-  push:
-    branches:
-      - master
+  # Do not trigger code checks on push to the master branch, as they will be triggered
+  # by the release workflow.
 
   # Trigger code checks on workflow call (e.g. from run release workflow).
   workflow_call:
