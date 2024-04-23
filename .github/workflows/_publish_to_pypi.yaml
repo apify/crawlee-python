@@ -1,0 +1,70 @@
+name: Publish to PyPI
+
+on:
+  workflow_call:
+
+jobs:
+  publish_to_pypi:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    environment:
+      name: pypi
+      url: https://pypi.org/project/crawlee
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.12
+
+      - name: Install dependencies
+        run: make install-dev
+
+      # Determines the release type based on the event that triggered the workflow.
+      - name: Determine release type
+        id: determine-release-type
+        run: |
+          if [[ ${{ github.event_name }} = release ]]; then
+            release_type="final"
+          elif [[ ${{ github.event_name }} = push ]]; then
+            release_type="beta"
+          elif [[ ${{ github.event_name }} = workflow_dispatch ]]; then
+            release_type=${{ github.event.inputs.release_type }}
+          fi
+          echo "release_type=${release_type}" >> $GITHUB_OUTPUT
+
+      # Updates the version number for pre-releases in the project's configuration.
+      - name: Set pre-release version
+        if: steps.determine-release-type.outputs.release_type != 'final'
+        run: python ./scripts/update_version_for_prerelease.py ${{ steps.determine-release-type.outputs.release_type }}
+
+      # - name: Set up PyPI token
+      #   run: poetry config pypi-token.pypi "$APIFY_PYPI_TOKEN_CRAWLEE"
+      #   env:
+      #     APIFY_PYPI_TOKEN_CRAWLEE: ${{ secrets.APIFY_PYPI_TOKEN_CRAWLEE }}
+
+      # Builds and publishes the package to PyPI, using environment variables for PyPI authentication.
+      - name: Build & publish package to PyPI
+        run: make build-and-publish-to-pypi
+        env:
+          APIFY_PYPI_TOKEN_CRAWLEE: ${{ secrets.APIFY_PYPI_TOKEN_CRAWLEE }}
+
+      # If this workflow is not triggered by a GitHub release event, manually create and push a Git tag.
+      - name: Create Git tag with the published version
+        if: github.event_name != 'release'
+        run: |
+          GIT_TAG=v$(python ./scripts/print_current_package_version.py)
+          git tag "$GIT_TAG"
+          git push origin $git_tag
+
+      # If triggered by a release, upload build artifacts to the associated GitHub release.
+      - name: Upload the build artifacts to release
+        if: github.event_name == 'release'
+        run: gh release upload ${{ github.ref_name }} dist/*
+        env:
+          GH_TOKEN: ${{ github.token }}

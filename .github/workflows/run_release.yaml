@@ -1,0 +1,39 @@
+name: Run release
+
+on:
+  # Trigger a beta version release (pre-release) on push to the master branch.
+  push:
+    branches:
+      - master
+    tags-ignore:
+      - "**" # Ignore all tags to prevent duplicate builds when tags are pushed.
+
+  # Trigger a stable version release when a GitHub release is published.
+  release:
+    types: [published]
+
+  # Allows manual workflow runs from GitHub's UI, with the ability to specify the type of release.
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: Release type
+        required: true
+        type: choice
+        default: alpha
+        options:
+          - alpha
+          - beta
+          - final
+
+jobs:
+  run_code_checks:
+    name: Run code checks
+    uses: ./.github/workflows/run_code_checks.yaml
+
+  publish_to_pypi:
+    name: Publish to PyPI
+    needs: [run_code_checks]
+    uses: ./.github/workflows/_publish_to_pypi.yaml
+
+  # TODO: add job for publish package to Conda
+  # https://github.com/apify/crawlee-py/issues/104
