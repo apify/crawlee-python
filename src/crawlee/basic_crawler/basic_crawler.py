@@ -241,17 +241,19 @@ class BasicCrawler(Generic[TCrawlingContext]):
         include: Sequence[re.Pattern | Glob] | None,
         exclude: Sequence[re.Pattern | Glob] | None,
     ) -> bool:
-        if exclude is not None:
-            for pattern in exclude:
-                if isinstance(pattern, Glob):
-                    pattern = pattern.regexp  # noqa: PLW2901
+        # If the URL matches any `exclude` pattern, reject it
+        for pattern in exclude or ():
+            if isinstance(pattern, Glob):
+                pattern = pattern.regexp  # noqa: PLW2901
 
-                if pattern.match(str(target_url)) is not None:
-                    return False
+            if pattern.match(str(target_url)) is not None:
+                return False
 
+        # If there are no `include` patterns and the URL passed all `exclude` patterns, accept the URL
         if include is None:
             return True
 
+        # If the URL matches any `include` pattern, accept it
         for pattern in include:
             if isinstance(pattern, Glob):
                 pattern = pattern.regexp  # noqa: PLW2901
@@ -259,6 +261,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             if pattern.match(str(target_url)) is not None:
                 return True
 
+        # The URL does not match any `include` pattern - reject it
         return False
 
     async def _handle_request_error(self, crawling_context: TCrawlingContext, error: Exception) -> None:
