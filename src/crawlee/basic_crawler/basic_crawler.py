@@ -16,8 +16,12 @@ from crawlee.autoscaling.snapshotter import Snapshotter
 from crawlee.autoscaling.system_status import SystemStatus
 from crawlee.basic_crawler.context_pipeline import (
     ContextPipeline,
+)
+from crawlee.basic_crawler.errors import (
     ContextPipelineInitializationError,
     RequestHandlerError,
+    SessionError,
+    UserDefinedErrorHandlerError,
 )
 from crawlee.basic_crawler.router import Router
 from crawlee.basic_crawler.types import BasicCrawlingContext, FinalStatistics, SendRequestFunction
@@ -38,10 +42,6 @@ ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Union[Request, 
 FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
 
 logger = getLogger(__name__)
-
-
-class UserDefinedErrorHandlerError(Exception):
-    """Wraps an exception thrown from an user-defined error handler."""
 
 
 class BasicCrawler(Generic[TCrawlingContext]):
@@ -65,6 +65,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         http_client: BaseHttpClient | None = None,
         concurrency_settings: ConcurrencySettings | None = None,
         max_request_retries: int = 3,
+        max_session_rotations: int = 10,
         configuration: Configuration | None = None,
         request_handler_timeout: timedelta = timedelta(minutes=1),
         session_pool: SessionPool | None = None,
@@ -79,6 +80,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
             http_client: HTTP client to be used for `BasicCrawlingContext.send_request` and HTTP-only crawling.
             concurrency_settings: Allows fine-tuning concurrency levels
             max_request_retries: Maximum amount of attempts at processing a request
+            max_session_rotations: Maximum number of session rotations per request.
+                The crawler will automatically rotate the session in case of a proxy error or if it gets blocked by
+                the website.
             configuration: Crawler configuration
             request_handler_timeout: How long is a single request handler allowed to run
             use_session_pool: Enables using the session pool for crawling
@@ -102,6 +106,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._failed_request_handler: FailedRequestHandler[TCrawlingContext] | None = None
 
         self._max_request_retries = max_request_retries
+        self._max_session_rotations = max_session_rotations
 
         self._request_provider = request_provider
         self._configuration = configuration or Configuration()
@@ -203,17 +208,21 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         return FinalStatistics()
 
-    def _should_retry_request(self, crawling_context: BasicCrawlingContext) -> bool:
+    def _should_retry_request(self, crawling_context: BasicCrawlingContext, error: Exception) -> bool:
+        if crawling_context.request.no_retry:
+            return False
+
+        if isinstance(error, SessionError):
+            return ((crawling_context.request.session_rotation_count or 0) + 1) < self._max_session_rotations
+
         max_request_retries = crawling_context.request.max_retries
         if max_request_retries is None:
             max_request_retries = self._max_request_retries
 
-        return (
-            not crawling_context.request.no_retry and (crawling_context.request.retry_count + 1) < max_request_retries
-        )
+        return (crawling_context.request.retry_count + 1) < max_request_retries
 
     async def _handle_request_error(self, crawling_context: TCrawlingContext, error: Exception) -> None:
-        if self._should_retry_request(crawling_context):
+        if self._should_retry_request(crawling_context, error):
             request = crawling_context.request
             request.retry_count += 1
 
@@ -300,6 +309,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
             )
 
             request.state = RequestState.DONE
+
+            if crawling_context.session:
+                crawling_context.session.mark_good()
         except RequestHandlerError as primary_error:
             primary_error = cast(
                 RequestHandlerError[TCrawlingContext], primary_error
@@ -330,10 +342,27 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 )
                 request.state = RequestState.ERROR
                 raise
+
+            if crawling_context.session:
+                crawling_context.session.mark_bad()
+        except SessionError as session_error:
+            if not crawling_context.session:
+                raise RuntimeError('SessionError raised in a crawling context without a session') from session_error
+
+            if self._should_retry_request(crawling_context, session_error):
+                logger.warning('Encountered a session error, rotating session and retrying')
+
+                crawling_context.session.retire()
+
+                if crawling_context.request.session_rotation_count is None:
+                    crawling_context.request.session_rotation_count = 0
+                crawling_context.request.session_rotation_count += 1
+            else:
+                logger.exception('Request failed and reached maximum retries', exc_info=session_error)
         except ContextPipelineInitializationError as initialization_error:
-            if self._should_retry_request(crawling_context):
+            if self._should_retry_request(crawling_context, initialization_error):
                 logger.debug(
-                    'An exception occured during the initialization of crawling context, a retry is in order',
+                    'An exception occurred during the initialization of crawling context, a retry is in order',
                     exc_info=initialization_error,
                 )
 
@@ -352,6 +381,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
                     logger=logger,
                     max_retries=3,
                 )
+
+            if crawling_context.session:
+                crawling_context.session.mark_bad()
         except Exception as internal_error:
             logger.exception(
                 'An exception occurred during handling of a request. This places the crawler '
