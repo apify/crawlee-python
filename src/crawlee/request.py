@@ -39,7 +39,7 @@ class BaseRequestData(BaseModel):
 
     headers: Annotated[dict[str, str] | None, Field(default_factory=dict)] = None
 
-    user_data: Annotated[dict[str, Any] | None, Field(alias='userData')] = None
+    user_data: Annotated[dict[str, Any], Field(alias='userData', default_factory=dict)]
     """Custom user data assigned to the request. Use this to save any request related data to the
     request's scope, keeping them accessible on retries, failures etc.
     """
@@ -66,8 +66,6 @@ class BaseRequestData(BaseModel):
         result = cls(url=url, unique_key=unique_key, **kwargs)
 
         if label is not None:
-            if result.user_data is None:
-                result.user_data = {}
             result.user_data['label'] = label
 
         return result
@@ -101,8 +99,6 @@ class Request(BaseRequestData):
         result = cls(url=url, unique_key=unique_key, id=id, **kwargs)
 
         if label is not None:
-            if result.user_data is None:
-                result.user_data = {}
             result.user_data['label'] = label
 
         return result
@@ -115,14 +111,14 @@ class Request(BaseRequestData):
     @property
     def label(self) -> str | None:
         """A string used to differentiate between arbitrary request types."""
-        if self.user_data and 'label' in self.user_data:
+        if 'label' in self.user_data:
             return str(self.user_data['label'])
         return None
 
     @property
     def crawlee_data(self) -> CrawleeRequestData:
         """Crawlee-specific configuration stored in the user_data."""
-        return CrawleeRequestData.model_validate(self.user_data.get('__crawlee', {}) if self.user_data else {})
+        return CrawleeRequestData.model_validate(self.user_data.get('__crawlee', {}))
 
     @property
     def state(self) -> RequestState | None:
@@ -131,9 +127,6 @@ class Request(BaseRequestData):
 
     @state.setter
     def state(self, new_state: RequestState) -> None:
-        if self.user_data is None:
-            self.user_data = {}
-
         self.user_data.setdefault('__crawlee', {})
         self.user_data['__crawlee']['state'] = new_state
 
@@ -144,9 +137,6 @@ class Request(BaseRequestData):
 
     @max_retries.setter
     def max_retries(self, new_max_retries: int) -> None:
-        if self.user_data is None:
-            self.user_data = {}
-
         self.user_data.setdefault('__crawlee', {})
         self.user_data['__crawlee']['maxRetries'] = new_max_retries
 
@@ -157,9 +147,6 @@ class Request(BaseRequestData):
 
     @enqueue_strategy.setter
     def enqueue_strategy(self, new_enqueue_strategy: EnqueueStrategy) -> None:
-        if self.user_data is None:
-            self.user_data = {}
-
         self.user_data.setdefault('__crawlee', {})
         self.user_data['__crawlee']['enqueueStrategy'] = str(new_enqueue_strategy)
 
