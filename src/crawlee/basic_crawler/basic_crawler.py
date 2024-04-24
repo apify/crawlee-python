@@ -172,7 +172,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
         wait_time_between_batches: timedelta = timedelta(0),
     ) -> None:
         """Add requests to the underlying queue."""
-        await (await self.get_request_provider()).add_requests_batched(
+        request_provider = await self.get_request_provider()
+        await request_provider.add_requests_batched(
             [
                 request if isinstance(request, BaseRequestData) else BaseRequestData.from_url(url=request)
                 for request in requests
@@ -333,10 +334,12 @@ class BasicCrawler(Generic[TCrawlingContext]):
             )
 
     async def __is_finished_function(self) -> bool:
-        return await (await self.get_request_provider()).is_finished()
+        request_provider = await self.get_request_provider()
+        return await request_provider.is_finished()
 
     async def __is_task_ready_function(self) -> bool:
-        return not await (await self.get_request_provider()).is_empty()
+        request_provider = await self.get_request_provider()
+        return not await request_provider.is_empty()
 
     async def __run_task_function(self) -> None:
         request_provider = await self.get_request_provider()
