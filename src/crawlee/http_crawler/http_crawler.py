@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, AsyncGenerator, Awaitable, Callable, Iterable
 
 from crawlee.basic_crawler.basic_crawler import BasicCrawler
 from crawlee.basic_crawler.context_pipeline import ContextPipeline
+from crawlee.basic_crawler.errors import SessionError
 from crawlee.http_clients.httpx_client import HttpxClient
 from crawlee.http_crawler.types import HttpCrawlingContext
 
@@ -48,7 +49,7 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
             ignore_http_error_status_codes: HTTP status codes that are normally considered errors but we want to treat
                 them as successful
         """
-        context_pipeline = ContextPipeline().compose(self._make_http_request)
+        context_pipeline = ContextPipeline().compose(self._make_http_request).compose(self._handle_blocked_request)
 
         basic_crawler_kwargs = {}
 
@@ -79,3 +80,14 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
             send_request=crawling_context.send_request,
             http_response=result.http_response,
         )
+
+    async def _handle_blocked_request(
+        self, crawling_context: HttpCrawlingContext
+    ) -> AsyncGenerator[HttpCrawlingContext, None]:
+        if self._retry_on_blocked:
+            status_code = crawling_context.http_response.status_code
+
+            if crawling_context.session and crawling_context.session.is_blocked_status_code(status_code=status_code):
+                raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
+
+        yield crawling_context

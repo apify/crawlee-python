@@ -187,7 +187,7 @@ class Session:
         self._usage_count += 1
         # Note: We emit an event here because of the Puppeteer in TS implementation.
 
-    def retire_on_blocked_status_codes(
+    def is_blocked_status_code(
         self,
         *,
         status_code: int,
@@ -200,12 +200,8 @@ class Session:
             additional_blocked_status_codes: Optional additional status codes that should trigger session retirement.
 
         Returns:
-            True if the session was retired, False otherwise.
+            True if the session should be retired, False otherwise.
         """
         blocked_status_codes = self._blocked_status_codes + (additional_blocked_status_codes or [])
 
-        if status_code in blocked_status_codes:
-            self.retire()
-            return True
-
-        return False
+        return status_code in blocked_status_codes

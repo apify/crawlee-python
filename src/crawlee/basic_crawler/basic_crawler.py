@@ -70,6 +70,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         request_handler_timeout: timedelta = timedelta(minutes=1),
         session_pool: SessionPool | None = None,
         use_session_pool: bool = True,
+        retry_on_blocked: bool = True,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
     ) -> None:
         """Initialize the BasicCrawler.
@@ -87,6 +88,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             request_handler_timeout: How long is a single request handler allowed to run
             use_session_pool: Enables using the session pool for crawling
             session_pool: A preconfigured SessionPool instance if you wish to use non-default configuration
+            retry_on_blocked: If set to True, the crawler will try to automatically bypass any detected bot protection
             _context_pipeline: Allows extending the request lifecycle and modifying the crawling context.
                 This parameter is meant to be used by child classes, not when BasicCrawler is instantiated directly.
         """
@@ -131,6 +133,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         self._use_session_pool = use_session_pool
         self._session_pool: SessionPool = session_pool or SessionPool()
+
+        self._retry_on_blocked = retry_on_blocked
 
     @property
     def router(self) -> Router[TCrawlingContext]:
