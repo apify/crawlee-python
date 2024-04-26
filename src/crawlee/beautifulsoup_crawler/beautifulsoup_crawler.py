@@ -87,7 +87,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
         )
 
     async def _make_http_request(self, context: BasicCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
-        result = await self._http_client.crawl(context.request)
+        result = await self._http_client.crawl(context.request, context.session)
 
         yield HttpCrawlingContext(
             request=context.request,

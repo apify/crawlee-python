@@ -30,10 +30,10 @@ from crawlee.events.local_event_manager import LocalEventManager
 from crawlee.http_clients.httpx_client import HttpxClient
 from crawlee.request import BaseRequestData, Request, RequestState
 from crawlee.sessions import SessionPool
-from crawlee.sessions.session import Session
 
 if TYPE_CHECKING:
     from crawlee.http_clients.base_http_client import BaseHttpClient, HttpResponse
+    from crawlee.sessions.session import Session
     from crawlee.storages.request_provider import RequestProvider
 
 
@@ -261,8 +261,15 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 raise UserDefinedErrorHandlerError('Exception thrown in user-defined failed request handler') from e
 
     def _prepare_send_request_function(self, session: Session | None) -> SendRequestFunction:
-        async def send_request(url: str, *, method: str = 'get', headers: dict[str, str] | None = None) -> HttpResponse:
-            return await self._http_client.send_request(url, method=method, headers=httpx.Headers(headers))
+        async def send_request(
+            url: str,
+            *,
+            method: str = 'get',
+            headers: dict[str, str] | None = None,
+        ) -> HttpResponse:
+            return await self._http_client.send_request(
+                url, method=method, headers=httpx.Headers(headers), session=session
+            )
 
         return send_request
 

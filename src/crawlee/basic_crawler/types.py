@@ -14,7 +14,11 @@ class SendRequestFunction(Protocol):
     """Type of a function for performing an HTTP request."""
 
     def __call__(  # noqa: D102
-        self, url: str, *, method: str = 'get', headers: dict[str, str] | None = None
+        self,
+        url: str,
+        *,
+        method: str = 'get',
+        headers: dict[str, str] | None = None,
     ) -> Coroutine[None, None, HttpResponse]: ...
 
 
