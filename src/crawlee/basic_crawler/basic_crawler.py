@@ -210,9 +210,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
         This is done to filter out links that redirect outside of the crawled domain.
         """
         if crawling_context.request.loaded_url is not None and not self._check_enqueue_strategy(
-            httpx.URL(crawling_context.request.url),
-            httpx.URL(crawling_context.request.loaded_url),
             crawling_context.request.enqueue_strategy,
+            origin_url=httpx.URL(crawling_context.request.url),
+            target_url=httpx.URL(crawling_context.request.loaded_url),
         ):
             raise ContextPipelineInterruptedError(
                 f'Skipping URL {crawling_context.request.loaded_url} (redirected from {crawling_context.request.url})'
@@ -221,7 +221,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         yield crawling_context
 
     def _check_enqueue_strategy(
-        self, target_url: httpx.URL, origin_url: httpx.URL, strategy: EnqueueStrategy | None
+        self, strategy: EnqueueStrategy | None, *, target_url: httpx.URL, origin_url: httpx.URL
     ) -> bool:
         """Check if a URL matches the enqueue_strategy."""
         if strategy == EnqueueStrategy.SAME_HOSTNAME:
@@ -332,9 +332,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
                     base_url = httpx.URL(call.get('base_url', origin))
                     request_model.url = str(base_url.join(destination))
 
-                if self._check_enqueue_strategy(destination, origin, call.get('strategy')) and self._check_url_patterns(
-                    destination, call.get('include', None), call.get('exclude', None)
-                ):
+                if self._check_enqueue_strategy(
+                    call.get('strategy'), target_url=destination, origin_url=origin
+                ) and self._check_url_patterns(destination, call.get('include', None), call.get('exclude', None)):
                     requests.append(request_model)
 
             await request_provider.add_requests_batched(
