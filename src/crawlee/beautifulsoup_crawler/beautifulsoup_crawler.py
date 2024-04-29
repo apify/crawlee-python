@@ -106,17 +106,14 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
             **kwargs: Unpack[AddRequestsFunctionKwargs],
         ) -> None:
             requests = list[BaseRequestData]()
+            user_data = user_data or {}
 
             link: Tag
             for link in soup.find_all(selector):
                 link_user_data = user_data
 
-                if user_data is not None or label is not None:
-                    if link_user_data is None:
-                        link_user_data = {}
-
-                    if label is not None:
-                        link_user_data.setdefault('label', label)
+                if label is not None:
+                    link_user_data.setdefault('label', label)
 
                 if (href := link.attrs.get('href')) is not None:
                     requests.append(BaseRequestData.from_url(href, user_data=link_user_data))
