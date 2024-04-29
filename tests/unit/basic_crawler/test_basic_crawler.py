@@ -9,10 +9,10 @@ from unittest.mock import Mock
 import pytest
 from httpx import Headers, Response
 
+from crawlee import Glob
 from crawlee.basic_crawler.basic_crawler import BasicCrawler, UserDefinedErrorHandlerError
 from crawlee.basic_crawler.types import AddRequestsFunctionKwargs, BasicCrawlingContext
 from crawlee.enqueue_strategy import EnqueueStrategy
-from crawlee.globs import Glob
 from crawlee.request import BaseRequestData, Request
 from crawlee.storages import RequestList
 

@@ -11,6 +11,7 @@ import httpx
 from tldextract import TLDExtract
 from typing_extensions import TypeVar, assert_never
 
+from crawlee import Glob
 from crawlee._utils.wait import wait_for
 from crawlee.autoscaling import AutoscaledPool, ConcurrencySettings
 from crawlee.autoscaling.snapshotter import Snapshotter
@@ -31,7 +32,6 @@ from crawlee.basic_crawler.types import (
 from crawlee.configuration import Configuration
 from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.events.local_event_manager import LocalEventManager
-from crawlee.globs import Glob
 from crawlee.http_clients.httpx_client import HttpxClient
 from crawlee.request import BaseRequestData, Request, RequestState
 from crawlee.storages.request_queue import RequestQueue
