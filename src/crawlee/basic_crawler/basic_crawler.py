@@ -205,6 +205,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
     async def _check_url_after_redirects(
         self, crawling_context: TCrawlingContext
     ) -> AsyncGenerator[TCrawlingContext, None]:
+        """Invoked at the end of the context pipeline to make sure that the `loaded_url` still matches enqueue_strategy.
+
+        This is done to filter out links that redirect outside of the crawled domain.
+        """
         if crawling_context.request.loaded_url is not None and not self._check_enqueue_strategy(
             httpx.URL(crawling_context.request.url),
             httpx.URL(crawling_context.request.loaded_url),
@@ -219,6 +223,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
     def _check_enqueue_strategy(
         self, target_url: httpx.URL, origin_url: httpx.URL, strategy: EnqueueStrategy | None
     ) -> bool:
+        """Check if a URL matches the enqueue_strategy."""
         if strategy == EnqueueStrategy.SAME_HOSTNAME:
             return target_url.host == origin_url.host
 
@@ -241,6 +246,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         include: Sequence[re.Pattern | Glob] | None,
         exclude: Sequence[re.Pattern | Glob] | None,
     ) -> bool:
+        """Check if a URL matches configured include/exclude patterns."""
         # If the URL matches any `exclude` pattern, reject it
         for pattern in exclude or ():
             if isinstance(pattern, Glob):
