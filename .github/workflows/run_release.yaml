@@ -35,12 +35,12 @@ jobs:
   should_release:
     name: Check whether to release
     if: |
-      github.event_name == "workflow_dispatch" ||
-      github.event_name == "release" ||
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'release' ||
       (
-        github.event_name == "push" &&
-        !startsWith(github.event.head_commit.message, "docs") &&
-        !startsWith(github.event.head_commit.message, "chore")
+        github.event_name == 'push' &&
+        !startsWith(github.event.head_commit.message, 'docs') &&
+        !startsWith(github.event.head_commit.message, 'chore')
       )
     runs-on: ubuntu-latest
     steps:
