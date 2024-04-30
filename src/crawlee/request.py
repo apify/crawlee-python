@@ -147,9 +147,6 @@ class Request(BaseRequestData):
 
     @session_rotation_count.setter
     def session_rotation_count(self, new_session_rotation_count: int) -> None:
-        if self.user_data is None:
-            self.user_data = {}
-
         self.user_data.setdefault('__crawlee', {})
         self.user_data['__crawlee']['sessionRotationCount'] = new_session_rotation_count
 
