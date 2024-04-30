@@ -1,15 +1,12 @@
 from __future__ import annotations
 
 from collections import deque
-from typing import TYPE_CHECKING
+from datetime import timedelta
 
 from typing_extensions import override
 
 from crawlee.request import BaseRequestData, Request
 from crawlee.storages.request_provider import RequestProvider
-
-if TYPE_CHECKING:
-    from datetime import timedelta
 
 
 class RequestList(RequestProvider):
@@ -81,9 +78,9 @@ class RequestList(RequestProvider):
         self,
         requests: list[BaseRequestData | Request],
         *,
-        batch_size: int,
-        wait_for_all_requests_to_be_added: bool,
-        wait_time_between_batches: timedelta,
+        batch_size: int = 1000,
+        wait_for_all_requests_to_be_added: bool = False,
+        wait_time_between_batches: timedelta = timedelta(seconds=1),
     ) -> None:
         self._sources.extend(
             request if isinstance(request, Request) else Request.from_base_request_data(request) for request in requests

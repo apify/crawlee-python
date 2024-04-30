@@ -549,6 +549,7 @@ class RequestQueueClient(BaseResourceClient):
             retry_count=request.retry_count,
             order_no=order_no,
             json_=json_request,
+            user_data={},
         )
 
     def _calculate_order_no(self, request: Request, forefront: bool | None) -> Decimal | None:

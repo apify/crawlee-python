@@ -47,3 +47,7 @@ class ContextPipelineFinalizationError(Exception):
     def __init__(self, wrapped_exception: Exception, crawling_context: BasicCrawlingContext) -> None:
         self.wrapped_exception = wrapped_exception
         self.crawling_context = crawling_context
+
+
+class ContextPipelineInterruptedError(Exception):
+    """May be thrown in the initialization phase of a middleware to signal that the request should not be processed."""

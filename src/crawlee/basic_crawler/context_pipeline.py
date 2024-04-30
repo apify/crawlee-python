@@ -7,6 +7,7 @@ from typing_extensions import TypeVar
 from crawlee.basic_crawler.errors import (
     ContextPipelineFinalizationError,
     ContextPipelineInitializationError,
+    ContextPipelineInterruptedError,
     RequestHandlerError,
     SessionError,
 )
@@ -63,6 +64,8 @@ class ContextPipeline(Generic[TCrawlingContext]):
                         raise
                     except StopAsyncIteration as e:
                         raise RuntimeError('The middleware did not yield') from e
+                    except ContextPipelineInterruptedError:
+                        raise
                     except Exception as e:
                         raise ContextPipelineInitializationError(e, crawling_context) from e
 
@@ -81,6 +84,8 @@ class ContextPipeline(Generic[TCrawlingContext]):
                     result = await middleware_instance.__anext__()
                 except StopAsyncIteration:  # noqa: PERF203
                     pass
+                except ContextPipelineInterruptedError as e:
+                    raise RuntimeError('Invalid state - pipeline interrupted in the finalization step') from e
                 except Exception as e:
                     raise ContextPipelineFinalizationError(e, crawling_context) from e
                 else:

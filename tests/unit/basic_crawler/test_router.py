@@ -16,6 +16,7 @@ class MockContext(BasicCrawlingContext):
             request=Request.from_url(url='42', user_data={'label': label}),
             session=Session(),
             send_request=AsyncMock(),
+            add_requests=AsyncMock(),
         )
 
 

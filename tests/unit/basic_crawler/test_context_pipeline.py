@@ -33,8 +33,9 @@ async def test_calls_consumer_without_middleware() -> None:
     pipeline = ContextPipeline()
     context = BasicCrawlingContext(
         request=Request.from_url(url='aaa'),
-        session=Session(),
         send_request=AsyncMock(),
+        add_requests=AsyncMock(),
+        session=Session(),
     )
 
     await pipeline(context, consumer)
@@ -53,9 +54,10 @@ async def test_calls_consumers_and_middlewares() -> None:
         events.append('middleware_a_in')
         yield EnhancedCrawlingContext(
             request=context.request,
-            session=context.session,
             foo='foo',
             send_request=AsyncMock(),
+            add_requests=AsyncMock(),
+            session=context.session,
         )
         events.append('middleware_a_out')
 
@@ -63,10 +65,11 @@ async def test_calls_consumers_and_middlewares() -> None:
         events.append('middleware_b_in')
         yield MoreEnhancedCrawlingContext(
             request=context.request,
-            session=context.session,
             foo=context.foo,
             bar=4,
             send_request=AsyncMock(),
+            add_requests=AsyncMock(),
+            session=context.session,
         )
         events.append('middleware_b_out')
 
@@ -74,8 +77,9 @@ async def test_calls_consumers_and_middlewares() -> None:
 
     context = BasicCrawlingContext(
         request=Request.from_url(url='aaa'),
-        session=Session(),
         send_request=AsyncMock(),
+        add_requests=AsyncMock(),
+        session=Session(),
     )
     await pipeline(context, consumer)
 
@@ -94,8 +98,9 @@ async def test_wraps_consumer_errors() -> None:
     pipeline = ContextPipeline()
     context = BasicCrawlingContext(
         request=Request.from_url(url='aaa'),
-        session=Session(),
         send_request=AsyncMock(),
+        add_requests=AsyncMock(),
+        session=Session(),
     )
 
     with pytest.raises(RequestHandlerError):
@@ -117,8 +122,9 @@ async def test_handles_exceptions_in_middleware_initialization() -> None:
     pipeline = ContextPipeline().compose(step_1).compose(step_2)
     context = BasicCrawlingContext(
         request=Request.from_url(url='aaa'),
-        session=Session(),
         send_request=AsyncMock(),
+        add_requests=AsyncMock(),
+        session=Session(),
     )
 
     with pytest.raises(ContextPipelineInitializationError):
@@ -143,8 +149,9 @@ async def test_handles_exceptions_in_middleware_finalization() -> None:
     pipeline = ContextPipeline().compose(step_1).compose(step_2)
     context = BasicCrawlingContext(
         request=Request.from_url(url='aaa'),
-        session=Session(),
         send_request=AsyncMock(),
+        add_requests=AsyncMock(),
+        session=Session(),
     )
 
     with pytest.raises(ContextPipelineFinalizationError):

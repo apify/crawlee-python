@@ -23,7 +23,7 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
     def __init__(
         self,
         *,
-        request_provider: RequestProvider,
+        request_provider: RequestProvider | None = None,
         router: Callable[[HttpCrawlingContext], Awaitable[None]] | None = None,
         concurrency_settings: ConcurrencySettings | None = None,
         configuration: Configuration | None = None,
@@ -78,6 +78,7 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
             request=crawling_context.request,
             session=crawling_context.session,
             send_request=crawling_context.send_request,
+            add_requests=crawling_context.add_requests,
             http_response=result.http_response,
         )
 

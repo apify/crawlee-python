@@ -30,9 +30,26 @@ jobs:
     name: Run code checks
     uses: ./.github/workflows/run_code_checks.yaml
 
+  # This job determines if the conditions are met for a release to occur. It will proceed if triggered manually,
+  # for any published release, or if the commit on push does not begin with "docs" or "chore".
+  should_release:
+    name: Check whether to release
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'release' ||
+      (
+        github.event_name == 'push' &&
+        !startsWith(github.event.head_commit.message, 'docs') &&
+        !startsWith(github.event.head_commit.message, 'chore')
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dummy step
+        run: "true"
+
   publish_to_pypi:
     name: Publish to PyPI
-    needs: [run_code_checks]
+    needs: [run_code_checks, should_release]
     uses: ./.github/workflows/_publish_to_pypi.yaml
 
   # TODO: add job for publish package to Conda
