@@ -397,7 +397,7 @@ async def test_enqueue_strategy(test_input: AddRequestsTestInput) -> None:
 
 
 async def test_session_rotation() -> None:
-    visit = Mock()
+    track_session_usage = Mock()
     crawler = BasicCrawler(
         request_provider=RequestList([Request.from_url('https://someplace.com', label='start')]),
         max_session_rotations=7,
@@ -406,8 +406,12 @@ async def test_session_rotation() -> None:
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        visit(context.request.url)
+        track_session_usage(context.session.id if context.session else None)
         raise SessionError('Test error')
 
     await crawler.run()
-    assert visit.call_count == 7
+    assert track_session_usage.call_count == 7
+
+    session_ids = {call[0][0] for call in track_session_usage.call_args_list}
+    assert len(session_ids) == 7
+    assert None not in session_ids
