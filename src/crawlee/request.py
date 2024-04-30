@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import Self
 
 from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
+from crawlee.enqueue_strategy import EnqueueStrategy
 
 
 class BaseRequestData(BaseModel):
@@ -38,7 +39,7 @@ class BaseRequestData(BaseModel):
 
     headers: Annotated[dict[str, str] | None, Field(default_factory=dict)] = None
 
-    user_data: Annotated[dict[str, Any] | None, Field(alias='userData')] = None
+    user_data: Annotated[dict[str, Any], Field(alias='userData', default_factory=dict)]
     """Custom user data assigned to the request. Use this to save any request related data to the
     request's scope, keeping them accessible on retries, failures etc.
     """
@@ -56,12 +57,18 @@ class BaseRequestData(BaseModel):
         cls,
         url: str,
         *,
+        label: str | None = None,
         unique_key: str | None = None,
         **kwargs: Any,
     ) -> Self:
         """Create a new `RequestData` instance from a URL."""
         unique_key = unique_key or compute_unique_key(url)
-        return cls(url=url, unique_key=unique_key, **kwargs)
+        result = cls(url=url, unique_key=unique_key, **kwargs)
+
+        if label is not None:
+            result.user_data['label'] = label
+
+        return result
 
 
 class Request(BaseRequestData):
@@ -80,6 +87,7 @@ class Request(BaseRequestData):
         cls,
         url: str,
         *,
+        label: str | None = None,
         unique_key: str | None = None,
         id: str | None = None,
         **kwargs: Any,
@@ -87,7 +95,13 @@ class Request(BaseRequestData):
         """Create a new `RequestData` instance from a URL."""
         unique_key = unique_key or compute_unique_key(url)
         id = id or unique_key_to_request_id(unique_key)
-        return cls(url=url, unique_key=unique_key, id=id, **kwargs)
+
+        result = cls(url=url, unique_key=unique_key, id=id, **kwargs)
+
+        if label is not None:
+            result.user_data['label'] = label
+
+        return result
 
     @classmethod
     def from_base_request_data(cls, base_request_data: BaseRequestData, *, id: str | None = None) -> Self:
@@ -95,16 +109,16 @@ class Request(BaseRequestData):
         return cls(**base_request_data.model_dump(), id=id or unique_key_to_request_id(base_request_data.unique_key))
 
     @property
-    def crawlee_data(self) -> CrawleeRequestData:
-        """Crawlee-specific configuration stored in the user_data."""
-        return CrawleeRequestData.model_validate(self.user_data.get('__crawlee', {}) if self.user_data else {})
-
-    @property
     def label(self) -> str | None:
         """A string used to differentiate between arbitrary request types."""
-        if self.user_data and 'label' in self.user_data:
+        if 'label' in self.user_data:
             return str(self.user_data['label'])
         return None
+
+    @property
+    def crawlee_data(self) -> CrawleeRequestData:
+        """Crawlee-specific configuration stored in the user_data."""
+        return CrawleeRequestData.model_validate(self.user_data.get('__crawlee', {}))
 
     @property
     def state(self) -> RequestState | None:
@@ -113,9 +127,6 @@ class Request(BaseRequestData):
 
     @state.setter
     def state(self, new_state: RequestState) -> None:
-        if self.user_data is None:
-            self.user_data = {}
-
         self.user_data.setdefault('__crawlee', {})
         self.user_data['__crawlee']['state'] = new_state
 
@@ -126,11 +137,22 @@ class Request(BaseRequestData):
 
     @max_retries.setter
     def max_retries(self, new_max_retries: int) -> None:
-        if self.user_data is None:
-            self.user_data = {}
-
         self.user_data.setdefault('__crawlee', {})
         self.user_data['__crawlee']['maxRetries'] = new_max_retries
+
+    @property
+    def enqueue_strategy(self) -> EnqueueStrategy:
+        """The strategy used when enqueueing the request."""
+        return (
+            EnqueueStrategy(self.crawlee_data.enqueue_strategy)
+            if self.crawlee_data.enqueue_strategy
+            else EnqueueStrategy.ALL
+        )
+
+    @enqueue_strategy.setter
+    def enqueue_strategy(self, new_enqueue_strategy: EnqueueStrategy) -> None:
+        self.user_data.setdefault('__crawlee', {})
+        self.user_data['__crawlee']['enqueueStrategy'] = str(new_enqueue_strategy)
 
 
 class RequestState(Enum):
