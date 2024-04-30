@@ -19,6 +19,10 @@ class SessionError(Exception):
     """
 
 
+class ProxyError(SessionError):
+    """Raised when a proxy is being blocked or malfunctions."""
+
+
 class RequestHandlerError(Exception, Generic[TCrawlingContext]):
     """Wraps an exception thrown from a request handler (router) and extends it with crawling context."""
 

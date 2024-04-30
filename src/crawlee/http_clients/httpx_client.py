@@ -6,6 +6,8 @@ import httpx
 from typing_extensions import override
 
 from .base_http_client import BaseHttpClient, HttpCrawlingResult, HttpResponse
+from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
+from crawlee.basic_crawler.errors import ProxyError
 
 if TYPE_CHECKING:
     from crawlee.request import Request
@@ -13,7 +15,7 @@ if TYPE_CHECKING:
 
 
 class HttpTransport(httpx.AsyncHTTPTransport):
-    """A modified HTTP transport adapter that avoids storing response cookies."""
+    """A modified HTTP transport adapter that avoids storing response cookies in the CookieJar of the httpx client."""
 
     @override
     async def handle_async_request(
@@ -30,6 +32,16 @@ class HttpTransport(httpx.AsyncHTTPTransport):
             del response.headers['Set-Cookie']
 
         return response
+
+
+def _is_proxy_error(error: httpx.TransportError) -> bool:
+    if isinstance(error, httpx.ProxyError):
+        return True
+
+    if any(needle in str(error) for needle in ROTATE_PROXY_ERRORS):
+        return True
+
+    return False
 
 
 class HttpxClient(BaseHttpClient):
@@ -57,7 +69,14 @@ class HttpxClient(BaseHttpClient):
             headers=request.headers,
             cookies=session.cookies if session else None,
         )
-        response = await self._client.send(http_request, follow_redirects=True)
+
+        try:
+            response = await self._client.send(http_request, follow_redirects=True)
+        except httpx.TransportError as e:
+            if _is_proxy_error(e):
+                raise ProxyError from e
+
+            raise
 
         if self._persist_cookies_per_session and session:
             session.cookies.update(cast(httpx.Cookies, response.extensions['_cookies']))
@@ -65,7 +84,7 @@ class HttpxClient(BaseHttpClient):
         exclude_error = response.status_code in self._ignore_http_error_status_codes
         include_error = response.status_code in self._additional_http_error_status_codes
 
-        if (response.is_server_error and not exclude_error) or include_error:
+        if include_error or (response.is_server_error and not exclude_error):
             if include_error:
                 raise httpx.HTTPStatusError(
                     f'Status code {response.status_code} (user-configured to be an error) returned',
@@ -91,7 +110,14 @@ class HttpxClient(BaseHttpClient):
         session: Session | None = None,
     ) -> HttpResponse:
         http_request = self._client.build_request(url=url, method=method, headers=headers)
-        response = await self._client.send(http_request)
+
+        try:
+            response = await self._client.send(http_request)
+        except httpx.TransportError as e:
+            if _is_proxy_error(e):
+                raise ProxyError from e
+
+            raise
 
         if self._persist_cookies_per_session and session:
             session.cookies.update(cast(httpx.Cookies, response.extensions['_cookies']))
