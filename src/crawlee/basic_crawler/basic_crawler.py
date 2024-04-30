@@ -495,8 +495,19 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 if crawling_context.request.session_rotation_count is None:
                     crawling_context.request.session_rotation_count = 0
                 crawling_context.request.session_rotation_count += 1
+
+                await request_provider.reclaim_request(request)
             else:
                 logger.exception('Request failed and reached maximum retries', exc_info=session_error)
+
+                await wait_for(
+                    lambda: request_provider.mark_request_as_handled(crawling_context.request),
+                    timeout=self._internal_timeout,
+                    timeout_message='Marking request as handled timed out after '
+                    f'{self._internal_timeout.total_seconds()} seconds',
+                    logger=logger,
+                    max_retries=3,
+                )
         except ContextPipelineInterruptedError as interruped_error:
             logger.debug('The context pipeline was interrupted', exc_info=interruped_error)
 
