@@ -19,7 +19,7 @@ class AddRequestsFunctionKwargs(TypedDict):
 
     limit: NotRequired[int]
     base_url: NotRequired[str]
-    strategy: NotRequired[EnqueueStrategy | None]
+    strategy: NotRequired[EnqueueStrategy]
     include: NotRequired[list[re.Pattern | Glob]]
     exclude: NotRequired[list[re.Pattern | Glob]]
 

@@ -141,9 +141,13 @@ class Request(BaseRequestData):
         self.user_data['__crawlee']['maxRetries'] = new_max_retries
 
     @property
-    def enqueue_strategy(self) -> EnqueueStrategy | None:
+    def enqueue_strategy(self) -> EnqueueStrategy:
         """The strategy used when enqueueing the request."""
-        return EnqueueStrategy(self.crawlee_data.enqueue_strategy) if self.crawlee_data.enqueue_strategy else None
+        return (
+            EnqueueStrategy(self.crawlee_data.enqueue_strategy)
+            if self.crawlee_data.enqueue_strategy
+            else EnqueueStrategy.ALL
+        )
 
     @enqueue_strategy.setter
     def enqueue_strategy(self, new_enqueue_strategy: EnqueueStrategy) -> None:

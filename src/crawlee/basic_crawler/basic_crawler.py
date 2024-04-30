@@ -221,7 +221,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         yield crawling_context
 
     def _check_enqueue_strategy(
-        self, strategy: EnqueueStrategy | None, *, target_url: httpx.URL, origin_url: httpx.URL
+        self, strategy: EnqueueStrategy, *, target_url: httpx.URL, origin_url: httpx.URL
     ) -> bool:
         """Check if a URL matches the enqueue_strategy."""
         if strategy == EnqueueStrategy.SAME_HOSTNAME:
@@ -235,7 +235,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         if strategy == EnqueueStrategy.SAME_ORIGIN:
             return target_url.host == origin_url.host and target_url.scheme == origin_url.scheme
 
-        if strategy is None or strategy == EnqueueStrategy.ALL:
+        if strategy == EnqueueStrategy.ALL:
             return True
 
         assert_never()
@@ -333,7 +333,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
                     request_model.url = str(base_url.join(destination))
 
                 if self._check_enqueue_strategy(
-                    call.get('strategy'), target_url=destination, origin_url=origin
+                    call.get('strategy', EnqueueStrategy.ALL), target_url=destination, origin_url=origin
                 ) and self._check_url_patterns(destination, call.get('include', None), call.get('exclude', None)):
                     requests.append(request_model)
 

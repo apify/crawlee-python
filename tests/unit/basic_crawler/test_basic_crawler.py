@@ -313,7 +313,7 @@ INCLUDE_TEST_URLS = (
         AddRequestsTestInput(
             start_url=STRATEGY_TEST_URLS[0],
             requests=STRATEGY_TEST_URLS,
-            kwargs=AddRequestsFunctionKwargs(strategy=None),
+            kwargs=AddRequestsFunctionKwargs(),
             expected_urls=STRATEGY_TEST_URLS,
         ),
         AddRequestsTestInput(

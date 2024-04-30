@@ -10,6 +10,7 @@ from typing_extensions import Unpack
 from crawlee.basic_crawler.basic_crawler import BasicCrawler
 from crawlee.basic_crawler.context_pipeline import ContextPipeline
 from crawlee.beautifulsoup_crawler.types import BeautifulSoupCrawlingContext
+from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.http_clients.httpx_client import HttpxClient
 from crawlee.http_crawler.types import HttpCrawlingContext
 from crawlee.request import BaseRequestData
@@ -117,6 +118,9 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
 
                 if (href := link.attrs.get('href')) is not None:
                     requests.append(BaseRequestData.from_url(href, user_data=link_user_data))
+
+            uses_patterns = 'include' in kwargs or 'exclude' in kwargs
+            kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME if uses_patterns else EnqueueStrategy.ALL)
 
             await context.add_requests(requests, **kwargs)
 
