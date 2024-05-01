@@ -17,30 +17,30 @@ if TYPE_CHECKING:
 class BaseStorageClient(ABC):
     """Defines an abstract base for storage clients.
 
-    It offers interfaces to get clients for interacting with storage resources like datasets, key-value stores,
+    It offers interfaces to get subclients for interacting with storage resources like datasets, key-value stores,
     and request queues.
     """
 
     @abstractmethod
     def dataset(self, id: str) -> BaseDatasetClient:
-        """Gets a client for a specific dataset by its ID."""
+        """Gets a subclient for a specific dataset by its ID."""
 
     @abstractmethod
     def datasets(self) -> BaseDatasetCollectionClient:
-        """Gets a client for dataset collection operations."""
+        """Gets a subclient for dataset collection operations."""
 
     @abstractmethod
     def key_value_store(self, id: str) -> BaseKeyValueStoreClient:
-        """Gets a client for a specific key-value store by its ID."""
+        """Gets a subclient for a specific key-value store by its ID."""
 
     @abstractmethod
     def key_value_stores(self) -> BaseKeyValueStoreCollectionClient:
-        """Gets a client for key-value store collection operations."""
+        """Gets a subclient for key-value store collection operations."""
 
     @abstractmethod
     def request_queue(self, id: str) -> BaseRequestQueueClient:
-        """Gets a client for a specific request queue by its ID."""
+        """Gets a subclient for a specific request queue by its ID."""
 
     @abstractmethod
     def request_queues(self) -> BaseRequestQueueCollectionClient:
-        """Gets a client for request queue collection operations."""
+        """Gets a subclient for request queue collection operations."""

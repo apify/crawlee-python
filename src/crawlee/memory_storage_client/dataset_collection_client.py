@@ -7,11 +7,14 @@ from crawlee.memory_storage_client.base_resource_collection_client import (
     BaseResourceCollectionClient as BaseMemoryResourceCollectionClient,
 )
 from crawlee.memory_storage_client.dataset_client import DatasetClient
-from crawlee.storages.models import DatasetsListPage
+from crawlee.storages.models import DatasetListPage
 
 
-class DatasetCollectionClient(BaseMemoryResourceCollectionClient, BaseDatasetCollectionClient):
-    """Sub-client for manipulating datasets."""
+class DatasetCollectionClient(  # type: ignore
+    BaseMemoryResourceCollectionClient,
+    BaseDatasetCollectionClient,
+):
+    """Subclient for manipulating datasets."""
 
     @property
     @override
@@ -30,11 +33,11 @@ class DatasetCollectionClient(BaseMemoryResourceCollectionClient, BaseDatasetCol
         limit: int | None = None,
         offset: int | None = None,
         desc: bool | None = None,
-    ) -> DatasetsListPage:
+    ) -> DatasetListPage:
         storage_client_cache = self._get_storage_client_cache()
         items = [storage.resource_info for storage in storage_client_cache]
 
-        return DatasetsListPage(
+        return DatasetListPage(
             total=len(items),
             count=len(items),
             offset=0,

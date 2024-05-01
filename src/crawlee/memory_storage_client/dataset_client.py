@@ -28,7 +28,7 @@ logger = getLogger(__name__)
 
 
 class DatasetClient(BaseDatasetClient, BaseMemoryResourceClient):
-    """Sub-client for manipulating a single dataset."""
+    """Subclient for manipulating a single dataset."""
 
     _LIST_ITEMS_LIMIT = 999_999_999_999
     """This is what API returns in the x-apify-pagination-limit header when no limit query parameter is used."""

@@ -148,7 +148,7 @@ class BaseListPage(BaseModel):
     desc: Annotated[bool, Field(default=False)]
 
 
-class DatasetsListPage(BaseListPage):
+class DatasetListPage(BaseListPage):
     """Model for a single page of dataset items returned from a collection list method.
 
     Args:
@@ -158,7 +158,7 @@ class DatasetsListPage(BaseListPage):
     items: Annotated[list[DatasetMetadata], Field(default_factory=list)]
 
 
-class KeyValueStoresListPage(BaseListPage):
+class KeyValueStoreListPage(BaseListPage):
     """Model for a single page of key-value store items returned from a collection list method.
 
     Args:
@@ -168,7 +168,7 @@ class KeyValueStoresListPage(BaseListPage):
     items: Annotated[list[KeyValueStoreMetadata], Field(default_factory=list)]
 
 
-class RequestQueuesListPage(BaseListPage):
+class RequestQueueListPage(BaseListPage):
     """Model for a single page of request queue items returned from a collection list method.
 
     Args:

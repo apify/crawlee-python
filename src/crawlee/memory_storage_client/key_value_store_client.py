@@ -43,7 +43,7 @@ logger = getLogger(__name__)
 
 
 class KeyValueStoreClient(BaseKeyValueStoreClient, MemoryBaseResourceClient):
-    """Sub-client for manipulating a single key-value store."""
+    """Subclient for manipulating a single key-value store."""
 
     def __init__(
         self,

@@ -1,20 +1,49 @@
 from __future__ import annotations
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, AsyncIterator
 
-from .base_resource_client import BaseResourceClient
-
 if TYPE_CHECKING:
-    from crawlee.storages.models import DatasetItemsListPage
+    from crawlee.storages.models import DatasetItemsListPage, DatasetMetadata
     from crawlee.types import JSONSerializable
 
 
-class BaseDatasetClient(BaseResourceClient):
-    """Base class for dataset clients."""
+class BaseDatasetClient(ABC):
+    """Abstract base class for dataset resource clients.
+
+    These clients are specific to the type of resource they manage and operate under a designated storage
+    client, like a memory storage client.
+    """
 
     _LIST_ITEMS_LIMIT = 999_999_999_999
     """This is what API returns in the x-apify-pagination-limit header when no limit query parameter is used."""
+
+    @abstractmethod
+    async def get(self) -> DatasetMetadata | None:
+        """Get metadata about the dataset being managed by this client.
+
+        Returns:
+            An object containing the dataset's details, or None if the dataset does not exist.
+        """
+
+    @abstractmethod
+    async def update(
+        self,
+        *,
+        name: str | None = None,
+    ) -> DatasetMetadata:
+        """Update the dataset metadata.
+
+        Args:
+            name: New new name for the dataset.
+
+        Returns:
+            An object reflecting the updated dataset metadata.
+        """
+
+    @abstractmethod
+    async def delete(self) -> None:
+        """Permanently delete the dataset managed by this client."""
 
     @abstractmethod
     async def list_items(
@@ -156,7 +185,7 @@ class BaseDatasetClient(BaseResourceClient):
         skip_hidden: bool | None = None,
         xml_root: str | None = None,
         xml_row: str | None = None,
-    ) -> AsyncIterator:
+    ) -> AsyncIterator[dict]:
         """Retrieves dataset items as a streaming response.
 
         Args:
@@ -176,7 +205,7 @@ class BaseDatasetClient(BaseResourceClient):
             xml_root: Custom root element name for XML output; default is 'items'.
             xml_row: Custom element name for each item in XML; default is 'item'.
 
-        Returns:
+        Yields:
             The dataset items in a streaming response.
         """
 

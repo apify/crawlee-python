@@ -7,11 +7,14 @@ from crawlee.memory_storage_client.base_resource_collection_client import (
     BaseResourceCollectionClient as BaseMemoryResourceCollectionClient,
 )
 from crawlee.memory_storage_client.request_queue_client import RequestQueueClient
-from crawlee.storages.models import RequestQueuesListPage
+from crawlee.storages.models import RequestQueueListPage
 
 
-class RequestQueueCollectionClient(BaseMemoryResourceCollectionClient, BaseRequestQueueCollectionClient):
-    """Sub-client for manipulating request queues."""
+class RequestQueueCollectionClient(  # type: ignore
+    BaseMemoryResourceCollectionClient,
+    BaseRequestQueueCollectionClient,
+):
+    """Subclient for manipulating request queues."""
 
     @property
     @override
@@ -30,11 +33,11 @@ class RequestQueueCollectionClient(BaseMemoryResourceCollectionClient, BaseReque
         limit: int | None = None,
         offset: int | None = None,
         desc: bool | None = None,
-    ) -> RequestQueuesListPage:
+    ) -> RequestQueueListPage:
         storage_client_cache = self._get_storage_client_cache()
         items = [storage.resource_info for storage in storage_client_cache]
 
-        return RequestQueuesListPage(
+        return RequestQueueListPage(
             total=len(items),
             count=len(items),
             offset=0,

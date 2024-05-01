@@ -10,7 +10,8 @@ from typing_extensions import Self
 from crawlee.configuration import Configuration
 
 if TYPE_CHECKING:
-    from crawlee.base_storage_client import BaseResourceClient, BaseResourceCollectionClient, BaseStorageClient
+    from crawlee.base_storage_client import BaseStorageClient
+    from crawlee.base_storage_client.types import ResourceClient, ResourceCollectionClient
 
 logger = getLogger(__name__)
 
@@ -154,12 +155,12 @@ class BaseStorage(ABC):
 
     @classmethod
     @abstractmethod
-    def _get_single_storage_client(cls, id: str, client: BaseStorageClient) -> BaseResourceClient:
+    def _get_single_storage_client(cls, id: str, client: BaseStorageClient) -> ResourceClient:
         """Get the single storage client for the given ID."""
 
     @classmethod
     @abstractmethod
-    def _get_storage_collection_client(cls, client: BaseStorageClient) -> BaseResourceCollectionClient:
+    def _get_storage_collection_client(cls, client: BaseStorageClient) -> ResourceCollectionClient:
         """Get the storage collection client."""
 
     @classmethod

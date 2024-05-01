@@ -1,17 +1,46 @@
 from __future__ import annotations
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
-
-from .base_resource_client import BaseResourceClient
 
 if TYPE_CHECKING:
     from crawlee.request import Request
-    from crawlee.storages.models import RequestQueueHead, RequestQueueOperationInfo
+    from crawlee.storages.models import RequestQueueHead, RequestQueueMetadata, RequestQueueOperationInfo
 
 
-class BaseRequestQueueClient(BaseResourceClient):
-    """Base class for request queue clients."""
+class BaseRequestQueueClient(ABC):
+    """Abstract base class for request queue resource clients.
+
+    These clients are specific to the type of resource they manage and operate under a designated storage
+    client, like a memory storage client.
+    """
+
+    @abstractmethod
+    async def get(self) -> RequestQueueMetadata | None:
+        """Get metadata about the request queue being managed by this client.
+
+        Returns:
+            An object containing the request queue's details, or None if the request queue does not exist.
+        """
+
+    @abstractmethod
+    async def update(
+        self,
+        *,
+        name: str | None = None,
+    ) -> RequestQueueMetadata:
+        """Update the request queue metadata.
+
+        Args:
+            name: New new name for the request queue.
+
+        Returns:
+            An object reflecting the updated request queue metadata.
+        """
+
+    @abstractmethod
+    async def delete(self) -> None:
+        """Permanently delete the request queue managed by this client."""
 
     @abstractmethod
     async def list_head(self, *, limit: int | None = None) -> RequestQueueHead:

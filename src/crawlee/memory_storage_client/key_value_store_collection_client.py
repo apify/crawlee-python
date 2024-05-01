@@ -7,11 +7,14 @@ from crawlee.memory_storage_client.base_resource_collection_client import (
     BaseResourceCollectionClient as BaseMemoryResourceCollectionClient,
 )
 from crawlee.memory_storage_client.key_value_store_client import KeyValueStoreClient
-from crawlee.storages.models import KeyValueStoresListPage
+from crawlee.storages.models import KeyValueStoreListPage
 
 
-class KeyValueStoreCollectionClient(BaseMemoryResourceCollectionClient, BaseKeyValueStoreCollectionClient):
-    """Sub-client for manipulating key-value stores."""
+class KeyValueStoreCollectionClient(  # type: ignore
+    BaseMemoryResourceCollectionClient,
+    BaseKeyValueStoreCollectionClient,
+):
+    """Subclient for manipulating key-value stores."""
 
     @property
     @override
@@ -30,11 +33,11 @@ class KeyValueStoreCollectionClient(BaseMemoryResourceCollectionClient, BaseKeyV
         limit: int | None = None,
         offset: int | None = None,
         desc: bool | None = None,
-    ) -> KeyValueStoresListPage:
+    ) -> KeyValueStoreListPage:
         storage_client_cache = self._get_storage_client_cache()
         items = [storage.resource_info for storage in storage_client_cache]
 
-        return KeyValueStoresListPage(
+        return KeyValueStoreListPage(
             total=len(items),
             count=len(items),
             offset=0,

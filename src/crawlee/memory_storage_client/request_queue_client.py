@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 
 
 class RequestQueueClient(BaseRequestQueueClient, BaseResourceClient):
-    """Sub-client for manipulating a single request queue."""
+    """Subclient for manipulating a single request queue."""
 
     def __init__(
         self,
