@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from crawlee.autoscaling.autoscaled_pool import ConcurrencySettings
     from crawlee.basic_crawler.types import AddRequestsFunctionKwargs, BasicCrawlingContext
     from crawlee.configuration import Configuration
+    from crawlee.sessions.session_pool import SessionPool
     from crawlee.storages.request_provider import RequestProvider
 
 
@@ -40,6 +41,9 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
         request_handler_timeout: timedelta | None = None,
         additional_http_error_status_codes: Iterable[int] = (),
         ignore_http_error_status_codes: Iterable[int] = (),
+        session_pool: SessionPool | None = None,
+        use_session_pool: bool = True,
+        retry_on_blocked: bool = True,
     ) -> None:
         """Initialize the BeautifulSoupCrawler.
 
@@ -60,6 +64,12 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
 
             ignore_http_error_status_codes: HTTP status codes that are normally considered errors but we want to treat
                 them as successful
+
+            use_session_pool: Enables using the session pool for crawling
+
+            session_pool: A preconfigured SessionPool instance if you wish to use non-default configuration
+
+            retry_on_blocked: If set to True, the crawler will try to automatically bypass any detected bot protection
         """
         context_pipeline = (
             ContextPipeline()
@@ -85,6 +95,9 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
                 additional_http_error_status_codes=additional_http_error_status_codes,
                 ignore_http_error_status_codes=ignore_http_error_status_codes,
             ),
+            use_session_pool=use_session_pool,
+            session_pool=session_pool,
+            retry_on_blocked=retry_on_blocked,
             _context_pipeline=context_pipeline,
             **basic_crawler_kwargs,  # type: ignore
         )

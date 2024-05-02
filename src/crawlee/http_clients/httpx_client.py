@@ -8,10 +8,10 @@ from typing_extensions import override
 from .base_http_client import BaseHttpClient, HttpCrawlingResult, HttpResponse
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
 from crawlee.basic_crawler.errors import ProxyError
+from crawlee.sessions.session import Session
 
 if TYPE_CHECKING:
     from crawlee.request import Request
-    from crawlee.sessions.session import Session
 
 
 class HttpTransport(httpx.AsyncHTTPTransport):
@@ -25,8 +25,10 @@ class HttpTransport(httpx.AsyncHTTPTransport):
         response = await super().handle_async_request(request)
         response.request = request
 
-        response.extensions['_cookies'] = httpx.Cookies()
-        response.extensions['_cookies'].extract_cookies(response)
+        if session := cast(Session, request.extensions.get('crawlee_session')):
+            response_cookies = httpx.Cookies()
+            response_cookies.extract_cookies(response)
+            session.cookies.update(response_cookies)
 
         if 'Set-Cookie' in response.headers:
             del response.headers['Set-Cookie']
@@ -68,6 +70,7 @@ class HttpxClient(BaseHttpClient):
             url=request.url,
             headers=request.headers,
             cookies=session.cookies if session else None,
+            extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
         )
 
         try:
@@ -77,9 +80,6 @@ class HttpxClient(BaseHttpClient):
                 raise ProxyError from e
 
             raise
-
-        if self._persist_cookies_per_session and session:
-            session.cookies.update(cast(httpx.Cookies, response.extensions['_cookies']))
 
         exclude_error = response.status_code in self._ignore_http_error_status_codes
         include_error = response.status_code in self._additional_http_error_status_codes
