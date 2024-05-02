@@ -30,7 +30,6 @@ from crawlee.basic_crawler.errors import (
 from crawlee.basic_crawler.router import Router
 from crawlee.basic_crawler.types import (
     BasicCrawlingContext,
-    FinalStatistics,
     RequestHandlerRunResult,
     SendRequestFunction,
 )
@@ -40,6 +39,7 @@ from crawlee.events.local_event_manager import LocalEventManager
 from crawlee.http_clients.httpx_client import HttpxClient
 from crawlee.request import BaseRequestData, Request, RequestState
 from crawlee.sessions import SessionPool
+from crawlee.statistics.models import FinalStatistics
 from crawlee.storages.request_queue import RequestQueue
 
 if TYPE_CHECKING:
