@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing_extensions import Self
 
-    from crawlee.storage_clients import MemoryStorageClient
+    from crawlee.memory_storage_client import MemoryStorageClient
     from crawlee.storages.models import BaseStorageMetadata
 
 
@@ -32,14 +32,6 @@ class BaseResourceClient(ABC):
     @abstractmethod
     def resource_info(self) -> BaseStorageMetadata:
         """Get the resource info for the storage client."""
-
-    @abstractmethod
-    async def get(self) -> BaseStorageMetadata | None:
-        """Get the info about the storage client.
-
-        Returns:
-            The storage client info or None if it does not exist.
-        """
 
     @classmethod
     @abstractmethod

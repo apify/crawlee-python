@@ -18,10 +18,9 @@ from crawlee.storages.models import RequestQueueHeadState, RequestQueueOperation
 from crawlee.storages.request_provider import RequestProvider
 
 if TYPE_CHECKING:
+    from crawlee.base_storage_client import BaseRequestQueueClient, BaseRequestQueueCollectionClient, BaseStorageClient
     from crawlee.configuration import Configuration
     from crawlee.request import BaseRequestData
-    from crawlee.resource_clients import RequestQueueClient, RequestQueueCollectionClient
-    from crawlee.storage_clients import MemoryStorageClient
     from crawlee.storages.models import BaseStorageMetadata
 
 logger = getLogger(__name__)
@@ -76,7 +75,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         id: str,
         name: str | None,
         configuration: Configuration,
-        client: MemoryStorageClient,
+        client: BaseStorageClient,
     ) -> None:
         super().__init__(id=id, name=name, client=client, configuration=configuration)
 
@@ -120,16 +119,16 @@ class RequestQueue(BaseStorage, RequestProvider):
     def _get_single_storage_client(
         cls,
         id: str,
-        client: MemoryStorageClient,
-    ) -> RequestQueueClient:
+        client: BaseStorageClient,
+    ) -> BaseRequestQueueClient:
         return client.request_queue(id)
 
     @classmethod
     @override
     def _get_storage_collection_client(
         cls,
-        client: MemoryStorageClient,
-    ) -> RequestQueueCollectionClient:
+        client: BaseStorageClient,
+    ) -> BaseRequestQueueCollectionClient:
         return client.request_queues()
 
     async def add_request(

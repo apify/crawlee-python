@@ -12,13 +12,14 @@ from typing_extensions import override
 
 from crawlee._utils.data_processing import maybe_parse_bool
 from crawlee._utils.env_vars import CrawleeEnvVars
-from crawlee.resource_clients.dataset_client import DatasetClient
-from crawlee.resource_clients.dataset_collection_client import DatasetCollectionClient
-from crawlee.resource_clients.key_value_store_client import KeyValueStoreClient
-from crawlee.resource_clients.key_value_store_collection_client import KeyValueStoreCollectionClient
-from crawlee.resource_clients.request_queue_client import RequestQueueClient
-from crawlee.resource_clients.request_queue_collection_client import RequestQueueCollectionClient
-from crawlee.storage_clients.base_storage_client import BaseStorageClient
+from crawlee.base_storage_client import BaseStorageClient
+
+from .dataset_client import DatasetClient
+from .dataset_collection_client import DatasetCollectionClient
+from .key_value_store_client import KeyValueStoreClient
+from .key_value_store_collection_client import KeyValueStoreCollectionClient
+from .request_queue_client import RequestQueueClient
+from .request_queue_collection_client import RequestQueueCollectionClient
 
 
 class MemoryStorageClient(BaseStorageClient):

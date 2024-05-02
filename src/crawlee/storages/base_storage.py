@@ -3,27 +3,20 @@ from __future__ import annotations
 import asyncio
 from abc import ABC, abstractmethod
 from logging import getLogger
-from typing import TYPE_CHECKING, Generic, TypeVar, cast
+from typing import TYPE_CHECKING, cast
 
 from typing_extensions import Self
 
 from crawlee.configuration import Configuration
 
 if TYPE_CHECKING:
-    from crawlee.resource_clients.base_resource_client import BaseResourceClient
-    from crawlee.resource_clients.base_resource_collection_client import BaseResourceCollectionClient
-    from crawlee.storage_clients import MemoryStorageClient
-
-    BaseResourceClientType = TypeVar('BaseResourceClientType', bound=BaseResourceClient)
-    BaseResourceCollectionClientType = TypeVar('BaseResourceCollectionClientType', bound=BaseResourceCollectionClient)
-else:
-    BaseResourceClientType = TypeVar('BaseResourceClientType')
-    BaseResourceCollectionClientType = TypeVar('BaseResourceCollectionClientType')
+    from crawlee.base_storage_client import BaseStorageClient
+    from crawlee.base_storage_client.types import ResourceClient, ResourceCollectionClient
 
 logger = getLogger(__name__)
 
 
-class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionClientType]):
+class BaseStorage(ABC):
     """A class for managing storages."""
 
     _purge_on_start: bool
@@ -36,7 +29,7 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
         id: str,
         name: str | None,
         configuration: Configuration,
-        client: MemoryStorageClient,
+        client: BaseStorageClient,
     ) -> None:
         """Create a new instance.
 
@@ -79,8 +72,8 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
         Returns:
             The opened or retrieved storage instance.
         """
+        from crawlee.memory_storage_client import MemoryStorageClient
         from crawlee.storage_client_manager import StorageClientManager
-        from crawlee.storage_clients import MemoryStorageClient
 
         cls._ensure_class_initialized()
 
@@ -162,12 +155,12 @@ class BaseStorage(ABC, Generic[BaseResourceClientType, BaseResourceCollectionCli
 
     @classmethod
     @abstractmethod
-    def _get_single_storage_client(cls, id: str, client: MemoryStorageClient) -> BaseResourceClientType:
+    def _get_single_storage_client(cls, id: str, client: BaseStorageClient) -> ResourceClient:
         """Get the single storage client for the given ID."""
 
     @classmethod
     @abstractmethod
-    def _get_storage_collection_client(cls, client: MemoryStorageClient) -> BaseResourceCollectionClientType:
+    def _get_storage_collection_client(cls, client: BaseStorageClient) -> ResourceCollectionClient:
         """Get the storage collection client."""
 
     @classmethod

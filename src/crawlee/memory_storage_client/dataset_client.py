@@ -15,19 +15,20 @@ from typing_extensions import override
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import raise_on_duplicate_storage, raise_on_non_existing_storage
 from crawlee._utils.file import force_rename, json_dumps, persist_metadata_if_enabled
-from crawlee.resource_clients.base_resource_client import BaseResourceClient
+from crawlee.base_storage_client import BaseDatasetClient
+from crawlee.memory_storage_client.base_resource_client import BaseResourceClient as BaseMemoryResourceClient
 from crawlee.storages.models import DatasetItemsListPage, DatasetMetadata
 from crawlee.types import StorageTypes
 
 if TYPE_CHECKING:
-    from crawlee.storage_clients import MemoryStorageClient
+    from crawlee.memory_storage_client import MemoryStorageClient
     from crawlee.types import JSONSerializable
 
 logger = getLogger(__name__)
 
 
-class DatasetClient(BaseResourceClient):
-    """Sub-client for manipulating a single dataset."""
+class DatasetClient(BaseDatasetClient, BaseMemoryResourceClient):
+    """Subclient for manipulating a single dataset."""
 
     _LIST_ITEMS_LIMIT = 999_999_999_999
     """This is what API returns in the x-apify-pagination-limit header when no limit query parameter is used."""
@@ -164,15 +165,8 @@ class DatasetClient(BaseResourceClient):
 
         return None
 
+    @override
     async def update(self, *, name: str | None = None) -> DatasetMetadata:
-        """Update the dataset with specified fields.
-
-        Args:
-            name: The new name for the dataset
-
-        Returns:
-            The updated dataset
-        """
         # Check by id
         existing_dataset_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
@@ -216,8 +210,8 @@ class DatasetClient(BaseResourceClient):
 
         return existing_dataset_by_id.resource_info
 
+    @override
     async def delete(self) -> None:
-        """Delete the dataset."""
         dataset = next(
             (dataset for dataset in self._memory_storage_client.datasets_handled if dataset.id == self.id), None
         )
@@ -231,55 +225,22 @@ class DatasetClient(BaseResourceClient):
                 if os.path.exists(dataset.resource_directory):
                     await aioshutil.rmtree(dataset.resource_directory)
 
+    @override
     async def list_items(
         self,
         *,
         offset: int | None = 0,
         limit: int | None = _LIST_ITEMS_LIMIT,
-        clean: bool = False,  # noqa: ARG002
+        clean: bool = False,
         desc: bool = False,
-        fields: list[str] | None = None,  # noqa: ARG002
-        omit: list[str] | None = None,  # noqa: ARG002
-        unwind: str | None = None,  # noqa: ARG002
-        skip_empty: bool = False,  # noqa: ARG002
-        skip_hidden: bool = False,  # noqa: ARG002
-        flatten: list[str] | None = None,  # noqa: ARG002
-        view: str | None = None,  # noqa: ARG002
+        fields: list[str] | None = None,
+        omit: list[str] | None = None,
+        unwind: str | None = None,
+        skip_empty: bool = False,
+        skip_hidden: bool = False,
+        flatten: list[str] | None = None,
+        view: str | None = None,
     ) -> DatasetItemsListPage:
-        """Retrieves a paginated list of items from a dataset based on various filtering parameters.
-
-        This method provides the flexibility to filter, sort, and modify the appearance of dataset items when listed.
-        Each parameter modifies the result set according to its purpose. The method also supports pagination
-        through 'offset' and 'limit' parameters.
-
-        Args:
-            offset: The number of initial items to skip.
-
-            limit: The maximum number of items to return.
-
-            clean: If True, filters out empty items and hidden fields. This is equivalent to setting 'skip_hidden'
-                and 'skip_empty' to True.
-
-            desc: If True, items are returned in descending order, i.e., newest first.
-
-            fields: Specifies a subset of fields to include in each item.
-
-            omit: Specifies a subset of fields to exclude from each item.
-
-            unwind: Specifies a field that should be unwound. If it's an array, each element becomes a separate record.
-
-            skip_empty: If True, omits items that are empty after other filters have been applied.
-
-            skip_hidden: If True, omits fields starting with the '#' character.
-
-            flatten: A list of fields to flatten in each item.
-
-            view: The specific view of the dataset to use when retrieving items.
-
-        Returns:
-            An object containing the list of filtered, sorted, and paginated dataset items,
-                as well as additional pagination details.
-        """
         # Check by id
         existing_dataset_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
@@ -318,57 +279,27 @@ class DatasetClient(BaseResourceClient):
                 total=existing_dataset_by_id.item_count,
             )
 
-    async def iterate_items(
+    @override
+    async def iterate_items(  # type: ignore
         self,
         *,
         offset: int = 0,
         limit: int | None = None,
-        clean: bool = False,  # noqa: ARG002
+        clean: bool = False,
         desc: bool = False,
-        fields: list[str] | None = None,  # noqa: ARG002
-        omit: list[str] | None = None,  # noqa: ARG002
-        unwind: str | None = None,  # noqa: ARG002
-        skip_empty: bool = False,  # noqa: ARG002
-        skip_hidden: bool = False,  # noqa: ARG002
+        fields: list[str] | None = None,
+        omit: list[str] | None = None,
+        unwind: str | None = None,
+        skip_empty: bool = False,
+        skip_hidden: bool = False,
     ) -> AsyncIterator[dict]:
-        """Iterates over items in the dataset according to specified filters and sorting.
-
-        This method allows for asynchronously iterating through dataset items while applying various filters such as
-        skipping empty items, hiding specific fields, and sorting. It supports pagination via `offset` and `limit`
-        parameters, and can modify the appearance of dataset items using `fields`, `omit`, `unwind`, `skip_empty`, and
-        `skip_hidden` parameters.
-
-        Args:
-            offset: The number of initial items to skip.
-
-            limit: The maximum number of items to iterate over. Defaults to no limit.
-
-            clean: If set to True, filters out empty items and hidden fields. Acts as a shortcut for setting
-                `skip_hidden` and `skip_empty` to True.
-
-            desc: If set to True, items are returned in descending order, i.e., newest first.
-
-            fields: Specifies a subset of fields to include in each item.
-
-            omit: Specifies a subset of fields to exclude from each item.
-
-            unwind: Specifies a field that should be unwound into separate items.
-
-            skip_empty: If set to True, omits items that are empty after other filters have been applied.
-
-            skip_hidden: If set to True, omits fields starting with the '#' character from the output.
-
-        Yields:
-            An asynchronous iterator of dictionary objects, each representing a dataset item after applying
-            the specified filters and transformations.
-        """
         cache_size = 1000
         first_item = offset
 
         # If there is no limit, set last_item to None until we get the total from the first API response
         last_item = None if limit is None else offset + limit
-
         current_offset = first_item
+
         while last_item is None or current_offset < last_item:
             current_limit = cache_size if last_item is None else min(cache_size, last_item - current_offset)
 
@@ -385,21 +316,56 @@ class DatasetClient(BaseResourceClient):
             for item in current_items_page.items:
                 yield item
 
-    async def get_items_as_bytes(self, *_args: Any, **_kwargs: Any) -> bytes:
-        """Retrieve the items as bytes."""
-        raise NotImplementedError('This method is not supported in local memory storage.')
+    @override
+    async def get_items_as_bytes(
+        self,
+        *,
+        item_format: str = 'json',
+        offset: int | None = None,
+        limit: int | None = None,
+        desc: bool | None = None,
+        clean: bool | None = None,
+        bom: bool | None = None,
+        delimiter: str | None = None,
+        fields: list[str] | None = None,
+        omit: list[str] | None = None,
+        unwind: str | None = None,
+        skip_empty: bool | None = None,
+        skip_header_row: bool | None = None,
+        skip_hidden: bool | None = None,
+        xml_root: str | None = None,
+        xml_row: str | None = None,
+        flatten: list[str] | None = None,
+    ) -> bytes:
+        raise NotImplementedError('This method is not supported in memory storage.')
 
-    async def stream_items(self, *_args: Any, **_kwargs: Any) -> AsyncIterator:
-        """Stream items from the dataset."""
-        raise NotImplementedError('This method is not supported in local memory storage.')
+    @override
+    async def stream_items(
+        self,
+        *,
+        item_format: str = 'json',
+        offset: int | None = None,
+        limit: int | None = None,
+        desc: bool | None = None,
+        clean: bool | None = None,
+        bom: bool | None = None,
+        delimiter: str | None = None,
+        fields: list[str] | None = None,
+        omit: list[str] | None = None,
+        unwind: str | None = None,
+        skip_empty: bool | None = None,
+        skip_header_row: bool | None = None,
+        skip_hidden: bool | None = None,
+        xml_root: str | None = None,
+        xml_row: str | None = None,
+    ) -> AsyncIterator:
+        raise NotImplementedError('This method is not supported in memory storage.')
 
-    async def push_items(self, items: JSONSerializable) -> None:
-        """Push items to the dataset.
-
-        Args:
-            items: The items which to push in the dataset. Either a stringified JSON, a dictionary,
-                or a list of strings or dictionaries.
-        """
+    @override
+    async def push_items(
+        self,
+        items: JSONSerializable,
+    ) -> None:
         # Check by id
         existing_dataset_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
