@@ -19,10 +19,13 @@ from crawlee._utils.data_processing import (
     raise_on_duplicate_storage,
     raise_on_non_existing_storage,
 )
-from crawlee._utils.file import force_remove, force_rename, json_dumps, persist_metadata_if_enabled
+from crawlee._utils.file import force_remove, force_rename, json_dumps
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee.base_storage_client import BaseRequestQueueClient
-from crawlee.memory_storage_client.base_resource_client import BaseResourceClient
+from crawlee.memory_storage_client._creation_management import (
+    find_or_create_client_by_id_or_name_inner,
+    persist_metadata_if_enabled,
+)
 from crawlee.request import Request
 from crawlee.storages.models import RequestQueueHead, RequestQueueMetadata, RequestQueueOperationInfo
 from crawlee.types import StorageTypes
@@ -31,7 +34,7 @@ if TYPE_CHECKING:
     from crawlee.memory_storage_client import MemoryStorageClient
 
 
-class RequestQueueClient(BaseRequestQueueClient, BaseResourceClient):
+class RequestQueueClient(BaseRequestQueueClient):
     """Subclient for manipulating a single request queue."""
 
     def __init__(
@@ -63,7 +66,6 @@ class RequestQueueClient(BaseRequestQueueClient, BaseResourceClient):
         self._last_used_timestamp = Decimal(0.0)
 
     @property
-    @override
     def resource_info(self) -> RequestQueueMetadata:
         """Get the resource info for the request queue client."""
         return RequestQueueMetadata(
@@ -82,17 +84,43 @@ class RequestQueueClient(BaseRequestQueueClient, BaseResourceClient):
         )
 
     @classmethod
-    @override
+    def find_or_create_client_by_id_or_name(
+        cls,
+        memory_storage_client: MemoryStorageClient,
+        id: str | None = None,
+        name: str | None = None,
+    ) -> RequestQueueClient | None:
+        """Restore existing or create a new key-value store client based on the given ID or name.
+
+        Args:
+            memory_storage_client: The memory storage client used to store and retrieve key-value store client.
+            id: The unique identifier for the key-value store client.
+            name: The name of the key-value store client.
+
+        Returns:
+            The found or created key-value store client, or None if no client could be found or created.
+        """
+        storage_client_cache = cls._get_storage_client_cache(memory_storage_client)
+        storages_dir = cls._get_storages_dir(memory_storage_client)
+
+        return find_or_create_client_by_id_or_name_inner(
+            storage_client_cache=storage_client_cache,
+            storages_dir=storages_dir,
+            memory_storage_client=memory_storage_client,
+            create_from_directory=cls._create_from_directory,
+            id=id,
+            name=name,
+        )
+
+    @classmethod
     def _get_storages_dir(cls, memory_storage_client: MemoryStorageClient) -> str:
         return memory_storage_client.request_queues_directory
 
     @classmethod
-    @override
     def _get_storage_client_cache(cls, memory_storage_client: MemoryStorageClient) -> list[RequestQueueClient]:
         return memory_storage_client.request_queues_handled
 
     @classmethod
-    @override
     def _create_from_directory(
         cls,
         storage_directory: str,
@@ -282,7 +310,7 @@ class RequestQueueClient(BaseRequestQueueClient, BaseResourceClient):
         self,
         request: Request,
         *,
-        forefront: bool | None = None,
+        forefront: bool = False,
     ) -> RequestQueueOperationInfo:
         existing_queue_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
@@ -352,7 +380,7 @@ class RequestQueueClient(BaseRequestQueueClient, BaseResourceClient):
         self,
         request: Request,
         *,
-        forefront: bool | None = None,
+        forefront: bool = False,
     ) -> RequestQueueOperationInfo:
         existing_queue_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,

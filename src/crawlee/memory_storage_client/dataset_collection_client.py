@@ -1,41 +1,61 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from typing_extensions import override
 
 from crawlee.base_storage_client import BaseDatasetCollectionClient
-from crawlee.memory_storage_client.base_resource_collection_client import (
-    BaseResourceCollectionClient as BaseMemoryResourceCollectionClient,
-)
+from crawlee.memory_storage_client._creation_management import get_or_create_inner
 from crawlee.memory_storage_client.dataset_client import DatasetClient
-from crawlee.storages.models import DatasetListPage
+from crawlee.storages.models import DatasetListPage, DatasetMetadata
+
+if TYPE_CHECKING:
+    from crawlee.memory_storage_client.memory_storage_client import MemoryStorageClient
 
 
-class DatasetCollectionClient(  # type: ignore
-    BaseMemoryResourceCollectionClient,
-    BaseDatasetCollectionClient,
-):
+class DatasetCollectionClient(BaseDatasetCollectionClient):
     """Subclient for manipulating datasets."""
 
+    def __init__(
+        self,
+        *,
+        base_storage_directory: str,
+        memory_storage_client: MemoryStorageClient,
+    ) -> None:
+        self._base_storage_directory = base_storage_directory
+        self._memory_storage_client = memory_storage_client
+
     @property
-    @override
-    def _client_class(self) -> type[DatasetClient]:
-        return DatasetClient
+    def _storage_client_cache(self) -> list[DatasetClient]:
+        return self._memory_storage_client.datasets_handled
 
     @override
-    def _get_storage_client_cache(self) -> list[DatasetClient]:
-        return self._memory_storage_client.datasets_handled
+    async def get_or_create(
+        self,
+        *,
+        name: str | None = None,
+        schema: dict | None = None,
+        id: str | None = None,
+    ) -> DatasetMetadata:
+        return await get_or_create_inner(
+            memory_storage_client=self._memory_storage_client,
+            base_storage_directory=self._base_storage_directory,
+            storage_client_cache=self._storage_client_cache,
+            resource_client_class=DatasetClient,
+            name=name,
+            id=id,
+        )
 
     @override
     async def list(
         self,
         *,
-        unnamed: bool | None = None,
+        unnamed: bool = False,
         limit: int | None = None,
         offset: int | None = None,
-        desc: bool | None = None,
+        desc: bool = False,
     ) -> DatasetListPage:
-        storage_client_cache = self._get_storage_client_cache()
-        items = [storage.resource_info for storage in storage_client_cache]
+        items = [storage.resource_info for storage in self._storage_client_cache]
 
         return DatasetListPage(
             total=len(items),

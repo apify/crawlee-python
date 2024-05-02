@@ -40,10 +40,10 @@ class BaseRequestQueueCollectionClient(ABC):
     async def list(
         self,
         *,
-        unnamed: bool | None = None,
+        unnamed: bool = False,
         limit: int | None = None,
         offset: int | None = None,
-        desc: bool | None = None,
+        desc: bool = False,
     ) -> RequestQueueListPage:
         """List the available request queues.
 

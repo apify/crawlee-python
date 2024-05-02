@@ -14,9 +14,12 @@ from typing_extensions import override
 
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import raise_on_duplicate_storage, raise_on_non_existing_storage
-from crawlee._utils.file import force_rename, json_dumps, persist_metadata_if_enabled
+from crawlee._utils.file import force_rename, json_dumps
 from crawlee.base_storage_client import BaseDatasetClient
-from crawlee.memory_storage_client.base_resource_client import BaseResourceClient as BaseMemoryResourceClient
+from crawlee.memory_storage_client._creation_management import (
+    find_or_create_client_by_id_or_name_inner,
+    persist_metadata_if_enabled,
+)
 from crawlee.storages.models import DatasetItemsListPage, DatasetMetadata
 from crawlee.types import StorageTypes
 
@@ -27,7 +30,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-class DatasetClient(BaseDatasetClient, BaseMemoryResourceClient):
+class DatasetClient(BaseDatasetClient):
     """Subclient for manipulating a single dataset."""
 
     _LIST_ITEMS_LIMIT = 999_999_999_999
@@ -62,7 +65,6 @@ class DatasetClient(BaseDatasetClient, BaseMemoryResourceClient):
         self.item_count = item_count
 
     @property
-    @override
     def resource_info(self) -> DatasetMetadata:
         """Get the resource info for the dataset client."""
         return DatasetMetadata(
@@ -75,12 +77,39 @@ class DatasetClient(BaseDatasetClient, BaseMemoryResourceClient):
         )
 
     @classmethod
-    @override
+    def find_or_create_client_by_id_or_name(
+        cls,
+        memory_storage_client: MemoryStorageClient,
+        id: str | None = None,
+        name: str | None = None,
+    ) -> DatasetClient | None:
+        """Restore existing or create a new dataset client based on the given ID or name.
+
+        Args:
+            memory_storage_client: The memory storage client used to store and retrieve dataset client.
+            id: The unique identifier for the dataset client.
+            name: The name of the dataset client.
+
+        Returns:
+            The found or created dataset client, or None if no client could be found or created.
+        """
+        storage_client_cache = cls._get_storage_client_cache(memory_storage_client)
+        storages_dir = cls._get_storages_dir(memory_storage_client)
+
+        return find_or_create_client_by_id_or_name_inner(
+            storage_client_cache=storage_client_cache,
+            storages_dir=storages_dir,
+            memory_storage_client=memory_storage_client,
+            create_from_directory=cls._create_from_directory,
+            id=id,
+            name=name,
+        )
+
+    @classmethod
     def _get_storages_dir(cls, memory_storage_client: MemoryStorageClient) -> str:
         return memory_storage_client.datasets_directory
 
     @classmethod
-    @override
     def _get_storage_client_cache(
         cls,
         memory_storage_client: MemoryStorageClient,
@@ -88,7 +117,6 @@ class DatasetClient(BaseDatasetClient, BaseMemoryResourceClient):
         return memory_storage_client.datasets_handled
 
     @classmethod
-    @override
     def _create_from_directory(
         cls,
         storage_directory: str,
@@ -323,16 +351,16 @@ class DatasetClient(BaseDatasetClient, BaseMemoryResourceClient):
         item_format: str = 'json',
         offset: int | None = None,
         limit: int | None = None,
-        desc: bool | None = None,
-        clean: bool | None = None,
-        bom: bool | None = None,
+        desc: bool = False,
+        clean: bool = False,
+        bom: bool = False,
         delimiter: str | None = None,
         fields: list[str] | None = None,
         omit: list[str] | None = None,
         unwind: str | None = None,
-        skip_empty: bool | None = None,
-        skip_header_row: bool | None = None,
-        skip_hidden: bool | None = None,
+        skip_empty: bool = False,
+        skip_header_row: bool = False,
+        skip_hidden: bool = False,
         xml_root: str | None = None,
         xml_row: str | None = None,
         flatten: list[str] | None = None,
@@ -346,16 +374,16 @@ class DatasetClient(BaseDatasetClient, BaseMemoryResourceClient):
         item_format: str = 'json',
         offset: int | None = None,
         limit: int | None = None,
-        desc: bool | None = None,
-        clean: bool | None = None,
-        bom: bool | None = None,
+        desc: bool = False,
+        clean: bool = False,
+        bom: bool = False,
         delimiter: str | None = None,
         fields: list[str] | None = None,
         omit: list[str] | None = None,
         unwind: str | None = None,
-        skip_empty: bool | None = None,
-        skip_header_row: bool | None = None,
-        skip_hidden: bool | None = None,
+        skip_empty: bool = False,
+        skip_header_row: bool = False,
+        skip_hidden: bool = False,
         xml_root: str | None = None,
         xml_row: str | None = None,
     ) -> AsyncIterator:

@@ -17,16 +17,12 @@ from typing_extensions import override
 
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import maybe_parse_body, raise_on_duplicate_storage, raise_on_non_existing_storage
-from crawlee._utils.file import (
-    determine_file_extension,
-    force_remove,
-    force_rename,
-    is_file_or_bytes,
-    json_dumps,
+from crawlee._utils.file import determine_file_extension, force_remove, force_rename, is_file_or_bytes, json_dumps
+from crawlee.base_storage_client import BaseKeyValueStoreClient
+from crawlee.memory_storage_client._creation_management import (
+    find_or_create_client_by_id_or_name_inner,
     persist_metadata_if_enabled,
 )
-from crawlee.base_storage_client import BaseKeyValueStoreClient
-from crawlee.memory_storage_client.base_resource_client import BaseResourceClient as MemoryBaseResourceClient
 from crawlee.storages.models import (
     KeyValueStoreKeyInfo,
     KeyValueStoreListKeysPage,
@@ -42,7 +38,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-class KeyValueStoreClient(BaseKeyValueStoreClient, MemoryBaseResourceClient):
+class KeyValueStoreClient(BaseKeyValueStoreClient):
     """Subclient for manipulating a single key-value store."""
 
     def __init__(
@@ -70,7 +66,6 @@ class KeyValueStoreClient(BaseKeyValueStoreClient, MemoryBaseResourceClient):
         self.file_operation_lock = asyncio.Lock()
 
     @property
-    @override
     def resource_info(self) -> KeyValueStoreMetadata:
         """Get the resource info for the key-value store client."""
         return KeyValueStoreMetadata(
@@ -83,17 +78,43 @@ class KeyValueStoreClient(BaseKeyValueStoreClient, MemoryBaseResourceClient):
         )
 
     @classmethod
-    @override
+    def find_or_create_client_by_id_or_name(
+        cls,
+        memory_storage_client: MemoryStorageClient,
+        id: str | None = None,
+        name: str | None = None,
+    ) -> KeyValueStoreClient | None:
+        """Restore existing or create a new key-value store client based on the given ID or name.
+
+        Args:
+            memory_storage_client: The memory storage client used to store and retrieve key-value store client.
+            id: The unique identifier for the key-value store client.
+            name: The name of the key-value store client.
+
+        Returns:
+            The found or created key-value store client, or None if no client could be found or created.
+        """
+        storage_client_cache = cls._get_storage_client_cache(memory_storage_client)
+        storages_dir = cls._get_storages_dir(memory_storage_client)
+
+        return find_or_create_client_by_id_or_name_inner(
+            storage_client_cache=storage_client_cache,
+            storages_dir=storages_dir,
+            memory_storage_client=memory_storage_client,
+            create_from_directory=cls._create_from_directory,
+            id=id,
+            name=name,
+        )
+
+    @classmethod
     def _get_storages_dir(cls, memory_storage_client: MemoryStorageClient) -> str:
         return memory_storage_client.key_value_stores_directory
 
     @classmethod
-    @override
     def _get_storage_client_cache(cls, memory_storage_client: MemoryStorageClient) -> list[KeyValueStoreClient]:
         return memory_storage_client.key_value_stores_handled
 
     @classmethod
-    @override
     def _create_from_directory(
         cls,
         storage_directory: str,

@@ -40,10 +40,10 @@ class BaseKeyValueStoreCollectionClient(ABC):
     async def list(
         self,
         *,
-        unnamed: bool | None = None,
+        unnamed: bool = False,
         limit: int | None = None,
         offset: int | None = None,
-        desc: bool | None = None,
+        desc: bool = False,
     ) -> KeyValueStoreListPage:
         """List the available key-value stores.
 
