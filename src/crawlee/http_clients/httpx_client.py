@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 
 class HttpTransport(httpx.AsyncHTTPTransport):
-    """A modified HTTP transport adapter that avoids storing response cookies in the CookieJar of the httpx client."""
+    """A modified HTTP transport adapter that stores response cookies in a `Session` instead of the httpx client."""
 
     @override
     async def handle_async_request(
@@ -109,7 +109,12 @@ class HttpxClient(BaseHttpClient):
         headers: httpx.Headers | dict[str, str],
         session: Session | None = None,
     ) -> HttpResponse:
-        http_request = self._client.build_request(url=url, method=method, headers=headers)
+        http_request = self._client.build_request(
+            url=url,
+            method=method,
+            headers=headers,
+            extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
+        )
 
         try:
             response = await self._client.send(http_request)
@@ -118,8 +123,5 @@ class HttpxClient(BaseHttpClient):
                 raise ProxyError from e
 
             raise
-
-        if self._persist_cookies_per_session and session:
-            session.cookies.update(cast(httpx.Cookies, response.extensions['_cookies']))
 
         return response
