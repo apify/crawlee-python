@@ -22,7 +22,7 @@ async def mock_request_handler() -> Callable[[HttpCrawlingContext], Awaitable[No
 
 @pytest.fixture()
 async def crawler(mock_request_handler: Callable[[HttpCrawlingContext], Awaitable[None]]) -> HttpCrawler:
-    return HttpCrawler(router=mock_request_handler, request_provider=RequestList())
+    return HttpCrawler(request_handler=mock_request_handler, request_provider=RequestList())
 
 
 @pytest.fixture()

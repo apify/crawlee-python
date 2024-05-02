@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, AsyncGenerator, Awaitable, Callable, Generic, 
 
 import httpx
 from tldextract import TLDExtract
-from typing_extensions import TypeVar, assert_never
+from typing_extensions import NotRequired, TypedDict, TypeVar, assert_never
 
 from crawlee import Glob
 from crawlee._utils.wait import wait_for
@@ -56,6 +56,23 @@ FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
 logger = getLogger(__name__)
 
 
+class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
+    """Copy of the parameter types of `BasicCrawler.__init__` meant for typing forwarded __init__ args in subclasses."""
+
+    request_provider: NotRequired[RequestProvider]
+    request_handler: NotRequired[Callable[[TCrawlingContext], Awaitable[None]]]
+    http_client: NotRequired[BaseHttpClient]
+    concurrency_settings: NotRequired[ConcurrencySettings]
+    max_request_retries: NotRequired[int]
+    max_session_rotations: NotRequired[int]
+    configuration: NotRequired[Configuration]
+    request_handler_timeout: NotRequired[timedelta]
+    session_pool: NotRequired[SessionPool]
+    use_session_pool: NotRequired[bool]
+    retry_on_blocked: NotRequired[bool]
+    _context_pipeline: NotRequired[ContextPipeline[TCrawlingContext]]
+
+
 class BasicCrawler(Generic[TCrawlingContext]):
     """Provides a simple framework for parallel crawling of web pages.
 
@@ -71,7 +88,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self,
         *,
         request_provider: RequestProvider | None = None,
-        router: Callable[[TCrawlingContext], Awaitable[None]] | None = None,
+        request_handler: Callable[[TCrawlingContext], Awaitable[None]] | None = None,
         http_client: BaseHttpClient | None = None,
         concurrency_settings: ConcurrencySettings | None = None,
         max_request_retries: int = 3,
@@ -87,7 +104,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         Args:
             request_provider: Provides requests to be processed
-            router: A callable to which request handling is delegated
+            request_handler: A callable to which request handling is delegated
             http_client: HTTP client to be used for `BasicCrawlingContext.send_request` and HTTP-only crawling.
             concurrency_settings: Allows fine-tuning concurrency levels
             max_request_retries: Maximum amount of attempts at processing a request
@@ -104,11 +121,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
         """
         self._router: Router[TCrawlingContext] | None = None
 
-        if isinstance(cast(Router, router), Router):
-            self._router = cast(Router[TCrawlingContext], router)
-        elif router is not None:
+        if isinstance(cast(Router, request_handler), Router):
+            self._router = cast(Router[TCrawlingContext], request_handler)
+        elif request_handler is not None:
             self._router = None
-            self.router.default_handler(router)
+            self.router.default_handler(request_handler)
 
         self._http_client = http_client or HttpxClient()
 
