@@ -89,17 +89,15 @@ def test_retire_method(session: Session) -> None:
 def test_retire_on_blocked_status_code(session: Session) -> None:
     """Test retiring the session based on specific HTTP status codes."""
     status_code = 403
-    result = session.retire_on_blocked_status_codes(status_code=status_code)
+    result = session.is_blocked_status_code(status_code=status_code)
     assert result is True
-    assert not session.is_usable
 
 
 def test_not_retire_on_not_block_status_code(session: Session) -> None:
     """Test that the session is not retired on a non-blocked status code."""
     status_code = 200
-    result = session.retire_on_blocked_status_codes(status_code=status_code)
+    result = session.is_blocked_status_code(status_code=status_code)
     assert result is False
-    assert session.is_usable
 
 
 def test_session_expiration() -> None:

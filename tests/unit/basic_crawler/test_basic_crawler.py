@@ -11,6 +11,7 @@ from httpx import Headers, Response
 
 from crawlee import Glob
 from crawlee.basic_crawler.basic_crawler import BasicCrawler, UserDefinedErrorHandlerError
+from crawlee.basic_crawler.errors import SessionError
 from crawlee.basic_crawler.types import AddRequestsFunctionKwargs, BasicCrawlingContext
 from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.request import BaseRequestData, Request
@@ -393,3 +394,24 @@ async def test_enqueue_strategy(test_input: AddRequestsTestInput) -> None:
 
     visited = {call[0][0] for call in visit.call_args_list}
     assert visited == set(test_input.expected_urls)
+
+
+async def test_session_rotation() -> None:
+    track_session_usage = Mock()
+    crawler = BasicCrawler(
+        request_provider=RequestList([Request.from_url('https://someplace.com', label='start')]),
+        max_session_rotations=7,
+        max_request_retries=1,
+    )
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        track_session_usage(context.session.id if context.session else None)
+        raise SessionError('Test error')
+
+    await crawler.run()
+    assert track_session_usage.call_count == 7
+
+    session_ids = {call[0][0] for call in track_session_usage.call_args_list}
+    assert len(session_ids) == 7
+    assert None not in session_ids

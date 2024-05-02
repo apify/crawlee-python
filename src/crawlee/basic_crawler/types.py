@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from crawlee.enqueue_strategy import EnqueueStrategy
     from crawlee.http_clients.base_http_client import HttpResponse
     from crawlee.request import BaseRequestData, Request
+    from crawlee.sessions.session import Session
 
 
 class AddRequestsFunctionKwargs(TypedDict):
@@ -49,7 +50,11 @@ class SendRequestFunction(Protocol):
     """Type of a function for performing an HTTP request."""
 
     def __call__(  # noqa: D102
-        self, url: str, *, method: str = 'get', headers: dict[str, str] | None = None
+        self,
+        url: str,
+        *,
+        method: str = 'get',
+        headers: dict[str, str] | None = None,
     ) -> Coroutine[None, None, HttpResponse]: ...
 
 
@@ -58,6 +63,7 @@ class BasicCrawlingContext:
     """Basic crawling context intended to be extended by crawlers."""
 
     request: Request
+    session: Session | None
     send_request: SendRequestFunction
     add_requests: AddRequestsFunction
 

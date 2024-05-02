@@ -7,12 +7,14 @@ import pytest
 from crawlee.basic_crawler.router import Router
 from crawlee.basic_crawler.types import BasicCrawlingContext
 from crawlee.request import Request
+from crawlee.sessions.session import Session
 
 
 class MockContext(BasicCrawlingContext):
     def __init__(self, *, label: str | None) -> None:
         super().__init__(
             request=Request.from_url(url='42', user_data={'label': label}),
+            session=Session(),
             send_request=AsyncMock(),
             add_requests=AsyncMock(),
         )

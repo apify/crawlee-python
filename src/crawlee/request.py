@@ -141,6 +141,16 @@ class Request(BaseRequestData):
         self.user_data['__crawlee']['maxRetries'] = new_max_retries
 
     @property
+    def session_rotation_count(self) -> int | None:
+        """Crawlee-specific number of finished session rotations for the request."""
+        return self.crawlee_data.session_rotation_count
+
+    @session_rotation_count.setter
+    def session_rotation_count(self, new_session_rotation_count: int) -> None:
+        self.user_data.setdefault('__crawlee', {})
+        self.user_data['__crawlee']['sessionRotationCount'] = new_session_rotation_count
+
+    @property
     def enqueue_strategy(self) -> EnqueueStrategy:
         """The strategy used when enqueueing the request."""
         return (

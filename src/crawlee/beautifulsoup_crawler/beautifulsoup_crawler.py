@@ -7,8 +7,10 @@ from typing import TYPE_CHECKING, Any, AsyncGenerator, Awaitable, Callable, Iter
 import httpx
 from typing_extensions import Unpack
 
+from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee.basic_crawler.basic_crawler import BasicCrawler
 from crawlee.basic_crawler.context_pipeline import ContextPipeline
+from crawlee.basic_crawler.errors import SessionError
 from crawlee.beautifulsoup_crawler.types import BeautifulSoupCrawlingContext
 from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.http_clients.httpx_client import HttpxClient
@@ -21,6 +23,7 @@ if TYPE_CHECKING:
     from crawlee.autoscaling.autoscaled_pool import ConcurrencySettings
     from crawlee.basic_crawler.types import AddRequestsFunctionKwargs, BasicCrawlingContext
     from crawlee.configuration import Configuration
+    from crawlee.sessions.session_pool import SessionPool
     from crawlee.storages.request_provider import RequestProvider
 
 
@@ -38,6 +41,9 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
         request_handler_timeout: timedelta | None = None,
         additional_http_error_status_codes: Iterable[int] = (),
         ignore_http_error_status_codes: Iterable[int] = (),
+        session_pool: SessionPool | None = None,
+        use_session_pool: bool = True,
+        retry_on_blocked: bool = True,
     ) -> None:
         """Initialize the BeautifulSoupCrawler.
 
@@ -58,8 +64,19 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
 
             ignore_http_error_status_codes: HTTP status codes that are normally considered errors but we want to treat
                 them as successful
+
+            use_session_pool: Enables using the session pool for crawling
+
+            session_pool: A preconfigured SessionPool instance if you wish to use non-default configuration
+
+            retry_on_blocked: If set to True, the crawler will try to automatically bypass any detected bot protection
         """
-        context_pipeline = ContextPipeline().compose(self._make_http_request).compose(self._parse_http_response)
+        context_pipeline = (
+            ContextPipeline()
+            .compose(self._make_http_request)
+            .compose(self._parse_http_response)
+            .compose(self._handle_blocked_request)
+        )
 
         self._client = httpx.AsyncClient()
         self._parser = parser
@@ -78,19 +95,44 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
                 additional_http_error_status_codes=additional_http_error_status_codes,
                 ignore_http_error_status_codes=ignore_http_error_status_codes,
             ),
+            use_session_pool=use_session_pool,
+            session_pool=session_pool,
+            retry_on_blocked=retry_on_blocked,
             _context_pipeline=context_pipeline,
             **basic_crawler_kwargs,  # type: ignore
         )
 
     async def _make_http_request(self, context: BasicCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
-        result = await self._http_client.crawl(context.request)
+        result = await self._http_client.crawl(context.request, context.session)
 
         yield HttpCrawlingContext(
             request=context.request,
+            session=context.session,
             send_request=context.send_request,
             add_requests=context.add_requests,
             http_response=result.http_response,
         )
+
+    async def _handle_blocked_request(
+        self, crawling_context: BeautifulSoupCrawlingContext
+    ) -> AsyncGenerator[BeautifulSoupCrawlingContext, None]:
+        if self._retry_on_blocked:
+            status_code = crawling_context.http_response.status_code
+
+            if crawling_context.session and crawling_context.session.is_blocked_status_code(status_code=status_code):
+                raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
+
+            matched_selectors = [
+                selector for selector in RETRY_CSS_SELECTORS if crawling_context.soup.find(selector) is not None
+            ]
+
+            if matched_selectors:
+                raise SessionError(
+                    'Assuming the session is blocked - '
+                    f"HTTP response matched the following selectors: {'; '.join(matched_selectors)}"
+                )
+
+        yield crawling_context
 
     async def _parse_http_response(
         self, context: HttpCrawlingContext
@@ -126,6 +168,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
 
         yield BeautifulSoupCrawlingContext(
             request=context.request,
+            session=context.session,
             send_request=context.send_request,
             add_requests=context.add_requests,
             enqueue_links=enqueue_links,

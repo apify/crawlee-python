@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, AsyncGenerator, Awaitable, Callable
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 import respx
 from httpx import Response
 
 from crawlee.http_crawler.http_crawler import HttpCrawler
+from crawlee.sessions.session_pool import SessionPool
 from crawlee.storages import RequestList
 
 if TYPE_CHECKING:
@@ -104,3 +105,37 @@ async def test_handles_server_error(
 
     mock_request_handler.assert_not_called()
     assert server['500_endpoint'].called
+
+
+async def test_stores_cookies() -> None:
+    visit = Mock()
+    track_session_usage = Mock()
+
+    session_pool = SessionPool(max_pool_size=1)
+    crawler = HttpCrawler(
+        request_provider=RequestList(
+            [
+                'https://httpbin.org/cookies/set?a=1',
+                'https://httpbin.org/cookies/set?b=2',
+                'https://httpbin.org/cookies/set?c=3',
+            ]
+        ),
+        session_pool=session_pool,
+    )
+
+    @crawler.router.default_handler
+    async def handler(context: HttpCrawlingContext) -> None:
+        visit(context.request.url)
+        track_session_usage(context.session.id if context.session else None)
+
+    await crawler.run()
+
+    visited = {call[0][0] for call in visit.call_args_list}
+    assert len(visited) == 3
+
+    session_ids = {call[0][0] for call in track_session_usage.call_args_list}
+    assert len(session_ids) == 1
+
+    session = await session_pool.get_session_by_id(session_ids.pop())
+    assert session is not None
+    assert session.cookies == {'a': '1', 'b': '2', 'c': '3'}
