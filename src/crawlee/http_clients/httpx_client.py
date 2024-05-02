@@ -5,9 +5,9 @@ from typing import TYPE_CHECKING, Iterable, cast
 import httpx
 from typing_extensions import override
 
-from .base_http_client import BaseHttpClient, HttpCrawlingResult, HttpResponse
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
 from crawlee.basic_crawler.errors import ProxyError
+from crawlee.http_clients.base_http_client import BaseHttpClient, HttpCrawlingResult, HttpResponse
 from crawlee.sessions.session import Session
 
 if TYPE_CHECKING:
