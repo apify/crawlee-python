@@ -100,25 +100,14 @@ class RequestQueueClient(BaseRequestQueueClient):
         Returns:
             The found or created key-value store client, or None if no client could be found or created.
         """
-        storage_client_cache = cls._get_storage_client_cache(memory_storage_client)
-        storages_dir = cls._get_storages_dir(memory_storage_client)
-
         return find_or_create_client_by_id_or_name_inner(
-            storage_client_cache=storage_client_cache,
-            storages_dir=storages_dir,
+            storage_client_cache=memory_storage_client.request_queues_handled,
+            storages_dir=memory_storage_client.request_queues_directory,
             memory_storage_client=memory_storage_client,
             create_from_directory=cls._create_from_directory,
             id=id,
             name=name,
         )
-
-    @classmethod
-    def _get_storages_dir(cls, memory_storage_client: MemoryStorageClient) -> str:
-        return memory_storage_client.request_queues_directory
-
-    @classmethod
-    def _get_storage_client_cache(cls, memory_storage_client: MemoryStorageClient) -> list[RequestQueueClient]:
-        return memory_storage_client.request_queues_handled
 
     @classmethod
     def _create_from_directory(
