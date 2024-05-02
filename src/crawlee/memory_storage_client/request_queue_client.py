@@ -101,77 +101,13 @@ class RequestQueueClient(BaseRequestQueueClient):
             The found or created key-value store client, or None if no client could be found or created.
         """
         return find_or_create_client_by_id_or_name_inner(
+            resource_label='Request queue',
             storage_client_cache=memory_storage_client.request_queues_handled,
             storages_dir=memory_storage_client.request_queues_directory,
             memory_storage_client=memory_storage_client,
-            create_from_directory=cls._create_from_directory,
             id=id,
             name=name,
         )
-
-    @classmethod
-    def _create_from_directory(
-        cls,
-        storage_directory: str,
-        memory_storage_client: MemoryStorageClient,
-        id: str | None = None,
-        name: str | None = None,
-    ) -> RequestQueueClient:
-        created_at = datetime.now(timezone.utc)
-        accessed_at = datetime.now(timezone.utc)
-        modified_at = datetime.now(timezone.utc)
-        handled_request_count = 0
-        pending_request_count = 0
-
-        # Load metadata if it exists
-        metadata_filepath = os.path.join(storage_directory, '__metadata__.json')
-
-        if os.path.exists(metadata_filepath):
-            with open(metadata_filepath, encoding='utf-8') as f:
-                json_content = json.load(f)
-                resource_info = RequestQueueMetadata(**json_content)
-
-            id = resource_info.id
-            name = resource_info.name
-            created_at = resource_info.created_at
-            accessed_at = resource_info.accessed_at
-            modified_at = resource_info.modified_at
-            handled_request_count = resource_info.handled_request_count
-            pending_request_count = resource_info.pending_request_count
-
-        # Load request entries
-        entries: dict[str, Request] = {}
-
-        for entry in os.scandir(storage_directory):
-            if entry.is_file():
-                if entry.name == '__metadata__.json':
-                    continue
-
-                with open(os.path.join(storage_directory, entry.name), encoding='utf-8') as f:
-                    content = json.load(f)
-
-                request = Request(**content)
-                order_no = request.order_no
-                if order_no:
-                    request.order_no = Decimal(order_no)
-
-                entries[request.id] = request
-
-        # Create new RQ client
-        new_client = RequestQueueClient(
-            base_storage_directory=memory_storage_client.request_queues_directory,
-            memory_storage_client=memory_storage_client,
-            id=id,
-            name=name,
-            accessed_at=accessed_at,
-            created_at=created_at,
-            modified_at=modified_at,
-            handled_request_count=handled_request_count,
-            pending_request_count=pending_request_count,
-        )
-
-        new_client.requests.update(entries)
-        return new_client
 
     @override
     async def get(self) -> RequestQueueMetadata | None:

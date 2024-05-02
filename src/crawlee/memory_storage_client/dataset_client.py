@@ -94,75 +94,13 @@ class DatasetClient(BaseDatasetClient):
             The found or created dataset client, or None if no client could be found or created.
         """
         return find_or_create_client_by_id_or_name_inner(
+            resource_label='Dataset',
             storage_client_cache=memory_storage_client.datasets_handled,
             storages_dir=memory_storage_client.datasets_directory,
             memory_storage_client=memory_storage_client,
-            create_from_directory=cls._create_from_directory,
             id=id,
             name=name,
         )
-
-    @classmethod
-    def _create_from_directory(
-        cls,
-        storage_directory: str,
-        memory_storage_client: MemoryStorageClient,
-        id: str | None = None,
-        name: str | None = None,
-    ) -> DatasetClient:
-        item_count = 0
-        created_at = datetime.now(timezone.utc)
-        accessed_at = datetime.now(timezone.utc)
-        modified_at = datetime.now(timezone.utc)
-
-        # Load metadata if it exists
-        metadata_filepath = os.path.join(storage_directory, '__metadata__.json')
-
-        if os.path.exists(metadata_filepath):
-            with open(metadata_filepath, encoding='utf-8') as f:
-                json_content = json.load(f)
-                resource_info = DatasetMetadata(**json_content)
-
-            id = resource_info.id
-            name = resource_info.name
-            item_count = resource_info.item_count
-            created_at = resource_info.created_at
-            accessed_at = resource_info.accessed_at
-            modified_at = resource_info.modified_at
-
-        # Load dataset entries
-        entries: dict[str, dict] = {}
-        has_seen_metadata_file = False
-
-        for entry in os.scandir(storage_directory):
-            if entry.is_file():
-                if entry.name == '__metadata__.json':
-                    has_seen_metadata_file = True
-                    continue
-
-                with open(os.path.join(storage_directory, entry.name), encoding='utf-8') as f:
-                    entry_content = json.load(f)
-
-                entry_name = entry.name.split('.')[0]
-                entries[entry_name] = entry_content
-
-                if not has_seen_metadata_file:
-                    item_count += 1
-
-        # Create new dataset client
-        new_client = DatasetClient(
-            base_storage_directory=memory_storage_client.datasets_directory,
-            memory_storage_client=memory_storage_client,
-            id=id,
-            name=name,
-            created_at=created_at,
-            accessed_at=accessed_at,
-            modified_at=modified_at,
-            item_count=item_count,
-        )
-
-        new_client.dataset_entries.update(entries)
-        return new_client
 
     @override
     async def get(self) -> DatasetMetadata | None:
