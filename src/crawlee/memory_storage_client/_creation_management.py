@@ -14,6 +14,7 @@ from aiofiles.os import makedirs
 
 from crawlee._utils.data_processing import maybe_parse_body
 from crawlee._utils.file import json_dumps
+from crawlee.consts import DATASET_LABEL, KEY_VALUE_STORE_LABEL, METADATA_FILENAME, REQUEST_QUEUE_LABEL
 from crawlee.storages.models import (
     DatasetMetadata,
     KeyValueStoreMetadata,
@@ -30,11 +31,6 @@ if TYPE_CHECKING:
     from crawlee.memory_storage_client.request_queue_client import RequestQueueClient
 
 logger = getLogger(__name__)
-
-METADATA_FILENAME = '__metadata__.json'
-DATASET_LABEL = 'Dataset'
-KEY_VALUE_STORE_LABEL = 'Key-value store'
-REQUEST_QUEUE_LABEL = 'Request queue'
 
 
 async def persist_metadata_if_enabled(*, data: dict, entity_directory: str, write_metadata: bool) -> None:

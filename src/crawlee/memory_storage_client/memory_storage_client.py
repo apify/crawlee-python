@@ -131,12 +131,8 @@ class MemoryStorageClient(BaseStorageClient):
             memory_storage_client=self,
         )
 
+    @override
     async def purge_on_start(self) -> None:
-        """Performs a purge of the default storage directories.
-
-        This method ensures that the purge is executed only once during the lifetime of the instance.
-        It is primarily used to clean up residual data from previous runs to maintain a clean state.
-        """
         # Optimistic, non-blocking check
         if self._purged_on_start is True:
             return
