@@ -33,6 +33,7 @@ class KeyValueStore(BaseStorage):
         self._name = name
         self._configuration = configuration
 
+        # Get resource clients from storage client
         self._resource_client = client.key_value_store(self._id)
         self._resource_collection_client = client.key_value_stores()
 
