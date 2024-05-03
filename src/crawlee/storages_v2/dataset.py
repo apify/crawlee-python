@@ -40,6 +40,9 @@ class Dataset(BaseStorage):
         dataset = await Dataset.open(id='my_dataset_id')
     """
 
+    LABEL = 'Dataset'
+    """Human readable label of the storage."""
+
     _MAX_PAYLOAD_SIZE = ByteSize.from_mb(9)
     """Maximum size for a single payload."""
 
@@ -48,8 +51,6 @@ class Dataset(BaseStorage):
 
     _EFFECTIVE_LIMIT_SIZE = _MAX_PAYLOAD_SIZE - (_MAX_PAYLOAD_SIZE * _SAFETY_BUFFER_PERCENT)
     """Calculated payload limit considering safety buffer."""
-
-    LABEL = 'Dataset'
 
     def __init__(
         self,

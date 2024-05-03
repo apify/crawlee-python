@@ -18,9 +18,28 @@ T = TypeVar('T')
 
 
 class KeyValueStore(BaseStorage):
-    """A class for managing key-value stores."""
+    """Represents a key-value based storage for reading data records or files.
+
+    Each record is identified by a unique key and associated with a MIME content type. This class is used within
+    crawler runs to store inputs and outputs, typically in JSON format, but supports other types as well.
+
+    The data can be stored on a local filesystem or in the cloud, determined by the `CRAWLEE_LOCAL_STORAGE_DIR`
+    environment variable.
+
+    By default, data is stored in `{CRAWLEE_LOCAL_STORAGE_DIR}/key_value_stores/{STORE_ID}/{INDEX}.{EXT}`, where
+    `{STORE_ID}` is either "default" or specified by `CRAWLEE_DEFAULT_KEY_VALUE_STORE_ID`, `{KEY}` is the record key,
+    and `{EXT}` is the MIME type.
+
+    To open a key-value store, use the class method `open`, providing either an `id` or `name` along with optional
+    `config`. If neither is provided, the default store for the crawler run is used. Opening a non-existent store by
+    `id` raises an error, while a non-existent store by `name` is created.
+
+    Usage:
+        kvs = await KeyValueStore.open(id='my_kvs_id')
+    """
 
     LABEL = KEY_VALUE_STORE_LABEL
+    """Human readable label of the storage."""
 
     def __init__(
         self,
