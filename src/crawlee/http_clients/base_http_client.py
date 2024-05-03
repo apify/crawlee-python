@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Iterable, Protocol
 if TYPE_CHECKING:
     from httpx import Headers  # Type from `httpx` is used here because it is lightweight and convenient
 
-    from crawlee.request import Request
+    from crawlee.models import Request
     from crawlee.sessions.session import Session
 
 

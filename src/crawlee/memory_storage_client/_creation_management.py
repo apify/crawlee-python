@@ -15,7 +15,7 @@ from aiofiles.os import makedirs
 from crawlee._utils.data_processing import maybe_parse_body
 from crawlee._utils.file import json_dumps
 from crawlee.consts import DATASET_LABEL, KEY_VALUE_STORE_LABEL, METADATA_FILENAME, REQUEST_QUEUE_LABEL
-from crawlee.storages.models import (
+from crawlee.models import (
     DatasetMetadata,
     KeyValueStoreMetadata,
     KeyValueStoreRecord,

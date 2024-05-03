@@ -7,7 +7,7 @@ from typing_extensions import override
 from crawlee.base_storage_client import BaseRequestQueueCollectionClient
 from crawlee.memory_storage_client._creation_management import get_or_create_inner
 from crawlee.memory_storage_client.request_queue_client import RequestQueueClient
-from crawlee.storages.models import RequestQueueListPage, RequestQueueMetadata
+from crawlee.models import RequestQueueListPage, RequestQueueMetadata
 
 if TYPE_CHECKING:
     from crawlee.memory_storage_client.memory_storage_client import MemoryStorageClient

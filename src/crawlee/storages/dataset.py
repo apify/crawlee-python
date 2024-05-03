@@ -8,14 +8,15 @@ from typing_extensions import override
 
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.file import json_dumps
+from crawlee.configuration import Configuration
+from crawlee.models import DatasetMetadata
 from crawlee.storages.base_storage import BaseStorage
 from crawlee.storages.key_value_store import KeyValueStore
-from crawlee.storages.models import DatasetMetadata
+from crawlee.storages.storage_creator import StorageCreator
 
 if TYPE_CHECKING:
-    from crawlee.base_storage_client import BaseDatasetClient, BaseDatasetCollectionClient, BaseStorageClient
-    from crawlee.configuration import Configuration
-    from crawlee.storages.models import DatasetItemsListPage
+    from crawlee.base_storage_client import BaseStorageClient
+    from crawlee.models import DatasetItemsListPage
     from crawlee.types import JSONSerializable
 
 
@@ -38,6 +39,9 @@ class Dataset(BaseStorage):
         dataset = await Dataset.open(id='my_dataset_id')
     """
 
+    LABEL = 'Dataset'
+    """Human readable label of the storage."""
+
     _MAX_PAYLOAD_SIZE = ByteSize.from_mb(9)
     """Maximum size for a single payload."""
 
@@ -54,28 +58,46 @@ class Dataset(BaseStorage):
         configuration: Configuration,
         client: BaseStorageClient,
     ) -> None:
-        super().__init__(id=id, name=name, client=client, configuration=configuration)
-        self._dataset_client = client.dataset(self.id)
+        self._id = id
+        self._name = name
+        self._configuration = configuration
 
-    @classmethod
-    @override
-    def _get_human_friendly_label(cls) -> str:
-        return 'Dataset'
+        # Get resource clients from storage client
+        self._resource_client = client.dataset(self._id)
+        self._resource_collection_client = client.datasets()
 
-    @classmethod
     @override
-    def _get_default_id(cls, configuration: Configuration) -> str:
-        return configuration.default_dataset_id
+    @property
+    def id(self) -> str:
+        return self._id
 
-    @classmethod
     @override
-    def _get_single_storage_client(cls, id: str, client: BaseStorageClient) -> BaseDatasetClient:
-        return client.dataset(id)
+    @property
+    def name(self) -> str | None:
+        return self._name
 
-    @classmethod
     @override
-    def _get_storage_collection_client(cls, client: BaseStorageClient) -> BaseDatasetCollectionClient:
-        return client.datasets()
+    @classmethod
+    async def open(
+        cls,
+        id: str | None = None,
+        name: str | None = None,
+        configuration: Configuration | None = None,
+    ) -> Dataset:
+        configuration = configuration or Configuration()
+        id = id or configuration.default_dataset_id
+
+        return await StorageCreator.open_storage(
+            storage_class=cls,
+            id=id,
+            name=name,
+            configuration=configuration,
+        )
+
+    @override
+    async def drop(self) -> None:
+        await self._resource_client.delete()
+        StorageCreator.remove_storage_from_cache(id=self._id, name=self._name)
 
     async def push_data(self, data: JSONSerializable) -> None:
         """Store an object or an array of objects to the dataset.
@@ -91,14 +113,14 @@ class Dataset(BaseStorage):
         # Handle singular items
         if not isinstance(data, list):
             payload = await self._check_and_serialize(data)
-            return await self._dataset_client.push_items(payload)
+            return await self._resource_client.push_items(payload)
 
         # Handle lists
         payloads_generator = (await self._check_and_serialize(item, index) for index, item in enumerate(data))
 
         # Invoke client in series to preserve the order of data
         async for chunk in self._chunk_by_size(payloads_generator):
-            await self._dataset_client.push_items(chunk)
+            await self._resource_client.push_items(chunk)
 
         return None
 
@@ -140,7 +162,7 @@ class Dataset(BaseStorage):
         """
         # TODO: Improve error handling here
         # https://github.com/apify/apify-sdk-python/issues/140
-        return await self._dataset_client.list_items(
+        return await self._resource_client.list_items(
             offset=offset,
             limit=limit,
             desc=desc,
@@ -218,7 +240,7 @@ class Dataset(BaseStorage):
         Returns:
             Object returned by calling the GET dataset API endpoint.
         """
-        metadata = await self._dataset_client.get()
+        metadata = await self._resource_client.get()
         if isinstance(metadata, DatasetMetadata):
             return metadata
         return None
@@ -256,7 +278,7 @@ class Dataset(BaseStorage):
         Yields:
             Each item from the dataset as a dictionary.
         """
-        async for item in self._dataset_client.iterate_items(  # type: ignore
+        async for item in self._resource_client.iterate_items(  # type: ignore
             offset=offset,
             limit=limit,
             clean=clean,
@@ -268,11 +290,6 @@ class Dataset(BaseStorage):
             skip_hidden=skip_hidden,
         ):
             yield item
-
-    async def drop(self) -> None:
-        """Remove the dataset either from the Apify cloud storage or from the local directory."""
-        await self._dataset_client.delete()
-        self._remove_from_cache()
 
     async def _export_to(
         self,
@@ -300,7 +317,7 @@ class Dataset(BaseStorage):
         limit = 1000
         offset = 0
         while True:
-            list_items = await self._dataset_client.list_items(limit=limit, offset=offset)
+            list_items = await self._resource_client.list_items(limit=limit, offset=offset)
             items.extend(list_items.items)
             if list_items.total <= offset + list_items.count:
                 break

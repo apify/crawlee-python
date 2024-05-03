@@ -26,8 +26,7 @@ from crawlee.memory_storage_client._creation_management import (
     find_or_create_client_by_id_or_name_inner,
     persist_metadata_if_enabled,
 )
-from crawlee.request import Request
-from crawlee.storages.models import RequestQueueHead, RequestQueueMetadata, RequestQueueOperationInfo
+from crawlee.models import Request, RequestQueueHead, RequestQueueMetadata, RequestQueueOperationInfo
 from crawlee.types import StorageTypes
 
 if TYPE_CHECKING:

@@ -7,7 +7,7 @@ from typing_extensions import override
 from crawlee.base_storage_client import BaseKeyValueStoreCollectionClient
 from crawlee.memory_storage_client._creation_management import get_or_create_inner
 from crawlee.memory_storage_client.key_value_store_client import KeyValueStoreClient
-from crawlee.storages.models import KeyValueStoreListPage, KeyValueStoreMetadata
+from crawlee.models import KeyValueStoreListPage, KeyValueStoreMetadata
 
 if TYPE_CHECKING:
     from crawlee.memory_storage_client.memory_storage_client import MemoryStorageClient

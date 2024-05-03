@@ -5,7 +5,7 @@ from datetime import timedelta
 
 from typing_extensions import override
 
-from crawlee.request import BaseRequestData, Request
+from crawlee.models import BaseRequestData, Request
 from crawlee.storages.request_provider import RequestProvider
 
 

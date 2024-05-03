@@ -7,9 +7,7 @@ import pytest
 from crawlee._utils.env_vars import CrawleeEnvVars
 from crawlee.memory_storage_client import MemoryStorageClient
 from crawlee.storage_client_manager import StorageClientManager
-from crawlee.storages.dataset import Dataset
-from crawlee.storages.key_value_store import KeyValueStore
-from crawlee.storages.request_queue import RequestQueue
+from crawlee.storages.storage_creator import StorageCreator
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -18,13 +16,10 @@ if TYPE_CHECKING:
 @pytest.fixture()
 def reset_default_instances(monkeypatch: pytest.MonkeyPatch) -> Callable[[], None]:
     def reset() -> None:
-        monkeypatch.setattr(Dataset, 'cache_by_id', None)
-        monkeypatch.setattr(Dataset, 'cache_by_name', None)
-        monkeypatch.setattr(KeyValueStore, 'cache_by_id', None)
-        monkeypatch.setattr(KeyValueStore, 'cache_by_name', None)
-        monkeypatch.setattr(RequestQueue, 'cache_by_id', None)
-        monkeypatch.setattr(RequestQueue, 'cache_by_name', None)
+        monkeypatch.setattr(StorageClientManager, 'persist_storage', None)
         monkeypatch.setattr(StorageClientManager, '_default_instance', None)
+        monkeypatch.setattr(StorageCreator, '_cache_by_id', {})
+        monkeypatch.setattr(StorageCreator, '_cache_by_name', {})
 
     return reset
 

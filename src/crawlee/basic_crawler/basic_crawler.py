@@ -38,7 +38,7 @@ from crawlee.configuration import Configuration
 from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.events.local_event_manager import LocalEventManager
 from crawlee.http_clients.httpx_client import HttpxClient
-from crawlee.request import BaseRequestData, Request, RequestState
+from crawlee.models import BaseRequestData, Request, RequestState
 from crawlee.sessions import SessionPool
 from crawlee.storages.request_queue import RequestQueue
 

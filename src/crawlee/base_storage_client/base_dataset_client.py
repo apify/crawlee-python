@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, AsyncIterator
 
 if TYPE_CHECKING:
-    from crawlee.storages.models import DatasetItemsListPage, DatasetMetadata
+    from crawlee.models import DatasetItemsListPage, DatasetMetadata
     from crawlee.types import JSONSerializable
 
 

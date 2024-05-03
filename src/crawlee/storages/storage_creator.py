@@ -12,10 +12,9 @@ from crawlee.storage_client_manager import StorageClientManager
 if TYPE_CHECKING:
     from crawlee.base_storage_client.types import ResourceClient, ResourceCollectionClient
     from crawlee.configuration import Configuration
-
-    from .dataset import Dataset
-    from .key_value_store import KeyValueStore
-    from .request_queue import RequestQueue
+    from crawlee.storages.dataset import Dataset
+    from crawlee.storages.key_value_store import KeyValueStore
+    from crawlee.storages.request_queue import RequestQueue
 
 
 class StorageCreator:
