@@ -10,9 +10,9 @@ from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.file import json_dumps
 from crawlee.configuration import Configuration
 from crawlee.models import DatasetMetadata
+from crawlee.storages._creation_management import open_storage, remove_storage_from_cache
 from crawlee.storages.base_storage import BaseStorage
 from crawlee.storages.key_value_store import KeyValueStore
-from crawlee.storages.storage_creator import StorageCreator
 
 if TYPE_CHECKING:
     from crawlee.base_storage_client import BaseStorageClient
@@ -87,7 +87,7 @@ class Dataset(BaseStorage):
         configuration = configuration or Configuration()
         id = id or configuration.default_dataset_id
 
-        return await StorageCreator.open_storage(
+        return await open_storage(
             storage_class=cls,
             id=id,
             name=name,
@@ -97,7 +97,7 @@ class Dataset(BaseStorage):
     @override
     async def drop(self) -> None:
         await self._resource_client.delete()
-        StorageCreator.remove_storage_from_cache(id=self._id, name=self._name)
+        remove_storage_from_cache(id=self._id, name=self._name)
 
     async def push_data(self, data: JSONSerializable) -> None:
         """Store an object or an array of objects to the dataset.
