@@ -39,7 +39,7 @@ from crawlee.events.local_event_manager import LocalEventManager
 from crawlee.http_clients.httpx_client import HttpxClient
 from crawlee.request import BaseRequestData, Request, RequestState
 from crawlee.sessions import SessionPool
-from crawlee.statistics.models import FinalStatistics
+from crawlee.statistics.statistics import Statistics
 from crawlee.storages.request_queue import RequestQueue
 
 if TYPE_CHECKING:
@@ -47,6 +47,7 @@ if TYPE_CHECKING:
 
     from crawlee.http_clients.base_http_client import BaseHttpClient, HttpResponse
     from crawlee.sessions.session import Session
+    from crawlee.statistics.models import FinalStatistics, StatisticsState
     from crawlee.storages.request_provider import RequestProvider
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
@@ -70,6 +71,7 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     session_pool: NotRequired[SessionPool]
     use_session_pool: NotRequired[bool]
     retry_on_blocked: NotRequired[bool]
+    statistics: NotRequired[Statistics[StatisticsState]]
     _context_pipeline: NotRequired[ContextPipeline[TCrawlingContext]]
 
 
@@ -98,6 +100,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         session_pool: SessionPool | None = None,
         use_session_pool: bool = True,
         retry_on_blocked: bool = True,
+        statistics: Statistics | None = None,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
     ) -> None:
         """Initialize the BasicCrawler.
@@ -114,8 +117,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
             configuration: Crawler configuration
             request_handler_timeout: How long is a single request handler allowed to run
             use_session_pool: Enables using the session pool for crawling
-            session_pool: A preconfigured SessionPool instance if you wish to use non-default configuration
+            session_pool: A preconfigured `SessionPool` instance if you wish to use non-default configuration
             retry_on_blocked: If set to True, the crawler will try to automatically bypass any detected bot protection
+            statistics: A preconfigured `Statistics` instance if you wish to use non-default configuration
             _context_pipeline: Allows extending the request lifecycle and modifying the crawling context.
                 This parameter is meant to be used by child classes, not when BasicCrawler is instantiated directly.
         """
@@ -164,6 +168,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._session_pool: SessionPool = session_pool or SessionPool()
 
         self._retry_on_blocked = retry_on_blocked
+
+        self._statistics = statistics or Statistics(event_manager=self._event_manager)
 
     @property
     def router(self) -> Router[TCrawlingContext]:
@@ -241,13 +247,14 @@ class BasicCrawler(Generic[TCrawlingContext]):
         async with AsyncExitStack() as exit_stack:
             await exit_stack.enter_async_context(self._event_manager)
             await exit_stack.enter_async_context(self._snapshotter)
+            await exit_stack.enter_async_context(self._statistics)
 
             if self._use_session_pool:
                 await exit_stack.enter_async_context(self._session_pool)
 
             await self._pool.run()
 
-        return FinalStatistics()
+        return self._statistics.calculate()
 
     def _should_retry_request(self, crawling_context: BasicCrawlingContext, error: Exception) -> bool:
         if crawling_context.request.no_retry:
