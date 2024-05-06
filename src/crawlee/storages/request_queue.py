@@ -12,7 +12,6 @@ from typing_extensions import override
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.lru_cache import LRUCache
 from crawlee._utils.requests import unique_key_to_request_id
-from crawlee.configuration import Configuration
 from crawlee.models import Request, RequestQueueHeadState, RequestQueueOperationInfo
 from crawlee.storages._creation_management import open_storage, remove_storage_from_cache
 from crawlee.storages.base_storage import BaseStorage
@@ -20,6 +19,7 @@ from crawlee.storages.request_provider import RequestProvider
 
 if TYPE_CHECKING:
     from crawlee.base_storage_client import BaseStorageClient
+    from crawlee.configuration import Configuration
     from crawlee.models import BaseRequestData, BaseStorageMetadata
 
 logger = getLogger(__name__)
@@ -117,9 +117,6 @@ class RequestQueue(BaseStorage, RequestProvider):
         name: str | None = None,
         configuration: Configuration | None = None,
     ) -> RequestQueue:
-        configuration = configuration or Configuration()
-        id = id or configuration.default_request_queue_id
-
         return await open_storage(
             storage_class=cls,
             id=id,

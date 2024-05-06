@@ -202,7 +202,7 @@ class BaseStorageMetadata(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     id: Annotated[str, Field(alias='id')]
-    name: Annotated[str, Field(alias='name', default='')]
+    name: Annotated[str | None, Field(alias='name', default='')]
     accessed_at: Annotated[datetime, Field(alias='accessedAt')]
     created_at: Annotated[datetime, Field(alias='createdAt')]
     modified_at: Annotated[datetime, Field(alias='modifiedAt')]

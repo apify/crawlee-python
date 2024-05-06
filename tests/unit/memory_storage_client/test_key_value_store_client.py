@@ -12,6 +12,7 @@ import pytest
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import maybe_parse_body
 from crawlee._utils.file import json_dumps
+from crawlee.consts import METADATA_FILENAME
 from crawlee.models import KeyValueStoreMetadata, KeyValueStoreRecordMetadata
 
 if TYPE_CHECKING:
@@ -79,7 +80,7 @@ async def test_update(key_value_store_client: KeyValueStoreClient) -> None:
     old_kvs_info = await key_value_store_client.get()
     assert old_kvs_info is not None
     old_kvs_directory = os.path.join(
-        key_value_store_client._memory_storage_client.key_value_stores_directory, old_kvs_info.name
+        key_value_store_client._memory_storage_client.key_value_stores_directory, old_kvs_info.name or ''
     )
     new_kvs_directory = os.path.join(
         key_value_store_client._memory_storage_client.key_value_stores_directory, new_kvs_name
@@ -106,7 +107,7 @@ async def test_delete(key_value_store_client: KeyValueStoreClient) -> None:
     kvs_info = await key_value_store_client.get()
     assert kvs_info is not None
     kvs_directory = os.path.join(
-        key_value_store_client._memory_storage_client.key_value_stores_directory, kvs_info.name
+        key_value_store_client._memory_storage_client.key_value_stores_directory, kvs_info.name or ''
     )
     assert os.path.exists(os.path.join(kvs_directory, 'test.json')) is True
     await key_value_store_client.delete()
@@ -408,7 +409,7 @@ async def test_reads_correct_metadata(
     )
 
     # Write the store metadata to disk
-    storage_metadata_path = os.path.join(storage_path, '__metadata__.json')
+    storage_metadata_path = os.path.join(storage_path, METADATA_FILENAME)
     with open(storage_metadata_path, mode='wb') as f:  # noqa: ASYNC101
         f.write(store_metadata.model_dump_json().encode('utf-8'))
 

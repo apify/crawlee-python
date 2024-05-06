@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from crawlee._utils.env_vars import CrawleeEnvVars
+from crawlee.consts import METADATA_FILENAME
 from crawlee.memory_storage_client import MemoryStorageClient
 
 if TYPE_CHECKING:
@@ -21,9 +22,9 @@ async def test_write_metadata(tmp_path: Path) -> None:
     datasets_no_metadata_client = ms_no_metadata.datasets()
     await datasets_client.get_or_create(name=dataset_name)
     await datasets_no_metadata_client.get_or_create(name=dataset_no_metadata_name)
-    assert os.path.exists(os.path.join(ms.datasets_directory, dataset_name, '__metadata__.json')) is True
+    assert os.path.exists(os.path.join(ms.datasets_directory, dataset_name, METADATA_FILENAME)) is True
     assert (
-        os.path.exists(os.path.join(ms_no_metadata.datasets_directory, dataset_no_metadata_name, '__metadata__.json'))
+        os.path.exists(os.path.join(ms_no_metadata.datasets_directory, dataset_no_metadata_name, METADATA_FILENAME))
         is False
     )
 
@@ -37,11 +38,12 @@ async def test_persist_storage(tmp_path: Path) -> None:
     kvs_no_metadata_info = await kvs_no_metadata_client.get_or_create(name='kvs-no-persist')
     await ms.key_value_store(kvs_info.id).set_record('test', {'x': 1}, 'application/json')
     await ms_no_persist.key_value_store(kvs_no_metadata_info.id).set_record('test', {'x': 1}, 'application/json')
-    assert os.path.exists(os.path.join(ms.key_value_stores_directory, kvs_info.name, 'test.json')) is True
-    assert (
-        os.path.exists(os.path.join(ms_no_persist.key_value_stores_directory, kvs_no_metadata_info.name, 'test.json'))
-        is False
-    )
+
+    path1 = os.path.join(ms.key_value_stores_directory, kvs_info.name or '', 'test.json')
+    assert os.path.exists(path1) is True
+
+    path2 = os.path.join(ms_no_persist.key_value_stores_directory, kvs_no_metadata_info.name or '', 'test.json')
+    assert os.path.exists(path2) is False
 
 
 def test_config_via_env_vars_persist_storage(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

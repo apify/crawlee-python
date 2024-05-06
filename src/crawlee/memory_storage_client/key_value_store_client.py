@@ -58,7 +58,6 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
         self._accessed_at = accessed_at or datetime.now(timezone.utc)
         self._modified_at = modified_at or datetime.now(timezone.utc)
 
-        self.resource_directory = os.path.join(base_storage_directory, self.name or self.id)
         self.records: dict[str, KeyValueStoreRecord] = {}
         self.file_operation_lock = asyncio.Lock()
 
@@ -66,13 +65,18 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
     def resource_info(self) -> KeyValueStoreMetadata:
         """Get the resource info for the key-value store client."""
         return KeyValueStoreMetadata(
-            id=str(self.id),
-            name=str(self.name),
+            id=self.id,
+            name=self.name,
             accessed_at=self._accessed_at,
             created_at=self._created_at,
             modified_at=self._modified_at,
             user_id='1',
         )
+
+    @property
+    def resource_directory(self) -> str:
+        """Get the resource directory for the client."""
+        return os.path.join(self._base_storage_directory, self.name or self.id)
 
     @classmethod
     def find_or_create_client_by_id_or_name(
@@ -145,14 +149,8 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
             if existing_store_by_name is not None:
                 raise_on_duplicate_storage(StorageTypes.KEY_VALUE_STORE, 'name', name)
 
-            existing_store_by_id.name = name
-
             previous_dir = existing_store_by_id.resource_directory
-
-            existing_store_by_id.resource_directory = os.path.join(
-                self._memory_storage_client.key_value_stores_directory,
-                name,
-            )
+            existing_store_by_id.name = name
 
             await force_rename(previous_dir, existing_store_by_id.resource_directory)
 

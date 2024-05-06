@@ -55,7 +55,6 @@ class DatasetClient(BaseDatasetClient):
         self._accessed_at = accessed_at or datetime.now(timezone.utc)
         self._modified_at = modified_at or datetime.now(timezone.utc)
 
-        self.resource_directory = os.path.join(self._base_storage_directory, self.name or self.id)
         self.dataset_entries: dict[str, dict] = {}
         self.file_operation_lock = asyncio.Lock()
         self.item_count = item_count
@@ -64,13 +63,18 @@ class DatasetClient(BaseDatasetClient):
     def resource_info(self) -> DatasetMetadata:
         """Get the resource info for the dataset client."""
         return DatasetMetadata(
-            id=str(self.id),
-            name=str(self.name),
+            id=self.id,
+            name=self.name,
             accessed_at=self._accessed_at,
             created_at=self._created_at,
             modified_at=self._modified_at,
             item_count=self.item_count,
         )
+
+    @property
+    def resource_directory(self) -> str:
+        """Get the resource directory for the client."""
+        return os.path.join(self._base_storage_directory, self.name or self.id)
 
     @classmethod
     def find_or_create_client_by_id_or_name(
@@ -145,13 +149,8 @@ class DatasetClient(BaseDatasetClient):
             if existing_dataset_by_name is not None:
                 raise_on_duplicate_storage(StorageTypes.DATASET, 'name', name)
 
-            existing_dataset_by_id.name = name
-
             previous_dir = existing_dataset_by_id.resource_directory
-
-            existing_dataset_by_id.resource_directory = os.path.join(
-                self._memory_storage_client.datasets_directory, name
-            )
+            existing_dataset_by_id.name = name
 
             await force_rename(previous_dir, existing_dataset_by_id.resource_directory)
 

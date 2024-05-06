@@ -37,6 +37,9 @@ class RequestQueueCollectionClient(BaseRequestQueueCollectionClient):
         schema: dict | None = None,
         id: str | None = None,
     ) -> RequestQueueMetadata:
+        if name is None and id is None:
+            id = self._memory_storage_client.configuration.default_storage_id
+
         return await get_or_create_inner(
             memory_storage_client=self._memory_storage_client,
             base_storage_directory=self._base_storage_directory,

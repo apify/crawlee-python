@@ -237,7 +237,7 @@ async def get_or_create_inner(
         storage_client_cache: The cache of storage clients.
         resource_client_class: The class of the storage to retrieve or create.
         name: The name of the storage to retrieve or create.
-        id: ID of the storage to retrieve or create
+        id: ID of the storage to retrieve or create.
 
     Returns:
         The retrieved or newly-created storage.

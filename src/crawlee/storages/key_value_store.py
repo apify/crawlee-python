@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, Any, AsyncIterator, TypeVar, overload
 
 from typing_extensions import override
 
-from crawlee.configuration import Configuration
 from crawlee.consts import KEY_VALUE_STORE_LABEL
 from crawlee.models import KeyValueStoreKeyInfo
 from crawlee.storages._creation_management import open_storage, remove_storage_from_cache
@@ -12,6 +11,7 @@ from crawlee.storages.base_storage import BaseStorage
 
 if TYPE_CHECKING:
     from crawlee.base_storage_client import BaseStorageClient
+    from crawlee.configuration import Configuration
 
 T = TypeVar('T')
 
@@ -73,9 +73,6 @@ class KeyValueStore(BaseStorage):
         name: str | None = None,
         configuration: Configuration | None = None,
     ) -> KeyValueStore:
-        configuration = configuration or Configuration()
-        id = id or configuration.default_key_value_store_id
-
         return await open_storage(
             storage_class=cls,
             id=id,

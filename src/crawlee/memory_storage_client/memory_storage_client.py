@@ -13,13 +13,13 @@ from typing_extensions import override
 from crawlee._utils.data_processing import maybe_parse_bool
 from crawlee._utils.env_vars import CrawleeEnvVars
 from crawlee.base_storage_client import BaseStorageClient
-
-from .dataset_client import DatasetClient
-from .dataset_collection_client import DatasetCollectionClient
-from .key_value_store_client import KeyValueStoreClient
-from .key_value_store_collection_client import KeyValueStoreCollectionClient
-from .request_queue_client import RequestQueueClient
-from .request_queue_collection_client import RequestQueueCollectionClient
+from crawlee.configuration import Configuration
+from crawlee.memory_storage_client.dataset_client import DatasetClient
+from crawlee.memory_storage_client.dataset_collection_client import DatasetCollectionClient
+from crawlee.memory_storage_client.key_value_store_client import KeyValueStoreClient
+from crawlee.memory_storage_client.key_value_store_collection_client import KeyValueStoreCollectionClient
+from crawlee.memory_storage_client.request_queue_client import RequestQueueClient
+from crawlee.memory_storage_client.request_queue_collection_client import RequestQueueCollectionClient
 
 
 class MemoryStorageClient(BaseStorageClient):
@@ -41,6 +41,7 @@ class MemoryStorageClient(BaseStorageClient):
     def __init__(
         self,
         *,
+        configuration: Configuration | None = None,
         local_data_directory: str | None = None,
         write_metadata: bool | None = None,
         persist_storage: bool | None = None,
@@ -48,17 +49,22 @@ class MemoryStorageClient(BaseStorageClient):
         """Create a new instance.
 
         Args:
+            configuration: Configuration object to use. If None, a new Configuration object will be created.
             local_data_directory: Path to the local directory where data will be persisted. If None, defaults to
                 CrawleeEnvVars.LOCAL_STORAGE_DIR or './storage'.
-
-            write_metadata: Flag indicating whether to write metadata for the storages. Defaults based on DEBUG
-                environment variable.
-
+            write_metadata: Flag indicating whether to write metadata for the storages. Defaults based on
+                CrawleeEnvVars.WRITE_METADATA.
             persist_storage: Flag indicating whether to persist the storage data locally. Defaults based on
                 CrawleeEnvVars.PERSIST_STORAGE.
         """
+        self.configuration = configuration or Configuration()
+
         self._local_data_directory = local_data_directory or os.getenv(CrawleeEnvVars.LOCAL_STORAGE_DIR) or './storage'
-        self.write_metadata = write_metadata if write_metadata is not None else '*' in os.getenv('DEBUG', '')
+        self.write_metadata = (
+            write_metadata
+            if write_metadata is not None
+            else maybe_parse_bool(os.getenv(CrawleeEnvVars.WRITE_METADATA, 'true'))
+        )
         self.persist_storage = (
             persist_storage
             if persist_storage is not None
