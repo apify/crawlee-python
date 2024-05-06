@@ -8,6 +8,7 @@ from typing_extensions import override
 
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.file import json_dumps
+from crawlee.consts import DATASET_LABEL
 from crawlee.models import DatasetMetadata
 from crawlee.storages._creation_management import open_storage, remove_storage_from_cache
 from crawlee.storages.base_storage import BaseStorage
@@ -39,7 +40,7 @@ class Dataset(BaseStorage):
         dataset = await Dataset.open(id='my_dataset_id')
     """
 
-    LABEL = 'Dataset'
+    LABEL = DATASET_LABEL
     """Human readable label of the storage."""
 
     _MAX_PAYLOAD_SIZE = ByteSize.from_mb(9)
