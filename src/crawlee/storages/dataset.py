@@ -95,7 +95,7 @@ class Dataset(BaseStorage):
     @override
     async def drop(self) -> None:
         await self._resource_client.delete()
-        remove_storage_from_cache(id=self._id, name=self._name)
+        remove_storage_from_cache(storage_class_label=self.LABEL, id=self._id, name=self._name)
 
     async def push_data(self, data: JSONSerializable) -> None:
         """Store an object or an array of objects to the dataset.

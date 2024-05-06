@@ -21,11 +21,94 @@ if TYPE_CHECKING:
 _creation_lock = asyncio.Lock()
 """Lock for storage creation."""
 
-_cache_by_id: dict[str, Dataset | KeyValueStore | RequestQueue] = {}
-"""Cache of storages by ID."""
+_cache_dataset_by_id: dict[str, Dataset] = {}
+_cache_dataset_by_name: dict[str, Dataset] = {}
+_cache_kvs_by_id: dict[str, KeyValueStore] = {}
+_cache_kvs_by_name: dict[str, KeyValueStore] = {}
+_cache_rq_by_id: dict[str, RequestQueue] = {}
+_cache_rq_by_name: dict[str, RequestQueue] = {}
 
-_cache_by_name: dict[str, Dataset | KeyValueStore | RequestQueue] = {}
-"""Cache of storages by name."""
+
+def _get_from_cache_by_name(
+    storage_class_label: str,
+    name: str,
+) -> Dataset | KeyValueStore | RequestQueue | None:
+    """Try to restore storage from cache by name."""
+    if storage_class_label == DATASET_LABEL:
+        return _cache_dataset_by_name.get(name)
+    if storage_class_label == KEY_VALUE_STORE_LABEL:
+        return _cache_kvs_by_name.get(name)
+    if storage_class_label == REQUEST_QUEUE_LABEL:
+        return _cache_rq_by_name.get(name)
+    raise ValueError(f'Unknown storage class: {storage_class_label}')
+
+
+def _get_from_cache_by_id(
+    storage_class_label: str,
+    id: str,
+) -> Dataset | KeyValueStore | RequestQueue | None:
+    """Try to restore storage from cache by ID."""
+    if storage_class_label == DATASET_LABEL:
+        return _cache_dataset_by_id.get(id)
+    if storage_class_label == KEY_VALUE_STORE_LABEL:
+        return _cache_kvs_by_id.get(id)
+    if storage_class_label == REQUEST_QUEUE_LABEL:
+        return _cache_rq_by_id.get(id)
+    raise ValueError(f'Unknown storage: {storage_class_label}')
+
+
+def _add_to_cache_by_name(name: str, storage: Dataset | KeyValueStore | RequestQueue) -> None:
+    """Add storage to cache by name."""
+    if storage.LABEL == DATASET_LABEL:
+        _cache_dataset_by_name[name] = storage  # type: ignore
+    elif storage.LABEL == KEY_VALUE_STORE_LABEL:
+        _cache_kvs_by_name[name] = storage  # type: ignore
+    elif storage.LABEL == REQUEST_QUEUE_LABEL:
+        _cache_rq_by_name[name] = storage  # type: ignore
+    else:
+        raise TypeError(f'Unknown storage: {storage}')
+
+
+def _add_to_cache_by_id(id: str, storage: Dataset | KeyValueStore | RequestQueue) -> None:
+    """Add storage to cache by ID."""
+    if storage.LABEL == DATASET_LABEL:
+        _cache_dataset_by_id[id] = storage  # type: ignore
+    elif storage.LABEL == KEY_VALUE_STORE_LABEL:
+        _cache_kvs_by_id[id] = storage  # type: ignore
+    elif storage.LABEL == REQUEST_QUEUE_LABEL:
+        _cache_rq_by_id[id] = storage  # type: ignore
+    else:
+        raise TypeError(f'Unknown storage: {storage}')
+
+
+def _rm_from_cache_by_id(storage_class_label: str, id: str) -> None:
+    """Remove a storage from cache by ID."""
+    try:
+        if storage_class_label == DATASET_LABEL:
+            del _cache_dataset_by_id[id]
+        elif storage_class_label == KEY_VALUE_STORE_LABEL:
+            del _cache_kvs_by_id[id]
+        elif storage_class_label == REQUEST_QUEUE_LABEL:
+            del _cache_rq_by_id[id]
+        else:
+            raise ValueError(f'Unknown storage class: {storage_class_label}')
+    except KeyError as exc:
+        raise RuntimeError(f'Storage with provided ID was not found ({id}).') from exc
+
+
+def _rm_from_cache_by_name(storage_class_label: str, name: str) -> None:
+    """Remove a storage from cache by name."""
+    try:
+        if storage_class_label == DATASET_LABEL:
+            del _cache_dataset_by_name[name]
+        elif storage_class_label == KEY_VALUE_STORE_LABEL:
+            del _cache_kvs_by_name[name]
+        elif storage_class_label == REQUEST_QUEUE_LABEL:
+            del _cache_rq_by_name[name]
+        else:
+            raise ValueError(f'Unknown storage class: {storage_class_label}')
+    except KeyError as exc:
+        raise RuntimeError(f'Storage with provided name was not found ({name}).') from exc
 
 
 @overload
@@ -71,10 +154,9 @@ async def open_storage(
 
     # Try to restore the storage from cache by ID
     if name:
-        cached_storage = _cache_by_name.get(name)
-
-        if isinstance(cached_storage, storage_class):
-            return cached_storage  # type: ignore
+        cached_storage = _get_from_cache_by_name(storage_class_label=storage_class.LABEL, name=name)
+        if cached_storage:
+            return cached_storage
 
     # Find out if the storage is a default on memory storage
     is_default_on_memory = False
@@ -85,10 +167,9 @@ async def open_storage(
 
     # Try to restore storage from cache by ID
     if id:
-        cached_storage = _cache_by_id.get(id)
-
-        if isinstance(cached_storage, storage_class):
-            return cached_storage  # type: ignore
+        cached_storage = _get_from_cache_by_id(storage_class_label=storage_class.LABEL, id=id)
+        if cached_storage:
+            return cached_storage
 
     # Purge on start if configured
     if configuration.purge_on_start:
@@ -118,26 +199,25 @@ async def open_storage(
         )
 
         # Cache the storage by ID and name
-        _cache_by_id[storage.id] = storage
+        _add_to_cache_by_id(storage.id, storage)
         if storage.name is not None:
-            _cache_by_name[storage.name] = storage
+            _add_to_cache_by_name(storage.name, storage)
 
     return storage
 
 
-def remove_storage_from_cache(id: str | None = None, name: str | None = None) -> None:
+def remove_storage_from_cache(
+    *,
+    storage_class_label: str,
+    id: str | None = None,
+    name: str | None = None,
+) -> None:
     """Remove a storage from cache by ID or name."""
     if id:
-        try:
-            del _cache_by_id[id]
-        except KeyError as exc:
-            raise RuntimeError(f'Storage with provided ID was not found ({id}).') from exc
+        _rm_from_cache_by_id(storage_class_label=storage_class_label, id=id)
 
     if name:
-        try:
-            del _cache_by_name[name]
-        except KeyError as exc:
-            raise RuntimeError(f'Storage with provided name was not found ({name}).') from exc
+        _rm_from_cache_by_name(storage_class_label=storage_class_label, name=name)
 
 
 def _get_resource_client(

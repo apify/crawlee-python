@@ -83,7 +83,7 @@ class KeyValueStore(BaseStorage):
     @override
     async def drop(self) -> None:
         await self._resource_client.delete()
-        remove_storage_from_cache(id=self._id, name=self._name)
+        remove_storage_from_cache(storage_class_label=self.LABEL, id=self._id, name=self._name)
 
     @overload
     async def get_value(self, key: str) -> Any: ...

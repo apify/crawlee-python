@@ -18,8 +18,12 @@ def reset_default_instances(monkeypatch: pytest.MonkeyPatch) -> Callable[[], Non
     def reset() -> None:
         monkeypatch.setattr(StorageClientManager, 'persist_storage', None)
         monkeypatch.setattr(StorageClientManager, '_default_instance', None)
-        monkeypatch.setattr(_creation_management, '_cache_by_id', {})
-        monkeypatch.setattr(_creation_management, '_cache_by_name', {})
+        monkeypatch.setattr(_creation_management, '_cache_dataset_by_id', {})
+        monkeypatch.setattr(_creation_management, '_cache_dataset_by_name', {})
+        monkeypatch.setattr(_creation_management, '_cache_kvs_by_id', {})
+        monkeypatch.setattr(_creation_management, '_cache_kvs_by_name', {})
+        monkeypatch.setattr(_creation_management, '_cache_rq_by_id', {})
+        monkeypatch.setattr(_creation_management, '_cache_rq_by_name', {})
 
     return reset
 
