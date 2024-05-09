@@ -24,7 +24,7 @@ class LocalEventManager(EventManager):
     def __init__(
         self,
         *,
-        system_info_interval: timedelta = timedelta(seconds=60),
+        system_info_interval: timedelta = timedelta(seconds=1),
     ) -> None:
         """Create a new instance.
 
