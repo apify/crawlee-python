@@ -1,3 +1,6 @@
+# TODO: type ignores and crawlee_local_storage_dir
+# https://github.com/apify/crawlee-py/issues/146
+
 from __future__ import annotations
 
 import os
@@ -5,7 +8,6 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from crawlee._utils.env_vars import CrawleeEnvVars
 from crawlee.configuration import Configuration
 from crawlee.consts import METADATA_FILENAME
 from crawlee.memory_storage_client import MemoryStorageClient
@@ -17,8 +19,18 @@ if TYPE_CHECKING:
 async def test_write_metadata(tmp_path: Path) -> None:
     dataset_name = 'test'
     dataset_no_metadata_name = 'test-no-metadata'
-    ms = MemoryStorageClient(Configuration(local_storage_dir=str(tmp_path), write_metadata=True))
-    ms_no_metadata = MemoryStorageClient(Configuration(local_storage_dir=str(tmp_path), write_metadata=False))
+    ms = MemoryStorageClient(
+        Configuration(
+            crawlee_local_storage_dir=str(tmp_path),  # type: ignore
+            write_metadata=True,
+        ),
+    )
+    ms_no_metadata = MemoryStorageClient(
+        Configuration(
+            crawlee_local_storage_dir=str(tmp_path),  # type: ignore
+            write_metadata=False,
+        )
+    )
     datasets_client = ms.datasets()
     datasets_no_metadata_client = ms_no_metadata.datasets()
     await datasets_client.get_or_create(name=dataset_name)
@@ -31,8 +43,18 @@ async def test_write_metadata(tmp_path: Path) -> None:
 
 
 async def test_persist_storage(tmp_path: Path) -> None:
-    ms = MemoryStorageClient(Configuration(local_storage_dir=str(tmp_path), persist_storage=True))
-    ms_no_persist = MemoryStorageClient(Configuration(local_storage_dir=str(tmp_path), persist_storage=False))
+    ms = MemoryStorageClient(
+        Configuration(
+            crawlee_local_storage_dir=str(tmp_path),  # type: ignore
+            persist_storage=True,
+        )
+    )
+    ms_no_persist = MemoryStorageClient(
+        Configuration(
+            crawlee_local_storage_dir=str(tmp_path),  # type: ignore
+            persist_storage=False,
+        )
+    )
     kvs_client = ms.key_value_stores()
     kvs_no_metadata_client = ms_no_persist.key_value_stores()
     kvs_info = await kvs_client.get_or_create(name='kvs')
@@ -47,36 +69,59 @@ async def test_persist_storage(tmp_path: Path) -> None:
     assert os.path.exists(path2) is False
 
 
-def test_config_via_env_vars_persist_storage(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    # Env var changes persist_storage to False
+def test_persist_storage_set_to_false_via_string_env_var(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv('CRAWLEE_PERSIST_STORAGE', 'false')
-    ms = MemoryStorageClient(Configuration(local_storage_dir=str(tmp_path)))
+    ms = MemoryStorageClient(Configuration(crawlee_local_storage_dir=str(tmp_path)))  # type: ignore
     assert ms.persist_storage is False
+
+
+def test_persist_storage_set_to_false_via_numeric_env_var(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv('CRAWLEE_PERSIST_STORAGE', '0')
-    ms = MemoryStorageClient(Configuration(local_storage_dir=str(tmp_path)))
+    ms = MemoryStorageClient(Configuration(crawlee_local_storage_dir=str(tmp_path)))  # type: ignore
     assert ms.persist_storage is False
-    # Test if constructor arg takes precedence over env var value
-    ms = MemoryStorageClient(Configuration(local_storage_dir=str(tmp_path), persist_storage=True))
+
+
+def test_persist_storage_true_via_constructor_arg(tmp_path: Path) -> None:
+    ms = MemoryStorageClient(
+        Configuration(
+            crawlee_local_storage_dir=str(tmp_path),  # type: ignore
+            persist_storage=True,
+        )
+    )
     assert ms.persist_storage is True
 
 
-def test_config_via_env_vars_write_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_default_write_metadata_behavior(tmp_path: Path) -> None:
     # Default behavior
-    ms = MemoryStorageClient(Configuration(local_storage_dir=str(tmp_path)))
+    ms = MemoryStorageClient(Configuration(crawlee_local_storage_dir=str(tmp_path)))  # type: ignore
     assert ms.write_metadata is True
 
+
+def test_write_metadata_set_to_false_via_env_var(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     # Test if env var changes write_metadata to False
     monkeypatch.setenv('CRAWLEE_WRITE_METADATA', 'false')
-    ms = MemoryStorageClient(Configuration(local_storage_dir=str(tmp_path)))
+    ms = MemoryStorageClient(Configuration(crawlee_local_storage_dir=str(tmp_path)))  # type: ignore
     assert ms.write_metadata is False
 
+
+def test_write_metadata_false_via_constructor_arg_overrides_env_var(tmp_path: Path) -> None:
     # Test if constructor arg takes precedence over env var value
-    ms = MemoryStorageClient(Configuration(write_metadata=False, local_storage_dir=str(tmp_path)))
+    ms = MemoryStorageClient(
+        Configuration(
+            write_metadata=False,
+            crawlee_local_storage_dir=str(tmp_path),  # type: ignore
+        )
+    )
     assert ms.write_metadata is False
 
 
 async def test_purge_datasets(tmp_path: Path) -> None:
-    ms = MemoryStorageClient(Configuration(write_metadata=True, local_storage_dir=str(tmp_path)))
+    ms = MemoryStorageClient(
+        Configuration(
+            write_metadata=True,
+            crawlee_local_storage_dir=str(tmp_path),  # type: ignore
+        )
+    )
     # Create default and non-default datasets
     datasets_client = ms.datasets()
     default_dataset_info = await datasets_client.get_or_create(name='default')
@@ -94,7 +139,12 @@ async def test_purge_datasets(tmp_path: Path) -> None:
 
 
 async def test_purge_key_value_stores(tmp_path: Path) -> None:
-    ms = MemoryStorageClient(Configuration(write_metadata=True, local_storage_dir=str(tmp_path)))
+    ms = MemoryStorageClient(
+        Configuration(
+            write_metadata=True,
+            crawlee_local_storage_dir=str(tmp_path),  # type: ignore
+        )
+    )
 
     # Create default and non-default key-value stores
     kvs_client = ms.key_value_stores()
@@ -124,7 +174,12 @@ async def test_purge_key_value_stores(tmp_path: Path) -> None:
 
 
 async def test_purge_request_queues(tmp_path: Path) -> None:
-    ms = MemoryStorageClient(Configuration(write_metadata=True, local_storage_dir=str(tmp_path)))
+    ms = MemoryStorageClient(
+        Configuration(
+            write_metadata=True,
+            crawlee_local_storage_dir=str(tmp_path),  # type: ignore
+        )
+    )
     # Create default and non-default request queues
     rq_client = ms.request_queues()
     default_rq_info = await rq_client.get_or_create(name='default')
@@ -141,7 +196,12 @@ async def test_purge_request_queues(tmp_path: Path) -> None:
 
 
 async def test_not_implemented_method(tmp_path: Path) -> None:
-    ms = MemoryStorageClient(Configuration(write_metadata=True, local_storage_dir=str(tmp_path)))
+    ms = MemoryStorageClient(
+        Configuration(
+            write_metadata=True,
+            crawlee_local_storage_dir=str(tmp_path),  # type: ignore
+        )
+    )
     ddt = ms.dataset('test')
     with pytest.raises(NotImplementedError, match='This method is not supported in memory storage.'):
         await ddt.stream_items(item_format='json')
@@ -150,16 +210,23 @@ async def test_not_implemented_method(tmp_path: Path) -> None:
         await ddt.stream_items(item_format='json')
 
 
-async def test_storage_path_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv(CrawleeEnvVars.LOCAL_STORAGE_DIR)
-    default_ms = MemoryStorageClient()
-    assert default_ms.storage_dir == './storage'
+async def test_default_storage_path_used(monkeypatch: pytest.MonkeyPatch) -> None:
+    # We expect the default value to be used
+    monkeypatch.delenv('CRAWLEE_LOCAL_STORAGE_DIR', raising=False)
+    ms = MemoryStorageClient()
+    assert ms.storage_dir == './storage'
 
+
+async def test_storage_path_from_env_var_overrides_default(monkeypatch: pytest.MonkeyPatch) -> None:
     # We expect the env var to override the default value
-    monkeypatch.setenv(CrawleeEnvVars.LOCAL_STORAGE_DIR, './env_var_storage_dir')
-    env_var_ms = MemoryStorageClient()
-    assert env_var_ms.storage_dir == './env_var_storage_dir'
+    monkeypatch.setenv('CRAWLEE_LOCAL_STORAGE_DIR', './env_var_storage_dir')
+    ms = MemoryStorageClient()
+    assert ms.storage_dir == './env_var_storage_dir'
 
-    # We expect the parametrized value to override the env var
-    parametrized_ms = MemoryStorageClient(Configuration(local_storage_dir='./parametrized_storage_dir'))
-    assert parametrized_ms.storage_dir == './parametrized_storage_dir'
+
+async def test_parametrized_storage_path_overrides_env_var() -> None:
+    # We expect the parametrized value to be used
+    ms = MemoryStorageClient(
+        Configuration(crawlee_local_storage_dir='./parametrized_storage_dir'),  # type: ignore
+    )
+    assert ms.storage_dir == './parametrized_storage_dir'

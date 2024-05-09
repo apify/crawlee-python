@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, Callable
 
 import pytest
 
-from crawlee._utils.env_vars import CrawleeEnvVars
 from crawlee.configuration import Configuration
 from crawlee.memory_storage_client import MemoryStorageClient
 from crawlee.storages import _creation_management
@@ -37,10 +36,14 @@ def _reset_and_patch_default_instances(
     reset_default_instances()
 
     # This forces the MemoryStorageClient to use tmp_path for its storage dir
-    monkeypatch.setenv(CrawleeEnvVars.LOCAL_STORAGE_DIR, str(tmp_path))
+    monkeypatch.setenv('CRAWLEE_LOCAL_STORAGE_DIR', str(tmp_path))
 
 
 @pytest.fixture()
 def memory_storage_client(tmp_path: Path) -> MemoryStorageClient:
-    cfg = Configuration(write_metadata=True, persist_storage=True, local_storage_dir=str(tmp_path))
+    cfg = Configuration(
+        write_metadata=True,
+        persist_storage=True,
+        crawlee_local_storage_dir=str(tmp_path),  # type: ignore
+    )
     return MemoryStorageClient(cfg)

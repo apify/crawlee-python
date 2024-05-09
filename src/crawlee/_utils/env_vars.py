@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from enum import Enum
 from typing import Any, Literal, get_args
 
 from crawlee._utils.data_processing import (
@@ -11,16 +10,6 @@ from crawlee._utils.data_processing import (
     maybe_parse_float,
     maybe_parse_int,
 )
-
-
-class CrawleeEnvVars(str, Enum):
-    """Enum for the environment variables used by Crawlee."""
-
-    LOCAL_STORAGE_DIR = 'CRAWLEE_LOCAL_STORAGE_DIR'
-    PERSIST_STORAGE = 'CRAWLEE_PERSIST_STORAGE'
-    WRITE_METADATA = 'CRAWLEE_WRITE_METADATA'
-    PURGE_ON_START = 'CRAWLEE_PURGE_ON_START'
-
 
 INTEGER_ENV_VARS_TYPE = Literal[None]
 
