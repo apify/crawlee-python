@@ -38,7 +38,7 @@ class KeyValueStoreCollectionClient(BaseKeyValueStoreCollectionClient):
         id: str | None = None,
     ) -> KeyValueStoreMetadata:
         if name is None and id is None:
-            id = self._memory_storage_client.configuration.default_storage_id
+            id = self._memory_storage_client.default_storage_id
 
         return await get_or_create_inner(
             memory_storage_client=self._memory_storage_client,

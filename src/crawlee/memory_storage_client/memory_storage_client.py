@@ -10,8 +10,6 @@ from aiofiles import ospath
 from aiofiles.os import rename, scandir
 from typing_extensions import override
 
-from crawlee._utils.data_processing import maybe_parse_bool
-from crawlee._utils.env_vars import CrawleeEnvVars
 from crawlee.base_storage_client import BaseStorageClient
 from crawlee.configuration import Configuration
 from crawlee.memory_storage_client.dataset_client import DatasetClient
@@ -38,59 +36,54 @@ class MemoryStorageClient(BaseStorageClient):
     _TEMPORARY_DIR_NAME = '__CRAWLEE_TEMPORARY'
     """Name of the directory used to temporarily store files during purges."""
 
-    def __init__(
-        self,
-        *,
-        configuration: Configuration | None = None,
-        local_data_directory: str | None = None,
-        write_metadata: bool | None = None,
-        persist_storage: bool | None = None,
-    ) -> None:
+    def __init__(self, configuration: Configuration | None = None) -> None:
         """Create a new instance.
 
         Args:
-            configuration: Configuration object to use. If None, a new Configuration object will be created.
-            local_data_directory: Path to the local directory where data will be persisted. If None, defaults to
-                CrawleeEnvVars.LOCAL_STORAGE_DIR or './storage'.
-            write_metadata: Flag indicating whether to write metadata for the storages. Defaults based on
-                CrawleeEnvVars.WRITE_METADATA.
-            persist_storage: Flag indicating whether to persist the storage data locally. Defaults based on
-                CrawleeEnvVars.PERSIST_STORAGE.
+            configuration: Configuration object to use. If None, a default Configuration object will be created.
         """
-        self.configuration = configuration or Configuration()
+        self._configuration = configuration or Configuration()
 
-        self._local_data_directory = local_data_directory or os.getenv(CrawleeEnvVars.LOCAL_STORAGE_DIR) or './storage'
-        self.write_metadata = (
-            write_metadata
-            if write_metadata is not None
-            else maybe_parse_bool(os.getenv(CrawleeEnvVars.WRITE_METADATA, 'true'))
-        )
-        self.persist_storage = (
-            persist_storage
-            if persist_storage is not None
-            else maybe_parse_bool(os.getenv(CrawleeEnvVars.PERSIST_STORAGE, 'true'))
-        )
-
-        self._purged_on_start = False  # Indicates whether a purge was already performed on this instance.
         self.datasets_handled: list[DatasetClient] = []
         self.key_value_stores_handled: list[KeyValueStoreClient] = []
         self.request_queues_handled: list[RequestQueueClient] = []
+        self._purged_on_start = False  # Indicates whether a purge was already performed on this instance.
         self._purge_lock = asyncio.Lock()
+
+    @property
+    def default_storage_id(self) -> str:
+        """The ID of the default storage."""
+        return self._configuration.default_storage_id
+
+    @property
+    def write_metadata(self) -> bool:
+        """Whether to write metadata to the storage."""
+        return self._configuration.write_metadata
+
+    @property
+    def persist_storage(self) -> bool:
+        """Whether to persist the storage."""
+        return self._configuration.persist_storage
+
+    @property
+    def storage_dir(self) -> str:
+        """Path to the storage directory."""
+        return self._configuration.local_storage_dir
 
     @property
     def datasets_directory(self) -> str:
         """Path to the directory containing datasets."""
-        return os.path.join(self._local_data_directory, 'datasets')
+        return os.path.join(self.storage_dir, 'datasets')
 
     @property
     def key_value_stores_directory(self) -> str:
         """Path to the directory containing key-value stores."""
-        return os.path.join(self._local_data_directory, 'key_value_stores')
+        return os.path.join(self.storage_dir, 'key_value_stores')
 
     @property
     def request_queues_directory(self) -> str:
         """Path to the directory containing request queues."""
-        return os.path.join(self._local_data_directory, 'request_queues')
+        return os.path.join(self.storage_dir, 'request_queues')
 
     @override
     def dataset(self, id: str) -> DatasetClient:

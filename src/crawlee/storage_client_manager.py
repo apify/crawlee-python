@@ -8,7 +8,6 @@ from crawlee.memory_storage_client import MemoryStorageClient
 class StorageClientManager:
     """A class for managing storage clients."""
 
-    persist_storage: bool | None = None
     is_at_home: bool | None = None
 
     local_client: MemoryStorageClient | None = None
@@ -25,10 +24,7 @@ class StorageClientManager:
         """
         default_instance = cls._get_default_instance()
         if not default_instance.local_client:
-            default_instance.local_client = MemoryStorageClient(
-                persist_storage=default_instance.persist_storage,
-                write_metadata=True,
-            )
+            default_instance.local_client = MemoryStorageClient()
 
         if default_instance.is_at_home:
             if default_instance.cloud_client is None:

@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING, Callable
 import pytest
 
 from crawlee._utils.env_vars import CrawleeEnvVars
+from crawlee.configuration import Configuration
 from crawlee.memory_storage_client import MemoryStorageClient
-from crawlee.storage_client_manager import StorageClientManager
 from crawlee.storages import _creation_management
 
 if TYPE_CHECKING:
@@ -16,8 +16,6 @@ if TYPE_CHECKING:
 @pytest.fixture()
 def reset_default_instances(monkeypatch: pytest.MonkeyPatch) -> Callable[[], None]:
     def reset() -> None:
-        monkeypatch.setattr(StorageClientManager, 'persist_storage', None)
-        monkeypatch.setattr(StorageClientManager, '_default_instance', None)
         monkeypatch.setattr(_creation_management, '_cache_dataset_by_id', {})
         monkeypatch.setattr(_creation_management, '_cache_dataset_by_name', {})
         monkeypatch.setattr(_creation_management, '_cache_kvs_by_id', {})
@@ -43,5 +41,6 @@ def _reset_and_patch_default_instances(
 
 
 @pytest.fixture()
-def memory_storage_client() -> MemoryStorageClient:
-    return MemoryStorageClient(write_metadata=True, persist_storage=True)
+def memory_storage_client(tmp_path: Path) -> MemoryStorageClient:
+    cfg = Configuration(write_metadata=True, persist_storage=True, crawlee_local_storage_dir=str(tmp_path))
+    return MemoryStorageClient(cfg)
