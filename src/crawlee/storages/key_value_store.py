@@ -6,7 +6,6 @@ from typing_extensions import override
 
 from crawlee.consts import KEY_VALUE_STORE_LABEL
 from crawlee.models import KeyValueStoreKeyInfo
-from crawlee.storages._creation_management import open_storage, remove_storage_from_cache
 from crawlee.storages.base_storage import BaseStorage
 
 if TYPE_CHECKING:
@@ -73,6 +72,8 @@ class KeyValueStore(BaseStorage):
         name: str | None = None,
         configuration: Configuration | None = None,
     ) -> KeyValueStore:
+        from crawlee.storages._creation_management import open_storage
+
         return await open_storage(
             storage_class=cls,
             id=id,
@@ -82,6 +83,8 @@ class KeyValueStore(BaseStorage):
 
     @override
     async def drop(self) -> None:
+        from crawlee.storages._creation_management import remove_storage_from_cache
+
         await self._resource_client.delete()
         remove_storage_from_cache(storage_class_label=self.LABEL, id=self._id, name=self._name)
 

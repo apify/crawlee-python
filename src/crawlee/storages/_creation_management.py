@@ -9,14 +9,13 @@ from crawlee.configuration import Configuration
 from crawlee.consts import DATASET_LABEL, KEY_VALUE_STORE_LABEL, REQUEST_QUEUE_LABEL
 from crawlee.memory_storage_client import MemoryStorageClient
 from crawlee.storage_client_manager import StorageClientManager
+from crawlee.storages.dataset import Dataset
+from crawlee.storages.key_value_store import KeyValueStore
+from crawlee.storages.request_queue import RequestQueue
 
 if TYPE_CHECKING:
     from crawlee.base_storage_client.base_storage_client import BaseStorageClient
     from crawlee.base_storage_client.types import ResourceClient, ResourceCollectionClient
-    from crawlee.storages.dataset import Dataset
-    from crawlee.storages.key_value_store import KeyValueStore
-    from crawlee.storages.request_queue import RequestQueue
-
 
 _creation_lock = asyncio.Lock()
 """Lock for storage creation."""
@@ -59,24 +58,24 @@ def _get_from_cache_by_id(
 
 def _add_to_cache_by_name(name: str, storage: Dataset | KeyValueStore | RequestQueue) -> None:
     """Add storage to cache by name."""
-    if storage.LABEL == DATASET_LABEL:
-        _cache_dataset_by_name[name] = storage  # type: ignore
-    elif storage.LABEL == KEY_VALUE_STORE_LABEL:
-        _cache_kvs_by_name[name] = storage  # type: ignore
-    elif storage.LABEL == REQUEST_QUEUE_LABEL:
-        _cache_rq_by_name[name] = storage  # type: ignore
+    if isinstance(storage, Dataset):
+        _cache_dataset_by_name[name] = storage
+    elif isinstance(storage, KeyValueStore):
+        _cache_kvs_by_name[name] = storage
+    elif isinstance(storage, RequestQueue):
+        _cache_rq_by_name[name] = storage
     else:
         raise TypeError(f'Unknown storage: {storage}')
 
 
 def _add_to_cache_by_id(id: str, storage: Dataset | KeyValueStore | RequestQueue) -> None:
     """Add storage to cache by ID."""
-    if storage.LABEL == DATASET_LABEL:
-        _cache_dataset_by_id[id] = storage  # type: ignore
-    elif storage.LABEL == KEY_VALUE_STORE_LABEL:
-        _cache_kvs_by_id[id] = storage  # type: ignore
-    elif storage.LABEL == REQUEST_QUEUE_LABEL:
-        _cache_rq_by_id[id] = storage  # type: ignore
+    if isinstance(storage, Dataset):
+        _cache_dataset_by_id[id] = storage
+    elif isinstance(storage, KeyValueStore):
+        _cache_kvs_by_id[id] = storage
+    elif isinstance(storage, RequestQueue):
+        _cache_rq_by_id[id] = storage
     else:
         raise TypeError(f'Unknown storage: {storage}')
 

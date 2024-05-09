@@ -10,7 +10,6 @@ from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.file import json_dumps
 from crawlee.consts import DATASET_LABEL
 from crawlee.models import DatasetMetadata
-from crawlee.storages._creation_management import open_storage, remove_storage_from_cache
 from crawlee.storages.base_storage import BaseStorage
 from crawlee.storages.key_value_store import KeyValueStore
 
@@ -85,6 +84,8 @@ class Dataset(BaseStorage):
         name: str | None = None,
         configuration: Configuration | None = None,
     ) -> Dataset:
+        from crawlee.storages._creation_management import open_storage
+
         return await open_storage(
             storage_class=cls,
             id=id,
@@ -94,6 +95,8 @@ class Dataset(BaseStorage):
 
     @override
     async def drop(self) -> None:
+        from crawlee.storages._creation_management import remove_storage_from_cache
+
         await self._resource_client.delete()
         remove_storage_from_cache(storage_class_label=self.LABEL, id=self._id, name=self._name)
 

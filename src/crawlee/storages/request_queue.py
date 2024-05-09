@@ -14,7 +14,6 @@ from crawlee._utils.lru_cache import LRUCache
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee.consts import REQUEST_QUEUE_LABEL
 from crawlee.models import Request, RequestQueueHeadState, RequestQueueOperationInfo
-from crawlee.storages._creation_management import open_storage, remove_storage_from_cache
 from crawlee.storages.base_storage import BaseStorage
 from crawlee.storages.request_provider import RequestProvider
 
@@ -118,6 +117,8 @@ class RequestQueue(BaseStorage, RequestProvider):
         name: str | None = None,
         configuration: Configuration | None = None,
     ) -> RequestQueue:
+        from crawlee.storages._creation_management import open_storage
+
         return await open_storage(
             storage_class=cls,
             id=id,
@@ -127,6 +128,8 @@ class RequestQueue(BaseStorage, RequestProvider):
 
     @override
     async def drop(self) -> None:
+        from crawlee.storages._creation_management import remove_storage_from_cache
+
         await self._resource_client.delete()
         remove_storage_from_cache(storage_class_label=self.LABEL, id=self._id, name=self._name)
 
