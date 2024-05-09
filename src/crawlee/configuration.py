@@ -21,10 +21,10 @@ class Configuration(BaseSettings):
 
     model_config = SettingsConfigDict(populate_by_name=True)
 
-    internal_timeout: Annotated[timedelta | None, Field(alias='crawlee_internal_timeout', default=None)]
-    verbose_log: Annotated[bool, Field(alias='crawlee_verbose_log', default=False)]
-    default_storage_id: Annotated[str, Field(alias='crawlee_default_storage_id', default='default')]
-    purge_on_start: Annotated[bool, Field(alias='crawlee_purge_on_start', default=True)]
-    write_metadata: Annotated[bool, Field(alias='crawlee_write_metadata', default=True)]
-    persist_storage: Annotated[bool, Field(alias='crawlee_persist_storage', default=True)]
-    local_storage_dir: Annotated[str, Field(alias='crawlee_local_storage_dir', default='./storage')]
+    internal_timeout: Annotated[timedelta | None, Field(alias='crawlee_internal_timeout')] = None
+    verbose_log: Annotated[bool, Field(alias='crawlee_verbose_log')] = False
+    default_storage_id: Annotated[str, Field(alias='crawlee_default_storage_id')] = 'default'
+    purge_on_start: Annotated[bool, Field(alias='crawlee_purge_on_start')] = True
+    write_metadata: Annotated[bool, Field(alias='crawlee_write_metadata')] = True
+    persist_storage: Annotated[bool, Field(alias='crawlee_persist_storage')] = True
+    local_storage_dir: Annotated[str, Field(alias='crawlee_local_storage_dir')] = './storage'

@@ -42,5 +42,5 @@ def _reset_and_patch_default_instances(
 
 @pytest.fixture()
 def memory_storage_client(tmp_path: Path) -> MemoryStorageClient:
-    cfg = Configuration(write_metadata=True, persist_storage=True, crawlee_local_storage_dir=str(tmp_path))
+    cfg = Configuration(write_metadata=True, persist_storage=True, local_storage_dir=str(tmp_path))
     return MemoryStorageClient(cfg)
