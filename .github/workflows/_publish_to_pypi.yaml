@@ -57,12 +57,23 @@ jobs:
         if: github.event_name != 'release'
         run: |
           GIT_TAG=v$(python ./scripts/print_current_package_version.py)
+          echo "Current package version retrieved: ${GIT_TAG}"
+
+          echo "Creating Git tag: ${GIT_TAG}"
           git tag "$GIT_TAG"
-          git push origin $git_tag
+          echo "Git tag ${GIT_TAG} created successfully."
+
+          echo "Pushing Git tag ${GIT_TAG} to the remote repository."
+          git push origin tag "$GIT_TAG"
+          echo "Git tag ${GIT_TAG} pushed successfully."
 
       # If triggered by a release, upload build artifacts to the associated GitHub release.
       - name: Upload the build artifacts to release
         if: github.event_name == 'release'
-        run: gh release upload ${{ github.ref_name }} dist/*
+        run: |
+          echo "Uploading build artifacts to GitHub release: ${{ github.ref_name }}"
+          gh release upload ${{ github.ref_name }} dist/*
+          echo "Build artifacts uploaded successfully."
+
         env:
           GH_TOKEN: ${{ github.token }}
