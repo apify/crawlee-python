@@ -148,8 +148,8 @@ async def open_storage(
     name: str | None = None,
 ) -> Dataset | KeyValueStore | RequestQueue:
     """Open a either a new key-value store or restore existing one and return it."""
-    storage_client = StorageClientManager.get_storage_client()
     configuration = configuration or Configuration()
+    storage_client = StorageClientManager().get_storage_client(in_cloud=configuration.in_cloud)
 
     # Try to restore the storage from cache by ID
     if name:

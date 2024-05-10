@@ -28,3 +28,4 @@ class Configuration(BaseSettings):
     write_metadata: Annotated[bool, Field(alias='crawlee_write_metadata')] = True
     persist_storage: Annotated[bool, Field(alias='crawlee_persist_storage')] = True
     local_storage_dir: Annotated[str, Field(alias='crawlee_local_storage_dir')] = './storage'
+    in_cloud: Annotated[bool, Field(alias='crawlee_in_cloud')] = False
