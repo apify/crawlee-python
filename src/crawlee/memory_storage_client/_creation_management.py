@@ -7,7 +7,7 @@ import pathlib
 from datetime import datetime, timezone
 from decimal import Decimal
 from logging import getLogger
-from typing import TYPE_CHECKING, overload
+from typing import TYPE_CHECKING, TypeVar, overload
 
 import aiofiles
 from aiofiles.os import makedirs
@@ -29,6 +29,8 @@ if TYPE_CHECKING:
     from crawlee.memory_storage_client.key_value_store_client import KeyValueStoreClient
     from crawlee.memory_storage_client.memory_storage_client import MemoryStorageClient
     from crawlee.memory_storage_client.request_queue_client import RequestQueueClient
+
+    TResourceClient = TypeVar('TResourceClient', DatasetClient, KeyValueStoreClient, RequestQueueClient)
 
 logger = getLogger(__name__)
 
@@ -59,47 +61,14 @@ async def persist_metadata_if_enabled(*, data: dict, entity_directory: str, writ
         await f.write(s.encode('utf-8'))
 
 
-@overload
 def find_or_create_client_by_id_or_name_inner(
     resource_label: str,
-    storage_client_cache: list[DatasetClient],
+    storage_client_cache: list[TResourceClient],
     storages_dir: str,
     memory_storage_client: MemoryStorageClient,
     id: str | None = None,
     name: str | None = None,
-) -> DatasetClient | None: ...
-
-
-@overload
-def find_or_create_client_by_id_or_name_inner(
-    resource_label: str,
-    storage_client_cache: list[KeyValueStoreClient],
-    storages_dir: str,
-    memory_storage_client: MemoryStorageClient,
-    id: str | None = None,
-    name: str | None = None,
-) -> KeyValueStoreClient | None: ...
-
-
-@overload
-def find_or_create_client_by_id_or_name_inner(
-    resource_label: str,
-    storage_client_cache: list[RequestQueueClient],
-    storages_dir: str,
-    memory_storage_client: MemoryStorageClient,
-    id: str | None = None,
-    name: str | None = None,
-) -> RequestQueueClient | None: ...
-
-
-def find_or_create_client_by_id_or_name_inner(
-    resource_label: str,
-    storage_client_cache: list[DatasetClient] | list[KeyValueStoreClient] | list[RequestQueueClient],
-    storages_dir: str,
-    memory_storage_client: MemoryStorageClient,
-    id: str | None = None,
-    name: str | None = None,
-) -> DatasetClient | KeyValueStoreClient | RequestQueueClient | None:
+) -> TResourceClient | None:
     """Locates or creates a new storage client based on the given ID or name.
 
     This method attempts to find a storage client in the memory cache first. If not found,
@@ -181,7 +150,7 @@ def find_or_create_client_by_id_or_name_inner(
         raise ValueError('Invalid resource client class.')
 
     storage_client_cache.append(resource_client)  # type: ignore
-    return resource_client
+    return resource_client  # type: ignore
 
 
 @overload
