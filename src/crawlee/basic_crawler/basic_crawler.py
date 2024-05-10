@@ -6,7 +6,7 @@ from contextlib import AsyncExitStack
 from datetime import timedelta
 from functools import partial
 from logging import getLogger
-from typing import TYPE_CHECKING, AsyncGenerator, Awaitable, Callable, Generic, Sequence, Union, cast
+from typing import TYPE_CHECKING, Any, AsyncGenerator, Awaitable, Callable, Generic, Sequence, Union, cast
 
 import httpx
 from tldextract import TLDExtract
@@ -305,13 +305,13 @@ class BasicCrawler(Generic[TCrawlingContext]):
         if strategy == EnqueueStrategy.ALL:
             return True
 
-        assert_never()
+        assert_never(strategy)
 
     def _check_url_patterns(
         self,
         target_url: httpx.URL,
-        include: Sequence[re.Pattern | Glob] | None,
-        exclude: Sequence[re.Pattern | Glob] | None,
+        include: Sequence[re.Pattern[Any] | Glob] | None,
+        exclude: Sequence[re.Pattern[Any] | Glob] | None,
     ) -> bool:
         """Check if a URL matches configured include/exclude patterns."""
         # If the URL matches any `exclude` pattern, reject it

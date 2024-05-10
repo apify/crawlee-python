@@ -1,4 +1,4 @@
-# ruff: noqa: TCH003
+# ruff: noqa: TCH001 TCH003
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from crawlee._utils.models import timedelta_ms
 
 
 @dataclass(frozen=True)
@@ -25,34 +27,42 @@ class FinalStatistics:
 
 
 class StatisticsState(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    """Statistic data about a crawler run."""
 
-    requests_finished: Annotated[int, Field(alias='requestsFinished')]
-    requests_failed: Annotated[int, Field(alias='requestsFailed')]
-    requests_retries: Annotated[int, Field(alias='requestsRetries')]
-    requests_failed_per_minute: Annotated[float, Field(alias='requestsFailedPerMinute')]
-    requests_finished_per_minute: Annotated[float, Field(alias='requestsFinishedPerMinute')]
-    request_min_duration: Annotated[timedelta, Field(alias='requestMinDurationMillis')]
-    request_max_duration: Annotated[timedelta, Field(alias='requestMaxDurationMillis')]
-    request_total_failed_duration: Annotated[timedelta, Field(alias='requestTotalFailedDurationMillis')]
-    request_total_finished_duration: Annotated[timedelta, Field(alias='requestTotalFinishedDurationMilles')]
-    crawler_started_at: Annotated[datetime | None, Field(alias='crawlerStartedAt')]
-    crawler_finished_at: Annotated[datetime | None, Field(alias='crawlerFinishedAt')]
-    crawler_runtime: Annotated[timedelta, Field(alias='crawlerRuntime')]
-    errors: dict[str, Any]
-    retry_errors: Annotated[dict[str, Any], Field(alias='retryErrors')]
-    requests_with_status_code: Annotated[dict[str, int], Field(alias='requestsWithStatusCode')]
-    stats_persisted_at: Annotated[datetime | None, Field(alias='statsPersistedAt')]
+    model_config = ConfigDict(populate_by_name=True, ser_json_inf_nan='constants')
+
+    requests_finished: Annotated[int, Field(alias='requestsFinished')] = 0
+    requests_failed: Annotated[int, Field(alias='requestsFailed')] = 0
+    requests_retries: Annotated[int, Field(alias='requestsRetries')] = 0
+    requests_failed_per_minute: Annotated[float, Field(alias='requestsFailedPerMinute')] = 0
+    requests_finished_per_minute: Annotated[float, Field(alias='requestsFinishedPerMinute')] = 0
+    request_min_duration: Annotated[timedelta_ms, Field(alias='requestMinDurationMillis')] = timedelta.max
+    request_max_duration: Annotated[timedelta_ms, Field(alias='requestMaxDurationMillis')] = timedelta()
+    request_total_failed_duration: Annotated[timedelta_ms, Field(alias='requestTotalFailedDurationMillis')] = (
+        timedelta()
+    )
+    request_total_finished_duration: Annotated[timedelta_ms, Field(alias='requestTotalFinishedDurationMillis')] = (
+        timedelta()
+    )
+    crawler_started_at: Annotated[datetime | None, Field(alias='crawlerStartedAt')] = None
+    crawler_finished_at: Annotated[datetime | None, Field(alias='crawlerFinishedAt')] = None
+    crawler_runtime: Annotated[timedelta_ms, Field(alias='crawlerRuntimeMillis')] = timedelta()
+    errors: dict[str, Any] = Field(default_factory=dict)
+    retry_errors: dict[str, Any] = Field(alias='retryErrors', default_factory=dict)
+    requests_with_status_code: dict[str, int] = Field(alias='requestsWithStatusCode', default_factory=dict)
+    stats_persisted_at: Annotated[datetime | None, Field(alias='statsPersistedAt')] = None
 
 
 class StatisticsPersistedState(BaseModel):
+    """Additional statistic data to be stored in the persisted state."""
+
     model_config = ConfigDict(populate_by_name=True)
 
     request_retry_histogram: Annotated[list[int], Field(alias='requestRetryHistogram')]
     stats_id: Annotated[int, Field(alias='statsId')]
-    request_avg_failed_duration: Annotated[timedelta, Field(alias='requestAvgFailedDurationMillis')]
-    request_avg_finished_duration: Annotated[timedelta, Field(alias='requestAvgFinishedDurationMillis')]
-    request_total_duration: Annotated[int, Field(alias='requestTotalDurationMillis')]
+    request_avg_failed_duration: Annotated[timedelta_ms, Field(alias='requestAvgFailedDurationMillis')]
+    request_avg_finished_duration: Annotated[timedelta_ms, Field(alias='requestAvgFinishedDurationMillis')]
+    request_total_duration: Annotated[timedelta_ms, Field(alias='requestTotalDurationMillis')]
     requests_total: Annotated[int, Field(alias='requestsTotal')]
     crawler_last_started_at: Annotated[datetime, Field(alias='crawlerLastStartTimestamp')]
     stats_persisted_at: Annotated[datetime, Field(alias='statsPersistedAt')]

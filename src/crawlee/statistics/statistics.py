@@ -3,17 +3,24 @@ from __future__ import annotations
 
 import math
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Generic
+from logging import getLogger
+from typing import TYPE_CHECKING, Any, Generic, cast
 
 from typing_extensions import Self, TypeVar
 
-from crawlee.events import EventManager
+from crawlee.events.local_event_manager import LocalEventManager
+from crawlee.events.types import Event
 from crawlee.statistics.models import FinalStatistics, StatisticsPersistedState, StatisticsState
+from crawlee.storages import KeyValueStore
 
 if TYPE_CHECKING:
     from types import TracebackType
 
-TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState)
+    from crawlee.events import EventManager
+
+TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
+
+logger = getLogger(__name__)
 
 
 class Statistics(Generic[TStatisticsState]):
@@ -26,6 +33,7 @@ class Statistics(Generic[TStatisticsState]):
         persistence_enabled: bool = False,
         persist_state_kvs_name: str = 'default',
         persist_state_key: str | None = None,
+        key_value_store: KeyValueStore | None = None,
         state_model: type[TStatisticsState] = StatisticsState,
     ) -> None:
         self._id = self.__next_id
@@ -36,12 +44,26 @@ class Statistics(Generic[TStatisticsState]):
         self._instance_end: datetime | None = None
         self._retry_histogram = dict[int, int]()
 
+        self._events = event_manager or LocalEventManager()
+
         if persist_state_key is None:
             persist_state_key = f'SDK_CRAWLER_STATISTICS_{self._id}'
+
+        self._persistence_enabled = persistence_enabled
+        self._persist_state_key = persist_state_key
+        self._persist_state_kvs_name = persist_state_kvs_name
+        self._key_value_store: KeyValueStore | None = key_value_store
 
     async def __aenter__(self) -> Self:
         """Subscribe to events and start collecting statistics."""
         self._instance_start = datetime.now(timezone.utc)
+
+        if self._key_value_store is None:
+            self._key_value_store = await KeyValueStore.open(name=self._persist_state_kvs_name)
+
+        self._events.on(event=Event.PERSIST_STATE, listener=self._persist_state)
+        await self._maybe_load_statistics()
+
         return self
 
     async def __aexit__(
@@ -52,6 +74,7 @@ class Statistics(Generic[TStatisticsState]):
     ) -> None:
         """Stop collecting statistics."""
         self._instance_end = datetime.now(timezone.utc)
+        await self._persist_state()
 
     def register_status_code(self, code: int) -> None:
         pass
@@ -91,4 +114,47 @@ class Statistics(Generic[TStatisticsState]):
                 self._retry_histogram.get(retry_count, 0)
                 for retry_count in range(max(self._retry_histogram.keys(), default=0) + 1)
             ],
+        )
+
+    async def _maybe_load_statistics(self) -> None:
+        if not self._persistence_enabled:
+            return
+
+        if not self._key_value_store:
+            return
+
+        saved_state = self.state.__class__.model_validate(
+            await self._key_value_store.get_value(self._persist_state_key, cast(Any, {}))
+        )
+
+        self.state = saved_state
+
+    async def _persist_state(self) -> None:
+        if not self._persistence_enabled:
+            return
+
+        if not self._key_value_store:
+            return
+
+        if not self._instance_start:
+            return
+
+        final_statistics = self.calculate()
+        persisted_state = StatisticsPersistedState(
+            stats_id=self._id,
+            stats_persisted_at=datetime.now(timezone.utc),
+            crawler_last_started_at=self._instance_start,
+            request_total_duration=final_statistics.request_total_duration,
+            request_avg_failed_duration=final_statistics.request_avg_failed_duration,
+            request_avg_finished_duration=final_statistics.request_avg_finished_duration,
+            requests_total=final_statistics.requests_total,
+            request_retry_histogram=final_statistics.retry_histogram,
+        )
+
+        logger.debug('Persisting state')
+
+        await self._key_value_store.set_value(
+            self._persist_state_key,
+            self.state.model_dump(mode='json', by_alias=True) | persisted_state.model_dump(mode='json', by_alias=True),
+            'application/json',
         )
