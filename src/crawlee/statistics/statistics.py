@@ -23,7 +23,40 @@ TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=St
 logger = getLogger(__name__)
 
 
+class Job:
+    """Tracks information about a running job."""
+
+    def __init__(self) -> None:
+        self.last_run_at: datetime | None = None
+        self.runs = 0
+        self.duration: timedelta | None = None
+
+    def run(self) -> int:
+        """Mark the job as started."""
+        self.last_run_at = datetime.now(timezone.utc)
+        self.runs += 1
+        return self.runs
+
+    def finish(self) -> timedelta:
+        """Mark the job as finished."""
+        if self.last_run_at is None:
+            raise RuntimeError('Invalid state')
+
+        self.duration = datetime.now(timezone.utc) - self.last_run_at
+        return self.duration
+
+    @property
+    def retry_count(self) -> int:
+        """Number of times the job has been retried."""
+        return max(0, self.runs - 1)
+
+
 class Statistics(Generic[TStatisticsState]):
+    """An interface to collecting and logging runtime statistics for requests.
+
+    All information is saved to the key value store so that it persists between migrations, abortions and resurrections.
+    """
+
     __next_id = 0
 
     def __init__(
@@ -44,6 +77,8 @@ class Statistics(Generic[TStatisticsState]):
         self._retry_histogram = dict[int, int]()
 
         self._events = event_manager or LocalEventManager()
+
+        self._requests_in_progress = dict[str, Job]()
 
         if persist_state_key is None:
             persist_state_key = f'SDK_CRAWLER_STATISTICS_{self._id}'
@@ -80,18 +115,44 @@ class Statistics(Generic[TStatisticsState]):
         await self._persist_state()
 
     def register_status_code(self, code: int) -> None:
-        pass
+        """Increment the number of times a status code has been received."""
+        self.state.requests_with_status_code.setdefault(str(code), 0)
+        self.state.requests_with_status_code[str(code)] += 1
 
     def start_job(self, job_id: str) -> None:
-        pass
+        """Mark a job as started."""
+        job = self._requests_in_progress.get(job_id, Job())
+        job.run()
+        self._requests_in_progress[job_id] = job
 
     def finish_job(self, job_id: str) -> None:
-        pass
+        """Mark a job as finished."""
+        job = self._requests_in_progress.get(job_id)
+        if job is None:
+            return
+
+        duration = job.finish()
+        self.state.requests_finished += 1
+        self.state.request_total_finished_duration += duration
+        self._save_retry_count_for_job(job)
+        self.state.request_min_duration = min(self.state.request_min_duration, duration)
+
+        del self._requests_in_progress[job_id]
 
     def fail_job(self, job_id: str) -> None:
-        pass
+        """Mark a job as failed."""
+        job = self._requests_in_progress.get(job_id)
+        if job is None:
+            return
+
+        self.state.request_total_finished_duration += job.finish()
+        self.state.requests_failed += 1
+        self._save_retry_count_for_job(job)
+
+        del self._requests_in_progress[job_id]
 
     def calculate(self) -> FinalStatistics:
+        """Calculate the current statistics."""
         if self._instance_start is None:
             raise RuntimeError('The Statistics object is not initialized')
 
@@ -169,3 +230,12 @@ class Statistics(Generic[TStatisticsState]):
             self.state.model_dump(mode='json', by_alias=True) | persisted_state.model_dump(mode='json', by_alias=True),
             'application/json',
         )
+
+    def _save_retry_count_for_job(self, job: Job) -> None:
+        retry_count = job.retry_count
+
+        if retry_count:
+            self.state.requests_retries += 1
+
+        self._retry_histogram.setdefault(retry_count, 0)
+        self._retry_histogram[retry_count] += 1
