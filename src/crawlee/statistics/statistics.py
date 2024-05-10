@@ -41,7 +41,6 @@ class Statistics(Generic[TStatisticsState]):
 
         self.state = state_model()
         self._instance_start: datetime | None = None
-        self._instance_end: datetime | None = None
         self._retry_histogram = dict[int, int]()
 
         self._events = event_manager or LocalEventManager()
@@ -58,11 +57,14 @@ class Statistics(Generic[TStatisticsState]):
         """Subscribe to events and start collecting statistics."""
         self._instance_start = datetime.now(timezone.utc)
 
+        if self.state.crawler_started_at is None:
+            self.state.crawler_started_at = datetime.now(timezone.utc)
+
         if self._key_value_store is None:
             self._key_value_store = await KeyValueStore.open(name=self._persist_state_kvs_name)
 
-        self._events.on(event=Event.PERSIST_STATE, listener=self._persist_state)
         await self._maybe_load_statistics()
+        self._events.on(event=Event.PERSIST_STATE, listener=self._persist_state)
 
         return self
 
@@ -73,7 +75,8 @@ class Statistics(Generic[TStatisticsState]):
         exc_traceback: TracebackType | None,
     ) -> None:
         """Stop collecting statistics."""
-        self._instance_end = datetime.now(timezone.utc)
+        self.state.crawler_finished_at = datetime.now(timezone.utc)
+        self._events.off(event=Event.PERSIST_STATE, listener=self._persist_state)
         await self._persist_state()
 
     def register_status_code(self, code: int) -> None:
@@ -92,7 +95,7 @@ class Statistics(Generic[TStatisticsState]):
         if self._instance_start is None:
             raise RuntimeError('The Statistics object is not initialized')
 
-        crawler_runtime = (self._instance_end or datetime.now(timezone.utc)) - self._instance_start
+        crawler_runtime = datetime.now(timezone.utc) - self._instance_start
         total_minutes = crawler_runtime.total_seconds() / 60
 
         return FinalStatistics(
@@ -123,11 +126,19 @@ class Statistics(Generic[TStatisticsState]):
         if not self._key_value_store:
             return
 
-        saved_state = self.state.__class__.model_validate(
-            await self._key_value_store.get_value(self._persist_state_key, cast(Any, {}))
-        )
+        stored_state = await self._key_value_store.get_value(self._persist_state_key, cast(Any, {}))
+
+        saved_state = self.state.__class__.model_validate(stored_state)
+        persisted_state = StatisticsPersistedState.model_validate(stored_state)
 
         self.state = saved_state
+
+        if saved_state.stats_persisted_at is not None:
+            self._instance_start = datetime.now(timezone.utc) - (
+                saved_state.stats_persisted_at - persisted_state.crawler_last_started_at
+            )
+        else:
+            self._instance_start = persisted_state.crawler_last_started_at
 
     async def _persist_state(self) -> None:
         if not self._persistence_enabled:
