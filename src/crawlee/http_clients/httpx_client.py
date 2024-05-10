@@ -11,7 +11,7 @@ from crawlee.http_clients.base_http_client import BaseHttpClient, HttpCrawlingRe
 from crawlee.sessions.session import Session
 
 if TYPE_CHECKING:
-    from crawlee.request import Request
+    from crawlee.models import Request
 
 
 class HttpTransport(httpx.AsyncHTTPTransport):

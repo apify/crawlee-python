@@ -2,10 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import io
-import json
-import mimetypes
 import os
-import pathlib
 from datetime import datetime, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, AsyncIterator
@@ -17,17 +14,14 @@ from typing_extensions import override
 
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import maybe_parse_body, raise_on_duplicate_storage, raise_on_non_existing_storage
-from crawlee._utils.file import (
-    determine_file_extension,
-    force_remove,
-    force_rename,
-    is_file_or_bytes,
-    json_dumps,
+from crawlee._utils.file import determine_file_extension, force_remove, force_rename, is_file_or_bytes, json_dumps
+from crawlee.base_storage_client import BaseKeyValueStoreClient
+from crawlee.consts import KEY_VALUE_STORE_LABEL
+from crawlee.memory_storage_client._creation_management import (
+    find_or_create_client_by_id_or_name_inner,
     persist_metadata_if_enabled,
 )
-from crawlee.base_storage_client import BaseKeyValueStoreClient
-from crawlee.memory_storage_client.base_resource_client import BaseResourceClient as MemoryBaseResourceClient
-from crawlee.storages.models import (
+from crawlee.models import (
     KeyValueStoreKeyInfo,
     KeyValueStoreListKeysPage,
     KeyValueStoreMetadata,
@@ -42,7 +36,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-class KeyValueStoreClient(BaseKeyValueStoreClient, MemoryBaseResourceClient):
+class KeyValueStoreClient(BaseKeyValueStoreClient):
     """Subclient for manipulating a single key-value store."""
 
     def __init__(
@@ -65,128 +59,51 @@ class KeyValueStoreClient(BaseKeyValueStoreClient, MemoryBaseResourceClient):
         self._accessed_at = accessed_at or datetime.now(timezone.utc)
         self._modified_at = modified_at or datetime.now(timezone.utc)
 
-        self.resource_directory = os.path.join(base_storage_directory, self.name or self.id)
         self.records: dict[str, KeyValueStoreRecord] = {}
         self.file_operation_lock = asyncio.Lock()
 
     @property
-    @override
     def resource_info(self) -> KeyValueStoreMetadata:
         """Get the resource info for the key-value store client."""
         return KeyValueStoreMetadata(
-            id=str(self.id),
-            name=str(self.name),
+            id=self.id,
+            name=self.name,
             accessed_at=self._accessed_at,
             created_at=self._created_at,
             modified_at=self._modified_at,
             user_id='1',
         )
 
-    @classmethod
-    @override
-    def _get_storages_dir(cls, memory_storage_client: MemoryStorageClient) -> str:
-        return memory_storage_client.key_value_stores_directory
+    @property
+    def resource_directory(self) -> str:
+        """Get the resource directory for the client."""
+        return os.path.join(self._base_storage_directory, self.name or self.id)
 
     @classmethod
-    @override
-    def _get_storage_client_cache(cls, memory_storage_client: MemoryStorageClient) -> list[KeyValueStoreClient]:
-        return memory_storage_client.key_value_stores_handled
-
-    @classmethod
-    @override
-    def _create_from_directory(
+    def find_or_create_client_by_id_or_name(
         cls,
-        storage_directory: str,
         memory_storage_client: MemoryStorageClient,
         id: str | None = None,
         name: str | None = None,
-    ) -> KeyValueStoreClient:
-        created_at = datetime.now(timezone.utc)
-        accessed_at = datetime.now(timezone.utc)
-        modified_at = datetime.now(timezone.utc)
+    ) -> KeyValueStoreClient | None:
+        """Restore existing or create a new key-value store client based on the given ID or name.
 
-        # Load metadata if it exists
-        metadata_filepath = os.path.join(storage_directory, '__metadata__.json')
+        Args:
+            memory_storage_client: The memory storage client used to store and retrieve key-value store client.
+            id: The unique identifier for the key-value store client.
+            name: The name of the key-value store client.
 
-        if os.path.exists(metadata_filepath):
-            with open(metadata_filepath, encoding='utf-8') as f:
-                json_content = json.load(f)
-                resource_info = KeyValueStoreMetadata(**json_content)
-
-            id = resource_info.id
-            name = resource_info.name
-            created_at = resource_info.created_at
-            accessed_at = resource_info.accessed_at
-            modified_at = resource_info.modified_at
-
-        # Create new KVS client
-        new_client = KeyValueStoreClient(
-            base_storage_directory=memory_storage_client.key_value_stores_directory,
+        Returns:
+            The found or created key-value store client, or None if no client could be found or created.
+        """
+        return find_or_create_client_by_id_or_name_inner(
+            resource_label=KEY_VALUE_STORE_LABEL,
+            storage_client_cache=memory_storage_client.key_value_stores_handled,
+            storages_dir=memory_storage_client.key_value_stores_directory,
             memory_storage_client=memory_storage_client,
             id=id,
             name=name,
-            accessed_at=accessed_at,
-            created_at=created_at,
-            modified_at=modified_at,
         )
-
-        # Scan the KVS folder, check each entry in there and parse it as a store record
-        for entry in os.scandir(storage_directory):
-            if not entry.is_file():
-                continue
-
-            # Ignore metadata files on their own
-            if entry.name.endswith('__metadata__.json'):
-                continue
-
-            # Try checking if this file has a metadata file associated with it
-            record_metadata = None
-            record_metadata_filepath = os.path.join(storage_directory, f'{entry.name}.__metadata__.json')
-
-            if os.path.exists(record_metadata_filepath):
-                with open(record_metadata_filepath, encoding='utf-8') as metadata_file:
-                    try:
-                        json_content = json.load(metadata_file)
-                        record_metadata = KeyValueStoreRecordMetadata(**json_content)
-
-                    except Exception:
-                        logger.warning(
-                            f'Metadata of key-value store entry "{entry.name}" for store {name or id} could '
-                            'not be parsed. The metadata file will be ignored.',
-                            exc_info=True,
-                        )
-
-            if not record_metadata:
-                content_type, _ = mimetypes.guess_type(entry.name)
-                if content_type is None:
-                    content_type = 'application/octet-stream'
-
-                record_metadata = KeyValueStoreRecordMetadata(
-                    key=pathlib.Path(entry.name).stem,
-                    content_type=content_type,
-                )
-
-            with open(os.path.join(storage_directory, entry.name), 'rb') as f:
-                file_content = f.read()
-
-            try:
-                maybe_parse_body(file_content, record_metadata.content_type)
-            except Exception:
-                record_metadata.content_type = 'application/octet-stream'
-                logger.warning(
-                    f'Key-value store entry "{record_metadata.key}" for store {name or id} could not be parsed.'
-                    'The entry will be assumed as binary.',
-                    exc_info=True,
-                )
-
-            new_client.records[record_metadata.key] = KeyValueStoreRecord(
-                key=record_metadata.key,
-                content_type=record_metadata.content_type,
-                filename=entry.name,
-                value=file_content,
-            )
-
-        return new_client
 
     @override
     async def get(self) -> KeyValueStoreMetadata | None:
@@ -233,14 +150,8 @@ class KeyValueStoreClient(BaseKeyValueStoreClient, MemoryBaseResourceClient):
             if existing_store_by_name is not None:
                 raise_on_duplicate_storage(StorageTypes.KEY_VALUE_STORE, 'name', name)
 
-            existing_store_by_id.name = name
-
             previous_dir = existing_store_by_id.resource_directory
-
-            existing_store_by_id.resource_directory = os.path.join(
-                self._memory_storage_client.key_value_stores_directory,
-                name,
-            )
+            existing_store_by_id.name = name
 
             await force_rename(previous_dir, existing_store_by_id.resource_directory)
 

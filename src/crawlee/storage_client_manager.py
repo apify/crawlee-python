@@ -1,54 +1,43 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
 from crawlee.memory_storage_client import MemoryStorageClient
+
+if TYPE_CHECKING:
+    from crawlee.base_storage_client import BaseStorageClient
 
 
 class StorageClientManager:
     """A class for managing storage clients."""
 
-    persist_storage: bool | None = None
-    is_at_home: bool | None = None
+    def __init__(
+        self,
+        *,
+        local_client: BaseStorageClient | None = None,
+        cloud_client: BaseStorageClient | None = None,
+    ) -> None:
+        """Create a new instance.
 
-    local_client: MemoryStorageClient | None = None
-    cloud_client: None = None
+        Args:
+            local_client: The storage client to be used in the local environment.
+            cloud_client: The storage client to be used in the cloud environment.
+        """
+        self._local_client = local_client or MemoryStorageClient()
+        self._cloud_client = cloud_client
 
-    _default_instance: StorageClientManager | None = None
+    def get_storage_client(self, *, in_cloud: bool = False) -> BaseStorageClient:
+        """Get the storage client instance for the current environment.
 
-    @classmethod
-    def get_storage_client(cls) -> MemoryStorageClient:
-        """Get the current storage client instance.
+        Args:
+            in_cloud: Whether the code is running in the cloud environment.
 
         Returns:
             The current storage client instance.
         """
-        default_instance = cls._get_default_instance()
-        if not default_instance.local_client:
-            default_instance.local_client = MemoryStorageClient(
-                persist_storage=default_instance.persist_storage,
-                write_metadata=True,
-            )
+        if in_cloud:
+            if self._cloud_client is None:
+                raise RuntimeError('Running in cloud environment, but cloud client was not provided.')
+            return self._cloud_client
 
-        if default_instance.is_at_home:
-            if default_instance.cloud_client is None:
-                raise RuntimeError('Cloud client is expected but not set in the environment.')
-            return default_instance.cloud_client  # type: ignore
-
-        return default_instance.local_client
-
-    @classmethod
-    def set_cloud_client(cls, client: Any) -> None:
-        """Set the storage client.
-
-        Args:
-            client: The instance of a storage client.
-        """
-        cls._get_default_instance().cloud_client = client
-
-    @classmethod
-    def _get_default_instance(cls) -> StorageClientManager:
-        if cls._default_instance is None:
-            cls._default_instance = cls()
-
-        return cls._default_instance
+        return self._local_client

@@ -13,7 +13,7 @@ from crawlee.basic_crawler.context_pipeline import (
     RequestHandlerError,
 )
 from crawlee.basic_crawler.types import BasicCrawlingContext
-from crawlee.request import Request
+from crawlee.models import Request
 from crawlee.sessions.session import Session
 
 

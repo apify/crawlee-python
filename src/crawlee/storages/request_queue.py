@@ -12,16 +12,15 @@ from typing_extensions import override
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.lru_cache import LRUCache
 from crawlee._utils.requests import unique_key_to_request_id
-from crawlee.request import Request
+from crawlee.consts import REQUEST_QUEUE_LABEL
+from crawlee.models import Request, RequestQueueHeadState, RequestQueueOperationInfo
 from crawlee.storages.base_storage import BaseStorage
-from crawlee.storages.models import RequestQueueHeadState, RequestQueueOperationInfo
 from crawlee.storages.request_provider import RequestProvider
 
 if TYPE_CHECKING:
-    from crawlee.base_storage_client import BaseRequestQueueClient, BaseRequestQueueCollectionClient, BaseStorageClient
+    from crawlee.base_storage_client import BaseStorageClient
     from crawlee.configuration import Configuration
-    from crawlee.request import BaseRequestData
-    from crawlee.storages.models import BaseStorageMetadata
+    from crawlee.models import BaseRequestData, BaseStorageMetadata
 
 logger = getLogger(__name__)
 
@@ -45,6 +44,9 @@ class RequestQueue(BaseStorage, RequestProvider):
     Usage:
         rq = await RequestQueue.open(id='my_rq_id')
     """
+
+    LABEL = REQUEST_QUEUE_LABEL
+    """Human readable label of the storage."""
 
     _API_PROCESSED_REQUESTS_DELAY = timedelta(seconds=10)
     """Delay threshold to assume consistency of queue head operations after queue modifications."""
@@ -77,13 +79,19 @@ class RequestQueue(BaseStorage, RequestProvider):
         configuration: Configuration,
         client: BaseStorageClient,
     ) -> None:
-        super().__init__(id=id, name=name, client=client, configuration=configuration)
+        self._id = id
+        self._name = name
+        self._configuration = configuration
 
+        # Get resource clients from storage client
+        self._resource_client = client.request_queue(self._id)
+        self._resource_collection_client = client.request_queues()
+
+        # Other internal attributes
         self._client_key = crypto_random_object_id()
         self._internal_timeout_seconds = 5 * 60
         self._assumed_total_count = 0
         self._assumed_handled_count = 0
-        self._request_queue_client = client.request_queue(self.id)
         self._queue_head_dict: OrderedDictType[str, str] = OrderedDict()
         self._query_queue_head_task: asyncio.Task | None = None
         self._in_progress: set[str] = set()
@@ -91,45 +99,39 @@ class RequestQueue(BaseStorage, RequestProvider):
         self._recently_handled: LRUCache[bool] = LRUCache(max_length=self._RECENTLY_HANDLED_CACHE_SIZE)
         self._requests_cache: LRUCache[dict] = LRUCache(max_length=self._MAX_CACHED_REQUESTS)
 
-    @classmethod
     @override
+    @property
+    def id(self) -> str:
+        return self._id
+
+    @override
+    @property
+    def name(self) -> str | None:
+        return self._name
+
+    @override
+    @classmethod
     async def open(
         cls,
-        *,
         id: str | None = None,
         name: str | None = None,
         configuration: Configuration | None = None,
     ) -> RequestQueue:
-        rq = await super().open(id=id, name=name, configuration=configuration)
-        await rq.ensure_head_is_non_empty()
-        return rq
+        from crawlee.storages._creation_management import open_storage
 
-    @classmethod
-    @override
-    def _get_human_friendly_label(cls) -> str:
-        return 'Request queue'
+        return await open_storage(
+            storage_class=cls,
+            id=id,
+            name=name,
+            configuration=configuration,
+        )
 
-    @classmethod
     @override
-    def _get_default_id(cls, configuration: Configuration) -> str:
-        return configuration.default_request_queue_id
+    async def drop(self) -> None:
+        from crawlee.storages._creation_management import remove_storage_from_cache
 
-    @classmethod
-    @override
-    def _get_single_storage_client(
-        cls,
-        id: str,
-        client: BaseStorageClient,
-    ) -> BaseRequestQueueClient:
-        return client.request_queue(id)
-
-    @classmethod
-    @override
-    def _get_storage_collection_client(
-        cls,
-        client: BaseStorageClient,
-    ) -> BaseRequestQueueCollectionClient:
-        return client.request_queues()
+        await self._resource_client.delete()
+        remove_storage_from_cache(storage_class_label=self.LABEL, id=self._id, name=self._name)
 
     async def add_request(
         self,
@@ -183,7 +185,7 @@ class RequestQueue(BaseStorage, RequestProvider):
                 was_already_handled=cached_info['wasAlreadyHandled'],
             )
 
-        queue_operation_info = await self._request_queue_client.add_request(request, forefront=forefront)
+        queue_operation_info = await self._resource_client.add_request(request, forefront=forefront)
         queue_operation_info.request_unique_key = request.unique_key
 
         self._cache_request(cache_key, queue_operation_info)
@@ -226,7 +228,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         Returns:
             The retrieved request, or `None`, if it does not exist.
         """
-        return await self._request_queue_client.get_request(request_id)
+        return await self._resource_client.get_request(request_id)
 
     async def fetch_next_request(self) -> Request | None:
         """Return the next request in the queue to be processed.
@@ -327,7 +329,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         if request.handled_at is None:
             request.handled_at = datetime.now(timezone.utc)
 
-        queue_operation_info = await self._request_queue_client.update_request(request)
+        queue_operation_info = await self._resource_client.update_request(request)
         queue_operation_info.request_unique_key = request.unique_key
 
         self._in_progress.remove(request.id)
@@ -365,7 +367,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         # TODO: If request hasn't been changed since the last getRequest(), we don't need to call updateRequest()
         # and thus improve performance.
         # https://github.com/apify/apify-sdk-python/issues/143
-        queue_operation_info = await self._request_queue_client.update_request(request, forefront=forefront)
+        queue_operation_info = await self._resource_client.update_request(request, forefront=forefront)
         queue_operation_info.request_unique_key = request.unique_key
         self._cache_request(unique_key_to_request_id(request.unique_key), queue_operation_info)
 
@@ -417,18 +419,13 @@ class RequestQueue(BaseStorage, RequestProvider):
         is_head_consistent = await self.ensure_head_is_non_empty(ensure_consistency=True)
         return is_head_consistent and len(self._queue_head_dict) == 0 and self._in_progress_count() == 0
 
-    async def drop(self) -> None:
-        """Remove the request queue either from the Apify cloud storage or from the local directory."""
-        await self._request_queue_client.delete()
-        self._remove_from_cache()
-
     async def get_info(self) -> BaseStorageMetadata | None:
         """Get an object containing general information about the request queue.
 
         Returns:
             Object returned by calling the GET request queue API endpoint.
         """
-        return await self._request_queue_client.get()
+        return await self._resource_client.get()
 
     @override
     async def get_handled_count(self) -> int:
@@ -539,7 +536,7 @@ class RequestQueue(BaseStorage, RequestProvider):
     async def _queue_query_head(self, limit: int) -> RequestQueueHeadState:
         query_started_at = datetime.now(timezone.utc)
 
-        list_head = await self._request_queue_client.list_head(limit=limit)
+        list_head = await self._resource_client.list_head(limit=limit)
         list_head_items: list[Request] = list_head.items
 
         for request in list_head_items:

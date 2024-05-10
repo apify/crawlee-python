@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from crawlee.storages.models import RequestQueueListPage, RequestQueueMetadata
+    from crawlee.models import RequestQueueListPage, RequestQueueMetadata
 
 
 class BaseRequestQueueCollectionClient(ABC):
@@ -40,10 +40,10 @@ class BaseRequestQueueCollectionClient(ABC):
     async def list(
         self,
         *,
-        unnamed: bool | None = None,
+        unnamed: bool = False,
         limit: int | None = None,
         offset: int | None = None,
-        desc: bool | None = None,
+        desc: bool = False,
     ) -> RequestQueueListPage:
         """List the available request queues.
 

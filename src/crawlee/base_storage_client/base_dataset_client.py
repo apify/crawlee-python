@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, AsyncIterator
 
 if TYPE_CHECKING:
-    from crawlee.storages.models import DatasetItemsListPage, DatasetMetadata
+    from crawlee.models import DatasetItemsListPage, DatasetMetadata
     from crawlee.types import JSONSerializable
 
 
@@ -128,16 +128,16 @@ class BaseDatasetClient(ABC):
         item_format: str = 'json',
         offset: int | None = None,
         limit: int | None = None,
-        desc: bool | None = None,
-        clean: bool | None = None,
-        bom: bool | None = None,
+        desc: bool = False,
+        clean: bool = False,
+        bom: bool = False,
         delimiter: str | None = None,
         fields: list[str] | None = None,
         omit: list[str] | None = None,
         unwind: str | None = None,
-        skip_empty: bool | None = None,
-        skip_header_row: bool | None = None,
-        skip_hidden: bool | None = None,
+        skip_empty: bool = False,
+        skip_header_row: bool = False,
+        skip_hidden: bool = False,
         xml_root: str | None = None,
         xml_row: str | None = None,
         flatten: list[str] | None = None,
@@ -173,16 +173,16 @@ class BaseDatasetClient(ABC):
         item_format: str = 'json',
         offset: int | None = None,
         limit: int | None = None,
-        desc: bool | None = None,
-        clean: bool | None = None,
-        bom: bool | None = None,
+        desc: bool = False,
+        clean: bool = False,
+        bom: bool = False,
         delimiter: str | None = None,
         fields: list[str] | None = None,
         omit: list[str] | None = None,
         unwind: str | None = None,
-        skip_empty: bool | None = None,
-        skip_header_row: bool | None = None,
-        skip_hidden: bool | None = None,
+        skip_empty: bool = False,
+        skip_header_row: bool = False,
+        skip_hidden: bool = False,
         xml_root: str | None = None,
         xml_row: str | None = None,
     ) -> AsyncIterator[dict]:

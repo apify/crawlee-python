@@ -44,3 +44,12 @@ class BaseStorageClient(ABC):
     @abstractmethod
     def request_queues(self) -> BaseRequestQueueCollectionClient:
         """Gets a subclient for request queue collection operations."""
+
+    @abstractmethod
+    async def purge_on_start(self) -> None:
+        """Performs a purge of the default storages.
+
+        This method ensures that the purge is executed only once during the lifetime of the instance.
+        It is primarily used to clean up residual data from previous runs to maintain a clean state.
+        If the storage client does not support purging, leave it empty.
+        """

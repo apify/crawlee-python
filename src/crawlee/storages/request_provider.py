@@ -5,8 +5,7 @@ from datetime import timedelta
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from crawlee.request import BaseRequestData, Request
-    from crawlee.storages.models import RequestQueueOperationInfo
+    from crawlee.models import BaseRequestData, Request, RequestQueueOperationInfo
 
 
 class RequestProvider(ABC):

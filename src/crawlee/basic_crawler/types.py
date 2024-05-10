@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from crawlee import Glob
     from crawlee.enqueue_strategy import EnqueueStrategy
     from crawlee.http_clients.base_http_client import HttpResponse
-    from crawlee.request import BaseRequestData, Request
+    from crawlee.models import BaseRequestData, Request
     from crawlee.sessions.session import Session
 
 
