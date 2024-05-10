@@ -22,6 +22,7 @@ from crawlee._utils.data_processing import (
 from crawlee._utils.file import force_remove, force_rename, json_dumps
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee.base_storage_client import BaseRequestQueueClient
+from crawlee.consts import REQUEST_QUEUE_LABEL
 from crawlee.memory_storage_client._creation_management import (
     find_or_create_client_by_id_or_name_inner,
     persist_metadata_if_enabled,
@@ -104,7 +105,7 @@ class RequestQueueClient(BaseRequestQueueClient):
             The found or created key-value store client, or None if no client could be found or created.
         """
         return find_or_create_client_by_id_or_name_inner(
-            resource_label='Request queue',
+            resource_label=REQUEST_QUEUE_LABEL,
             storage_client_cache=memory_storage_client.request_queues_handled,
             storages_dir=memory_storage_client.request_queues_directory,
             memory_storage_client=memory_storage_client,

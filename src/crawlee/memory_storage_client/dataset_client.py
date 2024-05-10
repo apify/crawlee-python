@@ -16,6 +16,7 @@ from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import raise_on_duplicate_storage, raise_on_non_existing_storage
 from crawlee._utils.file import force_rename, json_dumps
 from crawlee.base_storage_client import BaseDatasetClient
+from crawlee.consts import DATASET_LABEL
 from crawlee.models import DatasetItemsListPage, DatasetMetadata
 from crawlee.types import StorageTypes
 
@@ -96,7 +97,7 @@ class DatasetClient(BaseDatasetClient):
         from crawlee.memory_storage_client._creation_management import find_or_create_client_by_id_or_name_inner
 
         return find_or_create_client_by_id_or_name_inner(
-            resource_label='Dataset',
+            resource_label=DATASET_LABEL,
             storage_client_cache=memory_storage_client.datasets_handled,
             storages_dir=memory_storage_client.datasets_directory,
             memory_storage_client=memory_storage_client,

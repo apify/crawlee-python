@@ -16,6 +16,7 @@ from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import maybe_parse_body, raise_on_duplicate_storage, raise_on_non_existing_storage
 from crawlee._utils.file import determine_file_extension, force_remove, force_rename, is_file_or_bytes, json_dumps
 from crawlee.base_storage_client import BaseKeyValueStoreClient
+from crawlee.consts import KEY_VALUE_STORE_LABEL
 from crawlee.memory_storage_client._creation_management import (
     find_or_create_client_by_id_or_name_inner,
     persist_metadata_if_enabled,
@@ -96,7 +97,7 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
             The found or created key-value store client, or None if no client could be found or created.
         """
         return find_or_create_client_by_id_or_name_inner(
-            resource_label='Key-value store',
+            resource_label=KEY_VALUE_STORE_LABEL,
             storage_client_cache=memory_storage_client.key_value_stores_handled,
             storages_dir=memory_storage_client.key_value_stores_directory,
             memory_storage_client=memory_storage_client,
