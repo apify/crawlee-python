@@ -7,7 +7,7 @@ import pathlib
 from datetime import datetime, timezone
 from decimal import Decimal
 from logging import getLogger
-from typing import TYPE_CHECKING, TypeVar, overload
+from typing import TYPE_CHECKING, TypeVar
 
 import aiofiles
 from aiofiles.os import makedirs
@@ -153,51 +153,15 @@ def find_or_create_client_by_id_or_name_inner(
     return resource_client  # type: ignore
 
 
-@overload
 async def get_or_create_inner(
     *,
     memory_storage_client: MemoryStorageClient,
     base_storage_directory: str,
-    storage_client_cache: list[DatasetClient],
-    resource_client_class: type[DatasetClient],
+    storage_client_cache: list[TResourceClient],
+    resource_client_class: type[TResourceClient],
     name: str | None = None,
     id: str | None = None,
-) -> DatasetMetadata: ...
-
-
-@overload
-async def get_or_create_inner(
-    *,
-    memory_storage_client: MemoryStorageClient,
-    base_storage_directory: str,
-    storage_client_cache: list[KeyValueStoreClient],
-    resource_client_class: type[KeyValueStoreClient],
-    name: str | None = None,
-    id: str | None = None,
-) -> KeyValueStoreMetadata: ...
-
-
-@overload
-async def get_or_create_inner(
-    *,
-    memory_storage_client: MemoryStorageClient,
-    base_storage_directory: str,
-    storage_client_cache: list[RequestQueueClient],
-    resource_client_class: type[RequestQueueClient],
-    name: str | None = None,
-    id: str | None = None,
-) -> RequestQueueMetadata: ...
-
-
-async def get_or_create_inner(
-    *,
-    memory_storage_client: MemoryStorageClient,
-    base_storage_directory: str,
-    storage_client_cache: list[DatasetClient] | list[KeyValueStoreClient] | list[RequestQueueClient],
-    resource_client_class: type[DatasetClient | KeyValueStoreClient | RequestQueueClient],
-    name: str | None = None,
-    id: str | None = None,
-) -> DatasetMetadata | KeyValueStoreMetadata | RequestQueueMetadata:
+) -> TResourceClient:
     """Retrieve a named storage, or create a new one when it doesn't exist.
 
     Args:
@@ -219,7 +183,7 @@ async def get_or_create_inner(
             id=id,
         )
         if found:
-            return found.resource_info
+            return found
 
     # Otherwise, create a new one and add it to the cache
     resource_client = resource_client_class(
@@ -229,7 +193,7 @@ async def get_or_create_inner(
         memory_storage_client=memory_storage_client,
     )
 
-    storage_client_cache.append(resource_client)  # type: ignore
+    storage_client_cache.append(resource_client)
 
     # Write to the disk
     await persist_metadata_if_enabled(
@@ -238,7 +202,7 @@ async def get_or_create_inner(
         write_metadata=memory_storage_client.write_metadata,
     )
 
-    return resource_client.resource_info
+    return resource_client
 
 
 def create_dataset_from_directory(

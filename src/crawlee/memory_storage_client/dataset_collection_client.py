@@ -40,7 +40,7 @@ class DatasetCollectionClient(BaseDatasetCollectionClient):
         if name is None and id is None:
             id = self._memory_storage_client.default_storage_id
 
-        return await get_or_create_inner(
+        resource_client = await get_or_create_inner(
             memory_storage_client=self._memory_storage_client,
             base_storage_directory=self._base_storage_directory,
             storage_client_cache=self._storage_client_cache,
@@ -48,6 +48,7 @@ class DatasetCollectionClient(BaseDatasetCollectionClient):
             name=name,
             id=id,
         )
+        return resource_client.resource_info
 
     @override
     async def list(
