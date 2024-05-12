@@ -161,7 +161,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         )
 
         self._use_session_pool = use_session_pool
-        self._session_pool: SessionPool = session_pool or SessionPool()
+        self._session_pool = session_pool or SessionPool()
 
         self._retry_on_blocked = retry_on_blocked
 

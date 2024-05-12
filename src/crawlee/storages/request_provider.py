@@ -54,7 +54,7 @@ class RequestProvider(ABC):
     @abstractmethod
     async def add_requests_batched(
         self,
-        requests: list[BaseRequestData | Request],
+        requests: list[BaseRequestData | Request | str],
         *,
         batch_size: int = 1000,
         wait_for_all_requests_to_be_added: bool = False,
