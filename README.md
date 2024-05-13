@@ -13,6 +13,8 @@ Crawlee covers your crawling and scraping end-to-end and **helps you build relia
 
 Your crawlers will appear human-like and fly under the radar of modern bot protections even with the default configuration. Crawlee gives you the tools to crawl the web for links, scrape data, and store it to disk or cloud while staying configurable to suit your project's needs.
 
+We have also a TypeScript implementation, see [github.com/apify/crawlee](https://github.com/apify/crawlee).
+
 ## Installation
 
 Crawlee is available as the [`crawlee`](https://pypi.org/project/crawlee/) PyPI package.
@@ -191,7 +193,7 @@ See the following example with the updated request handler:
 
 ### Storages
 
-The Crawlee introduces several result storage types that are useful for specific tasks. The storing of underlying data
+Crawlee introduces several result storage types that are useful for specific tasks. The storing of underlying data
 is realized by the storage client. Currently, only a memory storage client is implemented. Using this, the data
 are stored either in the memory or persisted on the disk.
 
