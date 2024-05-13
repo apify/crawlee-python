@@ -4,7 +4,7 @@ import asyncio
 from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence
 from typing import OrderedDict as OrderedDictType
 
 from typing_extensions import override
@@ -13,14 +13,14 @@ from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.lru_cache import LRUCache
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee.consts import REQUEST_QUEUE_LABEL
-from crawlee.models import Request, RequestQueueHeadState, RequestQueueOperationInfo
+from crawlee.models import BaseRequestData, Request, RequestQueueHeadState, RequestQueueOperationInfo
 from crawlee.storages.base_storage import BaseStorage
 from crawlee.storages.request_provider import RequestProvider
 
 if TYPE_CHECKING:
     from crawlee.base_storage_client import BaseStorageClient
     from crawlee.configuration import Configuration
-    from crawlee.models import BaseRequestData, BaseStorageMetadata
+    from crawlee.models import BaseStorageMetadata
 
 logger = getLogger(__name__)
 
@@ -135,7 +135,7 @@ class RequestQueue(BaseStorage, RequestProvider):
 
     async def add_request(
         self,
-        request: Request,
+        request: Request | BaseRequestData | str,
         *,
         forefront: bool = False,
     ) -> RequestQueueOperationInfo:
@@ -169,6 +169,11 @@ class RequestQueue(BaseStorage, RequestProvider):
             - `wasAlreadyPresent` (bool): Indicates whether the request was already in the queue.
             - `wasAlreadyHandled` (bool): Indicates whether the request was already processed.
         """
+        if isinstance(request, BaseRequestData):
+            request = Request.from_base_request_data(request)
+        elif isinstance(request, str):
+            request = Request.from_url(request)
+
         self._last_activity = datetime.now(timezone.utc)
 
         cache_key = unique_key_to_request_id(request.unique_key)
@@ -207,17 +212,14 @@ class RequestQueue(BaseStorage, RequestProvider):
     @override
     async def add_requests_batched(
         self,
-        requests: list[BaseRequestData | Request],
+        requests: Sequence[BaseRequestData | Request | str],
         *,
         batch_size: int = 1000,
         wait_for_all_requests_to_be_added: bool = False,
         wait_time_between_batches: timedelta = timedelta(seconds=1),
     ) -> None:
         for request in requests:
-            if isinstance(request, Request):
-                await self.add_request(request)
-            else:
-                await self.add_request(Request.from_base_request_data(request))
+            await self.add_request(request)
 
     async def get_request(self, request_id: str) -> Request | None:
         """Retrieve a request from the queue.

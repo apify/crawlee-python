@@ -107,7 +107,9 @@ class Request(BaseRequestData):
     @classmethod
     def from_base_request_data(cls, base_request_data: BaseRequestData, *, id: str | None = None) -> Self:
         """Create a complete Request object based on a BaseRequestData instance."""
-        return cls(**base_request_data.model_dump(), id=id or unique_key_to_request_id(base_request_data.unique_key))
+        kwargs = base_request_data.model_dump()
+        kwargs['id'] = id or unique_key_to_request_id(base_request_data.unique_key)
+        return cls(**kwargs)
 
     @property
     def label(self) -> str | None:
