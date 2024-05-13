@@ -10,6 +10,7 @@ from typing_extensions import Self, TypeVar
 
 from crawlee.events.local_event_manager import LocalEventManager
 from crawlee.events.types import Event
+from crawlee.statistics.error_tracker import ErrorTracker
 from crawlee.statistics.models import FinalStatistics, StatisticsPersistedState, StatisticsState
 from crawlee.storages import KeyValueStore
 
@@ -75,6 +76,9 @@ class Statistics(Generic[TStatisticsState]):
         self.state = state_model()
         self._instance_start: datetime | None = None
         self._retry_histogram = dict[int, int]()
+
+        self.error_tracker = ErrorTracker()
+        self.error_tracker_retry = ErrorTracker()
 
         self._events = event_manager or LocalEventManager()
 

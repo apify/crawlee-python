@@ -254,6 +254,13 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
             await self._pool.run()
 
+        if self._statistics.error_tracker.total > 0:
+            logger.info(
+                'Error analysis:'
+                f' total_errors={self._statistics.error_tracker.total}'
+                f' unique_errors={self._statistics.error_tracker.unique_error_count}'
+            )
+
         return self._statistics.calculate()
 
     def _should_retry_request(self, crawling_context: BasicCrawlingContext, error: Exception) -> bool:
@@ -343,6 +350,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         if self._should_retry_request(crawling_context, error):
             request.retry_count += 1
+            self._statistics.error_tracker.add(error)
 
             if self._error_handler:
                 try:
@@ -368,6 +376,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     async def _handle_failed_request(self, crawling_context: TCrawlingContext, error: Exception) -> None:
         logger.exception('Request failed and reached maximum retries', exc_info=error)
+        self._statistics.error_tracker.add(error)
 
         if self._failed_request_handler:
             try:
@@ -527,6 +536,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 crawling_context.request.session_rotation_count += 1
 
                 await request_provider.reclaim_request(request)
+                self._statistics.error_tracker_retry.add(session_error)
             else:
                 logger.exception('Request failed and reached maximum retries', exc_info=session_error)
 
@@ -540,6 +550,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 )
 
                 self._statistics.fail_job(statistics_id)
+                self._statistics.error_tracker.add(session_error)
         except ContextPipelineInterruptedError as interruped_error:
             logger.debug('The context pipeline was interrupted', exc_info=interruped_error)
 
