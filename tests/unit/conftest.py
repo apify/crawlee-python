@@ -6,6 +6,7 @@ import pytest
 
 from crawlee.configuration import Configuration
 from crawlee.memory_storage_client import MemoryStorageClient
+from crawlee.storage_client_manager import StorageClientManager
 from crawlee.storages import _creation_management
 
 if TYPE_CHECKING:
@@ -15,6 +16,9 @@ if TYPE_CHECKING:
 @pytest.fixture()
 def reset_default_instances(monkeypatch: pytest.MonkeyPatch) -> Callable[[], None]:
     def reset() -> None:
+        StorageClientManager._local_client = MemoryStorageClient()
+        StorageClientManager._cloud_client = None
+
         monkeypatch.setattr(_creation_management, '_cache_dataset_by_id', {})
         monkeypatch.setattr(_creation_management, '_cache_dataset_by_name', {})
         monkeypatch.setattr(_creation_management, '_cache_kvs_by_id', {})
