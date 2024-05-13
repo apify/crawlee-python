@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
+from logging import getLogger
 from pathlib import Path
 
 import aioshutil
@@ -18,6 +19,8 @@ from crawlee.memory_storage_client.key_value_store_client import KeyValueStoreCl
 from crawlee.memory_storage_client.key_value_store_collection_client import KeyValueStoreCollectionClient
 from crawlee.memory_storage_client.request_queue_client import RequestQueueClient
 from crawlee.memory_storage_client.request_queue_collection_client import RequestQueueCollectionClient
+
+logger = getLogger(__name__)
 
 
 class MemoryStorageClient(BaseStorageClient):
@@ -47,6 +50,7 @@ class MemoryStorageClient(BaseStorageClient):
         self.datasets_handled: list[DatasetClient] = []
         self.key_value_stores_handled: list[KeyValueStoreClient] = []
         self.request_queues_handled: list[RequestQueueClient] = []
+
         self._purged_on_start = False  # Indicates whether a purge was already performed on this instance.
         self._purge_lock = asyncio.Lock()
 
@@ -134,6 +138,7 @@ class MemoryStorageClient(BaseStorageClient):
     async def purge_on_start(self) -> None:
         # Optimistic, non-blocking check
         if self._purged_on_start is True:
+            logger.debug('Storage was already purged on start.')
             return
 
         async with self._purge_lock:
@@ -142,10 +147,10 @@ class MemoryStorageClient(BaseStorageClient):
                 # Mypy doesn't understand that the _purged_on_start can change while we're getting the async lock
                 return  # type: ignore[unreachable]
 
-            await self._purge_inner()
+            await self._purge_default_storages()
             self._purged_on_start = True
 
-    async def _purge_inner(self) -> None:
+    async def _purge_default_storages(self) -> None:
         """Cleans up the storage directories, preparing the environment for a new run.
 
         It aims to remove residues from previous executions to avoid data contamination between runs.
@@ -163,21 +168,23 @@ class MemoryStorageClient(BaseStorageClient):
                     self._TEMPORARY_DIR_NAME
                 ) or key_value_store_folder.name.startswith('__OLD'):
                     await self._batch_remove_files(key_value_store_folder.path)
-                elif key_value_store_folder.name == 'default':
+                elif key_value_store_folder.name == self.default_storage_id:
                     await self._handle_default_key_value_store(key_value_store_folder.path)
 
         # Datasets
         if await ospath.exists(self.datasets_directory):
             dataset_folders = await scandir(self.datasets_directory)
             for dataset_folder in dataset_folders:
-                if dataset_folder.name == 'default' or dataset_folder.name.startswith(self._TEMPORARY_DIR_NAME):
+                if dataset_folder.name == self.default_storage_id or dataset_folder.name.startswith(
+                    self._TEMPORARY_DIR_NAME
+                ):
                     await self._batch_remove_files(dataset_folder.path)
 
         # Request queues
         if await ospath.exists(self.request_queues_directory):
             request_queue_folders = await scandir(self.request_queues_directory)
             for request_queue_folder in request_queue_folders:
-                if request_queue_folder.name == 'default' or request_queue_folder.name.startswith(
+                if request_queue_folder.name == self.default_storage_id or request_queue_folder.name.startswith(
                     self._TEMPORARY_DIR_NAME
                 ):
                     await self._batch_remove_files(request_queue_folder.path)
