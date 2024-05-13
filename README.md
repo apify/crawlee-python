@@ -11,9 +11,12 @@
 
 Crawlee covers your crawling and scraping end-to-end and **helps you build reliable scrapers. Fast.**
 
-Your crawlers will appear human-like and fly under the radar of modern bot protections even with the default configuration. Crawlee gives you the tools to crawl the web for links, scrape data, and store it to disk or cloud while staying configurable to suit your project's needs.
+Your crawlers will appear almost human-like and fly under the radar of modern bot protections even with
+the default configuration. Crawlee gives you the tools to crawl the web for links, scrape data, and
+store it to disk or cloud while staying configurable to suit your project's needs.
 
-We have also a TypeScript implementation, see [github.com/apify/crawlee](https://github.com/apify/crawlee).
+We also have a TypeScript implementation of the Crawlee, which you can explore and utilize for your projects.
+Visit our GitHub repository for more information [Crawlee on GitHub](https://github.com/apify/crawlee).
 
 ## Installation
 
@@ -25,13 +28,15 @@ pip install crawlee
 
 ## Features
 
-- Single interface for **HTTP and headless browser** crawling.
+- Unified interface for **HTTP and headless browser** crawling.
 - Persistent **queue** for URLs to crawl (breadth & depth-first).
 - Pluggable **storage** of both tabular data and files.
 - Automatic **scaling** with available system resources.
 - Integrated **proxy rotation** and session management.
-- Configurable **routing**, **error handling** and **retries**.
-- Written in Python with **type hints**.
+- Configurable **request routing** - directing URLs to appropriate handlers.
+- Robust **error handling**.
+- Automatic **retries** when getting blocked.
+- Written in Python with **type hints**, which means better DX and fewer bugs.
 
 ## Introduction
 
@@ -50,10 +55,8 @@ Crawlee offers a framework for parallel web crawling through a variety of crawle
 #### HttpCrawler
 
 [`HttpCrawler`](https://github.com/apify/crawlee-py/tree/master/src/crawlee/http_crawler) provides a framework
-for the parallel crawling of web pages using plain HTTP requests.
-The URLs to crawl are fed either from a static list of URLs or from a dynamic queue of URLs enabling recursive
-crawling of websites. The parsing of obtained HTML is the user's responsibility.
-A [HTTPX](https://pypi.org/project/httpx/) library is used for making HTTP requests.
+for the parallel crawling of web pages using plain HTTP requests. The URLs to crawl are fed from a request provider.
+It enables the recursive crawling of websites. The parsing of obtained HTML is the user's responsibility.
 
 Since `HttpCrawler` uses raw HTTP requests to download web pages, it is very fast and efficient on data
 bandwidth. However, if the target website requires JavaScript to display the content, you might need to use
@@ -126,7 +129,7 @@ the `HttpCrawler`. It provides the same features and on top of that, it uses
 Same as for `HttpCrawler`, since `BeautifulSoupCrawler` uses raw HTTP requests to download web pages,
 it is very fast and efficient on data bandwidth. However, if the target website requires JavaScript to display
 the content, you might need to use `PlaywrightCrawler` instead, because it loads the pages using
-a full-featured headless Chrome browser.
+a full-featured headless browser (Chrome, Firefox or others).
 
 `BeautifulSoupCrawler` downloads each URL using a plain HTTP request, parses the HTML content using BeautifulSoup
 and then invokes the user-provided request handler to extract page data using an interface to the
@@ -197,6 +200,9 @@ Crawlee introduces several result storage types that are useful for specific tas
 is realized by the storage client. Currently, only a memory storage client is implemented. Using this, the data
 are stored either in the memory or persisted on the disk.
 
+By default, the data are stored in the directory specified by the `CRAWLEE_STORAGE_DIR` environment variable.
+With default `.storage/`.
+
 #### Dataset
 
 A [`Dataset`](https://github.com/apify/crawlee-py/blob/master/src/crawlee/storages/dataset.py) is a type
@@ -210,8 +216,7 @@ remove existing records.
 Each Crawlee project run is associated with a default dataset. Typically, it is used to store crawling results
 specific to the crawler run. Its usage is optional.
 
-By default, the data is stored in the directory specified by the `CRAWLEE_STORAGE_DIR` environment variable
-as follows:
+The data are persisted as follows:
 
 ```
 {CRAWLEE_STORAGE_DIR}/datasets/{DATASET_ID}/{INDEX}.json
@@ -259,8 +264,7 @@ or to persist the state of crawlers.
 Each Crawlee project run is associated with a default key-value store. By convention, the project input and output are stored in the default key-value store under the `INPUT` and `OUTPUT` keys respectively. Typically, both input
 and output are `JSON` files, although they could be any other format.
 
-By default, the data is stored in the directory specified by the `CRAWLEE_STORAGE_DIR` environment variable
-as follows:
+The data are persisted as follows:
 
 ```
 {CRAWLEE_STORAGE_DIR}/key_value_stores/{STORE_ID}/{KEY}.{EXT}
@@ -310,8 +314,7 @@ breadth-first and depth-first crawling orders.
 
 Each Crawlee project run is associated with a default request queue. Typically, it is used to store URLs to crawl in the specific crawler run. Its usage is optional.
 
-By default, the data is stored in the directory specified by the `CRAWLEE_STORAGE_DIR` environment variable
-as follows:
+The data are persisted as follows:
 
 ```
 {CRAWLEE_STORAGE_DIR}/request_queues/{QUEUE_ID}/entries.json
