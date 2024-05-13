@@ -11,22 +11,11 @@ if TYPE_CHECKING:
 class StorageClientManager:
     """A class for managing storage clients."""
 
-    def __init__(
-        self,
-        *,
-        local_client: BaseStorageClient | None = None,
-        cloud_client: BaseStorageClient | None = None,
-    ) -> None:
-        """Create a new instance.
+    _local_client: BaseStorageClient = MemoryStorageClient()
+    _cloud_client: BaseStorageClient | None = None
 
-        Args:
-            local_client: The storage client to be used in the local environment.
-            cloud_client: The storage client to be used in the cloud environment.
-        """
-        self._local_client = local_client or MemoryStorageClient()
-        self._cloud_client = cloud_client
-
-    def get_storage_client(self, *, in_cloud: bool = False) -> BaseStorageClient:
+    @classmethod
+    def get_storage_client(cls, *, in_cloud: bool = False) -> BaseStorageClient:
         """Get the storage client instance for the current environment.
 
         Args:
@@ -36,8 +25,26 @@ class StorageClientManager:
             The current storage client instance.
         """
         if in_cloud:
-            if self._cloud_client is None:
+            if cls._cloud_client is None:
                 raise RuntimeError('Running in cloud environment, but cloud client was not provided.')
-            return self._cloud_client
+            return cls._cloud_client
 
-        return self._local_client
+        return cls._local_client
+
+    @classmethod
+    def set_cloud_client(cls, cloud_client: BaseStorageClient) -> None:
+        """Set the cloud storage client instance.
+
+        Args:
+            cloud_client: The cloud storage client instance.
+        """
+        cls._cloud_client = cloud_client
+
+    @classmethod
+    def set_local_client(cls, local_client: BaseStorageClient) -> None:
+        """Set the local storage client instance.
+
+        Args:
+            local_client: The local storage client instance.
+        """
+        cls._local_client = local_client

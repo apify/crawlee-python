@@ -27,6 +27,7 @@ class BaseStorage(ABC):
     @abstractmethod
     async def open(
         cls,
+        *,
         id: str | None = None,
         name: str | None = None,
         configuration: Configuration | None = None,
