@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import deque
 from datetime import timedelta
+from typing import Sequence
 
 from typing_extensions import override
 
@@ -76,7 +77,7 @@ class RequestList(RequestProvider):
     @override
     async def add_requests_batched(
         self,
-        requests: list[BaseRequestData | Request | str],
+        requests: Sequence[BaseRequestData | Request | str],
         *,
         batch_size: int = 1000,
         wait_for_all_requests_to_be_added: bool = False,

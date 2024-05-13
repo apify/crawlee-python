@@ -4,7 +4,7 @@ import asyncio
 from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence
 from typing import OrderedDict as OrderedDictType
 
 from typing_extensions import override
@@ -212,7 +212,7 @@ class RequestQueue(BaseStorage, RequestProvider):
     @override
     async def add_requests_batched(
         self,
-        requests: list[BaseRequestData | Request | str],
+        requests: Sequence[BaseRequestData | Request | str],
         *,
         batch_size: int = 1000,
         wait_for_all_requests_to_be_added: bool = False,
