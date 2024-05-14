@@ -5,10 +5,11 @@ from typing import TYPE_CHECKING, Iterable, cast
 import httpx
 from typing_extensions import override
 
-from .base_http_client import BaseHttpClient, HttpCrawlingResult, HttpResponse
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
 from crawlee.basic_crawler.errors import ProxyError
 from crawlee.sessions.session import Session
+
+from .base_http_client import BaseHttpClient, HttpCrawlingResult, HttpResponse
 
 if TYPE_CHECKING:
     from crawlee.request import Request
