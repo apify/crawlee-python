@@ -171,6 +171,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         self._statistics = statistics or Statistics(event_manager=self._event_manager)
 
+        self._running = False
+        self._has_finished_before = False
+
     @property
     def router(self) -> Router[TCrawlingContext]:
         """The router used to handle each individual crawling request."""
@@ -241,6 +244,19 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     async def run(self, requests: list[str | BaseRequestData] | None = None) -> FinalStatistics:
         """Run the crawler until all requests are processed."""
+        if self._running:
+            raise RuntimeError(
+                'This crawler instance is already running, you can add more requests to it via `crawler.add_requests()`'
+            )
+
+        self._running = True
+
+        if self._has_finished_before:
+            await self._statistics.reset()
+
+            if self._use_session_pool:
+                await self._session_pool.reset_store()
+
         if requests is not None:
             await self.add_requests(requests)
 
@@ -260,6 +276,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 f' total_errors={self._statistics.error_tracker.total}'
                 f' unique_errors={self._statistics.error_tracker.unique_error_count}'
             )
+
+        self._running = False
+        self._has_finished_before = True
 
         return self._statistics.calculate()
 

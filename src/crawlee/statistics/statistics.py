@@ -73,7 +73,8 @@ class Statistics(Generic[TStatisticsState]):
         self._id = self.__next_id
         self.__next_id += 1
 
-        self.state = state_model()
+        self._state_model = state_model
+        self.state = self._state_model()
         self._instance_start: datetime | None = None
         self._retry_histogram = dict[int, int]()
 
@@ -183,6 +184,17 @@ class Statistics(Generic[TStatisticsState]):
                 for retry_count in range(max(self._retry_histogram.keys(), default=0) + 1)
             ],
         )
+
+    async def reset(self) -> None:
+        """Reset the statistics to their defaults and remove any persistent state."""
+        self.state = self._state_model()
+        self.error_tracker = ErrorTracker()
+        self.error_tracker_retry = ErrorTracker()
+        self._retry_histogram.clear()
+        self._requests_in_progress.clear()
+
+        if self._persistence_enabled and self._key_value_store:
+            await self._key_value_store.set_value(self._persist_state_key, None)
 
     async def _maybe_load_statistics(self) -> None:
         if not self._persistence_enabled:
