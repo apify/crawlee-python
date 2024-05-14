@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import math
+from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, Generic, cast
 
 from typing_extensions import Self, TypeVar
 
+from crawlee._utils.recurring_task import RecurringTask
 from crawlee.events.local_event_manager import LocalEventManager
 from crawlee.events.types import Event
 from crawlee.statistics.error_tracker import ErrorTracker
@@ -68,6 +70,8 @@ class Statistics(Generic[TStatisticsState]):
         persist_state_kvs_name: str = 'default',
         persist_state_key: str | None = None,
         key_value_store: KeyValueStore | None = None,
+        log_message: str = 'Statistics',
+        log_interval: timedelta = timedelta(minutes=1),
         state_model: type[TStatisticsState] = StatisticsState,
     ) -> None:
         self._id = self.__next_id
@@ -93,6 +97,9 @@ class Statistics(Generic[TStatisticsState]):
         self._persist_state_kvs_name = persist_state_kvs_name
         self._key_value_store: KeyValueStore | None = key_value_store
 
+        self._log_message = log_message
+        self._periodic_logger = RecurringTask(self._log, log_interval)
+
     async def __aenter__(self) -> Self:
         """Subscribe to events and start collecting statistics."""
         self._instance_start = datetime.now(timezone.utc)
@@ -106,6 +113,8 @@ class Statistics(Generic[TStatisticsState]):
         await self._maybe_load_statistics()
         self._events.on(event=Event.PERSIST_STATE, listener=self._persist_state)
 
+        self._periodic_logger.start()
+
         return self
 
     async def __aexit__(
@@ -117,6 +126,7 @@ class Statistics(Generic[TStatisticsState]):
         """Stop collecting statistics."""
         self.state.crawler_finished_at = datetime.now(timezone.utc)
         self._events.off(event=Event.PERSIST_STATE, listener=self._persist_state)
+        await self._periodic_logger.stop()
         await self._persist_state()
 
     def register_status_code(self, code: int) -> None:
@@ -195,6 +205,10 @@ class Statistics(Generic[TStatisticsState]):
 
         if self._persistence_enabled and self._key_value_store:
             await self._key_value_store.set_value(self._persist_state_key, None)
+
+    def _log(self) -> None:
+        stats = self.calculate()
+        logger.info(f'{self._log_message} {asdict(stats)}')
 
     async def _maybe_load_statistics(self) -> None:
         if not self._persistence_enabled:

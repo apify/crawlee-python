@@ -169,7 +169,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         self._retry_on_blocked = retry_on_blocked
 
-        self._statistics = statistics or Statistics(event_manager=self._event_manager)
+        self._statistics = statistics or Statistics(
+            event_manager=self._event_manager,
+            log_message=f'{logger.name} request statistics',
+        )
 
         self._running = False
         self._has_finished_before = False
