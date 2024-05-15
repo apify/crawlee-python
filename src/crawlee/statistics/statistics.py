@@ -78,7 +78,7 @@ class Statistics(Generic[TStatisticsState]):
         self.__next_id += 1
 
         self._state_model = state_model
-        self.state = self._state_model()
+        self.state: StatisticsState = self._state_model()
         self._instance_start: datetime | None = None
         self._retry_histogram = dict[int, int]()
 
@@ -220,18 +220,14 @@ class Statistics(Generic[TStatisticsState]):
         stored_state = await self._key_value_store.get_value(self._persist_state_key, cast(Any, {}))
 
         saved_state = self.state.__class__.model_validate(stored_state)
-        persisted_state = StatisticsPersistedState.model_construct(
-            **stored_state
-        )  # Intentional partial load of StatisticsPersistedState
-
         self.state = saved_state
 
-        if saved_state.stats_persisted_at is not None and 'crawler_last_started_at' in persisted_state.model_fields_set:
+        if saved_state.stats_persisted_at is not None and saved_state.crawler_last_started_at:
             self._instance_start = datetime.now(timezone.utc) - (
-                saved_state.stats_persisted_at - persisted_state.crawler_last_started_at
+                saved_state.stats_persisted_at - saved_state.crawler_last_started_at
             )
-        elif 'crawler_last_started_at' in persisted_state.model_fields_set:
-            self._instance_start = persisted_state.crawler_last_started_at
+        elif saved_state.crawler_last_started_at:
+            self._instance_start = saved_state.crawler_last_started_at
 
     async def _persist_state(self) -> None:
         if not self._persistence_enabled:

@@ -45,6 +45,7 @@ class StatisticsState(BaseModel):
         timedelta()
     )
     crawler_started_at: Annotated[datetime | None, Field(alias='crawlerStartedAt')] = None
+    crawler_last_started_at: Annotated[datetime | None, Field(alias='crawlerLastStartTimestamp')] = None
     crawler_finished_at: Annotated[datetime | None, Field(alias='crawlerFinishedAt')] = None
     crawler_runtime: Annotated[timedelta_ms, Field(alias='crawlerRuntimeMillis')] = timedelta()
     errors: dict[str, Any] = Field(default_factory=dict)
