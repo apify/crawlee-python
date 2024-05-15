@@ -10,8 +10,6 @@ from crawlee.basic_crawler.errors import ProxyError
 from crawlee.http_clients.base_http_client import BaseHttpClient, HttpCrawlingResult, HttpResponse
 from crawlee.sessions.session import Session
 
-from .base_http_client import BaseHttpClient, HttpCrawlingResult, HttpResponse
-
 if TYPE_CHECKING:
     from crawlee.models import Request
 
