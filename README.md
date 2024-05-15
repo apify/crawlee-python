@@ -107,8 +107,8 @@ async def main() -> None:
     # Define a handler for processing requests
     @crawler.router.default_handler
     async def request_handler(context: HttpCrawlingContext) -> None:
-        # Crawler will provide a HttpCrawlingContext instance, from which you can access
-        # the request and response data
+        # Crawler will provide a HttpCrawlingContext instance,
+        # from which you can access the request and response data
         record = {
             'url': context.request.url,
             'status_code': context.http_response.status_code,
@@ -166,10 +166,10 @@ async def main() -> None:
     # Define a handler for processing requests
     @crawler.router.default_handler
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
-        # Crawler will provide a BeautifulSoupCrawlingContext instance, from which you can access
-        # the request and response data
+        # Crawler will provide a BeautifulSoupCrawlingContext instance,
+        # from which you can access the request and response data
         record = {
-            'title': context.soup.title.text if context.soup.title else '',
+            'title': context.soup.title.text,
             'url': context.request.url,
         }
         # Extract the record and push it to the dataset
@@ -187,14 +187,20 @@ if __name__ == '__main__':
 See the following example with the updated request handler:
 
 ```python
+from crawlee.enqueue_strategy import EnqueueStrategy
+
+# ...
+
     @crawler.router.default_handler
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         # Use enqueue links helper to enqueue all links from the page with the same domain
         await context.enqueue_links(strategy=EnqueueStrategy.SAME_DOMAIN)
+
         record = {
-            'title': context.soup.title.text if context.soup.title else '',
+            'title': context.soup.title.text,
             'url': context.request.url,
         }
+
         await dataset.push_data(record)
 ```
 
@@ -250,7 +256,7 @@ async def main() -> None:
     print(f'Dataset data: {data.items}')  # Dataset data: [{'key1': 'value1'}]
 
     # Open a named dataset
-    dataset_named = await Dataset.open('some-name')
+    dataset_named = await Dataset.open(name='some-name')
 
     # Push multiple records
     await dataset_named.push_data([{'key2': 'value2'}, {'key3': 'value3'}])
@@ -297,7 +303,7 @@ async def main() -> None:
     print(f'Value of OUTPUT: {value}')  # Value of OUTPUT: {'my_result': 123}
 
     # Open a named key-value store
-    kvs_named = await KeyValueStore.open('some-name')
+    kvs_named = await KeyValueStore.open(name='some-name')
 
     # Write a record to the named key-value store
     await kvs_named.set_value('some-key', {'foo': 'bar'})
@@ -308,7 +314,6 @@ async def main() -> None:
 
 if __name__ == '__main__':
     asyncio.run(main())
-
 ```
 
 <!-- TODO: link to a real-world example -->
@@ -344,7 +349,7 @@ async def main() -> None:
     await rq.add_request('https://crawlee.dev')
 
     # Open a named request queue
-    rq_named = await RequestQueue.open('some-name')
+    rq_named = await RequestQueue.open(name='some-name')
 
     # Add multiple requests
     await rq_named.add_requests_batched(['https://apify.com', 'https://example.com'])
