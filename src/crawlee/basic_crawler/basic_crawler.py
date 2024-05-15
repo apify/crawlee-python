@@ -194,6 +194,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     @property
     def statistics(self) -> Statistics[StatisticsState]:
+        """Statistics about the current (or last) crawler run."""
         return self._statistics
 
     async def _get_session(self) -> Session | None:

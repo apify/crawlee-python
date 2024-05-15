@@ -148,3 +148,4 @@ async def test_http_status_statistics(crawler: HttpCrawler, server: respx.MockRo
 
     await crawler.run()
     assert crawler.statistics.state.requests_with_status_code == {'200': 100, '500': 300, '404': 100}
+    assert len(server['html_endpoint'].calls) == 100
