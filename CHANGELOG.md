@@ -1,8 +1,20 @@
 # Changelog
 
-## [0.0.3](../../releases/tag/v0.0.3) - Unreleased
+## [0.0.4](../../releases/tag/v0.0.4) - Unreleased
 
 - ...
+
+## [0.0.3](../../releases/tag/v0.0.3) - 2024-05-15
+
+- Another internal release, adding mainly session management and `BeautifulSoupCrawler`.
+
+### Adds
+
+- `HttpxClient`
+- `SessionPool`
+- `BeautifulSoupCrawler`
+- `BaseStorageClient`
+- `Storages` and `MemoryStorageClient` were refactored
 
 ## [0.0.2](../../releases/tag/v0.0.2) - 2024-04-11
 
@@ -10,11 +22,11 @@
 
 ### Adds
 
-- `EventManager`
+- `EventManager` & `LocalEventManager`
 - `Snapshotter`
 - `AutoscaledPool`
 - `MemoryStorageClient`
-- `Storages` & `StorageClients`
+- `Storages`
 - `BasicCrawler` & `HttpCrawler`
 
 ## [0.0.1](../../releases/tag/v0.0.1) - 2024-01-30
