@@ -26,6 +26,14 @@ Crawlee is available as the [`crawlee`](https://pypi.org/project/crawlee/) PyPI 
 pip install crawlee
 ```
 
+Additional, optional dependencies unlocking more features are shipped as package extras.
+
+If you plan to use `BeautifulSoupCrawler`, install `crawlee` with `beautifulsoup` extra:
+
+```
+pip install crawlee[beautifulsoup]
+```
+
 ## Features
 
 - Unified interface for **HTTP and headless browser** crawling.
@@ -99,8 +107,8 @@ async def main() -> None:
     # Define a handler for processing requests
     @crawler.router.default_handler
     async def request_handler(context: HttpCrawlingContext) -> None:
-        # Crawler will provide a HttpCrawlingContext instance, from which you can access
-        # the request and response data
+        # Crawler will provide a HttpCrawlingContext instance,
+        # from which you can access the request and response data
         record = {
             'url': context.request.url,
             'status_code': context.http_response.status_code,
@@ -158,10 +166,10 @@ async def main() -> None:
     # Define a handler for processing requests
     @crawler.router.default_handler
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
-        # Crawler will provide a BeautifulSoupCrawlingContext instance, from which you can access
-        # the request and response data
+        # Crawler will provide a BeautifulSoupCrawlingContext instance,
+        # from which you can access the request and response data
         record = {
-            'title': context.soup.title.text if context.soup.title else '',
+            'title': context.soup.title.text,
             'url': context.request.url,
         }
         # Extract the record and push it to the dataset
@@ -179,14 +187,20 @@ if __name__ == '__main__':
 See the following example with the updated request handler:
 
 ```python
+from crawlee.enqueue_strategy import EnqueueStrategy
+
+# ...
+
     @crawler.router.default_handler
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         # Use enqueue links helper to enqueue all links from the page with the same domain
         await context.enqueue_links(strategy=EnqueueStrategy.SAME_DOMAIN)
+
         record = {
-            'title': context.soup.title.text if context.soup.title else '',
+            'title': context.soup.title.text,
             'url': context.request.url,
         }
+
         await dataset.push_data(record)
 ```
 
@@ -242,7 +256,7 @@ async def main() -> None:
     print(f'Dataset data: {data.items}')  # Dataset data: [{'key1': 'value1'}]
 
     # Open a named dataset
-    dataset_named = await Dataset.open('some-name')
+    dataset_named = await Dataset.open(name='some-name')
 
     # Push multiple records
     await dataset_named.push_data([{'key2': 'value2'}, {'key3': 'value3'}])
@@ -289,7 +303,7 @@ async def main() -> None:
     print(f'Value of OUTPUT: {value}')  # Value of OUTPUT: {'my_result': 123}
 
     # Open a named key-value store
-    kvs_named = await KeyValueStore.open('some-name')
+    kvs_named = await KeyValueStore.open(name='some-name')
 
     # Write a record to the named key-value store
     await kvs_named.set_value('some-key', {'foo': 'bar'})
@@ -300,7 +314,6 @@ async def main() -> None:
 
 if __name__ == '__main__':
     asyncio.run(main())
-
 ```
 
 <!-- TODO: link to a real-world example -->
@@ -336,7 +349,7 @@ async def main() -> None:
     await rq.add_request('https://crawlee.dev')
 
     # Open a named request queue
-    rq_named = await RequestQueue.open('some-name')
+    rq_named = await RequestQueue.open(name='some-name')
 
     # Add multiple requests
     await rq_named.add_requests_batched(['https://apify.com', 'https://example.com'])
@@ -376,22 +389,31 @@ crawler = HttpCrawler(use_session_pool=True)
 If you want to configure your own session pool, instantiate it and provide it directly to the crawler.
 
 ```python
+import asyncio
+from datetime import timedelta
+
 from crawlee.http_crawler import HttpCrawler
-from crawlee.sessions import SessionPool
+from crawlee.sessions import Session, SessionPool
 
-# Use dict as args for new sessions
-session_pool_v1 = SessionPool(
-    max_pool_size=10,
-    create_session_settings = {'max_age': timedelta(minutes=10)},
-)
 
-# Use lambda creation function for new sessions
-session_pool_v2 = SessionPool(
-    max_pool_size=10,
-    create_session_function=lambda _: Session(max_age=timedelta(minutes=10)),
-)
+async def main() -> None:
+    # Use dict as args for new sessions
+    session_pool_v1 = SessionPool(
+        max_pool_size=10,
+        create_session_settings = {'max_age': timedelta(minutes=10)},
+    )
 
-crawler = HttpCrawler(session_pool=session_pool_v1, use_session_pool=True)
+    # Use lambda creation function for new sessions
+    session_pool_v2 = SessionPool(
+        max_pool_size=10,
+        create_session_function=lambda _: Session(max_age=timedelta(minutes=10)),
+    )
+
+    crawler = HttpCrawler(session_pool=session_pool_v1, use_session_pool=True)
+
+
+if __name__ == '__main__':
+    asyncio.run(main())
 ```
 
 ## Running on the Apify platform
