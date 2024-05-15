@@ -7,12 +7,13 @@ from typing_extensions import override
 
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
 from crawlee.basic_crawler.errors import ProxyError
+from crawlee.http_clients.base_http_client import BaseHttpClient, HttpCrawlingResult, HttpResponse
 from crawlee.sessions.session import Session
 
 from .base_http_client import BaseHttpClient, HttpCrawlingResult, HttpResponse
 
 if TYPE_CHECKING:
-    from crawlee.request import Request
+    from crawlee.models import Request
 
 
 class HttpTransport(httpx.AsyncHTTPTransport):

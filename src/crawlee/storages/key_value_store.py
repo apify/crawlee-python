@@ -4,15 +4,12 @@ from typing import TYPE_CHECKING, Any, AsyncIterator, TypeVar, overload
 
 from typing_extensions import override
 
+from crawlee.consts import KEY_VALUE_STORE_LABEL
+from crawlee.models import KeyValueStoreKeyInfo
 from crawlee.storages.base_storage import BaseStorage
-from crawlee.storages.models import KeyValueStoreKeyInfo
 
 if TYPE_CHECKING:
-    from crawlee.base_storage_client import (
-        BaseKeyValueStoreClient,
-        BaseKeyValueStoreCollectionClient,
-        BaseStorageClient,
-    )
+    from crawlee.base_storage_client import BaseStorageClient
     from crawlee.configuration import Configuration
 
 T = TypeVar('T')
@@ -39,6 +36,9 @@ class KeyValueStore(BaseStorage):
         kvs = await KeyValueStore.open(id='my_kvs_id')
     """
 
+    LABEL = KEY_VALUE_STORE_LABEL
+    """Human readable label of the storage."""
+
     def __init__(
         self,
         id: str,
@@ -46,28 +46,48 @@ class KeyValueStore(BaseStorage):
         configuration: Configuration,
         client: BaseStorageClient,
     ) -> None:
-        super().__init__(id=id, name=name, client=client, configuration=configuration)
-        self._key_value_store_client = client.key_value_store(self.id)
+        self._id = id
+        self._name = name
+        self._configuration = configuration
 
-    @classmethod
-    @override
-    def _get_human_friendly_label(cls) -> str:
-        return 'Key-value store'
+        # Get resource clients from storage client
+        self._resource_client = client.key_value_store(self._id)
+        self._resource_collection_client = client.key_value_stores()
 
-    @classmethod
     @override
-    def _get_default_id(cls, configuration: Configuration) -> str:
-        return configuration.default_key_value_store_id
+    @property
+    def id(self) -> str:
+        return self._id
 
-    @classmethod
     @override
-    def _get_single_storage_client(cls, id: str, client: BaseStorageClient) -> BaseKeyValueStoreClient:
-        return client.key_value_store(id)
+    @property
+    def name(self) -> str | None:
+        return self._name
 
-    @classmethod
     @override
-    def _get_storage_collection_client(cls, client: BaseStorageClient) -> BaseKeyValueStoreCollectionClient:
-        return client.key_value_stores()
+    @classmethod
+    async def open(
+        cls,
+        *,
+        id: str | None = None,
+        name: str | None = None,
+        configuration: Configuration | None = None,
+    ) -> KeyValueStore:
+        from crawlee.storages._creation_management import open_storage
+
+        return await open_storage(
+            storage_class=cls,
+            id=id,
+            name=name,
+            configuration=configuration,
+        )
+
+    @override
+    async def drop(self) -> None:
+        from crawlee.storages._creation_management import remove_storage_from_cache
+
+        await self._resource_client.delete()
+        remove_storage_from_cache(storage_class_label=self.LABEL, id=self._id, name=self._name)
 
     @overload
     async def get_value(self, key: str) -> Any: ...
@@ -79,29 +99,29 @@ class KeyValueStore(BaseStorage):
     async def get_value(self, key: str, default_value: T | None = None) -> T | None: ...
 
     async def get_value(self, key: str, default_value: T | None = None) -> T | None:
-        """Get a value from the key-value store.
+        """Get a value from the KVS.
 
         Args:
             key: Key of the record to retrieve.
             default_value: Default value returned in case the record does not exist.
 
         Returns:
-            Any: The value associated with the given key. `default_value` is used in case the record does not exist.
+            The value associated with the given key. `default_value` is used in case the record does not exist.
         """
-        record = await self._key_value_store_client.get_record(key)
+        record = await self._resource_client.get_record(key)
         return record.value if record else default_value
 
     async def iterate_keys(self, exclusive_start_key: str | None = None) -> AsyncIterator[KeyValueStoreKeyInfo]:
-        """Iterate over the keys in the key-value store.
+        """Iterate over the existing keys in the KVS.
 
         Args:
-            exclusive_start_key: All keys up to this one (including) are skipped from the result.
+            exclusive_start_key: Key to start the iteration from.
 
         Yields:
-            Information about a key-value store record.
+            Information about the key.
         """
         while True:
-            list_keys = await self._key_value_store_client.list_keys(exclusive_start_key=exclusive_start_key)
+            list_keys = await self._resource_client.list_keys(exclusive_start_key=exclusive_start_key)
             for item in list_keys.items:
                 yield KeyValueStoreKeyInfo(key=item.key, size=item.size)
 
@@ -115,19 +135,14 @@ class KeyValueStore(BaseStorage):
         value: Any,
         content_type: str | None = None,
     ) -> None:
-        """Set or delete a value in the key-value store.
+        """Set a value in the KVS.
 
         Args:
-            key: The key under which the value should be saved.
-            value: The value to save. If the value is `None`, the corresponding key-value pair will be deleted.
-            content_type: The content type of the saved value.
+            key: Key of the record to set.
+            value: Value to set. If `None`, the record is deleted.
+            content_type: Content type of the record.
         """
         if value is None:
-            return await self._key_value_store_client.delete_record(key)
+            return await self._resource_client.delete_record(key)
 
-        return await self._key_value_store_client.set_record(key, value, content_type)
-
-    async def drop(self) -> None:
-        """Remove the key-value store either from the Apify cloud storage or from the local directory."""
-        await self._key_value_store_client.delete()
-        self._remove_from_cache()
+        return await self._resource_client.set_record(key, value, content_type)

@@ -5,15 +5,13 @@ import contextlib
 import io
 import json
 import mimetypes
-import os
 import re
 from enum import Enum
 from typing import Any
 
-import aiofiles
 import aioshutil
 from aiofiles import ospath
-from aiofiles.os import makedirs, remove, rename
+from aiofiles.os import remove, rename
 
 
 class ContentType(Enum):
@@ -108,29 +106,3 @@ async def json_dumps(obj: Any) -> str:
         A string containing the JSON representation of the input object.
     """
     return await asyncio.to_thread(json.dumps, obj, ensure_ascii=False, indent=2, default=str)
-
-
-async def persist_metadata_if_enabled(*, data: dict, entity_directory: str, write_metadata: bool) -> None:
-    """Updates or writes metadata to a specified directory.
-
-    The function writes a given metadata dictionary to a JSON file within a specified directory.
-    The writing process is skipped if `write_metadata` is False. Before writing, it ensures that
-    the target directory exists, creating it if necessary.
-
-    Args:
-        data: A dictionary containing metadata to be written.
-        entity_directory: The directory path where the metadata file should be stored.
-        write_metadata: A boolean flag indicating whether the metadata should be written to file.
-    """
-    # Skip metadata write; ensure directory exists first
-    if not write_metadata:
-        return
-
-    # Ensure the directory for the entity exists
-    await makedirs(entity_directory, exist_ok=True)
-
-    # Write the metadata to the file
-    file_path = os.path.join(entity_directory, '__metadata__.json')
-    async with aiofiles.open(file_path, mode='wb') as f:
-        s = await json_dumps(data)
-        await f.write(s.encode('utf-8'))

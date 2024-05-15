@@ -19,19 +19,22 @@ from crawlee._utils.data_processing import (
     raise_on_duplicate_storage,
     raise_on_non_existing_storage,
 )
-from crawlee._utils.file import force_remove, force_rename, json_dumps, persist_metadata_if_enabled
+from crawlee._utils.file import force_remove, force_rename, json_dumps
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee.base_storage_client import BaseRequestQueueClient
-from crawlee.memory_storage_client.base_resource_client import BaseResourceClient
-from crawlee.request import Request
-from crawlee.storages.models import RequestQueueHead, RequestQueueMetadata, RequestQueueOperationInfo
+from crawlee.consts import REQUEST_QUEUE_LABEL
+from crawlee.memory_storage_client._creation_management import (
+    find_or_create_client_by_id_or_name_inner,
+    persist_metadata_if_enabled,
+)
+from crawlee.models import Request, RequestQueueHead, RequestQueueMetadata, RequestQueueOperationInfo
 from crawlee.types import StorageTypes
 
 if TYPE_CHECKING:
     from crawlee.memory_storage_client import MemoryStorageClient
 
 
-class RequestQueueClient(BaseRequestQueueClient, BaseResourceClient):
+class RequestQueueClient(BaseRequestQueueClient):
     """Subclient for manipulating a single request queue."""
 
     def __init__(
@@ -57,18 +60,16 @@ class RequestQueueClient(BaseRequestQueueClient, BaseResourceClient):
         self.handled_request_count = handled_request_count
         self.pending_request_count = pending_request_count
 
-        self.resource_directory = os.path.join(base_storage_directory, name or self.id)
         self.requests = ValueSortedDict(lambda request: request.order_no or -float('inf'))
         self.file_operation_lock = asyncio.Lock()
         self._last_used_timestamp = Decimal(0.0)
 
     @property
-    @override
     def resource_info(self) -> RequestQueueMetadata:
         """Get the resource info for the request queue client."""
         return RequestQueueMetadata(
-            id=str(self.id),
-            name=str(self.name),
+            id=self.id,
+            name=self.name,
             accessed_at=self._accessed_at,
             created_at=self._created_at,
             modified_at=self._modified_at,
@@ -81,80 +82,36 @@ class RequestQueueClient(BaseRequestQueueClient, BaseResourceClient):
             resource_directory=self.resource_directory,
         )
 
-    @classmethod
-    @override
-    def _get_storages_dir(cls, memory_storage_client: MemoryStorageClient) -> str:
-        return memory_storage_client.request_queues_directory
+    @property
+    def resource_directory(self) -> str:
+        """Get the resource directory for the client."""
+        return os.path.join(self._base_storage_directory, self.name or self.id)
 
     @classmethod
-    @override
-    def _get_storage_client_cache(cls, memory_storage_client: MemoryStorageClient) -> list[RequestQueueClient]:
-        return memory_storage_client.request_queues_handled
-
-    @classmethod
-    @override
-    def _create_from_directory(
+    def find_or_create_client_by_id_or_name(
         cls,
-        storage_directory: str,
         memory_storage_client: MemoryStorageClient,
         id: str | None = None,
         name: str | None = None,
-    ) -> RequestQueueClient:
-        created_at = datetime.now(timezone.utc)
-        accessed_at = datetime.now(timezone.utc)
-        modified_at = datetime.now(timezone.utc)
-        handled_request_count = 0
-        pending_request_count = 0
+    ) -> RequestQueueClient | None:
+        """Restore existing or create a new key-value store client based on the given ID or name.
 
-        # Load metadata if it exists
-        metadata_filepath = os.path.join(storage_directory, '__metadata__.json')
+        Args:
+            memory_storage_client: The memory storage client used to store and retrieve key-value store client.
+            id: The unique identifier for the key-value store client.
+            name: The name of the key-value store client.
 
-        if os.path.exists(metadata_filepath):
-            with open(metadata_filepath, encoding='utf-8') as f:
-                json_content = json.load(f)
-                resource_info = RequestQueueMetadata(**json_content)
-
-            id = resource_info.id
-            name = resource_info.name
-            created_at = resource_info.created_at
-            accessed_at = resource_info.accessed_at
-            modified_at = resource_info.modified_at
-            handled_request_count = resource_info.handled_request_count
-            pending_request_count = resource_info.pending_request_count
-
-        # Load request entries
-        entries: dict[str, Request] = {}
-
-        for entry in os.scandir(storage_directory):
-            if entry.is_file():
-                if entry.name == '__metadata__.json':
-                    continue
-
-                with open(os.path.join(storage_directory, entry.name), encoding='utf-8') as f:
-                    content = json.load(f)
-
-                request = Request(**content)
-                order_no = request.order_no
-                if order_no:
-                    request.order_no = Decimal(order_no)
-
-                entries[request.id] = request
-
-        # Create new RQ client
-        new_client = RequestQueueClient(
-            base_storage_directory=memory_storage_client.request_queues_directory,
+        Returns:
+            The found or created key-value store client, or None if no client could be found or created.
+        """
+        return find_or_create_client_by_id_or_name_inner(
+            resource_label=REQUEST_QUEUE_LABEL,
+            storage_client_cache=memory_storage_client.request_queues_handled,
+            storages_dir=memory_storage_client.request_queues_directory,
             memory_storage_client=memory_storage_client,
             id=id,
             name=name,
-            accessed_at=accessed_at,
-            created_at=created_at,
-            modified_at=modified_at,
-            handled_request_count=handled_request_count,
-            pending_request_count=pending_request_count,
         )
-
-        new_client.requests.update(entries)
-        return new_client
 
     @override
     async def get(self) -> RequestQueueMetadata | None:
@@ -201,12 +158,8 @@ class RequestQueueClient(BaseRequestQueueClient, BaseResourceClient):
             if existing_queue_by_name is not None:
                 raise_on_duplicate_storage(StorageTypes.REQUEST_QUEUE, 'name', name)
 
-            existing_queue_by_id.name = name
             previous_dir = existing_queue_by_id.resource_directory
-            existing_queue_by_id.resource_directory = os.path.join(
-                self._memory_storage_client.request_queues_directory,
-                name,
-            )
+            existing_queue_by_id.name = name
 
             await force_rename(previous_dir, existing_queue_by_id.resource_directory)
 
@@ -282,7 +235,7 @@ class RequestQueueClient(BaseRequestQueueClient, BaseResourceClient):
         self,
         request: Request,
         *,
-        forefront: bool | None = None,
+        forefront: bool = False,
     ) -> RequestQueueOperationInfo:
         existing_queue_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
@@ -352,7 +305,7 @@ class RequestQueueClient(BaseRequestQueueClient, BaseResourceClient):
         self,
         request: Request,
         *,
-        forefront: bool | None = None,
+        forefront: bool = False,
     ) -> RequestQueueOperationInfo:
         existing_queue_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,

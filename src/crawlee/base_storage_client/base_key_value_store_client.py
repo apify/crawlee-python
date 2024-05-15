@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, AsyncIterator
 
 if TYPE_CHECKING:
-    from crawlee.storages.models import KeyValueStoreListKeysPage, KeyValueStoreMetadata, KeyValueStoreRecord
+    from crawlee.models import KeyValueStoreListKeysPage, KeyValueStoreMetadata, KeyValueStoreRecord
 
 
 class BaseKeyValueStoreClient(ABC):

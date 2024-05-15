@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
+from logging import getLogger
 from pathlib import Path
 
 import aioshutil
@@ -10,16 +11,16 @@ from aiofiles import ospath
 from aiofiles.os import rename, scandir
 from typing_extensions import override
 
-from crawlee._utils.data_processing import maybe_parse_bool
-from crawlee._utils.env_vars import CrawleeEnvVars
 from crawlee.base_storage_client import BaseStorageClient
+from crawlee.configuration import Configuration
+from crawlee.memory_storage_client.dataset_client import DatasetClient
+from crawlee.memory_storage_client.dataset_collection_client import DatasetCollectionClient
+from crawlee.memory_storage_client.key_value_store_client import KeyValueStoreClient
+from crawlee.memory_storage_client.key_value_store_collection_client import KeyValueStoreCollectionClient
+from crawlee.memory_storage_client.request_queue_client import RequestQueueClient
+from crawlee.memory_storage_client.request_queue_collection_client import RequestQueueCollectionClient
 
-from .dataset_client import DatasetClient
-from .dataset_collection_client import DatasetCollectionClient
-from .key_value_store_client import KeyValueStoreClient
-from .key_value_store_collection_client import KeyValueStoreCollectionClient
-from .request_queue_client import RequestQueueClient
-from .request_queue_collection_client import RequestQueueCollectionClient
+logger = getLogger(__name__)
 
 
 class MemoryStorageClient(BaseStorageClient):
@@ -38,53 +39,55 @@ class MemoryStorageClient(BaseStorageClient):
     _TEMPORARY_DIR_NAME = '__CRAWLEE_TEMPORARY'
     """Name of the directory used to temporarily store files during purges."""
 
-    def __init__(
-        self,
-        *,
-        local_data_directory: str | None = None,
-        write_metadata: bool | None = None,
-        persist_storage: bool | None = None,
-    ) -> None:
+    def __init__(self, configuration: Configuration | None = None) -> None:
         """Create a new instance.
 
         Args:
-            local_data_directory: Path to the local directory where data will be persisted. If None, defaults to
-                CrawleeEnvVars.LOCAL_STORAGE_DIR or './storage'.
-
-            write_metadata: Flag indicating whether to write metadata for the storages. Defaults based on DEBUG
-                environment variable.
-
-            persist_storage: Flag indicating whether to persist the storage data locally. Defaults based on
-                CrawleeEnvVars.PERSIST_STORAGE.
+            configuration: Configuration object to use. If None, a default Configuration object will be created.
         """
-        self._local_data_directory = local_data_directory or os.getenv(CrawleeEnvVars.LOCAL_STORAGE_DIR) or './storage'
-        self.write_metadata = write_metadata if write_metadata is not None else '*' in os.getenv('DEBUG', '')
-        self.persist_storage = (
-            persist_storage
-            if persist_storage is not None
-            else maybe_parse_bool(os.getenv(CrawleeEnvVars.PERSIST_STORAGE, 'true'))
-        )
+        self._configuration = configuration or Configuration()
 
-        self._purged_on_start = False  # Indicates whether a purge was already performed on this instance.
         self.datasets_handled: list[DatasetClient] = []
         self.key_value_stores_handled: list[KeyValueStoreClient] = []
         self.request_queues_handled: list[RequestQueueClient] = []
+
+        self._purged_on_start = False  # Indicates whether a purge was already performed on this instance.
         self._purge_lock = asyncio.Lock()
+
+    @property
+    def default_storage_id(self) -> str:
+        """The ID of the default storage."""
+        return self._configuration.default_storage_id
+
+    @property
+    def write_metadata(self) -> bool:
+        """Whether to write metadata to the storage."""
+        return self._configuration.write_metadata
+
+    @property
+    def persist_storage(self) -> bool:
+        """Whether to persist the storage."""
+        return self._configuration.persist_storage
+
+    @property
+    def storage_dir(self) -> str:
+        """Path to the storage directory."""
+        return self._configuration.local_storage_dir
 
     @property
     def datasets_directory(self) -> str:
         """Path to the directory containing datasets."""
-        return os.path.join(self._local_data_directory, 'datasets')
+        return os.path.join(self.storage_dir, 'datasets')
 
     @property
     def key_value_stores_directory(self) -> str:
         """Path to the directory containing key-value stores."""
-        return os.path.join(self._local_data_directory, 'key_value_stores')
+        return os.path.join(self.storage_dir, 'key_value_stores')
 
     @property
     def request_queues_directory(self) -> str:
         """Path to the directory containing request queues."""
-        return os.path.join(self._local_data_directory, 'request_queues')
+        return os.path.join(self.storage_dir, 'request_queues')
 
     @override
     def dataset(self, id: str) -> DatasetClient:
@@ -131,14 +134,11 @@ class MemoryStorageClient(BaseStorageClient):
             memory_storage_client=self,
         )
 
+    @override
     async def purge_on_start(self) -> None:
-        """Performs a purge of the default storage directories.
-
-        This method ensures that the purge is executed only once during the lifetime of the instance.
-        It is primarily used to clean up residual data from previous runs to maintain a clean state.
-        """
         # Optimistic, non-blocking check
         if self._purged_on_start is True:
+            logger.debug('Storage was already purged on start.')
             return
 
         async with self._purge_lock:
@@ -147,10 +147,10 @@ class MemoryStorageClient(BaseStorageClient):
                 # Mypy doesn't understand that the _purged_on_start can change while we're getting the async lock
                 return  # type: ignore[unreachable]
 
-            await self._purge_inner()
+            await self._purge_default_storages()
             self._purged_on_start = True
 
-    async def _purge_inner(self) -> None:
+    async def _purge_default_storages(self) -> None:
         """Cleans up the storage directories, preparing the environment for a new run.
 
         It aims to remove residues from previous executions to avoid data contamination between runs.
@@ -168,21 +168,23 @@ class MemoryStorageClient(BaseStorageClient):
                     self._TEMPORARY_DIR_NAME
                 ) or key_value_store_folder.name.startswith('__OLD'):
                     await self._batch_remove_files(key_value_store_folder.path)
-                elif key_value_store_folder.name == 'default':
+                elif key_value_store_folder.name == self.default_storage_id:
                     await self._handle_default_key_value_store(key_value_store_folder.path)
 
         # Datasets
         if await ospath.exists(self.datasets_directory):
             dataset_folders = await scandir(self.datasets_directory)
             for dataset_folder in dataset_folders:
-                if dataset_folder.name == 'default' or dataset_folder.name.startswith(self._TEMPORARY_DIR_NAME):
+                if dataset_folder.name == self.default_storage_id or dataset_folder.name.startswith(
+                    self._TEMPORARY_DIR_NAME
+                ):
                     await self._batch_remove_files(dataset_folder.path)
 
         # Request queues
         if await ospath.exists(self.request_queues_directory):
             request_queue_folders = await scandir(self.request_queues_directory)
             for request_queue_folder in request_queue_folders:
-                if request_queue_folder.name == 'default' or request_queue_folder.name.startswith(
+                if request_queue_folder.name == self.default_storage_id or request_queue_folder.name.startswith(
                     self._TEMPORARY_DIR_NAME
                 ):
                     await self._batch_remove_files(request_queue_folder.path)

@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from collections import deque
 from datetime import timedelta
+from typing import Sequence
 
 from typing_extensions import override
 
-from crawlee.request import BaseRequestData, Request
+from crawlee.models import BaseRequestData, Request
 from crawlee.storages.request_provider import RequestProvider
 
 
@@ -76,12 +77,20 @@ class RequestList(RequestProvider):
     @override
     async def add_requests_batched(
         self,
-        requests: list[BaseRequestData | Request],
+        requests: Sequence[BaseRequestData | Request | str],
         *,
         batch_size: int = 1000,
         wait_for_all_requests_to_be_added: bool = False,
         wait_time_between_batches: timedelta = timedelta(seconds=1),
     ) -> None:
-        self._sources.extend(
-            request if isinstance(request, Request) else Request.from_base_request_data(request) for request in requests
-        )
+        batch = []
+
+        for request in requests:
+            if isinstance(request, Request):
+                batch.append(request)
+            elif isinstance(request, BaseRequestData):
+                batch.append(Request.from_base_request_data(request))
+            else:
+                batch.append(Request.from_url(request))
+
+        self._sources.extend(batch)

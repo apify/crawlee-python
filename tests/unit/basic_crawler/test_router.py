@@ -6,7 +6,7 @@ import pytest
 
 from crawlee.basic_crawler.router import Router
 from crawlee.basic_crawler.types import BasicCrawlingContext
-from crawlee.request import Request
+from crawlee.models import Request
 from crawlee.sessions.session import Session
 
 

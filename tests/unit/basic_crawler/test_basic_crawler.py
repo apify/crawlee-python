@@ -14,7 +14,7 @@ from crawlee.basic_crawler.basic_crawler import BasicCrawler, UserDefinedErrorHa
 from crawlee.basic_crawler.errors import SessionError
 from crawlee.basic_crawler.types import AddRequestsFunctionKwargs, BasicCrawlingContext
 from crawlee.enqueue_strategy import EnqueueStrategy
-from crawlee.request import BaseRequestData, Request
+from crawlee.models import BaseRequestData, Request
 from crawlee.storages import RequestList
 
 if TYPE_CHECKING:

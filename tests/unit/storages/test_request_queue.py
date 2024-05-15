@@ -6,7 +6,7 @@ from typing import AsyncGenerator
 
 import pytest
 
-from crawlee.request import Request
+from crawlee.models import Request
 from crawlee.storages.request_queue import RequestQueue
 
 

@@ -13,7 +13,7 @@ from crawlee.beautifulsoup_crawler.types import BeautifulSoupCrawlingContext
 from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.http_clients.httpx_client import HttpxClient
 from crawlee.http_crawler.types import HttpCrawlingContext
-from crawlee.request import BaseRequestData
+from crawlee.models import BaseRequestData
 
 if TYPE_CHECKING:
     from crawlee.basic_crawler.types import AddRequestsFunctionKwargs, BasicCrawlingContext

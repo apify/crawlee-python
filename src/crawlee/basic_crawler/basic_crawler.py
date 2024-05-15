@@ -37,7 +37,7 @@ from crawlee.configuration import Configuration
 from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.events.local_event_manager import LocalEventManager
 from crawlee.http_clients.httpx_client import HttpxClient
-from crawlee.request import BaseRequestData, Request, RequestState
+from crawlee.models import BaseRequestData, Request, RequestState
 from crawlee.sessions import SessionPool
 from crawlee.statistics.statistics import Statistics
 from crawlee.storages.request_queue import RequestQueue
@@ -165,7 +165,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         )
 
         self._use_session_pool = use_session_pool
-        self._session_pool: SessionPool = session_pool or SessionPool()
+        self._session_pool = session_pool or SessionPool()
 
         self._retry_on_blocked = retry_on_blocked
 

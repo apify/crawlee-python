@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from datetime import timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence
 
 if TYPE_CHECKING:
-    from crawlee.request import BaseRequestData, Request
-    from crawlee.storages.models import RequestQueueOperationInfo
+    from crawlee.models import BaseRequestData, Request, RequestQueueOperationInfo
 
 
 class RequestProvider(ABC):
@@ -55,7 +54,7 @@ class RequestProvider(ABC):
     @abstractmethod
     async def add_requests_batched(
         self,
-        requests: list[BaseRequestData | Request],
+        requests: Sequence[BaseRequestData | Request | str],
         *,
         batch_size: int = 1000,
         wait_for_all_requests_to_be_added: bool = False,
