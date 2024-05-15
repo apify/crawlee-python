@@ -72,7 +72,7 @@ class Statistics(Generic[TStatisticsState]):
         key_value_store: KeyValueStore | None = None,
         log_message: str = 'Statistics',
         log_interval: timedelta = timedelta(minutes=1),
-        state_model: type[TStatisticsState] = StatisticsState,
+        state_model: type[TStatisticsState] = cast(Any, StatisticsState),  # noqa: B008 - in an ideal world, TStatisticsState would be inferred from this argument, but I haven't managed to do that
     ) -> None:
         self._id = self.__next_id
         self.__next_id += 1
