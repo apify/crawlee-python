@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any, Sequence
 from unittest.mock import Mock
 
+import httpx
 import pytest
 from httpx import Headers, Response
 
@@ -415,3 +417,42 @@ async def test_session_rotation() -> None:
     session_ids = {call[0][0] for call in track_session_usage.call_args_list}
     assert len(session_ids) == 7
     assert None not in session_ids
+
+
+async def test_final_statistics() -> None:
+    crawler = BasicCrawler(
+        request_provider=RequestList(
+            [Request.from_url(f'https://someplace.com/?id={id}', label='start') for id in range(50)]
+        ),
+        max_request_retries=3,
+    )
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        id = int(httpx.URL(context.request.url).params['id'])
+
+        if context.request.retry_count == 0 and id % 2 == 0:
+            raise RuntimeError('First crash')
+
+        if context.request.retry_count == 1 and id % 3 == 0:
+            raise RuntimeError('Second crash')
+
+        if context.request.retry_count == 2 and id % 4 == 0:
+            raise RuntimeError('Third crash')
+
+    final_statistics = await crawler.run()
+
+    assert final_statistics.requests_total == 50
+    assert final_statistics.requests_finished == 45
+    assert final_statistics.requests_failed == 5
+
+    assert final_statistics.retry_histogram == [25, 16, 9]
+
+    assert final_statistics.request_avg_finished_duration > timedelta()
+    assert final_statistics.request_avg_failed_duration > timedelta()
+    assert final_statistics.request_total_duration > timedelta()
+
+    assert final_statistics.crawler_runtime > timedelta()
+
+    assert final_statistics.requests_finished_per_minute > 0
+    assert final_statistics.requests_failed_per_minute > 0

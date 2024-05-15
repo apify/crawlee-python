@@ -160,7 +160,7 @@ class Statistics(Generic[TStatisticsState]):
         if job is None:
             return
 
-        self.state.request_total_finished_duration += job.finish()
+        self.state.request_total_failed_duration += job.finish()
         self.state.requests_failed += 1
         self._save_retry_count_for_job(job)
 
