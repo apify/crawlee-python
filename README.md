@@ -389,22 +389,31 @@ crawler = HttpCrawler(use_session_pool=True)
 If you want to configure your own session pool, instantiate it and provide it directly to the crawler.
 
 ```python
+import asyncio
+from datetime import timedelta
+
 from crawlee.http_crawler import HttpCrawler
-from crawlee.sessions import SessionPool
+from crawlee.sessions import Session, SessionPool
 
-# Use dict as args for new sessions
-session_pool_v1 = SessionPool(
-    max_pool_size=10,
-    create_session_settings = {'max_age': timedelta(minutes=10)},
-)
 
-# Use lambda creation function for new sessions
-session_pool_v2 = SessionPool(
-    max_pool_size=10,
-    create_session_function=lambda _: Session(max_age=timedelta(minutes=10)),
-)
+async def main() -> None:
+    # Use dict as args for new sessions
+    session_pool_v1 = SessionPool(
+        max_pool_size=10,
+        create_session_settings = {'max_age': timedelta(minutes=10)},
+    )
 
-crawler = HttpCrawler(session_pool=session_pool_v1, use_session_pool=True)
+    # Use lambda creation function for new sessions
+    session_pool_v2 = SessionPool(
+        max_pool_size=10,
+        create_session_function=lambda _: Session(max_age=timedelta(minutes=10)),
+    )
+
+    crawler = HttpCrawler(session_pool=session_pool_v1, use_session_pool=True)
+
+
+if __name__ == '__main__':
+    asyncio.run(main())
 ```
 
 ## Running on the Apify platform
