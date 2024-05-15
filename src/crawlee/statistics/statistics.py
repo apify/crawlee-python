@@ -220,15 +220,17 @@ class Statistics(Generic[TStatisticsState]):
         stored_state = await self._key_value_store.get_value(self._persist_state_key, cast(Any, {}))
 
         saved_state = self.state.__class__.model_validate(stored_state)
-        persisted_state = StatisticsPersistedState.model_validate(stored_state)
+        persisted_state = StatisticsPersistedState.model_construct(
+            **stored_state
+        )  # Intentional partial load of StatisticsPersistedState
 
         self.state = saved_state
 
-        if saved_state.stats_persisted_at is not None:
+        if saved_state.stats_persisted_at is not None and 'crawler_last_started_at' in persisted_state.model_fields_set:
             self._instance_start = datetime.now(timezone.utc) - (
                 saved_state.stats_persisted_at - persisted_state.crawler_last_started_at
             )
-        else:
+        elif 'crawler_last_started_at' in persisted_state.model_fields_set:
             self._instance_start = persisted_state.crawler_last_started_at
 
     async def _persist_state(self) -> None:
