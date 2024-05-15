@@ -12,6 +12,7 @@ from crawlee.sessions.session import Session
 
 if TYPE_CHECKING:
     from crawlee.models import Request
+    from crawlee.statistics.statistics import Statistics
 
 
 class HttpTransport(httpx.AsyncHTTPTransport):
@@ -64,7 +65,7 @@ class HttpxClient(BaseHttpClient):
         self._client = httpx.AsyncClient(transport=HttpTransport())
 
     @override
-    async def crawl(self, request: Request, session: Session | None) -> HttpCrawlingResult:
+    async def crawl(self, request: Request, session: Session | None, statistics: Statistics) -> HttpCrawlingResult:
         http_request = self._client.build_request(
             method=request.method,
             url=request.url,
@@ -80,6 +81,8 @@ class HttpxClient(BaseHttpClient):
                 raise ProxyError from e
 
             raise
+
+        statistics.register_status_code(response.status_code)
 
         exclude_error = response.status_code in self._ignore_http_error_status_codes
         include_error = response.status_code in self._additional_http_error_status_codes

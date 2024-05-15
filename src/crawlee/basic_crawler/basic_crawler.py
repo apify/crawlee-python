@@ -192,6 +192,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         self._router = router
 
+    @property
+    def statistics(self) -> Statistics[StatisticsState]:
+        return self._statistics
+
     async def _get_session(self) -> Session | None:
         """If session pool is being used, try to take a session from it."""
         if not self._use_session_pool:

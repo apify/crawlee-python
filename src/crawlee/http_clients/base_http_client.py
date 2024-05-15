@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 
     from crawlee.models import Request
     from crawlee.sessions.session import Session
+    from crawlee.statistics.statistics import Statistics
 
 
 class HttpResponse(Protocol):
@@ -48,7 +49,12 @@ class BaseHttpClient(ABC):
         self._ignore_http_error_status_codes = set(ignore_http_error_status_codes)
 
     @abstractmethod
-    async def crawl(self, request: Request, session: Session | None) -> HttpCrawlingResult:
+    async def crawl(
+        self,
+        request: Request,
+        session: Session | None,
+        statistics: Statistics,
+    ) -> HttpCrawlingResult:
         """Perform a crawl of an URL."""
 
     @abstractmethod
