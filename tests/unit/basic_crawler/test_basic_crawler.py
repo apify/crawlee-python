@@ -1,6 +1,7 @@
 # ruff: noqa: ARG001
 from __future__ import annotations
 
+import asyncio
 import json
 from dataclasses import dataclass
 from datetime import timedelta
@@ -430,6 +431,7 @@ async def test_final_statistics() -> None:
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
         id = int(httpx.URL(context.request.url).params['id'])
+        await asyncio.sleep(0.001)
 
         if context.request.retry_count == 0 and id % 2 == 0:
             raise RuntimeError('First crash')
