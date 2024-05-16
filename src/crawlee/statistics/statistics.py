@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+import time
 from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
@@ -30,28 +31,28 @@ class Job:
     """Tracks information about a running job."""
 
     def __init__(self) -> None:
-        self.last_run_at: datetime | None = None
-        self.runs = 0
+        self._last_run_at: int | None = None
+        self._runs = 0
         self.duration: timedelta | None = None
 
     def run(self) -> int:
         """Mark the job as started."""
-        self.last_run_at = datetime.now(timezone.utc)
-        self.runs += 1
-        return self.runs
+        self._last_run_at = time.time_ns()
+        self._runs += 1
+        return self._runs
 
     def finish(self) -> timedelta:
         """Mark the job as finished."""
-        if self.last_run_at is None:
+        if self._last_run_at is None:
             raise RuntimeError('Invalid state')
 
-        self.duration = datetime.now(timezone.utc) - self.last_run_at
+        self.duration = timedelta(microseconds=(time.time_ns() - self._last_run_at) / 1000)
         return self.duration
 
     @property
     def retry_count(self) -> int:
         """Number of times the job has been retried."""
-        return max(0, self.runs - 1)
+        return max(0, self._runs - 1)
 
 
 class Statistics(Generic[TStatisticsState]):
