@@ -27,7 +27,7 @@ def timedelta_from_ms(value: float | timedelta | Any | None) -> Any:
     if not isinstance(value, (int, float)):
         return value
 
-    return timedelta(seconds=value / 1000)
+    return timedelta(milliseconds=value)
 
 
 timedelta_ms = Annotated[timedelta, PlainSerializer(timedelta_to_ms), PlainValidator(timedelta_from_ms)]
