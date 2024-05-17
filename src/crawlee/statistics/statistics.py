@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import math
-import time
 from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
@@ -27,17 +26,17 @@ TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=St
 logger = getLogger(__name__)
 
 
-class Job:
-    """Tracks information about a running job."""
+class RequestProcessingRecord:
+    """Tracks information about the processing of a request."""
 
     def __init__(self) -> None:
-        self._last_run_at: int | None = None
+        self._last_run_at: datetime | None = None
         self._runs = 0
         self.duration: timedelta | None = None
 
     def run(self) -> int:
         """Mark the job as started."""
-        self._last_run_at = time.time_ns()
+        self._last_run_at = datetime.now(timezone.utc)
         self._runs += 1
         return self._runs
 
@@ -46,7 +45,7 @@ class Job:
         if self._last_run_at is None:
             raise RuntimeError('Invalid state')
 
-        self.duration = timedelta(microseconds=(time.time_ns() - self._last_run_at) / 1000)
+        self.duration = datetime.now(timezone.utc) - self._last_run_at
         return self.duration
 
     @property
@@ -75,8 +74,8 @@ class Statistics(Generic[TStatisticsState]):
         log_interval: timedelta = timedelta(minutes=1),
         state_model: type[TStatisticsState] = cast(Any, StatisticsState),  # noqa: B008 - in an ideal world, TStatisticsState would be inferred from this argument, but I haven't managed to do that
     ) -> None:
-        self._id = self.__next_id
-        self.__next_id += 1
+        self._id = Statistics.__next_id
+        Statistics.__next_id += 1
 
         self._state_model = state_model
         self.state: StatisticsState = self._state_model()
@@ -88,7 +87,7 @@ class Statistics(Generic[TStatisticsState]):
 
         self._events = event_manager or LocalEventManager()
 
-        self._requests_in_progress = dict[str, Job]()
+        self._requests_in_progress = dict[str, RequestProcessingRecord]()
 
         if persist_state_key is None:
             persist_state_key = f'SDK_CRAWLER_STATISTICS_{self._id}'
@@ -135,37 +134,37 @@ class Statistics(Generic[TStatisticsState]):
         self.state.requests_with_status_code.setdefault(str(code), 0)
         self.state.requests_with_status_code[str(code)] += 1
 
-    def start_job(self, job_id: str) -> None:
-        """Mark a job as started."""
-        job = self._requests_in_progress.get(job_id, Job())
-        job.run()
-        self._requests_in_progress[job_id] = job
+    def record_request_processing_start(self, request_id_or_key: str) -> None:
+        """Mark a request as started."""
+        record = self._requests_in_progress.get(request_id_or_key, RequestProcessingRecord())
+        record.run()
+        self._requests_in_progress[request_id_or_key] = record
 
-    def finish_job(self, job_id: str) -> None:
-        """Mark a job as finished."""
-        job = self._requests_in_progress.get(job_id)
-        if job is None:
+    def record_request_processing_finish(self, request_id_or_key: str) -> None:
+        """Mark a request as finished."""
+        record = self._requests_in_progress.get(request_id_or_key)
+        if record is None:
             return
 
-        duration = job.finish()
+        duration = record.finish()
         self.state.requests_finished += 1
         self.state.request_total_finished_duration += duration
-        self._save_retry_count_for_job(job)
+        self._save_retry_count_for_request(record)
         self.state.request_min_duration = min(self.state.request_min_duration, duration)
 
-        del self._requests_in_progress[job_id]
+        del self._requests_in_progress[request_id_or_key]
 
-    def fail_job(self, job_id: str) -> None:
-        """Mark a job as failed."""
-        job = self._requests_in_progress.get(job_id)
-        if job is None:
+    def record_request_processing_failure(self, request_id_or_key: str) -> None:
+        """Mark a request as failed."""
+        record = self._requests_in_progress.get(request_id_or_key)
+        if record is None:
             return
 
-        self.state.request_total_failed_duration += job.finish()
+        self.state.request_total_failed_duration += record.finish()
         self.state.requests_failed += 1
-        self._save_retry_count_for_job(job)
+        self._save_retry_count_for_request(record)
 
-        del self._requests_in_progress[job_id]
+        del self._requests_in_progress[request_id_or_key]
 
     def calculate(self) -> FinalStatistics:
         """Calculate the current statistics."""
@@ -260,8 +259,8 @@ class Statistics(Generic[TStatisticsState]):
             'application/json',
         )
 
-    def _save_retry_count_for_job(self, job: Job) -> None:
-        retry_count = job.retry_count
+    def _save_retry_count_for_request(self, record: RequestProcessingRecord) -> None:
+        retry_count = record.retry_count
 
         if retry_count:
             self.state.requests_retries += 1
