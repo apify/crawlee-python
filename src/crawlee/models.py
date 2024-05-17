@@ -167,6 +167,26 @@ class Request(BaseRequestData):
         self.user_data.setdefault('__crawlee', {})
         self.user_data['__crawlee']['enqueueStrategy'] = str(new_enqueue_strategy)
 
+    @property
+    def last_proxy_tier(self) -> int | None:
+        """The last proxy tier used to process the request."""
+        return self.crawlee_data.last_proxy_tier
+
+    @last_proxy_tier.setter
+    def last_proxy_tier(self, new_value: int) -> None:
+        self.user_data.setdefault('__crawlee', {})
+        self.user_data['__crawlee']['lastProxyTier'] = new_value
+
+    @property
+    def forefront(self) -> bool:
+        """Should the request be enqueued at the start of the queue?"""
+        return self.crawlee_data.forefront
+
+    @forefront.setter
+    def forefront(self, new_value: bool) -> None:
+        self.user_data.setdefault('__crawlee', {})
+        self.user_data['__crawlee']['forefront'] = new_value
+
 
 class RequestState(Enum):
     """Crawlee-specific request handling state."""
@@ -196,6 +216,10 @@ class CrawleeRequestData(BaseModel):
     session_rotation_count: Annotated[int | None, Field(alias='sessionRotationCount')] = None
 
     skip_navigation: Annotated[bool, Field(alias='skipNavigation')] = False
+
+    last_proxy_tier: Annotated[int | None, Field(alias='lastProxyTier')] = None
+
+    forefront: Annotated[bool, Field()] = False
 
 
 class BaseStorageMetadata(BaseModel):
