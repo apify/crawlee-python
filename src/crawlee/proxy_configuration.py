@@ -52,7 +52,7 @@ class ProxyTierTracker:
     def all_urls(self) -> Sequence[URL]:
         return list(flatten(self._tiered_proxy_urls))
 
-    def get_tier_urls(self, tier_number: int) -> list[URL]:
+    def get_tier_urls(self, tier_number: int) -> Sequence[URL]:
         return self._tiered_proxy_urls[tier_number]
 
     def add_error(self, domain: str, tier: int) -> None:
@@ -159,7 +159,7 @@ class ProxyConfiguration:
             if inspect.isawaitable(result):
                 result = await result
 
-            return URL(result) if result is not None else None, None
+            return URL(cast(str, result)) if result is not None else None, None
 
         if self._proxy_tier_tracker:
             if request is not None and proxy_tier is None:
