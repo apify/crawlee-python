@@ -127,7 +127,7 @@ class ProxyConfiguration:
     async def new_proxy_info(
         self, session_id: str | None, request: Request | None, proxy_tier: int | None
     ) -> ProxyInfo | None:
-        if self._proxy_tier_tracker is not None:
+        if self._proxy_tier_tracker is not None and session_id is None:
             session_id = crypto_random_object_id(6)
 
         url, proxy_tier = await self._pick_url(session_id, request, proxy_tier)

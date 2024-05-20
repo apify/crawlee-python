@@ -36,6 +36,7 @@ async def test_calls_consumer_without_middleware() -> None:
         send_request=AsyncMock(),
         add_requests=AsyncMock(),
         session=Session(),
+        proxy_info=AsyncMock(),
     )
 
     await pipeline(context, consumer)
@@ -58,6 +59,7 @@ async def test_calls_consumers_and_middlewares() -> None:
             send_request=AsyncMock(),
             add_requests=AsyncMock(),
             session=context.session,
+            proxy_info=AsyncMock(),
         )
         events.append('middleware_a_out')
 
@@ -70,6 +72,7 @@ async def test_calls_consumers_and_middlewares() -> None:
             send_request=AsyncMock(),
             add_requests=AsyncMock(),
             session=context.session,
+            proxy_info=AsyncMock(),
         )
         events.append('middleware_b_out')
 
@@ -80,6 +83,7 @@ async def test_calls_consumers_and_middlewares() -> None:
         send_request=AsyncMock(),
         add_requests=AsyncMock(),
         session=Session(),
+        proxy_info=AsyncMock(),
     )
     await pipeline(context, consumer)
 
@@ -101,6 +105,7 @@ async def test_wraps_consumer_errors() -> None:
         send_request=AsyncMock(),
         add_requests=AsyncMock(),
         session=Session(),
+        proxy_info=AsyncMock(),
     )
 
     with pytest.raises(RequestHandlerError):
@@ -125,6 +130,7 @@ async def test_handles_exceptions_in_middleware_initialization() -> None:
         send_request=AsyncMock(),
         add_requests=AsyncMock(),
         session=Session(),
+        proxy_info=AsyncMock(),
     )
 
     with pytest.raises(ContextPipelineInitializationError):
@@ -152,6 +158,7 @@ async def test_handles_exceptions_in_middleware_finalization() -> None:
         send_request=AsyncMock(),
         add_requests=AsyncMock(),
         session=Session(),
+        proxy_info=AsyncMock(),
     )
 
     with pytest.raises(ContextPipelineFinalizationError):

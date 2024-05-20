@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING, Any, Coroutine, Protocol, Sequence
 
 from typing_extensions import NotRequired, TypedDict, Unpack
 
+from crawlee.proxy_configuration import ProxyInfo
+
 if TYPE_CHECKING:
     from crawlee import Glob
     from crawlee.enqueue_strategy import EnqueueStrategy
@@ -64,6 +66,7 @@ class BasicCrawlingContext:
 
     request: Request
     session: Session | None
+    proxy_info: ProxyInfo | None
     send_request: SendRequestFunction
     add_requests: AddRequestsFunction
 

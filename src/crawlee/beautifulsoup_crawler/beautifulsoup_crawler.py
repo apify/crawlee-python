@@ -67,6 +67,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
         yield HttpCrawlingContext(
             request=context.request,
             session=context.session,
+            proxy_info=context.proxy_info,
             send_request=context.send_request,
             add_requests=context.add_requests,
             http_response=result.http_response,
@@ -128,6 +129,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
         yield BeautifulSoupCrawlingContext(
             request=context.request,
             session=context.session,
+            proxy_info=context.proxy_info,
             send_request=context.send_request,
             add_requests=context.add_requests,
             enqueue_links=enqueue_links,

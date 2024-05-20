@@ -56,6 +56,7 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
         yield HttpCrawlingContext(
             request=crawling_context.request,
             session=crawling_context.session,
+            proxy_info=crawling_context.proxy_info,
             send_request=crawling_context.send_request,
             add_requests=crawling_context.add_requests,
             http_response=result.http_response,

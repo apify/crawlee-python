@@ -17,6 +17,7 @@ class MockContext(BasicCrawlingContext):
             session=Session(),
             send_request=AsyncMock(),
             add_requests=AsyncMock(),
+            proxy_info=AsyncMock(),
         )
 
 

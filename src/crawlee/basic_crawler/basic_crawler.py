@@ -39,6 +39,7 @@ from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.events.local_event_manager import LocalEventManager
 from crawlee.http_clients.httpx_client import HttpxClient
 from crawlee.models import BaseRequestData, Request, RequestState
+from crawlee.proxy_configuration import ProxyInfo
 from crawlee.sessions import SessionPool
 from crawlee.storages.request_queue import RequestQueue
 
@@ -46,6 +47,7 @@ if TYPE_CHECKING:
     import re
 
     from crawlee.http_clients.base_http_client import BaseHttpClient, HttpResponse
+    from crawlee.proxy_configuration import ProxyConfiguration
     from crawlee.sessions.session import Session
     from crawlee.storages.request_provider import RequestProvider
 
@@ -70,6 +72,7 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     session_pool: NotRequired[SessionPool]
     use_session_pool: NotRequired[bool]
     retry_on_blocked: NotRequired[bool]
+    proxy_configuration: NotRequired[ProxyConfiguration]
     _context_pipeline: NotRequired[ContextPipeline[TCrawlingContext]]
 
 
@@ -98,6 +101,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         session_pool: SessionPool | None = None,
         use_session_pool: bool = True,
         retry_on_blocked: bool = True,
+        proxy_configuration: ProxyConfiguration | None = None,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
     ) -> None:
         """Initialize the BasicCrawler.
@@ -116,6 +120,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             use_session_pool: Enables using the session pool for crawling
             session_pool: A preconfigured SessionPool instance if you wish to use non-default configuration
             retry_on_blocked: If set to True, the crawler will try to automatically bypass any detected bot protection
+            proxy_configuration: A HTTP proxy configuration to be used for making requests
             _context_pipeline: Allows extending the request lifecycle and modifying the crawling context.
                 This parameter is meant to be used by child classes, not when BasicCrawler is instantiated directly.
         """
@@ -165,6 +170,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         self._retry_on_blocked = retry_on_blocked
 
+        self._proxy_configuration = proxy_configuration
+
     @property
     def router(self) -> Router[TCrawlingContext]:
         """The router used to handle each individual crawling request."""
@@ -192,6 +199,17 @@ class BasicCrawler(Generic[TCrawlingContext]):
             f'{self._internal_timeout.total_seconds()} seconds',
             max_retries=3,
             logger=logger,
+        )
+
+    async def _get_proxy_info(self, request: Request, session: Session | None) -> ProxyInfo | None:
+        """Retrieve a new ProxyInfo object based on crawler configuration and the current request and session."""
+        if not self._proxy_configuration:
+            return None
+
+        return await self._proxy_configuration.new_proxy_info(
+            session_id=session.id if session else None,
+            request=request,
+            proxy_tier=None,
         )
 
     async def get_request_provider(self) -> RequestProvider:
@@ -437,6 +455,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         crawling_context = BasicCrawlingContext(
             request=request,
             session=session,
+            proxy_info=await self._get_proxy_info(request, session),
             send_request=self._prepare_send_request_function(session),
             add_requests=result.add_requests,
         )
