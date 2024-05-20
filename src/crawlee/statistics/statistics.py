@@ -208,7 +208,7 @@ class Statistics(Generic[TStatisticsState]):
 
     def _log(self) -> None:
         stats = self.calculate()
-        logger.info(f'{self._log_message} {asdict(stats)}')
+        logger.info(f'{self._log_message} {stats}')
 
     async def _maybe_load_statistics(self) -> None:
         if not self._persistence_enabled:

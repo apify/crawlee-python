@@ -1,11 +1,13 @@
 # ruff: noqa: TCH001 TCH003
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field
+from typing_extensions import override
 
 from crawlee._utils.models import timedelta_ms
 
@@ -24,6 +26,13 @@ class FinalStatistics:
     request_total_duration: timedelta
     requests_total: int
     crawler_runtime: timedelta
+
+    @override
+    def __str__(self) -> str:
+        return json.dumps(
+            {k: v.total_seconds() if isinstance(v, timedelta) else v for k, v in asdict(self).items()},
+            indent=2,
+        )
 
 
 class StatisticsState(BaseModel):
