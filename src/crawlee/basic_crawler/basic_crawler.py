@@ -385,7 +385,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
             except Exception as e:
                 raise UserDefinedErrorHandlerError('Exception thrown in user-defined failed request handler') from e
 
-    def _prepare_send_request_function(self, session: Session | None) -> SendRequestFunction:
+    def _prepare_send_request_function(
+        self,
+        session: Session | None,
+        proxy_info: ProxyInfo | None,
+    ) -> SendRequestFunction:
         async def send_request(
             url: str,
             *,
@@ -393,7 +397,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
             headers: dict[str, str] | None = None,
         ) -> HttpResponse:
             return await self._http_client.send_request(
-                url, method=method, headers=httpx.Headers(headers), session=session
+                url,
+                method=method,
+                headers=httpx.Headers(headers),
+                session=session,
+                proxy_info=proxy_info,
             )
 
         return send_request
@@ -450,13 +458,14 @@ class BasicCrawler(Generic[TCrawlingContext]):
             return
 
         session = await self._get_session()
+        proxy_info = await self._get_proxy_info(request, session)
         result = RequestHandlerRunResult()
 
         crawling_context = BasicCrawlingContext(
             request=request,
             session=session,
-            proxy_info=await self._get_proxy_info(request, session),
-            send_request=self._prepare_send_request_function(session),
+            proxy_info=proxy_info,
+            send_request=self._prepare_send_request_function(session, proxy_info),
             add_requests=result.add_requests,
         )
 

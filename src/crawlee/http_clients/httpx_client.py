@@ -12,6 +12,7 @@ from crawlee.sessions.session import Session
 
 if TYPE_CHECKING:
     from crawlee.models import Request
+    from crawlee.proxy_configuration import ProxyInfo
 
 
 class HttpTransport(httpx.AsyncHTTPTransport):
@@ -64,7 +65,9 @@ class HttpxClient(BaseHttpClient):
         self._client = httpx.AsyncClient(transport=HttpTransport())
 
     @override
-    async def crawl(self, request: Request, session: Session | None) -> HttpCrawlingResult:
+    async def crawl(
+        self, request: Request, session: Session | None, proxy_info: ProxyInfo | None
+    ) -> HttpCrawlingResult:
         http_request = self._client.build_request(
             method=request.method,
             url=request.url,
@@ -107,7 +110,8 @@ class HttpxClient(BaseHttpClient):
         *,
         method: str,
         headers: httpx.Headers | dict[str, str],
-        session: Session | None = None,
+        session: Session | None,
+        proxy_info: ProxyInfo | None,
     ) -> HttpResponse:
         http_request = self._client.build_request(
             url=url,

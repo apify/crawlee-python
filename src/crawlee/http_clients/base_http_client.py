@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from httpx import Headers  # Type from `httpx` is used here because it is lightweight and convenient
 
     from crawlee.models import Request
+    from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions.session import Session
 
 
@@ -48,11 +49,19 @@ class BaseHttpClient(ABC):
         self._ignore_http_error_status_codes = set(ignore_http_error_status_codes)
 
     @abstractmethod
-    async def crawl(self, request: Request, session: Session | None) -> HttpCrawlingResult:
+    async def crawl(
+        self, request: Request, session: Session | None, proxy_info: ProxyInfo | None
+    ) -> HttpCrawlingResult:
         """Perform a crawl of an URL."""
 
     @abstractmethod
     async def send_request(
-        self, url: str, *, method: str, headers: Headers | dict[str, str], session: Session | None = None
+        self,
+        url: str,
+        *,
+        method: str,
+        headers: Headers | dict[str, str],
+        session: Session | None,
+        proxy_info: ProxyInfo | None,
     ) -> HttpResponse:
         """Perform an HTTP request."""

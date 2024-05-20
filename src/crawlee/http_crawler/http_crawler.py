@@ -51,7 +51,9 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
     async def _make_http_request(
         self, crawling_context: BasicCrawlingContext
     ) -> AsyncGenerator[HttpCrawlingContext, None]:
-        result = await self._http_client.crawl(crawling_context.request, crawling_context.session)
+        result = await self._http_client.crawl(
+            crawling_context.request, crawling_context.session, crawling_context.proxy_info
+        )
 
         yield HttpCrawlingContext(
             request=crawling_context.request,
