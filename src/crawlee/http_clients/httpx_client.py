@@ -72,7 +72,7 @@ class HttpxClient(BaseHttpClient):
 
     def _get_client(self, proxy_url: str | None) -> httpx.AsyncClient:
         if proxy_url not in self._client_by_proxy_url:
-            self._client_by_proxy_url[proxy_url] = httpx.AsyncClient(transport=HttpTransport())
+            self._client_by_proxy_url[proxy_url] = httpx.AsyncClient(transport=HttpTransport(), proxy=proxy_url)
 
         return self._client_by_proxy_url[proxy_url]
 
