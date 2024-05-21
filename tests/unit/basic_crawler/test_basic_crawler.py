@@ -450,8 +450,12 @@ async def test_final_statistics() -> None:
 
     assert final_statistics.retry_histogram == [25, 16, 9]
 
+    assert final_statistics.request_avg_finished_duration is not None
     assert final_statistics.request_avg_finished_duration > timedelta()
+
+    assert final_statistics.request_avg_failed_duration is not None
     assert final_statistics.request_avg_failed_duration > timedelta()
+
     assert final_statistics.request_total_duration > timedelta()
 
     assert final_statistics.crawler_runtime > timedelta()
