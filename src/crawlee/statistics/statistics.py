@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import math
-from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, Generic, cast
@@ -150,7 +149,12 @@ class Statistics(Generic[TStatisticsState]):
         self.state.requests_finished += 1
         self.state.request_total_finished_duration += duration
         self._save_retry_count_for_request(record)
-        self.state.request_min_duration = min(self.state.request_min_duration, duration)
+        self.state.request_min_duration = min(
+            self.state.request_min_duration if self.state.request_min_duration is not None else timedelta.max, duration
+        )
+        self.state.request_max_duration = min(
+            self.state.request_max_duration if self.state.request_max_duration is not None else timedelta(), duration
+        )
 
         del self._requests_in_progress[request_id_or_key]
 
@@ -177,10 +181,10 @@ class Statistics(Generic[TStatisticsState]):
         return FinalStatistics(
             request_avg_failed_duration=(self.state.request_total_failed_duration / self.state.requests_failed)
             if self.state.requests_failed
-            else timedelta.max,
+            else None,
             request_avg_finished_duration=(self.state.request_total_finished_duration / self.state.requests_finished)
             if self.state.requests_finished
-            else timedelta.max,
+            else None,
             requests_finished_per_minute=round(self.state.requests_finished / total_minutes) if total_minutes else 0,
             requests_failed_per_minute=math.floor(self.state.requests_failed / total_minutes) if total_minutes else 0,
             request_total_duration=self.state.request_total_finished_duration

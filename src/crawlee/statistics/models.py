@@ -19,8 +19,8 @@ class FinalStatistics:
     requests_finished: int
     requests_failed: int
     retry_histogram: list[int]
-    request_avg_failed_duration: timedelta
-    request_avg_finished_duration: timedelta
+    request_avg_failed_duration: timedelta | None
+    request_avg_finished_duration: timedelta | None
     requests_finished_per_minute: float
     requests_failed_per_minute: float
     request_total_duration: timedelta
@@ -45,8 +45,8 @@ class StatisticsState(BaseModel):
     requests_retries: Annotated[int, Field(alias='requestsRetries')] = 0
     requests_failed_per_minute: Annotated[float, Field(alias='requestsFailedPerMinute')] = 0
     requests_finished_per_minute: Annotated[float, Field(alias='requestsFinishedPerMinute')] = 0
-    request_min_duration: Annotated[timedelta_ms, Field(alias='requestMinDurationMillis')] = timedelta.max
-    request_max_duration: Annotated[timedelta_ms, Field(alias='requestMaxDurationMillis')] = timedelta()
+    request_min_duration: Annotated[timedelta_ms | None, Field(alias='requestMinDurationMillis')] = None
+    request_max_duration: Annotated[timedelta_ms | None, Field(alias='requestMaxDurationMillis')] = None
     request_total_failed_duration: Annotated[timedelta_ms, Field(alias='requestTotalFailedDurationMillis')] = (
         timedelta()
     )
@@ -70,8 +70,8 @@ class StatisticsPersistedState(BaseModel):
 
     request_retry_histogram: Annotated[list[int], Field(alias='requestRetryHistogram')]
     stats_id: Annotated[int, Field(alias='statsId')]
-    request_avg_failed_duration: Annotated[timedelta_ms, Field(alias='requestAvgFailedDurationMillis')]
-    request_avg_finished_duration: Annotated[timedelta_ms, Field(alias='requestAvgFinishedDurationMillis')]
+    request_avg_failed_duration: Annotated[timedelta_ms | None, Field(alias='requestAvgFailedDurationMillis')]
+    request_avg_finished_duration: Annotated[timedelta_ms | None, Field(alias='requestAvgFinishedDurationMillis')]
     request_total_duration: Annotated[timedelta_ms, Field(alias='requestTotalDurationMillis')]
     requests_total: Annotated[int, Field(alias='requestsTotal')]
     crawler_last_started_at: Annotated[datetime, Field(alias='crawlerLastStartTimestamp')]
