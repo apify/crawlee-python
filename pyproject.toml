@@ -195,3 +195,11 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "assert_never()"
 ]
+
+[tool.basedpyright]
+reportPrivateLocalImportUsage = false
+reportUnusedCallResult = false
+reportUnusedVariable = false
+reportCallInDefaultInitializer = false
+reportImplicitStringConcatenation = false
+reportAny = false

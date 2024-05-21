@@ -22,7 +22,7 @@ Visit our GitHub repository for more information [Crawlee on GitHub](https://git
 
 Crawlee is available as the [`crawlee`](https://pypi.org/project/crawlee/) PyPI package.
 
-```
+```bash
 pip install crawlee
 ```
 
@@ -30,8 +30,8 @@ Additional, optional dependencies unlocking more features are shipped as package
 
 If you plan to use `BeautifulSoupCrawler`, install `crawlee` with `beautifulsoup` extra:
 
-```
-pip install crawlee[beautifulsoup]
+```bash
+pip install 'crawlee[beautifulsoup]'
 ```
 
 ## Features

@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from crawlee.models import Request
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions.session import Session
+    from crawlee.statistics.statistics import Statistics
 
 
 class HttpResponse(Protocol):
@@ -50,7 +51,11 @@ class BaseHttpClient(ABC):
 
     @abstractmethod
     async def crawl(
-        self, request: Request, session: Session | None, proxy_info: ProxyInfo | None
+        self,
+        request: Request,
+        session: Session | None,
+        proxy_info: ProxyInfo | None,
+        statistics: Statistics,
     ) -> HttpCrawlingResult:
         """Perform a crawl of an URL."""
 

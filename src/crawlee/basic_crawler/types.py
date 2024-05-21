@@ -71,11 +71,6 @@ class BasicCrawlingContext:
     add_requests: AddRequestsFunction
 
 
-@dataclass(frozen=True)
-class FinalStatistics:
-    """Statistics about a crawler run."""
-
-
 class AddRequestsFunctionCall(AddRequestsFunctionKwargs):
     """Record of a call to `add_requests`."""
 
