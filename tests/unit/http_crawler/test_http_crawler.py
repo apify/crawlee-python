@@ -139,3 +139,13 @@ async def test_stores_cookies() -> None:
     session = await session_pool.get_session_by_id(session_ids.pop())
     assert session is not None
     assert session.cookies == {'a': '1', 'b': '2', 'c': '3'}
+
+
+async def test_http_status_statistics(crawler: HttpCrawler, server: respx.MockRouter) -> None:
+    await crawler.add_requests([f'https://test.io/500?id={i}' for i in range(100)])
+    await crawler.add_requests([f'https://test.io/404?id={i}' for i in range(100)])
+    await crawler.add_requests([f'https://test.io/html?id={i}' for i in range(100)])
+
+    await crawler.run()
+    assert crawler.statistics.state.requests_with_status_code == {'200': 100, '500': 300, '404': 100}
+    assert len(server['html_endpoint'].calls) == 100

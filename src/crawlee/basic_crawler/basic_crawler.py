@@ -6,7 +6,7 @@ from contextlib import AsyncExitStack
 from datetime import timedelta
 from functools import partial
 from logging import getLogger
-from typing import TYPE_CHECKING, AsyncGenerator, Awaitable, Callable, Generic, Sequence, Union, cast
+from typing import TYPE_CHECKING, Any, AsyncGenerator, Awaitable, Callable, Generic, Sequence, Union, cast
 
 import httpx
 from tldextract import TLDExtract
@@ -30,7 +30,6 @@ from crawlee.basic_crawler.errors import (
 from crawlee.basic_crawler.router import Router
 from crawlee.basic_crawler.types import (
     BasicCrawlingContext,
-    FinalStatistics,
     RequestHandlerRunResult,
     SendRequestFunction,
 )
@@ -40,6 +39,7 @@ from crawlee.events.local_event_manager import LocalEventManager
 from crawlee.http_clients.httpx_client import HttpxClient
 from crawlee.models import BaseRequestData, Request, RequestState
 from crawlee.sessions import SessionPool
+from crawlee.statistics.statistics import Statistics
 from crawlee.storages.request_queue import RequestQueue
 
 if TYPE_CHECKING:
@@ -47,6 +47,7 @@ if TYPE_CHECKING:
 
     from crawlee.http_clients.base_http_client import BaseHttpClient, HttpResponse
     from crawlee.sessions.session import Session
+    from crawlee.statistics.models import FinalStatistics, StatisticsState
     from crawlee.storages.request_provider import RequestProvider
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
@@ -70,6 +71,7 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     session_pool: NotRequired[SessionPool]
     use_session_pool: NotRequired[bool]
     retry_on_blocked: NotRequired[bool]
+    statistics: NotRequired[Statistics[StatisticsState]]
     _context_pipeline: NotRequired[ContextPipeline[TCrawlingContext]]
 
 
@@ -98,6 +100,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         session_pool: SessionPool | None = None,
         use_session_pool: bool = True,
         retry_on_blocked: bool = True,
+        statistics: Statistics | None = None,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
     ) -> None:
         """Initialize the BasicCrawler.
@@ -114,8 +117,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
             configuration: Crawler configuration
             request_handler_timeout: How long is a single request handler allowed to run
             use_session_pool: Enables using the session pool for crawling
-            session_pool: A preconfigured SessionPool instance if you wish to use non-default configuration
+            session_pool: A preconfigured `SessionPool` instance if you wish to use non-default configuration
             retry_on_blocked: If set to True, the crawler will try to automatically bypass any detected bot protection
+            statistics: A preconfigured `Statistics` instance if you wish to use non-default configuration
             _context_pipeline: Allows extending the request lifecycle and modifying the crawling context.
                 This parameter is meant to be used by child classes, not when BasicCrawler is instantiated directly.
         """
@@ -165,6 +169,14 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         self._retry_on_blocked = retry_on_blocked
 
+        self._statistics = statistics or Statistics(
+            event_manager=self._event_manager,
+            log_message=f'{logger.name} request statistics',
+        )
+
+        self._running = False
+        self._has_finished_before = False
+
     @property
     def router(self) -> Router[TCrawlingContext]:
         """The router used to handle each individual crawling request."""
@@ -179,6 +191,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
             raise RuntimeError('A router is already set')
 
         self._router = router
+
+    @property
+    def statistics(self) -> Statistics[StatisticsState]:
+        """Statistics about the current (or last) crawler run."""
+        return self._statistics
 
     async def _get_session(self) -> Session | None:
         """If session pool is being used, try to take a session from it."""
@@ -235,19 +252,43 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     async def run(self, requests: list[str | BaseRequestData] | None = None) -> FinalStatistics:
         """Run the crawler until all requests are processed."""
+        if self._running:
+            raise RuntimeError(
+                'This crawler instance is already running, you can add more requests to it via `crawler.add_requests()`'
+            )
+
+        self._running = True
+
+        if self._has_finished_before:
+            await self._statistics.reset()
+
+            if self._use_session_pool:
+                await self._session_pool.reset_store()
+
         if requests is not None:
             await self.add_requests(requests)
 
         async with AsyncExitStack() as exit_stack:
             await exit_stack.enter_async_context(self._event_manager)
             await exit_stack.enter_async_context(self._snapshotter)
+            await exit_stack.enter_async_context(self._statistics)
 
             if self._use_session_pool:
                 await exit_stack.enter_async_context(self._session_pool)
 
             await self._pool.run()
 
-        return FinalStatistics()
+        if self._statistics.error_tracker.total > 0:
+            logger.info(
+                'Error analysis:'
+                f' total_errors={self._statistics.error_tracker.total}'
+                f' unique_errors={self._statistics.error_tracker.unique_error_count}'
+            )
+
+        self._running = False
+        self._has_finished_before = True
+
+        return self._statistics.calculate()
 
     def _should_retry_request(self, crawling_context: BasicCrawlingContext, error: Exception) -> bool:
         if crawling_context.request.no_retry:
@@ -298,13 +339,13 @@ class BasicCrawler(Generic[TCrawlingContext]):
         if strategy == EnqueueStrategy.ALL:
             return True
 
-        assert_never()
+        assert_never(strategy)
 
     def _check_url_patterns(
         self,
         target_url: httpx.URL,
-        include: Sequence[re.Pattern | Glob] | None,
-        exclude: Sequence[re.Pattern | Glob] | None,
+        include: Sequence[re.Pattern[Any] | Glob] | None,
+        exclude: Sequence[re.Pattern[Any] | Glob] | None,
     ) -> bool:
         """Check if a URL matches configured include/exclude patterns."""
         # If the URL matches any `exclude` pattern, reject it
@@ -332,10 +373,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     async def _handle_request_error(self, crawling_context: TCrawlingContext, error: Exception) -> None:
         request_provider = await self.get_request_provider()
+        request = crawling_context.request
 
         if self._should_retry_request(crawling_context, error):
-            request = crawling_context.request
             request.retry_count += 1
+            self._statistics.error_tracker.add(error)
 
             if self._error_handler:
                 try:
@@ -357,9 +399,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 max_retries=3,
             )
             await self._handle_failed_request(crawling_context, error)
+            self._statistics.record_request_processing_failure(request.id or request.unique_key)
 
     async def _handle_failed_request(self, crawling_context: TCrawlingContext, error: Exception) -> None:
         logger.exception('Request failed and reached maximum retries', exc_info=error)
+        self._statistics.error_tracker.add(error)
 
         if self._failed_request_handler:
             try:
@@ -441,6 +485,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
             add_requests=result.add_requests,
         )
 
+        statistics_id = request.id or request.unique_key
+        self._statistics.record_request_processing_start(statistics_id)
+
         try:
             request.state = RequestState.REQUEST_HANDLER
 
@@ -467,6 +514,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
             if crawling_context.session:
                 crawling_context.session.mark_good()
+
+            self._statistics.record_request_processing_finish(statistics_id)
         except RequestHandlerError as primary_error:
             primary_error = cast(
                 RequestHandlerError[TCrawlingContext], primary_error
@@ -514,6 +563,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 crawling_context.request.session_rotation_count += 1
 
                 await request_provider.reclaim_request(request)
+                self._statistics.error_tracker_retry.add(session_error)
             else:
                 logger.exception('Request failed and reached maximum retries', exc_info=session_error)
 
@@ -525,6 +575,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
                     logger=logger,
                     max_retries=3,
                 )
+
+                self._statistics.record_request_processing_failure(statistics_id)
+                self._statistics.error_tracker.add(session_error)
         except ContextPipelineInterruptedError as interruped_error:
             logger.debug('The context pipeline was interrupted', exc_info=interruped_error)
 
