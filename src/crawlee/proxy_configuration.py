@@ -17,6 +17,9 @@ if TYPE_CHECKING:
     from crawlee.models import Request
 
 
+__all__ = ['ProxyInfo', 'ProxyConfiguration']
+
+
 class ProxyInfo(TypedDict):
     """Provides information about a proxy connection that is used for requests."""
 
@@ -80,7 +83,7 @@ class ProxyTierTracker:
 
 
 class NewUrlFunction(Protocol):
-    def __call__(  # noqa: D102
+    def __call__(
         self,
         session_id: str | None = None,
         request: Request | None = None,
@@ -127,6 +130,11 @@ class ProxyConfiguration:
     async def new_proxy_info(
         self, session_id: str | None, request: Request | None, proxy_tier: int | None
     ) -> ProxyInfo | None:
+        """Return a new ProxyInfo object.
+
+        If called repeatedly with the same request, it is assumed that the request is being retried.
+        If a previously used session ID is received, it will return the same proxy url.
+        """
         if self._proxy_tier_tracker is not None and session_id is None:
             session_id = crypto_random_object_id(6)
 
