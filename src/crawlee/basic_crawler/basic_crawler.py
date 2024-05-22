@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import tempfile
+from collections.abc import AsyncGenerator, Awaitable, Sequence
 from contextlib import AsyncExitStack
 from datetime import timedelta
 from functools import partial
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, AsyncGenerator, Awaitable, Callable, Generic, Sequence, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Generic, Union, cast
 
 import httpx
 from tldextract import TLDExtract
@@ -38,7 +39,6 @@ from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.events.local_event_manager import LocalEventManager
 from crawlee.http_clients.httpx_client import HttpxClient
 from crawlee.models import BaseRequestData, Request, RequestState
-from crawlee.proxy_configuration import ProxyInfo
 from crawlee.sessions import SessionPool
 from crawlee.statistics.statistics import Statistics
 from crawlee.storages.request_queue import RequestQueue
@@ -47,7 +47,7 @@ if TYPE_CHECKING:
     import re
 
     from crawlee.http_clients.base_http_client import BaseHttpClient, HttpResponse
-    from crawlee.proxy_configuration import ProxyConfiguration
+    from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
     from crawlee.sessions.session import Session
     from crawlee.statistics.models import FinalStatistics, StatisticsState
     from crawlee.storages.request_provider import RequestProvider

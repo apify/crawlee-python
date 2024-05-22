@@ -27,7 +27,7 @@ async def test_returns_proxy_info() -> None:
 
 async def test_throws_on_invalid_new_url_function() -> None:
     config = ProxyConfiguration(
-        new_url_function=lambda session_id=None, request=None: 'http://proxy.com:1111*invalid_url'
+        new_url_function=lambda session_id=None, request=None: 'http://proxy.com:1111*invalid_url'  # noqa: ARG005
     )
 
     with pytest.raises(InvalidURL):
@@ -35,7 +35,7 @@ async def test_throws_on_invalid_new_url_function() -> None:
 
 
 async def test_returns_proxy_info_with_new_url_function() -> None:
-    config = ProxyConfiguration(new_url_function=lambda session_id=None, request=None: 'http://proxy.com:1111')
+    config = ProxyConfiguration(new_url_function=lambda session_id=None, request=None: 'http://proxy.com:1111')  # noqa: ARG005
 
     proxy_info = await config.new_proxy_info(None, None, None)
 
@@ -49,7 +49,7 @@ async def test_returns_proxy_info_with_new_url_function() -> None:
 
 
 async def test_returns_proxy_info_with_new_url_function_async() -> None:
-    async def new_url(session_id: str | None = None, request: Request | None = None):
+    async def new_url(session_id: str | None = None, request: Request | None = None) -> str:  # noqa: ARG001
         return 'http://proxy.com:1111'
 
     config = ProxyConfiguration(new_url_function=new_url)
