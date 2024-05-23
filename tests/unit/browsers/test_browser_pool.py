@@ -62,4 +62,27 @@ async def test_browser_pool_more_plugins() -> None:
         await page_3.page.close()
 
 
+async def test_new_page_with_each_plugin() -> None:
+    plugin_chromium = PlaywrightBrowserPlugin(browser_type='chromium')
+    plugin_firefox = PlaywrightBrowserPlugin(browser_type='firefox')
+    # plugin_webkit = PlaywrightBrowserPlugin(browser_type='webkit')
+
+    async with BrowserPool([plugin_chromium, plugin_firefox]) as browser_pool:
+        pages = await browser_pool.new_page_with_each_plugin()
+
+        assert len(pages) == 2
+        assert pages[0].browser_type == 'chromium'
+        assert pages[1].browser_type == 'firefox'
+
+        await pages[0].page.goto('https://example.com/')
+        await pages[1].page.goto('https://example.com/')
+
+        # Ensure the pages are working by checking their titles or another element
+        assert await pages[0].page.title() == 'Example Domain'
+        assert await pages[1].page.title() == 'Example Domain'
+
+        await pages[0].page.close()
+        await pages[1].page.close()
+
+
 #

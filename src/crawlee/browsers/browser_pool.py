@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-import random
+import asyncio
+import itertools
+from collections.abc import Sequence
 from datetime import timedelta
 from logging import getLogger
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING
 
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee.browsers.types import CrawleePage
@@ -57,7 +59,7 @@ class BrowserPool:
         self._fingerprint_options = fingerprint_options or {}
 
         self._pages = {}  # Track the pages in the pool
-        self._current_plugin_index = 0  # Track the index of the last used plugin
+        self._plugins_cycle = itertools.cycle(plugins)  # Cycle through the plugins
 
     @property
     def plugins(self) -> Sequence[BaseBrowserPlugin]:
@@ -89,6 +91,7 @@ class BrowserPool:
 
     async def new_page(
         self,
+        *,
         page_id: str | None = None,
         browser_plugin: BaseBrowserPlugin | None = None,
         page_options: dict | None = None,
@@ -104,44 +107,56 @@ class BrowserPool:
         Returns:
             The newly created browser page wrapped in a CrawleePage object.
         """
+        if page_id in self.pages:
+            raise ValueError(f'Page with ID: {page_id} already exists.')
+
+        if browser_plugin and browser_plugin not in self.plugins:
+            raise ValueError('Provided browser_plugin is not one of the plugins used by BrowserPool.')
+
         page_id = page_id or crypto_random_object_id(self._GENERATED_PAGE_ID_LENGTH)
-        plugin = browser_plugin or self._get_next_plugin()
+        plugin = browser_plugin or next(self._plugins_cycle)
         page_options = page_options or {}
+
         raw_page = await plugin.new_page(**page_options)
         page = CrawleePage(id=page_id, page=raw_page, browser_type=plugin.browser_type)
         self._pages[page_id] = page
         return page
 
-    def get_page_by_id(self, page_id: str) -> CrawleePage | None:
-        """Get a page by its ID."""
-        return self._pages.get(page_id, None)
+    async def new_page_in_new_browser(
+        self,
+        *,
+        page_id: str | None = None,
+        browser_plugin: BaseBrowserPlugin | None = None,
+        page_options: dict | None = None,
+        browser_launch_options: dict | None = None,
+    ) -> CrawleePage:
+        # will probably be skipped
+        pass
 
-    def _get_next_plugin(self) -> BaseBrowserPlugin:
-        """Returns the next plugin in the rotation.
+    async def new_page_with_each_plugin(self, *, page_options: dict | None = None) -> Sequence[CrawleePage]:
+        """Create a new page with each browser plugin in the pool.
 
-        This method rotates through the plugins in the sequence, ensuring each plugin is used in turn.
+        This method is useful for running scripts in multiple environments simultaneously, typically for testing
+        or website analysis. Each page is created using a different browser plugin, allowing you to interact
+        with various browser types concurrently.
+
+        Args:
+            page_options: Options to configure the new pages. These options will be applied to all pages created.
+                If not provided, an empty dictionary is used.
 
         Returns:
-            BaseBrowserPlugin: The next browser plugin to use.
+            A list of newly created pages, one for each plugin in the pool.
         """
-        plugin = self._plugins[self._current_plugin_index]
-        self._current_plugin_index = (self._current_plugin_index + 1) % len(self._plugins)
-        return plugin
-
-    async def new_page_in_new_browser(self) -> None:
-        pass
-
-    async def new_page_with_each_plugin(self) -> None:
-        pass
+        page_options = page_options or {}
+        pages_coroutines = [self.new_page(browser_plugin=plugin, page_options=page_options) for plugin in self._plugins]
+        return await asyncio.gather(*pages_coroutines)
 
     async def get_browser_controller_by_page(self) -> None:
         pass
 
-    async def get_page(self) -> None:
-        pass
-
-    async def get_page_id(self) -> None:
-        pass
+    def get_page_by_id(self, page_id: str) -> CrawleePage | None:
+        """Get a page by its ID."""
+        return self._pages.get(page_id, None)
 
     async def retire_browser_controller(self) -> None:
         pass

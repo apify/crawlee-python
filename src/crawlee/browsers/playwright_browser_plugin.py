@@ -6,13 +6,11 @@ from typing import TYPE_CHECKING, Any, Literal, override
 from playwright.async_api import async_playwright
 
 from crawlee.browsers.base_browser_plugin import BaseBrowserPlugin
-from crawlee.browsers.playwright_browser import PlaywrightBrowser
-from crawlee.browsers.playwright_browser_controller import PlaywrightBrowserController
 
 if TYPE_CHECKING:
     from types import TracebackType
 
-    from playwright.async_api import Browser, BrowserType, Page
+    from playwright.async_api import Page
 
     from crawlee.events import EventManager
 
