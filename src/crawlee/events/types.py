@@ -12,12 +12,22 @@ if TYPE_CHECKING:
 class Event(Enum):
     """Enum of all possible events that can be emitted."""
 
+    # Core events
     PERSIST_STATE = 'persistState'
     SYSTEM_INFO = 'systemInfo'
     MIGRATING = 'migrating'
     ABORTING = 'aborting'
     EXIT = 'exit'
+
+    # Session pool events
     SESSION_RETIRED = 'sessionRetired'
+
+    # Browser pool events
+    BROWSER_LAUNCHED = 'browserLaunched'
+    BROWSER_RETIRED = 'browserRetired'
+    BROWSER_CLOSED = 'browserClosed'
+    PAGE_CREATED = 'pageCreated'
+    PAGE_CLOSED = 'pageClosed'
 
 
 @dataclass
