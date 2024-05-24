@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import tempfile
+from collections.abc import AsyncGenerator, Awaitable, Sequence
 from contextlib import AsyncExitStack
 from datetime import timedelta
 from functools import partial
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, AsyncGenerator, Awaitable, Callable, Generic, Sequence, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Generic, Union, cast
 
 import httpx
 from tldextract import TLDExtract
@@ -46,6 +47,7 @@ if TYPE_CHECKING:
     import re
 
     from crawlee.http_clients.base_http_client import BaseHttpClient, HttpResponse
+    from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
     from crawlee.sessions.session import Session
     from crawlee.statistics.models import FinalStatistics, StatisticsState
     from crawlee.storages.request_provider import RequestProvider
@@ -71,6 +73,7 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     session_pool: NotRequired[SessionPool]
     use_session_pool: NotRequired[bool]
     retry_on_blocked: NotRequired[bool]
+    proxy_configuration: NotRequired[ProxyConfiguration]
     statistics: NotRequired[Statistics[StatisticsState]]
     _context_pipeline: NotRequired[ContextPipeline[TCrawlingContext]]
 
@@ -100,6 +103,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         session_pool: SessionPool | None = None,
         use_session_pool: bool = True,
         retry_on_blocked: bool = True,
+        proxy_configuration: ProxyConfiguration | None = None,
         statistics: Statistics | None = None,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
     ) -> None:
@@ -119,6 +123,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             use_session_pool: Enables using the session pool for crawling
             session_pool: A preconfigured `SessionPool` instance if you wish to use non-default configuration
             retry_on_blocked: If set to True, the crawler will try to automatically bypass any detected bot protection
+            proxy_configuration: A HTTP proxy configuration to be used for making requests
             statistics: A preconfigured `Statistics` instance if you wish to use non-default configuration
             _context_pipeline: Allows extending the request lifecycle and modifying the crawling context.
                 This parameter is meant to be used by child classes, not when BasicCrawler is instantiated directly.
@@ -169,6 +174,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         self._retry_on_blocked = retry_on_blocked
 
+        self._proxy_configuration = proxy_configuration
         self._statistics = statistics or Statistics(
             event_manager=self._event_manager,
             log_message=f'{logger.name} request statistics',
@@ -209,6 +215,17 @@ class BasicCrawler(Generic[TCrawlingContext]):
             f'{self._internal_timeout.total_seconds()} seconds',
             max_retries=3,
             logger=logger,
+        )
+
+    async def _get_proxy_info(self, request: Request, session: Session | None) -> ProxyInfo | None:
+        """Retrieve a new ProxyInfo object based on crawler configuration and the current request and session."""
+        if not self._proxy_configuration:
+            return None
+
+        return await self._proxy_configuration.new_proxy_info(
+            session_id=session.id if session else None,
+            request=request,
+            proxy_tier=None,
         )
 
     async def get_request_provider(self) -> RequestProvider:
@@ -411,7 +428,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
             except Exception as e:
                 raise UserDefinedErrorHandlerError('Exception thrown in user-defined failed request handler') from e
 
-    def _prepare_send_request_function(self, session: Session | None) -> SendRequestFunction:
+    def _prepare_send_request_function(
+        self,
+        session: Session | None,
+        proxy_info: ProxyInfo | None,
+    ) -> SendRequestFunction:
         async def send_request(
             url: str,
             *,
@@ -419,7 +440,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
             headers: dict[str, str] | None = None,
         ) -> HttpResponse:
             return await self._http_client.send_request(
-                url, method=method, headers=httpx.Headers(headers), session=session
+                url,
+                method=method,
+                headers=httpx.Headers(headers),
+                session=session,
+                proxy_info=proxy_info,
             )
 
         return send_request
@@ -461,7 +486,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         request_provider = await self.get_request_provider()
         return not await request_provider.is_empty()
 
-    async def __run_task_function(self) -> None:  # noqa: PLR0912
+    async def __run_task_function(self) -> None:
         request_provider = await self.get_request_provider()
 
         request = await wait_for(
@@ -476,12 +501,14 @@ class BasicCrawler(Generic[TCrawlingContext]):
             return
 
         session = await self._get_session()
+        proxy_info = await self._get_proxy_info(request, session)
         result = RequestHandlerRunResult()
 
         crawling_context = BasicCrawlingContext(
             request=request,
             session=session,
-            send_request=self._prepare_send_request_function(session),
+            proxy_info=proxy_info,
+            send_request=self._prepare_send_request_function(session, proxy_info),
             add_requests=result.add_requests,
         )
 

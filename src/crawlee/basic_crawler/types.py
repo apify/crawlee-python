@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Coroutine, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Coroutine, Protocol, Sequence
+from typing import TYPE_CHECKING, Any, Protocol
 
 from typing_extensions import NotRequired, TypedDict, Unpack
 
@@ -12,6 +13,7 @@ if TYPE_CHECKING:
     from crawlee.enqueue_strategy import EnqueueStrategy
     from crawlee.http_clients.base_http_client import HttpResponse
     from crawlee.models import BaseRequestData, Request
+    from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions.session import Session
 
 
@@ -64,6 +66,7 @@ class BasicCrawlingContext:
 
     request: Request
     session: Session | None
+    proxy_info: ProxyInfo | None
     send_request: SendRequestFunction
     add_requests: AddRequestsFunction
 

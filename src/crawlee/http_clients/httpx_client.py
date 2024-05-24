@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterable, cast
+from typing import TYPE_CHECKING, Optional, cast
 
 import httpx
 from typing_extensions import override
@@ -11,8 +11,13 @@ from crawlee.http_clients.base_http_client import BaseHttpClient, HttpCrawlingRe
 from crawlee.sessions.session import Session
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from crawlee.models import Request
+    from crawlee.proxy_configuration import ProxyInfo
     from crawlee.statistics.statistics import Statistics
+
+__all__ = ['HttpxClient']
 
 
 class HttpTransport(httpx.AsyncHTTPTransport):
@@ -62,11 +67,25 @@ class HttpxClient(BaseHttpClient):
             additional_http_error_status_codes=additional_http_error_status_codes,
             ignore_http_error_status_codes=ignore_http_error_status_codes,
         )
-        self._client = httpx.AsyncClient(transport=HttpTransport())
+
+        self._client_by_proxy_url = dict[Optional[str], httpx.AsyncClient]()
+
+    def _get_client(self, proxy_url: str | None) -> httpx.AsyncClient:
+        if proxy_url not in self._client_by_proxy_url:
+            self._client_by_proxy_url[proxy_url] = httpx.AsyncClient(transport=HttpTransport(), proxy=proxy_url)
+
+        return self._client_by_proxy_url[proxy_url]
 
     @override
-    async def crawl(self, request: Request, session: Session | None, statistics: Statistics) -> HttpCrawlingResult:
-        http_request = self._client.build_request(
+    async def crawl(
+        self,
+        request: Request,
+        session: Session | None,
+        proxy_info: ProxyInfo | None,
+        statistics: Statistics,
+    ) -> HttpCrawlingResult:
+        client = self._get_client(proxy_info.url if proxy_info else None)
+        http_request = client.build_request(
             method=request.method,
             url=request.url,
             headers=request.headers,
@@ -75,7 +94,7 @@ class HttpxClient(BaseHttpClient):
         )
 
         try:
-            response = await self._client.send(http_request, follow_redirects=True)
+            response = await client.send(http_request, follow_redirects=True)
         except httpx.TransportError as e:
             if _is_proxy_error(e):
                 raise ProxyError from e
@@ -110,9 +129,12 @@ class HttpxClient(BaseHttpClient):
         *,
         method: str,
         headers: httpx.Headers | dict[str, str],
-        session: Session | None = None,
+        session: Session | None,
+        proxy_info: ProxyInfo | None,
     ) -> HttpResponse:
-        http_request = self._client.build_request(
+        client = self._get_client(proxy_info.url if proxy_info else None)
+
+        http_request = client.build_request(
             url=url,
             method=method,
             headers=headers,
@@ -120,7 +142,7 @@ class HttpxClient(BaseHttpClient):
         )
 
         try:
-            response = await self._client.send(http_request)
+            response = await client.send(http_request)
         except httpx.TransportError as e:
             if _is_proxy_error(e):
                 raise ProxyError from e

@@ -62,11 +62,17 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
         super().__init__(**kwargs)
 
     async def _make_http_request(self, context: BasicCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
-        result = await self._http_client.crawl(context.request, context.session, self._statistics)
+        result = await self._http_client.crawl(
+            context.request,
+            context.session,
+            context.proxy_info,
+            self._statistics,
+        )
 
         yield HttpCrawlingContext(
             request=context.request,
             session=context.session,
+            proxy_info=context.proxy_info,
             send_request=context.send_request,
             add_requests=context.add_requests,
             http_response=result.http_response,
@@ -128,6 +134,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
         yield BeautifulSoupCrawlingContext(
             request=context.request,
             session=context.session,
+            proxy_info=context.proxy_info,
             send_request=context.send_request,
             add_requests=context.add_requests,
             enqueue_links=enqueue_links,
