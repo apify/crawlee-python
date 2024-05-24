@@ -84,7 +84,7 @@ class HttpxClient(BaseHttpClient):
         proxy_info: ProxyInfo | None,
         statistics: Statistics,
     ) -> HttpCrawlingResult:
-        client = self._get_client(proxy_info['url'] if proxy_info else None)
+        client = self._get_client(proxy_info.url if proxy_info else None)
         http_request = client.build_request(
             method=request.method,
             url=request.url,
@@ -132,7 +132,7 @@ class HttpxClient(BaseHttpClient):
         session: Session | None,
         proxy_info: ProxyInfo | None,
     ) -> HttpResponse:
-        client = self._get_client(proxy_info['url'] if proxy_info else None)
+        client = self._get_client(proxy_info.url if proxy_info else None)
 
         http_request = client.build_request(
             url=url,

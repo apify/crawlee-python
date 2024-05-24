@@ -29,11 +29,11 @@ async def proxy(proxy_info: ProxyInfo) -> AsyncGenerator[ProxyInfo, None]:
     with Proxy(
         [
             '--hostname',
-            proxy_info['hostname'],
+            proxy_info.hostname,
             '--port',
-            str(proxy_info['port']),
+            str(proxy_info.port),
             '--basic-auth',
-            f'{proxy_info.get("username", "")}:{proxy_info["password"]}',
+            f'{proxy_info.username}:{proxy_info.password}',
         ]
     ):
         yield proxy_info
@@ -54,11 +54,11 @@ async def disabled_proxy(proxy_info: ProxyInfo) -> AsyncGenerator[ProxyInfo, Non
     with Proxy(
         [
             '--hostname',
-            proxy_info['hostname'],
+            proxy_info.hostname,
             '--port',
-            str(proxy_info['port']),
+            str(proxy_info.port),
             '--basic-auth',
-            f'{proxy_info.get("username", "")}:{proxy_info["password"]}',
+            f'{proxy_info.username}:{proxy_info.password}',
             '--disable-http-proxy',
         ]
     ):

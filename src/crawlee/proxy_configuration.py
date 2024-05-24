@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import inspect
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
 from httpx import URL
 from more_itertools import flatten
-from typing_extensions import NotRequired, Protocol, TypedDict
+from typing_extensions import Protocol
 
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee.configuration import Configuration
@@ -20,7 +21,8 @@ if TYPE_CHECKING:
 __all__ = ['ProxyInfo', 'ProxyConfiguration']
 
 
-class ProxyInfo(TypedDict):
+@dataclass
+class ProxyInfo:
     """Provides information about a proxy connection that is used for requests."""
 
     url: str
@@ -32,17 +34,17 @@ class ProxyInfo(TypedDict):
     port: int
     """The proxy port."""
 
-    username: NotRequired[str]
+    username: str = ''
     """The username for the proxy."""
 
-    password: str
+    password: str = ''
     """The password for the proxy."""
 
-    session_id: NotRequired[str]
+    session_id: str | None = None
     """The identifier of the used proxy session, if used.
     Using the same session ID guarantees getting the same proxy URL."""
 
-    proxy_tier: NotRequired[int]
+    proxy_tier: int | None = None
 
 
 class ProxyTierTracker:
@@ -154,10 +156,10 @@ class ProxyConfiguration:
         )
 
         if session_id is not None:
-            info['session_id'] = session_id
+            info.session_id = session_id
 
         if proxy_tier is not None:
-            info['proxy_tier'] = proxy_tier
+            info.proxy_tier = proxy_tier
 
         return info
 

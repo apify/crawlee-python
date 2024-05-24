@@ -16,13 +16,12 @@ async def test_returns_proxy_info() -> None:
 
     proxy_info = await config.new_proxy_info(None, None, None)
 
-    assert proxy_info == {
-        'url': 'http://proxy.com:1111',
-        'hostname': 'proxy.com',
-        'username': '',
-        'password': '',
-        'port': 1111,
-    }
+    assert proxy_info is not None
+    assert proxy_info.url == 'http://proxy.com:1111'
+    assert proxy_info.hostname == 'proxy.com'
+    assert proxy_info.username == ''
+    assert proxy_info.password == ''
+    assert proxy_info.port == 1111
 
 
 async def test_throws_on_invalid_new_url_function() -> None:
@@ -39,13 +38,12 @@ async def test_returns_proxy_info_with_new_url_function() -> None:
 
     proxy_info = await config.new_proxy_info(None, None, None)
 
-    assert proxy_info == {
-        'url': 'http://proxy.com:1111',
-        'hostname': 'proxy.com',
-        'username': '',
-        'password': '',
-        'port': 1111,
-    }
+    assert proxy_info is not None
+    assert proxy_info.url == 'http://proxy.com:1111'
+    assert proxy_info.hostname == 'proxy.com'
+    assert proxy_info.username == ''
+    assert proxy_info.password == ''
+    assert proxy_info.port == 1111
 
 
 async def test_returns_proxy_info_with_new_url_function_async() -> None:
@@ -56,13 +54,12 @@ async def test_returns_proxy_info_with_new_url_function_async() -> None:
 
     proxy_info = await config.new_proxy_info(None, None, None)
 
-    assert proxy_info == {
-        'url': 'http://proxy.com:1111',
-        'hostname': 'proxy.com',
-        'username': '',
-        'password': '',
-        'port': 1111,
-    }
+    assert proxy_info is not None
+    assert proxy_info.url == 'http://proxy.com:1111'
+    assert proxy_info.hostname == 'proxy.com'
+    assert proxy_info.username == ''
+    assert proxy_info.password == ''
+    assert proxy_info.port == 1111
 
 
 async def test_rotates_proxies() -> None:
@@ -71,15 +68,15 @@ async def test_rotates_proxies() -> None:
 
     info = await config.new_proxy_info(None, None, None)
     assert info is not None
-    assert info['url'] == proxy_urls[0]
+    assert info.url == proxy_urls[0]
 
     info = await config.new_proxy_info(None, None, None)
     assert info is not None
-    assert info['url'] == proxy_urls[1]
+    assert info.url == proxy_urls[1]
 
     info = await config.new_proxy_info(None, None, None)
     assert info is not None
-    assert info['url'] == proxy_urls[2]
+    assert info.url == proxy_urls[2]
 
 
 async def test_rotates_proxies_with_sessions() -> None:
@@ -91,33 +88,33 @@ async def test_rotates_proxies_with_sessions() -> None:
     # A single session should always receive the same proxy
     info = await config.new_proxy_info(sessions[0], None, None)
     assert info is not None
-    assert info['url'] == proxy_urls[0]
+    assert info.url == proxy_urls[0]
 
     info = await config.new_proxy_info(sessions[0], None, None)
     assert info is not None
-    assert info['url'] == proxy_urls[0]
+    assert info.url == proxy_urls[0]
 
     info = await config.new_proxy_info(sessions[0], None, None)
     assert info is not None
-    assert info['url'] == proxy_urls[0]
+    assert info.url == proxy_urls[0]
 
     # Different sessions should get rotated proxies
     info = await config.new_proxy_info(sessions[1], None, None)
     assert info is not None
-    assert info['url'] == proxy_urls[1]
+    assert info.url == proxy_urls[1]
 
     info = await config.new_proxy_info(sessions[2], None, None)
     assert info is not None
-    assert info['url'] == proxy_urls[2]
+    assert info.url == proxy_urls[2]
 
     info = await config.new_proxy_info(sessions[3], None, None)
     assert info is not None
-    assert info['url'] == proxy_urls[0]
+    assert info.url == proxy_urls[0]
 
     info = await config.new_proxy_info(sessions[4], None, None)
     assert info is not None
-    assert info['url'] == proxy_urls[1]
+    assert info.url == proxy_urls[1]
 
     info = await config.new_proxy_info(sessions[5], None, None)
     assert info is not None
-    assert info['url'] == proxy_urls[2]
+    assert info.url == proxy_urls[2]
