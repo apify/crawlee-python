@@ -26,11 +26,11 @@ async def test_browser_pool_one_plugin() -> None:
     async with BrowserPool([plugin]) as browser_pool:
         assert browser_pool.plugins == [plugin]
 
-        page_1 = await browser_pool.new_page()
+        page_1 = await browser_pool.get_new_page()
         await page_1.page.goto('https://apify.com/')
         assert page_1.browser_type == 'chromium'
 
-        page_2 = await browser_pool.new_page()
+        page_2 = await browser_pool.get_new_page()
         await page_2.page.goto('https://crawlee.dev/')
         assert page_2.browser_type == 'chromium'
 
@@ -45,15 +45,15 @@ async def test_browser_pool_more_plugins() -> None:
     async with BrowserPool([plugin_chromium, plugin_firefox]) as browser_pool:
         assert browser_pool.plugins == [plugin_chromium, plugin_firefox]
 
-        page_1 = await browser_pool.new_page()
+        page_1 = await browser_pool.get_new_page()
         await page_1.page.goto('https://apify.com/')
         assert page_1.browser_type == 'chromium'
 
-        page_2 = await browser_pool.new_page()
+        page_2 = await browser_pool.get_new_page()
         await page_2.page.goto('https://crawlee.dev/')
         assert page_2.browser_type == 'firefox'
 
-        page_3 = await browser_pool.new_page()
+        page_3 = await browser_pool.get_new_page()
         await page_3.page.goto('https://example.com/')
         assert page_3.browser_type == 'chromium'
 
@@ -68,7 +68,7 @@ async def test_new_page_with_each_plugin() -> None:
     # plugin_webkit = PlaywrightBrowserPlugin(browser_type='webkit')
 
     async with BrowserPool([plugin_chromium, plugin_firefox]) as browser_pool:
-        pages = await browser_pool.new_page_with_each_plugin()
+        pages = await browser_pool.get_new_page_with_each_plugin()
 
         assert len(pages) == 2
         assert pages[0].browser_type == 'chromium'

@@ -1,28 +1,30 @@
+# Inspiration:
+#
+# TODO:
+#  - Cleaning - browser? page?
+#  - Underlying implementation - controllers, plugins
+#  - What about browser contexts?
+#  - Parameters for new_page and launch_browser
+
 from __future__ import annotations
 
 import asyncio
 import itertools
-from collections.abc import Sequence
 from datetime import timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING
 
 from crawlee._utils.crypto import crypto_random_object_id
-from crawlee.browsers.types import CrawleePage
+from crawlee.browsers.types import BrowserOptions, CrawleePage, PageOptions
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
     from types import TracebackType
 
     from crawlee.browsers.base_browser_controller import BaseBrowserController
     from crawlee.browsers.base_browser_plugin import BaseBrowserPlugin
 
 logger = getLogger(__name__)
-
-# Fingerprints?
-# browser pool hooks:
-#   (pre/post) launch hooks?
-#   (pre/post) page create hooks?
-#   (pre/post) page close hooks?
 
 
 class BrowserPool:
@@ -46,8 +48,6 @@ class BrowserPool:
         operation_timeout: timedelta = timedelta(seconds=15),
         close_inactive_browser_after: timedelta = timedelta(minutes=5),
         retire_inactive_browser_after: timedelta = timedelta(seconds=1),
-        use_fingerprints: bool = True,
-        fingerprint_options: dict | None = None,
     ) -> None:
         self._plugins = plugins
         self._max_open_pages_per_browser = max_open_pages_per_browser
@@ -55,8 +55,6 @@ class BrowserPool:
         self._operation_timeout = operation_timeout
         self._close_inactive_browser_after = close_inactive_browser_after
         self._retire_inactive_browser_after = retire_inactive_browser_after
-        self._use_fingerprints = use_fingerprints
-        self._fingerprint_options = fingerprint_options or {}
 
         self._pages = {}  # Track the pages in the pool
         self._plugins_cycle = itertools.cycle(plugins)  # Cycle through the plugins
@@ -67,7 +65,7 @@ class BrowserPool:
         return self._plugins
 
     @property
-    def pages(self) -> dict[str, CrawleePage]:
+    def pages(self) -> Mapping[str, CrawleePage]:
         """Return the pages in the pool."""
         return self._pages
 
@@ -89,12 +87,12 @@ class BrowserPool:
         for plugin in self._plugins:
             await plugin.__aexit__(exc_type, exc_value, exc_traceback)
 
-    async def new_page(
+    async def get_new_page(
         self,
         *,
         page_id: str | None = None,
         browser_plugin: BaseBrowserPlugin | None = None,
-        page_options: dict | None = None,
+        page_options: PageOptions | None = None,
     ) -> CrawleePage:
         """Opens a new page in a browser using the specified or a random browser plugin.
 
@@ -115,25 +113,26 @@ class BrowserPool:
 
         page_id = page_id or crypto_random_object_id(self._GENERATED_PAGE_ID_LENGTH)
         plugin = browser_plugin or next(self._plugins_cycle)
-        page_options = page_options or {}
+        page_options = page_options or PageOptions()
 
-        raw_page = await plugin.new_page(**page_options)
-        page = CrawleePage(id=page_id, page=raw_page, browser_type=plugin.browser_type)
-        self._pages[page_id] = page
-        return page
+        return await self._create_page(page_id, plugin, page_options)
 
-    async def new_page_in_new_browser(
+    async def get_new_page_in_new_browser(
         self,
         *,
         page_id: str | None = None,
         browser_plugin: BaseBrowserPlugin | None = None,
-        page_options: dict | None = None,
-        browser_launch_options: dict | None = None,
+        page_options: PageOptions | None = None,
+        browser_options: BrowserOptions | None = None,
     ) -> CrawleePage:
         # will probably be skipped
         pass
 
-    async def new_page_with_each_plugin(self, *, page_options: dict | None = None) -> Sequence[CrawleePage]:
+    async def get_new_page_with_each_plugin(
+        self,
+        *,
+        page_options: PageOptions | None = None,
+    ) -> Sequence[CrawleePage]:
         """Create a new page with each browser plugin in the pool.
 
         This method is useful for running scripts in multiple environments simultaneously, typically for testing
@@ -147,16 +146,13 @@ class BrowserPool:
         Returns:
             A list of newly created pages, one for each plugin in the pool.
         """
-        page_options = page_options or {}
-        pages_coroutines = [self.new_page(browser_plugin=plugin, page_options=page_options) for plugin in self._plugins]
+        pages_coroutines = [
+            self.get_new_page(browser_plugin=plugin, page_options=page_options) for plugin in self._plugins
+        ]
         return await asyncio.gather(*pages_coroutines)
 
     async def get_browser_controller_by_page(self) -> None:
         pass
-
-    def get_page_by_id(self, page_id: str) -> CrawleePage | None:
-        """Get a page by its ID."""
-        return self._pages.get(page_id, None)
 
     async def retire_browser_controller(self) -> None:
         pass
@@ -169,6 +165,18 @@ class BrowserPool:
 
     async def close_all_browsers(self) -> None:
         pass
+
+    async def _create_page(
+        self,
+        page_id: str,
+        plugin: BaseBrowserPlugin,
+        page_options: PageOptions,
+    ) -> CrawleePage:
+        """Internal method to create a new page in a browser using the specified plugin."""
+        raw_page = await plugin.get_new_page(page_options=page_options)
+        page = CrawleePage(id=page_id, page=raw_page, browser_type=plugin.browser_type)
+        self._pages[page_id] = page
+        return page
 
     async def _pick_browser_with_free_capacity(self) -> BaseBrowserController:
         pass

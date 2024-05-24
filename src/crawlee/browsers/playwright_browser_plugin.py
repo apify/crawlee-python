@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, Literal, override
+from typing import TYPE_CHECKING, Literal, override
 
 from playwright.async_api import async_playwright
 
 from crawlee.browsers.base_browser_plugin import BaseBrowserPlugin
+from crawlee.browsers.types import BrowserOptions, PageOptions
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -24,9 +25,11 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         self,
         *,
         browser_type: Literal['chromium', 'firefox', 'webkit'] = 'chromium',
+        browser_options: BrowserOptions | None = None,
         event_manager: EventManager | None = None,
     ) -> None:
         self._browser_type = browser_type
+        self._browser_options = browser_options or BrowserOptions()
         self._event_manager = event_manager
 
         self._playwright_context_manager = async_playwright()
@@ -44,11 +47,11 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         self._playwright = await self._playwright_context_manager.__aenter__()
 
         if self.browser_type == 'chromium':
-            self._browser = await self._playwright.chromium.launch()
+            self._browser = await self._playwright.chromium.launch(**self._browser_options)
         elif self.browser_type == 'firefox':
-            self._browser = await self._playwright.firefox.launch()
+            self._browser = await self._playwright.firefox.launch(**self._browser_options)
         elif self.browser_type == 'webkit':
-            self._browser = await self._playwright.webkit.launch()
+            self._browser = await self._playwright.webkit.launch(**self._browser_options)
         else:
             raise ValueError(f'Invalid browser type: {self.browser_type}')
 
@@ -66,11 +69,11 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         await self._playwright_context_manager.__aexit__(exc_type, exc_value, exc_traceback)
 
     @override
-    async def new_page(self, **kwargs: Any) -> Page:
+    async def get_new_page(self, *, page_options: PageOptions) -> Page:
         if not self._browser:
             raise RuntimeError('Playwright browser plugin is not initialized.')
 
-        return await self._browser.new_page(**kwargs)
+        return await self._browser.new_page(**page_options)
 
     # async def _launch(self, **kwargs: Any) -> Browser:
     #     use_incognito_pages = kwargs.pop('use_incognito_pages', False)
