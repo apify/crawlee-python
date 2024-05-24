@@ -46,6 +46,8 @@ class ProxyInfo(TypedDict):
 
 
 class ProxyTierTracker:
+    """Tracks the state of currently used proxy tiers and their error frequency for individual crawled domains."""
+
     def __init__(self, tiered_proxy_urls: list[list[URL]]) -> None:
         self._tiered_proxy_urls = tiered_proxy_urls
         self._histogram_by_domain = defaultdict[str, list[int]](lambda: [0 for _tier in tiered_proxy_urls])
