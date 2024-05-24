@@ -65,7 +65,7 @@ class BrowserPool:
 
     async def __aenter__(self) -> BrowserPool:
         """Enter the context manager and initialize all browser plugins."""
-        logger.info('Initializing browser pool.')
+        logger.debug('Initializing browser pool.')
         timeout = self._operation_timeout.total_seconds()
 
         try:
@@ -83,11 +83,11 @@ class BrowserPool:
         exc_traceback: TracebackType | None,
     ) -> None:
         """Exit the context manager and close all browser plugins."""
-        logger.info('Closing browser pool.')
+        logger.debug('Closing browser pool.')
         for plugin in self._plugins:
             await plugin.__aexit__(exc_type, exc_value, exc_traceback)
 
-    async def get_new_page(
+    async def new_page(
         self,
         *,
         page_id: str | None = None,
@@ -117,7 +117,7 @@ class BrowserPool:
 
         return await self._initialize_page(page_id, plugin, page_options)
 
-    async def get_new_page_with_each_plugin(
+    async def new_page_with_each_plugin(
         self,
         *,
         page_options: Mapping | None = None,
@@ -136,7 +136,7 @@ class BrowserPool:
             A list of newly created pages, one for each plugin in the pool.
         """
         pages_coroutines = [
-            self.get_new_page(browser_plugin=plugin, page_options=page_options) for plugin in self._plugins
+            self.new_page(browser_plugin=plugin, page_options=page_options) for plugin in self._plugins
         ]
         return await asyncio.gather(*pages_coroutines)
 
@@ -150,7 +150,7 @@ class BrowserPool:
         timeout = self._operation_timeout.total_seconds()
 
         try:
-            raw_page = await asyncio.wait_for(plugin.get_new_page(page_options=page_options), timeout)
+            raw_page = await asyncio.wait_for(plugin.new_page(page_options=page_options), timeout)
         except asyncio.TimeoutError:
             logger.warning(f'Creating a new page with plugin {plugin} timed out.')
             return None

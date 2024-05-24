@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
     from types import TracebackType
 
-    from playwright.async_api import Page
+    from playwright.async_api import Browser, Page
 
 logger = getLogger(__name__)
 
@@ -36,12 +36,17 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
 
     @property
     @override
+    def browser(self) -> Browser:
+        return self._browser
+
+    @property
+    @override
     def browser_type(self) -> str:
         return self._browser_type
 
     @override
     async def __aenter__(self) -> PlaywrightBrowserPlugin:
-        logger.info('Initializing Playwright browser plugin.')
+        logger.debug('Initializing Playwright browser plugin.')
         self._playwright = await self._playwright_context_manager.__aenter__()
 
         if self._browser_type == 'chromium':
@@ -62,13 +67,14 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         exc_value: BaseException | None,
         exc_traceback: TracebackType | None,
     ) -> None:
-        logger.info('Closing Playwright browser plugin.')
+        logger.debug('Closing Playwright browser plugin.')
         await self._browser.close()
         await self._playwright_context_manager.__aexit__(exc_type, exc_value, exc_traceback)
 
     @override
-    async def get_new_page(self, *, page_options: Mapping) -> Page:
+    async def new_page(self, *, page_options: Mapping | None = None) -> Page:
         if not self._browser:
             raise RuntimeError('Playwright browser plugin is not initialized.')
 
+        page_options = page_options or {}
         return await self._browser.new_page(**page_options)

@@ -9,11 +9,16 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
     from types import TracebackType
 
-    from playwright.async_api import Page
+    from playwright.async_api import Browser, Page
 
 
 class BaseBrowserPlugin(ABC):
     """An abstract base class for browser plugins."""
+
+    @property
+    @abstractmethod
+    def browser(self) -> Browser:
+        """Return the browser instance."""
 
     @property
     @abstractmethod
@@ -34,7 +39,7 @@ class BaseBrowserPlugin(ABC):
         """Exit the context manager and close the browser plugin."""
 
     @abstractmethod
-    async def get_new_page(self, *, page_options: Mapping) -> Page:
+    async def new_page(self, *, page_options: Mapping) -> Page:
         """Get a new page in a browser.
 
         Args:
