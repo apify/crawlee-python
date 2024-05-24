@@ -486,7 +486,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         request_provider = await self.get_request_provider()
         return not await request_provider.is_empty()
 
-    async def __run_task_function(self) -> None:  # noqa: PLR0912
+    async def __run_task_function(self) -> None:
         request_provider = await self.get_request_provider()
 
         request = await wait_for(
