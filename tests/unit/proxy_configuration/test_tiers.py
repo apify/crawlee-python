@@ -65,6 +65,10 @@ async def test_retrying_request_makes_tier_go_up() -> None:
 
 
 async def test_successful_request_makes_tier_go_down() -> None:
+    """Repeatedly requesting a proxy for a single request will cause the proxy tier to go up -
+    ProxyConfiguration assumes those are retries. Then, requesting a proxy for different requests to the same domain
+    will cause the tier to drop back down."""
+
     tiered_proxy_urls = [
         ['http://proxy:1111'],
         ['http://proxy:2222'],
