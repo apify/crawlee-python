@@ -13,8 +13,6 @@ if TYPE_CHECKING:
 
     from playwright.async_api import Page
 
-    from crawlee.events import EventManager
-
 logger = getLogger(__name__)
 
 
@@ -26,11 +24,9 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         *,
         browser_type: Literal['chromium', 'firefox', 'webkit'] = 'chromium',
         browser_options: BrowserOptions | None = None,
-        event_manager: EventManager | None = None,
     ) -> None:
         self._browser_type = browser_type
         self._browser_options = browser_options or BrowserOptions()
-        self._event_manager = event_manager
 
         self._playwright_context_manager = async_playwright()
         self._playwright = None
