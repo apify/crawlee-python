@@ -1,16 +1,4 @@
-# Inspiration:
-#
-# TODO:
-#  - [ ] Cleaning - browser? page?
-#  - [ ] Underlying implementation - controllers, plugins
-#  - [ ] What about browser contexts?
-#  - [x] Parameters for new_page and launch_browser
-#  - [x] Operation timeout
-#  - [ ] Max open pages per browser
-#  - [ ] Retire browser after page count
-#  - [ ] Automatically closing inactive browser after
-#  - [ ] Automatically retire inactive browser after
-#  - [ ] Integrate event manager (why?)
+# Inspiration: https://github.com/apify/crawlee/tree/v3.10.0/packages/browser-pool/
 
 from __future__ import annotations
 
@@ -21,13 +9,12 @@ from logging import getLogger
 from typing import TYPE_CHECKING
 
 from crawlee._utils.crypto import crypto_random_object_id
-from crawlee.browsers.types import BrowserOptions, CrawleePage, PageOptions
+from crawlee.browsers.types import CrawleePage
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
     from types import TracebackType
 
-    from crawlee.browsers.base_browser_controller import BaseBrowserController
     from crawlee.browsers.base_browser_plugin import BaseBrowserPlugin
 
 logger = getLogger(__name__)
@@ -49,45 +36,19 @@ class BrowserPool:
         self,
         plugins: Sequence[BaseBrowserPlugin],
         *,
-        max_open_pages_per_browser: int = 20,
-        retire_browser_after_page_count: int = 100,
         operation_timeout: timedelta = timedelta(seconds=15),
-        close_inactive_browser_after: timedelta = timedelta(minutes=5),
-        retire_inactive_browser_after: timedelta = timedelta(seconds=1),
     ) -> None:
         """Create a new instance.
 
         Args:
             plugins: Browser plugins serve as wrappers around various browser automation libraries,
                 providing a consistent interface across different libraries.
-
-            max_open_pages_per_browser: Sets the maximum number of pages that can be open in a single browser
-                instance simultaneously. If this limit is reached, a new browser instance will be launched
-                to handle any additional pages.
-
-            retire_browser_after_page_count: Browsers can become bloated after processing many pages. This option
-                sets the maximum number of pages a browser can process before it automatically retires and closes.
-                A new browser will launch to replace it. The browser may retire sooner if the associated `Session`
-                is retired. You can adjust session retirement behavior configuring `SessionPool`.
-
             operation_timeout: Operations of the underlying automation libraries, such as launching a browser
                 or opening a new page, can sometimes get stuck. To prevent `BrowserPool` from becoming unresponsive,
                 we add a timeout to these operations.
-
-            close_inactive_browser_after: Browsers normally close immediately after their last page is processed.
-                However, there could be situations where this does not happen. `BrowserPool` ensures that all inactive
-                browsers are regularly closed to free up resources.
-
-            retire_inactive_browser_after: Browsers are marked as retired after being inactive for a certain period.
-                This option sets the interval at which browsers are checked and retired if they remain inactive.
-                Retired browsers are closed once all their pages are closed.
         """
         self._plugins = plugins
-        self._max_open_pages_per_browser = max_open_pages_per_browser
-        self._retire_browser_after_page_count = retire_browser_after_page_count
         self._operation_timeout = operation_timeout
-        self._close_inactive_browser_after = close_inactive_browser_after
-        self._retire_inactive_browser_after = retire_inactive_browser_after
 
         self._pages = {}  # Track the pages in the pool
         self._plugins_cycle = itertools.cycle(plugins)  # Cycle through the plugins
@@ -131,7 +92,7 @@ class BrowserPool:
         *,
         page_id: str | None = None,
         browser_plugin: BaseBrowserPlugin | None = None,
-        page_options: PageOptions | None = None,
+        page_options: Mapping | None = None,
     ) -> CrawleePage:
         """Opens a new page in a browser using the specified or a random browser plugin.
 
@@ -152,25 +113,14 @@ class BrowserPool:
 
         page_id = page_id or crypto_random_object_id(self._GENERATED_PAGE_ID_LENGTH)
         plugin = browser_plugin or next(self._plugins_cycle)
-        page_options = page_options or PageOptions()
+        page_options = page_options or {}
 
         return await self._initialize_page(page_id, plugin, page_options)
-
-    async def get_new_page_in_new_browser(
-        self,
-        *,
-        page_id: str | None = None,
-        browser_plugin: BaseBrowserPlugin | None = None,
-        page_options: PageOptions | None = None,
-        browser_options: BrowserOptions | None = None,
-    ) -> CrawleePage:
-        # will probably be skipped
-        pass
 
     async def get_new_page_with_each_plugin(
         self,
         *,
-        page_options: PageOptions | None = None,
+        page_options: Mapping | None = None,
     ) -> Sequence[CrawleePage]:
         """Create a new page with each browser plugin in the pool.
 
@@ -190,26 +140,11 @@ class BrowserPool:
         ]
         return await asyncio.gather(*pages_coroutines)
 
-    async def get_browser_controller_by_page(self) -> None:
-        pass
-
-    async def retire_browser_controller(self) -> None:
-        pass
-
-    async def retire_browser_by_page(self) -> None:
-        pass
-
-    async def retire_all_browsers(self) -> None:
-        pass
-
-    async def close_all_browsers(self) -> None:
-        pass
-
     async def _initialize_page(
         self,
         page_id: str,
         plugin: BaseBrowserPlugin,
-        page_options: PageOptions,
+        page_options: Mapping,
     ) -> CrawleePage | None:
         """Internal method to initialize a new page in a browser using the specified plugin."""
         timeout = self._operation_timeout.total_seconds()
@@ -223,48 +158,3 @@ class BrowserPool:
         page = CrawleePage(id=page_id, page=raw_page, browser_type=plugin.browser_type)
         self._pages[page_id] = page
         return page
-
-    async def _pick_browser_with_free_capacity(self) -> BaseBrowserController:
-        # Potreba:
-        # - max_open_pages_per_browser
-        # - activate_pages na controlleru
-        #
-        # Vrati browser controller, ktery ma volnou kapacitu pro otevreni nove stranky
-        # pokud neni zadny, vytvori novy browser controller
-        pass
-
-    async def _launch_browser(self) -> BaseBrowserController:
-        pass
-
-    async def _create_page_for_browser(self, browser: BaseBrowserController) -> CrawleePage:
-        pass
-
-    async def _teardown(self) -> None:
-        pass
-
-    async def _get_all_browser_controllers(self) -> None:
-        pass
-
-    async def _pick_browser_plugin(self) -> None:
-        pass
-
-    async def _close_inactive_retired_browsers(self) -> None:
-        pass
-
-    async def _override_page_close(self) -> None:
-        pass
-
-    async def _execute_hooks(self) -> None:
-        pass
-
-    async def _close_retired_browser_with_no_pages(self) -> None:
-        pass
-
-    async def _initialize_fingerprinting(self) -> None:
-        pass
-
-    async def _add_fingerprint_hooks(self) -> None:
-        pass
-
-
-#

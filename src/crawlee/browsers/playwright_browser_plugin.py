@@ -1,3 +1,5 @@
+# Inspiration: https://github.com/apify/crawlee/blob/v3.10.0/packages/browser-pool/src/playwright/playwright-plugin.ts
+
 from __future__ import annotations
 
 from logging import getLogger
@@ -6,9 +8,9 @@ from typing import TYPE_CHECKING, Literal, override
 from playwright.async_api import async_playwright
 
 from crawlee.browsers.base_browser_plugin import BaseBrowserPlugin
-from crawlee.browsers.types import BrowserOptions, PageOptions
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from types import TracebackType
 
     from playwright.async_api import Page
@@ -23,10 +25,10 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         self,
         *,
         browser_type: Literal['chromium', 'firefox', 'webkit'] = 'chromium',
-        browser_options: BrowserOptions | None = None,
+        browser_options: Mapping | None = None,
     ) -> None:
         self._browser_type = browser_type
-        self._browser_options = browser_options or BrowserOptions()
+        self._browser_options = browser_options or {}
 
         self._playwright_context_manager = async_playwright()
         self._playwright = None
@@ -42,14 +44,14 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         logger.info('Initializing Playwright browser plugin.')
         self._playwright = await self._playwright_context_manager.__aenter__()
 
-        if self.browser_type == 'chromium':
+        if self._browser_type == 'chromium':
             self._browser = await self._playwright.chromium.launch(**self._browser_options)
-        elif self.browser_type == 'firefox':
+        elif self._browser_type == 'firefox':
             self._browser = await self._playwright.firefox.launch(**self._browser_options)
-        elif self.browser_type == 'webkit':
+        elif self._browser_type == 'webkit':
             self._browser = await self._playwright.webkit.launch(**self._browser_options)
         else:
-            raise ValueError(f'Invalid browser type: {self.browser_type}')
+            raise ValueError(f'Invalid browser type: {self._browser_type}')
 
         return self
 
@@ -65,31 +67,8 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         await self._playwright_context_manager.__aexit__(exc_type, exc_value, exc_traceback)
 
     @override
-    async def get_new_page(self, *, page_options: PageOptions) -> Page:
+    async def get_new_page(self, *, page_options: Mapping) -> Page:
         if not self._browser:
             raise RuntimeError('Playwright browser plugin is not initialized.')
 
         return await self._browser.new_page(**page_options)
-
-    # async def _launch(self, **kwargs: Any) -> Browser:
-    #     use_incognito_pages = kwargs.pop('use_incognito_pages', False)
-
-    #     # WebKit does not support --no-sandbox
-    #     if self.browser_type_name == 'webkit':
-    #         kwargs['args'] = [arg for arg in kwargs.get('args', []) if arg != '--no-sandbox']
-
-    #     if use_incognito_pages:
-    #         browser = await self._browser_type.launch(**kwargs)
-    #     else:
-    #         user_data_dir = kwargs.pop('user_data_dir', None)
-    #         browser_context = await self._browser_type.launch_persistent_context(user_data_dir, **kwargs)
-
-    #         browser = PlaywrightBrowser(
-    #             browser_context=browser_context,
-    #             event_manager=self._event_manager,
-    #         )
-
-    #     return browser
-
-    # def _create_controller(self) -> PlaywrightBrowserController:
-    #     return PlaywrightBrowserController(self._browser_type)

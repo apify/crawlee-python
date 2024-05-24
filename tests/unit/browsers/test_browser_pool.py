@@ -65,7 +65,6 @@ async def test_browser_pool_more_plugins() -> None:
 async def test_new_page_with_each_plugin() -> None:
     plugin_chromium = PlaywrightBrowserPlugin(browser_type='chromium')
     plugin_firefox = PlaywrightBrowserPlugin(browser_type='firefox')
-    # plugin_webkit = PlaywrightBrowserPlugin(browser_type='webkit')
 
     async with BrowserPool([plugin_chromium, plugin_firefox]) as browser_pool:
         pages = await browser_pool.get_new_page_with_each_plugin()

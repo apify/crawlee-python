@@ -6,11 +6,10 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from types import TracebackType
 
     from playwright.async_api import Page
-
-    from crawlee.browsers.types import PageOptions
 
 
 class BaseBrowserPlugin(ABC):
@@ -35,12 +34,9 @@ class BaseBrowserPlugin(ABC):
         """Exit the context manager and close the browser plugin."""
 
     @abstractmethod
-    async def get_new_page(self, *, page_options: PageOptions) -> Page:
+    async def get_new_page(self, *, page_options: Mapping) -> Page:
         """Get a new page in a browser.
 
         Args:
             page_options: Options to configure the new page.
         """
-
-
-#
