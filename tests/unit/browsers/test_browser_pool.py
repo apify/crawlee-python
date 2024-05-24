@@ -5,8 +5,6 @@ import pytest
 from crawlee.browsers.browser_pool import BrowserPool
 from crawlee.browsers.playwright_browser_plugin import PlaywrightBrowserPlugin
 
-pytestmark = pytest.mark.only()
-
 
 async def test_new_page_single_plugin() -> None:
     plugin = PlaywrightBrowserPlugin(browser_type='chromium')
@@ -84,3 +82,10 @@ async def test_resource_management() -> None:
     # Browsers in all plugins should be disconnected
     for plugin in browser_pool.plugins:
         assert plugin.browser.is_connected() is False
+
+
+async def test_raises_error_when_not_initialized() -> None:
+    plugin = PlaywrightBrowserPlugin()
+    browser_pool = BrowserPool([plugin])
+    with pytest.raises(RuntimeError, match='Browser pool is not initialized.'):
+        await browser_pool.new_page()

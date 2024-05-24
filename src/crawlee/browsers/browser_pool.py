@@ -135,9 +135,7 @@ class BrowserPool:
         Returns:
             A list of newly created pages, one for each plugin in the pool.
         """
-        pages_coroutines = [
-            self.new_page(browser_plugin=plugin, page_options=page_options) for plugin in self._plugins
-        ]
+        pages_coroutines = [self.new_page(browser_plugin=plugin, page_options=page_options) for plugin in self._plugins]
         return await asyncio.gather(*pages_coroutines)
 
     async def _initialize_page(
@@ -154,6 +152,8 @@ class BrowserPool:
         except asyncio.TimeoutError:
             logger.warning(f'Creating a new page with plugin {plugin} timed out.')
             return None
+        except RuntimeError as exc:
+            raise RuntimeError('Browser pool is not initialized.') from exc
 
         page = CrawleePage(id=page_id, page=raw_page, browser_type=plugin.browser_type)
         self._pages[page_id] = page

@@ -4,8 +4,6 @@ import pytest
 
 from crawlee.browsers.playwright_browser_plugin import PlaywrightBrowserPlugin
 
-pytestmark = pytest.mark.only()
-
 
 async def test_new_page() -> None:
     async with PlaywrightBrowserPlugin() as plugin:
