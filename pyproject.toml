@@ -149,7 +149,6 @@ indent-style = "space"
     "T20",     # flake8-print
     "TRY301",  # Abstract `raise` to an inner function
 ]
-"run.py" = ["D", "T", "I"]
 
 [tool.ruff.lint.flake8-quotes]
 docstring-quotes = "double"
@@ -194,7 +193,11 @@ ignore_missing_imports = true
 ignore_missing_imports = true
 
 [tool.coverage.report]
-exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "assert_never()"]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "assert_never()"
+]
 
 [tool.basedpyright]
 reportPrivateLocalImportUsage = false
