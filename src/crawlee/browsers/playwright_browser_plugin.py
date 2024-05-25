@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from logging import getLogger
-from typing import TYPE_CHECKING, Literal, override
+from typing import TYPE_CHECKING, Literal
 
 from playwright.async_api import async_playwright
+from typing_extensions import override
 
 from crawlee.browsers.base_browser_plugin import BaseBrowserPlugin
 
