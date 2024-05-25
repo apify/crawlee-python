@@ -1,13 +1,17 @@
-from typing import AsyncGenerator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, AsyncGenerator
 from unittest import mock
 
 import pytest
 import respx
 from httpx import Response
 
-from crawlee.beautifulsoup_crawler.beautifulsoup_crawler import BeautifulSoupCrawler
-from crawlee.beautifulsoup_crawler.types import BeautifulSoupCrawlingContext
+from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler
 from crawlee.storages.request_list import RequestList
+
+if TYPE_CHECKING:
+    from crawlee.beautifulsoup_crawler import BeautifulSoupCrawlingContext
 
 
 @pytest.fixture()

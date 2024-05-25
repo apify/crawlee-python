@@ -9,6 +9,7 @@ from logging import getLogger
 from typing import TYPE_CHECKING
 
 from crawlee._utils.crypto import crypto_random_object_id
+from crawlee.browsers.playwright_browser_plugin import PlaywrightBrowserPlugin
 from crawlee.browsers.types import CrawleePage
 
 if TYPE_CHECKING:
@@ -34,7 +35,7 @@ class BrowserPool:
 
     def __init__(
         self,
-        plugins: Sequence[BaseBrowserPlugin],
+        plugins: Sequence[BaseBrowserPlugin] | None = None,
         *,
         operation_timeout: timedelta = timedelta(seconds=15),
     ) -> None:
@@ -47,11 +48,11 @@ class BrowserPool:
                 or opening a new page, can sometimes get stuck. To prevent `BrowserPool` from becoming unresponsive,
                 we add a timeout to these operations.
         """
-        self._plugins = plugins
+        self._plugins = plugins or [PlaywrightBrowserPlugin()]
         self._operation_timeout = operation_timeout
 
         self._pages = {}  # Track the pages in the pool
-        self._plugins_cycle = itertools.cycle(plugins)  # Cycle through the plugins
+        self._plugins_cycle = itertools.cycle(self._plugins)  # Cycle through the plugins
 
     @property
     def plugins(self) -> Sequence[BaseBrowserPlugin]:
