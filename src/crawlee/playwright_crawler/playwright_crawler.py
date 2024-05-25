@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
+from typing import TYPE_CHECKING
 
 from typing_extensions import Unpack
 
@@ -11,6 +11,9 @@ from crawlee.basic_crawler import (
     ContextPipeline,
 )
 from crawlee.playwright_crawler.types import PlaywrightCrawlingContext
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 
 class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
@@ -53,6 +56,3 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
             proxy_info=context.proxy_info,
             page=page.page,
         )
-
-
-#
