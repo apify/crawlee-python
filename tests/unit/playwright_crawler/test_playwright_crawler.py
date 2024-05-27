@@ -17,6 +17,7 @@ async def test_basic() -> None:
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        assert context.page is not None
         assert context.page.url == context.request.url == 'https://example.com/'
         assert await context.page.title() == 'Example Domain'
         assert (await context.page.content()).split('\n')[0] == '<!DOCTYPE html><html><head>'

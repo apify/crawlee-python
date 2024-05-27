@@ -51,7 +51,7 @@ class BrowserPool:
         self._plugins = plugins or [PlaywrightBrowserPlugin()]
         self._operation_timeout = operation_timeout
 
-        self._pages = {}  # Track the pages in the pool
+        self._pages: dict[str, CrawleePage] = {}  # Track the pages in the pool
         self._plugins_cycle = itertools.cycle(self._plugins)  # Cycle through the plugins
 
     @property
@@ -60,7 +60,7 @@ class BrowserPool:
         return self._plugins
 
     @property
-    def pages(self) -> Mapping[str, CrawleePage]:
+    def pages(self) -> dict[str, CrawleePage]:
         """Return the pages in the pool."""
         return self._pages
 
@@ -94,7 +94,7 @@ class BrowserPool:
         page_id: str | None = None,
         browser_plugin: BaseBrowserPlugin | None = None,
         page_options: Mapping | None = None,
-    ) -> CrawleePage:
+    ) -> CrawleePage | None:
         """Opens a new page in a browser using the specified or a random browser plugin.
 
         Args:
@@ -137,7 +137,8 @@ class BrowserPool:
             A list of newly created pages, one for each plugin in the pool.
         """
         pages_coroutines = [self.new_page(browser_plugin=plugin, page_options=page_options) for plugin in self._plugins]
-        return await asyncio.gather(*pages_coroutines)
+        pages = await asyncio.gather(*pages_coroutines)
+        return [page for page in pages if page is not None]
 
     async def _initialize_page(
         self,

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -17,12 +17,12 @@ class BaseBrowserPlugin(ABC):
 
     @property
     @abstractmethod
-    def browser(self) -> Browser:
+    def browser(self) -> Browser | None:
         """Return the browser instance."""
 
     @property
     @abstractmethod
-    def browser_type(self) -> str:
+    def browser_type(self) -> Literal['chromium', 'firefox', 'webkit']:
         """Return the browser type name."""
 
     @abstractmethod

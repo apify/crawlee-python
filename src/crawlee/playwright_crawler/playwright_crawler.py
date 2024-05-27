@@ -33,20 +33,17 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
 
             kwargs: Arguments to be forwarded to the underlying BasicCrawler
         """
-        context_pipeline = ContextPipeline().compose(self._page_goto)
-
-        super().__init__(
-            **kwargs,
-            _context_pipeline=context_pipeline,
-            use_browser_pool=True,
-        )
+        kwargs['use_browser_pool'] = True
+        kwargs['_context_pipeline'] = ContextPipeline().compose(self._page_goto)
+        super().__init__(**kwargs)
 
     async def _page_goto(
         self,
         context: BasicCrawlingContext,
     ) -> AsyncGenerator[PlaywrightCrawlingContext, None]:
-        page = await self._browser_pool.new_page()
-        await page.page.goto(context.request.url)
+        crawlee_page = await self._browser_pool.new_page()
+        if crawlee_page:
+            await crawlee_page.page.goto(context.request.url)
 
         yield PlaywrightCrawlingContext(
             request=context.request,
@@ -54,5 +51,5 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
             send_request=context.send_request,
             add_requests=context.add_requests,
             proxy_info=context.proxy_info,
-            page=page.page,
+            page=crawlee_page.page if crawlee_page else None,
         )

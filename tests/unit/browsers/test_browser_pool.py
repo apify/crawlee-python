@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import playwright
 import pytest
 
 from crawlee.browsers.browser_pool import BrowserPool
@@ -13,11 +14,13 @@ async def test_new_page_single_plugin() -> None:
         assert browser_pool.plugins == [plugin]
 
         page_1 = await browser_pool.new_page()
+        assert page_1 is not None
         await page_1.page.goto('https://apify.com/')
         assert page_1.browser_type == 'chromium'
         assert page_1.page.url == 'https://apify.com/'
 
         page_2 = await browser_pool.new_page()
+        assert page_2 is not None
         await page_2.page.goto('https://crawlee.dev/')
         assert page_2.browser_type == 'chromium'
         assert page_2.page.url == 'https://crawlee.dev/'
@@ -31,16 +34,19 @@ async def test_new_page_multiple_plugins() -> None:
         assert browser_pool.plugins == [plugin_chromium, plugin_firefox]
 
         page_1 = await browser_pool.new_page()
+        assert page_1 is not None
         await page_1.page.goto('https://apify.com/')
         assert page_1.browser_type == 'chromium'
         assert page_1.page.url == 'https://apify.com/'
 
         page_2 = await browser_pool.new_page()
+        assert page_2 is not None
         await page_2.page.goto('https://crawlee.dev/')
         assert page_2.browser_type == 'firefox'
         assert page_2.page.url == 'https://crawlee.dev/'
 
         page_3 = await browser_pool.new_page()
+        assert page_3 is not None
         await page_3.page.goto('https://example.com/')
         assert page_3.browser_type == 'chromium'
         assert page_3.page.url == 'https://example.com/'
@@ -69,10 +75,11 @@ async def test_new_page_with_each_plugin() -> None:
 
 
 async def test_resource_management() -> None:
-    plugin = PlaywrightBrowserPlugin(browser_type='chromium')
+    playwright_plugin = PlaywrightBrowserPlugin(browser_type='chromium')
 
-    async with BrowserPool([plugin]) as browser_pool:
+    async with BrowserPool([playwright_plugin]) as browser_pool:
         page = await browser_pool.new_page()
+        assert page is not None
         await page.page.goto('https://apify.com/')
         assert page.page.url == 'https://apify.com/'
 
@@ -81,6 +88,7 @@ async def test_resource_management() -> None:
 
     # Browsers in all plugins should be disconnected
     for plugin in browser_pool.plugins:
+        assert plugin.browser is not None
         assert plugin.browser.is_connected() is False
 
 

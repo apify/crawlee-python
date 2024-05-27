@@ -25,6 +25,7 @@ async def test_new_page() -> None:
 
 async def test_resource_management() -> None:
     async with PlaywrightBrowserPlugin() as plugin:
+        assert plugin.browser is not None
         # Browser should be connected
         assert plugin.browser.is_connected() is True
 

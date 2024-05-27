@@ -5,7 +5,7 @@ from __future__ import annotations
 from logging import getLogger
 from typing import TYPE_CHECKING, Literal
 
-from playwright.async_api import async_playwright
+from playwright.async_api import Playwright, async_playwright
 from typing_extensions import override
 
 from crawlee.browsers.base_browser_plugin import BaseBrowserPlugin
@@ -32,17 +32,17 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         self._browser_options = browser_options or {}
 
         self._playwright_context_manager = async_playwright()
-        self._playwright = None
-        self._browser = None
+        self._playwright: Playwright | None = None
+        self._browser: Browser | None = None
 
     @property
     @override
-    def browser(self) -> Browser:
+    def browser(self) -> Browser | None:
         return self._browser
 
     @property
     @override
-    def browser_type(self) -> str:
+    def browser_type(self) -> Literal['chromium', 'firefox', 'webkit']:
         return self._browser_type
 
     @override
@@ -69,7 +69,8 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         exc_traceback: TracebackType | None,
     ) -> None:
         logger.debug('Closing Playwright browser plugin.')
-        await self._browser.close()
+        if self._browser:
+            await self._browser.close()
         await self._playwright_context_manager.__aexit__(exc_type, exc_value, exc_traceback)
 
     @override
