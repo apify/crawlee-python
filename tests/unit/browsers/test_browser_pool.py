@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import playwright
 import pytest
 
 from crawlee.browsers.browser_pool import BrowserPool

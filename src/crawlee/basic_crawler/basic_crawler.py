@@ -187,7 +187,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
             log_message=f'{logger.name} request statistics',
         )
 
-        if use_browser_pool:
+        self._use_browser_pool = use_browser_pool
+        if self._use_browser_pool:
             self._browser_pool = browser_pool or BrowserPool()
 
         self._running = False
@@ -303,7 +304,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             if self._use_session_pool:
                 await exit_stack.enter_async_context(self._session_pool)
 
-            if self._browser_pool:
+            if self._use_browser_pool:
                 await exit_stack.enter_async_context(self._browser_pool)
 
             await self._pool.run()
