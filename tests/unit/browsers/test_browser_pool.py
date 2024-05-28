@@ -13,14 +13,12 @@ async def test_new_page_single_plugin() -> None:
         assert browser_pool.plugins == [plugin]
 
         page_1 = await browser_pool.new_page()
-        assert page_1 is not None
         await page_1.page.goto('https://httpbin.org/get')
         assert page_1.browser_type == 'chromium'
         assert page_1.page.url == 'https://httpbin.org/get'
         assert '<html' in await page_1.page.content()  # there is some HTML content
 
         page_2 = await browser_pool.new_page()
-        assert page_2 is not None
         await page_2.page.goto('https://httpbin.org/status/200')
         assert page_2.browser_type == 'chromium'
         assert page_2.page.url == 'https://httpbin.org/status/200'
@@ -35,21 +33,18 @@ async def test_new_page_multiple_plugins() -> None:
         assert browser_pool.plugins == [plugin_chromium, plugin_firefox]
 
         page_1 = await browser_pool.new_page()
-        assert page_1 is not None
         await page_1.page.goto('https://httpbin.org/get')
         assert page_1.browser_type == 'chromium'
         assert page_1.page.url == 'https://httpbin.org/get'
         assert '<html' in await page_1.page.content()  # there is some HTML content
 
         page_2 = await browser_pool.new_page()
-        assert page_2 is not None
         await page_2.page.goto('https://httpbin.org/headers')
         assert page_2.browser_type == 'firefox'
         assert page_2.page.url == 'https://httpbin.org/headers'
         assert '<html' in await page_2.page.content()  # there is some HTML content
 
         page_3 = await browser_pool.new_page()
-        assert page_3 is not None
         await page_3.page.goto('https://httpbin.org/user-agent')
         assert page_3.browser_type == 'chromium'
         assert page_3.page.url == 'https://httpbin.org/user-agent'
@@ -82,7 +77,6 @@ async def test_resource_management() -> None:
 
     async with BrowserPool([playwright_plugin]) as browser_pool:
         page = await browser_pool.new_page()
-        assert page is not None
         await page.page.goto('https://httpbin.org/get')
         assert page.page.url == 'https://httpbin.org/get'
         assert '<html' in await page.page.content()  # there is some HTML content
