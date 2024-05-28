@@ -7,6 +7,7 @@ import itertools
 from datetime import timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING
+from weakref import WeakValueDictionary
 
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee.browsers.playwright_browser_plugin import PlaywrightBrowserPlugin
@@ -51,7 +52,7 @@ class BrowserPool:
         self._plugins = plugins or [PlaywrightBrowserPlugin()]
         self._operation_timeout = operation_timeout
 
-        self._pages: dict[str, CrawleePage] = {}  # Track the pages in the pool
+        self._pages = WeakValueDictionary[str, CrawleePage]()  # Track the pages in the pool
         self._plugins_cycle = itertools.cycle(self._plugins)  # Cycle through the plugins
 
     @property
@@ -60,7 +61,7 @@ class BrowserPool:
         return self._plugins
 
     @property
-    def pages(self) -> dict[str, CrawleePage]:
+    def pages(self) -> Mapping[str, CrawleePage]:
         """Return the pages in the pool."""
         return self._pages
 
