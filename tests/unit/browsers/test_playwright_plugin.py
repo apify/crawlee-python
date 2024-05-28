@@ -9,8 +9,9 @@ async def test_new_page() -> None:
     async with PlaywrightBrowserPlugin() as plugin:
         # Get a new page with default options
         page_1 = await plugin.new_page()
-        await page_1.goto('https://apify.com/')
-        assert page_1.url == 'https://apify.com/'
+        await page_1.goto('https://httpbin.org/get')
+        assert page_1.url == 'https://httpbin.org/get'
+        assert '<html><head>' in await page_1.content()  # there is some HTML content
 
         # Get a new page with custom options
         page_2_options = {
@@ -19,8 +20,9 @@ async def test_new_page() -> None:
             'java_script_enabled': False,
         }
         page_2 = await plugin.new_page(page_options=page_2_options)
-        await page_2.goto('https://crawlee.dev/')
-        assert page_2.url == 'https://crawlee.dev/'
+        await page_2.goto('https://httpbin.org/user-agent')
+        assert page_2.url == 'https://httpbin.org/user-agent'
+        assert '<html><head>' in await page_2.content()  # there is some HTML content
 
 
 async def test_resource_management() -> None:
@@ -30,8 +32,9 @@ async def test_resource_management() -> None:
         assert plugin.browser.is_connected() is True
 
         page = await plugin.new_page()
-        await page.goto('https://apify.com/')
-        assert page.url == 'https://apify.com/'
+        await page.goto('https://httpbin.org/get')
+        assert page.url == 'https://httpbin.org/get'
+        assert '<html><head>' in await page.content()  # there is some HTML content
 
     # The page should be closed
     assert page.is_closed()

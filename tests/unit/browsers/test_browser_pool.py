@@ -14,15 +14,17 @@ async def test_new_page_single_plugin() -> None:
 
         page_1 = await browser_pool.new_page()
         assert page_1 is not None
-        await page_1.page.goto('https://apify.com/')
+        await page_1.page.goto('https://httpbin.org/get')
         assert page_1.browser_type == 'chromium'
-        assert page_1.page.url == 'https://apify.com/'
+        assert page_1.page.url == 'https://httpbin.org/get'
+        assert '<html><head>' in await page_1.page.content()  # there is some HTML content
 
         page_2 = await browser_pool.new_page()
         assert page_2 is not None
-        await page_2.page.goto('https://crawlee.dev/')
+        await page_2.page.goto('https://httpbin.org/status/200')
         assert page_2.browser_type == 'chromium'
-        assert page_2.page.url == 'https://crawlee.dev/'
+        assert page_2.page.url == 'https://httpbin.org/status/200'
+        assert '<html><head>' in await page_1.page.content()  # there is some HTML content
 
 
 async def test_new_page_multiple_plugins() -> None:
@@ -34,21 +36,24 @@ async def test_new_page_multiple_plugins() -> None:
 
         page_1 = await browser_pool.new_page()
         assert page_1 is not None
-        await page_1.page.goto('https://apify.com/')
+        await page_1.page.goto('https://httpbin.org/get')
         assert page_1.browser_type == 'chromium'
-        assert page_1.page.url == 'https://apify.com/'
+        assert page_1.page.url == 'https://httpbin.org/get'
+        assert '<html><head>' in await page_1.page.content()  # there is some HTML content
 
         page_2 = await browser_pool.new_page()
         assert page_2 is not None
-        await page_2.page.goto('https://crawlee.dev/')
+        await page_2.page.goto('https://httpbin.org/headers')
         assert page_2.browser_type == 'firefox'
-        assert page_2.page.url == 'https://crawlee.dev/'
+        assert page_2.page.url == 'https://httpbin.org/headers'
+        assert '<html><head>' in await page_2.page.content()  # there is some HTML content
 
         page_3 = await browser_pool.new_page()
         assert page_3 is not None
-        await page_3.page.goto('https://example.com/')
+        await page_3.page.goto('https://httpbin.org/user-agent')
         assert page_3.browser_type == 'chromium'
-        assert page_3.page.url == 'https://example.com/'
+        assert page_3.page.url == 'https://httpbin.org/user-agent'
+        assert '<html><head>' in await page_3.page.content()  # there is some HTML content
 
 
 async def test_new_page_with_each_plugin() -> None:
@@ -59,18 +64,17 @@ async def test_new_page_with_each_plugin() -> None:
         pages = await browser_pool.new_page_with_each_plugin()
 
         assert len(pages) == 2
+
         assert pages[0].browser_type == 'chromium'
         assert pages[1].browser_type == 'firefox'
 
-        await pages[0].page.goto('https://example.com/')
-        await pages[1].page.goto('https://example.com/')
+        await pages[0].page.goto('https://httpbin.org/get')
+        assert pages[0].page.url == 'https://httpbin.org/get'
+        assert '<html><head>' in await pages[0].page.content()  # there is some HTML content
 
-        # Ensure the pages are working by checking their titles or another element
-        assert await pages[0].page.title() == 'Example Domain'
-        assert await pages[1].page.title() == 'Example Domain'
-
-        await pages[0].page.close()
-        await pages[1].page.close()
+        await pages[1].page.goto('https://httpbin.org/headers')
+        assert pages[1].page.url == 'https://httpbin.org/headers'
+        assert '<html><head>' in await pages[1].page.content()
 
 
 async def test_resource_management() -> None:
@@ -79,8 +83,9 @@ async def test_resource_management() -> None:
     async with BrowserPool([playwright_plugin]) as browser_pool:
         page = await browser_pool.new_page()
         assert page is not None
-        await page.page.goto('https://apify.com/')
-        assert page.page.url == 'https://apify.com/'
+        await page.page.goto('https://httpbin.org/get')
+        assert page.page.url == 'https://httpbin.org/get'
+        assert '<html><head>' in await page.page.content()  # there is some HTML content
 
     # The page should be closed
     assert page.page.is_closed()
