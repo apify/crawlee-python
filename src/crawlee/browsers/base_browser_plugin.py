@@ -13,7 +13,11 @@ if TYPE_CHECKING:
 
 
 class BaseBrowserPlugin(ABC):
-    """An abstract base class for browser plugins."""
+    """An abstract base class for browser plugins.
+
+    Browser plugins act as wrappers around browser automation tools like Playwright,
+    providing a unified interface for interacting with browsers.
+    """
 
     @property
     @abstractmethod

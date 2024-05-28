@@ -20,7 +20,7 @@ logger = getLogger(__name__)
 
 
 class PlaywrightBrowserPlugin(BaseBrowserPlugin):
-    """A Playwright browser plugin that manages browser instances."""
+    """A plugin for managing Playwright browser instances."""
 
     def __init__(
         self,
@@ -28,6 +28,12 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         browser_type: Literal['chromium', 'firefox', 'webkit'] = 'chromium',
         browser_options: Mapping | None = None,
     ) -> None:
+        """Create a new instance.
+
+        Args:
+            browser_type: The type of the browser to launch.
+            browser_options: Options to configure the browser instance.
+        """
         self._browser_type = browser_type
         self._browser_options = browser_options or {}
 

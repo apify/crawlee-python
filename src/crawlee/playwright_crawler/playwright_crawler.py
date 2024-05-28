@@ -23,14 +23,9 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
         self,
         **kwargs: Unpack[BasicCrawlerOptions[PlaywrightCrawlingContext]],
     ) -> None:
-        """Initialize the HttpCrawler.
+        """Create a new instance.
 
         Args:
-            additional_http_error_status_codes: HTTP status codes that should be considered errors (and trigger a retry)
-
-            ignore_http_error_status_codes: HTTP status codes that are normally considered errors but we want to treat
-                them as successful
-
             kwargs: Arguments to be forwarded to the underlying BasicCrawler
         """
         kwargs['use_browser_pool'] = True

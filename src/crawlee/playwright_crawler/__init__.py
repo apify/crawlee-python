@@ -1,1 +1,2 @@
-from .playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
+from .playwright_crawler import PlaywrightCrawler
+from .types import PlaywrightCrawlingContext
