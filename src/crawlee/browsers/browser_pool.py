@@ -94,7 +94,6 @@ class BrowserPool:
         *,
         page_id: str | None = None,
         browser_plugin: BaseBrowserPlugin | None = None,
-        page_options: Mapping | None = None,
     ) -> CrawleePage:
         """Opens a new page in a browser using the specified or a random browser plugin.
 
@@ -102,7 +101,6 @@ class BrowserPool:
             page_id: The ID to assign to the new page. If not provided, a random ID is generated.
             browser_plugin: browser_plugin: The browser plugin to use for creating the new page.
                 If not provided, the next plugin in the rotation is used.
-            page_options: Options to configure the new page.
 
         Returns:
             The newly created browser page.
@@ -115,15 +113,10 @@ class BrowserPool:
 
         page_id = page_id or crypto_random_object_id(self._GENERATED_PAGE_ID_LENGTH)
         plugin = browser_plugin or next(self._plugins_cycle)
-        page_options = page_options or {}
 
-        return await self._initialize_page(page_id, plugin, page_options)
+        return await self._initialize_page(page_id, plugin)
 
-    async def new_page_with_each_plugin(
-        self,
-        *,
-        page_options: Mapping | None = None,
-    ) -> Sequence[CrawleePage]:
+    async def new_page_with_each_plugin(self) -> Sequence[CrawleePage]:
         """Create a new page with each browser plugin in the pool.
 
         This method is useful for running scripts in multiple environments simultaneously, typically for testing
@@ -137,20 +130,19 @@ class BrowserPool:
         Returns:
             A list of newly created pages, one for each plugin in the pool.
         """
-        pages_coroutines = [self.new_page(browser_plugin=plugin, page_options=page_options) for plugin in self._plugins]
+        pages_coroutines = [self.new_page(browser_plugin=plugin) for plugin in self._plugins]
         return await asyncio.gather(*pages_coroutines)
 
     async def _initialize_page(
         self,
         page_id: str,
         plugin: BaseBrowserPlugin,
-        page_options: Mapping,
     ) -> CrawleePage:
         """Internal method to initialize a new page in a browser using the specified plugin."""
         timeout = self._operation_timeout.total_seconds()
 
         try:
-            raw_page = await asyncio.wait_for(plugin.new_page(page_options=page_options), timeout)
+            raw_page = await asyncio.wait_for(plugin.new_page(), timeout)
         except asyncio.TimeoutError as exc:
             raise TimeoutError(f'Creating a new page with plugin {plugin} timed out.') from exc
         except RuntimeError as exc:

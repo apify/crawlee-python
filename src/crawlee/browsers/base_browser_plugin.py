@@ -6,7 +6,6 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
     from types import TracebackType
 
     from playwright.async_api import Browser, Page
@@ -43,9 +42,5 @@ class BaseBrowserPlugin(ABC):
         """Exit the context manager and close the browser plugin."""
 
     @abstractmethod
-    async def new_page(self, *, page_options: Mapping) -> Page:
-        """Get a new page in a browser.
-
-        Args:
-            page_options: Options to configure the new page.
-        """
+    async def new_page(self) -> Page:
+        """Get a new page in a browser."""

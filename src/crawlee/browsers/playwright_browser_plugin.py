@@ -27,15 +27,18 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         *,
         browser_type: Literal['chromium', 'firefox', 'webkit'] = 'chromium',
         browser_options: Mapping | None = None,
+        page_options: Mapping | None = None,
     ) -> None:
         """Create a new instance.
 
         Args:
             browser_type: The type of the browser to launch.
             browser_options: Options to configure the browser instance.
+            page_options: Options to configure a new page instance.
         """
         self._browser_type = browser_type
         self._browser_options = browser_options or {}
+        self._page_options = page_options or {}
 
         self._playwright_context_manager = async_playwright()
         self._playwright: Playwright | None = None
@@ -80,9 +83,8 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         await self._playwright_context_manager.__aexit__(exc_type, exc_value, exc_traceback)
 
     @override
-    async def new_page(self, *, page_options: Mapping | None = None) -> Page:
+    async def new_page(self) -> Page:
         if not self._browser:
             raise RuntimeError('Playwright browser plugin is not initialized.')
 
-        page_options = page_options or {}
-        return await self._browser.new_page(**page_options)
+        return await self._browser.new_page(**self._page_options)

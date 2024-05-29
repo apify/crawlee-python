@@ -38,6 +38,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
     ) -> AsyncGenerator[PlaywrightCrawlingContext, None]:
         crawlee_page = await self._browser_pool.new_page()
         await crawlee_page.page.goto(context.request.url)
+        context.request.loaded_url = crawlee_page.page.url
 
         yield PlaywrightCrawlingContext(
             request=context.request,
