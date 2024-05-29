@@ -235,8 +235,12 @@ async def main() -> None:
     # Open a default dataset for storing results
     dataset = await Dataset.open()
 
-    # Create a crawler instance and provide a request provider
-    crawler = PlaywrightCrawler(request_provider=rq)
+    # Create a crawler instance and provide a request provider (and other optional arguments)
+    crawler = PlaywrightCrawler(
+        request_provider=rq,
+        # headless=False,
+        # browser_type='firefox',
+    )
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
