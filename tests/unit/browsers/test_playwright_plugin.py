@@ -13,13 +13,15 @@ async def test_new_page() -> None:
         assert page_1.url == 'https://httpbin.org/get'
         assert '<html' in await page_1.content()  # there is some HTML content
 
+    page_options = {
+        'viewport': {'width': 1920, 'height': 1080},
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0) Chrome/58.0 Safari/537.36',
+        'java_script_enabled': False,
+    }
+
+    async with PlaywrightBrowserPlugin(page_options=page_options) as plugin:
         # Get a new page with custom options
-        page_2_options = {
-            'viewport': {'width': 1920, 'height': 1080},
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0) Chrome/58.0 Safari/537.36',
-            'java_script_enabled': False,
-        }
-        page_2 = await plugin.new_page(page_options=page_2_options)
+        page_2 = await plugin.new_page()
         await page_2.goto('https://httpbin.org/user-agent')
         assert page_2.url == 'https://httpbin.org/user-agent'
         assert '<html' in await page_2.content()  # there is some HTML content
