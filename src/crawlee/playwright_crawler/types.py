@@ -13,4 +13,4 @@ if TYPE_CHECKING:
 class PlaywrightCrawlingContext(BasicCrawlingContext):
     """Crawling context used by PlaywrightSoupCrawler."""
 
-    page: Page | None
+    page: Page

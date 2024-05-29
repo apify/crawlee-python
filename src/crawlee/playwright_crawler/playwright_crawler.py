@@ -45,5 +45,5 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
             send_request=context.send_request,
             add_requests=context.add_requests,
             proxy_info=context.proxy_info,
-            page=crawlee_page.page if crawlee_page else None,
+            page=crawlee_page.page,
         )
