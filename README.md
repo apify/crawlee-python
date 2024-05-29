@@ -206,7 +206,108 @@ from crawlee.enqueue_strategy import EnqueueStrategy
 
 #### PlaywrightCrawler
 
-- TODO
+[`PlaywrightCrawler`](https://github.com/apify/crawlee-py/tree/master/src/crawlee/playwright_crawler) extends
+the `BasicCrawler`. It provides the same features and on top of that, it uses
+[Playwright](https://playwright.dev/python) browser automation tool.
+
+This crawler provides a straightforward framework for parallel web page crawling using headless versions of Chromium,
+Firefox, and Webkit browsers through Playwright. URLs to be crawled are supplied by a request provider, which can be
+either a `RequestList` containing a static list of URLs or a dynamic `RequestQueue`.
+
+Using a headless browser to download web pages and extract data, `PlaywrightCrawler` is ideal for crawling
+websites that require JavaScript execution. For websites that do not require JavaScript, consider using
+the `BeautifulSoupCrawler`, which utilizes raw HTTP requests and will be much faster.
+
+Example usage:
+
+```python
+import asyncio
+
+from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
+from crawlee.storages import Dataset, RequestQueue
+
+
+async def main() -> None:
+    # Open a default request queue and add requests to it
+    rq = await RequestQueue.open()
+    await rq.add_request('https://crawlee.dev')
+
+    # Open a default dataset for storing results
+    dataset = await Dataset.open()
+
+    # Create a crawler instance and provide a request provider (and other optional arguments)
+    crawler = PlaywrightCrawler(
+        request_provider=rq,
+        # headless=False,
+        # browser_type='firefox',
+    )
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        record = {
+            'request_url': context.request.url,
+            'page_url': context.page.url,
+            'page_title': await context.page.title(),
+            'page_content': (await context.page.content())[:10000],
+        }
+        await dataset.push_data(record)
+
+    await crawler.run()
+
+
+if __name__ == '__main__':
+    asyncio.run(main())
+```
+
+Example usage with custom browser pool:
+
+```python
+import asyncio
+
+from crawlee.browsers import BrowserPool, PlaywrightBrowserPlugin
+from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
+from crawlee.storages import Dataset, RequestQueue
+
+
+async def main() -> None:
+    # Open a default request queue and add requests to it
+    rq = await RequestQueue.open()
+    await rq.add_request('https://crawlee.dev')
+    await rq.add_request('https://apify.com')
+
+    # Open a default dataset for storing results
+    dataset = await Dataset.open()
+
+    # Create a browser pool with a Playwright browser plugin
+    browser_pool = BrowserPool(
+        plugins=[
+            PlaywrightBrowserPlugin(
+                browser_type='firefox',
+                browser_options={'headless': False},
+                page_options={'viewport': {'width': 1920, 'height': 1080}},
+            )
+        ]
+    )
+
+    # Create a crawler instance and provide a browser pool and request provider
+    crawler = PlaywrightCrawler(request_provider=rq, browser_pool=browser_pool)
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        record = {
+            'request_url': context.request.url,
+            'page_url': context.page.url,
+            'page_title': await context.page.title(),
+            'page_content': (await context.page.content())[:10000],
+        }
+        await dataset.push_data(record)
+
+    await crawler.run()
+
+
+if __name__ == '__main__':
+    asyncio.run(main())
+```
 
 ### Storages
 
@@ -415,6 +516,14 @@ async def main() -> None:
 if __name__ == '__main__':
     asyncio.run(main())
 ```
+
+<!--
+### Browser Management
+
+- TODO
+- Write once browser rotation and/or other features are ready
+- Update PlaywrightCrawler according to this
+-->
 
 ## Running on the Apify platform
 

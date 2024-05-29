@@ -1,1 +1,2 @@
-from .beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
+from .beautifulsoup_crawler import BeautifulSoupCrawler
+from .types import BeautifulSoupCrawlingContext

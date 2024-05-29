@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # Inspiration: https://github.com/apify/crawlee/blob/v3.9.2/packages/utils/src/internals/blocked.ts
 
 CLOUDFLARE_RETRY_CSS_SELECTORS = [

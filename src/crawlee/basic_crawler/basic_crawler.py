@@ -34,6 +34,7 @@ from crawlee.basic_crawler.types import (
     RequestHandlerRunResult,
     SendRequestFunction,
 )
+from crawlee.browsers import BrowserPool
 from crawlee.configuration import Configuration
 from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.events.local_event_manager import LocalEventManager
@@ -75,6 +76,8 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     retry_on_blocked: NotRequired[bool]
     proxy_configuration: NotRequired[ProxyConfiguration]
     statistics: NotRequired[Statistics[StatisticsState]]
+    browser_pool: NotRequired[BrowserPool]
+    use_browser_pool: NotRequired[bool]
     _context_pipeline: NotRequired[ContextPipeline[TCrawlingContext]]
 
 
@@ -105,6 +108,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
         retry_on_blocked: bool = True,
         proxy_configuration: ProxyConfiguration | None = None,
         statistics: Statistics | None = None,
+        browser_pool: BrowserPool | None = None,
+        use_browser_pool: bool = False,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
     ) -> None:
         """Initialize the BasicCrawler.
@@ -125,6 +130,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
             retry_on_blocked: If set to True, the crawler will try to automatically bypass any detected bot protection
             proxy_configuration: A HTTP proxy configuration to be used for making requests
             statistics: A preconfigured `Statistics` instance if you wish to use non-default configuration
+            browser_pool: A preconfigured `BrowserPool` instance for browser crawling.
+            use_browser_pool: Enables using the browser pool for crawling.
             _context_pipeline: Allows extending the request lifecycle and modifying the crawling context.
                 This parameter is meant to be used by child classes, not when BasicCrawler is instantiated directly.
         """
@@ -179,6 +186,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
             event_manager=self._event_manager,
             log_message=f'{logger.name} request statistics',
         )
+
+        self._use_browser_pool = use_browser_pool
+        if self._use_browser_pool:
+            self._browser_pool = browser_pool or BrowserPool()
 
         self._running = False
         self._has_finished_before = False
@@ -292,6 +303,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
             if self._use_session_pool:
                 await exit_stack.enter_async_context(self._session_pool)
+
+            if self._use_browser_pool:
+                await exit_stack.enter_async_context(self._browser_pool)
 
             await self._pool.run()
 
