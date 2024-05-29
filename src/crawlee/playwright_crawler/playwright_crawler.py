@@ -78,3 +78,5 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
             proxy_info=context.proxy_info,
             page=crawlee_page.page,
         )
+
+        await crawlee_page.page.close()
