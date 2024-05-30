@@ -34,6 +34,24 @@ If you plan to use `BeautifulSoupCrawler`, install `crawlee` with `beautifulsoup
 pip install 'crawlee[beautifulsoup]'
 ```
 
+If you plan to use `PlaywrightCrawler`, install `crawlee` with the `playwright` extra:
+
+```bash
+pip install 'crawlee[playwright]'
+```
+
+Then, install the Playwright dependencies:
+
+```bash
+playwright install
+```
+
+You can install multiple extras at once by using a comma as a separator:
+
+```bash
+pip install 'crawlee[beautifulsoup,playwright]'
+```
+
 ## Features
 
 - Unified interface for **HTTP and headless browser** crawling.
