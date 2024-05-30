@@ -1,8 +1,20 @@
 # Changelog
 
-## [0.0.4](../../releases/tag/v0.0.4) - Unreleased
+## [0.0.5](../../releases/tag/v0.0.5) - Unreleased
 
 - ...
+
+## [0.0.4](../../releases/tag/v0.0.4) - 2024-05-30
+
+- Another internal release, adding statistics capturing, proxy configuration and
+the initial version of browser management and `PlaywrightCrawler`.
+
+### Adds
+
+- `Statistics`
+- `ProxyConfiguration`
+- `BrowserPool`
+- `PlaywrightCrawler`
 
 ## [0.0.3](../../releases/tag/v0.0.3) - 2024-05-15
 
