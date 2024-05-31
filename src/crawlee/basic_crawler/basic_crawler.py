@@ -34,7 +34,6 @@ from crawlee.basic_crawler.types import (
     RequestHandlerRunResult,
     SendRequestFunction,
 )
-from crawlee.browsers import BrowserPool
 from crawlee.configuration import Configuration
 from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.events.local_event_manager import LocalEventManager
@@ -47,6 +46,7 @@ from crawlee.storages.request_queue import RequestQueue
 if TYPE_CHECKING:
     import re
 
+    from crawlee.browsers import BrowserPool
     from crawlee.http_clients.base_http_client import BaseHttpClient, HttpResponse
     from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
     from crawlee.sessions.session import Session
@@ -188,8 +188,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         )
 
         self._use_browser_pool = use_browser_pool
-        if self._use_browser_pool:
-            self._browser_pool = browser_pool or BrowserPool()
+        self._browser_pool = browser_pool
 
         self._running = False
         self._has_finished_before = False
@@ -305,6 +304,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 await exit_stack.enter_async_context(self._session_pool)
 
             if self._use_browser_pool:
+                if self._browser_pool is None:
+                    raise RuntimeError('Browser pool is not configured')
                 await exit_stack.enter_async_context(self._browser_pool)
 
             await self._pool.run()
