@@ -208,3 +208,6 @@ reportUnusedVariable = false
 reportCallInDefaultInitializer = false
 reportImplicitStringConcatenation = false
 reportAny = false
+
+[tool.ipdb]
+context = 7
