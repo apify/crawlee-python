@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING, Any, AsyncGenerator, Iterable, Literal
 
+from bs4 import BeautifulSoup, Tag
 from typing_extensions import Unpack
 
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
@@ -102,8 +103,6 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
     async def _parse_http_response(
         self, context: HttpCrawlingContext
     ) -> AsyncGenerator[BeautifulSoupCrawlingContext, None]:
-        from bs4 import BeautifulSoup, Tag
-
         soup = await asyncio.to_thread(lambda: BeautifulSoup(context.http_response.read(), self._parser))
 
         async def enqueue_links(
