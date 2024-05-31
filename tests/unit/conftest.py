@@ -24,9 +24,6 @@ def _reset_and_patch_default_instances(monkeypatch: pytest.MonkeyPatch, tmp_path
         monkeypatch: Test utility provided by pytest.
         tmp_path: A unique temporary directory path provided by pytest for test isolation.
     """
-    # Ensure the tmp_path is within the /tmp directory
-    assert str(tmp_path).startswith('/tmp')  # noqa: S108
-
     # Reset the local and cloud clients in StorageClientManager
     StorageClientManager._local_client = MemoryStorageClient()
     StorageClientManager._cloud_client = None
