@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable
+import os
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -13,34 +14,33 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-@pytest.fixture()
-def reset_default_instances(monkeypatch: pytest.MonkeyPatch) -> Callable[[], None]:
-    def reset() -> None:
-        StorageClientManager._local_client = MemoryStorageClient()
-        StorageClientManager._cloud_client = None
-
-        monkeypatch.setattr(_creation_management, '_cache_dataset_by_id', {})
-        monkeypatch.setattr(_creation_management, '_cache_dataset_by_name', {})
-        monkeypatch.setattr(_creation_management, '_cache_kvs_by_id', {})
-        monkeypatch.setattr(_creation_management, '_cache_kvs_by_name', {})
-        monkeypatch.setattr(_creation_management, '_cache_rq_by_id', {})
-        monkeypatch.setattr(_creation_management, '_cache_rq_by_name', {})
-
-    return reset
-
-
-# To isolate the tests, we need to reset the used singletons before each test case
-# We also set the MemoryStorageClient to use a temp path
 @pytest.fixture(autouse=True)
-def _reset_and_patch_default_instances(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    reset_default_instances: Callable[[], None],
-) -> None:
-    reset_default_instances()
+def _isolate_test_environment(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Isolate tests by resetting the storage clients, clearing caches, and setting the environment variables.
 
-    # This forces the MemoryStorageClient to use tmp_path for its storage dir
+    The fixture is applied automatically to all test cases.
+
+    Args:
+        monkeypatch: Test utility provided by pytest.
+        tmp_path: A unique temporary directory path provided by pytest for test isolation.
+    """
+    # Set the environment variable for the local storage directory to the temporary path
     monkeypatch.setenv('CRAWLEE_LOCAL_STORAGE_DIR', str(tmp_path))
+
+    # Reset the local and cloud clients in StorageClientManager
+    StorageClientManager._local_client = MemoryStorageClient()
+    StorageClientManager._cloud_client = None
+
+    # Clear creation-related caches to ensure no state is carried over between tests
+    monkeypatch.setattr(_creation_management, '_cache_dataset_by_id', {})
+    monkeypatch.setattr(_creation_management, '_cache_dataset_by_name', {})
+    monkeypatch.setattr(_creation_management, '_cache_kvs_by_id', {})
+    monkeypatch.setattr(_creation_management, '_cache_kvs_by_name', {})
+    monkeypatch.setattr(_creation_management, '_cache_rq_by_id', {})
+    monkeypatch.setattr(_creation_management, '_cache_rq_by_name', {})
+
+    # Verify that the environment variable is set correctly
+    assert os.environ.get('CRAWLEE_LOCAL_STORAGE_DIR') == str(tmp_path)
 
 
 @pytest.fixture()

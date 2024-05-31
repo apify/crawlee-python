@@ -68,6 +68,7 @@ tldextract = "^5.1.2"
 [tool.poetry.group.dev.dependencies]
 build = "~1.2.0"
 filelock = "~3.14.0"
+ipdb = "^0.13.13"
 mypy = "~1.10.0"
 pre-commit = "~3.7.0"
 pydoc-markdown = "~4.8.2"
