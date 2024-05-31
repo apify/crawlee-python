@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import itertools
+from collections import defaultdict
 from datetime import timedelta
 from logging import getLogger
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Literal
 from weakref import WeakValueDictionary
 
 from crawlee._utils.crypto import crypto_random_object_id
@@ -54,6 +55,32 @@ class BrowserPool:
 
         self._pages = WeakValueDictionary[str, CrawleePage]()  # Track the pages in the pool
         self._plugins_cycle = itertools.cycle(self._plugins)  # Cycle through the plugins
+
+    @classmethod
+    def with_default_plugin(
+        cls,
+        *,
+        headless: bool | None = None,
+        browser_type: Literal['chromium', 'firefox', 'webkit'] | None = None,
+        **kwargs: Any,
+    ) -> BrowserPool:
+        """Create a new instance with a single `PlaywrightBrowserPlugin` configured with the provided options.
+
+        Args:
+            headless: Whether to run the browser in headless mode.
+            browser_type: The type of browser to launch ('chromium', 'firefox', or 'webkit').
+            kwargs: Additional arguments for default constructor.
+        """
+        plugin_options: dict = defaultdict(dict)
+
+        if headless is not None:
+            plugin_options['browser_options']['headless'] = headless
+
+        if browser_type:
+            plugin_options['browser_type'] = browser_type
+
+        plugin = PlaywrightBrowserPlugin(**plugin_options)
+        return cls(plugins=[plugin], **kwargs)
 
     @property
     def plugins(self) -> Sequence[BaseBrowserPlugin]:

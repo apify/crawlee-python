@@ -2,7 +2,9 @@
 
 ## [0.0.5](../../releases/tag/v0.0.5) - Unreleased
 
-- ...
+### Adds
+
+- Add explicit error messages for missing package extras during import
 
 ## [0.0.4](../../releases/tag/v0.0.4) - 2024-05-30
 
