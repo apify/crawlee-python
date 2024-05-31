@@ -58,7 +58,6 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
             browser_pool = BrowserPool(plugins=[PlaywrightBrowserPlugin(**plugin_options)])
             kwargs['browser_pool'] = browser_pool
 
-        kwargs['use_browser_pool'] = True
         kwargs['_context_pipeline'] = ContextPipeline().compose(self._page_goto)
         super().__init__(**kwargs)
 
@@ -66,6 +65,9 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
         self,
         context: BasicCrawlingContext,
     ) -> AsyncGenerator[PlaywrightCrawlingContext, None]:
+        if self._browser_pool is None:
+            raise ValueError('Browser pool is not initialized.')
+
         crawlee_page = await self._browser_pool.new_page()
         await crawlee_page.page.goto(context.request.url)
         context.request.loaded_url = crawlee_page.page.url

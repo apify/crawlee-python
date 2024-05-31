@@ -77,7 +77,6 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     proxy_configuration: NotRequired[ProxyConfiguration]
     statistics: NotRequired[Statistics[StatisticsState]]
     browser_pool: NotRequired[BrowserPool]
-    use_browser_pool: NotRequired[bool]
     _context_pipeline: NotRequired[ContextPipeline[TCrawlingContext]]
 
 
@@ -109,7 +108,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
         proxy_configuration: ProxyConfiguration | None = None,
         statistics: Statistics | None = None,
         browser_pool: BrowserPool | None = None,
-        use_browser_pool: bool = False,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
     ) -> None:
         """Initialize the BasicCrawler.
@@ -131,7 +129,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
             proxy_configuration: A HTTP proxy configuration to be used for making requests
             statistics: A preconfigured `Statistics` instance if you wish to use non-default configuration
             browser_pool: A preconfigured `BrowserPool` instance for browser crawling.
-            use_browser_pool: Enables using the browser pool for crawling.
             _context_pipeline: Allows extending the request lifecycle and modifying the crawling context.
                 This parameter is meant to be used by child classes, not when BasicCrawler is instantiated directly.
         """
@@ -187,7 +184,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
             log_message=f'{logger.name} request statistics',
         )
 
-        self._use_browser_pool = use_browser_pool
         self._browser_pool = browser_pool
 
         self._running = False
@@ -303,9 +299,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             if self._use_session_pool:
                 await exit_stack.enter_async_context(self._session_pool)
 
-            if self._use_browser_pool:
-                if self._browser_pool is None:
-                    raise RuntimeError('Browser pool is not configured')
+            if self._browser_pool:
                 await exit_stack.enter_async_context(self._browser_pool)
 
             await self._pool.run()
