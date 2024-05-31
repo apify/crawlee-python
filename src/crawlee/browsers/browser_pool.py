@@ -57,7 +57,7 @@ class BrowserPool:
         self._plugins_cycle = itertools.cycle(self._plugins)  # Cycle through the plugins
 
     @classmethod
-    def from_headless_and_browser_type(
+    def with_default_plugin(
         cls,
         *,
         headless: bool | None = None,

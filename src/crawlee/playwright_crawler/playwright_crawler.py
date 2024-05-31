@@ -41,7 +41,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
 
         # If browser_pool is not provided, create a new instance of BrowserPool with specified arguments.
         else:
-            browser_pool = BrowserPool.from_headless_and_browser_type(headless=headless, browser_type=browser_type)
+            browser_pool = BrowserPool.with_default_plugin(headless=headless, browser_type=browser_type)
 
         self._browser_pool = browser_pool
 
