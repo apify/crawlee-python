@@ -45,11 +45,10 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
 
         self._browser_pool = browser_pool
 
-        super().__init__(
-            _context_pipeline=ContextPipeline().compose(self._page_goto),
-            _additional_context_managers=[self._browser_pool],
-            **kwargs,
-        )
+        kwargs['_context_pipeline'] = ContextPipeline().compose(self._page_goto)
+        kwargs['_additional_context_managers'] = [self._browser_pool]
+
+        super().__init__(**kwargs)
 
     async def _page_goto(
         self,
