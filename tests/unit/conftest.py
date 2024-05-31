@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 @pytest.fixture(autouse=True)
 def _isolate_test_environment(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Isolate tests by resetting singletons and setting a temporary storage path.
+    """Isolate tests by resetting the storage clients, clearing caches, and setting the environment variables.
 
     The fixture is applied automatically to all test cases.
 
