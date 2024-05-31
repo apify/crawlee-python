@@ -9,8 +9,8 @@ if TYPE_CHECKING:
     from crawlee.playwright_crawler import PlaywrightCrawlingContext
 
 
-async def test_basic_request() -> None:
-    request_provider = RequestList(['https://httpbin.org/'])
+async def test_basic_request(httpbin: str) -> None:
+    request_provider = RequestList([f'{httpbin}/'])
     crawler = PlaywrightCrawler(request_provider=request_provider)
     result: dict = {}
 
@@ -24,6 +24,6 @@ async def test_basic_request() -> None:
 
     await crawler.run()
 
-    assert result.get('request_url') == result.get('page_url') == 'https://httpbin.org/'
+    assert result.get('request_url') == result.get('page_url') == f'{httpbin}/'
     assert 'httpbin' in result.get('page_title', '')
     assert '<html' in result.get('page_content', '')  # there is some HTML content
