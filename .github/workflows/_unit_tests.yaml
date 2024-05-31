@@ -12,6 +12,13 @@ jobs:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
     runs-on: ${{ matrix.os }}
 
+    services:
+      httpbin:
+        image: kennethreitz/httpbin
+        ports: 80:80
+    env:
+      HTTPBIN_URL: http://httpbin/
+
     steps:
       # We need to check out the head commit in case of PRs, and the default ref otherwise (during release).
       - name: Checkout repository
