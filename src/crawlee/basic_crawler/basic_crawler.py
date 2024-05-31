@@ -7,7 +7,7 @@ from contextlib import AsyncExitStack
 from datetime import timedelta
 from functools import partial
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, Callable, Generic, Union, cast
+from typing import TYPE_CHECKING, Any, AsyncContextManager, Callable, Generic, Union, cast
 
 import httpx
 from tldextract import TLDExtract
@@ -18,9 +18,7 @@ from crawlee._utils.wait import wait_for
 from crawlee.autoscaling import AutoscaledPool, ConcurrencySettings
 from crawlee.autoscaling.snapshotter import Snapshotter
 from crawlee.autoscaling.system_status import SystemStatus
-from crawlee.basic_crawler.context_pipeline import (
-    ContextPipeline,
-)
+from crawlee.basic_crawler.context_pipeline import ContextPipeline
 from crawlee.basic_crawler.errors import (
     ContextPipelineInitializationError,
     ContextPipelineInterruptedError,
@@ -29,11 +27,7 @@ from crawlee.basic_crawler.errors import (
     UserDefinedErrorHandlerError,
 )
 from crawlee.basic_crawler.router import Router
-from crawlee.basic_crawler.types import (
-    BasicCrawlingContext,
-    RequestHandlerRunResult,
-    SendRequestFunction,
-)
+from crawlee.basic_crawler.types import BasicCrawlingContext, RequestHandlerRunResult, SendRequestFunction
 from crawlee.configuration import Configuration
 from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.events.local_event_manager import LocalEventManager
@@ -46,7 +40,6 @@ from crawlee.storages.request_queue import RequestQueue
 if TYPE_CHECKING:
     import re
 
-    from crawlee.browsers import BrowserPool
     from crawlee.http_clients.base_http_client import BaseHttpClient, HttpResponse
     from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
     from crawlee.sessions.session import Session
@@ -76,8 +69,8 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     retry_on_blocked: NotRequired[bool]
     proxy_configuration: NotRequired[ProxyConfiguration]
     statistics: NotRequired[Statistics[StatisticsState]]
-    browser_pool: NotRequired[BrowserPool]
     _context_pipeline: NotRequired[ContextPipeline[TCrawlingContext]]
+    _additional_context_managers: NotRequired[Sequence[AsyncContextManager]]
 
 
 class BasicCrawler(Generic[TCrawlingContext]):
@@ -107,8 +100,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
         retry_on_blocked: bool = True,
         proxy_configuration: ProxyConfiguration | None = None,
         statistics: Statistics | None = None,
-        browser_pool: BrowserPool | None = None,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
+        _additional_context_managers: Sequence[AsyncContextManager] | None = None,
     ) -> None:
         """Initialize the BasicCrawler.
 
@@ -131,6 +124,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             browser_pool: A preconfigured `BrowserPool` instance for browser crawling.
             _context_pipeline: Allows extending the request lifecycle and modifying the crawling context.
                 This parameter is meant to be used by child classes, not when BasicCrawler is instantiated directly.
+            _additional_context_managers: Additional context managers to be used in the crawler lifecycle.
         """
         self._router: Router[TCrawlingContext] | None = None
 
@@ -183,8 +177,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             event_manager=self._event_manager,
             log_message=f'{logger.name} request statistics',
         )
-
-        self._browser_pool = browser_pool
+        self._additional_context_managers = _additional_context_managers or []
 
         self._running = False
         self._has_finished_before = False
@@ -299,8 +292,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
             if self._use_session_pool:
                 await exit_stack.enter_async_context(self._session_pool)
 
-            if self._browser_pool:
-                await exit_stack.enter_async_context(self._browser_pool)
+            for context_manager in self._additional_context_managers:
+                await exit_stack.enter_async_context(context_manager)
 
             await self._pool.run()
 
