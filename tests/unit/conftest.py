@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture(autouse=True)
-def _reset_and_patch_default_instances(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def _isolate_test_environment(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Isolate tests by resetting singletons and setting a temporary storage path.
 
     The fixture is applied automatically to all test cases.
@@ -24,6 +24,9 @@ def _reset_and_patch_default_instances(monkeypatch: pytest.MonkeyPatch, tmp_path
         monkeypatch: Test utility provided by pytest.
         tmp_path: A unique temporary directory path provided by pytest for test isolation.
     """
+    # Set the environment variable for the local storage directory to the temporary path
+    monkeypatch.setenv('CRAWLEE_LOCAL_STORAGE_DIR', str(tmp_path))
+
     # Reset the local and cloud clients in StorageClientManager
     StorageClientManager._local_client = MemoryStorageClient()
     StorageClientManager._cloud_client = None
@@ -35,9 +38,6 @@ def _reset_and_patch_default_instances(monkeypatch: pytest.MonkeyPatch, tmp_path
     monkeypatch.setattr(_creation_management, '_cache_kvs_by_name', {})
     monkeypatch.setattr(_creation_management, '_cache_rq_by_id', {})
     monkeypatch.setattr(_creation_management, '_cache_rq_by_name', {})
-
-    # Set the environment variable for the local storage directory to the temporary path
-    monkeypatch.setenv('CRAWLEE_LOCAL_STORAGE_DIR', str(tmp_path))
 
     # Verify that the environment variable is set correctly
     assert os.environ.get('CRAWLEE_LOCAL_STORAGE_DIR') == str(tmp_path)
