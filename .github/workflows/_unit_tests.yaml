@@ -12,13 +12,8 @@ jobs:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
     runs-on: ${{ matrix.os }}
 
-    services:
-      httpbin:
-        image: kennethreitz/httpbin
-        ports: 
-          - 80:80
     env:
-      HTTPBIN_URL: http://httpbin/
+      HTTPBIN_URL: http://127.0.0.1:8080/
 
     steps:
       # We need to check out the head commit in case of PRs, and the default ref otherwise (during release).
@@ -26,6 +21,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: "${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}"
+
+      - name: Run a httpbin in the background
+        uses: addnab/docker-run-action@v3
+        with:
+          image: kennethreitz/httpbin
+          options: -d -p 8080:80
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
