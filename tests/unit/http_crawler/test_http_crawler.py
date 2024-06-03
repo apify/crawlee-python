@@ -107,7 +107,7 @@ async def test_handles_server_error(
     assert server['500_endpoint'].called
 
 
-async def test_stores_cookies() -> None:
+async def test_stores_cookies(httpbin: str) -> None:
     visit = Mock()
     track_session_usage = Mock()
 
@@ -115,9 +115,9 @@ async def test_stores_cookies() -> None:
     crawler = HttpCrawler(
         request_provider=RequestList(
             [
-                'https://httpbin.org/cookies/set?a=1',
-                'https://httpbin.org/cookies/set?b=2',
-                'https://httpbin.org/cookies/set?c=3',
+                f'{httpbin}/cookies/set?a=1',
+                f'{httpbin}/cookies/set?b=2',
+                f'{httpbin}/cookies/set?c=3',
             ]
         ),
         session_pool=session_pool,

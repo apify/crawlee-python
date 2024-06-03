@@ -51,3 +51,8 @@ def memory_storage_client(tmp_path: Path) -> MemoryStorageClient:
         crawlee_local_storage_dir=str(tmp_path),  # type: ignore
     )
     return MemoryStorageClient(cfg)
+
+
+@pytest.fixture()
+def httpbin() -> str:
+    return os.environ.get('HTTPBIN_URL', 'https://httpbin.org')
