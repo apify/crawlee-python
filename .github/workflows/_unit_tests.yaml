@@ -15,7 +15,8 @@ jobs:
     services:
       httpbin:
         image: kennethreitz/httpbin
-        ports: 80:80
+        ports: 
+          - 80:80
     env:
       HTTPBIN_URL: http://httpbin/
 
