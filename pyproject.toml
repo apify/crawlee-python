@@ -98,7 +98,7 @@ line-length = 120
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
-    "ANN101",  # Missing type annotation for `{name}` in method
+    "ANN101",  # Missing type annotation for `self` in method
     "ANN102",  # Missing type annotation for `{name}` in classmethod
     "ANN401",  # Dynamically typed expressions (typing.Any) are disallowed in {filename}
     "BLE001",  # Do not catch blind exception
@@ -202,12 +202,7 @@ exclude_lines = [
 ]
 
 [tool.basedpyright]
-reportPrivateLocalImportUsage = false
-reportUnusedCallResult = false
-reportUnusedVariable = false
-reportCallInDefaultInitializer = false
-reportImplicitStringConcatenation = false
-reportAny = false
+typeCheckingMode = "standard"
 
 [tool.ipdb]
 context = 7
