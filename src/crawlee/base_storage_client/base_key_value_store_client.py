@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, AsyncIterator
+from typing import TYPE_CHECKING, Any, AsyncContextManager
 
 if TYPE_CHECKING:
+    from httpx import Response
+
     from crawlee.models import KeyValueStoreListKeysPage, KeyValueStoreMetadata, KeyValueStoreRecord
 
 
@@ -70,7 +72,7 @@ class BaseKeyValueStoreClient(ABC):
         """
 
     @abstractmethod
-    async def get_record_as_bytes(self, key: str) -> KeyValueStoreRecord | None:
+    async def get_record_as_bytes(self, key: str) -> KeyValueStoreRecord[bytes] | None:
         """Retrieve the given record from the key-value store, without parsing it.
 
         Args:
@@ -81,7 +83,7 @@ class BaseKeyValueStoreClient(ABC):
         """
 
     @abstractmethod
-    async def stream_record(self, key: str) -> AsyncIterator[KeyValueStoreRecord | None]:
+    async def stream_record(self, key: str) -> AsyncContextManager[KeyValueStoreRecord[Response] | None]:
         """Retrieve the given record from the key-value store, as a stream.
 
         Args:

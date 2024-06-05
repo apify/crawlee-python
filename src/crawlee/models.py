@@ -8,7 +8,7 @@ from enum import Enum
 from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field
-from typing_extensions import Self
+from typing_extensions import Generic, Self, TypeVar
 
 from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
 from crawlee.enqueue_strategy import EnqueueStrategy
@@ -264,13 +264,16 @@ class RequestQueueMetadata(BaseStorageMetadata):
     resource_directory: Annotated[str, Field(alias='resourceDirectory')]
 
 
-class KeyValueStoreRecord(BaseModel):
+ValueType = TypeVar('ValueType', default=Any)
+
+
+class KeyValueStoreRecord(BaseModel, Generic[ValueType]):
     """Model for a key-value store record."""
 
     model_config = ConfigDict(populate_by_name=True)
 
     key: Annotated[str, Field(alias='key')]
-    value: Annotated[Any, Field(alias='value')]
+    value: Annotated[ValueType, Field(alias='value')]
     content_type: Annotated[str | None, Field(alias='contentType', default=None)]
     filename: Annotated[str | None, Field(alias='filename', default=None)]
 

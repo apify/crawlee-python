@@ -5,11 +5,12 @@ import io
 import os
 from datetime import datetime, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, AsyncIterator
+from typing import TYPE_CHECKING, Any, AsyncContextManager
 
 import aiofiles
 import aioshutil
 from aiofiles.os import makedirs
+from httpx import Response
 from typing_extensions import override
 
 from crawlee._utils.crypto import crypto_random_object_id
@@ -240,11 +241,11 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
         return await self._get_record_internal(key)
 
     @override
-    async def get_record_as_bytes(self, key: str) -> KeyValueStoreRecord | None:
+    async def get_record_as_bytes(self, key: str) -> KeyValueStoreRecord[bytes] | None:
         return await self._get_record_internal(key, as_bytes=True)
 
     @override
-    async def stream_record(self, key: str) -> AsyncIterator[KeyValueStoreRecord | None]:
+    async def stream_record(self, key: str) -> AsyncContextManager[KeyValueStoreRecord[Response] | None]:
         raise NotImplementedError('This method is not supported in memory storage.')
 
     @override
