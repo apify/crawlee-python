@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
 from enum import Enum
 from typing import TYPE_CHECKING, Any, NoReturn
 
@@ -54,37 +53,6 @@ def maybe_parse_body(body: bytes, content_type: str) -> Any:
         return body.decode('utf-8')
 
     return body
-
-
-def maybe_parse_bool(val: str | None) -> bool:
-    """Parse a string value to a boolean."""
-    if val in {'true', 'True', '1'}:
-        return True
-    return False
-
-
-def maybe_parse_datetime(val: str) -> datetime | str:
-    """Parse a string value to a datetime object."""
-    try:
-        return datetime.strptime(val, '%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=timezone.utc)
-    except ValueError:
-        return val
-
-
-def maybe_parse_float(val: str) -> float | None:
-    """Parse a string value to a float."""
-    try:
-        return float(val)
-    except ValueError:
-        return None
-
-
-def maybe_parse_int(val: str) -> int | None:
-    """Parse a string value to an integer."""
-    try:
-        return int(val)
-    except ValueError:
-        return None
 
 
 def raise_on_duplicate_storage(client_type: StorageTypes, key_name: str, value: str) -> NoReturn:

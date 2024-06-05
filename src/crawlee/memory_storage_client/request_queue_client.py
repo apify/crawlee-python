@@ -489,7 +489,7 @@ class RequestQueueClient(BaseRequestQueueClient):
         request_dict = filter_out_none_values_recursively(json.loads(request_json))
         if request_dict is None:
             return None
-        return Request(**request_dict)
+        return Request.model_validate(**request_dict)
 
     async def _create_internal_request(self, request: Request, forefront: bool | None) -> Request:
         order_no = self._calculate_order_no(request, forefront)
