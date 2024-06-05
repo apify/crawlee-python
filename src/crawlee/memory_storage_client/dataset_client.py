@@ -5,7 +5,7 @@ import json
 import os
 from datetime import datetime, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, AsyncIterator
+from typing import TYPE_CHECKING, Any, AsyncContextManager, AsyncIterator
 
 import aiofiles
 import aioshutil
@@ -21,6 +21,8 @@ from crawlee.models import DatasetItemsListPage, DatasetMetadata
 from crawlee.types import StorageTypes
 
 if TYPE_CHECKING:
+    from httpx import Response
+
     from crawlee.memory_storage_client import MemoryStorageClient
     from crawlee.types import JSONSerializable
 
@@ -308,7 +310,7 @@ class DatasetClient(BaseDatasetClient):
         skip_hidden: bool = False,
         xml_root: str | None = None,
         xml_row: str | None = None,
-    ) -> AsyncIterator:
+    ) -> AsyncContextManager[Response | None]:
         raise NotImplementedError('This method is not supported in memory storage.')
 
     @override
