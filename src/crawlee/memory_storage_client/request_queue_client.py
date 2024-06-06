@@ -27,7 +27,16 @@ from crawlee.memory_storage_client._creation_management import (
     find_or_create_client_by_id_or_name_inner,
     persist_metadata_if_enabled,
 )
-from crawlee.models import Request, RequestQueueHead, RequestQueueMetadata, RequestQueueOperationInfo
+from crawlee.models import (
+    BatchRequestsOperationResponse,
+    ProlongRequestLockResponse,
+    Request,
+    RequestListResponse,
+    RequestQueueHead,
+    RequestQueueHeadWithLocks,
+    RequestQueueMetadata,
+    RequestQueueOperationInfo,
+)
 from crawlee.types import StorageTypes
 
 if TYPE_CHECKING:
@@ -227,7 +236,7 @@ class RequestQueueClient(BaseRequestQueueClient):
             )
 
     @override
-    async def list_and_lock_head(self, *, lock_secs: int, limit: int | None = None) -> dict:
+    async def list_and_lock_head(self, *, lock_secs: int, limit: int | None = None) -> RequestQueueHeadWithLocks:
         raise NotImplementedError('This method is not supported in memory storage.')
 
     @override
@@ -388,7 +397,7 @@ class RequestQueueClient(BaseRequestQueueClient):
         *,
         forefront: bool = False,
         lock_secs: int,
-    ) -> dict:
+    ) -> ProlongRequestLockResponse:
         raise NotImplementedError('This method is not supported in memory storage.')
 
     @override
@@ -406,11 +415,11 @@ class RequestQueueClient(BaseRequestQueueClient):
         requests: list[Request],
         *,
         forefront: bool = False,
-    ) -> dict:
+    ) -> BatchRequestsOperationResponse:
         raise NotImplementedError('This method is not supported in memory storage.')
 
     @override
-    async def batch_delete_requests(self, requests: list[Request]) -> dict:
+    async def batch_delete_requests(self, requests: list[Request]) -> BatchRequestsOperationResponse:
         raise NotImplementedError('This method is not supported in memory storage.')
 
     @override
@@ -419,7 +428,7 @@ class RequestQueueClient(BaseRequestQueueClient):
         *,
         limit: int | None = None,
         exclusive_start_id: str | None = None,
-    ) -> dict:
+    ) -> RequestListResponse:
         raise NotImplementedError('This method is not supported in memory storage.')
 
     async def update_timestamps(self, *, has_been_modified: bool) -> None:
