@@ -9,8 +9,6 @@ from playwright.async_api import Browser, Playwright, async_playwright
 
 from crawlee.browsers.playwright_browser_controller import PlaywrightBrowserController
 
-# pytestmark = pytest.mark.only()
-
 
 @pytest.fixture()
 async def playwright() -> AsyncGenerator[Playwright, None]:

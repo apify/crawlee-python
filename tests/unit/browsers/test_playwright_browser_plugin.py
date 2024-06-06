@@ -6,8 +6,6 @@ import pytest
 
 from crawlee.browsers.playwright_browser_plugin import PlaywrightBrowserPlugin
 
-# pytestmark = pytest.mark.only()
-
 
 @pytest.fixture()
 async def plugin() -> AsyncGenerator[PlaywrightBrowserPlugin, None]:
