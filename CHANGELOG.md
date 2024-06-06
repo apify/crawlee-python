@@ -5,6 +5,10 @@
 ### Adds
 
 - Add explicit error messages for missing package extras during import
+- Better browser abstraction:
+    - `BrowserController` - Wraps a single browser instance and maintains its state.
+    - `BrowserPlugin` - Manages the browser automation framework, and basically acts as a factory for controllers.
+- Browser rotation with a maximum number of pages opened per browser.
 
 ## [0.0.4](../../releases/tag/v0.0.4) - 2024-05-30
 
