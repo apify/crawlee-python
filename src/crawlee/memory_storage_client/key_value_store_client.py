@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Any, AsyncContextManager
 import aiofiles
 import aioshutil
 from aiofiles.os import makedirs
-from httpx import Response
 from typing_extensions import override
 
 from crawlee._utils.crypto import crypto_random_object_id
@@ -32,6 +31,8 @@ from crawlee.models import (
 from crawlee.types import StorageTypes
 
 if TYPE_CHECKING:
+    from httpx import Response
+
     from crawlee.memory_storage_client import MemoryStorageClient
 
 logger = getLogger(__name__)
