@@ -1,4 +1,4 @@
-# Inspiration: https://github.com/apify/crawlee/tree/v3.10.0/packages/browser-pool/
+# Inspiration: https://github.com/apify/crawlee/tree/v3.10.1/packages/browser-pool/
 
 from __future__ import annotations
 
