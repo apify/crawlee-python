@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from logging import getLogger
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from playwright.async_api import Playwright, async_playwright
 from typing_extensions import override
@@ -30,8 +30,8 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         self,
         *,
         browser_type: Literal['chromium', 'firefox', 'webkit'] = 'chromium',
-        browser_options: Mapping | None = None,
-        page_options: Mapping | None = None,
+        browser_options: Mapping[str, Any] | None = None,
+        page_options: Mapping[str, Any] | None = None,
         max_open_pages_per_browser: int = 20,
     ) -> None:
         """Create a new instance.
@@ -58,12 +58,12 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
 
     @property
     @override
-    def browser_options(self) -> Mapping:
+    def browser_options(self) -> Mapping[str, Any]:
         return self._browser_options
 
     @property
     @override
-    def page_options(self) -> Mapping:
+    def page_options(self) -> Mapping[str, Any]:
         return self._page_options
 
     @property

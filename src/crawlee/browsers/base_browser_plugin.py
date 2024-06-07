@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -29,12 +29,12 @@ class BaseBrowserPlugin(ABC):
 
     @property
     @abstractmethod
-    def browser_options(self) -> Mapping:
+    def browser_options(self) -> Mapping[str, Any]:
         """Return the options for a new browser."""
 
     @property
     @abstractmethod
-    def page_options(self) -> Mapping:
+    def page_options(self) -> Mapping[str, Any]:
         """Return the options for a new page."""
 
     @property

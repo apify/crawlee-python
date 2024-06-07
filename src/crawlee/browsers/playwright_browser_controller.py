@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from playwright.async_api import Page
 from typing_extensions import override
@@ -75,7 +75,7 @@ class PlaywrightBrowserController(BaseBrowserController):
         return self._browser.is_connected()
 
     @override
-    async def new_page(self, page_options: Mapping | None = None) -> Page:
+    async def new_page(self, page_options: Mapping[str, Any] | None = None) -> Page:
         page_options = page_options or {}
 
         if not self.has_free_capacity:
