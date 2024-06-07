@@ -5,10 +5,10 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Annotated, Any
+from typing import Annotated, Any, Generic
 
 from pydantic import BaseModel, ConfigDict, Field
-from typing_extensions import Self
+from typing_extensions import Self, TypeVar
 
 from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
 from crawlee.enqueue_strategy import EnqueueStrategy
@@ -188,6 +188,12 @@ class Request(BaseRequestData):
         self.user_data['__crawlee']['forefront'] = new_value
 
 
+class RequestWithLock(Request):
+    """A crawling request with information about locks."""
+
+    lock_expires_at: Annotated[datetime, Field(alias='lockExpiresAt')]
+
+
 class RequestState(Enum):
     """Crawlee-specific request handling state."""
 
@@ -264,13 +270,16 @@ class RequestQueueMetadata(BaseStorageMetadata):
     resource_directory: Annotated[str, Field(alias='resourceDirectory')]
 
 
-class KeyValueStoreRecord(BaseModel):
+ValueType = TypeVar('ValueType', default=Any)
+
+
+class KeyValueStoreRecord(BaseModel, Generic[ValueType]):
     """Model for a key-value store record."""
 
     model_config = ConfigDict(populate_by_name=True)
 
     key: Annotated[str, Field(alias='key')]
-    value: Annotated[Any, Field(alias='value')]
+    value: Annotated[ValueType, Field(alias='value')]
     content_type: Annotated[str | None, Field(alias='contentType', default=None)]
     filename: Annotated[str | None, Field(alias='filename', default=None)]
 
@@ -340,6 +349,13 @@ class RequestQueueHead(BaseModel):
     items: Annotated[list[Request], Field(alias='items', default_factory=list)]
 
 
+class RequestQueueHeadWithLocks(RequestQueueHead):
+    """Model for request queue head with locks."""
+
+    lock_secs: Annotated[int, Field(alias='lockSecs')]
+    items: Annotated[list[Request], Field(alias='items', default_factory=list)]
+
+
 class BaseListPage(BaseModel):
     """Model for a single page of storage items returned from a collection list method.
 
@@ -398,3 +414,47 @@ class DatasetItemsListPage(BaseListPage):
     """
 
     items: Annotated[list[dict], Field(default_factory=list)]
+
+
+class ProlongRequestLockResponse(BaseModel):
+    """Response to prolong request lock calls."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    lock_expires_at: Annotated[datetime, Field(alias="'lockExpiresAt'")]
+
+
+class ProcessedRequest(BaseModel):
+    """Represents a processed request."""
+
+    unique_key: Annotated[str, Field(alias='uniqueKey')]
+    request_id: Annotated[str, Field(alias='requestId')]
+    was_already_present: Annotated[bool, Field(alias='wasAlreadyPresent')]
+    was_already_handled: Annotated[bool, Field(alias='wasAlreadyHandled')]
+
+
+class UnprocessedRequest(BaseModel):
+    """Represents an unprocessed request."""
+
+    unique_key: Annotated[str, Field(alias='uniqueKey')]
+    url: Annotated[str, Field()]
+    method: Annotated[str | None, Field()] = None
+
+
+class BatchRequestsOperationResponse(BaseModel):
+    """Response to batch request deletion calls."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    processed_requests: Annotated[list[ProcessedRequest], Field(alias='processedRequests')]
+    unprocessed_requests: Annotated[list[UnprocessedRequest], Field(alias='unprocessedRequests')]
+
+
+class RequestListResponse(BaseModel):
+    """Response to a request list call."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    limit: Annotated[int, Field()]
+    exclusive_start_key: Annotated[str | None, Field(alias='exclusiveStartId')]
+    items: Annotated[list[Request], Field()]

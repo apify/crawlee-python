@@ -4,7 +4,16 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from crawlee.models import Request, RequestQueueHead, RequestQueueMetadata, RequestQueueOperationInfo
+    from crawlee.models import (
+        BatchRequestsOperationResponse,
+        ProlongRequestLockResponse,
+        Request,
+        RequestListResponse,
+        RequestQueueHead,
+        RequestQueueHeadWithLocks,
+        RequestQueueMetadata,
+        RequestQueueOperationInfo,
+    )
 
 
 class BaseRequestQueueClient(ABC):
@@ -53,7 +62,7 @@ class BaseRequestQueueClient(ABC):
         """
 
     @abstractmethod
-    async def list_and_lock_head(self, *, lock_secs: int, limit: int | None = None) -> dict:
+    async def list_and_lock_head(self, *, lock_secs: int, limit: int | None = None) -> RequestQueueHeadWithLocks:
         """Fetch and lock a specified number of requests from the start of the queue.
 
         Retrieves and locks the first few requests of a queue for the specified duration. This prevents the requests
@@ -127,7 +136,7 @@ class BaseRequestQueueClient(ABC):
         *,
         forefront: bool = False,
         lock_secs: int,
-    ) -> dict:
+    ) -> ProlongRequestLockResponse:
         """Prolong the lock on a specific request in the queue.
 
         Args:
@@ -156,7 +165,7 @@ class BaseRequestQueueClient(ABC):
         requests: list[Request],
         *,
         forefront: bool = False,
-    ) -> dict:
+    ) -> BatchRequestsOperationResponse:
         """Add batch of requests to the queue.
 
         Args:
@@ -165,7 +174,7 @@ class BaseRequestQueueClient(ABC):
         """
 
     @abstractmethod
-    async def batch_delete_requests(self, requests: list[Request]) -> dict:
+    async def batch_delete_requests(self, requests: list[Request]) -> BatchRequestsOperationResponse:
         """Delete given requests from the queue.
 
         Args:
@@ -178,7 +187,7 @@ class BaseRequestQueueClient(ABC):
         *,
         limit: int | None = None,
         exclusive_start_id: str | None = None,
-    ) -> dict:
+    ) -> RequestListResponse:
         """List requests from the queue.
 
         Args:
