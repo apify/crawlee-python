@@ -117,7 +117,7 @@ async def test_resource_management(httpbin: str) -> None:
         assert page.page.url == f'{httpbin}/get'
         assert '<html' in await page.page.content()  # there is some HTML content
 
-    # All pages should be closed in __aeexit__
+    # All pages should be closed in __aexit__
     assert page.page.is_closed()
 
 

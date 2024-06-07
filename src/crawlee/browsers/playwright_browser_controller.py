@@ -36,7 +36,7 @@ class PlaywrightBrowserController(BaseBrowserController):
         self._max_open_pages_per_browser = max_open_pages_per_browser
 
         self._pages = list[Page]()
-        self._num_of_total_pages = 0
+        self._total_pages_count = 0
         self._last_page_opened_at = datetime.now(timezone.utc)
 
     @property
@@ -46,13 +46,13 @@ class PlaywrightBrowserController(BaseBrowserController):
 
     @property
     @override
-    def num_of_pages(self) -> int:
+    def pages_count(self) -> int:
         return len(self._pages)
 
     @property
     @override
-    def num_of_total_pages(self) -> int:
-        return self._num_of_total_pages
+    def total_pages_count(self) -> int:
+        return self._total_pages_count
 
     @property
     @override
@@ -67,7 +67,7 @@ class PlaywrightBrowserController(BaseBrowserController):
     @property
     @override
     def has_free_capacity(self) -> bool:
-        return self.num_of_pages < self._max_open_pages_per_browser
+        return self.pages_count < self._max_open_pages_per_browser
 
     @property
     @override
@@ -88,7 +88,7 @@ class PlaywrightBrowserController(BaseBrowserController):
 
         # Update internal state
         self._pages.append(page)
-        self._num_of_total_pages += 1
+        self._total_pages_count += 1
         self._last_page_opened_at = datetime.now(timezone.utc)
 
         return page
@@ -99,7 +99,7 @@ class PlaywrightBrowserController(BaseBrowserController):
             for page in self._pages:
                 await page.close()
 
-        if self.num_of_pages > 0:
+        if self.pages_count > 0:
             raise ValueError('Cannot close the browser while there are open pages.')
 
         await self._browser.close()

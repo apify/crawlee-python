@@ -44,8 +44,8 @@ class BrowserPool:
         plugins: Sequence[BaseBrowserPlugin] | None = None,
         *,
         operation_timeout: timedelta = timedelta(seconds=15),
-        browser_inactive_threshold: timedelta = timedelta(seconds=3),
-        identify_inactive_browsers_interval: timedelta = timedelta(seconds=10),
+        browser_inactive_threshold: timedelta = timedelta(seconds=10),
+        identify_inactive_browsers_interval: timedelta = timedelta(seconds=20),
         close_inactive_browsers_interval: timedelta = timedelta(seconds=30),
     ) -> None:
         """Create a new instance.
@@ -132,8 +132,11 @@ class BrowserPool:
     async def __aenter__(self) -> BrowserPool:
         """Enter the context manager and initialize all browser plugins."""
         logger.debug('Initializing browser pool.')
+
+        # Start the recurring tasks for identifying and closing inactive browsers
         self._identify_inactive_browsers_task.start()
         self._close_inactive_browsers_task.start()
+
         timeout = self._operation_timeout.total_seconds()
 
         try:
@@ -152,6 +155,10 @@ class BrowserPool:
     ) -> None:
         """Exit the context manager and close all browser plugins."""
         logger.debug('Closing browser pool.')
+
+        await self._identify_inactive_browsers_task.stop()
+        await self._close_inactive_browsers_task.stop()
+
         for browser in self._active_browsers + self._inactive_browsers:
             await browser.close(force=True)
 

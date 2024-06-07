@@ -35,8 +35,8 @@ async def test_initial_state(browser: Browser) -> None:
 
     # Test initial state
     assert controller.pages == []
-    assert controller.num_of_pages == 0
-    assert controller.num_of_total_pages == 0
+    assert controller.pages_count == 0
+    assert controller.total_pages_count == 0
     assert isinstance(controller.last_page_opened_at, datetime)
     assert controller.idle_time < timedelta(seconds=1)
     assert controller.has_free_capacity
@@ -47,41 +47,41 @@ async def test_open_and_close_page(controller: PlaywrightBrowserController, http
     await page.goto(f'{httpbin}')
 
     assert page in controller.pages
-    assert controller.num_of_pages == 1
-    assert controller.num_of_total_pages == 1
+    assert controller.pages_count == 1
+    assert controller.total_pages_count == 1
     assert controller.last_page_opened_at <= datetime.now(timezone.utc)
 
     await page.close()
 
     assert page not in controller.pages
-    assert controller.num_of_pages == 0
-    assert controller.num_of_total_pages == 1
+    assert controller.pages_count == 0
+    assert controller.total_pages_count == 1
 
 
 async def test_max_open_pages_limit(controller: PlaywrightBrowserController) -> None:
     page1 = await controller.new_page()
-    assert controller.num_of_pages == 1
+    assert controller.pages_count == 1
 
     page2 = await controller.new_page()
-    assert controller.num_of_pages == 2
+    assert controller.pages_count == 2
 
     with pytest.raises(ValueError, match='Cannot open more pages in this browser.'):
         await controller.new_page()
 
-    assert controller.num_of_pages == 2
+    assert controller.pages_count == 2
 
     await page1.close()
-    assert controller.num_of_pages == 1
+    assert controller.pages_count == 1
 
     page3 = await controller.new_page()
-    assert controller.num_of_pages == 2
+    assert controller.pages_count == 2
 
     await page2.close()
     await page3.close()
 
     assert controller.pages == []
-    assert controller.num_of_pages == 0
-    assert controller.num_of_total_pages == 3
+    assert controller.pages_count == 0
+    assert controller.total_pages_count == 3
 
 
 async def test_idle_time(controller: PlaywrightBrowserController) -> None:
@@ -98,10 +98,10 @@ async def test_close_browser_with_open_pages(browser: Browser) -> None:
     with pytest.raises(ValueError, match='Cannot close the browser while there are open pages.'):
         await controller.close()
 
-    assert controller.num_of_pages == 1
+    assert controller.pages_count == 1
     assert controller.is_browser_connected
 
     await controller.close(force=True)
 
-    assert controller.num_of_pages == 0
+    assert controller.pages_count == 0
     assert not controller.is_browser_connected
