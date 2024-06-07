@@ -140,10 +140,10 @@ def test_get_system_info(snapshotter: Snapshotter, now: datetime) -> None:
 
     # Add client snapshots
     system_status._snapshotter._client_snapshots = [
-        ClientSnapshot(num_of_errors=1, max_num_of_errors=2, created_at=now - timedelta(minutes=3)),
-        ClientSnapshot(num_of_errors=1, max_num_of_errors=2, created_at=now - timedelta(minutes=2)),
-        ClientSnapshot(num_of_errors=2, max_num_of_errors=2, created_at=now - timedelta(minutes=1)),
-        ClientSnapshot(num_of_errors=0, max_num_of_errors=2, created_at=now),
+        ClientSnapshot(error_count=1, max_error_count=2, created_at=now - timedelta(minutes=3)),
+        ClientSnapshot(error_count=1, max_error_count=2, created_at=now - timedelta(minutes=2)),
+        ClientSnapshot(error_count=2, max_error_count=2, created_at=now - timedelta(minutes=1)),
+        ClientSnapshot(error_count=0, max_error_count=2, created_at=now),
     ]
 
     # Test current system info
