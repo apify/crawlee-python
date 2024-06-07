@@ -67,6 +67,13 @@ class BrowserPool:
         self._operation_timeout = operation_timeout
         self._browser_inactive_threshold = browser_inactive_threshold
 
+        self._active_browsers = list[BaseBrowserController]()
+        """A list of browsers currently active and being used to open pages."""
+
+        self._inactive_browsers = list[BaseBrowserController]()
+        """A list of browsers currently inactive and not being used to open new pages,
+        but may still contain open pages."""
+
         self._identify_inactive_browsers_task = RecurringTask(
             self._identify_inactive_browsers,
             identify_inactive_browsers_interval,
@@ -76,9 +83,6 @@ class BrowserPool:
             self._close_inactive_browsers,
             close_inactive_browsers_interval,
         )
-
-        self._active_browsers = list[BaseBrowserController]()
-        self._inactive_browsers = list[BaseBrowserController]()
 
         self._total_pages_count = 0
         self._pages = WeakValueDictionary[str, CrawleePage]()  # Track the pages in the pool
