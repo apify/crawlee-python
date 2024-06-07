@@ -80,6 +80,7 @@ class BrowserPool:
         self._active_browsers = list[BaseBrowserController]()
         self._inactive_browsers = list[BaseBrowserController]()
 
+        self._total_pages_count = 0
         self._pages = WeakValueDictionary[str, CrawleePage]()  # Track the pages in the pool
         self._plugins_cycle = itertools.cycle(self._plugins)  # Cycle through the plugins
 
@@ -128,6 +129,11 @@ class BrowserPool:
     def pages(self) -> Mapping[str, CrawleePage]:
         """Return the pages in the pool."""
         return self._pages
+
+    @property
+    def total_pages_count(self) -> int:
+        """Returns the total number of pages opened since the browser pool was launched."""
+        return self._total_pages_count
 
     async def __aenter__(self) -> BrowserPool:
         """Enter the context manager and initialize all browser plugins."""
@@ -225,6 +231,7 @@ class BrowserPool:
 
         crawlee_page = CrawleePage(id=page_id, page=page, browser_type=plugin.browser_type)
         self._pages[page_id] = crawlee_page
+        self._total_pages_count += 1
         return crawlee_page
 
     def _pick_browser_with_free_capacity(

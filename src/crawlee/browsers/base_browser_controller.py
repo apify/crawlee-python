@@ -30,11 +30,6 @@ class BaseBrowserController(ABC):
 
     @property
     @abstractmethod
-    def total_pages_count(self) -> int:
-        """Returns the total number of pages opened since the browser was launched."""
-
-    @property
-    @abstractmethod
     def last_page_opened_at(self) -> datetime:
         """Return the time when the last page was opened."""
 

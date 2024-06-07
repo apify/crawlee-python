@@ -13,12 +13,14 @@ async def test_default_plugin_new_page_creation(httpbin: str) -> None:
         assert page_1.browser_type == 'chromium'
         assert page_1.page.url == f'{httpbin}/get'
         assert '<html' in await page_1.page.content()  # there is some HTML content
+        assert browser_pool.total_pages_count == 1
 
         page_2 = await browser_pool.new_page()
         await page_2.page.goto(f'{httpbin}/status/200')
         assert page_2.browser_type == 'chromium'
         assert page_2.page.url == f'{httpbin}/status/200'
         assert '<html' in await page_1.page.content()  # there is some HTML content
+        assert browser_pool.total_pages_count == 2
 
         await page_1.page.close()
         await page_2.page.close()
@@ -53,6 +55,8 @@ async def test_multiple_plugins_new_page_creation(httpbin: str) -> None:
         await page_2.page.close()
         await page_3.page.close()
 
+        assert browser_pool.total_pages_count == 3
+
 
 async def test_new_page_with_each_plugin(httpbin: str) -> None:
     plugin_chromium = PlaywrightBrowserPlugin(browser_type='chromium')
@@ -77,6 +81,8 @@ async def test_new_page_with_each_plugin(httpbin: str) -> None:
         for page in pages:
             await page.page.close()
 
+        assert browser_pool.total_pages_count == 2
+
 
 async def test_with_default_plugin_constructor(httpbin: str) -> None:
     async with BrowserPool.with_default_plugin(headless=True, browser_type='firefox') as browser_pool:
@@ -91,6 +97,7 @@ async def test_with_default_plugin_constructor(httpbin: str) -> None:
         assert '<html' in await page.page.content()  # there is some HTML content
 
         await page.page.close()
+        assert browser_pool.total_pages_count == 1
 
 
 async def test_new_page_with_existing_id() -> None:
@@ -116,6 +123,7 @@ async def test_resource_management(httpbin: str) -> None:
         await page.page.goto(f'{httpbin}/get')
         assert page.page.url == f'{httpbin}/get'
         assert '<html' in await page.page.content()  # there is some HTML content
+        assert browser_pool.total_pages_count == 1
 
     # All pages should be closed in __aexit__
     assert page.page.is_closed()

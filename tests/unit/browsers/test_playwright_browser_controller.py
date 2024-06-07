@@ -36,7 +36,6 @@ async def test_initial_state(browser: Browser) -> None:
     # Test initial state
     assert controller.pages == []
     assert controller.pages_count == 0
-    assert controller.total_pages_count == 0
     assert isinstance(controller.last_page_opened_at, datetime)
     assert controller.idle_time < timedelta(seconds=1)
     assert controller.has_free_capacity
@@ -48,14 +47,12 @@ async def test_open_and_close_page(controller: PlaywrightBrowserController, http
 
     assert page in controller.pages
     assert controller.pages_count == 1
-    assert controller.total_pages_count == 1
     assert controller.last_page_opened_at <= datetime.now(timezone.utc)
 
     await page.close()
 
     assert page not in controller.pages
     assert controller.pages_count == 0
-    assert controller.total_pages_count == 1
 
 
 async def test_max_open_pages_limit(controller: PlaywrightBrowserController) -> None:
@@ -81,7 +78,6 @@ async def test_max_open_pages_limit(controller: PlaywrightBrowserController) -> 
 
     assert controller.pages == []
     assert controller.pages_count == 0
-    assert controller.total_pages_count == 3
 
 
 async def test_idle_time(controller: PlaywrightBrowserController) -> None:
