@@ -132,6 +132,8 @@ class BrowserPool:
     async def __aenter__(self) -> BrowserPool:
         """Enter the context manager and initialize all browser plugins."""
         logger.debug('Initializing browser pool.')
+        self._identify_inactive_browsers_task.start()
+        self._close_inactive_browsers_task.start()
         timeout = self._operation_timeout.total_seconds()
 
         try:
