@@ -141,19 +141,19 @@ class ClientSnapshot:
     """Snapshot of the state of the client.
 
     Args:
-        num_of_errors: The number of errors (HTTP 429) that occurred.
-        max_num_of_errors: The maximum number of errors that is considered acceptable.
+        error_count: The number of errors (HTTP 429) that occurred.
+        max_error_count: The maximum number of errors that is considered acceptable.
         created_at: The time at which the measurement was taken.
     """
 
-    num_of_errors: int
-    max_num_of_errors: int
+    error_count: int
+    max_error_count: int
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     @property
     def is_overloaded(self) -> bool:
         """Returns whether the client is considered as overloaded."""
-        return self.num_of_errors > self.max_num_of_errors
+        return self.error_count > self.max_error_count
 
 
 Snapshot = Union[MemorySnapshot, CpuSnapshot, EventLoopSnapshot, ClientSnapshot]

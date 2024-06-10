@@ -269,8 +269,8 @@ class Snapshotter:
         # Attribute `self._client_rate_limit_error_retry_count` will be used here.
         # https://github.com/apify/crawlee-py/issues/60
 
-        num_of_errors = 0
-        snapshot = ClientSnapshot(num_of_errors=num_of_errors, max_num_of_errors=self._max_client_errors)
+        error_count = 0
+        snapshot = ClientSnapshot(error_count=error_count, max_error_count=self._max_client_errors)
 
         snapshots = cast(list[Snapshot], self._client_snapshots)
         self._prune_snapshots(snapshots, snapshot.created_at)
