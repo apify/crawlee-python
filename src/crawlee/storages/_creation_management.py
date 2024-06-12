@@ -151,9 +151,15 @@ async def open_storage(
     configuration = configuration or Configuration()
     storage_client = StorageClientManager.get_storage_client(in_cloud=configuration.in_cloud)
 
-    # Try to restore the storage from cache by ID
+    # Try to restore the storage from cache by name
     if name:
         cached_storage = _get_from_cache_by_name(storage_class_label=storage_class.LABEL, name=name)
+        if cached_storage:
+            return cached_storage
+
+    # Try to restore storage from cache by ID
+    if id:
+        cached_storage = _get_from_cache_by_id(storage_class_label=storage_class.LABEL, id=id)
         if cached_storage:
             return cached_storage
 
@@ -163,12 +169,6 @@ async def open_storage(
         if isinstance(storage_client, MemoryStorageClient):
             is_default_on_memory = True
         id = configuration.default_storage_id
-
-    # Try to restore storage from cache by ID
-    if id:
-        cached_storage = _get_from_cache_by_id(storage_class_label=storage_class.LABEL, id=id)
-        if cached_storage:
-            return cached_storage
 
     # Purge on start if configured
     if configuration.purge_on_start:
