@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from crawlee._utils.system import CpuInfo, MemoryInfo
 
 
-class Event(Enum):
+class Event(str, Enum):
     """Enum of all possible events that can be emitted."""
 
     # Core events
