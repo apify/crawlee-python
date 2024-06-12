@@ -5,19 +5,30 @@ from __future__ import annotations
 import asyncio
 from collections import defaultdict
 from contextlib import suppress
+from datetime import timedelta
 from functools import wraps
 from logging import getLogger
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 from pyee.asyncio import AsyncIOEventEmitter
+from typing_extensions import NotRequired
+
+from crawlee._utils.recurring_task import RecurringTask
+from crawlee.events.types import Event, EventPersistStateData
 
 if TYPE_CHECKING:
-    from datetime import timedelta
     from types import TracebackType
 
-    from crawlee.events.types import Event, EventData, Listener, WrappedListener
+    from crawlee.events.types import EventData, Listener, WrappedListener
 
 logger = getLogger(__name__)
+
+
+class EventManagerOptions(TypedDict):
+    """Parameter types for subclass __init__ methods, copied from EventManager.__init__."""
+
+    persist_state_interval: NotRequired[timedelta]
+    close_timeout: NotRequired[timedelta | None]
 
 
 class EventManager:
@@ -27,12 +38,19 @@ class EventManager:
     their execution. It is built on top of the `pyee.asyncio.AsyncIOEventEmitter` class.
     """
 
-    def __init__(self, close_timeout: timedelta | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        persist_state_interval: timedelta = timedelta(minutes=1),
+        close_timeout: timedelta | None = None,
+    ) -> None:
         """Create a new instance.
 
         Args:
+            persist_state_interval: Interval at which `PersistState` events are emitted.
             close_timeout: Optional timeout after which the pending event listeners are canceled.
         """
+        self._persist_state_interval = persist_state_interval
         self._close_timeout = close_timeout
 
         # Asynchronous event emitter for handle events and invoke the event listeners.
@@ -47,8 +65,15 @@ class EventManager:
             lambda: defaultdict(list),
         )
 
+        # Recurring task for emitting persist state events.
+        self._emit_persist_state_event_rec_task = RecurringTask(
+            func=self._emit_persist_state_event,
+            delay=self._persist_state_interval,
+        )
+
     async def __aenter__(self) -> EventManager:
         """Initializes the event manager upon entering the async context."""
+        self._emit_persist_state_event_rec_task.start()
         return self
 
     async def __aexit__(
@@ -65,6 +90,7 @@ class EventManager:
         self._event_emitter.remove_all_listeners()
         self._listener_tasks.clear()
         self._listeners_to_wrappers.clear()
+        await self._emit_persist_state_event_rec_task.stop()
 
     def on(self, *, event: Event, listener: Listener) -> None:
         """Add an event listener to the event manager.
@@ -162,3 +188,7 @@ class EventManager:
                     task.cancel()
                     with suppress(asyncio.CancelledError):
                         await task
+
+    async def _emit_persist_state_event(self) -> None:
+        """Emits a persist state event with the given migration status."""
+        self.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False))

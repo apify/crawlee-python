@@ -7,9 +7,11 @@ from datetime import timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING
 
+from typing_extensions import Unpack
+
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.system import get_cpu_info, get_memory_info
-from crawlee.events.event_manager import EventManager
+from crawlee.events.event_manager import EventManager, EventManagerOptions
 from crawlee.events.types import Event, EventSystemInfoData
 
 if TYPE_CHECKING:
@@ -23,21 +25,24 @@ class LocalEventManager(EventManager):
 
     def __init__(
         self,
-        *,
         system_info_interval: timedelta = timedelta(seconds=1),
+        **event_manager_options: Unpack[EventManagerOptions],
     ) -> None:
         """Create a new instance.
 
         Args:
             system_info_interval: Interval at which `SystemInfo` events are emitted.
-            close_timeout: Optional timeout for closing the event manager.
+            event_manager_options: Additional options for the parent class.
         """
         self._system_info_interval = system_info_interval
 
         # Recurring task for emitting system info events.
-        self._emit_system_info_event_rec_task: RecurringTask | None = None
+        self._emit_system_info_event_rec_task = RecurringTask(
+            func=self._emit_system_info_event,
+            delay=self._system_info_interval,
+        )
 
-        super().__init__()
+        super().__init__(**event_manager_options)
 
     async def __aenter__(self) -> LocalEventManager:
         """Initializes the local event manager upon entering the async context.
@@ -45,13 +50,7 @@ class LocalEventManager(EventManager):
         It starts emitting system info events at regular intervals.
         """
         await super().__aenter__()
-
-        self._emit_system_info_event_rec_task = RecurringTask(
-            func=self._emit_system_info_event,
-            delay=self._system_info_interval,
-        )
         self._emit_system_info_event_rec_task.start()
-
         return self
 
     async def __aexit__(
@@ -64,9 +63,7 @@ class LocalEventManager(EventManager):
 
         It stops emitting system info events and closes the event manager.
         """
-        if self._emit_system_info_event_rec_task is not None:
-            await self._emit_system_info_event_rec_task.stop()
-
+        await self._emit_system_info_event_rec_task.stop()
         await super().__aexit__(exc_type, exc_value, exc_traceback)
 
     async def _emit_system_info_event(self) -> None:
