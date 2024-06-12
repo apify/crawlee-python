@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 _BYTES_PER_KB = 1024
 _BYTES_PER_MB = _BYTES_PER_KB**2
@@ -17,6 +18,16 @@ class ByteSize:
     def __post_init__(self) -> None:
         if self.bytes < 0:
             raise ValueError('ByteSize cannot be negative')
+
+    @classmethod
+    def validate(cls, value: Any) -> ByteSize:
+        if isinstance(value, ByteSize):
+            return value
+
+        if not isinstance(value, (float, int)):
+            raise TypeError('Value must be numeric')
+
+        return cls(int(value))
 
     @classmethod
     def from_kb(cls, kb: float) -> ByteSize:

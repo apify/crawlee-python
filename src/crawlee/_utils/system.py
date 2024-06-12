@@ -1,20 +1,21 @@
+# ruff: noqa: TCH003
 from __future__ import annotations
 
 import os
 from contextlib import suppress
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from logging import getLogger
+from typing import Annotated
 
 import psutil
+from pydantic import BaseModel, ConfigDict, Field, PlainValidator
 
 from crawlee._utils.byte_size import ByteSize
 
 logger = getLogger(__name__)
 
 
-@dataclass
-class CpuInfo:
+class CpuInfo(BaseModel):
     """Information about the CPU usage.
 
     Args:
@@ -22,12 +23,16 @@ class CpuInfo:
         created_at: The time at which the measurement was taken.
     """
 
-    used_ratio: float
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    model_config = ConfigDict(populate_by_name=True)
+
+    used_ratio: Annotated[float, Field(alias='usedRatio')]
+    created_at: datetime = Field(
+        alias='createdAt',
+        default_factory=lambda: datetime.now(timezone.utc),
+    )
 
 
-@dataclass
-class MemoryInfo:
+class MemoryInfo(BaseModel):
     """Information about the memory usage.
 
     Args:
@@ -36,9 +41,14 @@ class MemoryInfo:
         created_at: The time at which the measurement was taken.
     """
 
-    total_size: ByteSize
-    current_size: ByteSize
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    model_config = ConfigDict(populate_by_name=True)
+
+    total_size: Annotated[ByteSize, PlainValidator(ByteSize.validate), Field(alias='totalSize')]
+    current_size: Annotated[ByteSize, PlainValidator(ByteSize.validate), Field(alias='currentSize')]
+    created_at: datetime = Field(
+        alias='createdAt',
+        default_factory=lambda: datetime.now(timezone.utc),
+    )
 
 
 def get_cpu_info() -> CpuInfo:
