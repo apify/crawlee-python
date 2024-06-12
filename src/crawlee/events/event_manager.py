@@ -8,9 +8,10 @@ from contextlib import suppress
 from datetime import timedelta
 from functools import wraps
 from logging import getLogger
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 from pyee.asyncio import AsyncIOEventEmitter
+from typing_extensions import NotRequired
 
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee.events.types import Event, EventPersistStateData
@@ -21,6 +22,13 @@ if TYPE_CHECKING:
     from crawlee.events.types import EventData, Listener, WrappedListener
 
 logger = getLogger(__name__)
+
+
+class EventManagerOptions(TypedDict):
+    """Parameter types for subclass __init__ methods, copied from EventManager.__init__."""
+
+    persist_state_interval: NotRequired[timedelta]
+    close_timeout: NotRequired[timedelta | None]
 
 
 class EventManager:

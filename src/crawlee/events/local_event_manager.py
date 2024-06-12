@@ -5,11 +5,13 @@ from __future__ import annotations
 import asyncio
 from datetime import timedelta
 from logging import getLogger
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
+
+from typing_extensions import Unpack
 
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.system import get_cpu_info, get_memory_info
-from crawlee.events.event_manager import EventManager
+from crawlee.events.event_manager import EventManager, EventManagerOptions
 from crawlee.events.types import Event, EventSystemInfoData
 
 if TYPE_CHECKING:
@@ -24,13 +26,13 @@ class LocalEventManager(EventManager):
     def __init__(
         self,
         system_info_interval: timedelta = timedelta(seconds=1),
-        **kwargs: Any,
+        **event_manager_options: Unpack[EventManagerOptions],
     ) -> None:
         """Create a new instance.
 
         Args:
             system_info_interval: Interval at which `SystemInfo` events are emitted.
-            kwargs: Additional keyword arguments to pass to the parent class.
+            event_manager_options: Additional options for the parent class.
         """
         self._system_info_interval = system_info_interval
 
@@ -40,7 +42,7 @@ class LocalEventManager(EventManager):
             delay=self._system_info_interval,
         )
 
-        super().__init__(**kwargs)
+        super().__init__(**event_manager_options)
 
     async def __aenter__(self) -> LocalEventManager:
         """Initializes the local event manager upon entering the async context.
