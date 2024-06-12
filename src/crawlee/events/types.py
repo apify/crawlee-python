@@ -1,12 +1,13 @@
+# ruff: noqa: TCH001 TCH002
 from __future__ import annotations
 
 from collections.abc import Callable, Coroutine
-from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Union
+from typing import Annotated, Any, Union
 
-if TYPE_CHECKING:
-    from crawlee._utils.system import CpuInfo, MemoryInfo
+from pydantic import BaseModel, ConfigDict, Field
+
+from crawlee._utils.system import CpuInfo, MemoryInfo
 
 
 class Event(Enum):
@@ -30,34 +31,39 @@ class Event(Enum):
     PAGE_CLOSED = 'pageClosed'
 
 
-@dataclass
-class EventPersistStateData:
+class EventPersistStateData(BaseModel):
     """Data for the persist state event."""
 
-    is_migrating: bool
+    model_config = ConfigDict(populate_by_name=True)
+
+    is_migrating: Annotated[bool, Field(alias='isMigrating')]
 
 
-@dataclass
-class EventSystemInfoData:
+class EventSystemInfoData(BaseModel):
     """Data for the system info event."""
 
-    cpu_info: CpuInfo
-    memory_info: MemoryInfo
+    model_config = ConfigDict(populate_by_name=True)
+
+    cpu_info: Annotated[CpuInfo, Field(alias='cpuInfo')]
+    memory_info: Annotated[MemoryInfo, Field(alias='memoryInfo')]
 
 
-@dataclass
-class EventMigratingData:
+class EventMigratingData(BaseModel):
     """Data for the migrating event."""
 
+    model_config = ConfigDict(populate_by_name=True)
 
-@dataclass
-class EventAbortingData:
+
+class EventAbortingData(BaseModel):
     """Data for the aborting event."""
 
+    model_config = ConfigDict(populate_by_name=True)
 
-@dataclass
-class EventExitData:
+
+class EventExitData(BaseModel):
     """Data for the exit event."""
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 EventData = Union[EventPersistStateData, EventSystemInfoData, EventMigratingData, EventAbortingData, EventExitData]
