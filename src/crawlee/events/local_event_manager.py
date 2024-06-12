@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from datetime import timedelta
 from logging import getLogger
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.system import get_cpu_info, get_memory_info
@@ -23,21 +23,24 @@ class LocalEventManager(EventManager):
 
     def __init__(
         self,
-        *,
         system_info_interval: timedelta = timedelta(seconds=1),
+        **kwargs: Any,
     ) -> None:
         """Create a new instance.
 
         Args:
             system_info_interval: Interval at which `SystemInfo` events are emitted.
-            close_timeout: Optional timeout for closing the event manager.
+            kwargs: Additional keyword arguments to pass to the parent class.
         """
         self._system_info_interval = system_info_interval
 
         # Recurring task for emitting system info events.
-        self._emit_system_info_event_rec_task: RecurringTask | None = None
+        self._emit_system_info_event_rec_task = RecurringTask(
+            func=self._emit_system_info_event,
+            delay=self._system_info_interval,
+        )
 
-        super().__init__()
+        super().__init__(**kwargs)
 
     async def __aenter__(self) -> LocalEventManager:
         """Initializes the local event manager upon entering the async context.
@@ -45,13 +48,7 @@ class LocalEventManager(EventManager):
         It starts emitting system info events at regular intervals.
         """
         await super().__aenter__()
-
-        self._emit_system_info_event_rec_task = RecurringTask(
-            func=self._emit_system_info_event,
-            delay=self._system_info_interval,
-        )
         self._emit_system_info_event_rec_task.start()
-
         return self
 
     async def __aexit__(
