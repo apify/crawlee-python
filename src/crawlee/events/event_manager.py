@@ -33,7 +33,7 @@ class EventManager:
     def __init__(
         self,
         *,
-        persist_state_interval: timedelta = timedelta(seconds=1),
+        persist_state_interval: timedelta = timedelta(minutes=1),
         close_timeout: timedelta | None = None,
     ) -> None:
         """Create a new instance.
@@ -82,6 +82,7 @@ class EventManager:
         self._event_emitter.remove_all_listeners()
         self._listener_tasks.clear()
         self._listeners_to_wrappers.clear()
+        await self._emit_persist_state_event_rec_task.stop()
 
     def on(self, *, event: Event, listener: Listener) -> None:
         """Add an event listener to the event manager.
@@ -180,6 +181,6 @@ class EventManager:
                     with suppress(asyncio.CancelledError):
                         await task
 
-    async def _emit_persist_state_event(self, *, is_migrating: bool = False) -> None:
+    async def _emit_persist_state_event(self) -> None:
         """Emits a persist state event with the given migration status."""
-        self.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=is_migrating))
+        self.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False))
