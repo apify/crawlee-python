@@ -78,7 +78,7 @@ class RequestList(RequestProvider):
         return self._handled_count
 
     @override
-    async def add_requests_batched(  # type: ignore  # mypy has problems here
+    async def add_requests_batched(  # type: ignore  # mypy bug
         self,
         requests: Sequence[BaseRequestData | Request | str],
         *,

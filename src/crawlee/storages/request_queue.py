@@ -219,7 +219,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         return processed_request
 
     @override
-    async def add_requests_batched(  # type: ignore  # mypy has problems here
+    async def add_requests_batched(  # type: ignore  # mypy bug
         self,
         requests: Sequence[BaseRequestData | Request | str],
         *,
