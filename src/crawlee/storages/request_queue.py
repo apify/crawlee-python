@@ -194,7 +194,7 @@ class RequestQueue(BaseStorage, RequestProvider):
                 id=request.id,
                 unique_key=request.unique_key,
                 was_already_present=True,
-                was_already_handled=cached_info['wasAlreadyHandled'],
+                was_already_handled=cached_info['was_already_handled'],
             )
 
         processed_request = await self._resource_client.add_request(request, forefront=forefront)
@@ -549,9 +549,9 @@ class RequestQueue(BaseStorage, RequestProvider):
     def _cache_request(self, cache_key: str, processed_request: ProcessedRequest) -> None:
         self._requests_cache[cache_key] = {
             'id': processed_request.id,
-            'isHandled': processed_request.was_already_handled,
-            'uniqueKey': processed_request.unique_key,
-            'wasAlreadyHandled': processed_request.was_already_handled,
+            'is_handled': processed_request.was_already_handled,
+            'unique_key': processed_request.unique_key,
+            'was_already_handled': processed_request.was_already_handled,
         }
 
     async def _queue_query_head(self, limit: int) -> RequestQueueHeadState:
