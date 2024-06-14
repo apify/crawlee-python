@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from crawlee.models import (
         BatchRequestsOperationResponse,
         ProcessedRequest,
@@ -96,7 +98,7 @@ class BaseRequestQueueClient(ABC):
     @abstractmethod
     async def batch_add_requests(
         self,
-        requests: list[Request],
+        requests: Sequence[Request],
         *,
         forefront: bool = False,
     ) -> BatchRequestsOperationResponse:
@@ -109,8 +111,6 @@ class BaseRequestQueueClient(ABC):
         Returns:
             Request queue batch operation information.
         """
-        # TODO: implement `wait_for_all_requests_to_be_added` parameter
-        # https://github.com/apify/crawlee-python/issues/187
 
     @abstractmethod
     async def get_request(self, request_id: str) -> Request | None:

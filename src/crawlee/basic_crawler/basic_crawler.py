@@ -295,6 +295,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
         *,
         batch_size: int = 1000,
         wait_time_between_batches: timedelta = timedelta(0),
+        wait_for_all_requests_to_be_added: bool = False,
+        wait_for_all_requests_to_be_added_timeout: timedelta | None = None,
     ) -> None:
         """Add requests to the underlying request provider in batches.
 
@@ -302,17 +304,18 @@ class BasicCrawler(Generic[TCrawlingContext]):
             requests: A list of requests to add to the queue.
             batch_size: The number of requests to add in one batch.
             wait_time_between_batches: Time to wait between adding batches.
+            wait_for_all_requests_to_be_added: If True, wait for all requests to be added before returning.
+            wait_for_all_requests_to_be_added_timeout: Timeout for waiting for all requests to be added.
         """
-        # TODO: implement `wait_for_all_requests_to_be_added` parameter
-        # https://github.com/apify/crawlee-python/issues/187
         request_provider = await self.get_request_provider()
 
-        async for response in request_provider.add_requests_batched(  # type: ignore  # mypy bug
+        await request_provider.add_requests_batched(
             requests=requests,
             batch_size=batch_size,
             wait_time_between_batches=wait_time_between_batches,
-        ):
-            logger.debug(f'Batch of requests added to the request provider ({response}).')
+            wait_for_all_requests_to_be_added=wait_for_all_requests_to_be_added,
+            wait_for_all_requests_to_be_added_timeout=wait_for_all_requests_to_be_added_timeout,
+        )
 
     def _should_retry_request(self, crawling_context: BasicCrawlingContext, error: Exception) -> bool:
         if crawling_context.request.no_retry:
@@ -480,8 +483,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 ) and self._check_url_patterns(destination, call.get('include', None), call.get('exclude', None)):
                     requests.append(request_model)
 
-            async for response in request_provider.add_requests_batched(requests):  # type: ignore  # mypy bug
-                logger.debug(f'Batch of requests added to the request provider ({response}).')
+            await request_provider.add_requests_batched(requests)
 
     async def __is_finished_function(self) -> bool:
         request_provider = await self.get_request_provider()

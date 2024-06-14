@@ -6,11 +6,11 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
-from crawlee.models import BaseRequestData, BatchRequestsOperationResponse, ProcessedRequest, Request
+from crawlee.models import BaseRequestData, Request
 from crawlee.storages.request_provider import RequestProvider
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Sequence
+    from collections.abc import Sequence
 
 
 class RequestList(RequestProvider):
@@ -78,25 +78,14 @@ class RequestList(RequestProvider):
         return self._handled_count
 
     @override
-    async def add_requests_batched(  # type: ignore  # mypy bug
+    async def add_requests_batched(
         self,
         requests: Sequence[BaseRequestData | Request | str],
         *,
         batch_size: int = 1000,
         wait_time_between_batches: timedelta = timedelta(seconds=1),
-    ) -> AsyncGenerator[BatchRequestsOperationResponse, None]:
+        wait_for_all_requests_to_be_added: bool = False,
+        wait_for_all_requests_to_be_added_timeout: timedelta | None = None,
+    ) -> None:
         transformed_requests = self._transform_requests(requests)
         self._sources.extend(transformed_requests)
-
-        yield BatchRequestsOperationResponse(
-            processed_requests=[
-                ProcessedRequest(
-                    id=request.id,
-                    unique_key=request.unique_key,
-                    was_already_present=False,
-                    was_already_handled=False,
-                )
-                for request in transformed_requests
-            ],
-            unprocessed_requests=[],
-        )

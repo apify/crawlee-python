@@ -4,10 +4,10 @@ from abc import ABC, abstractmethod
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
-from crawlee.models import BaseRequestData, BatchRequestsOperationResponse, Request
+from crawlee.models import BaseRequestData, Request
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Sequence
+    from collections.abc import Sequence
 
     from crawlee.models import ProcessedRequest
 
@@ -62,16 +62,18 @@ class RequestProvider(ABC):
         *,
         batch_size: int = 1000,
         wait_time_between_batches: timedelta = timedelta(seconds=1),
-    ) -> AsyncGenerator[BatchRequestsOperationResponse, None]:
-        """Add requests to the request provider in batches.
+        wait_for_all_requests_to_be_added: bool = False,
+        wait_for_all_requests_to_be_added_timeout: timedelta | None = None,
+    ) -> None:
+        """Add requests to the underlying resource client in batches.
 
         Args:
-            requests: A list of requests to add to the queue.
+            requests: Requests to add to the queue.
             batch_size: The number of requests to add in one batch.
             wait_time_between_batches: Time to wait between adding batches.
+            wait_for_all_requests_to_be_added: If True, wait for all requests to be added before returning.
+            wait_for_all_requests_to_be_added_timeout: Timeout for waiting for all requests to be added.
         """
-        # TODO: implement `wait_for_all_requests_to_be_added` parameter
-        # https://github.com/apify/crawlee-python/issues/187
 
     def _transform_requests(self, requests: Sequence[BaseRequestData | Request | str]) -> list[Request]:
         """Transforms a list of request-like objects into a list of Request objects."""

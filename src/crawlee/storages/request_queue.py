@@ -12,10 +12,10 @@ from typing_extensions import override
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.lru_cache import LRUCache
 from crawlee._utils.requests import unique_key_to_request_id
+from crawlee._utils.wait import wait_for_all_tasks_for_finish
 from crawlee.consts import REQUEST_QUEUE_LABEL
 from crawlee.models import (
     BaseRequestData,
-    BatchRequestsOperationResponse,
     ProcessedRequest,
     Request,
     RequestQueueHeadState,
@@ -24,7 +24,7 @@ from crawlee.storages.base_storage import BaseStorage
 from crawlee.storages.request_provider import RequestProvider
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Sequence
+    from collections.abc import Sequence
 
     from crawlee.base_storage_client import BaseStorageClient
     from crawlee.configuration import Configuration
@@ -96,6 +96,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         self._resource_collection_client = client.request_queues()
 
         # Other internal attributes
+        self._tasks = list[asyncio.Task]()
         self._client_key = crypto_random_object_id()
         self._internal_timeout_seconds = 5 * 60
         self._assumed_total_count = 0
@@ -136,9 +137,13 @@ class RequestQueue(BaseStorage, RequestProvider):
         )
 
     @override
-    async def drop(self) -> None:
+    async def drop(self, *, timeout: timedelta | None = None) -> None:
         from crawlee.storages._creation_management import remove_storage_from_cache
 
+        # Wait for all tasks to finish
+        await wait_for_all_tasks_for_finish(self._tasks, logger=logger, timeout=timeout)
+
+        # Delete the storage from the underlying client and remove it from the cache
         await self._resource_client.delete()
         remove_storage_from_cache(storage_class_label=self.LABEL, id=self._id, name=self._name)
 
@@ -219,25 +224,42 @@ class RequestQueue(BaseStorage, RequestProvider):
         return processed_request
 
     @override
-    async def add_requests_batched(  # type: ignore  # mypy bug
+    async def add_requests_batched(
         self,
         requests: Sequence[BaseRequestData | Request | str],
         *,
         batch_size: int = 1000,
         wait_time_between_batches: timedelta = timedelta(seconds=1),
-    ) -> AsyncGenerator[BatchRequestsOperationResponse, None]:
+        wait_for_all_requests_to_be_added: bool = False,
+        wait_for_all_requests_to_be_added_timeout: timedelta | None = None,
+    ) -> None:
         transformed_requests = self._transform_requests(requests)
         wait_time_secs = wait_time_between_batches.total_seconds()
 
-        # Split processed_requests into batches and process them
+        async def _process_batch(batch_of_requests: Sequence[Request]) -> None:
+            request_count = len(batch_of_requests)
+            response = await self._resource_client.batch_add_requests(batch_of_requests)
+            self._assumed_total_count += request_count
+            logger.debug(f'Added {request_count} requests to the queue, response: {response}')
+
+        # Split requests into batches and process them
         for i in range(0, len(transformed_requests), batch_size):
             batch = transformed_requests[i : i + batch_size]
-            response = await self._resource_client.batch_add_requests(requests=batch)
-            self._assumed_total_count += len(batch)
-            yield response
+
+            # Create an task to process the batch
+            task = asyncio.create_task(_process_batch(batch))
+            self._tasks.append(task)
 
             if wait_time_secs > 0:
                 await asyncio.sleep(wait_time_secs)
+
+        # Wait for all tasks to finish if requested
+        if wait_for_all_requests_to_be_added:
+            await wait_for_all_tasks_for_finish(
+                self._tasks,
+                logger=logger,
+                timeout=wait_for_all_requests_to_be_added_timeout,
+            )
 
     async def get_request(self, request_id: str) -> Request | None:
         """Retrieve a request from the queue.

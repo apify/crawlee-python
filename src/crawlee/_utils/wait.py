@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Awaitable, Callable, TypeVar
+from contextlib import suppress
+from typing import TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable, Sequence
     from datetime import timedelta
     from logging import Logger
 
@@ -42,3 +44,35 @@ async def wait_for(
             logger.warning(f'{e!s}: retrying ({iteration}/{max_retries})')
 
     raise RuntimeError('Unreachable code')
+
+
+async def wait_for_all_tasks_for_finish(
+    tasks: Sequence[asyncio.Task],
+    *,
+    logger: Logger,
+    timeout: timedelta | None = None,
+) -> None:
+    """Wait for all tasks to finish or until the timeout is reached.
+
+    Args:
+        tasks: A sequence of asyncio tasks to wait for.
+        logger: Logger to use for reporting.
+        timeout: How long should we wait before cancelling the tasks.
+    """
+    if not tasks:
+        return
+
+    timeout_secs = timeout.total_seconds() if timeout else None
+    try:
+        _, pending = await asyncio.wait(tasks, timeout=timeout_secs)
+        if pending:
+            logger.warning('Waiting timeout reached; canceling unfinished tasks.')
+    except asyncio.CancelledError:
+        logger.warning('Asyncio wait was cancelled; canceling unfinished tasks.')
+        raise
+    finally:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task

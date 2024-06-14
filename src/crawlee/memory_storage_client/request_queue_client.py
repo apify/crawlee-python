@@ -42,6 +42,8 @@ from crawlee.models import (
 from crawlee.types import StorageTypes
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from crawlee.memory_storage_client import MemoryStorageClient
 
 logger = getLogger(__name__)
@@ -416,7 +418,7 @@ class RequestQueueClient(BaseRequestQueueClient):
     @override
     async def batch_add_requests(
         self,
-        requests: list[Request],
+        requests: Sequence[Request],
         *,
         forefront: bool = False,
     ) -> BatchRequestsOperationResponse:
