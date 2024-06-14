@@ -219,13 +219,13 @@ class RequestQueue(BaseStorage, RequestProvider):
         return processed_request
 
     @override
-    async def add_requests_batched(
+    async def add_requests_batched(  # type: ignore  # mypy has problems here
         self,
         requests: Sequence[BaseRequestData | Request | str],
         *,
         batch_size: int = 1000,
         wait_time_between_batches: timedelta = timedelta(seconds=1),
-    ) -> AsyncGenerator[BatchRequestsOperationResponse, None, None]:
+    ) -> AsyncGenerator[BatchRequestsOperationResponse, None]:
         transformed_requests = self._transform_requests(requests)
         wait_time_secs = wait_time_between_batches.total_seconds()
 
@@ -234,7 +234,6 @@ class RequestQueue(BaseStorage, RequestProvider):
             batch = transformed_requests[i : i + batch_size]
             response = await self._resource_client.batch_add_requests(requests=batch)
             self._assumed_total_count += len(batch)
-
             yield response
 
             if wait_time_secs > 0:

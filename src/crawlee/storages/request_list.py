@@ -84,6 +84,5 @@ class RequestList(RequestProvider):
         *,
         batch_size: int = 1000,
         wait_time_between_batches: timedelta = timedelta(seconds=1),
-    ) -> AsyncGenerator[BatchRequestsOperationResponse, None, None]:
-        transformed_requests = self._transform_requests(requests)
-        self._sources.extend(transformed_requests)
+    ) -> AsyncGenerator[BatchRequestsOperationResponse, None]:
+        raise NotImplementedError('This method is not supported by RequestList.')

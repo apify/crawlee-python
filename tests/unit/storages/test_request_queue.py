@@ -130,7 +130,6 @@ async def test_reclaim_request(request_queue: RequestQueue) -> None:
     assert next_again.unique_key == request.unique_key
 
 
-@pytest.mark.only()
 @pytest.mark.parametrize(
     'requests',
     [

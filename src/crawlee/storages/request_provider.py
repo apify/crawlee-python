@@ -62,7 +62,7 @@ class RequestProvider(ABC):
         *,
         batch_size: int = 1000,
         wait_time_between_batches: timedelta = timedelta(seconds=1),
-    ) -> AsyncGenerator[BatchRequestsOperationResponse, None, None]:
+    ) -> AsyncGenerator[BatchRequestsOperationResponse, None]:
         """Add requests to the request provider in batches.
 
         Args:
