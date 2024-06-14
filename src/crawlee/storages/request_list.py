@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
-from crawlee.models import BaseRequestData, BatchRequestsOperationResponse, Request
+from crawlee.models import BaseRequestData, BatchRequestsOperationResponse, ProcessedRequest, Request
 from crawlee.storages.request_provider import RequestProvider
 
 if TYPE_CHECKING:
@@ -78,11 +78,25 @@ class RequestList(RequestProvider):
         return self._handled_count
 
     @override
-    async def add_requests_batched(
+    async def add_requests_batched(  # type: ignore  # mypy has problems here
         self,
         requests: Sequence[BaseRequestData | Request | str],
         *,
         batch_size: int = 1000,
         wait_time_between_batches: timedelta = timedelta(seconds=1),
     ) -> AsyncGenerator[BatchRequestsOperationResponse, None]:
-        raise NotImplementedError('This method is not supported by RequestList.')
+        transformed_requests = self._transform_requests(requests)
+        self._sources.extend(transformed_requests)
+
+        yield BatchRequestsOperationResponse(
+            processed_requests=[
+                ProcessedRequest(
+                    id=request.id,
+                    unique_key=request.unique_key,
+                    was_already_present=False,
+                    was_already_handled=False,
+                )
+                for request in transformed_requests
+            ],
+            unprocessed_requests=[],
+        )
