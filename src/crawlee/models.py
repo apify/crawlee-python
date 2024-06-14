@@ -427,6 +427,8 @@ class ProcessedRequest(BaseModel):
 class UnprocessedRequest(BaseModel):
     """Represents an unprocessed request."""
 
+    model_config = ConfigDict(populate_by_name=True)
+
     unique_key: Annotated[str, Field(alias='requestUniqueKey')]
     url: Annotated[str, Field()]
     method: Annotated[str | None, Field()] = None
