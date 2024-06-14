@@ -68,6 +68,8 @@ class RequestProvider(ABC):
             batch_size: The number of requests to add in one batch.
             wait_time_between_batches: Time to wait between adding batches.
         """
+        # TODO: implement `wait_for_all_requests_to_be_added` parameter
+        # https://github.com/apify/crawlee-python/issues/187
 
     def _transform_requests(self, requests: Sequence[BaseRequestData | Request | str]) -> list[Request]:
         """Transforms a list of request-like objects into a list of Request objects."""

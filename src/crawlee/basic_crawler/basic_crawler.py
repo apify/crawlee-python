@@ -303,6 +303,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
             batch_size: The number of requests to add in one batch.
             wait_time_between_batches: Time to wait between adding batches.
         """
+        # TODO: implement `wait_for_all_requests_to_be_added` parameter
+        # https://github.com/apify/crawlee-python/issues/187
         request_provider = await self.get_request_provider()
         await request_provider.add_requests_batched(
             requests=requests,
