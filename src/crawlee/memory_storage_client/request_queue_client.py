@@ -5,6 +5,7 @@ import json
 import os
 from datetime import datetime, timezone
 from decimal import Decimal
+from logging import getLogger
 from typing import TYPE_CHECKING
 
 import aiofiles
@@ -29,18 +30,21 @@ from crawlee.memory_storage_client._creation_management import (
 )
 from crawlee.models import (
     BatchRequestsOperationResponse,
+    ProcessedRequest,
     ProlongRequestLockResponse,
     Request,
     RequestListResponse,
     RequestQueueHead,
     RequestQueueHeadWithLocks,
     RequestQueueMetadata,
-    RequestQueueOperationInfo,
+    UnprocessedRequest,
 )
 from crawlee.types import StorageTypes
 
 if TYPE_CHECKING:
     from crawlee.memory_storage_client import MemoryStorageClient
+
+logger = getLogger(__name__)
 
 
 class RequestQueueClient(BaseRequestQueueClient):
@@ -245,7 +249,7 @@ class RequestQueueClient(BaseRequestQueueClient):
         request: Request,
         *,
         forefront: bool = False,
-    ) -> RequestQueueOperationInfo:
+    ) -> ProcessedRequest:
         existing_queue_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
             id=self.id,
@@ -264,9 +268,9 @@ class RequestQueueClient(BaseRequestQueueClient):
             if existing_request_with_id is not None:
                 await existing_queue_by_id.update_timestamps(has_been_modified=False)
 
-                return RequestQueueOperationInfo(
-                    request_id=request_model.id,
-                    request_unique_key=request_model.unique_key,
+                return ProcessedRequest(
+                    id=request_model.id,
+                    unique_key=request_model.unique_key,
                     was_already_present=True,
                     was_already_handled=existing_request_with_id.order_no is None,
                 )
@@ -285,9 +289,9 @@ class RequestQueueClient(BaseRequestQueueClient):
 
             # We return wasAlreadyHandled is false even though the request may have been added as handled,
             # because that's how API behaves.
-            return RequestQueueOperationInfo(
-                request_id=request_model.id,
-                request_unique_key=request_model.unique_key,
+            return ProcessedRequest(
+                id=request_model.id,
+                unique_key=request_model.unique_key,
                 was_already_present=False,
                 was_already_handled=False,
             )
@@ -315,7 +319,7 @@ class RequestQueueClient(BaseRequestQueueClient):
         request: Request,
         *,
         forefront: bool = False,
-    ) -> RequestQueueOperationInfo:
+    ) -> ProcessedRequest:
         existing_queue_by_id = self.find_or_create_client_by_id_or_name(
             memory_storage_client=self._memory_storage_client,
             id=self.id,
@@ -357,9 +361,9 @@ class RequestQueueClient(BaseRequestQueueClient):
                 persist_storage=self._memory_storage_client.persist_storage,
             )
 
-            return RequestQueueOperationInfo(
-                request_id=request_model.id,
-                request_unique_key=request_model.unique_key,
+            return ProcessedRequest(
+                id=request_model.id,
+                unique_key=request_model.unique_key,
                 was_already_present=True,
                 was_already_handled=request_was_handled_before_update,
             )
@@ -416,7 +420,34 @@ class RequestQueueClient(BaseRequestQueueClient):
         *,
         forefront: bool = False,
     ) -> BatchRequestsOperationResponse:
-        raise NotImplementedError('This method is not supported in memory storage.')
+        processed_requests = list[ProcessedRequest]()
+        unprocessed_requests = list[UnprocessedRequest]()
+
+        for request in requests:
+            try:
+                processed_request = await self.add_request(request, forefront=forefront)
+                processed_requests.append(
+                    ProcessedRequest(
+                        id=processed_request.id,
+                        unique_key=processed_request.unique_key,
+                        was_already_present=processed_request.was_already_present,
+                        was_already_handled=processed_request.was_already_handled,
+                    )
+                )
+            except Exception as exc:  # noqa: PERF203
+                logger.warning(f'Error adding request to the queue: {exc}')
+                unprocessed_requests.append(
+                    UnprocessedRequest(
+                        unique_key=request.unique_key,
+                        url=request.url,
+                        method=request.method,
+                    )
+                )
+
+        return BatchRequestsOperationResponse(
+            processed_requests=processed_requests,
+            unprocessed_requests=unprocessed_requests,
+        )
 
     @override
     async def batch_delete_requests(self, requests: list[Request]) -> BatchRequestsOperationResponse:

@@ -315,17 +315,6 @@ class KeyValueStoreListKeysPage(BaseModel):
     next_exclusive_start_key: Annotated[str | None, Field(alias='nextExclusiveStartKey', default=None)]
 
 
-class RequestQueueOperationInfo(BaseModel):
-    """Model for the request queue operation info."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-    request_id: Annotated[str, Field(alias='requestId')]
-    request_unique_key: Annotated[str, Field(alias='requestUniqueKey')]
-    was_already_present: Annotated[bool, Field(alias='wasAlreadyPresent')]
-    was_already_handled: Annotated[bool, Field(alias='wasAlreadyHandled')]
-
-
 class RequestQueueHeadState(BaseModel):
     """Model for the request queue head state."""
 
@@ -427,8 +416,10 @@ class ProlongRequestLockResponse(BaseModel):
 class ProcessedRequest(BaseModel):
     """Represents a processed request."""
 
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: Annotated[str, Field(alias='id')]
     unique_key: Annotated[str, Field(alias='uniqueKey')]
-    request_id: Annotated[str, Field(alias='requestId')]
     was_already_present: Annotated[bool, Field(alias='wasAlreadyPresent')]
     was_already_handled: Annotated[bool, Field(alias='wasAlreadyHandled')]
 
@@ -436,7 +427,7 @@ class ProcessedRequest(BaseModel):
 class UnprocessedRequest(BaseModel):
     """Represents an unprocessed request."""
 
-    unique_key: Annotated[str, Field(alias='uniqueKey')]
+    unique_key: Annotated[str, Field(alias='requestUniqueKey')]
     url: Annotated[str, Field()]
     method: Annotated[str | None, Field()] = None
 

@@ -4,8 +4,10 @@ from abc import ABC, abstractmethod
 from datetime import timedelta
 from typing import TYPE_CHECKING, Sequence
 
+from crawlee.models import BaseRequestData, BatchRequestsOperationResponse, Request
+
 if TYPE_CHECKING:
-    from crawlee.models import BaseRequestData, Request, RequestQueueOperationInfo
+    from crawlee.models import ProcessedRequest
 
 
 class RequestProvider(ABC):
@@ -37,14 +39,14 @@ class RequestProvider(ABC):
         """Returns a next request in the queue to be processed, or `null` if there are no more pending requests."""
 
     @abstractmethod
-    async def reclaim_request(self, request: Request, *, forefront: bool = False) -> RequestQueueOperationInfo | None:
+    async def reclaim_request(self, request: Request, *, forefront: bool = False) -> ProcessedRequest | None:
         """Reclaims a failed request back to the queue, so that it can be returned for processing later again.
 
         It is possible to modify the request data by supplying an updated request as a parameter.
         """
 
     @abstractmethod
-    async def mark_request_as_handled(self, request: Request) -> RequestQueueOperationInfo | None:
+    async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
         """Marks a request as handled after a successful processing (or after giving up retrying)."""
 
     @abstractmethod
@@ -57,13 +59,25 @@ class RequestProvider(ABC):
         requests: Sequence[BaseRequestData | Request | str],
         *,
         batch_size: int = 1000,
-        wait_for_all_requests_to_be_added: bool = False,
         wait_time_between_batches: timedelta = timedelta(seconds=1),
-    ) -> None:
-        """Adds requests to the queue in batches.
+    ) -> list[BatchRequestsOperationResponse]:
+        """Add requests to the request provider in batches.
 
-        By default, it will resolve after the initial batch is added, and continue adding the rest in background.
-        You can configure the batch size via `batch_size` option and the sleep time in between the batches
-        via `wait_time_between_batches`. If you want to wait for all batches to be added to the queue, you can use
-        the `wait_for_all_requests_to_be_added` option.
+        Args:
+            requests: A list of requests to add to the queue.
+            batch_size: The number of requests to add in one batch.
+            wait_time_between_batches: Time to wait between adding batches.
         """
+
+    def _transform_requests(self, requests: Sequence[BaseRequestData | Request | str]) -> list[Request]:
+        """Transforms a list of request-like objects into a list of Request objects."""
+        processed_requests: list[Request] = []
+
+        for request in requests:
+            if isinstance(request, BaseRequestData):
+                processed_request = Request.from_base_request_data(request)
+            elif isinstance(request, str):
+                processed_request = Request.from_url(request)
+            processed_requests.append(processed_request)
+
+        return processed_requests

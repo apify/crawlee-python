@@ -92,19 +92,19 @@ async def test_list_head(request_queue_client: RequestQueueClient) -> None:
 
 
 async def test_add_record(request_queue_client: RequestQueueClient) -> None:
-    request_forefront_info = await request_queue_client.add_request(
+    processed_request_forefront = await request_queue_client.add_request(
         Request.from_url('https://apify.com'),
         forefront=True,
     )
-    request_not_forefront_info = await request_queue_client.add_request(
+    processed_request_not_forefront = await request_queue_client.add_request(
         Request.from_url('https://example.com'),
         forefront=False,
     )
 
-    assert request_forefront_info.request_id is not None
-    assert request_not_forefront_info.request_id is not None
-    assert request_forefront_info.was_already_handled is False
-    assert request_not_forefront_info.was_already_handled is False
+    assert processed_request_forefront.id is not None
+    assert processed_request_not_forefront.id is not None
+    assert processed_request_forefront.was_already_handled is False
+    assert processed_request_not_forefront.was_already_handled is False
 
     rq_info = await request_queue_client.get()
     assert rq_info is not None
@@ -114,9 +114,9 @@ async def test_add_record(request_queue_client: RequestQueueClient) -> None:
 
 async def test_get_record(request_queue_client: RequestQueueClient) -> None:
     request_url = 'https://apify.com'
-    request_info = await request_queue_client.add_request(Request.from_url(request_url))
+    processed_request = await request_queue_client.add_request(Request.from_url(request_url))
 
-    request = await request_queue_client.get_request(request_info.request_id)
+    request = await request_queue_client.get_request(processed_request.id)
     assert request is not None
     assert request.url == request.url == request_url
 
@@ -125,8 +125,8 @@ async def test_get_record(request_queue_client: RequestQueueClient) -> None:
 
 
 async def test_update_record(request_queue_client: RequestQueueClient) -> None:
-    request_info = await request_queue_client.add_request(Request.from_url('https://apify.com'))
-    request = await request_queue_client.get_request(request_info.request_id)
+    processed_request = await request_queue_client.add_request(Request.from_url('https://apify.com'))
+    request = await request_queue_client.get_request(processed_request.id)
     assert request is not None
 
     rq_info_before_update = await request_queue_client.get()
@@ -146,14 +146,14 @@ async def test_update_record(request_queue_client: RequestQueueClient) -> None:
 
 
 async def test_delete_record(request_queue_client: RequestQueueClient) -> None:
-    pending_request_info = await request_queue_client.add_request(
+    processed_request_pending = await request_queue_client.add_request(
         Request.from_url(
             url='https://apify.com',
             unique_key='pending',
         ),
     )
 
-    handled_request_info = await request_queue_client.add_request(
+    processed_request_handled = await request_queue_client.add_request(
         Request.from_url(
             url='https://apify.com',
             unique_key='handled',
@@ -165,20 +165,20 @@ async def test_delete_record(request_queue_client: RequestQueueClient) -> None:
     assert rq_info_before_delete is not None
     assert rq_info_before_delete.pending_request_count == 1
 
-    await request_queue_client.delete_request(pending_request_info.request_id)
+    await request_queue_client.delete_request(processed_request_pending.id)
     rq_info_after_first_delete = await request_queue_client.get()
     assert rq_info_after_first_delete is not None
     assert rq_info_after_first_delete.pending_request_count == 0
     assert rq_info_after_first_delete.handled_request_count == 1
 
-    await request_queue_client.delete_request(handled_request_info.request_id)
+    await request_queue_client.delete_request(processed_request_handled.id)
     rq_info_after_second_delete = await request_queue_client.get()
     assert rq_info_after_second_delete is not None
     assert rq_info_after_second_delete.pending_request_count == 0
     assert rq_info_after_second_delete.handled_request_count == 0
 
     # Does not crash when called again
-    await request_queue_client.delete_request(pending_request_info.request_id)
+    await request_queue_client.delete_request(processed_request_pending.id)
 
 
 async def test_forefront(request_queue_client: RequestQueueClient) -> None:

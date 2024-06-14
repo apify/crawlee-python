@@ -6,7 +6,7 @@ from typing import Sequence
 
 from typing_extensions import override
 
-from crawlee.models import BaseRequestData, Request
+from crawlee.models import BaseRequestData, BatchRequestsOperationResponse, Request
 from crawlee.storages.request_provider import RequestProvider
 
 
@@ -80,17 +80,8 @@ class RequestList(RequestProvider):
         requests: Sequence[BaseRequestData | Request | str],
         *,
         batch_size: int = 1000,
-        wait_for_all_requests_to_be_added: bool = False,
         wait_time_between_batches: timedelta = timedelta(seconds=1),
-    ) -> None:
-        batch = []
-
-        for request in requests:
-            if isinstance(request, Request):
-                batch.append(request)
-            elif isinstance(request, BaseRequestData):
-                batch.append(Request.from_base_request_data(request))
-            else:
-                batch.append(Request.from_url(request))
-
-        self._sources.extend(batch)
+    ) -> list[BatchRequestsOperationResponse]:
+        transformed_requests = self._transform_requests(requests)
+        self._sources.extend(transformed_requests)
+        return []
