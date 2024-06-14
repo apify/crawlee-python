@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from datetime import timedelta
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING
 
 from crawlee.models import BaseRequestData, BatchRequestsOperationResponse, Request
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Sequence
+
     from crawlee.models import ProcessedRequest
 
 
@@ -60,7 +62,7 @@ class RequestProvider(ABC):
         *,
         batch_size: int = 1000,
         wait_time_between_batches: timedelta = timedelta(seconds=1),
-    ) -> list[BatchRequestsOperationResponse]:
+    ) -> AsyncGenerator[BatchRequestsOperationResponse, None, None]:
         """Add requests to the request provider in batches.
 
         Args:

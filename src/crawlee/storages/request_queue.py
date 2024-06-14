@@ -4,7 +4,7 @@ import asyncio
 from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING
 from typing import OrderedDict as OrderedDictType
 
 from typing_extensions import override
@@ -24,6 +24,8 @@ from crawlee.storages.base_storage import BaseStorage
 from crawlee.storages.request_provider import RequestProvider
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Sequence
+
     from crawlee.base_storage_client import BaseStorageClient
     from crawlee.configuration import Configuration
     from crawlee.models import BaseStorageMetadata
@@ -223,22 +225,20 @@ class RequestQueue(BaseStorage, RequestProvider):
         *,
         batch_size: int = 1000,
         wait_time_between_batches: timedelta = timedelta(seconds=1),
-    ) -> list[BatchRequestsOperationResponse]:
+    ) -> AsyncGenerator[BatchRequestsOperationResponse, None, None]:
         transformed_requests = self._transform_requests(requests)
         wait_time_secs = wait_time_between_batches.total_seconds()
-        response = list[BatchRequestsOperationResponse]()
 
         # Split processed_requests into batches and process them
         for i in range(0, len(transformed_requests), batch_size):
             batch = transformed_requests[i : i + batch_size]
-            r = await self._resource_client.batch_add_requests(requests=batch)
-            response.append(r)
+            response = await self._resource_client.batch_add_requests(requests=batch)
             self._assumed_total_count += len(batch)
+
+            yield response
 
             if wait_time_secs > 0:
                 await asyncio.sleep(wait_time_secs)
-
-        return response
 
     async def get_request(self, request_id: str) -> Request | None:
         """Retrieve a request from the queue.

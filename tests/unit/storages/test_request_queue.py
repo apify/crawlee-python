@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
-from typing import AsyncGenerator, Sequence
+from typing import TYPE_CHECKING
 
 import pytest
 
 from crawlee.models import BaseRequestData, Request
 from crawlee.storages.request_queue import RequestQueue
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Sequence
 
 
 @pytest.fixture()
@@ -127,6 +130,7 @@ async def test_reclaim_request(request_queue: RequestQueue) -> None:
     assert next_again.unique_key == request.unique_key
 
 
+@pytest.mark.only()
 @pytest.mark.parametrize(
     'requests',
     [
@@ -143,7 +147,9 @@ async def test_add_batched_requests(
     requests: Sequence[BaseRequestData | Request | str],
 ) -> None:
     request_count = len(requests)
-    add_requests_info = await request_queue.add_requests_batched(requests)
+
+    # Add the requests to the RQ in batches
+    add_requests_info = [response async for response in request_queue.add_requests_batched(requests)]
 
     # Ensure the batch was processed correctly
     assert len(add_requests_info) == 1
