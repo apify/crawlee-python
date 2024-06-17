@@ -236,20 +236,27 @@ class RequestQueue(BaseStorage, RequestProvider):
         transformed_requests = self._transform_requests(requests)
         wait_time_secs = wait_time_between_batches.total_seconds()
 
-        async def _process_all_batches() -> None:
-            for i in range(0, len(transformed_requests), batch_size):
-                batch = transformed_requests[i : i + batch_size]
-                request_count = len(batch)
-                response = await self._resource_client.batch_add_requests(batch)
-                self._assumed_total_count += request_count
-                logger.debug(f'Added {request_count} requests to the queue, response: {response}')
+        async def _process_batch(batch: Sequence[Request]) -> None:
+            request_count = len(batch)
+            response = await self._resource_client.batch_add_requests(batch)
+            self._assumed_total_count += request_count
+            logger.debug(f'Added {request_count} requests to the queue, response: {response}')
 
+        # Wait for the first batch to be added
+        first_batch = transformed_requests[:batch_size]
+        if first_batch:
+            await _process_batch(first_batch)
+
+        async def _process_remaining_batches() -> None:
+            for i in range(batch_size, len(transformed_requests), batch_size):
+                batch = transformed_requests[i : i + batch_size]
+                await _process_batch(batch)
                 if i + batch_size < len(transformed_requests):
                     await asyncio.sleep(wait_time_secs)
 
-        # Create and start the task to process all batches
-        batch_task = asyncio.create_task(_process_all_batches())
-        self._tasks.append(batch_task)
+        # Create and start the task to process remaining batches in the background
+        remaining_batches_task = asyncio.create_task(_process_remaining_batches())
+        self._tasks.append(remaining_batches_task)
 
         # Wait for all tasks to finish if requested
         if wait_for_all_requests_to_be_added:
