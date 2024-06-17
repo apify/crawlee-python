@@ -76,3 +76,11 @@ async def wait_for_all_tasks_for_finish(
                 task.cancel()
                 with suppress(asyncio.CancelledError):
                     await task
+            # If task is done, access the result to clear any exceptions
+            else:
+                try:
+                    task.result()
+                except asyncio.CancelledError:
+                    pass
+                except Exception as e:
+                    logger.warning(f'Task raised an exception: {e}')
