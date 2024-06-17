@@ -4,15 +4,17 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from crawlee.models import (
         BatchRequestsOperationResponse,
+        ProcessedRequest,
         ProlongRequestLockResponse,
         Request,
         RequestListResponse,
         RequestQueueHead,
         RequestQueueHeadWithLocks,
         RequestQueueMetadata,
-        RequestQueueOperationInfo,
     )
 
 
@@ -82,7 +84,7 @@ class BaseRequestQueueClient(ABC):
         request: Request,
         *,
         forefront: bool = False,
-    ) -> RequestQueueOperationInfo:
+    ) -> ProcessedRequest:
         """Add a request to the queue.
 
         Args:
@@ -90,7 +92,24 @@ class BaseRequestQueueClient(ABC):
             forefront: Whether to add the request to the head or the end of the queue
 
         Returns:
-            The added request.
+            Request queue operation information.
+        """
+
+    @abstractmethod
+    async def batch_add_requests(
+        self,
+        requests: Sequence[Request],
+        *,
+        forefront: bool = False,
+    ) -> BatchRequestsOperationResponse:
+        """Add a batch of requests to the queue.
+
+        Args:
+            requests: The requests to add to the queue
+            forefront: Whether to add the requests to the head or the end of the queue
+
+        Returns:
+            Request queue batch operation information.
         """
 
     @abstractmethod
@@ -110,7 +129,7 @@ class BaseRequestQueueClient(ABC):
         request: Request,
         *,
         forefront: bool = False,
-    ) -> RequestQueueOperationInfo:
+    ) -> ProcessedRequest:
         """Update a request in the queue.
 
         Args:
@@ -157,20 +176,6 @@ class BaseRequestQueueClient(ABC):
         Args:
             request_id: ID of the request to delete the lock
             forefront: Whether to put the request in the beginning or the end of the queue after the lock is deleted.
-        """
-
-    @abstractmethod
-    async def batch_add_requests(
-        self,
-        requests: list[Request],
-        *,
-        forefront: bool = False,
-    ) -> BatchRequestsOperationResponse:
-        """Add batch of requests to the queue.
-
-        Args:
-            requests: The requests to add to the queue.
-            forefront: Whether to add the requests to the head or the end of the queue.
         """
 
     @abstractmethod

@@ -5,7 +5,7 @@ import asyncio
 import json
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import TYPE_CHECKING, Any
 from unittest.mock import Mock
 
 import httpx
@@ -21,6 +21,8 @@ from crawlee.models import BaseRequestData, Request
 from crawlee.storages import RequestList
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     import respx
 
 

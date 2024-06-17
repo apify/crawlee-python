@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
-from typing import AsyncGenerator
+from typing import TYPE_CHECKING
 
 import pytest
 
-from crawlee.models import Request
+from crawlee.models import BaseRequestData, Request
 from crawlee.storages.request_queue import RequestQueue
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Sequence
 
 
 @pytest.fixture()
@@ -77,8 +80,8 @@ async def test_drop() -> None:
 
 async def test_get_request(request_queue: RequestQueue) -> None:
     request = Request.from_url('https://example.com')
-    add_request_info = await request_queue.add_request(request)
-    assert request.id == add_request_info.request_id
+    processed_request = await request_queue.add_request(request)
+    assert request.id == processed_request.id
     request_2 = await request_queue.get_request(request.id)
     assert request_2 is not None
     assert request == request_2
@@ -99,11 +102,11 @@ async def test_add_fetch_handle_request(request_queue: RequestQueue) -> None:
 
     # Mark it as handled
     next_request.handled_at = datetime.now(timezone.utc)
-    queue_operation_info = await request_queue.mark_request_as_handled(next_request)
+    processed_request = await request_queue.mark_request_as_handled(next_request)
 
-    assert queue_operation_info is not None
-    assert queue_operation_info.request_id == request.id
-    assert queue_operation_info.request_unique_key == request.unique_key
+    assert processed_request is not None
+    assert processed_request.id == request.id
+    assert processed_request.unique_key == request.unique_key
     assert await request_queue.is_finished() is True
 
 
@@ -125,3 +128,38 @@ async def test_reclaim_request(request_queue: RequestQueue) -> None:
     assert next_again is not None
     assert next_again.id == request.id
     assert next_again.unique_key == request.unique_key
+
+
+@pytest.mark.parametrize(
+    'requests',
+    [
+        [BaseRequestData.from_url('https://example.com')],
+        [Request.from_url('https://apify.com')],
+        ['https://crawlee.dev'],
+        [Request.from_url(f'https://example.com/{i}') for i in range(10)],
+        [f'https://example.com/{i}' for i in range(15)],
+    ],
+    ids=['single-base-request', 'single-request', 'single-url', 'multiple-requests', 'multiple-urls'],
+)
+async def test_add_batched_requests(
+    request_queue: RequestQueue,
+    requests: Sequence[BaseRequestData | Request | str],
+) -> None:
+    request_count = len(requests)
+
+    # Add the requests to the RQ in batches
+    await request_queue.add_requests_batched(requests, wait_for_all_requests_to_be_added=True)
+
+    # Ensure the batch was processed correctly
+    assert await request_queue.get_total_count() == request_count
+
+    # Fetch and validate each request in the queue
+    for original_request in requests:
+        next_request = await request_queue.fetch_next_request()
+        assert next_request is not None
+
+        expected_url = original_request if isinstance(original_request, str) else original_request.url
+        assert next_request.url == expected_url
+
+    # Confirm the queue is empty after processing all requests
+    assert await request_queue.is_empty() is True

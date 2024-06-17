@@ -35,7 +35,7 @@ from crawlee.http_clients.httpx_client import HttpxClient
 from crawlee.models import BaseRequestData, Request, RequestState
 from crawlee.sessions import SessionPool
 from crawlee.statistics.statistics import Statistics
-from crawlee.storages.request_queue import RequestQueue
+from crawlee.storages import RequestQueue
 
 if TYPE_CHECKING:
     import re
@@ -246,26 +246,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._failed_request_handler = handler
         return handler
 
-    async def add_requests(
-        self,
-        requests: list[str | BaseRequestData],
-        *,
-        batch_size: int = 1000,
-        wait_for_all_requests_to_be_added: bool = False,
-        wait_time_between_batches: timedelta = timedelta(0),
-    ) -> None:
-        """Add requests to the underlying queue."""
-        request_provider = await self.get_request_provider()
-        await request_provider.add_requests_batched(
-            [
-                request if isinstance(request, BaseRequestData) else BaseRequestData.from_url(url=request)
-                for request in requests
-            ],
-            batch_size=batch_size,
-            wait_for_all_requests_to_be_added=wait_for_all_requests_to_be_added,
-            wait_time_between_batches=wait_time_between_batches,
-        )
-
     async def run(self, requests: list[str | BaseRequestData] | None = None) -> FinalStatistics:
         """Run the crawler until all requests are processed."""
         if self._running:
@@ -308,6 +288,34 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._has_finished_before = True
 
         return self._statistics.calculate()
+
+    async def add_requests(
+        self,
+        requests: Sequence[BaseRequestData | Request | str],
+        *,
+        batch_size: int = 1000,
+        wait_time_between_batches: timedelta = timedelta(0),
+        wait_for_all_requests_to_be_added: bool = False,
+        wait_for_all_requests_to_be_added_timeout: timedelta | None = None,
+    ) -> None:
+        """Add requests to the underlying request provider in batches.
+
+        Args:
+            requests: A list of requests to add to the queue.
+            batch_size: The number of requests to add in one batch.
+            wait_time_between_batches: Time to wait between adding batches.
+            wait_for_all_requests_to_be_added: If True, wait for all requests to be added before returning.
+            wait_for_all_requests_to_be_added_timeout: Timeout for waiting for all requests to be added.
+        """
+        request_provider = await self.get_request_provider()
+
+        await request_provider.add_requests_batched(
+            requests=requests,
+            batch_size=batch_size,
+            wait_time_between_batches=wait_time_between_batches,
+            wait_for_all_requests_to_be_added=wait_for_all_requests_to_be_added,
+            wait_for_all_requests_to_be_added_timeout=wait_for_all_requests_to_be_added_timeout,
+        )
 
     def _should_retry_request(self, crawling_context: BasicCrawlingContext, error: Exception) -> bool:
         if crawling_context.request.no_retry:
@@ -475,10 +483,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 ) and self._check_url_patterns(destination, call.get('include', None), call.get('exclude', None)):
                     requests.append(request_model)
 
-            await request_provider.add_requests_batched(
-                requests=requests,
-                wait_for_all_requests_to_be_added=False,
-            )
+            await request_provider.add_requests_batched(requests)
 
     async def __is_finished_function(self) -> bool:
         request_provider = await self.get_request_provider()
