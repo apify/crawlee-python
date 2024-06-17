@@ -22,7 +22,6 @@ from crawlee._utils.data_processing import (
 from crawlee._utils.file import force_remove, force_rename, json_dumps
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee.base_storage_client import BaseRequestQueueClient
-from crawlee.consts import REQUEST_QUEUE_LABEL
 from crawlee.memory_storage_client._creation_management import (
     find_or_create_client_by_id_or_name_inner,
     persist_metadata_if_enabled,
@@ -49,7 +48,6 @@ class RequestQueueClient(BaseRequestQueueClient):
     def __init__(
         self,
         *,
-        base_storage_directory: str,
         memory_storage_client: MemoryStorageClient,
         id: str | None = None,
         name: str | None = None,
@@ -59,7 +57,6 @@ class RequestQueueClient(BaseRequestQueueClient):
         handled_request_count: int = 0,
         pending_request_count: int = 0,
     ) -> None:
-        self._base_storage_directory = base_storage_directory
         self._memory_storage_client = memory_storage_client
         self.id = id or crypto_random_object_id()
         self.name = name
@@ -94,37 +91,12 @@ class RequestQueueClient(BaseRequestQueueClient):
     @property
     def resource_directory(self) -> str:
         """Get the resource directory for the client."""
-        return os.path.join(self._base_storage_directory, self.name or self.id)
-
-    @classmethod
-    def find_or_create_client_by_id_or_name(
-        cls,
-        memory_storage_client: MemoryStorageClient,
-        id: str | None = None,
-        name: str | None = None,
-    ) -> RequestQueueClient | None:
-        """Restore existing or create a new key-value store client based on the given ID or name.
-
-        Args:
-            memory_storage_client: The memory storage client used to store and retrieve key-value store client.
-            id: The unique identifier for the key-value store client.
-            name: The name of the key-value store client.
-
-        Returns:
-            The found or created key-value store client, or None if no client could be found or created.
-        """
-        return find_or_create_client_by_id_or_name_inner(
-            resource_label=REQUEST_QUEUE_LABEL,
-            storage_client_cache=memory_storage_client.request_queues_handled,
-            storages_dir=memory_storage_client.request_queues_directory,
-            memory_storage_client=memory_storage_client,
-            id=id,
-            name=name,
-        )
+        return os.path.join(self._memory_storage_client.request_queues_directory, self.name or self.id)
 
     @override
     async def get(self) -> RequestQueueMetadata | None:
-        found = self.find_or_create_client_by_id_or_name(
+        found = find_or_create_client_by_id_or_name_inner(
+            resource_client_class=RequestQueueClient,
             memory_storage_client=self._memory_storage_client,
             id=self.id,
             name=self.name,
@@ -140,7 +112,8 @@ class RequestQueueClient(BaseRequestQueueClient):
     @override
     async def update(self, *, name: str | None = None) -> RequestQueueMetadata:
         # Check by id
-        existing_queue_by_id = self.find_or_create_client_by_id_or_name(
+        existing_queue_by_id = find_or_create_client_by_id_or_name_inner(
+            resource_client_class=RequestQueueClient,
             memory_storage_client=self._memory_storage_client,
             id=self.id,
             name=self.name,
@@ -196,7 +169,8 @@ class RequestQueueClient(BaseRequestQueueClient):
 
     @override
     async def list_head(self, *, limit: int | None = None) -> RequestQueueHead:
-        existing_queue_by_id = self.find_or_create_client_by_id_or_name(
+        existing_queue_by_id = find_or_create_client_by_id_or_name_inner(
+            resource_client_class=RequestQueueClient,
             memory_storage_client=self._memory_storage_client,
             id=self.id,
             name=self.name,
@@ -246,7 +220,8 @@ class RequestQueueClient(BaseRequestQueueClient):
         *,
         forefront: bool = False,
     ) -> RequestQueueOperationInfo:
-        existing_queue_by_id = self.find_or_create_client_by_id_or_name(
+        existing_queue_by_id = find_or_create_client_by_id_or_name_inner(
+            resource_client_class=RequestQueueClient,
             memory_storage_client=self._memory_storage_client,
             id=self.id,
             name=self.name,
@@ -294,7 +269,8 @@ class RequestQueueClient(BaseRequestQueueClient):
 
     @override
     async def get_request(self, request_id: str) -> Request | None:
-        existing_queue_by_id = self.find_or_create_client_by_id_or_name(
+        existing_queue_by_id = find_or_create_client_by_id_or_name_inner(
+            resource_client_class=RequestQueueClient,
             memory_storage_client=self._memory_storage_client,
             id=self.id,
             name=self.name,
@@ -316,7 +292,8 @@ class RequestQueueClient(BaseRequestQueueClient):
         *,
         forefront: bool = False,
     ) -> RequestQueueOperationInfo:
-        existing_queue_by_id = self.find_or_create_client_by_id_or_name(
+        existing_queue_by_id = find_or_create_client_by_id_or_name_inner(
+            resource_client_class=RequestQueueClient,
             memory_storage_client=self._memory_storage_client,
             id=self.id,
             name=self.name,
@@ -366,7 +343,8 @@ class RequestQueueClient(BaseRequestQueueClient):
 
     @override
     async def delete_request(self, request_id: str) -> None:
-        existing_queue_by_id = self.find_or_create_client_by_id_or_name(
+        existing_queue_by_id = find_or_create_client_by_id_or_name_inner(
+            resource_client_class=RequestQueueClient,
             memory_storage_client=self._memory_storage_client,
             id=self.id,
             name=self.name,

@@ -16,13 +16,7 @@ if TYPE_CHECKING:
 class RequestQueueCollectionClient(BaseRequestQueueCollectionClient):
     """Subclient for manipulating request queues."""
 
-    def __init__(
-        self,
-        *,
-        base_storage_directory: str,
-        memory_storage_client: MemoryStorageClient,
-    ) -> None:
-        self._base_storage_directory = base_storage_directory
+    def __init__(self, *, memory_storage_client: MemoryStorageClient) -> None:
         self._memory_storage_client = memory_storage_client
 
     @property
@@ -37,12 +31,8 @@ class RequestQueueCollectionClient(BaseRequestQueueCollectionClient):
         schema: dict | None = None,
         id: str | None = None,
     ) -> RequestQueueMetadata:
-        if name is None and id is None:
-            id = self._memory_storage_client.default_storage_id
-
         resource_client = await get_or_create_inner(
             memory_storage_client=self._memory_storage_client,
-            base_storage_directory=self._base_storage_directory,
             storage_client_cache=self._storage_client_cache,
             resource_client_class=RequestQueueClient,
             name=name,

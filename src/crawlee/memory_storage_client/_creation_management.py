@@ -7,14 +7,14 @@ import pathlib
 from datetime import datetime, timezone
 from decimal import Decimal
 from logging import getLogger
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING
 
 import aiofiles
 from aiofiles.os import makedirs
 
 from crawlee._utils.data_processing import maybe_parse_body
 from crawlee._utils.file import json_dumps
-from crawlee.consts import DATASET_LABEL, KEY_VALUE_STORE_LABEL, METADATA_FILENAME, REQUEST_QUEUE_LABEL
+from crawlee.consts import METADATA_FILENAME
 from crawlee.models import (
     DatasetMetadata,
     KeyValueStoreMetadata,
@@ -27,10 +27,8 @@ from crawlee.models import (
 if TYPE_CHECKING:
     from crawlee.memory_storage_client.dataset_client import DatasetClient
     from crawlee.memory_storage_client.key_value_store_client import KeyValueStoreClient
-    from crawlee.memory_storage_client.memory_storage_client import MemoryStorageClient
+    from crawlee.memory_storage_client.memory_storage_client import MemoryStorageClient, TResourceClient
     from crawlee.memory_storage_client.request_queue_client import RequestQueueClient
-
-    TResourceClient = TypeVar('TResourceClient', DatasetClient, KeyValueStoreClient, RequestQueueClient)
 
 logger = getLogger(__name__)
 
@@ -62,9 +60,7 @@ async def persist_metadata_if_enabled(*, data: dict, entity_directory: str, writ
 
 
 def find_or_create_client_by_id_or_name_inner(
-    resource_label: str,
-    storage_client_cache: list[TResourceClient],
-    storages_dir: str,
+    resource_client_class: type[TResourceClient],
     memory_storage_client: MemoryStorageClient,
     id: str | None = None,
     name: str | None = None,
@@ -79,9 +75,7 @@ def find_or_create_client_by_id_or_name_inner(
     created, the method returns None.
 
     Args:
-        resource_label: The label of the resource client.
-        storage_client_cache: The cache of storage clients.
-        storages_dir: The directory where storage clients are stored.
+        resource_client_class: The class of the resource client.
         memory_storage_client: The memory storage client used to store and retrieve storage clients.
         id: The unique identifier for the storage client. Defaults to None.
         name: The name of the storage client. Defaults to None.
@@ -92,21 +86,27 @@ def find_or_create_client_by_id_or_name_inner(
     Returns:
         The found or created storage client, or None if no client could be found or created.
     """
+    from crawlee.memory_storage_client.dataset_client import DatasetClient
+    from crawlee.memory_storage_client.key_value_store_client import KeyValueStoreClient
+    from crawlee.memory_storage_client.request_queue_client import RequestQueueClient
+
     if id is None and name is None:
         raise ValueError('Either id or name must be specified.')
 
     # First check memory cache
-    found = next(
-        (
-            storage_client
-            for storage_client in storage_client_cache
-            if storage_client.id == id or (storage_client.name and name and storage_client.name.lower() == name.lower())
-        ),
-        None,
-    )
+    found = memory_storage_client.get_cached_resource_client(resource_client_class, id, name)
 
     if found is not None:
         return found
+
+    if issubclass(resource_client_class, DatasetClient):
+        storages_dir = memory_storage_client.datasets_directory
+    elif issubclass(resource_client_class, KeyValueStoreClient):
+        storages_dir = memory_storage_client.key_value_stores_directory
+    elif issubclass(resource_client_class, RequestQueueClient):
+        storages_dir = memory_storage_client.request_queues_directory
+    else:
+        raise TypeError('Invalid resource client class.')
 
     storage_path = None
 
@@ -137,26 +137,24 @@ def find_or_create_client_by_id_or_name_inner(
     if not storage_path:
         return None
 
-    resource_client: DatasetClient | KeyValueStoreClient | RequestQueueClient
-
     # Create from directory if storage path is found
-    if resource_label == DATASET_LABEL:
+    if issubclass(resource_client_class, DatasetClient):
         resource_client = create_dataset_from_directory(storage_path, memory_storage_client, id, name)
-    elif resource_label == KEY_VALUE_STORE_LABEL:
+    elif issubclass(resource_client_class, KeyValueStoreClient):
         resource_client = create_kvs_from_directory(storage_path, memory_storage_client, id, name)
-    elif resource_label == REQUEST_QUEUE_LABEL:
+
+    elif issubclass(resource_client_class, RequestQueueClient):
         resource_client = create_rq_from_directory(storage_path, memory_storage_client, id, name)
     else:
-        raise ValueError('Invalid resource client class.')
+        raise TypeError('Invalid resource client class.')
 
-    storage_client_cache.append(resource_client)  # type: ignore
-    return resource_client  # type: ignore
+    memory_storage_client.add_resource_client_to_cache(resource_client)
+    return resource_client  # pyright: ignore
 
 
 async def get_or_create_inner(
     *,
     memory_storage_client: MemoryStorageClient,
-    base_storage_directory: str,
     storage_client_cache: list[TResourceClient],
     resource_client_class: type[TResourceClient],
     name: str | None = None,
@@ -166,7 +164,6 @@ async def get_or_create_inner(
 
     Args:
         memory_storage_client: The memory storage client.
-        base_storage_directory: The base directory where the storage clients are stored.
         storage_client_cache: The cache of storage clients.
         resource_client_class: The class of the storage to retrieve or create.
         name: The name of the storage to retrieve or create.
@@ -177,7 +174,8 @@ async def get_or_create_inner(
     """
     # If the name or id is provided, try to find the dataset in the cache
     if name or id:
-        found = resource_client_class.find_or_create_client_by_id_or_name(
+        found = find_or_create_client_by_id_or_name_inner(
+            resource_client_class=resource_client_class,
             memory_storage_client=memory_storage_client,
             name=name,
             id=id,
@@ -189,7 +187,6 @@ async def get_or_create_inner(
     resource_client = resource_client_class(
         id=id,
         name=name,
-        base_storage_directory=base_storage_directory,
         memory_storage_client=memory_storage_client,
     )
 
@@ -254,7 +251,6 @@ def create_dataset_from_directory(
 
     # Create new dataset client
     new_client = DatasetClient(
-        base_storage_directory=memory_storage_client.datasets_directory,
         memory_storage_client=memory_storage_client,
         id=id,
         name=name,
@@ -296,7 +292,6 @@ def create_kvs_from_directory(
 
     # Create new KVS client
     new_client = KeyValueStoreClient(
-        base_storage_directory=memory_storage_client.key_value_stores_directory,
         memory_storage_client=memory_storage_client,
         id=id,
         name=name,
@@ -414,7 +409,6 @@ def create_rq_from_directory(
 
     # Create new RQ client
     new_client = RequestQueueClient(
-        base_storage_directory=memory_storage_client.request_queues_directory,
         memory_storage_client=memory_storage_client,
         id=id,
         name=name,

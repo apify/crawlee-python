@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, Any, AsyncIterator, TypeVar, overload
 
 from typing_extensions import override
 
-from crawlee.consts import KEY_VALUE_STORE_LABEL
 from crawlee.models import KeyValueStoreKeyInfo
 from crawlee.storages.base_storage import BaseStorage
 
@@ -35,9 +34,6 @@ class KeyValueStore(BaseStorage):
     Usage:
         kvs = await KeyValueStore.open(id='my_kvs_id')
     """
-
-    LABEL = KEY_VALUE_STORE_LABEL
-    """Human readable label of the storage."""
 
     def __init__(
         self,
@@ -86,7 +82,7 @@ class KeyValueStore(BaseStorage):
         from crawlee.storages._creation_management import remove_storage_from_cache
 
         await self._resource_client.delete()
-        remove_storage_from_cache(storage_class_label=self.LABEL, id=self._id, name=self._name)
+        remove_storage_from_cache(storage_class=self.__class__, id=self._id, name=self._name)
 
     @overload
     async def get_value(self, key: str) -> Any: ...

@@ -12,7 +12,6 @@ from typing_extensions import override
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.lru_cache import LRUCache
 from crawlee._utils.requests import unique_key_to_request_id
-from crawlee.consts import REQUEST_QUEUE_LABEL
 from crawlee.models import BaseRequestData, Request, RequestQueueHeadState, RequestQueueOperationInfo
 from crawlee.storages.base_storage import BaseStorage
 from crawlee.storages.request_provider import RequestProvider
@@ -44,9 +43,6 @@ class RequestQueue(BaseStorage, RequestProvider):
     Usage:
         rq = await RequestQueue.open(id='my_rq_id')
     """
-
-    LABEL = REQUEST_QUEUE_LABEL
-    """Human readable label of the storage."""
 
     _API_PROCESSED_REQUESTS_DELAY = timedelta(seconds=10)
     """Delay threshold to assume consistency of queue head operations after queue modifications."""
@@ -132,7 +128,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         from crawlee.storages._creation_management import remove_storage_from_cache
 
         await self._resource_client.delete()
-        remove_storage_from_cache(storage_class_label=self.LABEL, id=self._id, name=self._name)
+        remove_storage_from_cache(storage_class=self.__class__, id=self._id, name=self._name)
 
     async def add_request(
         self,

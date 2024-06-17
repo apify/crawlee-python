@@ -16,7 +16,7 @@ from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import raise_on_duplicate_storage, raise_on_non_existing_storage
 from crawlee._utils.file import force_rename, json_dumps
 from crawlee.base_storage_client import BaseDatasetClient
-from crawlee.consts import DATASET_LABEL
+from crawlee.memory_storage_client._creation_management import find_or_create_client_by_id_or_name_inner
 from crawlee.models import DatasetItemsListPage, DatasetMetadata
 from crawlee.types import StorageTypes
 
@@ -41,7 +41,6 @@ class DatasetClient(BaseDatasetClient):
     def __init__(
         self,
         *,
-        base_storage_directory: str,
         memory_storage_client: MemoryStorageClient,
         id: str | None = None,
         name: str | None = None,
@@ -50,7 +49,6 @@ class DatasetClient(BaseDatasetClient):
         modified_at: datetime | None = None,
         item_count: int = 0,
     ) -> None:
-        self._base_storage_directory = base_storage_directory
         self._memory_storage_client = memory_storage_client
         self.id = id or crypto_random_object_id()
         self.name = name
@@ -77,39 +75,12 @@ class DatasetClient(BaseDatasetClient):
     @property
     def resource_directory(self) -> str:
         """Get the resource directory for the client."""
-        return os.path.join(self._base_storage_directory, self.name or self.id)
-
-    @classmethod
-    def find_or_create_client_by_id_or_name(
-        cls,
-        memory_storage_client: MemoryStorageClient,
-        id: str | None = None,
-        name: str | None = None,
-    ) -> DatasetClient | None:
-        """Restore existing or create a new dataset client based on the given ID or name.
-
-        Args:
-            memory_storage_client: The memory storage client used to store and retrieve dataset client.
-            id: The unique identifier for the dataset client.
-            name: The name of the dataset client.
-
-        Returns:
-            The found or created dataset client, or None if no client could be found or created.
-        """
-        from crawlee.memory_storage_client._creation_management import find_or_create_client_by_id_or_name_inner
-
-        return find_or_create_client_by_id_or_name_inner(
-            resource_label=DATASET_LABEL,
-            storage_client_cache=memory_storage_client.datasets_handled,
-            storages_dir=memory_storage_client.datasets_directory,
-            memory_storage_client=memory_storage_client,
-            id=id,
-            name=name,
-        )
+        return os.path.join(self._memory_storage_client.datasets_directory, self.name or self.id)
 
     @override
     async def get(self) -> DatasetMetadata | None:
-        found = self.find_or_create_client_by_id_or_name(
+        found = find_or_create_client_by_id_or_name_inner(
+            resource_client_class=DatasetClient,
             memory_storage_client=self._memory_storage_client,
             id=self.id,
             name=self.name,
@@ -125,7 +96,8 @@ class DatasetClient(BaseDatasetClient):
     @override
     async def update(self, *, name: str | None = None) -> DatasetMetadata:
         # Check by id
-        existing_dataset_by_id = self.find_or_create_client_by_id_or_name(
+        existing_dataset_by_id = find_or_create_client_by_id_or_name_inner(
+            resource_client_class=DatasetClient,
             memory_storage_client=self._memory_storage_client,
             id=self.id,
             name=self.name,
@@ -194,7 +166,8 @@ class DatasetClient(BaseDatasetClient):
         view: str | None = None,
     ) -> DatasetItemsListPage:
         # Check by id
-        existing_dataset_by_id = self.find_or_create_client_by_id_or_name(
+        existing_dataset_by_id = find_or_create_client_by_id_or_name_inner(
+            resource_client_class=DatasetClient,
             memory_storage_client=self._memory_storage_client,
             id=self.id,
             name=self.name,
@@ -319,7 +292,8 @@ class DatasetClient(BaseDatasetClient):
         items: JSONSerializable,
     ) -> None:
         # Check by id
-        existing_dataset_by_id = self.find_or_create_client_by_id_or_name(
+        existing_dataset_by_id = find_or_create_client_by_id_or_name_inner(
+            resource_client_class=DatasetClient,
             memory_storage_client=self._memory_storage_client,
             id=self.id,
             name=self.name,

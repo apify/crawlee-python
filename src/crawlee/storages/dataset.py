@@ -8,7 +8,6 @@ from typing_extensions import override
 
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.file import json_dumps
-from crawlee.consts import DATASET_LABEL
 from crawlee.models import DatasetMetadata
 from crawlee.storages.base_storage import BaseStorage
 from crawlee.storages.key_value_store import KeyValueStore
@@ -38,9 +37,6 @@ class Dataset(BaseStorage):
     Usage:
         dataset = await Dataset.open(id='my_dataset_id')
     """
-
-    LABEL = DATASET_LABEL
-    """Human readable label of the storage."""
 
     _MAX_PAYLOAD_SIZE = ByteSize.from_mb(9)
     """Maximum size for a single payload."""
@@ -99,7 +95,7 @@ class Dataset(BaseStorage):
         from crawlee.storages._creation_management import remove_storage_from_cache
 
         await self._resource_client.delete()
-        remove_storage_from_cache(storage_class_label=self.LABEL, id=self._id, name=self._name)
+        remove_storage_from_cache(storage_class=self.__class__, id=self._id, name=self._name)
 
     async def push_data(self, data: JSONSerializable) -> None:
         """Store an object or an array of objects to the dataset.
