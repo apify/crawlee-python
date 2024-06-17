@@ -78,16 +78,14 @@ def _determine_storage_path(
     else:
         raise TypeError('Invalid resource client class.')
 
-    storage_path = None
-
     # Try to find by name directly from directories
     if name:
         possible_storage_path = os.path.join(storages_dir, name)
         if os.access(possible_storage_path, os.F_OK):
-            storage_path = possible_storage_path
+            return possible_storage_path
 
     # If not found, try finding by metadata
-    if not storage_path and os.access(storages_dir, os.F_OK):
+    if os.access(storages_dir, os.F_OK):
         for entry in os.scandir(storages_dir):
             if entry.is_dir():
                 metadata_path = os.path.join(entry.path, METADATA_FILENAME)
@@ -95,14 +93,15 @@ def _determine_storage_path(
                     with open(metadata_path, encoding='utf-8') as metadata_file:
                         metadata = json.load(metadata_file)
                     if (id and metadata.get('id') == id) or (name and metadata.get('name') == name):
-                        storage_path = entry.path
-                        break
+                        return entry.path
 
     # Check for default storage directory as a last resort
     if id == 'default':
         possible_storage_path = os.path.join(storages_dir, id)
         if os.access(possible_storage_path, os.F_OK):
-            storage_path = possible_storage_path
+            return possible_storage_path
+
+    return None
 
 
 def find_or_create_client_by_id_or_name_inner(
