@@ -148,6 +148,7 @@ class MemoryStorageClient(BaseStorageClient):
     def get_cached_resource_client(
         self, resource_client_class: type[TResourceClient], id: str | None, name: str | None
     ) -> TResourceClient | None:
+        """Try to return a resource client from the internal cache."""
         if issubclass(resource_client_class, DatasetClient):
             cache = self.datasets_handled
         elif issubclass(resource_client_class, KeyValueStoreClient):
@@ -166,6 +167,7 @@ class MemoryStorageClient(BaseStorageClient):
         return None
 
     def add_resource_client_to_cache(self, resource_client: ResourceClient) -> None:
+        """Add a new resource client to the internal cache."""
         if isinstance(resource_client, DatasetClient):
             self.datasets_handled.append(resource_client)
         if isinstance(resource_client, KeyValueStoreClient):

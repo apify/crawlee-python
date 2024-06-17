@@ -59,6 +59,52 @@ async def persist_metadata_if_enabled(*, data: dict, entity_directory: str, writ
         await f.write(s.encode('utf-8'))
 
 
+def _determine_storage_path(
+    resource_client_class: type[TResourceClient],
+    memory_storage_client: MemoryStorageClient,
+    id: str | None = None,
+    name: str | None = None,
+) -> str | None:
+    from crawlee.memory_storage_client.dataset_client import DatasetClient
+    from crawlee.memory_storage_client.key_value_store_client import KeyValueStoreClient
+    from crawlee.memory_storage_client.request_queue_client import RequestQueueClient
+
+    if issubclass(resource_client_class, DatasetClient):
+        storages_dir = memory_storage_client.datasets_directory
+    elif issubclass(resource_client_class, KeyValueStoreClient):
+        storages_dir = memory_storage_client.key_value_stores_directory
+    elif issubclass(resource_client_class, RequestQueueClient):
+        storages_dir = memory_storage_client.request_queues_directory
+    else:
+        raise TypeError('Invalid resource client class.')
+
+    storage_path = None
+
+    # Try to find by name directly from directories
+    if name:
+        possible_storage_path = os.path.join(storages_dir, name)
+        if os.access(possible_storage_path, os.F_OK):
+            storage_path = possible_storage_path
+
+    # If not found, try finding by metadata
+    if not storage_path and os.access(storages_dir, os.F_OK):
+        for entry in os.scandir(storages_dir):
+            if entry.is_dir():
+                metadata_path = os.path.join(entry.path, METADATA_FILENAME)
+                if os.access(metadata_path, os.F_OK):
+                    with open(metadata_path, encoding='utf-8') as metadata_file:
+                        metadata = json.load(metadata_file)
+                    if (id and metadata.get('id') == id) or (name and metadata.get('name') == name):
+                        storage_path = entry.path
+                        break
+
+    # Check for default storage directory as a last resort
+    if id == 'default':
+        possible_storage_path = os.path.join(storages_dir, id)
+        if os.access(possible_storage_path, os.F_OK):
+            storage_path = possible_storage_path
+
+
 def find_or_create_client_by_id_or_name_inner(
     resource_client_class: type[TResourceClient],
     memory_storage_client: MemoryStorageClient,
@@ -99,40 +145,7 @@ def find_or_create_client_by_id_or_name_inner(
     if found is not None:
         return found
 
-    if issubclass(resource_client_class, DatasetClient):
-        storages_dir = memory_storage_client.datasets_directory
-    elif issubclass(resource_client_class, KeyValueStoreClient):
-        storages_dir = memory_storage_client.key_value_stores_directory
-    elif issubclass(resource_client_class, RequestQueueClient):
-        storages_dir = memory_storage_client.request_queues_directory
-    else:
-        raise TypeError('Invalid resource client class.')
-
-    storage_path = None
-
-    # Try to find by name directly from directories
-    if name:
-        possible_storage_path = os.path.join(storages_dir, name)
-        if os.access(possible_storage_path, os.F_OK):
-            storage_path = possible_storage_path
-
-    # If not found, try finding by metadata
-    if not storage_path and os.access(storages_dir, os.F_OK):
-        for entry in os.scandir(storages_dir):
-            if entry.is_dir():
-                metadata_path = os.path.join(entry.path, METADATA_FILENAME)
-                if os.access(metadata_path, os.F_OK):
-                    with open(metadata_path, encoding='utf-8') as metadata_file:
-                        metadata = json.load(metadata_file)
-                    if (id and metadata.get('id') == id) or (name and metadata.get('name') == name):
-                        storage_path = entry.path
-                        break
-
-    # Check for default storage directory as a last resort
-    if id == 'default':
-        possible_storage_path = os.path.join(storages_dir, id)
-        if os.access(possible_storage_path, os.F_OK):
-            storage_path = possible_storage_path
+    storage_path = _determine_storage_path(resource_client_class, memory_storage_client, id, name)
 
     if not storage_path:
         return None
@@ -142,7 +155,6 @@ def find_or_create_client_by_id_or_name_inner(
         resource_client = create_dataset_from_directory(storage_path, memory_storage_client, id, name)
     elif issubclass(resource_client_class, KeyValueStoreClient):
         resource_client = create_kvs_from_directory(storage_path, memory_storage_client, id, name)
-
     elif issubclass(resource_client_class, RequestQueueClient):
         resource_client = create_rq_from_directory(storage_path, memory_storage_client, id, name)
     else:
