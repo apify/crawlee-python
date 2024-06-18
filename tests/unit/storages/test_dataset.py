@@ -36,10 +36,10 @@ async def test_open() -> None:
 
 async def test_consistency_accross_two_clients() -> None:
     dataset = await Dataset.open(name='my-dataset')
-    await dataset.push_data(data={'key': 'value'})
+    await dataset.push_data({'key': 'value'})
 
     dataset_by_id = await Dataset.open(id=dataset.id)
-    await dataset_by_id.push_data(data={'key2': 'value2'})
+    await dataset_by_id.push_data({'key2': 'value2'})
 
     assert (await dataset.get_data()).items == [{'key': 'value'}, {'key2': 'value2'}]
     assert (await dataset_by_id.get_data()).items == [{'key': 'value'}, {'key2': 'value2'}]
@@ -71,7 +71,7 @@ async def test_export(dataset: Dataset) -> None:
     expected_csv = 'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
     expected_json = [{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}, {'id': 2, 'test': 'test'}]
     desired_item_count = 3
-    await dataset.push_data(data=[{'id': i, 'test': 'test'} for i in range(desired_item_count)])
+    await dataset.push_data([{'id': i, 'test': 'test'} for i in range(desired_item_count)])
     await dataset.export_to(key='dataset-csv', content_type='csv')
     await dataset.export_to(key='dataset-json', content_type='json')
     kvs = await KeyValueStore.open()
@@ -83,7 +83,7 @@ async def test_export(dataset: Dataset) -> None:
 
 async def test_push_data(dataset: Dataset) -> None:
     desired_item_count = 2000
-    await dataset.push_data(data=[{'id': i} for i in range(desired_item_count)])
+    await dataset.push_data([{'id': i} for i in range(desired_item_count)])
     dataset_info = await dataset.get_info()
     assert dataset_info is not None
     assert dataset_info.item_count == desired_item_count
@@ -93,14 +93,14 @@ async def test_push_data(dataset: Dataset) -> None:
 
 
 async def test_push_data_empty(dataset: Dataset) -> None:
-    await dataset.push_data(data=[])
+    await dataset.push_data([])
     dataset_info = await dataset.get_info()
     assert dataset_info is not None
     assert dataset_info.item_count == 0
 
 
 async def test_push_data_singular(dataset: Dataset) -> None:
-    await dataset.push_data(data={'id': 1})
+    await dataset.push_data({'id': 1})
     dataset_info = await dataset.get_info()
     assert dataset_info is not None
     assert dataset_info.item_count == 1
@@ -110,7 +110,7 @@ async def test_push_data_singular(dataset: Dataset) -> None:
 
 async def test_get_data(dataset: Dataset) -> None:  # We don't test everything, that's done in memory storage tests
     desired_item_count = 3
-    await dataset.push_data(data=[{'id': i} for i in range(desired_item_count)])
+    await dataset.push_data([{'id': i} for i in range(desired_item_count)])
     list_page = await dataset.get_data()
     assert list_page.count == desired_item_count
     assert list_page.desc is False
@@ -122,7 +122,7 @@ async def test_get_data(dataset: Dataset) -> None:  # We don't test everything, 
 async def test_iterate_items(dataset: Dataset) -> None:
     desired_item_count = 3
     idx = 0
-    await dataset.push_data(data=[{'id': i} for i in range(desired_item_count)])
+    await dataset.push_data([{'id': i} for i in range(desired_item_count)])
 
     async for item in dataset.iterate_items():
         assert item['id'] == idx

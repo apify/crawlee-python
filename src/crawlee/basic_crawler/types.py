@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from typing_extensions import NotRequired, TypedDict, Unpack
 
+from crawlee.types import JSONSerializable
+
 if TYPE_CHECKING:
     from crawlee import Glob
     from crawlee.configuration import Configuration
@@ -68,6 +70,7 @@ class PushDataFunction(Protocol):
 
     def __call__(  # noqa: D102
         self,
+        data: JSONSerializable,
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         configuration: Configuration | None = None,

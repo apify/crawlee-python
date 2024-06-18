@@ -500,14 +500,14 @@ async def test_context_push_and_get_data(httpbin: str) -> None:
     crawler = BasicCrawler()
     dataset = await Dataset.open()
 
-    await dataset.push_data(data='{"a": 1}')
+    await dataset.push_data('{"a": 1}')
     assert (await crawler.get_data()).items == [{'a': 1}]
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        await context.push_data(data='{"b": 2}')
+        await context.push_data('{"b": 2}')
 
-    await dataset.push_data(data='{"c": 3}')
+    await dataset.push_data('{"c": 3}')
     assert (await crawler.get_data()).items == [{'a': 1}, {'c': 3}]
 
     stats = await crawler.run([f'{httpbin}/1'])
@@ -521,8 +521,8 @@ async def test_crawler_push_and_export_data() -> None:
     crawler = BasicCrawler()
     dataset = await Dataset.open()
 
-    await dataset.push_data(data=[{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}])
-    await dataset.push_data(data={'id': 2, 'test': 'test'})
+    await dataset.push_data([{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}])
+    await dataset.push_data({'id': 2, 'test': 'test'})
 
     await crawler.export_to(key='dataset-json', content_type='json')
     await crawler.export_to(key='dataset-csv', content_type='csv')
@@ -541,8 +541,8 @@ async def test_context_push_and_export_data(httpbin: str) -> None:
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        await context.push_data(data=[{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}])
-        await context.push_data(data={'id': 2, 'test': 'test'})
+        await context.push_data([{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}])
+        await context.push_data({'id': 2, 'test': 'test'})
 
     await crawler.run([f'{httpbin}/1'])
 

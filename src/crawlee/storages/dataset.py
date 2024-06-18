@@ -50,14 +50,7 @@ class GetDataKwargs(TypedDict):
 
 
 class PushDataKwargs(TypedDict):
-    """Keyword arguments for dataset's `push_data` method.
-
-    Args:
-        data: A JSON serializable data structure to be stored in the dataset. The JSON representation
-            of each item must be smaller than 9MB.
-    """
-
-    data: Required[JSONSerializable]
+    """Keyword arguments for dataset's `push_data` method."""
 
 
 class ExportToKwargs(TypedDict):
@@ -154,7 +147,7 @@ class Dataset(BaseStorage):
         await self._resource_client.delete()
         remove_storage_from_cache(storage_class=self.__class__, id=self._id, name=self._name)
 
-    async def push_data(self, **kwargs: Unpack[PushDataKwargs]) -> None:
+    async def push_data(self, data: JSONSerializable, **kwargs: Unpack[PushDataKwargs]) -> None:
         """Store an object or an array of objects to the dataset.
 
         The size of the data is limited by the receiving API and therefore `push_data()` will only
@@ -162,21 +155,21 @@ class Dataset(BaseStorage):
         none of the included objects may be larger than 9MB, but the array itself may be of any size.
 
         Args:
+            data: A JSON serializable data structure to be stored in the dataset. The JSON representation
+                of each item must be smaller than 9MB.
             kwargs: Keyword arguments for the storage client method.
         """
-        data = kwargs.get('data')
-
         # Handle singular items
         if not isinstance(data, list):
-            payload = await self._check_and_serialize(data)
-            return await self._resource_client.push_items(payload)
+            items = await self._check_and_serialize(data)
+            return await self._resource_client.push_items(items, **kwargs)
 
         # Handle lists
         payloads_generator = (await self._check_and_serialize(item, index) for index, item in enumerate(data))
 
         # Invoke client in series to preserve the order of data
-        async for chunk in self._chunk_by_size(payloads_generator):
-            await self._resource_client.push_items(chunk)
+        async for items in self._chunk_by_size(payloads_generator):
+            await self._resource_client.push_items(items, **kwargs)
 
         return None
 

@@ -126,7 +126,7 @@ async def main() -> None:
             'response': context.http_response.read().decode()[:1000],
         }
         # Extract the record and push it to the dataset
-        await context.push_data(data=data)
+        await context.push_data(data)
 
     # Run the crawler
     await crawler.run(['https://crawlee.dev'])
@@ -175,7 +175,7 @@ async def main() -> None:
             'url': context.request.url,
         }
         # Extract the record and push it to the dataset
-        await context.push_data(data=data)
+        await context.push_data(data)
 
     # Run the crawler
     await crawler.run(['https://crawlee.dev'])
@@ -203,7 +203,7 @@ from crawlee.enqueue_strategy import EnqueueStrategy
             'url': context.request.url,
         }
 
-        await context.push_data(data=data)
+        await context.push_data(data)
 ```
 
 #### PlaywrightCrawler
@@ -243,7 +243,7 @@ async def main() -> None:
             'page_title': await context.page.title(),
             'page_content': (await context.page.content())[:10000],
         }
-        await context.push_data(data=data)
+        await context.push_data(data)
 
     await crawler.run(['https://crawlee.dev'])
 
@@ -284,7 +284,7 @@ async def main() -> None:
             'page_title': await context.page.title(),
             'page_content': (await context.page.content())[:10000],
         }
-        await context.push_data(data=data)
+        await context.push_data(data)
 
     await crawler.run(['https://apify.com', 'https://crawlee.dev'])
 
