@@ -8,8 +8,6 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from typing_extensions import NotRequired, TypedDict, Unpack
 
-from crawlee.types import JSONSerializable
-
 if TYPE_CHECKING:
     from crawlee import Glob
     from crawlee.configuration import Configuration
@@ -19,6 +17,7 @@ if TYPE_CHECKING:
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions.session import Session
     from crawlee.storages.dataset import ExportToKwargs, GetDataKwargs, PushDataKwargs
+    from crawlee.types import JSONSerializable
 
 
 class AddRequestsFunctionKwargs(TypedDict):

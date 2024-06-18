@@ -46,6 +46,7 @@ if TYPE_CHECKING:
     from crawlee.statistics.models import FinalStatistics, StatisticsState
     from crawlee.storages.dataset import ExportToKwargs, GetDataKwargs, PushDataKwargs
     from crawlee.storages.request_provider import RequestProvider
+    from crawlee.types import JSONSerializable
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Union[Request, None]]]
@@ -391,6 +392,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     async def _push_data(
         self,
+        data: JSONSerializable,
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         configuration: Configuration | None = None,
@@ -409,7 +411,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             kwargs: Keyword arguments to be passed to the dataset's `push_data` method.
         """
         dataset = await Dataset.open(id=dataset_id, name=dataset_name, configuration=configuration)
-        await dataset.push_data(**kwargs)
+        await dataset.push_data(data, **kwargs)
 
     def _should_retry_request(self, crawling_context: BasicCrawlingContext, error: Exception) -> bool:
         if crawling_context.request.no_retry:
