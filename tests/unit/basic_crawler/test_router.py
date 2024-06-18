@@ -18,6 +18,7 @@ class MockContext(BasicCrawlingContext):
             send_request=AsyncMock(),
             add_requests=AsyncMock(),
             proxy_info=AsyncMock(),
+            push_data=AsyncMock(),
         )
 
 

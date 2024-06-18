@@ -108,36 +108,28 @@ Example usage:
 import asyncio
 
 from crawlee.http_crawler import HttpCrawler, HttpCrawlingContext
-from crawlee.storages import Dataset, RequestQueue
 
 
 async def main() -> None:
-    # Open a default request queue and add requests to it
-    rq = await RequestQueue.open()
-    await rq.add_request('https://crawlee.dev')
-
-    # Open a default dataset for storing results
-    dataset = await Dataset.open()
-
-    # Create a HttpCrawler instance and provide a request provider
-    crawler = HttpCrawler(request_provider=rq)
+    # Create a HttpCrawler instance and provide a starting requests
+    crawler = HttpCrawler()
 
     # Define a handler for processing requests
     @crawler.router.default_handler
     async def request_handler(context: HttpCrawlingContext) -> None:
         # Crawler will provide a HttpCrawlingContext instance,
         # from which you can access the request and response data
-        record = {
+        data = {
             'url': context.request.url,
             'status_code': context.http_response.status_code,
             'headers': dict(context.http_response.headers),
             'response': context.http_response.read().decode()[:1000],
         }
         # Extract the record and push it to the dataset
-        await dataset.push_data(record)
+        await context.push_data(data)
 
     # Run the crawler
-    await crawler.run()
+    await crawler.run(['https://crawlee.dev'])
 
 
 if __name__ == '__main__':
@@ -167,34 +159,26 @@ Example usage:
 import asyncio
 
 from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
-from crawlee.storages import Dataset, RequestQueue
 
 
 async def main() -> None:
-    # Open a default request queue and add requests to it
-    rq = await RequestQueue.open()
-    await rq.add_request('https://crawlee.dev')
-
-    # Open a default dataset for storing results
-    dataset = await Dataset.open()
-
     # Create a BeautifulSoupCrawler instance and provide a request provider
-    crawler = BeautifulSoupCrawler(request_provider=rq)
+    crawler = BeautifulSoupCrawler()
 
     # Define a handler for processing requests
     @crawler.router.default_handler
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         # Crawler will provide a BeautifulSoupCrawlingContext instance,
         # from which you can access the request and response data
-        record = {
+        data = {
             'title': context.soup.title.text,
             'url': context.request.url,
         }
         # Extract the record and push it to the dataset
-        await dataset.push_data(record)
+        await context.push_data(data)
 
     # Run the crawler
-    await crawler.run()
+    await crawler.run(['https://crawlee.dev'])
 
 
 if __name__ == '__main__':
@@ -214,12 +198,12 @@ from crawlee.enqueue_strategy import EnqueueStrategy
         # Use enqueue links helper to enqueue all links from the page with the same domain
         await context.enqueue_links(strategy=EnqueueStrategy.SAME_DOMAIN)
 
-        record = {
+        data = {
             'title': context.soup.title.text,
             'url': context.request.url,
         }
 
-        await dataset.push_data(record)
+        await context.push_data(data)
 ```
 
 #### PlaywrightCrawler
@@ -242,35 +226,26 @@ Example usage:
 import asyncio
 
 from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
-from crawlee.storages import Dataset, RequestQueue
 
 
 async def main() -> None:
-    # Open a default request queue and add requests to it
-    rq = await RequestQueue.open()
-    await rq.add_request('https://crawlee.dev')
-
-    # Open a default dataset for storing results
-    dataset = await Dataset.open()
-
     # Create a crawler instance and provide a request provider (and other optional arguments)
     crawler = PlaywrightCrawler(
-        request_provider=rq,
         # headless=False,
         # browser_type='firefox',
     )
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
-        record = {
+        data = {
             'request_url': context.request.url,
             'page_url': context.page.url,
             'page_title': await context.page.title(),
             'page_content': (await context.page.content())[:10000],
         }
-        await dataset.push_data(record)
+        await context.push_data(data)
 
-    await crawler.run()
+    await crawler.run(['https://crawlee.dev'])
 
 
 if __name__ == '__main__':
@@ -284,18 +259,9 @@ import asyncio
 
 from crawlee.browsers import BrowserPool, PlaywrightBrowserPlugin
 from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
-from crawlee.storages import Dataset, RequestQueue
 
 
 async def main() -> None:
-    # Open a default request queue and add requests to it
-    rq = await RequestQueue.open()
-    await rq.add_request('https://crawlee.dev')
-    await rq.add_request('https://apify.com')
-
-    # Open a default dataset for storing results
-    dataset = await Dataset.open()
-
     # Create a browser pool with a Playwright browser plugin
     browser_pool = BrowserPool(
         plugins=[
@@ -308,19 +274,19 @@ async def main() -> None:
     )
 
     # Create a crawler instance and provide a browser pool and request provider
-    crawler = PlaywrightCrawler(request_provider=rq, browser_pool=browser_pool)
+    crawler = PlaywrightCrawler(browser_pool=browser_pool)
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
-        record = {
+        data = {
             'request_url': context.request.url,
             'page_url': context.page.url,
             'page_title': await context.page.title(),
             'page_content': (await context.page.content())[:10000],
         }
-        await dataset.push_data(record)
+        await context.push_data(data)
 
-    await crawler.run()
+    await crawler.run(['https://apify.com', 'https://crawlee.dev'])
 
 
 if __name__ == '__main__':

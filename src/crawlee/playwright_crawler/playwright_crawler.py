@@ -64,8 +64,9 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
         yield PlaywrightCrawlingContext(
             request=context.request,
             session=context.session,
-            send_request=context.send_request,
             add_requests=context.add_requests,
+            send_request=context.send_request,
+            push_data=context.push_data,
             proxy_info=context.proxy_info,
             page=crawlee_page.page,
         )

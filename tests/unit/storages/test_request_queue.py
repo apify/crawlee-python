@@ -143,7 +143,7 @@ async def test_reclaim_request(request_queue: RequestQueue) -> None:
 )
 async def test_add_batched_requests(
     request_queue: RequestQueue,
-    requests: Sequence[BaseRequestData | Request | str],
+    requests: Sequence[str | BaseRequestData | Request],
 ) -> None:
     request_count = len(requests)
 
