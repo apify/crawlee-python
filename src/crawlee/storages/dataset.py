@@ -164,19 +164,19 @@ class Dataset(BaseStorage):
         Args:
             kwargs: Keyword arguments for the storage client method.
         """
-        data = kwargs.pop('data')
+        data = kwargs.get('data')
 
         # Handle singular items
         if not isinstance(data, list):
             payload = await self._check_and_serialize(data)
-            return await self._resource_client.push_items(payload, **kwargs)
+            return await self._resource_client.push_items(payload)
 
         # Handle lists
         payloads_generator = (await self._check_and_serialize(item, index) for index, item in enumerate(data))
 
         # Invoke client in series to preserve the order of data
         async for chunk in self._chunk_by_size(payloads_generator):
-            await self._resource_client.push_items(chunk, **kwargs)
+            await self._resource_client.push_items(chunk)
 
         return None
 
@@ -207,10 +207,10 @@ class Dataset(BaseStorage):
         Args:
             kwargs: Keyword arguments for the storage client method.
         """
-        key = kwargs.pop('key')
-        content_type = kwargs.pop('content_type', 'json')
-        to_key_value_store_id = kwargs.pop('to_key_value_store_id', None)
-        to_key_value_store_name = kwargs.pop('to_key_value_store_name', None)
+        key = kwargs.get('key')
+        content_type = kwargs.get('content_type', 'json')
+        to_key_value_store_id = kwargs.get('to_key_value_store_id', None)
+        to_key_value_store_name = kwargs.get('to_key_value_store_name', None)
 
         key_value_store = await KeyValueStore.open(id=to_key_value_store_id, name=to_key_value_store_name)
         items: list[dict] = []
