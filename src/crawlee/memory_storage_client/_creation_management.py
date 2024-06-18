@@ -401,7 +401,6 @@ def _determine_storage_path(
     from crawlee.memory_storage_client.dataset_client import DatasetClient
     from crawlee.memory_storage_client.key_value_store_client import KeyValueStoreClient
     from crawlee.memory_storage_client.request_queue_client import RequestQueueClient
-
     from crawlee.storages._creation_management import _get_default_storage_id
 
     configuration = memory_storage_client._configuration  # noqa: SLF001
