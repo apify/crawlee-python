@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 from collections import defaultdict
-from contextlib import suppress
 from datetime import timedelta
 from functools import wraps
 from logging import getLogger
@@ -14,6 +13,7 @@ from pyee.asyncio import AsyncIOEventEmitter
 from typing_extensions import NotRequired
 
 from crawlee._utils.recurring_task import RecurringTask
+from crawlee._utils.wait import wait_for_all_tasks_for_finish
 from crawlee.events.types import Event, EventPersistStateData
 
 if TYPE_CHECKING:
@@ -173,21 +173,8 @@ class EventManager:
                     logger.exception('Event listener raised an exception.', exc_info=result)
 
         tasks = [asyncio.create_task(wait_for_listeners(), name=f'Task-{wait_for_listeners.__name__}')]
-        timeout_secs = timeout.total_seconds() if timeout else None
 
-        try:
-            _, pending = await asyncio.wait(tasks, timeout=timeout_secs)
-            if pending:
-                logger.warning('Waiting timeout reached; canceling unfinished event listeners.')
-        except asyncio.CancelledError:
-            logger.warning('Asyncio wait was cancelled; canceling unfinished event listeners.')
-            raise
-        finally:
-            for task in tasks:
-                if not task.done():
-                    task.cancel()
-                    with suppress(asyncio.CancelledError):
-                        await task
+        await wait_for_all_tasks_for_finish(tasks=tasks, logger=logger, timeout=timeout)
 
     async def _emit_persist_state_event(self) -> None:
         """Emits a persist state event with the given migration status."""

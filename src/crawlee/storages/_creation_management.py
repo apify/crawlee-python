@@ -128,7 +128,7 @@ async def open_storage(
     id: str | None = None,
     name: str | None = None,
 ) -> TResource:
-    """Open a either a new key-value store or restore existing one and return it."""
+    """Open either a new storage or restore an existing one and return it."""
     configuration = configuration or Configuration()
     storage_client = StorageClientManager.get_storage_client(in_cloud=configuration.in_cloud)
 
