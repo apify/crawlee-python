@@ -10,7 +10,6 @@ from typing_extensions import NotRequired, TypedDict, Unpack
 
 if TYPE_CHECKING:
     from crawlee import Glob
-    from crawlee.configuration import Configuration
     from crawlee.enqueue_strategy import EnqueueStrategy
     from crawlee.http_clients.base_http_client import HttpResponse
     from crawlee.models import BaseRequestData, DatasetItemsListPage, Request
@@ -55,7 +54,6 @@ class GetDataFunction(Protocol):
         self,
         dataset_id: str | None = None,
         dataset_name: str | None = None,
-        configuration: Configuration | None = None,
         **kwargs: Unpack[GetDataKwargs],
     ) -> Coroutine[None, None, DatasetItemsListPage]: ...
 
@@ -72,7 +70,6 @@ class PushDataFunction(Protocol):
         data: JSONSerializable,
         dataset_id: str | None = None,
         dataset_name: str | None = None,
-        configuration: Configuration | None = None,
         **kwargs: Unpack[PushDataKwargs],
     ) -> Coroutine[None, None, None]: ...
 
@@ -88,7 +85,6 @@ class ExportToFunction(Protocol):
         self,
         dataset_id: str | None = None,
         dataset_name: str | None = None,
-        configuration: Configuration | None = None,
         **kwargs: Unpack[ExportToKwargs],
     ) -> Coroutine[None, None, None]: ...
 
