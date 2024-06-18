@@ -59,51 +59,6 @@ async def persist_metadata_if_enabled(*, data: dict, entity_directory: str, writ
         await f.write(s.encode('utf-8'))
 
 
-def _determine_storage_path(
-    resource_client_class: type[TResourceClient],
-    memory_storage_client: MemoryStorageClient,
-    id: str | None = None,
-    name: str | None = None,
-) -> str | None:
-    from crawlee.memory_storage_client.dataset_client import DatasetClient
-    from crawlee.memory_storage_client.key_value_store_client import KeyValueStoreClient
-    from crawlee.memory_storage_client.request_queue_client import RequestQueueClient
-
-    if issubclass(resource_client_class, DatasetClient):
-        storages_dir = memory_storage_client.datasets_directory
-    elif issubclass(resource_client_class, KeyValueStoreClient):
-        storages_dir = memory_storage_client.key_value_stores_directory
-    elif issubclass(resource_client_class, RequestQueueClient):
-        storages_dir = memory_storage_client.request_queues_directory
-    else:
-        raise TypeError('Invalid resource client class.')
-
-    # Try to find by name directly from directories
-    if name:
-        possible_storage_path = os.path.join(storages_dir, name)
-        if os.access(possible_storage_path, os.F_OK):
-            return possible_storage_path
-
-    # If not found, try finding by metadata
-    if os.access(storages_dir, os.F_OK):
-        for entry in os.scandir(storages_dir):
-            if entry.is_dir():
-                metadata_path = os.path.join(entry.path, METADATA_FILENAME)
-                if os.access(metadata_path, os.F_OK):
-                    with open(metadata_path, encoding='utf-8') as metadata_file:
-                        metadata = json.load(metadata_file)
-                    if (id and metadata.get('id') == id) or (name and metadata.get('name') == name):
-                        return entry.path
-
-    # Check for default storage directory as a last resort
-    if id == 'default':
-        possible_storage_path = os.path.join(storages_dir, id)
-        if os.access(possible_storage_path, os.F_OK):
-            return possible_storage_path
-
-    return None
-
-
 def find_or_create_client_by_id_or_name_inner(
     resource_client_class: type[TResourceClient],
     memory_storage_client: MemoryStorageClient,
@@ -432,3 +387,48 @@ def create_rq_from_directory(
 
     new_client.requests.update(entries)
     return new_client
+
+
+def _determine_storage_path(
+    resource_client_class: type[TResourceClient],
+    memory_storage_client: MemoryStorageClient,
+    id: str | None = None,
+    name: str | None = None,
+) -> str | None:
+    from crawlee.memory_storage_client.dataset_client import DatasetClient
+    from crawlee.memory_storage_client.key_value_store_client import KeyValueStoreClient
+    from crawlee.memory_storage_client.request_queue_client import RequestQueueClient
+
+    if issubclass(resource_client_class, DatasetClient):
+        storages_dir = memory_storage_client.datasets_directory
+    elif issubclass(resource_client_class, KeyValueStoreClient):
+        storages_dir = memory_storage_client.key_value_stores_directory
+    elif issubclass(resource_client_class, RequestQueueClient):
+        storages_dir = memory_storage_client.request_queues_directory
+    else:
+        raise TypeError('Invalid resource client class.')
+
+    # Try to find by name directly from directories
+    if name:
+        possible_storage_path = os.path.join(storages_dir, name)
+        if os.access(possible_storage_path, os.F_OK):
+            return possible_storage_path
+
+    # If not found, try finding by metadata
+    if os.access(storages_dir, os.F_OK):
+        for entry in os.scandir(storages_dir):
+            if entry.is_dir():
+                metadata_path = os.path.join(entry.path, METADATA_FILENAME)
+                if os.access(metadata_path, os.F_OK):
+                    with open(metadata_path, encoding='utf-8') as metadata_file:
+                        metadata = json.load(metadata_file)
+                    if (id and metadata.get('id') == id) or (name and metadata.get('name') == name):
+                        return entry.path
+
+    # Check for default storage directory as a last resort
+    if id == 'default':
+        possible_storage_path = os.path.join(storages_dir, id)
+        if os.access(possible_storage_path, os.F_OK):
+            return possible_storage_path
+
+    return None
