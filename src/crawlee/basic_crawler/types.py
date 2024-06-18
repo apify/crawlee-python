@@ -125,9 +125,7 @@ class BasicCrawlingContext:
     proxy_info: ProxyInfo | None
     send_request: SendRequestFunction
     add_requests: AddRequestsFunction
-    get_data: GetDataFunction
     push_data: PushDataFunction
-    export_to: ExportToFunction
 
 
 class AddRequestsFunctionCall(AddRequestsFunctionKwargs):

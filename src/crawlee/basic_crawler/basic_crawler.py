@@ -617,9 +617,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             proxy_info=proxy_info,
             send_request=self._prepare_send_request_function(session, proxy_info),
             add_requests=result.add_requests,
-            get_data=self.get_data,
             push_data=self.push_data,
-            export_to=self.export_to,
         )
 
         statistics_id = request.id or request.unique_key

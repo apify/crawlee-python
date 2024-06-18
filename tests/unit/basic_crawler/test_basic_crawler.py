@@ -554,10 +554,10 @@ async def test_context_push_and_export_data() -> None:
         await context.push_data(data=[{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}])
         await context.push_data(data={'id': 2, 'test': 'test'})
 
-        await context.export_to(key='dataset-json', content_type='json')
-        await context.export_to(key='dataset-csv', content_type='csv')
-
     await crawler.run()
+
+    await crawler.export_to(key='dataset-json', content_type='json')
+    await crawler.export_to(key='dataset-csv', content_type='csv')
 
     kvs = await KeyValueStore.open()
     assert await kvs.get_value('dataset-json') == [

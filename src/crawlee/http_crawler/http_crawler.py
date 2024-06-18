@@ -62,9 +62,7 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
             proxy_info=context.proxy_info,
             add_requests=context.add_requests,
             send_request=context.send_request,
-            get_data=context.get_data,
             push_data=context.push_data,
-            export_to=context.export_to,
             http_response=result.http_response,
         )
 
