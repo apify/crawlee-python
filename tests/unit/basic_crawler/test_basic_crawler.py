@@ -18,7 +18,9 @@ from crawlee.basic_crawler.errors import SessionError
 from crawlee.basic_crawler.types import AddRequestsFunctionKwargs, BasicCrawlingContext
 from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.models import BaseRequestData, Request
-from crawlee.storages import RequestList
+from crawlee.storages import KeyValueStore, RequestList
+from crawlee.storages.dataset import Dataset
+from crawlee.storages.request_queue import RequestQueue
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -464,3 +466,103 @@ async def test_final_statistics() -> None:
 
     assert final_statistics.requests_finished_per_minute > 0
     assert final_statistics.requests_failed_per_minute > 0
+
+
+async def test_crawler_get_storages() -> None:
+    crawler = BasicCrawler()
+
+    rp = await crawler.get_request_provider()
+    assert isinstance(rp, RequestQueue)
+
+    dataset = await crawler.get_dataset()
+    assert isinstance(dataset, Dataset)
+
+    kvs = await crawler.get_key_value_store()
+    assert isinstance(kvs, KeyValueStore)
+
+
+async def test_crawler_start_requests() -> None:
+    crawler = BasicCrawler(['https://httpbin.org/1', 'https://httpbin.org/2', 'https://httpbin.org/3'])
+    seen_urls = list[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        seen_urls.append(context.request.url)
+
+    stats = await crawler.run()
+
+    assert seen_urls == ['https://httpbin.org/1', 'https://httpbin.org/2', 'https://httpbin.org/3']
+    assert stats.requests_total == 3
+    assert stats.requests_finished == 3
+
+
+async def test_crawler_push_and_get_data() -> None:
+    crawler = BasicCrawler()
+
+    await crawler.push_data(data='{"a": 1}')
+
+    assert (await crawler.get_data()).items == [{'a': 1}]
+
+    await crawler.push_data(data='{"b": 2}')
+
+    assert (await crawler.get_data()).items == [{'a': 1}, {'b': 2}]
+    assert (await crawler.get_data()).items == [{'a': 1}, {'b': 2}]
+
+
+async def test_context_push_and_get_data() -> None:
+    crawler = BasicCrawler(['https://httpbin.org/1'])
+
+    await crawler.push_data(data='{"a": 1}')
+    assert (await crawler.get_data()).items == [{'a': 1}]
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        await crawler.push_data(data='{"b": 2}')
+
+    await crawler.push_data(data='{"c": 3}')
+    assert (await crawler.get_data()).items == [{'a': 1}, {'c': 3}]
+
+    stats = await crawler.run()
+
+    assert (await crawler.get_data()).items == [{'a': 1}, {'c': 3}, {'b': 2}]
+    assert stats.requests_total == 1
+    assert stats.requests_finished == 1
+
+
+async def test_crawler_push_and_export_data() -> None:
+    crawler = BasicCrawler()
+    await crawler.push_data(data=[{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}])
+    await crawler.push_data(data={'id': 2, 'test': 'test'})
+
+    await crawler.export_to(key='dataset-json', content_type='json')
+    await crawler.export_to(key='dataset-csv', content_type='csv')
+
+    kvs = await KeyValueStore.open()
+    assert await kvs.get_value('dataset-json') == [
+        {'id': 0, 'test': 'test'},
+        {'id': 1, 'test': 'test'},
+        {'id': 2, 'test': 'test'},
+    ]
+    assert await kvs.get_value('dataset-csv') == 'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
+
+
+async def test_context_push_and_export_data() -> None:
+    crawler = BasicCrawler(['https://httpbin.org/1'])
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        await context.push_data(data=[{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}])
+        await context.push_data(data={'id': 2, 'test': 'test'})
+
+        await context.export_to(key='dataset-json', content_type='json')
+        await context.export_to(key='dataset-csv', content_type='csv')
+
+    await crawler.run()
+
+    kvs = await KeyValueStore.open()
+    assert await kvs.get_value('dataset-json') == [
+        {'id': 0, 'test': 'test'},
+        {'id': 1, 'test': 'test'},
+        {'id': 2, 'test': 'test'},
+    ]
+    assert await kvs.get_value('dataset-csv') == 'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'

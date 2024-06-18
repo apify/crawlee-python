@@ -58,7 +58,7 @@ class RequestProvider(ABC):
     @abstractmethod
     async def add_requests_batched(
         self,
-        requests: Sequence[BaseRequestData | Request | str],
+        requests: Sequence[str | BaseRequestData | Request],
         *,
         batch_size: int = 1000,
         wait_time_between_batches: timedelta = timedelta(seconds=1),
@@ -75,15 +75,25 @@ class RequestProvider(ABC):
             wait_for_all_requests_to_be_added_timeout: Timeout for waiting for all requests to be added.
         """
 
-    def _transform_requests(self, requests: Sequence[BaseRequestData | Request | str]) -> list[Request]:
+    def _transform_request(self, request: str | BaseRequestData | Request) -> Request:
+        """Transforms a request-like object into a Request object."""
+        if isinstance(request, Request):
+            return request
+
+        if isinstance(request, str):
+            return Request.from_url(request)
+
+        if isinstance(request, BaseRequestData):
+            return Request.from_base_request_data(request)
+
+        raise ValueError(f'Invalid request type: {type(request)}')
+
+    def _transform_requests(self, requests: Sequence[str | BaseRequestData | Request]) -> list[Request]:
         """Transforms a list of request-like objects into a list of Request objects."""
         processed_requests: list[Request] = []
 
         for request in requests:
-            if isinstance(request, BaseRequestData):
-                processed_request = Request.from_base_request_data(request)
-            elif isinstance(request, str):
-                processed_request = Request.from_url(request)
+            processed_request = self._transform_request(request)
             processed_requests.append(processed_request)
 
         return processed_requests

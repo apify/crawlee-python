@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import csv
 import io
-from typing import TYPE_CHECKING, AsyncIterator
+from typing import TYPE_CHECKING, AsyncIterator, Literal, TypedDict
 
-from typing_extensions import override
+from typing_extensions import NotRequired, Required, Unpack, override
 
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.file import json_dumps
@@ -17,6 +17,63 @@ if TYPE_CHECKING:
     from crawlee.configuration import Configuration
     from crawlee.models import DatasetItemsListPage
     from crawlee.types import JSONSerializable
+
+
+class GetDataKwargs(TypedDict):
+    """Keyword arguments for dataset's `get_data` method.
+
+    Args:
+        offset: Skips the specified number of items at the start.
+        limit: The maximum number of items to retrieve. Unlimited if None.
+        clean: Returns only non-empty items and excludes hidden fields. Shortcut for skip_hidden and skip_empty.
+        desc: Set True to sort results in descending order.
+        fields: Fields to include in each item. Sorts fields as specified if provided.
+        omit: Fields to exclude from each item.
+        unwind: Unwinds items by a specified array field, turning each element into a separate item.
+        skip_empty: Excludes empty items from the results if True.
+        skip_hidden: Excludes fields starting with '#' if True.
+        flatten: Fields to be flattened in returned items.
+        view: Specifies the dataset view to be used.
+    """
+
+    offset: NotRequired[int]
+    limit: NotRequired[int]
+    clean: NotRequired[bool]
+    desc: NotRequired[bool]
+    fields: NotRequired[list[str]]
+    omit: NotRequired[list[str]]
+    unwind: NotRequired[str]
+    skip_empty: NotRequired[bool]
+    skip_hidden: NotRequired[bool]
+    flatten: NotRequired[list[str]]
+    view: NotRequired[str]
+
+
+class PushDataKwargs(TypedDict):
+    """Keyword arguments for dataset's `push_data` method.
+
+    Args:
+        data: A JSON serializable data structure to be stored in the dataset. The JSON representation
+            of each item must be smaller than 9MB.
+    """
+
+    data: Required[JSONSerializable]
+
+
+class ExportToKwargs(TypedDict):
+    """Keyword arguments for dataset's `export_to` method.
+
+    Args:
+        key: The key under which to save the data.
+        content_type: The format in which to export the data. Either 'json' or 'csv'.
+        to_key_value_store_id: ID of the key-value store to save the exported file.
+        to_key_value_store_name: Name of the key-value store to save the exported file.
+    """
+
+    key: Required[str]
+    content_type: NotRequired[Literal['json', 'csv']]
+    to_key_value_store_id: NotRequired[str]
+    to_key_value_store_name: NotRequired[str]
 
 
 class Dataset(BaseStorage):
@@ -97,7 +154,7 @@ class Dataset(BaseStorage):
         await self._resource_client.delete()
         remove_storage_from_cache(storage_class=self.__class__, id=self._id, name=self._name)
 
-    async def push_data(self, data: JSONSerializable) -> None:
+    async def push_data(self, **kwargs: Unpack[PushDataKwargs]) -> None:
         """Store an object or an array of objects to the dataset.
 
         The size of the data is limited by the receiving API and therefore `push_data()` will only
@@ -105,132 +162,84 @@ class Dataset(BaseStorage):
         none of the included objects may be larger than 9MB, but the array itself may be of any size.
 
         Args:
-            data: A JSON serializable data structure to be stored in the dataset.
-                The JSON representation of each item must be smaller than 9MB.
+            kwargs: Keyword arguments for the storage client method.
         """
+        data = kwargs.pop('data')
+
         # Handle singular items
         if not isinstance(data, list):
             payload = await self._check_and_serialize(data)
-            return await self._resource_client.push_items(payload)
+            return await self._resource_client.push_items(payload, **kwargs)
 
         # Handle lists
         payloads_generator = (await self._check_and_serialize(item, index) for index, item in enumerate(data))
 
         # Invoke client in series to preserve the order of data
         async for chunk in self._chunk_by_size(payloads_generator):
-            await self._resource_client.push_items(chunk)
+            await self._resource_client.push_items(chunk, **kwargs)
 
         return None
 
-    async def get_data(
-        self,
-        *,
-        offset: int | None = None,
-        limit: int | None = None,
-        clean: bool = False,
-        desc: bool = False,
-        fields: list[str] | None = None,
-        omit: list[str] | None = None,
-        unwind: str | None = None,
-        skip_empty: bool = False,
-        skip_hidden: bool = False,
-        flatten: list[str] | None = None,
-        view: str | None = None,
-    ) -> DatasetItemsListPage:
+    async def get_data(self, **kwargs: Unpack[GetDataKwargs]) -> DatasetItemsListPage:
         """Retrieves dataset items based on filtering, sorting, and pagination parameters.
 
         This method allows customization of the data retrieval process from a dataset, supporting operations such as
         field selection, ordering, and skipping specific records based on provided parameters.
 
         Args:
-            offset: Skips the specified number of items at the start.
-            limit: The maximum number of items to retrieve. Unlimited if None.
-            clean: Returns only non-empty items and excludes hidden fields. Shortcut for skip_hidden and skip_empty.
-            desc: Set True to sort results in descending order.
-            fields: Fields to include in each item. Sorts fields as specified if provided.
-            omit: Fields to exclude from each item.
-            unwind: Unwinds items by a specified array field, turning each element into a separate item.
-            skip_empty: Excludes empty items from the results if True.
-            skip_hidden: Excludes fields starting with '#' if True.
-            flatten: Fields to be flattened in returned items.
-            view: Specifies the dataset view to be used.
+            kwargs: Keyword arguments for the storage client method.
 
         Returns:
             List page containing filtered and paginated dataset items.
         """
         # TODO: Improve error handling here
         # https://github.com/apify/apify-sdk-python/issues/140
-        return await self._resource_client.list_items(
-            offset=offset,
-            limit=limit,
-            desc=desc,
-            clean=clean,
-            fields=fields,
-            omit=omit,
-            unwind=unwind,
-            skip_empty=skip_empty,
-            skip_hidden=skip_hidden,
-            flatten=flatten,
-            view=view,
-        )
+        return await self._resource_client.list_items(**kwargs)
 
-    async def export_to_json(
-        self,
-        key: str,
-        *,
-        to_key_value_store_id: str | None = None,
-        to_key_value_store_name: str | None = None,
-    ) -> None:
-        """Exports a dataset's contents into a single JSON file in a specified key-value store.
+    async def export_to(self, **kwargs: Unpack[ExportToKwargs]) -> None:
+        """Exports the entire dataset into a specified file stored under a key in a key-value store.
 
-        This method consolidates all entries from a specified dataset into one JSON file, which is then saved under a
-        given key in a key-value store. Either the dataset's ID or name should be specified, and similarly, either the
-        target key-value store's ID or name should be used.
+        This method consolidates all entries from a specified dataset into one file, which is then saved under a
+        given key in a key-value store. The format of the exported file is determined by the `content_type` parameter.
+        Either the dataset's ID or name should be specified, and similarly, either the target key-value store's ID or
+        name should be used.
 
         Args:
-            key: The key under which to save the JSON data.
-            to_key_value_store_id: ID of the key-value store to save the exported file. Defaults to default store.
-            to_key_value_store_name: Name of the key-value store to save the exported file. Use if no store ID provided.
-
-        Note:
-            Specify only one of `from_dataset_id` and `from_dataset_name`, and one of `to_key_value_store_id` and
-            `to_key_value_store_name`. If both or neither are specified in each pair, defaults are used.
+            kwargs: Keyword arguments for the storage client method.
         """
-        await self._export_to(
-            key,
-            to_key_value_store_id=to_key_value_store_id,
-            to_key_value_store_name=to_key_value_store_name,
-            content_type='application/json',
-        )
+        key = kwargs.pop('key')
+        content_type = kwargs.pop('content_type', 'json')
+        to_key_value_store_id = kwargs.pop('to_key_value_store_id', None)
+        to_key_value_store_name = kwargs.pop('to_key_value_store_name', None)
 
-    async def export_to_csv(
-        self,
-        key: str,
-        *,
-        to_key_value_store_id: str | None = None,
-        to_key_value_store_name: str | None = None,
-    ) -> None:
-        """Exports the entire dataset contents into a CSV file stored under a specified key in a key-value store.
+        key_value_store = await KeyValueStore.open(id=to_key_value_store_id, name=to_key_value_store_name)
+        items: list[dict] = []
+        limit = 1000
+        offset = 0
 
-        The method exports data from the specified dataset, identifying it by `from_dataset_id` or `from_dataset_name`,
-        into a CSV file. This file is then saved in the designated key-value store, determined
-        by `to_key_value_store_id` or `to_key_value_store_name`.
+        while True:
+            list_items = await self._resource_client.list_items(limit=limit, offset=offset)
+            items.extend(list_items.items)
+            if list_items.total <= offset + list_items.count:
+                break
+            offset += list_items.count
 
-        Args:
-            key: Key under which to save the CSV data.
-            to_key_value_store_id: Optional key-value store ID to save the exported file.
-            to_key_value_store_name: Optional key-value store name to save the exported file.
+        if len(items) == 0:
+            raise ValueError('Cannot export an empty dataset')
 
-        Note:
-            Specify only one dataset source (`from_dataset_id` or `from_dataset_name`) and one storage destination
-            (`to_key_value_store_id` or `to_key_value_store_name`). Default settings apply if omitted.
-        """
-        await self._export_to(
-            key,
-            to_key_value_store_id=to_key_value_store_id,
-            to_key_value_store_name=to_key_value_store_name,
-            content_type='text/csv',
-        )
+        if content_type == 'csv':
+            content_type_full = 'text/csv'
+            output = io.StringIO()
+            writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
+            writer.writerows([items[0].keys(), *[item.values() for item in items]])
+            value = output.getvalue()
+            return await key_value_store.set_value(key, value, content_type_full)
+
+        if content_type == 'json':
+            content_type_full = 'application/json'
+            return await key_value_store.set_value(key, items, content_type_full)
+
+        raise ValueError(f'Unsupported content type: {content_type}')
 
     async def get_info(self) -> DatasetMetadata | None:
         """Get an object containing general information about the dataset.
@@ -288,53 +297,6 @@ class Dataset(BaseStorage):
             skip_hidden=skip_hidden,
         ):
             yield item
-
-    async def _export_to(
-        self,
-        key: str,
-        *,
-        to_key_value_store_id: str | None = None,
-        to_key_value_store_name: str | None = None,
-        content_type: str | None = None,
-    ) -> None:
-        """Save the entirety of the dataset's contents into one file within a key-value store.
-
-        Args:
-            key: The key to save the data under.
-
-            to_key_value_store_id: The id of the key-value store in which the result will be saved.
-
-            to_key_value_store_name: The name of the key-value store in which the result will be saved. You must
-                specify only one of `to_key_value_store_id` and `to_key_value_store_name` arguments. If you omit both,
-                it uses the default key-value store.
-
-            content_type: Either 'text/csv' or 'application/json'. Defaults to JSON.
-        """
-        key_value_store = await KeyValueStore.open(id=to_key_value_store_id, name=to_key_value_store_name)
-        items: list[dict] = []
-        limit = 1000
-        offset = 0
-        while True:
-            list_items = await self._resource_client.list_items(limit=limit, offset=offset)
-            items.extend(list_items.items)
-            if list_items.total <= offset + list_items.count:
-                break
-            offset += list_items.count
-
-        if len(items) == 0:
-            raise ValueError('Cannot export an empty dataset')
-
-        if content_type == 'text/csv':
-            output = io.StringIO()
-            writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
-            writer.writerows([items[0].keys(), *[item.values() for item in items]])
-            value = output.getvalue()
-            return await key_value_store.set_value(key, value, content_type)
-
-        if content_type == 'application/json':
-            return await key_value_store.set_value(key, items)
-
-        raise ValueError(f'Unsupported content type: {content_type}')
 
     async def _check_and_serialize(self, item: JSONSerializable, index: int | None = None) -> str:
         """Serializes a given item to JSON, checks its serializability and size against a limit.

@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, AsyncContextManager, Callable, Generic, U
 
 import httpx
 from tldextract import TLDExtract
-from typing_extensions import NotRequired, TypedDict, TypeVar, assert_never
+from typing_extensions import NotRequired, TypedDict, TypeVar, Unpack, assert_never
 
 from crawlee import Glob
 from crawlee._utils.wait import wait_for
@@ -32,10 +32,10 @@ from crawlee.configuration import Configuration
 from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.events.local_event_manager import LocalEventManager
 from crawlee.http_clients.httpx_client import HttpxClient
-from crawlee.models import BaseRequestData, Request, RequestState
+from crawlee.models import BaseRequestData, DatasetItemsListPage, Request, RequestState
 from crawlee.sessions import SessionPool
 from crawlee.statistics.statistics import Statistics
-from crawlee.storages import RequestQueue
+from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 if TYPE_CHECKING:
     import re
@@ -44,6 +44,7 @@ if TYPE_CHECKING:
     from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
     from crawlee.sessions.session import Session
     from crawlee.statistics.models import FinalStatistics, StatisticsState
+    from crawlee.storages.dataset import ExportToKwargs, GetDataKwargs, PushDataKwargs
     from crawlee.storages.request_provider import RequestProvider
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
@@ -86,6 +87,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     def __init__(
         self,
+        start_requests: Sequence[str | BaseRequestData | Request] | None = None,
         *,
         request_provider: RequestProvider | None = None,
         request_handler: Callable[[TCrawlingContext], Awaitable[None]] | None = None,
@@ -106,6 +108,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         """Initialize the BasicCrawler.
 
         Args:
+            start_requests: A list of URLs to start crawling from
             request_provider: Provides requests to be processed
             request_handler: A callable to which request handling is delegated
             http_client: HTTP client to be used for `BasicCrawlingContext.send_request` and HTTP-only crawling.
@@ -126,6 +129,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 This parameter is meant to be used by child classes, not when BasicCrawler is instantiated directly.
             _additional_context_managers: Additional context managers to be used in the crawler lifecycle.
         """
+        self._start_requests = start_requests or []
         self._router: Router[TCrawlingContext] | None = None
 
         if isinstance(cast(Router, request_handler), Router):
@@ -227,12 +231,38 @@ class BasicCrawler(Generic[TCrawlingContext]):
             proxy_tier=None,
         )
 
-    async def get_request_provider(self) -> RequestProvider:
+    async def get_request_provider(
+        self,
+        *,
+        id: str | None = None,
+        name: str | None = None,
+        configuration: Configuration | None = None,
+    ) -> RequestProvider:
         """Return the configured request provider. If none is configured, open and return the default request queue."""
         if not self._request_provider:
-            self._request_provider = await RequestQueue.open()
+            self._request_provider = await RequestQueue.open(id=id, name=name, configuration=configuration)
 
         return self._request_provider
+
+    async def get_dataset(
+        self,
+        *,
+        id: str | None = None,
+        name: str | None = None,
+        configuration: Configuration | None = None,
+    ) -> Dataset:
+        """Return the dataset with the given ID or name. If none is provided, return the default dataset."""
+        return await Dataset.open(id=id, name=name, configuration=configuration)
+
+    async def get_key_value_store(
+        self,
+        *,
+        id: str | None = None,
+        name: str | None = None,
+        configuration: Configuration | None = None,
+    ) -> KeyValueStore:
+        """Return the key-value store with the given ID or name. If none is provided, return the default KVS."""
+        return await KeyValueStore.open(id=id, name=name, configuration=configuration)
 
     def error_handler(self, handler: ErrorHandler[TCrawlingContext]) -> ErrorHandler[TCrawlingContext]:
         """Decorator for configuring an error handler (called after a request handler error and before retrying)."""
@@ -246,7 +276,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._failed_request_handler = handler
         return handler
 
-    async def run(self, requests: list[str | BaseRequestData] | None = None) -> FinalStatistics:
+    async def run(self, requests: Sequence[str | BaseRequestData | Request] | None = None) -> FinalStatistics:
         """Run the crawler until all requests are processed."""
         if self._running:
             raise RuntimeError(
@@ -260,6 +290,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
             if self._use_session_pool:
                 await self._session_pool.reset_store()
+
+        await self.add_requests(self._start_requests)
 
         if requests is not None:
             await self.add_requests(requests)
@@ -286,12 +318,13 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         self._running = False
         self._has_finished_before = True
+        self._start_requests = []  # Clear the start requests to prevent them from being added again
 
         return self._statistics.calculate()
 
     async def add_requests(
         self,
-        requests: Sequence[BaseRequestData | Request | str],
+        requests: Sequence[str | BaseRequestData | Request],
         *,
         batch_size: int = 1000,
         wait_time_between_batches: timedelta = timedelta(0),
@@ -316,6 +349,73 @@ class BasicCrawler(Generic[TCrawlingContext]):
             wait_for_all_requests_to_be_added=wait_for_all_requests_to_be_added,
             wait_for_all_requests_to_be_added_timeout=wait_for_all_requests_to_be_added_timeout,
         )
+
+    async def push_data(
+        self,
+        dataset_id: str | None = None,
+        dataset_name: str | None = None,
+        configuration: Configuration | None = None,
+        **kwargs: Unpack[PushDataKwargs],
+    ) -> None:
+        """Push data to a dataset.
+
+        This helper method simplifies the process of pushing data to a dataset. It opens the specified
+        dataset and then pushes the provided data to it.
+
+        Args:
+            data: The data to push to the dataset.
+            dataset_id: The ID of the dataset.
+            dataset_name: The name of the dataset.
+            configuration: The configuration settings for accessing the dataset.
+            kwargs: Keyword arguments to be passed to the dataset's `push_data` method.
+        """
+        dataset = await Dataset.open(id=dataset_id, name=dataset_name, configuration=configuration)
+        await dataset.push_data(**kwargs)
+
+    async def get_data(
+        self,
+        dataset_id: str | None = None,
+        dataset_name: str | None = None,
+        configuration: Configuration | None = None,
+        **kwargs: Unpack[GetDataKwargs],
+    ) -> DatasetItemsListPage:
+        """Retrieve data from a dataset.
+
+        This helper method simplifies the process of retrieving data from a dataset. It opens the specified
+        dataset and then retrieves the data based on the provided parameters.
+
+        Args:
+            dataset_id: The ID of the dataset.
+            dataset_name: The name of the dataset.
+            configuration: The configuration settings for accessing the dataset.
+            kwargs: Keyword arguments to be passed to the dataset's `get_data` method.
+
+        Returns:
+            The retrieved data.
+        """
+        dataset = await Dataset.open(id=dataset_id, name=dataset_name, configuration=configuration)
+        return await dataset.get_data(**kwargs)
+
+    async def export_to(
+        self,
+        dataset_id: str | None = None,
+        dataset_name: str | None = None,
+        configuration: Configuration | None = None,
+        **kwargs: Unpack[ExportToKwargs],
+    ) -> None:
+        """Export data from a dataset.
+
+        This helper method simplifies the process of exporting data from a dataset. It opens the specified
+        dataset and then exports the data based on the provided parameters.
+
+        Args:
+            dataset_id: The ID of the dataset.
+            dataset_name: The name of the dataset.
+            configuration: The configuration settings for accessing the dataset.
+            kwargs: Keyword arguments to be passed to the dataset's `export_to` method.
+        """
+        dataset = await Dataset.open(id=dataset_id, name=dataset_name, configuration=configuration)
+        return await dataset.export_to(**kwargs)
 
     def _should_retry_request(self, crawling_context: BasicCrawlingContext, error: Exception) -> bool:
         if crawling_context.request.no_retry:
@@ -517,6 +617,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
             proxy_info=proxy_info,
             send_request=self._prepare_send_request_function(session, proxy_info),
             add_requests=result.add_requests,
+            get_data=self.get_data,
+            push_data=self.push_data,
+            export_to=self.export_to,
         )
 
         statistics_id = request.id or request.unique_key

@@ -6,26 +6,32 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
-from crawlee.models import BaseRequestData, Request
 from crawlee.storages.request_provider import RequestProvider
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from crawlee.models import BaseRequestData, Request
+
 
 class RequestList(RequestProvider):
     """Represents a (potentially very large) list of URLs to crawl."""
 
-    def __init__(self, sources: list[str | Request] | None = None, name: str | None = None) -> None:
+    def __init__(
+        self,
+        requests: Sequence[str | BaseRequestData | Request] | None = None,
+        name: str | None = None,
+    ) -> None:
         """Initialize the RequestList.
 
         Args:
-            sources: the URLs (or crawling requests) to crawl
+            requests: the URLs (or crawling requests) to crawl
             name: a name of the request list
         """
         self._name = name or ''
         self._handled_count = 0
-        self._sources = deque(url if isinstance(url, Request) else Request.from_url(url) for url in sources or [])
+
+        self._requests = deque(self._transform_requests(requests or []))
         self._in_progress = set[str]()
 
     @property
@@ -35,11 +41,11 @@ class RequestList(RequestProvider):
 
     @override
     async def get_total_count(self) -> int:
-        return len(self._sources)
+        return len(self._requests)
 
     @override
     async def is_empty(self) -> bool:
-        return len(self._sources) == 0
+        return len(self._requests) == 0
 
     @override
     async def is_finished(self) -> bool:
@@ -47,12 +53,12 @@ class RequestList(RequestProvider):
 
     @override
     async def drop(self) -> None:
-        self._sources.clear()
+        self._requests.clear()
 
     @override
     async def fetch_next_request(self) -> Request | None:
         try:
-            request = self._sources.popleft()
+            request = self._requests.popleft()
         except IndexError:
             return None
         else:
@@ -62,9 +68,9 @@ class RequestList(RequestProvider):
     @override
     async def reclaim_request(self, request: Request, *, forefront: bool = False) -> None:
         if forefront:
-            self._sources.appendleft(request)
+            self._requests.appendleft(request)
         else:
-            self._sources.append(request)
+            self._requests.append(request)
 
         self._in_progress.remove(request.id)
 
@@ -80,7 +86,7 @@ class RequestList(RequestProvider):
     @override
     async def add_requests_batched(
         self,
-        requests: Sequence[BaseRequestData | Request | str],
+        requests: Sequence[str | BaseRequestData | Request],
         *,
         batch_size: int = 1000,
         wait_time_between_batches: timedelta = timedelta(seconds=1),
@@ -88,4 +94,4 @@ class RequestList(RequestProvider):
         wait_for_all_requests_to_be_added_timeout: timedelta | None = None,
     ) -> None:
         transformed_requests = self._transform_requests(requests)
-        self._sources.extend(transformed_requests)
+        self._requests.extend(transformed_requests)

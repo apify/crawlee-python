@@ -11,6 +11,8 @@
 - Browser rotation with a maximum number of pages opened per browser.
 - Add emit persist state event to event manager
 - Add batched request addition in `RequestQueue`
+- Add start requests option to `BasicCrawler`
+- Add storage-related helpers `get_data`, `push_data` and `export_to` to `BasicCrawler` and `BasicContext`
 
 ## [0.0.4](../../releases/tag/v0.0.4) - 2024-05-30
 

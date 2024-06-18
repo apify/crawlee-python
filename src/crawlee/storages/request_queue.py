@@ -179,11 +179,7 @@ class RequestQueue(BaseStorage, RequestProvider):
             - `wasAlreadyPresent` (bool): Indicates whether the request was already in the queue.
             - `wasAlreadyHandled` (bool): Indicates whether the request was already processed.
         """
-        if isinstance(request, BaseRequestData):
-            request = Request.from_base_request_data(request)
-        elif isinstance(request, str):
-            request = Request.from_url(request)
-
+        request = self._transform_request(request)
         self._last_activity = datetime.now(timezone.utc)
 
         cache_key = unique_key_to_request_id(request.unique_key)
@@ -222,7 +218,7 @@ class RequestQueue(BaseStorage, RequestProvider):
     @override
     async def add_requests_batched(
         self,
-        requests: Sequence[BaseRequestData | Request | str],
+        requests: Sequence[str | BaseRequestData | Request],
         *,
         batch_size: int = 1000,
         wait_time_between_batches: timedelta = timedelta(seconds=1),

@@ -10,11 +10,13 @@ from typing_extensions import NotRequired, TypedDict, Unpack
 
 if TYPE_CHECKING:
     from crawlee import Glob
+    from crawlee.configuration import Configuration
     from crawlee.enqueue_strategy import EnqueueStrategy
     from crawlee.http_clients.base_http_client import HttpResponse
-    from crawlee.models import BaseRequestData, Request
+    from crawlee.models import BaseRequestData, DatasetItemsListPage, Request
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions.session import Session
+    from crawlee.storages.dataset import ExportToKwargs, GetDataKwargs, PushDataKwargs
 
 
 class AddRequestsFunctionKwargs(TypedDict):
@@ -28,10 +30,64 @@ class AddRequestsFunctionKwargs(TypedDict):
 
 
 class AddRequestsFunction(Protocol):
-    """Type of a function for adding URLs to the request queue with optional filtering."""
+    """Type of a function for adding URLs to the request queue with optional filtering.
+
+    This helper method simplifies the process of adding requests to the request provider. It opens the specified
+    request provider and adds the requests to it.
+    """
 
     def __call__(  # noqa: D102
-        self, requests: Sequence[str | BaseRequestData], **kwargs: Unpack[AddRequestsFunctionKwargs]
+        self,
+        requests: Sequence[str | BaseRequestData | Request],
+        **kwargs: Unpack[AddRequestsFunctionKwargs],
+    ) -> Coroutine[None, None, None]: ...
+
+
+class GetDataFunction(Protocol):
+    """Type of a function for getting data from the dataset.
+
+    This helper method simplifies the process of retrieving data from a dataset. It opens the specified
+    dataset and then retrieves the data based on the provided parameters.
+    """
+
+    def __call__(  # noqa: D102
+        self,
+        dataset_id: str | None = None,
+        dataset_name: str | None = None,
+        configuration: Configuration | None = None,
+        **kwargs: Unpack[GetDataKwargs],
+    ) -> Coroutine[None, None, DatasetItemsListPage]: ...
+
+
+class PushDataFunction(Protocol):
+    """Type of a function for pushing data to the dataset.
+
+    This helper method simplifies the process of pushing data to a dataset. It opens the specified
+    dataset and then pushes the provided data to it.
+    """
+
+    def __call__(  # noqa: D102
+        self,
+        dataset_id: str | None = None,
+        dataset_name: str | None = None,
+        configuration: Configuration | None = None,
+        **kwargs: Unpack[PushDataKwargs],
+    ) -> Coroutine[None, None, None]: ...
+
+
+class ExportToFunction(Protocol):
+    """Type of a function for exporting data from a dataset.
+
+    This helper method simplifies the process of exporting data from a dataset. It opens the specified
+    dataset and then exports its content to the key-value store.
+    """
+
+    def __call__(  # noqa: D102
+        self,
+        dataset_id: str | None = None,
+        dataset_name: str | None = None,
+        configuration: Configuration | None = None,
+        **kwargs: Unpack[ExportToKwargs],
     ) -> Coroutine[None, None, None]: ...
 
 
@@ -69,12 +125,15 @@ class BasicCrawlingContext:
     proxy_info: ProxyInfo | None
     send_request: SendRequestFunction
     add_requests: AddRequestsFunction
+    get_data: GetDataFunction
+    push_data: PushDataFunction
+    export_to: ExportToFunction
 
 
 class AddRequestsFunctionCall(AddRequestsFunctionKwargs):
     """Record of a call to `add_requests`."""
 
-    requests: Sequence[str | BaseRequestData]
+    requests: Sequence[str | BaseRequestData | Request]
 
 
 @dataclass()
@@ -84,7 +143,9 @@ class RequestHandlerRunResult:
     add_requests_calls: list[AddRequestsFunctionCall] = field(default_factory=list)
 
     async def add_requests(
-        self, requests: Sequence[str | BaseRequestData], **kwargs: Unpack[AddRequestsFunctionKwargs]
+        self,
+        requests: Sequence[str | BaseRequestData],
+        **kwargs: Unpack[AddRequestsFunctionKwargs],
     ) -> None:
         """Track a call to the `add_requests` context helper."""
         self.add_requests_calls.append(AddRequestsFunctionCall(requests=requests, **kwargs))

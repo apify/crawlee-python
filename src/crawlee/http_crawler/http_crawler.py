@@ -48,32 +48,31 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
 
         super().__init__(**kwargs)
 
-    async def _make_http_request(
-        self, crawling_context: BasicCrawlingContext
-    ) -> AsyncGenerator[HttpCrawlingContext, None]:
+    async def _make_http_request(self, context: BasicCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
         result = await self._http_client.crawl(
-            crawling_context.request,
-            crawling_context.session,
-            crawling_context.proxy_info,
+            context.request,
+            context.session,
+            context.proxy_info,
             self._statistics,
         )
 
         yield HttpCrawlingContext(
-            request=crawling_context.request,
-            session=crawling_context.session,
-            proxy_info=crawling_context.proxy_info,
-            send_request=crawling_context.send_request,
-            add_requests=crawling_context.add_requests,
+            request=context.request,
+            session=context.session,
+            proxy_info=context.proxy_info,
+            add_requests=context.add_requests,
+            send_request=context.send_request,
+            get_data=context.get_data,
+            push_data=context.push_data,
+            export_to=context.export_to,
             http_response=result.http_response,
         )
 
-    async def _handle_blocked_request(
-        self, crawling_context: HttpCrawlingContext
-    ) -> AsyncGenerator[HttpCrawlingContext, None]:
+    async def _handle_blocked_request(self, context: HttpCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
         if self._retry_on_blocked:
-            status_code = crawling_context.http_response.status_code
+            status_code = context.http_response.status_code
 
-            if crawling_context.session and crawling_context.session.is_blocked_status_code(status_code=status_code):
+            if context.session and context.session.is_blocked_status_code(status_code=status_code):
                 raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
 
-        yield crawling_context
+        yield context
