@@ -30,12 +30,12 @@ async def test_open() -> None:
     named_request_queue = await RequestQueue.open(name=request_queue_name)
     assert default_request_queue is not named_request_queue
 
-    with pytest.raises(RuntimeError, match='Request queue with id "nonexistent-id" does not exist!'):
+    with pytest.raises(RuntimeError, match='RequestQueue with id "nonexistent-id" does not exist!'):
         await RequestQueue.open(id='nonexistent-id')
 
     # Test that when you try to open a request queue by ID and you use a name of an existing request queue,
     # it doesn't work
-    with pytest.raises(RuntimeError, match='Request queue with id "dummy-name" does not exist!'):
+    with pytest.raises(RuntimeError, match='RequestQueue with id "dummy-name" does not exist!'):
         await RequestQueue.open(id='dummy-name')
 
 

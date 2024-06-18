@@ -16,7 +16,6 @@ from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import maybe_parse_body, raise_on_duplicate_storage, raise_on_non_existing_storage
 from crawlee._utils.file import determine_file_extension, force_remove, force_rename, is_file_or_bytes, json_dumps
 from crawlee.base_storage_client import BaseKeyValueStoreClient
-from crawlee.consts import KEY_VALUE_STORE_LABEL
 from crawlee.memory_storage_client._creation_management import (
     find_or_create_client_by_id_or_name_inner,
     persist_metadata_if_enabled,
@@ -44,7 +43,6 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
     def __init__(
         self,
         *,
-        base_storage_directory: str,
         memory_storage_client: MemoryStorageClient,
         id: str | None = None,
         name: str | None = None,
@@ -55,7 +53,6 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
         self.id = id or crypto_random_object_id()
         self.name = name
 
-        self._base_storage_directory = base_storage_directory
         self._memory_storage_client = memory_storage_client
         self._created_at = created_at or datetime.now(timezone.utc)
         self._accessed_at = accessed_at or datetime.now(timezone.utc)
@@ -79,37 +76,12 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
     @property
     def resource_directory(self) -> str:
         """Get the resource directory for the client."""
-        return os.path.join(self._base_storage_directory, self.name or self.id)
-
-    @classmethod
-    def find_or_create_client_by_id_or_name(
-        cls,
-        memory_storage_client: MemoryStorageClient,
-        id: str | None = None,
-        name: str | None = None,
-    ) -> KeyValueStoreClient | None:
-        """Restore existing or create a new key-value store client based on the given ID or name.
-
-        Args:
-            memory_storage_client: The memory storage client used to store and retrieve key-value store client.
-            id: The unique identifier for the key-value store client.
-            name: The name of the key-value store client.
-
-        Returns:
-            The found or created key-value store client, or None if no client could be found or created.
-        """
-        return find_or_create_client_by_id_or_name_inner(
-            resource_label=KEY_VALUE_STORE_LABEL,
-            storage_client_cache=memory_storage_client.key_value_stores_handled,
-            storages_dir=memory_storage_client.key_value_stores_directory,
-            memory_storage_client=memory_storage_client,
-            id=id,
-            name=name,
-        )
+        return os.path.join(self._memory_storage_client.key_value_stores_directory, self.name or self.id)
 
     @override
     async def get(self) -> KeyValueStoreMetadata | None:
-        found = self.find_or_create_client_by_id_or_name(
+        found = find_or_create_client_by_id_or_name_inner(
+            resource_client_class=KeyValueStoreClient,
             memory_storage_client=self._memory_storage_client,
             id=self.id,
             name=self.name,
@@ -125,7 +97,8 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
     @override
     async def update(self, *, name: str | None = None) -> KeyValueStoreMetadata:
         # Check by id
-        existing_store_by_id = self.find_or_create_client_by_id_or_name(
+        existing_store_by_id = find_or_create_client_by_id_or_name_inner(
+            resource_client_class=KeyValueStoreClient,
             memory_storage_client=self._memory_storage_client,
             id=self.id,
             name=self.name,
@@ -184,7 +157,8 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
         exclusive_start_key: str | None = None,
     ) -> KeyValueStoreListKeysPage:
         # Check by id
-        existing_store_by_id = self.find_or_create_client_by_id_or_name(
+        existing_store_by_id = find_or_create_client_by_id_or_name_inner(
+            resource_client_class=KeyValueStoreClient,
             memory_storage_client=self._memory_storage_client,
             id=self.id,
             name=self.name,
@@ -252,7 +226,8 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
     @override
     async def set_record(self, key: str, value: Any, content_type: str | None = None) -> None:
         # Check by id
-        existing_store_by_id = self.find_or_create_client_by_id_or_name(
+        existing_store_by_id = find_or_create_client_by_id_or_name_inner(
+            resource_client_class=KeyValueStoreClient,
             memory_storage_client=self._memory_storage_client,
             id=self.id,
             name=self.name,
@@ -295,7 +270,8 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
     @override
     async def delete_record(self, key: str) -> None:
         # Check by id
-        existing_store_by_id = self.find_or_create_client_by_id_or_name(
+        existing_store_by_id = find_or_create_client_by_id_or_name_inner(
+            resource_client_class=KeyValueStoreClient,
             memory_storage_client=self._memory_storage_client,
             id=self.id,
             name=self.name,
@@ -374,7 +350,8 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
         as_bytes: bool = False,
     ) -> KeyValueStoreRecord | None:
         # Check by id
-        existing_store_by_id = self.find_or_create_client_by_id_or_name(
+        existing_store_by_id = find_or_create_client_by_id_or_name_inner(
+            resource_client_class=KeyValueStoreClient,
             memory_storage_client=self._memory_storage_client,
             id=self.id,
             name=self.name,

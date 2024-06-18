@@ -1,12 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
-
-from typing_extensions import overload
+from typing import TYPE_CHECKING, TypeVar
 
 from crawlee.configuration import Configuration
-from crawlee.consts import DATASET_LABEL, KEY_VALUE_STORE_LABEL, REQUEST_QUEUE_LABEL
 from crawlee.memory_storage_client import MemoryStorageClient
 from crawlee.storage_client_manager import StorageClientManager
 from crawlee.storages.dataset import Dataset
@@ -16,6 +13,9 @@ from crawlee.storages.request_queue import RequestQueue
 if TYPE_CHECKING:
     from crawlee.base_storage_client.base_storage_client import BaseStorageClient
     from crawlee.base_storage_client.types import ResourceClient, ResourceCollectionClient
+
+TResource = TypeVar('TResource', Dataset, KeyValueStore, RequestQueue)
+
 
 _creation_lock = asyncio.Lock()
 """Lock for storage creation."""
@@ -29,34 +29,34 @@ _cache_rq_by_name: dict[str, RequestQueue] = {}
 
 
 def _get_from_cache_by_name(
-    storage_class_label: str,
+    storage_class: type[TResource],
     name: str,
-) -> Dataset | KeyValueStore | RequestQueue | None:
+) -> TResource | None:
     """Try to restore storage from cache by name."""
-    if storage_class_label == DATASET_LABEL:
-        return _cache_dataset_by_name.get(name)
-    if storage_class_label == KEY_VALUE_STORE_LABEL:
-        return _cache_kvs_by_name.get(name)
-    if storage_class_label == REQUEST_QUEUE_LABEL:
-        return _cache_rq_by_name.get(name)
-    raise ValueError(f'Unknown storage class: {storage_class_label}')
+    if issubclass(storage_class, Dataset):
+        return _cache_dataset_by_name.get(name)  # pyright: ignore
+    if issubclass(storage_class, KeyValueStore):
+        return _cache_kvs_by_name.get(name)  # pyright: ignore
+    if issubclass(storage_class, RequestQueue):
+        return _cache_rq_by_name.get(name)  # pyright: ignore
+    raise ValueError(f'Unknown storage class: {storage_class.__name__}')
 
 
 def _get_from_cache_by_id(
-    storage_class_label: str,
+    storage_class: type[TResource],
     id: str,
-) -> Dataset | KeyValueStore | RequestQueue | None:
+) -> TResource | None:
     """Try to restore storage from cache by ID."""
-    if storage_class_label == DATASET_LABEL:
-        return _cache_dataset_by_id.get(id)
-    if storage_class_label == KEY_VALUE_STORE_LABEL:
-        return _cache_kvs_by_id.get(id)
-    if storage_class_label == REQUEST_QUEUE_LABEL:
-        return _cache_rq_by_id.get(id)
-    raise ValueError(f'Unknown storage: {storage_class_label}')
+    if issubclass(storage_class, Dataset):
+        return _cache_dataset_by_id.get(id)  # pyright: ignore
+    if issubclass(storage_class, KeyValueStore):
+        return _cache_kvs_by_id.get(id)  # pyright: ignore
+    if issubclass(storage_class, RequestQueue):
+        return _cache_rq_by_id.get(id)  # pyright: ignore
+    raise ValueError(f'Unknown storage: {storage_class.__name__}')
 
 
-def _add_to_cache_by_name(name: str, storage: Dataset | KeyValueStore | RequestQueue) -> None:
+def _add_to_cache_by_name(name: str, storage: TResource) -> None:
     """Add storage to cache by name."""
     if isinstance(storage, Dataset):
         _cache_dataset_by_name[name] = storage
@@ -68,7 +68,7 @@ def _add_to_cache_by_name(name: str, storage: Dataset | KeyValueStore | RequestQ
         raise TypeError(f'Unknown storage: {storage}')
 
 
-def _add_to_cache_by_id(id: str, storage: Dataset | KeyValueStore | RequestQueue) -> None:
+def _add_to_cache_by_id(id: str, storage: TResource) -> None:
     """Add storage to cache by ID."""
     if isinstance(storage, Dataset):
         _cache_dataset_by_id[id] = storage
@@ -80,93 +80,75 @@ def _add_to_cache_by_id(id: str, storage: Dataset | KeyValueStore | RequestQueue
         raise TypeError(f'Unknown storage: {storage}')
 
 
-def _rm_from_cache_by_id(storage_class_label: str, id: str) -> None:
+def _rm_from_cache_by_id(storage_class: type, id: str) -> None:
     """Remove a storage from cache by ID."""
     try:
-        if storage_class_label == DATASET_LABEL:
+        if issubclass(storage_class, Dataset):
             del _cache_dataset_by_id[id]
-        elif storage_class_label == KEY_VALUE_STORE_LABEL:
+        elif issubclass(storage_class, KeyValueStore):
             del _cache_kvs_by_id[id]
-        elif storage_class_label == REQUEST_QUEUE_LABEL:
+        elif issubclass(storage_class, RequestQueue):
             del _cache_rq_by_id[id]
         else:
-            raise ValueError(f'Unknown storage class: {storage_class_label}')
+            raise TypeError(f'Unknown storage class: {storage_class.__name__}')
     except KeyError as exc:
         raise RuntimeError(f'Storage with provided ID was not found ({id}).') from exc
 
 
-def _rm_from_cache_by_name(storage_class_label: str, name: str) -> None:
+def _rm_from_cache_by_name(storage_class: type, name: str) -> None:
     """Remove a storage from cache by name."""
     try:
-        if storage_class_label == DATASET_LABEL:
+        if issubclass(storage_class, Dataset):
             del _cache_dataset_by_name[name]
-        elif storage_class_label == KEY_VALUE_STORE_LABEL:
+        elif issubclass(storage_class, KeyValueStore):
             del _cache_kvs_by_name[name]
-        elif storage_class_label == REQUEST_QUEUE_LABEL:
+        elif issubclass(storage_class, RequestQueue):
             del _cache_rq_by_name[name]
         else:
-            raise ValueError(f'Unknown storage class: {storage_class_label}')
+            raise TypeError(f'Unknown storage class: {storage_class.__name__}')
     except KeyError as exc:
         raise RuntimeError(f'Storage with provided name was not found ({name}).') from exc
 
 
-@overload
-async def open_storage(
-    *,
-    storage_class: type[Dataset],
-    configuration: Configuration | None = None,
-    id: str | None = None,
-    name: str | None = None,
-) -> Dataset: ...
+def _get_default_storage_id(configuration: Configuration, storage_class: type[TResource]) -> str:
+    if issubclass(storage_class, Dataset):
+        return configuration.default_dataset_id
+    if issubclass(storage_class, KeyValueStore):
+        return configuration.default_key_value_store_id
+    if issubclass(storage_class, RequestQueue):
+        return configuration.default_request_queue_id
 
-
-@overload
-async def open_storage(
-    *,
-    storage_class: type[KeyValueStore],
-    configuration: Configuration | None = None,
-    id: str | None = None,
-    name: str | None = None,
-) -> KeyValueStore: ...
-
-
-@overload
-async def open_storage(
-    *,
-    storage_class: type[RequestQueue],
-    configuration: Configuration | None = None,
-    id: str | None = None,
-    name: str | None = None,
-) -> RequestQueue: ...
+    raise TypeError(f'Unknown storage class: {storage_class.__name__}')
 
 
 async def open_storage(
     *,
-    storage_class: type[Dataset | KeyValueStore | RequestQueue],
+    storage_class: type[TResource],
     configuration: Configuration | None = None,
     id: str | None = None,
     name: str | None = None,
-) -> Dataset | KeyValueStore | RequestQueue:
-    """Open a either a new storage or restore existing one and return it."""
+) -> TResource:
+    """Open either a new storage or restore an existing one and return it."""
     configuration = configuration or Configuration()
     storage_client = StorageClientManager.get_storage_client(in_cloud=configuration.in_cloud)
 
-    # Try to restore the storage from cache by ID
+    # Try to restore the storage from cache by name
     if name:
-        cached_storage = _get_from_cache_by_name(storage_class_label=storage_class.LABEL, name=name)
+        cached_storage = _get_from_cache_by_name(storage_class=storage_class, name=name)
         if cached_storage:
             return cached_storage
 
-    # Find out if the storage is a default on memory storage
-    is_default_on_memory = False
+    default_id = _get_default_storage_id(configuration, storage_class)
+
     if not id and not name:
-        if isinstance(storage_client, MemoryStorageClient):
-            is_default_on_memory = True
-        id = configuration.default_storage_id
+        id = default_id
+
+    # Find out if the storage is a default on memory storage
+    is_default_on_memory = id == default_id and isinstance(storage_client, MemoryStorageClient)
 
     # Try to restore storage from cache by ID
     if id:
-        cached_storage = _get_from_cache_by_id(storage_class_label=storage_class.LABEL, id=id)
+        cached_storage = _get_from_cache_by_id(storage_class=storage_class, id=id)
         if cached_storage:
             return cached_storage
 
@@ -177,17 +159,17 @@ async def open_storage(
     # Lock and create new storage
     async with _creation_lock:
         if id and not is_default_on_memory:
-            resource_client = _get_resource_client(storage_class.LABEL, storage_client, id)
+            resource_client = _get_resource_client(storage_class, storage_client, id)
             storage_info = await resource_client.get()
             if not storage_info:
-                raise RuntimeError(f'{storage_class.LABEL} with id "{id}" does not exist!')
+                raise RuntimeError(f'{storage_class.__name__} with id "{id}" does not exist!')
 
         elif is_default_on_memory:
-            resource_collection_client = _get_resource_collection_client(storage_class.LABEL, storage_client)
+            resource_collection_client = _get_resource_collection_client(storage_class, storage_client)
             storage_info = await resource_collection_client.get_or_create(name=name, id=id)
 
         else:
-            resource_collection_client = _get_resource_collection_client(storage_class.LABEL, storage_client)
+            resource_collection_client = _get_resource_collection_client(storage_class, storage_client)
             storage_info = await resource_collection_client.get_or_create(name=name)
 
         storage = storage_class(
@@ -207,46 +189,46 @@ async def open_storage(
 
 def remove_storage_from_cache(
     *,
-    storage_class_label: str,
+    storage_class: type,
     id: str | None = None,
     name: str | None = None,
 ) -> None:
     """Remove a storage from cache by ID or name."""
     if id:
-        _rm_from_cache_by_id(storage_class_label=storage_class_label, id=id)
+        _rm_from_cache_by_id(storage_class=storage_class, id=id)
 
     if name:
-        _rm_from_cache_by_name(storage_class_label=storage_class_label, name=name)
+        _rm_from_cache_by_name(storage_class=storage_class, name=name)
 
 
 def _get_resource_client(
-    storage_class_label: str,
+    storage_class: type[TResource],
     storage_client: BaseStorageClient,
     id: str,
 ) -> ResourceClient:
-    if storage_class_label == DATASET_LABEL:
+    if issubclass(storage_class, Dataset):
         return storage_client.dataset(id)
 
-    if storage_class_label == KEY_VALUE_STORE_LABEL:
+    if issubclass(storage_class, KeyValueStore):
         return storage_client.key_value_store(id)
 
-    if storage_class_label == REQUEST_QUEUE_LABEL:
+    if issubclass(storage_class, RequestQueue):
         return storage_client.request_queue(id)
 
-    raise ValueError(f'Unknown storage class label: {storage_class_label}')
+    raise ValueError(f'Unknown storage class label: {storage_class.__name__}')
 
 
 def _get_resource_collection_client(
-    storage_class_label: str,
+    storage_class: type,
     storage_client: BaseStorageClient,
 ) -> ResourceCollectionClient:
-    if storage_class_label == DATASET_LABEL:
+    if issubclass(storage_class, Dataset):
         return storage_client.datasets()
 
-    if storage_class_label == KEY_VALUE_STORE_LABEL:
+    if issubclass(storage_class, KeyValueStore):
         return storage_client.key_value_stores()
 
-    if storage_class_label == REQUEST_QUEUE_LABEL:
+    if issubclass(storage_class, RequestQueue):
         return storage_client.request_queues()
 
-    raise ValueError(f'Unknown storage class: {storage_class_label}')
+    raise ValueError(f'Unknown storage class: {storage_class.__name__}')

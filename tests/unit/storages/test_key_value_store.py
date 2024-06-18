@@ -24,12 +24,12 @@ async def test_open() -> None:
     named_key_value_store = await KeyValueStore.open(name=key_value_store_name)
     assert default_key_value_store is not named_key_value_store
 
-    with pytest.raises(RuntimeError, match='Key-value store with id "nonexistent-id" does not exist!'):
+    with pytest.raises(RuntimeError, match='KeyValueStore with id "nonexistent-id" does not exist!'):
         await KeyValueStore.open(id='nonexistent-id')
 
     # Test that when you try to open a key-value store by ID and you use a name of an existing key-value store,
     # it doesn't work
-    with pytest.raises(RuntimeError, match='Key-value store with id "dummy-name" does not exist!'):
+    with pytest.raises(RuntimeError, match='KeyValueStore with id "dummy-name" does not exist!'):
         await KeyValueStore.open(id='dummy-name')
 
 
