@@ -217,9 +217,6 @@ class Dataset(BaseStorage):
                 break
             offset += list_items.count
 
-        if len(items) == 0:
-            raise ValueError('Cannot export an empty dataset')
-
         if content_type == 'csv':
             content_type_full = 'text/csv'
             output = io.StringIO()
