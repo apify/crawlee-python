@@ -496,30 +496,18 @@ async def test_crawler_run_requests() -> None:
     assert stats.requests_finished == 3
 
 
-async def test_crawler_push_and_get_data() -> None:
-    crawler = BasicCrawler()
-
-    await crawler.push_data(data='{"a": 1}')
-
-    assert (await crawler.get_data()).items == [{'a': 1}]
-
-    await crawler.push_data(data='{"b": 2}')
-
-    assert (await crawler.get_data()).items == [{'a': 1}, {'b': 2}]
-    assert (await crawler.get_data()).items == [{'a': 1}, {'b': 2}]
-
-
 async def test_context_push_and_get_data() -> None:
     crawler = BasicCrawler()
+    dataset = await Dataset.open()
 
-    await crawler.push_data(data='{"a": 1}')
+    await dataset.push_data(data='{"a": 1}')
     assert (await crawler.get_data()).items == [{'a': 1}]
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        await crawler.push_data(data='{"b": 2}')
+        await context.push_data(data='{"b": 2}')
 
-    await crawler.push_data(data='{"c": 3}')
+    await dataset.push_data(data='{"c": 3}')
     assert (await crawler.get_data()).items == [{'a': 1}, {'c': 3}]
 
     stats = await crawler.run(['https://httpbin.org/1'])
@@ -531,8 +519,10 @@ async def test_context_push_and_get_data() -> None:
 
 async def test_crawler_push_and_export_data() -> None:
     crawler = BasicCrawler()
-    await crawler.push_data(data=[{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}])
-    await crawler.push_data(data={'id': 2, 'test': 'test'})
+    dataset = await Dataset.open()
+
+    await dataset.push_data(data=[{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}])
+    await dataset.push_data(data={'id': 2, 'test': 'test'})
 
     await crawler.export_to(key='dataset-json', content_type='json')
     await crawler.export_to(key='dataset-csv', content_type='csv')

@@ -344,28 +344,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
             wait_for_all_requests_to_be_added_timeout=wait_for_all_requests_to_be_added_timeout,
         )
 
-    async def push_data(
-        self,
-        dataset_id: str | None = None,
-        dataset_name: str | None = None,
-        configuration: Configuration | None = None,
-        **kwargs: Unpack[PushDataKwargs],
-    ) -> None:
-        """Push data to a dataset.
-
-        This helper method simplifies the process of pushing data to a dataset. It opens the specified
-        dataset and then pushes the provided data to it.
-
-        Args:
-            data: The data to push to the dataset.
-            dataset_id: The ID of the dataset.
-            dataset_name: The name of the dataset.
-            configuration: The configuration settings for accessing the dataset.
-            kwargs: Keyword arguments to be passed to the dataset's `push_data` method.
-        """
-        dataset = await Dataset.open(id=dataset_id, name=dataset_name, configuration=configuration)
-        await dataset.push_data(**kwargs)
-
     async def get_data(
         self,
         dataset_id: str | None = None,
@@ -410,6 +388,28 @@ class BasicCrawler(Generic[TCrawlingContext]):
         """
         dataset = await Dataset.open(id=dataset_id, name=dataset_name, configuration=configuration)
         return await dataset.export_to(**kwargs)
+
+    async def _push_data(
+        self,
+        dataset_id: str | None = None,
+        dataset_name: str | None = None,
+        configuration: Configuration | None = None,
+        **kwargs: Unpack[PushDataKwargs],
+    ) -> None:
+        """Push data to a dataset.
+
+        This helper method simplifies the process of pushing data to a dataset. It opens the specified
+        dataset and then pushes the provided data to it.
+
+        Args:
+            data: The data to push to the dataset.
+            dataset_id: The ID of the dataset.
+            dataset_name: The name of the dataset.
+            configuration: The configuration settings for accessing the dataset.
+            kwargs: Keyword arguments to be passed to the dataset's `push_data` method.
+        """
+        dataset = await Dataset.open(id=dataset_id, name=dataset_name, configuration=configuration)
+        await dataset.push_data(**kwargs)
 
     def _should_retry_request(self, crawling_context: BasicCrawlingContext, error: Exception) -> bool:
         if crawling_context.request.no_retry:
@@ -611,7 +611,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             proxy_info=proxy_info,
             send_request=self._prepare_send_request_function(session, proxy_info),
             add_requests=result.add_requests,
-            push_data=self.push_data,
+            push_data=self._push_data,
         )
 
         statistics_id = request.id or request.unique_key
