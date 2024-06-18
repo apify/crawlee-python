@@ -481,15 +481,15 @@ async def test_crawler_get_storages() -> None:
     assert isinstance(kvs, KeyValueStore)
 
 
-async def test_crawler_start_requests() -> None:
-    crawler = BasicCrawler(['https://httpbin.org/1', 'https://httpbin.org/2', 'https://httpbin.org/3'])
+async def test_crawler_run_requests() -> None:
+    crawler = BasicCrawler()
     seen_urls = list[str]()
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
         seen_urls.append(context.request.url)
 
-    stats = await crawler.run()
+    stats = await crawler.run(['https://httpbin.org/1', 'https://httpbin.org/2', 'https://httpbin.org/3'])
 
     assert seen_urls == ['https://httpbin.org/1', 'https://httpbin.org/2', 'https://httpbin.org/3']
     assert stats.requests_total == 3
@@ -510,7 +510,7 @@ async def test_crawler_push_and_get_data() -> None:
 
 
 async def test_context_push_and_get_data() -> None:
-    crawler = BasicCrawler(['https://httpbin.org/1'])
+    crawler = BasicCrawler()
 
     await crawler.push_data(data='{"a": 1}')
     assert (await crawler.get_data()).items == [{'a': 1}]
@@ -522,7 +522,7 @@ async def test_context_push_and_get_data() -> None:
     await crawler.push_data(data='{"c": 3}')
     assert (await crawler.get_data()).items == [{'a': 1}, {'c': 3}]
 
-    stats = await crawler.run()
+    stats = await crawler.run(['https://httpbin.org/1'])
 
     assert (await crawler.get_data()).items == [{'a': 1}, {'c': 3}, {'b': 2}]
     assert stats.requests_total == 1
@@ -547,14 +547,14 @@ async def test_crawler_push_and_export_data() -> None:
 
 
 async def test_context_push_and_export_data() -> None:
-    crawler = BasicCrawler(['https://httpbin.org/1'])
+    crawler = BasicCrawler()
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
         await context.push_data(data=[{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}])
         await context.push_data(data={'id': 2, 'test': 'test'})
 
-    await crawler.run()
+    await crawler.run(['https://httpbin.org/1'])
 
     await crawler.export_to(key='dataset-json', content_type='json')
     await crawler.export_to(key='dataset-csv', content_type='csv')

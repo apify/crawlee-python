@@ -87,7 +87,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     def __init__(
         self,
-        start_requests: Sequence[str | BaseRequestData | Request] | None = None,
         *,
         request_provider: RequestProvider | None = None,
         request_handler: Callable[[TCrawlingContext], Awaitable[None]] | None = None,
@@ -108,7 +107,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
         """Initialize the BasicCrawler.
 
         Args:
-            start_requests: A list of URLs to start crawling from
             request_provider: Provides requests to be processed
             request_handler: A callable to which request handling is delegated
             http_client: HTTP client to be used for `BasicCrawlingContext.send_request` and HTTP-only crawling.
@@ -129,7 +127,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 This parameter is meant to be used by child classes, not when BasicCrawler is instantiated directly.
             _additional_context_managers: Additional context managers to be used in the crawler lifecycle.
         """
-        self._start_requests = start_requests or []
         self._router: Router[TCrawlingContext] | None = None
 
         if isinstance(cast(Router, request_handler), Router):
@@ -291,8 +288,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
             if self._use_session_pool:
                 await self._session_pool.reset_store()
 
-        await self.add_requests(self._start_requests)
-
         if requests is not None:
             await self.add_requests(requests)
 
@@ -318,7 +313,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         self._running = False
         self._has_finished_before = True
-        self._start_requests = []  # Clear the start requests to prevent them from being added again
 
         return self._statistics.calculate()
 

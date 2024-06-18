@@ -112,7 +112,7 @@ from crawlee.http_crawler import HttpCrawler, HttpCrawlingContext
 
 async def main() -> None:
     # Create a HttpCrawler instance and provide a starting requests
-    crawler = HttpCrawler(start_requests=['https://crawlee.dev'])
+    crawler = HttpCrawler()
 
     # Define a handler for processing requests
     @crawler.router.default_handler
@@ -129,7 +129,7 @@ async def main() -> None:
         await context.push_data(data=data)
 
     # Run the crawler
-    await crawler.run()
+    await crawler.run(['https://crawlee.dev'])
 
 
 if __name__ == '__main__':
@@ -163,7 +163,7 @@ from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCra
 
 async def main() -> None:
     # Create a BeautifulSoupCrawler instance and provide a request provider
-    crawler = BeautifulSoupCrawler(start_requests=['https://crawlee.dev'])
+    crawler = BeautifulSoupCrawler()
 
     # Define a handler for processing requests
     @crawler.router.default_handler
@@ -178,7 +178,7 @@ async def main() -> None:
         await context.push_data(data=data)
 
     # Run the crawler
-    await crawler.run()
+    await crawler.run(['https://crawlee.dev'])
 
 
 if __name__ == '__main__':
@@ -231,7 +231,6 @@ from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingCont
 async def main() -> None:
     # Create a crawler instance and provide a request provider (and other optional arguments)
     crawler = PlaywrightCrawler(
-        start_requests=['https://crawlee.dev'],
         # headless=False,
         # browser_type='firefox',
     )
@@ -246,7 +245,7 @@ async def main() -> None:
         }
         await context.push_data(data=data)
 
-    await crawler.run()
+    await crawler.run(['https://crawlee.dev'])
 
 
 if __name__ == '__main__':
@@ -275,10 +274,7 @@ async def main() -> None:
     )
 
     # Create a crawler instance and provide a browser pool and request provider
-    crawler = PlaywrightCrawler(
-        start_requests=['https://apify.com', 'https://crawlee.dev'],
-        browser_pool=browser_pool,
-    )
+    crawler = PlaywrightCrawler(browser_pool=browser_pool)
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
@@ -290,7 +286,7 @@ async def main() -> None:
         }
         await context.push_data(data=data)
 
-    await crawler.run()
+    await crawler.run(['https://apify.com', 'https://crawlee.dev'])
 
 
 if __name__ == '__main__':
