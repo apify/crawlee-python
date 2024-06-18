@@ -234,11 +234,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
         *,
         id: str | None = None,
         name: str | None = None,
-        configuration: Configuration | None = None,
     ) -> RequestProvider:
         """Return the configured request provider. If none is configured, open and return the default request queue."""
         if not self._request_provider:
-            self._request_provider = await RequestQueue.open(id=id, name=name, configuration=configuration)
+            self._request_provider = await RequestQueue.open(id=id, name=name)
 
         return self._request_provider
 
@@ -247,20 +246,18 @@ class BasicCrawler(Generic[TCrawlingContext]):
         *,
         id: str | None = None,
         name: str | None = None,
-        configuration: Configuration | None = None,
     ) -> Dataset:
         """Return the dataset with the given ID or name. If none is provided, return the default dataset."""
-        return await Dataset.open(id=id, name=name, configuration=configuration)
+        return await Dataset.open(id=id, name=name)
 
     async def get_key_value_store(
         self,
         *,
         id: str | None = None,
         name: str | None = None,
-        configuration: Configuration | None = None,
     ) -> KeyValueStore:
         """Return the key-value store with the given ID or name. If none is provided, return the default KVS."""
-        return await KeyValueStore.open(id=id, name=name, configuration=configuration)
+        return await KeyValueStore.open(id=id, name=name)
 
     def error_handler(self, handler: ErrorHandler[TCrawlingContext]) -> ErrorHandler[TCrawlingContext]:
         """Decorator for configuring an error handler (called after a request handler error and before retrying)."""
@@ -349,7 +346,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self,
         dataset_id: str | None = None,
         dataset_name: str | None = None,
-        configuration: Configuration | None = None,
         **kwargs: Unpack[GetDataKwargs],
     ) -> DatasetItemsListPage:
         """Retrieve data from a dataset.
@@ -360,20 +356,18 @@ class BasicCrawler(Generic[TCrawlingContext]):
         Args:
             dataset_id: The ID of the dataset.
             dataset_name: The name of the dataset.
-            configuration: The configuration settings for accessing the dataset.
             kwargs: Keyword arguments to be passed to the dataset's `get_data` method.
 
         Returns:
             The retrieved data.
         """
-        dataset = await Dataset.open(id=dataset_id, name=dataset_name, configuration=configuration)
+        dataset = await Dataset.open(id=dataset_id, name=dataset_name)
         return await dataset.get_data(**kwargs)
 
     async def export_to(
         self,
         dataset_id: str | None = None,
         dataset_name: str | None = None,
-        configuration: Configuration | None = None,
         **kwargs: Unpack[ExportToKwargs],
     ) -> None:
         """Export data from a dataset.
@@ -384,10 +378,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
         Args:
             dataset_id: The ID of the dataset.
             dataset_name: The name of the dataset.
-            configuration: The configuration settings for accessing the dataset.
             kwargs: Keyword arguments to be passed to the dataset's `export_to` method.
         """
-        dataset = await Dataset.open(id=dataset_id, name=dataset_name, configuration=configuration)
+        dataset = await Dataset.open(id=dataset_id, name=dataset_name)
         return await dataset.export_to(**kwargs)
 
     async def _push_data(
@@ -395,7 +388,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
         data: JSONSerializable,
         dataset_id: str | None = None,
         dataset_name: str | None = None,
-        configuration: Configuration | None = None,
         **kwargs: Unpack[PushDataKwargs],
     ) -> None:
         """Push data to a dataset.
@@ -407,10 +399,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
             data: The data to push to the dataset.
             dataset_id: The ID of the dataset.
             dataset_name: The name of the dataset.
-            configuration: The configuration settings for accessing the dataset.
             kwargs: Keyword arguments to be passed to the dataset's `push_data` method.
         """
-        dataset = await Dataset.open(id=dataset_id, name=dataset_name, configuration=configuration)
+        dataset = await Dataset.open(id=dataset_id, name=dataset_name)
         await dataset.push_data(data, **kwargs)
 
     def _should_retry_request(self, crawling_context: BasicCrawlingContext, error: Exception) -> bool:
