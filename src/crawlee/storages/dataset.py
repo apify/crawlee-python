@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
-from typing import TYPE_CHECKING, AsyncIterator, Literal, TypedDict
+from typing import TYPE_CHECKING, AsyncIterator, Literal, TypedDict, cast
 
 from typing_extensions import NotRequired, Required, Unpack, override
 
@@ -207,7 +207,7 @@ class Dataset(BaseStorage):
         Args:
             kwargs: Keyword arguments for the storage client method.
         """
-        key = kwargs.get('key')
+        key = cast(str, kwargs.get('key'))
         content_type = kwargs.get('content_type', 'json')
         to_key_value_store_id = kwargs.get('to_key_value_store_id', None)
         to_key_value_store_name = kwargs.get('to_key_value_store_name', None)
