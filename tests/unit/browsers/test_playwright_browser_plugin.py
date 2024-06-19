@@ -4,7 +4,7 @@ from typing import AsyncGenerator
 
 import pytest
 
-from crawlee.browsers.playwright_browser_plugin import PlaywrightBrowserPlugin
+from crawlee.browsers import PlaywrightBrowserPlugin
 
 
 @pytest.fixture()

@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from crawlee.events.event_manager import EventManager
+from crawlee.events import EventManager
 from crawlee.events.types import Event, EventSystemInfoData
 
 

@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Awaitable, Callable
 from crawlee._utils.recurring_task import RecurringTask
 
 if TYPE_CHECKING:
-    from crawlee.autoscaling.system_status import SystemStatus
+    from crawlee.autoscaling import SystemStatus
 
 logger = getLogger(__name__)
 

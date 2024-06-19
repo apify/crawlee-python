@@ -4,10 +4,10 @@ import pytest
 from proxy import Proxy
 
 from crawlee.basic_crawler.errors import ProxyError
-from crawlee.http_clients.httpx_client import HttpxClient
+from crawlee.http_clients import HttpxClient
 from crawlee.models import Request
 from crawlee.proxy_configuration import ProxyInfo
-from crawlee.statistics.statistics import Statistics
+from crawlee.statistics import Statistics
 
 
 @pytest.fixture()

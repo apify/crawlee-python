@@ -1,2 +1,2 @@
 from .http_crawler import HttpCrawler
-from .types import HttpCrawlingContext
+from .types import HttpCrawlingContext, HttpCrawlingResult

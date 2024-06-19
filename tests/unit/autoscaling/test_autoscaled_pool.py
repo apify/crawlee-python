@@ -11,8 +11,7 @@ from unittest.mock import Mock
 import pytest
 
 from crawlee._utils.measure_time import measure_time
-from crawlee.autoscaling.autoscaled_pool import AutoscaledPool, ConcurrencySettings
-from crawlee.autoscaling.system_status import SystemStatus
+from crawlee.autoscaling import AutoscaledPool, ConcurrencySettings, SystemStatus
 from crawlee.autoscaling.types import LoadRatioInfo, SystemInfo
 
 

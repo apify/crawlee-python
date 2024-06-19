@@ -4,10 +4,9 @@ from typing import TYPE_CHECKING, AsyncGenerator, Iterable
 
 from typing_extensions import Unpack
 
-from crawlee.basic_crawler.basic_crawler import BasicCrawler, BasicCrawlerOptions
-from crawlee.basic_crawler.context_pipeline import ContextPipeline
+from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.basic_crawler.errors import SessionError
-from crawlee.http_clients.httpx_client import HttpxClient
+from crawlee.http_clients import HttpxClient
 from crawlee.http_crawler.types import HttpCrawlingContext
 
 if TYPE_CHECKING:

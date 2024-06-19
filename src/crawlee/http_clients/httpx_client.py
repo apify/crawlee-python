@@ -7,15 +7,15 @@ from typing_extensions import override
 
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
 from crawlee.basic_crawler.errors import ProxyError
-from crawlee.http_clients.base_http_client import BaseHttpClient, HttpCrawlingResult, HttpResponse
-from crawlee.sessions.session import Session
+from crawlee.http_clients import BaseHttpClient, HttpCrawlingResult, HttpResponse
+from crawlee.sessions import Session
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from crawlee.models import Request
     from crawlee.proxy_configuration import ProxyInfo
-    from crawlee.statistics.statistics import Statistics
+    from crawlee.statistics import Statistics
 
 __all__ = ['HttpxClient']
 

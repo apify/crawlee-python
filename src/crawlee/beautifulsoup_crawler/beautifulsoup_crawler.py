@@ -7,17 +7,16 @@ from bs4 import BeautifulSoup, Tag
 from typing_extensions import Unpack
 
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
-from crawlee.basic_crawler.basic_crawler import BasicCrawler, BasicCrawlerOptions
-from crawlee.basic_crawler.context_pipeline import ContextPipeline
+from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.basic_crawler.errors import SessionError
 from crawlee.beautifulsoup_crawler.types import BeautifulSoupCrawlingContext
 from crawlee.enqueue_strategy import EnqueueStrategy
-from crawlee.http_clients.httpx_client import HttpxClient
-from crawlee.http_crawler.types import HttpCrawlingContext
+from crawlee.http_clients import HttpxClient
+from crawlee.http_crawler import HttpCrawlingContext
 from crawlee.models import BaseRequestData
 
 if TYPE_CHECKING:
-    from crawlee.basic_crawler.types import AddRequestsFunctionKwargs, BasicCrawlingContext
+    from crawlee.basic_crawler.types import AddRequestsKwargs, BasicCrawlingContext
 
 
 class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
@@ -102,7 +101,8 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
         yield crawling_context
 
     async def _parse_http_response(
-        self, context: HttpCrawlingContext
+        self,
+        context: HttpCrawlingContext,
     ) -> AsyncGenerator[BeautifulSoupCrawlingContext, None]:
         soup = await asyncio.to_thread(lambda: BeautifulSoup(context.http_response.read(), self._parser))
 
@@ -111,7 +111,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
             selector: str = 'a',
             label: str | None = None,
             user_data: dict[str, Any] | None = None,
-            **kwargs: Unpack[AddRequestsFunctionKwargs],
+            **kwargs: Unpack[AddRequestsKwargs],
         ) -> None:
             requests = list[BaseRequestData]()
             user_data = user_data or {}

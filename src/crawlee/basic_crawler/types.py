@@ -19,8 +19,8 @@ if TYPE_CHECKING:
     from crawlee.types import JSONSerializable
 
 
-class AddRequestsFunctionKwargs(TypedDict):
-    """Keyword arguments type for AddRequestsFunction."""
+class AddRequestsKwargs(TypedDict):
+    """Keyword arguments for crawler's `add_requests` method."""
 
     limit: NotRequired[int]
     base_url: NotRequired[str]
@@ -39,7 +39,7 @@ class AddRequestsFunction(Protocol):
     def __call__(  # noqa: D102
         self,
         requests: Sequence[str | BaseRequestData | Request],
-        **kwargs: Unpack[AddRequestsFunctionKwargs],
+        **kwargs: Unpack[AddRequestsKwargs],
     ) -> Coroutine[None, None, None]: ...
 
 
@@ -98,7 +98,7 @@ class EnqueueLinksFunction(Protocol):
         selector: str = 'a',
         label: str | None = None,
         user_data: dict[str, Any] | None = None,
-        **kwargs: Unpack[AddRequestsFunctionKwargs],
+        **kwargs: Unpack[AddRequestsKwargs],
     ) -> Coroutine[None, None, None]: ...
 
 
@@ -126,7 +126,7 @@ class BasicCrawlingContext:
     push_data: PushDataFunction
 
 
-class AddRequestsFunctionCall(AddRequestsFunctionKwargs):
+class AddRequestsFunctionCall(AddRequestsKwargs):
     """Record of a call to `add_requests`."""
 
     requests: Sequence[str | BaseRequestData | Request]
@@ -141,7 +141,7 @@ class RequestHandlerRunResult:
     async def add_requests(
         self,
         requests: Sequence[str | BaseRequestData],
-        **kwargs: Unpack[AddRequestsFunctionKwargs],
+        **kwargs: Unpack[AddRequestsKwargs],
     ) -> None:
         """Track a call to the `add_requests` context helper."""
         self.add_requests_calls.append(AddRequestsFunctionCall(requests=requests, **kwargs))

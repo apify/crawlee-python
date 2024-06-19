@@ -9,10 +9,10 @@ from typing import TYPE_CHECKING, Any, Generic, cast
 from typing_extensions import Self, TypeVar
 
 from crawlee._utils.recurring_task import RecurringTask
-from crawlee.events.local_event_manager import LocalEventManager
+from crawlee.events import LocalEventManager
 from crawlee.events.types import Event
+from crawlee.statistics import FinalStatistics, StatisticsPersistedState, StatisticsState
 from crawlee.statistics.error_tracker import ErrorTracker
-from crawlee.statistics.models import FinalStatistics, StatisticsPersistedState, StatisticsState
 from crawlee.storages import KeyValueStore
 
 if TYPE_CHECKING:
