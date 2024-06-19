@@ -1,6 +1,10 @@
+# TODO: The current PlaywrightCrawler tests rely on external websites. It means they can fail or take more time
+# due to network issues. To enhance test stability and reliability, we should mock the network requests.
+# https://github.com/apify/crawlee-python/issues/197
+
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from unittest import mock
 
 from crawlee.playwright_crawler import PlaywrightCrawler
@@ -29,8 +33,8 @@ async def test_basic_request(httpbin: str) -> None:
     assert '<html' in result.get('page_content', '')  # there is some HTML content
 
 
-async def test_enqueue_links(server: Any) -> None:
-    requests = ['https://test.io/']
+async def test_enqueue_links() -> None:
+    requests = ['https://crawlee.dev/']
     crawler = PlaywrightCrawler()
     visit = mock.Mock()
 
@@ -41,14 +45,23 @@ async def test_enqueue_links(server: Any) -> None:
 
     await crawler.run(requests)
 
-    assert server['index_endpoint'].called
-    assert server['secondary_index_endpoint'].called
-
     visited = {call[0][0] for call in visit.call_args_list}
+
     assert visited == {
-        'https://test.io/',
-        'https://test.io/asdf',
-        'https://test.io/hjkl',
-        'https://test.io/qwer',
-        'https://test.io/uiop',
+        'https://crawlee.dev/',
+        'https://crawlee.dev/docs/guides/javascript-rendering',
+        'https://crawlee.dev/docs/guides/typescript-project',
+        'https://crawlee.dev/docs/guides/avoid-blocking',
+        'https://crawlee.dev/docs/guides/cheerio-crawler-guide',
+        'https://crawlee.dev/docs/guides/result-storage',
+        'https://crawlee.dev/docs/guides/proxy-management',
+        'https://crawlee.dev/api/core/class/AutoscaledPool',
+        'https://crawlee.dev/docs/guides/jsdom-crawler-guide',
+        'https://crawlee.dev/docs/guides/request-storage',
+        'https://crawlee.dev/api/utils',
+        'https://crawlee.dev/api/utils/namespace/social',
+        'https://crawlee.dev/docs/deployment/aws-cheerio',
+        'https://crawlee.dev/api/basic-crawler/interface/BasicCrawlerOptions',
+        'https://crawlee.dev/docs/deployment/gcp-cheerio',
+        'https://crawlee.dev/docs/quick-start',
     }

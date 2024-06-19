@@ -72,6 +72,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
             user_data: dict | None = None,
             **kwargs: Unpack[AddRequestsKwargs],
         ) -> None:
+            kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
+
             requests = list[BaseRequestData]()
             user_data = user_data or {}
 
@@ -89,7 +91,6 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                     request = BaseRequestData.from_url(href, user_data=link_user_data)
                     requests.append(request)
 
-            kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
             await context.add_requests(requests, **kwargs)
 
         yield PlaywrightCrawlingContext(
