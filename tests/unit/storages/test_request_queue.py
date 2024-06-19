@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from crawlee.models import BaseRequestData, Request
-from crawlee.storages.request_queue import RequestQueue
+from crawlee.storages import RequestQueue
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Sequence

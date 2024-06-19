@@ -8,7 +8,7 @@ import respx
 from httpx import Response
 
 from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler
-from crawlee.storages.request_list import RequestList
+from crawlee.storages import RequestList
 
 if TYPE_CHECKING:
     from crawlee.beautifulsoup_crawler import BeautifulSoupCrawlingContext

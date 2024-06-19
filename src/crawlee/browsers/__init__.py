@@ -1,5 +1,6 @@
 try:
     from .browser_pool import BrowserPool
+    from .playwright_browser_controller import PlaywrightBrowserController
     from .playwright_browser_plugin import PlaywrightBrowserPlugin
 except ImportError as exc:
     raise ImportError(

@@ -30,20 +30,20 @@ from crawlee.basic_crawler.router import Router
 from crawlee.basic_crawler.types import BasicCrawlingContext, RequestHandlerRunResult, SendRequestFunction
 from crawlee.configuration import Configuration
 from crawlee.enqueue_strategy import EnqueueStrategy
-from crawlee.events.local_event_manager import LocalEventManager
-from crawlee.http_clients.httpx_client import HttpxClient
+from crawlee.events import LocalEventManager
+from crawlee.http_clients import HttpxClient
 from crawlee.models import BaseRequestData, DatasetItemsListPage, Request, RequestState
 from crawlee.sessions import SessionPool
-from crawlee.statistics.statistics import Statistics
+from crawlee.statistics import Statistics
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 if TYPE_CHECKING:
     import re
 
-    from crawlee.http_clients.base_http_client import BaseHttpClient, HttpResponse
+    from crawlee.http_clients import BaseHttpClient, HttpResponse
     from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
-    from crawlee.sessions.session import Session
-    from crawlee.statistics.models import FinalStatistics, StatisticsState
+    from crawlee.sessions import Session
+    from crawlee.statistics import FinalStatistics, StatisticsState
     from crawlee.storages.dataset import ExportToKwargs, GetDataKwargs, PushDataKwargs
     from crawlee.storages.request_provider import RequestProvider
     from crawlee.types import JSONSerializable

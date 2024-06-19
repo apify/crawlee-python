@@ -12,7 +12,7 @@ from crawlee._utils.math import compute_weighted_avg
 from crawlee.autoscaling.types import LoadRatioInfo, Snapshot, SystemInfo
 
 if TYPE_CHECKING:
-    from crawlee.autoscaling.snapshotter import Snapshotter
+    from crawlee.autoscaling import Snapshotter
 
 logger = getLogger(__name__)
 

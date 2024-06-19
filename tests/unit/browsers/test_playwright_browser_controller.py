@@ -7,7 +7,7 @@ from typing import AsyncGenerator
 import pytest
 from playwright.async_api import Browser, Playwright, async_playwright
 
-from crawlee.browsers.playwright_browser_controller import PlaywrightBrowserController
+from crawlee.browsers import PlaywrightBrowserController
 
 
 @pytest.fixture()

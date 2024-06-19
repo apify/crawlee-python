@@ -4,7 +4,7 @@ from datetime import timedelta
 
 import pytest
 
-from crawlee.statistics.statistics import Statistics
+from crawlee.statistics import Statistics
 
 
 async def test_periodic_logging(caplog: pytest.LogCaptureFixture) -> None:

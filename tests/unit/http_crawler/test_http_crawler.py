@@ -7,8 +7,8 @@ import pytest
 import respx
 from httpx import Response
 
-from crawlee.http_crawler.http_crawler import HttpCrawler
-from crawlee.sessions.session_pool import SessionPool
+from crawlee.http_crawler import HttpCrawler
+from crawlee.sessions import SessionPool
 from crawlee.storages import RequestList
 
 if TYPE_CHECKING:

@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from crawlee.browsers.browser_pool import BrowserPool
-from crawlee.browsers.playwright_browser_plugin import PlaywrightBrowserPlugin
+from crawlee.browsers import BrowserPool, PlaywrightBrowserPlugin
 
 
 async def test_default_plugin_new_page_creation(httpbin: str) -> None:

@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from crawlee.basic_crawler.context_pipeline import (
-    ContextPipeline,
+from crawlee.basic_crawler import ContextPipeline
+from crawlee.basic_crawler.errors import (
     ContextPipelineFinalizationError,
     ContextPipelineInitializationError,
     RequestHandlerError,

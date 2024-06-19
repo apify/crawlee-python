@@ -6,12 +6,10 @@ from typing import TYPE_CHECKING, TypeVar
 from crawlee.configuration import Configuration
 from crawlee.memory_storage_client import MemoryStorageClient
 from crawlee.storage_client_manager import StorageClientManager
-from crawlee.storages.dataset import Dataset
-from crawlee.storages.key_value_store import KeyValueStore
-from crawlee.storages.request_queue import RequestQueue
+from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 if TYPE_CHECKING:
-    from crawlee.base_storage_client.base_storage_client import BaseStorageClient
+    from crawlee.base_storage_client import BaseStorageClient
     from crawlee.base_storage_client.types import ResourceClient, ResourceCollectionClient
 
 TResource = TypeVar('TResource', Dataset, KeyValueStore, RequestQueue)

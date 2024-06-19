@@ -9,8 +9,8 @@ if TYPE_CHECKING:
 
     from crawlee.models import Request
     from crawlee.proxy_configuration import ProxyInfo
-    from crawlee.sessions.session import Session
-    from crawlee.statistics.statistics import Statistics
+    from crawlee.sessions import Session
+    from crawlee.statistics import Statistics
 
 
 class HttpResponse(Protocol):

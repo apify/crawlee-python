@@ -4,12 +4,14 @@ from typing import TYPE_CHECKING, Literal
 
 from typing_extensions import Unpack
 
-from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, BasicCrawlingContext, ContextPipeline
+from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.browsers import BrowserPool
 from crawlee.playwright_crawler.types import PlaywrightCrawlingContext
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+
+    from crawlee.basic_crawler.types import BasicCrawlingContext
 
 
 class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):

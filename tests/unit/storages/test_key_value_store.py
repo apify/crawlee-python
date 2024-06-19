@@ -4,7 +4,7 @@ from typing import AsyncGenerator
 
 import pytest
 
-from crawlee.storages.key_value_store import KeyValueStore
+from crawlee.storages import KeyValueStore
 
 
 @pytest.fixture()
