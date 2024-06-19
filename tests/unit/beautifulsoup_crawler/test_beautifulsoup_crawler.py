@@ -8,6 +8,7 @@ import respx
 from httpx import Response
 
 from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler
+from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.storages import RequestList
 
 if TYPE_CHECKING:
@@ -87,7 +88,8 @@ async def test_enqueue_links(server: respx.MockRouter) -> None:
     @crawler.router.default_handler
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         visit(context.request.url)
-        await context.enqueue_links()
+        # Note: with RESPX server mocking, we have to set EnqueueStrategy to ALL
+        await context.enqueue_links(strategy=EnqueueStrategy.ALL)
 
     await crawler.run()
 
