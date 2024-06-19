@@ -19,7 +19,8 @@
 - Add batched request addition in `RequestQueue`
 - Add start requests option to `BasicCrawler`
 - Add storage-related helpers `get_data`, `push_data` and `export_to` to `BasicCrawler` and `BasicContext`
-- Add `PlaywrightCrawler`'s enqueue links helper
+- Add enqueue links helper to `PlaywrightCrawler`
+- Add max requests per crawl option to `BasicCrawler`
 
 ### Fixes
 
