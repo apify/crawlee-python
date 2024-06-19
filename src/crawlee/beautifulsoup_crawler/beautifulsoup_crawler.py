@@ -126,9 +126,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
                 if (href := link.attrs.get('href')) is not None:
                     requests.append(BaseRequestData.from_url(href, user_data=link_user_data))
 
-            uses_patterns = 'include' in kwargs or 'exclude' in kwargs
-            kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME if uses_patterns else EnqueueStrategy.ALL)
-
+            kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
             await context.add_requests(requests, **kwargs)
 
         yield BeautifulSoupCrawlingContext(
