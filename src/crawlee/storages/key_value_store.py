@@ -60,11 +60,7 @@ class KeyValueStore(BaseStorage):
         return self._name
 
     async def get_info(self) -> KeyValueStoreMetadata | None:
-        """Get an object containing general information about the key value store.
-
-        Returns:
-            Object returned by calling the GET key value store API endpoint.
-        """
+        """Get an object containing general information about the key value store."""
         return await self._resource_client.get()
 
     @override

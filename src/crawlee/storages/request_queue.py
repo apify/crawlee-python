@@ -459,11 +459,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         return is_head_consistent and len(self._queue_head_dict) == 0 and self._in_progress_count() == 0
 
     async def get_info(self) -> RequestQueueMetadata | None:
-        """Get an object containing general information about the request queue.
-
-        Returns:
-            Object returned by calling the GET request queue API endpoint.
-        """
+        """Get an object containing general information about the request queue."""
         return await self._resource_client.get()
 
     @override

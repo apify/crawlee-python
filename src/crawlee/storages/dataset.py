@@ -232,11 +232,7 @@ class Dataset(BaseStorage):
         raise ValueError(f'Unsupported content type: {content_type}')
 
     async def get_info(self) -> DatasetMetadata | None:
-        """Get an object containing general information about the dataset.
-
-        Returns:
-            Object returned by calling the GET dataset API endpoint.
-        """
+        """Get an object containing general information about the dataset."""
         metadata = await self._resource_client.get()
         if isinstance(metadata, DatasetMetadata):
             return metadata
