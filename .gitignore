@@ -26,3 +26,8 @@ docs/changelog.md
 
 .nvim.lua
 Session.vim
+
+website/build
+website/node_modules
+website/.yarn
+website/.docusaurus

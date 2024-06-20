@@ -1,0 +1,39 @@
+.button {
+    display: inline-block;
+    padding: 3px 10px;
+    position: absolute;
+    top: 9px;
+    right: 9px;
+    z-index: 1;
+    font-size: 16px;
+    line-height: 28px;
+    background: var(--prism-background-color);
+    color: var(--prism-color);
+    border: 1px solid var(--ifm-color-emphasis-300);
+    border-radius: var(--ifm-global-radius);
+    opacity: 0.7;
+    font-weight: 600;
+    width: 155px;
+}
+
+@media screen and (max-width: 768px) {
+    .button {
+        display: none;
+    }
+}
+
+.button svg {
+    height: 20px;
+    position: absolute;
+    top: 7.5px;
+    right: 0;
+}
+
+.button:hover {
+    opacity: 1;
+    color: var(--prism-color);
+}
+
+.container {
+    position: relative;
+}
