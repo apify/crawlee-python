@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, cast
 
 from httpx import URL
 from more_itertools import flatten
+from pydantic import AnyHttpUrl, TypeAdapter
 from typing_extensions import Protocol
 
 from crawlee._utils.crypto import crypto_random_object_id
@@ -117,6 +118,7 @@ class ProxyConfiguration:
         self._configuration = configuration or Configuration()
         self._next_custom_url_index = 0
         self._used_proxy_urls = dict[str, URL]()
+        self._url_validator = TypeAdapter(AnyHttpUrl)
 
         # Validation
         if sum(map(bool, (proxy_urls, new_url_function, list(flatten(tiered_proxy_urls or []))))) != 1:
@@ -125,9 +127,15 @@ class ProxyConfiguration:
                 'must be specified (and non-empty).'
             )
 
-        self._proxy_urls = [URL(url) for url in proxy_urls] if proxy_urls else []
+        self._proxy_urls = (
+            [URL(url) for url in proxy_urls if self._url_validator.validate_python(url)] if proxy_urls else []
+        )
         self._proxy_tier_tracker = (
-            ProxyTierTracker([[URL(url) for url in tier] for tier in tiered_proxy_urls]) if tiered_proxy_urls else None
+            ProxyTierTracker(
+                [[URL(url) for url in tier if self._url_validator.validate_python(url)] for tier in tiered_proxy_urls]
+            )
+            if tiered_proxy_urls
+            else None
         )
         self._new_url_function = new_url_function
 
@@ -163,15 +171,29 @@ class ProxyConfiguration:
 
         return info
 
+    async def new_url(
+        self, session_id: str | None = None, request: Request | None = None, proxy_tier: int | None = None
+    ) -> str | None:
+        """Return a new proxy url.
+
+        If called repeatedly with the same request, it is assumed that the request is being retried.
+        If a previously used session ID is received, it will return the same proxy url.
+        """
+        proxy_info = await self.new_proxy_info(session_id, request, proxy_tier)
+        return proxy_info.url if proxy_info else None
+
     async def _pick_url(
         self, session_id: str | None, request: Request | None, proxy_tier: int | None
     ) -> tuple[URL | None, int | None]:
         if self._new_url_function:
-            result = self._new_url_function(session_id, request)
-            if inspect.isawaitable(result):
-                result = await result
+            try:
+                result = self._new_url_function(session_id, request)
+                if inspect.isawaitable(result):
+                    result = await result
 
-            return URL(cast(str, result)) if result is not None else None, None
+                return URL(cast(str, result)) if result is not None else None, None
+            except Exception as e:
+                raise ValueError('The provided "new_url_function" did not return a valid URL') from e
 
         if self._proxy_tier_tracker:
             if request is not None and proxy_tier is None:
