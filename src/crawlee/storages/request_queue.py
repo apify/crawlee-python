@@ -18,6 +18,7 @@ from crawlee.models import (
     ProcessedRequest,
     Request,
     RequestQueueHeadState,
+    RequestQueueMetadata,
 )
 from crawlee.storages.base_storage import BaseStorage
 from crawlee.storages.request_provider import RequestProvider
@@ -27,7 +28,6 @@ if TYPE_CHECKING:
 
     from crawlee.base_storage_client import BaseStorageClient
     from crawlee.configuration import Configuration
-    from crawlee.models import BaseStorageMetadata
 
 logger = getLogger(__name__)
 
@@ -458,7 +458,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         is_head_consistent = await self.ensure_head_is_non_empty(ensure_consistency=True)
         return is_head_consistent and len(self._queue_head_dict) == 0 and self._in_progress_count() == 0
 
-    async def get_info(self) -> BaseStorageMetadata | None:
+    async def get_info(self) -> RequestQueueMetadata | None:
         """Get an object containing general information about the request queue.
 
         Returns:
