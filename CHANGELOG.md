@@ -13,6 +13,7 @@
 - Add batched request addition in `RequestQueue`
 - Add start requests option to `BasicCrawler`
 - Add storage-related helpers `get_data`, `push_data` and `export_to` to `BasicCrawler` and `BasicContext`
+- Add `PlaywrightCrawler`'s enqueue links helper
 
 ## [0.0.4](../../releases/tag/v0.0.4) - 2024-05-30
 

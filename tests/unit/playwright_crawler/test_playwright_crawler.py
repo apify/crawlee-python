@@ -1,17 +1,21 @@
+# TODO: The current PlaywrightCrawler tests rely on external websites. It means they can fail or take more time
+# due to network issues. To enhance test stability and reliability, we should mock the network requests.
+# https://github.com/apify/crawlee-python/issues/197
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from unittest import mock
 
 from crawlee.playwright_crawler import PlaywrightCrawler
-from crawlee.storages.request_list import RequestList
 
 if TYPE_CHECKING:
     from crawlee.playwright_crawler import PlaywrightCrawlingContext
 
 
 async def test_basic_request(httpbin: str) -> None:
-    request_provider = RequestList([f'{httpbin}/'])
-    crawler = PlaywrightCrawler(request_provider=request_provider)
+    requests = [f'{httpbin}/']
+    crawler = PlaywrightCrawler()
     result: dict = {}
 
     @crawler.router.default_handler
@@ -22,8 +26,42 @@ async def test_basic_request(httpbin: str) -> None:
         result['page_title'] = await context.page.title()
         result['page_content'] = await context.page.content()
 
-    await crawler.run()
+    await crawler.run(requests)
 
     assert result.get('request_url') == result.get('page_url') == f'{httpbin}/'
     assert 'httpbin' in result.get('page_title', '')
     assert '<html' in result.get('page_content', '')  # there is some HTML content
+
+
+async def test_enqueue_links() -> None:
+    requests = ['https://crawlee.dev/']
+    crawler = PlaywrightCrawler()
+    visit = mock.Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        visit(context.request.url)
+        await context.enqueue_links()
+
+    await crawler.run(requests)
+
+    visited = {call[0][0] for call in visit.call_args_list}
+
+    assert visited == {
+        'https://crawlee.dev/',
+        'https://crawlee.dev/docs/guides/javascript-rendering',
+        'https://crawlee.dev/docs/guides/typescript-project',
+        'https://crawlee.dev/docs/guides/avoid-blocking',
+        'https://crawlee.dev/docs/guides/cheerio-crawler-guide',
+        'https://crawlee.dev/docs/guides/result-storage',
+        'https://crawlee.dev/docs/guides/proxy-management',
+        'https://crawlee.dev/api/core/class/AutoscaledPool',
+        'https://crawlee.dev/docs/guides/jsdom-crawler-guide',
+        'https://crawlee.dev/docs/guides/request-storage',
+        'https://crawlee.dev/api/utils',
+        'https://crawlee.dev/api/utils/namespace/social',
+        'https://crawlee.dev/docs/deployment/aws-cheerio',
+        'https://crawlee.dev/api/basic-crawler/interface/BasicCrawlerOptions',
+        'https://crawlee.dev/docs/deployment/gcp-cheerio',
+        'https://crawlee.dev/docs/quick-start',
+    }
