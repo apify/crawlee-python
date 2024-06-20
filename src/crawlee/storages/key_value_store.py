@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, AsyncIterator, TypeVar, overload
 
 from typing_extensions import override
 
-from crawlee.models import KeyValueStoreKeyInfo
+from crawlee.models import KeyValueStoreKeyInfo, KeyValueStoreMetadata
 from crawlee.storages.base_storage import BaseStorage
 
 if TYPE_CHECKING:
@@ -58,6 +58,10 @@ class KeyValueStore(BaseStorage):
     @property
     def name(self) -> str | None:
         return self._name
+
+    async def get_info(self) -> KeyValueStoreMetadata | None:
+        """Get an object containing general information about the key value store."""
+        return await self._resource_client.get()
 
     @override
     @classmethod
