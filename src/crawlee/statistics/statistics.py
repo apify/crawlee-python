@@ -10,7 +10,7 @@ from typing_extensions import Self, TypeVar
 
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee.events import LocalEventManager
-from crawlee.events.types import Event
+from crawlee.events.types import Event, EventPersistStateData
 from crawlee.statistics import FinalStatistics, StatisticsPersistedState, StatisticsState
 from crawlee.statistics.error_tracker import ErrorTracker
 from crawlee.storages import KeyValueStore
@@ -126,7 +126,7 @@ class Statistics(Generic[TStatisticsState]):
         self.state.crawler_finished_at = datetime.now(timezone.utc)
         self._events.off(event=Event.PERSIST_STATE, listener=self._persist_state)
         await self._periodic_logger.stop()
-        await self._persist_state()
+        await self._persist_state(event_data=EventPersistStateData(is_migrating=False))
 
     def register_status_code(self, code: int) -> None:
         """Increment the number of times a status code has been received."""
@@ -233,7 +233,9 @@ class Statistics(Generic[TStatisticsState]):
         elif saved_state.crawler_last_started_at:
             self._instance_start = saved_state.crawler_last_started_at
 
-    async def _persist_state(self) -> None:
+    async def _persist_state(self, event_data: EventPersistStateData) -> None:
+        logger.debug(f'Persisting state of the Statistics (event_data={event_data}).')
+
         if not self._persistence_enabled:
             return
 
