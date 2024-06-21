@@ -1,32 +1,22 @@
 # Quick start
 
-This short tutorial will help you start scraping with Crawlee in just a minute or two. For an in-depth understanding
-of how Crawlee works, check out the [Introduction](https://crawlee.dev/docs/introduction) section, which provides
-a comprehensive step-by-step guide to creating your first scraper.
+This short tutorial will help you start scraping with Crawlee in just a minute or two. For an in-depth understanding of how Crawlee works, check out the [Introduction](https://crawlee.dev/docs/introduction) section, which provides a comprehensive step-by-step guide to creating your first scraper.
 
 ## Choose your crawler
 
-Crawlee offers three main crawler classes: `BeautifulSoupCrawler`, `HttpCrawler`, and `PlaywrightCrawler`.
-All crawlers share the same interface, providing maximum flexibility when switching between them.
+Crawlee offers three main crawler classes: `BeautifulSoupCrawler`, `HttpCrawler`, and `PlaywrightCrawler`. All crawlers share the same interface, providing maximum flexibility when switching between them.
 
 ### BeautifulSoupCrawler
 
-The `BeautifulSoupCrawler` is a plain HTTP crawler that parses HTML using the well-known
-[BeautifulSoup](https://pypi.org/project/beautifulsoup4/) library. It crawls the web using an HTTP client
-that mimics a browser. This crawler is very fast and efficient but cannot handle JavaScript rendering.
+The `BeautifulSoupCrawler` is a plain HTTP crawler that parses HTML using the well-known [BeautifulSoup](https://pypi.org/project/beautifulsoup4/) library. It crawls the web using an HTTP client that mimics a browser. This crawler is very fast and efficient but cannot handle JavaScript rendering.
 
 ### HttpCrawler
 
-The `HttpCrawler` serves as the core component of the `BeautifulSoupCrawler`, minus the `BeautifulSoup` library
-as a parser and some scraper-specific features like enqueue links helper. You can parse the HTML yourself or
-use any other parsing library.
+The `HttpCrawler` serves as the core component of the `BeautifulSoupCrawler`, minus the `BeautifulSoup` library as a parser and some scraper-specific features like enqueue links helper. You can parse the HTML yourself or use any other parsing library.
 
 ### PlaywrightCrawler
 
-The `PlaywrightCrawler` uses a headless browser controlled by the [Playwright](https://playwright.dev/)
-library. It can manage Chromium, Firefox, Webkit, and other browsers. Playwright is the successor to
-the [Puppeteer](https://pptr.dev/) library and is becoming the de facto standard in headless browser automation.
-If you need a headless browser, choose Playwright.
+The `PlaywrightCrawler` uses a headless browser controlled by the [Playwright](https://playwright.dev/) library. It can manage Chromium, Firefox, Webkit, and other browsers. Playwright is the successor to the [Puppeteer](https://pptr.dev/) library and is becoming the de facto standard in headless browser automation. If you need a headless browser, choose Playwright.
 
 :::caution before you start
 
@@ -139,9 +129,7 @@ When you run the example, you will see Crawlee automating the data extraction pr
 
 ## Running headful browser
 
-By default, browsers controlled by Playwright run in headless mode (without a visible window). However,
-you can configure the crawler to run in a headful mode, which is useful during development phase to observe
-the browser's actions. You can alsoswitch from the default Chromium browser to Firefox or WebKit.
+By default, browsers controlled by Playwright run in headless mode (without a visible window). However, you can configure the crawler to run in a headful mode, which is useful during development phase to observe the browser's actions. You can alsoswitch from the default Chromium browser to Firefox or WebKit.
 
 ```python
 # ...
@@ -163,8 +151,7 @@ When you run the example code, you'll see an automated browser navigating throug
 
 ## Results
 
-By default, Crawlee stores data in the `./storage` directory within your current working directory.
-The results of your crawl will be saved as JSON files under `./storage/datasets/default/`.
+By default, Crawlee stores data in the `./storage` directory within your current working directory. The results of your crawl will be saved as JSON files under `./storage/datasets/default/`.
 
 To view the results, you can use the `cat` command:
 
@@ -183,16 +170,12 @@ The JSON file will contain data similar to the following:
 
 :::tip
 
-If you want to change the storage directory, you can set the `CRAWLEE_LOCAL_STORAGE_DIR` environment variable
-to your preferred path.
+If you want to change the storage directory, you can set the `CRAWLEE_LOCAL_STORAGE_DIR` environment variable to your preferred path.
 
 :::
 
 ## Examples and further reading
 
-For more examples showcasing various features of Crawlee, visit
-the [Examples](https://crawlee.dev/python/docs/examples) section of the documentation.
-To get a deeper understanding of Crawlee and its components, read the step-by-step
-[Introduction](https://crawlee.dev/python/docs/examples) guide.
+For more examples showcasing various features of Crawlee, visit the [Examples](https://crawlee.dev/python/docs/examples) section of the documentation. To get a deeper understanding of Crawlee and its components, read the step-by-step [Introduction](https://crawlee.dev/python/docs/examples) guide.
 
 <!-- TODO: add related links once they are ready -->
