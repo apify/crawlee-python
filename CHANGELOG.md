@@ -15,6 +15,10 @@
 - Add storage-related helpers `get_data`, `push_data` and `export_to` to `BasicCrawler` and `BasicContext`
 - Add `PlaywrightCrawler`'s enqueue links helper
 
+### Fixes
+
+- Fix type error in persist state of statistics
+
 ## [0.0.4](../../releases/tag/v0.0.4) - 2024-05-30
 
 - Another internal release, adding statistics capturing, proxy configuration and
