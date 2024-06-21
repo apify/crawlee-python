@@ -28,10 +28,11 @@ library. It can manage Chromium, Firefox, Webkit, and other browsers. Playwright
 the [Puppeteer](https://pptr.dev/) library and is becoming the de facto standard in headless browser automation.
 If you need a headless browser, choose Playwright.
 
-```
-BEFORE YOU START
+:::caution before you start
+
 Crawlee requires Python 3.9 or later.
-```
+
+:::
 
 ## Installation
 
@@ -180,8 +181,12 @@ The JSON file will contain data similar to the following:
 }
 ```
 
+:::tip
+
 If you want to change the storage directory, you can set the `CRAWLEE_LOCAL_STORAGE_DIR` environment variable
 to your preferred path.
+
+:::
 
 ## Examples and further reading
 
