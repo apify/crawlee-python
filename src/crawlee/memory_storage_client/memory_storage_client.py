@@ -51,7 +51,7 @@ class MemoryStorageClient(BaseStorageClient):
         Args:
             configuration: Configuration object to use. If None, a default Configuration object will be created.
         """
-        self._configuration = configuration or Configuration()
+        self._configuration = configuration or Configuration.get_global_configuration()
 
         self.datasets_handled: list[DatasetClient] = []
         self.key_value_stores_handled: list[KeyValueStoreClient] = []
