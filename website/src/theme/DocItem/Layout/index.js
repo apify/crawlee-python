@@ -52,13 +52,12 @@ export default function DocItemLayout({ children }) {
                     </article>
                     <DocItemPaginator/>
 
-                    {/* TODO once repo is public, generate new repo/category ids via https://giscus.app */}
                     <Giscus
                         id="giscus-comments"
                         repo="apify/crawlee-python"
-                        repoId="MDEwOlJlcG9zaXRvcnk2NjY3MDgxOQ="
+                        repoId="R_kgDOLDBXgA"
                         category="Comments"
-                        categoryId="DIC_kwDOA_lQ484CQufN"
+                        categoryId="DIC_kwDOLDBXgM4CgQI1"
                         mapping="pathname"
                         reactionsEnabled="1"
                         emitMetadata="0"
