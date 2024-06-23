@@ -1,6 +1,10 @@
 # Changelog
 
-## [0.0.5](../../releases/tag/v0.0.5) - Unreleased
+## [0.0.6](../../releases/tag/v0.0.6) - Unreleased
+
+...
+
+## [0.0.5](../../releases/tag/v0.0.5) - 2024-06-21
 
 ### Adds
 

@@ -128,7 +128,7 @@ async def main() -> None:
         # Extract the record and push it to the dataset
         await context.push_data(data)
 
-    # Run the crawler
+    # Add first URL to the queue and start the crawl
     await crawler.run(['https://crawlee.dev'])
 
 
@@ -177,7 +177,7 @@ async def main() -> None:
         # Extract the record and push it to the dataset
         await context.push_data(data)
 
-    # Run the crawler
+    # Add first URL to the queue and start the crawl
     await crawler.run(['https://crawlee.dev'])
 
 
