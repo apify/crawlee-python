@@ -1,7 +1,11 @@
 # Inspiration: https://github.com/apify/crawlee/blob/v3.7.3/packages/basic-crawler/src/internals/basic-crawler.ts
 from __future__ import annotations
 
+import asyncio
+import signal
+import sys
 import tempfile
+from asyncio import CancelledError
 from collections.abc import AsyncGenerator, Awaitable, Sequence
 from contextlib import AsyncExitStack
 from datetime import timedelta
@@ -289,6 +293,43 @@ class BasicCrawler(Generic[TCrawlingContext]):
         if requests is not None:
             await self.add_requests(requests)
 
+        interrupted = False
+
+        def sigint_handler() -> None:
+            nonlocal interrupted
+
+            if not interrupted:
+                interrupted = True
+                logger.info('Pausing... Press CTRL+C again to force exit.')
+
+            run_task.cancel()
+
+        run_task = asyncio.create_task(self._run_crawler())
+        asyncio.get_running_loop().add_signal_handler(signal.SIGINT, sigint_handler)
+
+        try:
+            await run_task
+        except CancelledError:
+            pass
+        finally:
+            asyncio.get_running_loop().remove_signal_handler(signal.SIGINT)
+
+        if self._statistics.error_tracker.total > 0:
+            logger.info(
+                'Error analysis:'
+                f' total_errors={self._statistics.error_tracker.total}'
+                f' unique_errors={self._statistics.error_tracker.unique_error_count}'
+            )
+
+        if interrupted:
+            logger.info(f'The crawl was interrupted. To resume, do: CRAWLEE_PURGE_ON_START=0 python {sys.argv[0]}')
+
+        self._running = False
+        self._has_finished_before = True
+
+        return self._statistics.calculate()
+
+    async def _run_crawler(self) -> None:
         async with AsyncExitStack() as exit_stack:
             await exit_stack.enter_async_context(self._event_manager)
             await exit_stack.enter_async_context(self._snapshotter)
@@ -301,18 +342,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 await exit_stack.enter_async_context(context_manager)
 
             await self._pool.run()
-
-        if self._statistics.error_tracker.total > 0:
-            logger.info(
-                'Error analysis:'
-                f' total_errors={self._statistics.error_tracker.total}'
-                f' unique_errors={self._statistics.error_tracker.unique_error_count}'
-            )
-
-        self._running = False
-        self._has_finished_before = True
-
-        return self._statistics.calculate()
 
     async def add_requests(
         self,
