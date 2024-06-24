@@ -1,4 +1,4 @@
-name: Linting
+name: Docs build
 
 on:
   workflow_call:
@@ -26,15 +26,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           cache: 'yarn'
-
-      - name: Turbo cache
-        id: turbo-cache
-        uses: actions/cache@v4
-        with:
-          path: .turbo
-          key: turbo-${{ github.job }}-${{ github.ref_name }}-${{ github.sha }}
-          restore-keys: |
-            turbo-${{ github.job }}-${{ github.ref_name }}-
 
       - name: Install Dependencies
         run: yarn
