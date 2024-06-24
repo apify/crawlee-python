@@ -45,7 +45,7 @@ keywords = [
 # https://github.com/apify/apify-sdk-python/pull/154.
 [tool.poetry.dependencies]
 python = "^3.9"
-aiofiles = "^23.2.1"
+aiofiles = "^24.0.0"
 aioshutil = "^1.3"
 beautifulsoup4 = { version = "^4.12.3", optional = true }
 colorama = "^0.4.6"
