@@ -28,10 +28,7 @@ jobs:
           cache: 'yarn'
           cache-dependency-path: 'website/yarn.lock'
 
-      - name: Install Dependencies
-        run: yarn
-
-      - name: Build & deploy docs
+      - name: Install dependencies and try to build the website
         run: |
           cd website
           yarn

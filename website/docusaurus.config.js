@@ -38,10 +38,10 @@ module.exports = {
     title: 'Crawlee',
     tagline: 'Build reliable crawlers. Fast.',
     url: 'https://crawlee.dev',
-    baseUrl: '/',
+    baseUrl: '/crawlee-python/',
     trailingSlash: false,
     organizationName: 'apify',
-    projectName: 'crawlee',
+    projectName: 'crawlee-python',
     scripts: ['/js/custom.js'],
     favicon: 'img/favicon.ico',
     customFields: {
@@ -49,7 +49,7 @@ module.exports = {
             html: true,
         },
         gaGtag: true,
-        repoUrl: 'https://github.com/apify/crawlee',
+        repoUrl: 'https://github.com/apify/crawlee-python',
     },
     onBrokenLinks:
     /** @type {import('@docusaurus/types').ReportingSeverity} */ ('throw'),
@@ -68,7 +68,7 @@ module.exports = {
                     rehypePlugins: [externalLinkProcessor],
                     // disableVersioning: true,
                     editUrl: (doc) => {
-                        return `https://github.com/apify/crawlee/edit/master/website/${doc.versionDocsDirPath}/${doc.docPath}`;
+                        return `https://github.com/apify/crawlee-python/edit/master/website/${doc.versionDocsDirPath}/${doc.docPath}`;
                     },
                 },
                 // blog: {
