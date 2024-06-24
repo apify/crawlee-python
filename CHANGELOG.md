@@ -2,7 +2,9 @@
 
 ## [0.0.6](../../releases/tag/v0.0.6) - Unreleased
 
-...
+### Fixes
+
+- Handling of relative URLs in `add_requests`
 
 ## [0.0.5](../../releases/tag/v0.0.5) - 2024-06-21
 
