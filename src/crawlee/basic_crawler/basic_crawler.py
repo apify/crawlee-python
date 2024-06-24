@@ -148,7 +148,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._max_session_rotations = max_session_rotations
 
         self._request_provider = request_provider
-        self._configuration = configuration or Configuration()
+        self._configuration = configuration or Configuration.get_global_configuration()
 
         self._request_handler_timeout = request_handler_timeout
         self._internal_timeout = (

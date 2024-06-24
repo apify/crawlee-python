@@ -30,3 +30,7 @@ jobs:
   check_version_conflict:
     name: Check version conflict
     uses: ./.github/workflows/_check_version_conflict.yaml
+
+  check_docs_build:
+    name: Check docs build
+    uses: ./.github/workflows/_check_docs_build.yaml

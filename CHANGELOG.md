@@ -5,6 +5,7 @@
 ### Adds
 
 - BREAKING: `BasicCrawler.export_data` helper method which replaces `BasicCrawler.export_to`
+- `Configuration.get_global_configuration` method
 
 ### Fixes
 

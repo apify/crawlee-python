@@ -115,7 +115,7 @@ class ProxyConfiguration:
         tiered_proxy_urls: list[list[str]] | None = None,
         configuration: Configuration | None = None,
     ) -> None:
-        self._configuration = configuration or Configuration()
+        self._configuration = configuration or Configuration.get_global_configuration()
         self._next_custom_url_index = 0
         self._used_proxy_urls = dict[str, URL]()
         self._url_validator = TypeAdapter(AnyHttpUrl)
