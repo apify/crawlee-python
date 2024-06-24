@@ -563,7 +563,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 destination = httpx.URL(request_model.url)
                 if destination.is_relative_url:
                     base_url = httpx.URL(call.get('base_url', origin))
-                    request_model.url = str(base_url.join(destination))
+                    destination = base_url.join(destination)
+                    request_model.url = str(destination)
 
                 if self._check_enqueue_strategy(
                     call.get('strategy', EnqueueStrategy.ALL), target_url=destination, origin_url=origin
