@@ -389,7 +389,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         if content_type is None:
             content_type = 'csv' if path.suffix == '.csv' else 'json'
 
-        return await dataset.write_to(content_type, path.open('w'))
+        return await dataset.write_to(content_type, path.open('w', newline=''))
 
     async def _push_data(
         self,
