@@ -5,7 +5,6 @@ import asyncio
 import json
 from dataclasses import dataclass
 from datetime import timedelta
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest.mock import Mock
 
@@ -23,6 +22,7 @@ from crawlee.storages import Dataset, KeyValueStore, RequestList, RequestQueue
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from pathlib import Path
 
     import respx
 

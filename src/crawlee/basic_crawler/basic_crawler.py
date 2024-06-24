@@ -45,7 +45,7 @@ if TYPE_CHECKING:
     from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
     from crawlee.sessions import Session
     from crawlee.statistics import FinalStatistics, StatisticsState
-    from crawlee.storages.dataset import ExportToKwargs, GetDataKwargs, PushDataKwargs
+    from crawlee.storages.dataset import GetDataKwargs, PushDataKwargs
     from crawlee.storages.request_provider import RequestProvider
     from crawlee.types import JSONSerializable
 
@@ -378,9 +378,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
         dataset and then exports the data based on the provided parameters.
 
         Args:
+            path: The destination path
+            content_type: The output format
             dataset_id: The ID of the dataset.
             dataset_name: The name of the dataset.
-            kwargs: Keyword arguments to be passed to the dataset's `export_to` method.
         """
         dataset = await Dataset.open(id=dataset_id, name=dataset_name)
         path = path if isinstance(path, Path) else Path(path)
