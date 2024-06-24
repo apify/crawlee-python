@@ -18,8 +18,8 @@
         </filter>
         <linearGradient id="paint0_linear_601_36953" x1="551.354" y1="124.705" x2="166.625" y2="549.572"
                         gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stop-color="#ffde57" />
-            <stop offset="60%" stop-color="#4584b6" />
+            <stop offset="0%" stop-color="#9dceff" />
+            <stop offset="70%" stop-color="#4584b6" />
             <stop offset="100%" stop-color="#4584b6" />
         </linearGradient>
         <linearGradient id="paint1_linear_601_36953" x1="551.354" y1="124.705" x2="166.625" y2="549.572"

@@ -9,8 +9,8 @@
     <defs>
         <linearGradient id="paint0_linear_601_36955" x1="431.354" y1="4.70499" x2="46.625" y2="429.572"
                         gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stop-color="#ffde57" />
-            <stop offset="60%" stop-color="#4584b6" />
+            <stop offset="0%" stop-color="#9dceff" />
+            <stop offset="70%" stop-color="#4584b6" />
             <stop offset="100%" stop-color="#4584b6" />
         </linearGradient>
         <linearGradient id="paint1_linear_601_36955" x1="431.354" y1="4.70499" x2="46.625" y2="429.572"
