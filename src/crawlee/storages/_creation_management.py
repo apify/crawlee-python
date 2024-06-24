@@ -127,7 +127,7 @@ async def open_storage(
     name: str | None = None,
 ) -> TResource:
     """Open either a new storage or restore an existing one and return it."""
-    configuration = configuration or Configuration()
+    configuration = configuration or Configuration.get_global_configuration()
     storage_client = StorageClientManager.get_storage_client(in_cloud=configuration.in_cloud)
 
     # Try to restore the storage from cache by name

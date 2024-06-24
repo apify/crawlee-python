@@ -2,6 +2,10 @@
 
 ## [0.0.6](../../releases/tag/v0.0.6) - Unreleased
 
+### Adds
+
+- `Configuration.get_global_configuration` method
+
 ### Fixes
 
 - Handling of relative URLs in `add_requests`
