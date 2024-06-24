@@ -2,6 +2,10 @@
 
 ## [0.0.6](../../releases/tag/v0.0.6) - Unreleased
 
+### Adds
+
+- BREAKING: `BasicCrawler.export_data` helper method which replaces `BasicCrawler.export_to`
+
 ### Fixes
 
 - Handling of relative URLs in `add_requests`
