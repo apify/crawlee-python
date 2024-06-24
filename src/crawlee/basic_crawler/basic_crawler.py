@@ -7,7 +7,8 @@ from contextlib import AsyncExitStack
 from datetime import timedelta
 from functools import partial
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, AsyncContextManager, Callable, Generic, Union, cast
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, AsyncContextManager, Callable, Generic, Literal, Union, cast
 
 import httpx
 from tldextract import TLDExtract
@@ -364,11 +365,12 @@ class BasicCrawler(Generic[TCrawlingContext]):
         dataset = await Dataset.open(id=dataset_id, name=dataset_name)
         return await dataset.get_data(**kwargs)
 
-    async def export_to(
+    async def export_data(
         self,
+        path: str | Path,
+        content_type: Literal['json', 'csv'] | None = None,
         dataset_id: str | None = None,
         dataset_name: str | None = None,
-        **kwargs: Unpack[ExportToKwargs],
     ) -> None:
         """Export data from a dataset.
 
@@ -381,7 +383,12 @@ class BasicCrawler(Generic[TCrawlingContext]):
             kwargs: Keyword arguments to be passed to the dataset's `export_to` method.
         """
         dataset = await Dataset.open(id=dataset_id, name=dataset_name)
-        return await dataset.export_to(**kwargs)
+        path = path if isinstance(path, Path) else Path(path)
+
+        if content_type is None:
+            content_type = 'csv' if path.suffix == '.csv' else 'json'
+
+        return await dataset.write_to(content_type, path.open('w'))
 
     async def _push_data(
         self,

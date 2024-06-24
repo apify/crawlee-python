@@ -5,6 +5,7 @@ import asyncio
 import json
 from dataclasses import dataclass
 from datetime import timedelta
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest.mock import Mock
 
@@ -515,26 +516,25 @@ async def test_context_push_and_get_data(httpbin: str) -> None:
     assert stats.requests_finished == 1
 
 
-async def test_crawler_push_and_export_data() -> None:
+async def test_crawler_push_and_export_data(tmp_path: Path) -> None:
     crawler = BasicCrawler()
     dataset = await Dataset.open()
 
     await dataset.push_data([{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}])
     await dataset.push_data({'id': 2, 'test': 'test'})
 
-    await crawler.export_to(key='dataset-json', content_type='json')
-    await crawler.export_to(key='dataset-csv', content_type='csv')
+    await crawler.export_data(tmp_path / 'dataset.json')
+    await crawler.export_data(tmp_path / 'dataset.csv')
 
-    kvs = await KeyValueStore.open()
-    assert await kvs.get_value('dataset-json') == [
+    assert json.load((tmp_path / 'dataset.json').open()) == [
         {'id': 0, 'test': 'test'},
         {'id': 1, 'test': 'test'},
         {'id': 2, 'test': 'test'},
     ]
-    assert await kvs.get_value('dataset-csv') == 'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
+    assert (tmp_path / 'dataset.csv').read_bytes() == b'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
 
 
-async def test_context_push_and_export_data(httpbin: str) -> None:
+async def test_context_push_and_export_data(httpbin: str, tmp_path: Path) -> None:
     crawler = BasicCrawler()
 
     @crawler.router.default_handler
@@ -544,13 +544,12 @@ async def test_context_push_and_export_data(httpbin: str) -> None:
 
     await crawler.run([f'{httpbin}/1'])
 
-    await crawler.export_to(key='dataset-json', content_type='json')
-    await crawler.export_to(key='dataset-csv', content_type='csv')
+    await crawler.export_data(tmp_path / 'dataset.json')
+    await crawler.export_data(tmp_path / 'dataset.csv')
 
-    kvs = await KeyValueStore.open()
-    assert await kvs.get_value('dataset-json') == [
+    assert json.load((tmp_path / 'dataset.json').open()) == [
         {'id': 0, 'test': 'test'},
         {'id': 1, 'test': 'test'},
         {'id': 2, 'test': 'test'},
     ]
-    assert await kvs.get_value('dataset-csv') == 'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
+    assert (tmp_path / 'dataset.csv').read_bytes() == b'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
