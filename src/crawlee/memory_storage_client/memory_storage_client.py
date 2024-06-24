@@ -51,7 +51,7 @@ class MemoryStorageClient(BaseStorageClient):
         Args:
             configuration: Configuration object to use. If None, a default Configuration object will be created.
         """
-        self._configuration = configuration or Configuration.get_global_configuration()
+        self._explicit_configuration = configuration
 
         self.datasets_handled: list[DatasetClient] = []
         self.key_value_stores_handled: list[KeyValueStoreClient] = []
@@ -59,6 +59,10 @@ class MemoryStorageClient(BaseStorageClient):
 
         self._purged_on_start = False  # Indicates whether a purge was already performed on this instance.
         self._purge_lock = asyncio.Lock()
+
+    @property
+    def _configuration(self) -> Configuration:
+        return self._explicit_configuration or Configuration.get_global_configuration()
 
     @property
     def write_metadata(self) -> bool:
