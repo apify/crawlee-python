@@ -71,10 +71,10 @@ module.exports = {
                         return `https://github.com/apify/crawlee/edit/master/website/${doc.versionDocsDirPath}/${doc.docPath}`;
                     },
                 },
-                blog: {
-                    blogTitle: 'Crawlee Blog - learn how to build better scrapers',
-                    blogDescription: 'Guides and tutorials on using Crawlee, the most reliable open-source web scraping and browser automation library for JavaScript and Node.js developers.',
-                },
+                // blog: {
+                //     blogTitle: 'Crawlee Blog - learn how to build better scrapers',
+                //     blogDescription: 'Guides and tutorials on using Crawlee, the most reliable open-source web scraping and browser automation library for JavaScript and Node.js developers.',
+                // },
                 theme: {
                     customCss: '/src/css/custom.css',
                 },
@@ -97,40 +97,40 @@ module.exports = {
         //         },
         //     },
         // ],
-        [
-            '@docusaurus/plugin-client-redirects',
-            {
-                redirects: [
-                    {
-                        from: '/docs',
-                        to: '/docs/quick-start',
-                    },
-                    {
-                        from: '/docs/next',
-                        to: '/docs/next/quick-start',
-                    },
-                    {
-                        from: '/docs/guides/environment-variables',
-                        to: '/docs/guides/configuration',
-                    },
-                    {
-                        from: '/docs/guides/getting-started',
-                        to: '/docs/introduction',
-                    },
-                    {
-                        from: '/docs/guides/apify-platform',
-                        to: '/docs/deployment/apify-platform',
-                    },
-                ],
-                createRedirects(existingPath) {
-                    if (!existingPath.endsWith('/')) {
-                        return `${existingPath}/`;
-                    }
-
-                    return undefined; // Return a falsy value: no redirect created
-                },
-            },
-        ],
+        // [
+        //     '@docusaurus/plugin-client-redirects',
+        //     {
+        //         redirects: [
+        //             {
+        //                 from: '/docs',
+        //                 to: '/docs/quick-start',
+        //             },
+        //             {
+        //                 from: '/docs/next',
+        //                 to: '/docs/next/quick-start',
+        //             },
+        //             {
+        //                 from: '/docs/guides/environment-variables',
+        //                 to: '/docs/guides/configuration',
+        //             },
+        //             {
+        //                 from: '/docs/guides/getting-started',
+        //                 to: '/docs/introduction',
+        //             },
+        //             {
+        //                 from: '/docs/guides/apify-platform',
+        //                 to: '/docs/deployment/apify-platform',
+        //             },
+        //         ],
+        //         createRedirects(existingPath) {
+        //             if (!existingPath.endsWith('/')) {
+        //                 return `${existingPath}/`;
+        //             }
+        //
+        //             return undefined; // Return a falsy value: no redirect created
+        //         },
+        //     },
+        // ],
         [
             'docusaurus-gtm-plugin',
             {
@@ -271,7 +271,8 @@ module.exports = {
                     items: [
                         {
                             label: 'Blog',
-                            to: 'blog',
+                            href: 'https://crawlee.dev/blog',
+                            // to: 'blog',
                         },
                         {
                             label: 'Discord',

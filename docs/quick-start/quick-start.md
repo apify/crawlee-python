@@ -2,7 +2,7 @@
 title: Quick Start
 ---
 
-This short tutorial will help you start scraping with Crawlee in just a minute or two. For an in-depth understanding of how Crawlee works, check out the [Introduction](https://crawlee.dev/docs/introduction) section, which provides a comprehensive step-by-step guide to creating your first scraper.
+This short tutorial will help you start scraping with Crawlee in just a minute or two. For an in-depth understanding of how Crawlee works, check out the [Introduction](../introduction/index.mdx) section, which provides a comprehensive step-by-step guide to creating your first scraper.
 
 ## Choose your crawler
 
@@ -179,6 +179,6 @@ If you want to change the storage directory, you can set the `CRAWLEE_LOCAL_STOR
 
 ## Examples and further reading
 
-For more examples showcasing various features of Crawlee, visit the [Examples](https://crawlee.dev/python/docs/examples) section of the documentation. To get a deeper understanding of Crawlee and its components, read the step-by-step [Introduction](https://crawlee.dev/python/docs/examples) guide.
+For more examples showcasing various features of Crawlee, visit the [Examples](/docs/examples) section of the documentation. To get a deeper understanding of Crawlee and its components, read the step-by-step [Introduction](../introduction/index.mdx) guide.
 
-<!-- TODO: add related links once they are ready -->
+[//]: # (TODO: add related links once they are ready)
