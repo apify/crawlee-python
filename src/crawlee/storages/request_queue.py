@@ -181,6 +181,10 @@ class RequestQueue(BaseStorage, RequestProvider):
             - `wasAlreadyPresent` (bool): Indicates whether the request was already in the queue.
             - `wasAlreadyHandled` (bool): Indicates whether the request was already processed.
         """
+        await (
+            self.ensure_head_is_non_empty()
+        )  # This ensures that insertion order is correct when restarting a crawl without purging the storage
+
         request = self._transform_request(request)
         self._last_activity = datetime.now(timezone.utc)
 
@@ -198,6 +202,7 @@ class RequestQueue(BaseStorage, RequestProvider):
                 was_already_handled=cached_info['was_already_handled'],
             )
 
+        request.forefront = forefront
         processed_request = await self._resource_client.add_request(request, forefront=forefront)
         processed_request.unique_key = request.unique_key
 
