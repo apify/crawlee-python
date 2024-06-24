@@ -1,6 +1,12 @@
 # Changelog
 
-## [0.0.5](../../releases/tag/v0.0.5) - Unreleased
+## [0.0.6](../../releases/tag/v0.0.6) - Unreleased
+
+### Fixes
+
+- Handling of relative URLs in `add_requests`
+
+## [0.0.5](../../releases/tag/v0.0.5) - 2024-06-21
 
 ### Adds
 
@@ -13,6 +19,11 @@
 - Add batched request addition in `RequestQueue`
 - Add start requests option to `BasicCrawler`
 - Add storage-related helpers `get_data`, `push_data` and `export_to` to `BasicCrawler` and `BasicContext`
+- Add `PlaywrightCrawler`'s enqueue links helper
+
+### Fixes
+
+- Fix type error in persist state of statistics
 
 ## [0.0.4](../../releases/tag/v0.0.4) - 2024-05-30
 

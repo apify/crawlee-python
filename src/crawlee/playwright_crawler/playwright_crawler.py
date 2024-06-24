@@ -6,12 +6,14 @@ from typing_extensions import Unpack
 
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.browsers import BrowserPool
+from crawlee.enqueue_strategy import EnqueueStrategy
+from crawlee.models import BaseRequestData
 from crawlee.playwright_crawler.types import PlaywrightCrawlingContext
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
-    from crawlee.basic_crawler.types import BasicCrawlingContext
+    from crawlee.basic_crawler.types import AddRequestsKwargs, BasicCrawlingContext
 
 
 class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
@@ -63,6 +65,34 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
         await crawlee_page.page.goto(context.request.url)
         context.request.loaded_url = crawlee_page.page.url
 
+        async def enqueue_links(
+            *,
+            selector: str = 'a',
+            label: str | None = None,
+            user_data: dict | None = None,
+            **kwargs: Unpack[AddRequestsKwargs],
+        ) -> None:
+            kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
+
+            requests = list[BaseRequestData]()
+            user_data = user_data or {}
+
+            elements = await crawlee_page.page.query_selector_all(selector)
+
+            for element in elements:
+                href = await element.get_attribute('href')
+
+                if href:
+                    link_user_data = user_data.copy()
+
+                    if label is not None:
+                        link_user_data.setdefault('label', label)
+
+                    request = BaseRequestData.from_url(href, user_data=link_user_data)
+                    requests.append(request)
+
+            await context.add_requests(requests, **kwargs)
+
         yield PlaywrightCrawlingContext(
             request=context.request,
             session=context.session,
@@ -71,6 +101,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
             push_data=context.push_data,
             proxy_info=context.proxy_info,
             page=crawlee_page.page,
+            enqueue_links=enqueue_links,
         )
 
         await crawlee_page.page.close()

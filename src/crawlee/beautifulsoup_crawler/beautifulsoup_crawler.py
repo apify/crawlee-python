@@ -113,6 +113,8 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
             user_data: dict[str, Any] | None = None,
             **kwargs: Unpack[AddRequestsKwargs],
         ) -> None:
+            kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
+
             requests = list[BaseRequestData]()
             user_data = user_data or {}
 
@@ -125,9 +127,6 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
 
                 if (href := link.attrs.get('href')) is not None:
                     requests.append(BaseRequestData.from_url(href, user_data=link_user_data))
-
-            uses_patterns = 'include' in kwargs or 'exclude' in kwargs
-            kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME if uses_patterns else EnqueueStrategy.ALL)
 
             await context.add_requests(requests, **kwargs)
 

@@ -52,7 +52,9 @@ class RequestQueue(BaseStorage, RequestProvider):
         rq = await RequestQueue.open(id='my_rq_id')
     """
 
-    _API_PROCESSED_REQUESTS_DELAY = timedelta(seconds=10)
+    # TODO: set this back to 10 seconds once the following issue is resolved:
+    # https://github.com/apify/crawlee-python/issues/203
+    _API_PROCESSED_REQUESTS_DELAY = timedelta(seconds=1)
     """Delay threshold to assume consistency of queue head operations after queue modifications."""
 
     _MAX_CACHED_REQUESTS = 1_000_000

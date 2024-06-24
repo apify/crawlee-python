@@ -128,7 +128,7 @@ async def main() -> None:
         # Extract the record and push it to the dataset
         await context.push_data(data)
 
-    # Run the crawler
+    # Add first URL to the queue and start the crawl
     await crawler.run(['https://crawlee.dev'])
 
 
@@ -162,7 +162,7 @@ from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCra
 
 
 async def main() -> None:
-    # Create a BeautifulSoupCrawler instance and provide a request provider
+    # Create a BeautifulSoupCrawler instance
     crawler = BeautifulSoupCrawler()
 
     # Define a handler for processing requests
@@ -177,7 +177,7 @@ async def main() -> None:
         # Extract the record and push it to the dataset
         await context.push_data(data)
 
-    # Run the crawler
+    # Add first URL to the queue and start the crawl
     await crawler.run(['https://crawlee.dev'])
 
 
@@ -229,7 +229,7 @@ from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingCont
 
 
 async def main() -> None:
-    # Create a crawler instance and provide a request provider (and other optional arguments)
+    # Create a crawler instance
     crawler = PlaywrightCrawler(
         # headless=False,
         # browser_type='firefox',
@@ -273,7 +273,7 @@ async def main() -> None:
         ]
     )
 
-    # Create a crawler instance and provide a browser pool and request provider
+    # Create a crawler instance and provide a browser pool
     crawler = PlaywrightCrawler(browser_pool=browser_pool)
 
     @crawler.router.default_handler
