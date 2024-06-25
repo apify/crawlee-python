@@ -9,6 +9,7 @@
 ### Fixes
 
 - Handling of relative URLs in `add_requests`
+- Graceful exit in `BasicCrawler.run`
 
 ## [0.0.5](../../releases/tag/v0.0.5) - 2024-06-21
 
