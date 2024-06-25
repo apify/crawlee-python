@@ -7,6 +7,7 @@ import pytest
 import respx
 from httpx import Response
 
+from crawlee.autoscaling.autoscaled_pool import ConcurrencySettings
 from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler
 from crawlee.storages import RequestList
 
@@ -102,3 +103,27 @@ async def test_enqueue_links(server: respx.MockRouter) -> None:
         'https://test.io/qwer',
         'https://test.io/uiop',
     }
+
+
+async def test_enqueue_links_with_max_crawl(server: respx.MockRouter) -> None:
+    start_urls = ['https://test.io/']
+    processed_urls = []
+
+    # Set max_concurrency to 1 to ensure testing max_requests_per_crawl accurately
+    crawler = BeautifulSoupCrawler(
+        concurrency_settings=ConcurrencySettings(max_concurrency=1),
+        max_requests_per_crawl=3,
+    )
+
+    @crawler.router.default_handler
+    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
+        await context.enqueue_links()
+        processed_urls.append(context.request.url)
+
+    stats = await crawler.run(start_urls)
+
+    # Verify that only 3 out of the possible 5 requests were made
+    assert server['index_endpoint'].called
+    assert len(processed_urls) == 3
+    assert stats.requests_total == 3
+    assert stats.requests_finished == 3
