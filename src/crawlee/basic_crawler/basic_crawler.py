@@ -11,7 +11,8 @@ from contextlib import AsyncExitStack, suppress
 from datetime import timedelta
 from functools import partial
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, AsyncContextManager, Callable, Generic, Union, cast
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, AsyncContextManager, Callable, Generic, Literal, Union, cast
 
 import httpx
 from tldextract import TLDExtract
@@ -48,7 +49,7 @@ if TYPE_CHECKING:
     from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
     from crawlee.sessions import Session
     from crawlee.statistics import FinalStatistics, StatisticsState
-    from crawlee.storages.dataset import ExportToKwargs, GetDataKwargs, PushDataKwargs
+    from crawlee.storages.dataset import GetDataKwargs, PushDataKwargs
     from crawlee.storages.request_provider import RequestProvider
     from crawlee.types import JSONSerializable
 
@@ -411,11 +412,12 @@ class BasicCrawler(Generic[TCrawlingContext]):
         dataset = await Dataset.open(id=dataset_id, name=dataset_name)
         return await dataset.get_data(**kwargs)
 
-    async def export_to(
+    async def export_data(
         self,
+        path: str | Path,
+        content_type: Literal['json', 'csv'] | None = None,
         dataset_id: str | None = None,
         dataset_name: str | None = None,
-        **kwargs: Unpack[ExportToKwargs],
     ) -> None:
         """Export data from a dataset.
 
@@ -423,12 +425,18 @@ class BasicCrawler(Generic[TCrawlingContext]):
         dataset and then exports the data based on the provided parameters.
 
         Args:
+            path: The destination path
+            content_type: The output format
             dataset_id: The ID of the dataset.
             dataset_name: The name of the dataset.
-            kwargs: Keyword arguments to be passed to the dataset's `export_to` method.
         """
         dataset = await Dataset.open(id=dataset_id, name=dataset_name)
-        return await dataset.export_to(**kwargs)
+        path = path if isinstance(path, Path) else Path(path)
+
+        if content_type is None:
+            content_type = 'csv' if path.suffix == '.csv' else 'json'
+
+        return await dataset.write_to(content_type, path.open('w', newline=''))
 
     async def _push_data(
         self,
