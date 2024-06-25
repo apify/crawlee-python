@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, AsyncGenerator, Iterable
 
 from typing_extensions import Unpack
@@ -45,6 +46,8 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
             ),
         )
 
+        kwargs.setdefault('_logger', logging.getLogger(__name__))
+
         super().__init__(**kwargs)
 
     async def _make_http_request(self, context: BasicCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
@@ -62,6 +65,7 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
             add_requests=context.add_requests,
             send_request=context.send_request,
             push_data=context.push_data,
+            log=context.log,
             http_response=result.http_response,
         )
 

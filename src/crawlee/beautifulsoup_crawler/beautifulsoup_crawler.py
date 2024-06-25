@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import TYPE_CHECKING, Any, AsyncGenerator, Iterable, Literal
 
 from bs4 import BeautifulSoup, Tag
@@ -59,6 +60,8 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
             ),
         )
 
+        kwargs.setdefault('_logger', logging.getLogger(__name__))
+
         super().__init__(**kwargs)
 
     async def _make_http_request(self, context: BasicCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
@@ -76,6 +79,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
             add_requests=context.add_requests,
             send_request=context.send_request,
             push_data=context.push_data,
+            log=context.log,
             http_response=result.http_response,
         )
 
@@ -138,6 +142,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
             add_requests=context.add_requests,
             send_request=context.send_request,
             push_data=context.push_data,
+            log=context.log,
             http_response=context.http_response,
             soup=soup,
         )

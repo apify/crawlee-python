@@ -6,6 +6,8 @@
 
 - BREAKING: `BasicCrawler.export_data` helper method which replaces `BasicCrawler.export_to`
 - `Configuration.get_global_configuration` method
+- Automatic logging setup
+- Context helper for logging (`context.log`)
 
 ### Fixes
 

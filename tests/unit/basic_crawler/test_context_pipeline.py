@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock
@@ -38,6 +39,7 @@ async def test_calls_consumer_without_middleware() -> None:
         session=Session(),
         proxy_info=AsyncMock(),
         push_data=AsyncMock(),
+        log=logging.getLogger(),
     )
 
     await pipeline(context, consumer)
@@ -62,6 +64,7 @@ async def test_calls_consumers_and_middlewares() -> None:
             session=context.session,
             proxy_info=AsyncMock(),
             push_data=AsyncMock(),
+            log=logging.getLogger(),
         )
         events.append('middleware_a_out')
 
@@ -76,6 +79,7 @@ async def test_calls_consumers_and_middlewares() -> None:
             session=context.session,
             proxy_info=AsyncMock(),
             push_data=AsyncMock(),
+            log=logging.getLogger(),
         )
         events.append('middleware_b_out')
 
@@ -88,6 +92,7 @@ async def test_calls_consumers_and_middlewares() -> None:
         session=Session(),
         proxy_info=AsyncMock(),
         push_data=AsyncMock(),
+        log=logging.getLogger(),
     )
     await pipeline(context, consumer)
 
@@ -111,6 +116,7 @@ async def test_wraps_consumer_errors() -> None:
         session=Session(),
         proxy_info=AsyncMock(),
         push_data=AsyncMock(),
+        log=logging.getLogger(),
     )
 
     with pytest.raises(RequestHandlerError):
@@ -137,6 +143,7 @@ async def test_handles_exceptions_in_middleware_initialization() -> None:
         session=Session(),
         proxy_info=AsyncMock(),
         push_data=AsyncMock(),
+        log=logging.getLogger(),
     )
 
     with pytest.raises(ContextPipelineInitializationError):
@@ -166,6 +173,7 @@ async def test_handles_exceptions_in_middleware_finalization() -> None:
         session=Session(),
         proxy_info=AsyncMock(),
         push_data=AsyncMock(),
+        log=logging.getLogger(),
     )
 
     with pytest.raises(ContextPipelineFinalizationError):
