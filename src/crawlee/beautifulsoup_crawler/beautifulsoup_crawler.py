@@ -123,7 +123,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
             user_data = user_data or {}
 
             link: Tag
-            for link in soup.find_all(selector):
+            for link in soup.select(selector):
                 link_user_data = user_data
 
                 if label is not None:
