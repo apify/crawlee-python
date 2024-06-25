@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import TYPE_CHECKING, Any, AsyncGenerator, Iterable, Literal
 
 from bs4 import BeautifulSoup, Tag
@@ -58,6 +59,8 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
                 ignore_http_error_status_codes=ignore_http_error_status_codes,
             ),
         )
+
+        kwargs.setdefault('_logger', logging.getLogger(__name__))
 
         super().__init__(**kwargs)
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, AsyncGenerator, Iterable
 
 from typing_extensions import Unpack
@@ -44,6 +45,8 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
                 ignore_http_error_status_codes=ignore_http_error_status_codes,
             ),
         )
+
+        kwargs.setdefault('_logger', logging.getLogger(__name__))
 
         super().__init__(**kwargs)
 

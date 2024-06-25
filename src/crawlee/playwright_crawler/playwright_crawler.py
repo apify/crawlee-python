@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Literal
 
 from typing_extensions import Unpack
@@ -51,6 +52,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
 
         kwargs['_context_pipeline'] = ContextPipeline().compose(self._page_goto)
         kwargs['_additional_context_managers'] = [self._browser_pool]
+
+        kwargs.setdefault('_logger', logging.getLogger(__name__))
 
         super().__init__(**kwargs)
 

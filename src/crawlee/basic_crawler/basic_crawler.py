@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import signal
 import sys
 import tempfile
@@ -10,7 +11,6 @@ from collections.abc import AsyncGenerator, Awaitable, Sequence
 from contextlib import AsyncExitStack, suppress
 from datetime import timedelta
 from functools import partial
-from logging import getLogger
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, AsyncContextManager, Callable, Generic, Literal, Union, cast
 
@@ -37,6 +37,7 @@ from crawlee.configuration import Configuration
 from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.events import LocalEventManager
 from crawlee.http_clients import HttpxClient
+from crawlee.log_config import CrawleeLogFormatter
 from crawlee.models import BaseRequestData, DatasetItemsListPage, Request, RequestState
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
@@ -57,8 +58,6 @@ TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, defau
 ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Union[Request, None]]]
 FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
 
-logger = getLogger(__name__)
-
 
 class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     """Copy of the parameter types of `BasicCrawler.__init__` meant for typing forwarded __init__ args in subclasses."""
@@ -77,8 +76,10 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     retry_on_blocked: NotRequired[bool]
     proxy_configuration: NotRequired[ProxyConfiguration]
     statistics: NotRequired[Statistics[StatisticsState]]
+    setup_logging: NotRequired[bool]
     _context_pipeline: NotRequired[ContextPipeline[TCrawlingContext]]
     _additional_context_managers: NotRequired[Sequence[AsyncContextManager]]
+    _logger: NotRequired[logging.Logger]
 
 
 class BasicCrawler(Generic[TCrawlingContext]):
@@ -109,8 +110,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
         retry_on_blocked: bool = True,
         proxy_configuration: ProxyConfiguration | None = None,
         statistics: Statistics | None = None,
+        configure_logging: bool = True,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         _additional_context_managers: Sequence[AsyncContextManager] | None = None,
+        _logger: logging.Logger | None = None,
     ) -> None:
         """Initialize the BasicCrawler.
 
@@ -134,10 +137,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
             retry_on_blocked: If set to True, the crawler will try to automatically bypass any detected bot protection
             proxy_configuration: A HTTP proxy configuration to be used for making requests
             statistics: A preconfigured `Statistics` instance if you wish to use non-default configuration
-            browser_pool: A preconfigured `BrowserPool` instance for browser crawling.
+            configure_logging: If set to True, the crawler will configure the logging infrastructure
             _context_pipeline: Allows extending the request lifecycle and modifying the crawling context.
                 This parameter is meant to be used by child classes, not when BasicCrawler is instantiated directly.
             _additional_context_managers: Additional context managers to be used in the crawler lifecycle.
+            _logger: A logger instance passed from a child class to ensure consistent labels
         """
         self._router: Router[TCrawlingContext] | None = None
 
@@ -186,10 +190,27 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         self._retry_on_blocked = retry_on_blocked
 
+        if configure_logging:
+            handler = logging.StreamHandler()
+            handler.setFormatter(CrawleeLogFormatter())
+
+            root_logger = logging.getLogger()
+
+            for handler in root_logger.handlers[:]:
+                root_logger.removeHandler(handler)
+
+            root_logger.addHandler(handler)
+            root_logger.setLevel(logging.INFO if not sys.flags.dev_mode else logging.DEBUG)
+
+        if not _logger:
+            _logger = logging.getLogger(__name__)
+
+        self._logger = _logger
+
         self._proxy_configuration = proxy_configuration
         self._statistics = statistics or Statistics(
             event_manager=self._event_manager,
-            log_message=f'{logger.name} request statistics',
+            log_message=f'{self._logger.name} request statistics',
         )
         self._additional_context_managers = _additional_context_managers or []
 
@@ -235,7 +256,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             timeout_message='Fetching a session from the pool timed out after '
             f'{self._internal_timeout.total_seconds()} seconds',
             max_retries=3,
-            logger=logger,
+            logger=self._logger,
         )
 
     async def _get_proxy_info(self, request: Request, session: Session | None) -> ProxyInfo | None:
@@ -316,7 +337,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
             if not interrupted:
                 interrupted = True
-                logger.info('Pausing... Press CTRL+C again to force exit.')
+                self._logger.info('Pausing... Press CTRL+C again to force exit.')
 
             run_task.cancel()
 
@@ -334,14 +355,16 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 asyncio.get_running_loop().remove_signal_handler(signal.SIGINT)
 
         if self._statistics.error_tracker.total > 0:
-            logger.info(
+            self._logger.info(
                 'Error analysis:'
                 f' total_errors={self._statistics.error_tracker.total}'
                 f' unique_errors={self._statistics.error_tracker.unique_error_count}'
             )
 
         if interrupted:
-            logger.info(f'The crawl was interrupted. To resume, do: CRAWLEE_PURGE_ON_START=0 python {sys.argv[0]}')
+            self._logger.info(
+                f'The crawl was interrupted. To resume, do: CRAWLEE_PURGE_ON_START=0 python {sys.argv[0]}'
+            )
 
         self._running = False
         self._has_finished_before = True
@@ -564,14 +587,14 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 timeout=self._internal_timeout,
                 timeout_message='Marking request as handled timed out after '
                 f'{self._internal_timeout.total_seconds()} seconds',
-                logger=logger,
+                logger=self._logger,
                 max_retries=3,
             )
             await self._handle_failed_request(crawling_context, error)
             self._statistics.record_request_processing_failure(request.id or request.unique_key)
 
     async def _handle_failed_request(self, crawling_context: TCrawlingContext, error: Exception) -> None:
-        logger.exception('Request failed and reached maximum retries', exc_info=error)
+        self._logger.exception('Request failed and reached maximum retries', exc_info=error)
         self._statistics.error_tracker.add(error)
 
         if self._failed_request_handler:
@@ -633,19 +656,19 @@ class BasicCrawler(Generic[TCrawlingContext]):
         is_finished = await request_provider.is_finished()
 
         if self._max_requests_count_exceeded:
-            logger.info(
+            self._logger.info(
                 f'The crawler has reached its limit of {self._max_requests_per_crawl} requests per crawl. '
                 f'All ongoing requests have now completed. Total requests processed: '
                 f'{self._statistics.state.requests_finished}. The crawler will now shut down.'
             )
-            logger.info(f'is_finished: {is_finished}')
+            self._logger.info(f'is_finished: {is_finished}')
             return True
 
         return is_finished
 
     async def __is_task_ready_function(self) -> bool:
         if self._max_requests_count_exceeded:
-            logger.info(
+            self._logger.info(
                 f'The crawler has reached its limit of {self._max_requests_per_crawl} requests per crawl. '
                 f'The crawler will soon shut down. Ongoing requests will be allowed to complete.'
             )
@@ -661,7 +684,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             lambda: request_provider.fetch_next_request(),
             timeout=self._internal_timeout,
             timeout_message=f'Fetching next request failed after {self._internal_timeout.total_seconds()} seconds',
-            logger=logger,
+            logger=self._logger,
             max_retries=3,
         )
 
@@ -692,7 +715,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 timeout=self._request_handler_timeout,
                 timeout_message='Request handler timed out after '
                 f'{self._request_handler_timeout.total_seconds()} seconds',
-                logger=logger,
+                logger=self._logger,
             )
 
             await self._commit_request_handler_result(crawling_context, result)
@@ -702,7 +725,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 timeout=self._internal_timeout,
                 timeout_message='Marking request as handled timed out after '
                 f'{self._internal_timeout.total_seconds()} seconds',
-                logger=logger,
+                logger=self._logger,
                 max_retries=3,
             )
 
@@ -727,7 +750,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
                     timeout=self._internal_timeout,
                     timeout_message='Handling request failure timed out after '
                     f'{self._internal_timeout.total_seconds()} seconds',
-                    logger=logger,
+                    logger=self._logger,
                 )
 
                 request.state = RequestState.DONE
@@ -735,7 +758,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 request.state = RequestState.ERROR
                 raise
             except Exception as secondary_error:
-                logger.exception(
+                self._logger.exception(
                     'An exception occurred during handling of failed request. This places the crawler '
                     'and its underlying storages into an unknown state and crawling will be terminated.',
                     exc_info=secondary_error,
@@ -750,7 +773,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 raise RuntimeError('SessionError raised in a crawling context without a session') from session_error
 
             if self._should_retry_request(crawling_context, session_error):
-                logger.warning('Encountered a session error, rotating session and retrying')
+                self._logger.warning('Encountered a session error, rotating session and retrying')
 
                 crawling_context.session.retire()
 
@@ -761,33 +784,33 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 await request_provider.reclaim_request(request)
                 self._statistics.error_tracker_retry.add(session_error)
             else:
-                logger.exception('Request failed and reached maximum retries', exc_info=session_error)
+                self._logger.exception('Request failed and reached maximum retries', exc_info=session_error)
 
                 await wait_for(
                     lambda: request_provider.mark_request_as_handled(crawling_context.request),
                     timeout=self._internal_timeout,
                     timeout_message='Marking request as handled timed out after '
                     f'{self._internal_timeout.total_seconds()} seconds',
-                    logger=logger,
+                    logger=self._logger,
                     max_retries=3,
                 )
 
                 self._statistics.record_request_processing_failure(statistics_id)
                 self._statistics.error_tracker.add(session_error)
         except ContextPipelineInterruptedError as interruped_error:
-            logger.debug('The context pipeline was interrupted', exc_info=interruped_error)
+            self._logger.debug('The context pipeline was interrupted', exc_info=interruped_error)
 
             await wait_for(
                 lambda: request_provider.mark_request_as_handled(crawling_context.request),
                 timeout=self._internal_timeout,
                 timeout_message='Marking request as handled timed out after '
                 f'{self._internal_timeout.total_seconds()} seconds',
-                logger=logger,
+                logger=self._logger,
                 max_retries=3,
             )
         except ContextPipelineInitializationError as initialization_error:
             if self._should_retry_request(crawling_context, initialization_error):
-                logger.debug(
+                self._logger.debug(
                     'An exception occurred during the initialization of crawling context, a retry is in order',
                     exc_info=initialization_error,
                 )
@@ -797,21 +820,21 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 request.state = RequestState.DONE
                 await request_provider.reclaim_request(request)
             else:
-                logger.exception('Request failed and reached maximum retries', exc_info=initialization_error)
+                self._logger.exception('Request failed and reached maximum retries', exc_info=initialization_error)
 
                 await wait_for(
                     lambda: request_provider.mark_request_as_handled(crawling_context.request),
                     timeout=self._internal_timeout,
                     timeout_message='Marking request as handled timed out after '
                     f'{self._internal_timeout.total_seconds()} seconds',
-                    logger=logger,
+                    logger=self._logger,
                     max_retries=3,
                 )
 
             if crawling_context.session:
                 crawling_context.session.mark_bad()
         except Exception as internal_error:
-            logger.exception(
+            self._logger.exception(
                 'An exception occurred during handling of a request. This places the crawler '
                 'and its underlying storages into an unknown state and crawling will be terminated.',
                 exc_info=internal_error,
