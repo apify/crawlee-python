@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.0.7](../../releases/tag/v0.0.7) - Unreleased
+
+### Fixes
+
+- selector handling in `enqueue_links` in `BeautifulSoupCrawler`
+
 ## [0.0.6](../../releases/tag/v0.0.6) - Unreleased
 
 ### Adds
