@@ -1,6 +1,7 @@
 # ruff: noqa: TCH003
 from __future__ import annotations
 
+import logging
 import re
 from collections.abc import Coroutine, Sequence
 from dataclasses import dataclass, field
@@ -124,6 +125,7 @@ class BasicCrawlingContext:
     send_request: SendRequestFunction
     add_requests: AddRequestsFunction
     push_data: PushDataFunction
+    log: logging.Logger
 
 
 class AddRequestsFunctionCall(AddRequestsKwargs):

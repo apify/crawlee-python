@@ -76,7 +76,7 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     retry_on_blocked: NotRequired[bool]
     proxy_configuration: NotRequired[ProxyConfiguration]
     statistics: NotRequired[Statistics[StatisticsState]]
-    setup_logging: NotRequired[bool]
+    configure_logging: NotRequired[bool]
     _context_pipeline: NotRequired[ContextPipeline[TCrawlingContext]]
     _additional_context_managers: NotRequired[Sequence[AsyncContextManager]]
     _logger: NotRequired[logging.Logger]
@@ -196,8 +196,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
             root_logger = logging.getLogger()
 
-            for handler in root_logger.handlers[:]:
-                root_logger.removeHandler(handler)
+            for old_handler in root_logger.handlers[:]:
+                root_logger.removeHandler(old_handler)
 
             root_logger.addHandler(handler)
             root_logger.setLevel(logging.INFO if not sys.flags.dev_mode else logging.DEBUG)
@@ -702,6 +702,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             send_request=self._prepare_send_request_function(session, proxy_info),
             add_requests=result.add_requests,
             push_data=self._push_data,
+            log=self._logger,
         )
 
         statistics_id = request.id or request.unique_key

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -19,6 +20,7 @@ class MockContext(BasicCrawlingContext):
             add_requests=AsyncMock(),
             proxy_info=AsyncMock(),
             push_data=AsyncMock(),
+            log=logging.getLogger(),
         )
 
 
