@@ -1,3 +1,4 @@
+import os
 from collections.abc import AsyncGenerator
 
 import pytest
@@ -65,6 +66,7 @@ async def disabled_proxy(proxy_info: ProxyInfo) -> AsyncGenerator[ProxyInfo, Non
         yield proxy_info
 
 
+@pytest.mark.skipif(os.name == 'nt', reason='Skipped on Windows')
 async def test_proxy_disabled(disabled_proxy: ProxyInfo, httpbin: str) -> None:
     client = HttpxClient()
     request = Request(url=f'{httpbin}/status/222', unique_key='42', id='42', user_data={})
