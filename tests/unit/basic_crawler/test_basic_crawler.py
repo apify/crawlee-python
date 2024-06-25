@@ -13,6 +13,7 @@ import pytest
 from httpx import Headers, Response
 
 from crawlee import Glob
+from crawlee.autoscaling import ConcurrencySettings
 from crawlee.basic_crawler import BasicCrawler
 from crawlee.basic_crawler.errors import SessionError, UserDefinedErrorHandlerError
 from crawlee.basic_crawler.types import AddRequestsKwargs, BasicCrawlingContext
@@ -552,4 +553,27 @@ async def test_context_push_and_export_data(httpbin: str, tmp_path: Path) -> Non
         {'id': 1, 'test': 'test'},
         {'id': 2, 'test': 'test'},
     ]
+
     assert (tmp_path / 'dataset.csv').read_bytes() == b'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
+
+
+async def test_max_requests_per_crawl(httpbin: str) -> None:
+    start_urls = [f'{httpbin}/1', f'{httpbin}/2', f'{httpbin}/3', f'{httpbin}/4', f'{httpbin}/5']
+    processed_urls = []
+
+    # Set max_concurrency to 1 to ensure testing max_requests_per_crawl accurately
+    crawler = BasicCrawler(
+        concurrency_settings=ConcurrencySettings(max_concurrency=1),
+        max_requests_per_crawl=3,
+    )
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        processed_urls.append(context.request.url)
+
+    stats = await crawler.run(start_urls)
+
+    # Verify that only 3 out of the 5 provided URLs were made
+    assert len(processed_urls) == 3
+    assert stats.requests_total == 3
+    assert stats.requests_finished == 3

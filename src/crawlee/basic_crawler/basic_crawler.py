@@ -64,6 +64,7 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     http_client: NotRequired[BaseHttpClient]
     concurrency_settings: NotRequired[ConcurrencySettings]
     max_request_retries: NotRequired[int]
+    max_requests_per_crawl: NotRequired[int | None]
     max_session_rotations: NotRequired[int]
     configuration: NotRequired[Configuration]
     request_handler_timeout: NotRequired[timedelta]
@@ -95,6 +96,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         http_client: BaseHttpClient | None = None,
         concurrency_settings: ConcurrencySettings | None = None,
         max_request_retries: int = 3,
+        max_requests_per_crawl: int | None = None,
         max_session_rotations: int = 10,
         configuration: Configuration | None = None,
         request_handler_timeout: timedelta = timedelta(minutes=1),
@@ -114,6 +116,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
             http_client: HTTP client to be used for `BasicCrawlingContext.send_request` and HTTP-only crawling.
             concurrency_settings: Allows fine-tuning concurrency levels
             max_request_retries: Maximum amount of attempts at processing a request
+            max_requests_per_crawl: Maximum number of pages that the crawler will open. The crawl will stop when
+                the limit is reached. It is recommended to set this value in order to prevent infinite loops in
+                misconfigured crawlers. None means no limit. Due to concurrency_settings, the actual number of pages
+                visited may slightly exceed this value.
             max_session_rotations: Maximum number of session rotations per request.
                 The crawler will automatically rotate the session in case of a proxy error or if it gets blocked by
                 the website.
@@ -145,6 +151,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._failed_request_handler: FailedRequestHandler[TCrawlingContext] | None = None
 
         self._max_request_retries = max_request_retries
+        self._max_requests_per_crawl = max_requests_per_crawl
         self._max_session_rotations = max_session_rotations
 
         self._request_provider = request_provider
@@ -204,6 +211,14 @@ class BasicCrawler(Generic[TCrawlingContext]):
     def statistics(self) -> Statistics[StatisticsState]:
         """Statistics about the current (or last) crawler run."""
         return self._statistics
+
+    @property
+    def _max_requests_count_exceeded(self) -> bool:
+        """Whether the maximum number of requests to crawl has been reached."""
+        if self._max_requests_per_crawl is None:
+            return False
+
+        return self._statistics.state.requests_finished >= self._max_requests_per_crawl
 
     async def _get_session(self) -> Session | None:
         """If session pool is being used, try to take a session from it."""
@@ -583,9 +598,27 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     async def __is_finished_function(self) -> bool:
         request_provider = await self.get_request_provider()
-        return await request_provider.is_finished()
+        is_finished = await request_provider.is_finished()
+
+        if self._max_requests_count_exceeded:
+            logger.info(
+                f'The crawler has reached its limit of {self._max_requests_per_crawl} requests per crawl. '
+                f'All ongoing requests have now completed. Total requests processed: '
+                f'{self._statistics.state.requests_finished}. The crawler will now shut down.'
+            )
+            logger.info(f'is_finished: {is_finished}')
+            return True
+
+        return is_finished
 
     async def __is_task_ready_function(self) -> bool:
+        if self._max_requests_count_exceeded:
+            logger.info(
+                f'The crawler has reached its limit of {self._max_requests_per_crawl} requests per crawl. '
+                f'The crawler will soon shut down. Ongoing requests will be allowed to complete.'
+            )
+            return False
+
         request_provider = await self.get_request_provider()
         return not await request_provider.is_empty()
 
