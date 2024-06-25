@@ -7,7 +7,7 @@ import sys
 import tempfile
 from asyncio import CancelledError
 from collections.abc import AsyncGenerator, Awaitable, Sequence
-from contextlib import AsyncExitStack
+from contextlib import AsyncExitStack, suppress
 from datetime import timedelta
 from functools import partial
 from logging import getLogger
@@ -305,14 +305,17 @@ class BasicCrawler(Generic[TCrawlingContext]):
             run_task.cancel()
 
         run_task = asyncio.create_task(self._run_crawler())
-        asyncio.get_running_loop().add_signal_handler(signal.SIGINT, sigint_handler)
+
+        with suppress(NotImplementedError):  # event loop signal handlers are not supported on Windows
+            asyncio.get_running_loop().add_signal_handler(signal.SIGINT, sigint_handler)
 
         try:
             await run_task
         except CancelledError:
             pass
         finally:
-            asyncio.get_running_loop().remove_signal_handler(signal.SIGINT)
+            with suppress(NotImplementedError):
+                asyncio.get_running_loop().remove_signal_handler(signal.SIGINT)
 
         if self._statistics.error_tracker.total > 0:
             logger.info(
