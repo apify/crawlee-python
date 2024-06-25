@@ -369,7 +369,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._running = False
         self._has_finished_before = True
 
-        return self._statistics.calculate()
+        final_statistics = self._statistics.calculate()
+        self._logger.info(f'Final request statistics: {final_statistics}')
+
+        return final_statistics
 
     async def _run_crawler(self) -> None:
         async with AsyncExitStack() as exit_stack:
