@@ -3,19 +3,18 @@ id: quick-start
 title: Quick start
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 This short tutorial will help you start scraping with Crawlee in just a minute or two. For an in-depth understanding of how Crawlee works, check out the [Introduction](../introduction/index.md) section, which provides a comprehensive step-by-step guide to creating your first scraper.
 
 ## Choose your crawler
 
-Crawlee offers three main crawler classes: `BeautifulSoupCrawler`, `HttpCrawler`, and `PlaywrightCrawler`. All crawlers share the same interface, providing maximum flexibility when switching between them.
+Crawlee offers two main crawler classes: `BeautifulSoupCrawler`, and `PlaywrightCrawler`. All crawlers share the same interface, providing maximum flexibility when switching between them.
 
 ### BeautifulSoupCrawler
 
 The `BeautifulSoupCrawler` is a plain HTTP crawler that parses HTML using the well-known [BeautifulSoup](https://pypi.org/project/beautifulsoup4/) library. It crawls the web using an HTTP client that mimics a browser. This crawler is very fast and efficient but cannot handle JavaScript rendering.
-
-### HttpCrawler
-
-The `HttpCrawler` serves as the core component of the `BeautifulSoupCrawler`, minus the `BeautifulSoup` library as a parser and some scraper-specific features like enqueue links helper. You can parse the HTML yourself or use any other parsing library.
 
 ### PlaywrightCrawler
 
@@ -65,6 +64,9 @@ pip install 'crawlee[beautifulsoup,playwright]'
 
 Run the following example to perform a recursive crawl of the Crawlee website using the selected crawler.
 
+<Tabs groupId="main">
+<TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
+
 ```python
 import asyncio
 
@@ -96,6 +98,9 @@ if __name__ == '__main__':
     asyncio.run(main())
 ```
 
+</TabItem>
+<TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
+
 ```python
 import asyncio
 
@@ -126,6 +131,9 @@ async def main() -> None:
 if __name__ == '__main__':
     asyncio.run(main())
 ```
+
+</TabItem>
+</Tabs>
 
 When you run the example, you will see Crawlee automating the data extraction process in your terminal.
 

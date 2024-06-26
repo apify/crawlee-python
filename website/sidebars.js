@@ -11,7 +11,7 @@ module.exports = {
             },
             items: [
                 'introduction/setting-up',
-                // 'introduction/first-crawler',
+                'introduction/first-crawler',
                 // 'introduction/adding-urls',
                 // 'introduction/real-world-project',
                 // 'introduction/crawling',
