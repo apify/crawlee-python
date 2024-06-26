@@ -23,6 +23,7 @@ publish-to-pypi:
 	poetry publish --no-interaction -vv
 
 lint:
+	poetry run ruff format --check $(DIRS_WITH_CODE)
 	poetry run ruff check $(DIRS_WITH_CODE)
 
 type-check:
