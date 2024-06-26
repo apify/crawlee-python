@@ -56,6 +56,19 @@ async def server() -> AsyncGenerator[respx.MockRouter, None]:
             </html>""",
         )
 
+        mock.get('/fdyr', name='incapsula_endpoint').return_value = Response(
+            200,
+            text="""<html>
+                <head>
+                    <title>Hello</title>
+                </head>
+                <body>
+                    <iframe src=Test_Incapsula_Resource>
+                    </iframe>
+                </body>
+            </html>""",
+        )
+
         mock.get('/hjkl').return_value = generic_response
         mock.get('/qwer').return_value = generic_response
         mock.get('/uiop').return_value = generic_response
@@ -127,3 +140,13 @@ async def test_enqueue_links_with_max_crawl(server: respx.MockRouter) -> None:
     assert len(processed_urls) == 3
     assert stats.requests_total == 3
     assert stats.requests_finished == 3
+
+
+async def test_handle_blocked_request(server: respx.MockRouter) -> None:
+    crawler = BeautifulSoupCrawler(
+        request_provider=RequestList(['https://test.io/fdyr']),
+        max_session_rotations=1
+        )
+    stats = await crawler.run()
+    assert server['incapsula_endpoint'].called
+    assert stats.requests_failed == 1
