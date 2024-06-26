@@ -25,7 +25,7 @@ async def server() -> AsyncGenerator[respx.MockRouter, None]:
                     <title>Hello</title>
                 </head>
                 <body>
-                    <a href="/asdf">Link 1</a>
+                    <a href="/asdf" class="foo">Link 1</a>
                     <a href="/hjkl">Link 2</a>
                 </body>
             </html>""",
@@ -115,6 +115,27 @@ async def test_enqueue_links(server: respx.MockRouter) -> None:
         'https://test.io/hjkl',
         'https://test.io/qwer',
         'https://test.io/uiop',
+    }
+
+
+async def test_enqueue_links_selector(server: respx.MockRouter) -> None:
+    crawler = BeautifulSoupCrawler(request_provider=RequestList(['https://test.io/']))
+    visit = mock.Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
+        visit(context.request.url)
+        await context.enqueue_links(selector='a.foo')
+
+    await crawler.run()
+
+    assert server['index_endpoint'].called
+    assert server['secondary_index_endpoint'].called
+
+    visited = {call[0][0] for call in visit.call_args_list}
+    assert visited == {
+        'https://test.io/',
+        'https://test.io/asdf',
     }
 
 

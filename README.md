@@ -11,12 +11,9 @@
 
 Crawlee covers your crawling and scraping end-to-end and **helps you build reliable scrapers. Fast.**
 
-Your crawlers will appear almost human-like and fly under the radar of modern bot protections even with
-the default configuration. Crawlee gives you the tools to crawl the web for links, scrape data, and
-store it to disk or cloud while staying configurable to suit your project's needs.
+Your crawlers will appear almost human-like and fly under the radar of modern bot protections even with the default configuration. Crawlee gives you the tools to crawl the web for links, scrape data, and store it to disk or cloud while staying configurable to suit your project's needs.
 
-We also have a TypeScript implementation of the Crawlee, which you can explore and utilize for your projects.
-Visit our GitHub repository for more information [Crawlee on GitHub](https://github.com/apify/crawlee).
+We also have a TypeScript implementation of the Crawlee, which you can explore and utilize for your projects. Visit our GitHub repository for more information [Crawlee on GitHub](https://github.com/apify/crawlee).
 
 ## Installation
 
@@ -54,25 +51,32 @@ pip install 'crawlee[beautifulsoup,playwright]'
 
 ## Features
 
-- Unified interface for **HTTP and headless browser** crawling.
-- Persistent **queue** for URLs to crawl (breadth & depth-first).
-- Pluggable **storage** of both tabular data and files.
-- Automatic **scaling** with available system resources.
+Why Crawlee is the preferred choice for web scraping and crawling?
+
+### Why use Crawlee instead of just a random HTTP library with an HTML parser?
+
+- Unified interface for **HTTP & headless browser** crawling.
+- Automatic **parallel crawling** based on available system resources.
+- Written in Python with **type hints** - enhances DX (IDE autocompletion) and reduces bugs (static type checking).
+- Automatic **retries** on errors or when you’re getting blocked.
 - Integrated **proxy rotation** and session management.
-- Configurable **request routing** - directing URLs to appropriate handlers.
+- Configurable **request routing** - direct URLs to the appropriate handlers.
+- Persistent **queue for URLs** to crawl.
+- Pluggable **storage** of both tabular data and files.
 - Robust **error handling**.
-- Automatic **retries** when getting blocked.
-- Written in Python with **type hints**, which means better DX and fewer bugs.
+
+### Why to use Crawlee rather than Scrapy?
+
+- Crawlee has out-of-the-box support for **headless browser** crawling (Playwright).
+- Crawlee has a **minimalistic & elegant interface** - Set up your scraper with fewer than 10 lines of code.
+- Complete **type hint** coverage.
+- Based on standard **Asyncio**.
 
 ## Introduction
 
 Crawlee covers your crawling and scraping end-to-end and helps you build reliable scrapers. Fast.
 
-Your crawlers will appear human-like and fly under the radar of modern bot protections even with the default
-configuration. Crawlee gives you the tools to crawl the web for links, scrape data and persistently store it
-in machine-readable formats, without having to worry about the technical details. And thanks to rich configuration
-options, you can tweak almost any aspect of Crawlee to suit your project's needs if the default settings
-don't cut it.
+Your crawlers will appear human-like and fly under the radar of modern bot protections even with the default configuration. Crawlee gives you the tools to crawl the web for links, scrape data and persistently store it in machine-readable formats, without having to worry about the technical details. And thanks to rich configuration options, you can tweak almost any aspect of Crawlee to suit your project's needs if the default settings don't cut it.
 
 ### Crawlers
 
