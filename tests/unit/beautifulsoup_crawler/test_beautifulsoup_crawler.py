@@ -25,7 +25,7 @@ async def server() -> AsyncGenerator[respx.MockRouter, None]:
                     <title>Hello</title>
                 </head>
                 <body>
-                    <a href="/asdf">Link 1</a>
+                    <a href="/asdf" class="foo">Link 1</a>
                     <a href="/hjkl">Link 2</a>
                 </body>
             </html>""",
@@ -52,6 +52,19 @@ async def server() -> AsyncGenerator[respx.MockRouter, None]:
                 </head>
                 <body>
                     Insightful content
+                </body>
+            </html>""",
+        )
+
+        mock.get('/fdyr', name='incapsula_endpoint').return_value = Response(
+            200,
+            text="""<html>
+                <head>
+                    <title>Hello</title>
+                </head>
+                <body>
+                    <iframe src=Test_Incapsula_Resource>
+                    </iframe>
                 </body>
             </html>""",
         )
@@ -105,6 +118,27 @@ async def test_enqueue_links(server: respx.MockRouter) -> None:
     }
 
 
+async def test_enqueue_links_selector(server: respx.MockRouter) -> None:
+    crawler = BeautifulSoupCrawler(request_provider=RequestList(['https://test.io/']))
+    visit = mock.Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
+        visit(context.request.url)
+        await context.enqueue_links(selector='a.foo')
+
+    await crawler.run()
+
+    assert server['index_endpoint'].called
+    assert server['secondary_index_endpoint'].called
+
+    visited = {call[0][0] for call in visit.call_args_list}
+    assert visited == {
+        'https://test.io/',
+        'https://test.io/asdf',
+    }
+
+
 async def test_enqueue_links_with_max_crawl(server: respx.MockRouter) -> None:
     start_urls = ['https://test.io/']
     processed_urls = []
@@ -127,3 +161,10 @@ async def test_enqueue_links_with_max_crawl(server: respx.MockRouter) -> None:
     assert len(processed_urls) == 3
     assert stats.requests_total == 3
     assert stats.requests_finished == 3
+
+
+async def test_handle_blocked_request(server: respx.MockRouter) -> None:
+    crawler = BeautifulSoupCrawler(request_provider=RequestList(['https://test.io/fdyr']), max_session_rotations=1)
+    stats = await crawler.run()
+    assert server['incapsula_endpoint'].called
+    assert stats.requests_failed == 1

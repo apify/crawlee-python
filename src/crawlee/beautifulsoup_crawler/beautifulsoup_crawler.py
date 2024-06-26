@@ -93,7 +93,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
                 raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
 
             matched_selectors = [
-                selector for selector in RETRY_CSS_SELECTORS if crawling_context.soup.find(selector) is not None
+                selector for selector in RETRY_CSS_SELECTORS if crawling_context.soup.select_one(selector) is not None
             ]
 
             if matched_selectors:
@@ -123,7 +123,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
             user_data = user_data or {}
 
             link: Tag
-            for link in soup.find_all(selector):
+            for link in soup.select(selector):
                 link_user_data = user_data
 
                 if label is not None:
