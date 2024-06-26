@@ -68,7 +68,8 @@ Docusaurus and published to GitHub pages.
 Currently, releases to [PyPI](https://pypi.org/project/crawlee) are published manually.
 To release a new version, follow these steps:
 
-At first, update the version number under `tool.poetry.version` in `pyproject.toml`.
+At first, update the version number under `tool.poetry.version` in `pyproject.toml` and
+`__version__` field in the `crawlee/__init__.py`.
 
 ```toml
 [tool.poetry]

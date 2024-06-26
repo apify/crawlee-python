@@ -6,7 +6,7 @@
 
 - selector handling in `enqueue_links` in `BeautifulSoupCrawler`
 
-## [0.0.6](../../releases/tag/v0.0.6) - Unreleased
+## [0.0.6](../../releases/tag/v0.0.6) - 2024-06-25
 
 ### Adds
 
