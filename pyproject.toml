@@ -64,6 +64,7 @@ python-dateutil = "^2.9.0"
 sortedcollections = "^2.1.0"
 typing-extensions = "^4.1.0"
 tldextract = "^5.1.2"
+cookiecutter = "^2.6.0"
 
 [tool.poetry.group.dev.dependencies]
 build = "~1.2.0"
