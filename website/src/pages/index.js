@@ -48,8 +48,7 @@ function Hero() {
                     </div>
                     <div className={styles.codeBlock}>
                         <CodeBlock className="language-bash">
-                            pip install crawlee
-                            {/*pipx crawlee create my-crawler*/}
+                            pipx run crawlee create my-crawler
                         </CodeBlock>
                     </div>
                 </div>
@@ -148,8 +147,7 @@ function ActorExample() {
                     The CLI will install all the necessary dependencies and add boilerplate code for you to play with.
                 </p>
                 <CodeBlock className="language-bash">
-                    pip install crawlee
-                    {/*pipx crawlee create my-crawler*/}
+                    pipx run crawlee create my-crawler
                 </CodeBlock>
                 <p>
                     If you prefer adding Crawlee <b>into your own project</b>, try the example below.
