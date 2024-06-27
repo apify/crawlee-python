@@ -12,7 +12,7 @@ module.exports = {
             items: [
                 'introduction/setting-up',
                 'introduction/first-crawler',
-                // 'introduction/adding-urls',
+                'introduction/adding-more-urls',
                 // 'introduction/real-world-project',
                 // 'introduction/crawling',
                 // 'introduction/scraping',
