@@ -1,8 +1,25 @@
 # Changelog
 
-## [0.0.6](../../releases/tag/v0.0.6) - Unreleased
+## [0.0.7](../../releases/tag/v0.0.7) - Unreleased
 
-...
+### Fixes
+
+- selector handling for `RETRY_CSS_SELECTORS` in `_handle_blocked_request` in `BeautifulSoupCrawler`
+- selector handling in `enqueue_links` in `BeautifulSoupCrawler`
+
+## [0.0.6](../../releases/tag/v0.0.6) - 2024-06-25
+
+### Adds
+
+- BREAKING: `BasicCrawler.export_data` helper method which replaces `BasicCrawler.export_to`
+- `Configuration.get_global_configuration` method
+- Automatic logging setup
+- Context helper for logging (`context.log`)
+
+### Fixes
+
+- Handling of relative URLs in `add_requests`
+- Graceful exit in `BasicCrawler.run`
 
 ## [0.0.5](../../releases/tag/v0.0.5) - 2024-06-21
 
@@ -17,7 +34,8 @@
 - Add batched request addition in `RequestQueue`
 - Add start requests option to `BasicCrawler`
 - Add storage-related helpers `get_data`, `push_data` and `export_to` to `BasicCrawler` and `BasicContext`
-- Add `PlaywrightCrawler`'s enqueue links helper
+- Add enqueue links helper to `PlaywrightCrawler`
+- Add max requests per crawl option to `BasicCrawler`
 
 ### Fixes
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import TYPE_CHECKING, Any, AsyncGenerator, Iterable, Literal
 
 from bs4 import BeautifulSoup, Tag
@@ -59,6 +60,8 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
             ),
         )
 
+        kwargs.setdefault('_logger', logging.getLogger(__name__))
+
         super().__init__(**kwargs)
 
     async def _make_http_request(self, context: BasicCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
@@ -76,6 +79,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
             add_requests=context.add_requests,
             send_request=context.send_request,
             push_data=context.push_data,
+            log=context.log,
             http_response=result.http_response,
         )
 
@@ -89,7 +93,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
                 raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
 
             matched_selectors = [
-                selector for selector in RETRY_CSS_SELECTORS if crawling_context.soup.find(selector) is not None
+                selector for selector in RETRY_CSS_SELECTORS if crawling_context.soup.select_one(selector) is not None
             ]
 
             if matched_selectors:
@@ -119,7 +123,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
             user_data = user_data or {}
 
             link: Tag
-            for link in soup.find_all(selector):
+            for link in soup.select(selector):
                 link_user_data = user_data
 
                 if label is not None:
@@ -138,6 +142,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
             add_requests=context.add_requests,
             send_request=context.send_request,
             push_data=context.push_data,
+            log=context.log,
             http_response=context.http_response,
             soup=soup,
         )

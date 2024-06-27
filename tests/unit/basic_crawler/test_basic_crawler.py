@@ -13,6 +13,7 @@ import pytest
 from httpx import Headers, Response
 
 from crawlee import Glob
+from crawlee.autoscaling import ConcurrencySettings
 from crawlee.basic_crawler import BasicCrawler
 from crawlee.basic_crawler.errors import SessionError, UserDefinedErrorHandlerError
 from crawlee.basic_crawler.types import AddRequestsKwargs, BasicCrawlingContext
@@ -22,6 +23,7 @@ from crawlee.storages import Dataset, KeyValueStore, RequestList, RequestQueue
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from pathlib import Path
 
     import respx
 
@@ -515,26 +517,25 @@ async def test_context_push_and_get_data(httpbin: str) -> None:
     assert stats.requests_finished == 1
 
 
-async def test_crawler_push_and_export_data() -> None:
+async def test_crawler_push_and_export_data(tmp_path: Path) -> None:
     crawler = BasicCrawler()
     dataset = await Dataset.open()
 
     await dataset.push_data([{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}])
     await dataset.push_data({'id': 2, 'test': 'test'})
 
-    await crawler.export_to(key='dataset-json', content_type='json')
-    await crawler.export_to(key='dataset-csv', content_type='csv')
+    await crawler.export_data(tmp_path / 'dataset.json')
+    await crawler.export_data(tmp_path / 'dataset.csv')
 
-    kvs = await KeyValueStore.open()
-    assert await kvs.get_value('dataset-json') == [
+    assert json.load((tmp_path / 'dataset.json').open()) == [
         {'id': 0, 'test': 'test'},
         {'id': 1, 'test': 'test'},
         {'id': 2, 'test': 'test'},
     ]
-    assert await kvs.get_value('dataset-csv') == 'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
+    assert (tmp_path / 'dataset.csv').read_bytes() == b'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
 
 
-async def test_context_push_and_export_data(httpbin: str) -> None:
+async def test_context_push_and_export_data(httpbin: str, tmp_path: Path) -> None:
     crawler = BasicCrawler()
 
     @crawler.router.default_handler
@@ -544,13 +545,35 @@ async def test_context_push_and_export_data(httpbin: str) -> None:
 
     await crawler.run([f'{httpbin}/1'])
 
-    await crawler.export_to(key='dataset-json', content_type='json')
-    await crawler.export_to(key='dataset-csv', content_type='csv')
+    await crawler.export_data(tmp_path / 'dataset.json')
+    await crawler.export_data(tmp_path / 'dataset.csv')
 
-    kvs = await KeyValueStore.open()
-    assert await kvs.get_value('dataset-json') == [
+    assert json.load((tmp_path / 'dataset.json').open()) == [
         {'id': 0, 'test': 'test'},
         {'id': 1, 'test': 'test'},
         {'id': 2, 'test': 'test'},
     ]
-    assert await kvs.get_value('dataset-csv') == 'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
+
+    assert (tmp_path / 'dataset.csv').read_bytes() == b'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
+
+
+async def test_max_requests_per_crawl(httpbin: str) -> None:
+    start_urls = [f'{httpbin}/1', f'{httpbin}/2', f'{httpbin}/3', f'{httpbin}/4', f'{httpbin}/5']
+    processed_urls = []
+
+    # Set max_concurrency to 1 to ensure testing max_requests_per_crawl accurately
+    crawler = BasicCrawler(
+        concurrency_settings=ConcurrencySettings(max_concurrency=1),
+        max_requests_per_crawl=3,
+    )
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        processed_urls.append(context.request.url)
+
+    stats = await crawler.run(start_urls)
+
+    # Verify that only 3 out of the 5 provided URLs were made
+    assert len(processed_urls) == 3
+    assert stats.requests_total == 3
+    assert stats.requests_finished == 3

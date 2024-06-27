@@ -1,13 +1,18 @@
 # Inspiration: https://github.com/apify/crawlee/blob/v3.7.3/packages/basic-crawler/src/internals/basic-crawler.ts
 from __future__ import annotations
 
+import asyncio
+import logging
+import signal
+import sys
 import tempfile
+from asyncio import CancelledError
 from collections.abc import AsyncGenerator, Awaitable, Sequence
-from contextlib import AsyncExitStack
+from contextlib import AsyncExitStack, suppress
 from datetime import timedelta
 from functools import partial
-from logging import getLogger
-from typing import TYPE_CHECKING, Any, AsyncContextManager, Callable, Generic, Union, cast
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, AsyncContextManager, Callable, Generic, Literal, Union, cast
 
 import httpx
 from tldextract import TLDExtract
@@ -32,6 +37,7 @@ from crawlee.configuration import Configuration
 from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.events import LocalEventManager
 from crawlee.http_clients import HttpxClient
+from crawlee.log_config import CrawleeLogFormatter
 from crawlee.models import BaseRequestData, DatasetItemsListPage, Request, RequestState
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
@@ -44,15 +50,13 @@ if TYPE_CHECKING:
     from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
     from crawlee.sessions import Session
     from crawlee.statistics import FinalStatistics, StatisticsState
-    from crawlee.storages.dataset import ExportToKwargs, GetDataKwargs, PushDataKwargs
+    from crawlee.storages.dataset import GetDataKwargs, PushDataKwargs
     from crawlee.storages.request_provider import RequestProvider
     from crawlee.types import JSONSerializable
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Union[Request, None]]]
 FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
-
-logger = getLogger(__name__)
 
 
 class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
@@ -63,6 +67,7 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     http_client: NotRequired[BaseHttpClient]
     concurrency_settings: NotRequired[ConcurrencySettings]
     max_request_retries: NotRequired[int]
+    max_requests_per_crawl: NotRequired[int | None]
     max_session_rotations: NotRequired[int]
     configuration: NotRequired[Configuration]
     request_handler_timeout: NotRequired[timedelta]
@@ -71,8 +76,10 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     retry_on_blocked: NotRequired[bool]
     proxy_configuration: NotRequired[ProxyConfiguration]
     statistics: NotRequired[Statistics[StatisticsState]]
+    configure_logging: NotRequired[bool]
     _context_pipeline: NotRequired[ContextPipeline[TCrawlingContext]]
     _additional_context_managers: NotRequired[Sequence[AsyncContextManager]]
+    _logger: NotRequired[logging.Logger]
 
 
 class BasicCrawler(Generic[TCrawlingContext]):
@@ -94,6 +101,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         http_client: BaseHttpClient | None = None,
         concurrency_settings: ConcurrencySettings | None = None,
         max_request_retries: int = 3,
+        max_requests_per_crawl: int | None = None,
         max_session_rotations: int = 10,
         configuration: Configuration | None = None,
         request_handler_timeout: timedelta = timedelta(minutes=1),
@@ -102,8 +110,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
         retry_on_blocked: bool = True,
         proxy_configuration: ProxyConfiguration | None = None,
         statistics: Statistics | None = None,
+        configure_logging: bool = True,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         _additional_context_managers: Sequence[AsyncContextManager] | None = None,
+        _logger: logging.Logger | None = None,
     ) -> None:
         """Initialize the BasicCrawler.
 
@@ -113,6 +123,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
             http_client: HTTP client to be used for `BasicCrawlingContext.send_request` and HTTP-only crawling.
             concurrency_settings: Allows fine-tuning concurrency levels
             max_request_retries: Maximum amount of attempts at processing a request
+            max_requests_per_crawl: Maximum number of pages that the crawler will open. The crawl will stop when
+                the limit is reached. It is recommended to set this value in order to prevent infinite loops in
+                misconfigured crawlers. None means no limit. Due to concurrency_settings, the actual number of pages
+                visited may slightly exceed this value.
             max_session_rotations: Maximum number of session rotations per request.
                 The crawler will automatically rotate the session in case of a proxy error or if it gets blocked by
                 the website.
@@ -123,10 +137,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
             retry_on_blocked: If set to True, the crawler will try to automatically bypass any detected bot protection
             proxy_configuration: A HTTP proxy configuration to be used for making requests
             statistics: A preconfigured `Statistics` instance if you wish to use non-default configuration
-            browser_pool: A preconfigured `BrowserPool` instance for browser crawling.
+            configure_logging: If set to True, the crawler will configure the logging infrastructure
             _context_pipeline: Allows extending the request lifecycle and modifying the crawling context.
                 This parameter is meant to be used by child classes, not when BasicCrawler is instantiated directly.
             _additional_context_managers: Additional context managers to be used in the crawler lifecycle.
+            _logger: A logger instance passed from a child class to ensure consistent labels
         """
         self._router: Router[TCrawlingContext] | None = None
 
@@ -144,10 +159,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._failed_request_handler: FailedRequestHandler[TCrawlingContext] | None = None
 
         self._max_request_retries = max_request_retries
+        self._max_requests_per_crawl = max_requests_per_crawl
         self._max_session_rotations = max_session_rotations
 
         self._request_provider = request_provider
-        self._configuration = configuration or Configuration()
+        self._configuration = configuration or Configuration.get_global_configuration()
 
         self._request_handler_timeout = request_handler_timeout
         self._internal_timeout = (
@@ -174,10 +190,27 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         self._retry_on_blocked = retry_on_blocked
 
+        if configure_logging:
+            handler = logging.StreamHandler()
+            handler.setFormatter(CrawleeLogFormatter())
+
+            root_logger = logging.getLogger()
+
+            for old_handler in root_logger.handlers[:]:
+                root_logger.removeHandler(old_handler)
+
+            root_logger.addHandler(handler)
+            root_logger.setLevel(logging.INFO if not sys.flags.dev_mode else logging.DEBUG)
+
+        if not _logger:
+            _logger = logging.getLogger(__name__)
+
+        self._logger = _logger
+
         self._proxy_configuration = proxy_configuration
         self._statistics = statistics or Statistics(
             event_manager=self._event_manager,
-            log_message=f'{logger.name} request statistics',
+            log_message=f'{self._logger.name} request statistics',
         )
         self._additional_context_managers = _additional_context_managers or []
 
@@ -204,6 +237,14 @@ class BasicCrawler(Generic[TCrawlingContext]):
         """Statistics about the current (or last) crawler run."""
         return self._statistics
 
+    @property
+    def _max_requests_count_exceeded(self) -> bool:
+        """Whether the maximum number of requests to crawl has been reached."""
+        if self._max_requests_per_crawl is None:
+            return False
+
+        return self._statistics.state.requests_finished >= self._max_requests_per_crawl
+
     async def _get_session(self) -> Session | None:
         """If session pool is being used, try to take a session from it."""
         if not self._use_session_pool:
@@ -215,7 +256,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             timeout_message='Fetching a session from the pool timed out after '
             f'{self._internal_timeout.total_seconds()} seconds',
             max_retries=3,
-            logger=logger,
+            logger=self._logger,
         )
 
     async def _get_proxy_info(self, request: Request, session: Session | None) -> ProxyInfo | None:
@@ -289,6 +330,51 @@ class BasicCrawler(Generic[TCrawlingContext]):
         if requests is not None:
             await self.add_requests(requests)
 
+        interrupted = False
+
+        def sigint_handler() -> None:
+            nonlocal interrupted
+
+            if not interrupted:
+                interrupted = True
+                self._logger.info('Pausing... Press CTRL+C again to force exit.')
+
+            run_task.cancel()
+
+        run_task = asyncio.create_task(self._run_crawler())
+
+        with suppress(NotImplementedError):  # event loop signal handlers are not supported on Windows
+            asyncio.get_running_loop().add_signal_handler(signal.SIGINT, sigint_handler)
+
+        try:
+            await run_task
+        except CancelledError:
+            pass
+        finally:
+            with suppress(NotImplementedError):
+                asyncio.get_running_loop().remove_signal_handler(signal.SIGINT)
+
+        if self._statistics.error_tracker.total > 0:
+            self._logger.info(
+                'Error analysis:'
+                f' total_errors={self._statistics.error_tracker.total}'
+                f' unique_errors={self._statistics.error_tracker.unique_error_count}'
+            )
+
+        if interrupted:
+            self._logger.info(
+                f'The crawl was interrupted. To resume, do: CRAWLEE_PURGE_ON_START=0 python {sys.argv[0]}'
+            )
+
+        self._running = False
+        self._has_finished_before = True
+
+        final_statistics = self._statistics.calculate()
+        self._logger.info(f'Final request statistics: {final_statistics}')
+
+        return final_statistics
+
+    async def _run_crawler(self) -> None:
         async with AsyncExitStack() as exit_stack:
             await exit_stack.enter_async_context(self._event_manager)
             await exit_stack.enter_async_context(self._snapshotter)
@@ -301,18 +387,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 await exit_stack.enter_async_context(context_manager)
 
             await self._pool.run()
-
-        if self._statistics.error_tracker.total > 0:
-            logger.info(
-                'Error analysis:'
-                f' total_errors={self._statistics.error_tracker.total}'
-                f' unique_errors={self._statistics.error_tracker.unique_error_count}'
-            )
-
-        self._running = False
-        self._has_finished_before = True
-
-        return self._statistics.calculate()
 
     async def add_requests(
         self,
@@ -364,11 +438,12 @@ class BasicCrawler(Generic[TCrawlingContext]):
         dataset = await Dataset.open(id=dataset_id, name=dataset_name)
         return await dataset.get_data(**kwargs)
 
-    async def export_to(
+    async def export_data(
         self,
+        path: str | Path,
+        content_type: Literal['json', 'csv'] | None = None,
         dataset_id: str | None = None,
         dataset_name: str | None = None,
-        **kwargs: Unpack[ExportToKwargs],
     ) -> None:
         """Export data from a dataset.
 
@@ -376,12 +451,18 @@ class BasicCrawler(Generic[TCrawlingContext]):
         dataset and then exports the data based on the provided parameters.
 
         Args:
+            path: The destination path
+            content_type: The output format
             dataset_id: The ID of the dataset.
             dataset_name: The name of the dataset.
-            kwargs: Keyword arguments to be passed to the dataset's `export_to` method.
         """
         dataset = await Dataset.open(id=dataset_id, name=dataset_name)
-        return await dataset.export_to(**kwargs)
+        path = path if isinstance(path, Path) else Path(path)
+
+        if content_type is None:
+            content_type = 'csv' if path.suffix == '.csv' else 'json'
+
+        return await dataset.write_to(content_type, path.open('w', newline=''))
 
     async def _push_data(
         self,
@@ -509,14 +590,14 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 timeout=self._internal_timeout,
                 timeout_message='Marking request as handled timed out after '
                 f'{self._internal_timeout.total_seconds()} seconds',
-                logger=logger,
+                logger=self._logger,
                 max_retries=3,
             )
             await self._handle_failed_request(crawling_context, error)
             self._statistics.record_request_processing_failure(request.id or request.unique_key)
 
     async def _handle_failed_request(self, crawling_context: TCrawlingContext, error: Exception) -> None:
-        logger.exception('Request failed and reached maximum retries', exc_info=error)
+        self._logger.exception('Request failed and reached maximum retries', exc_info=error)
         self._statistics.error_tracker.add(error)
 
         if self._failed_request_handler:
@@ -563,7 +644,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 destination = httpx.URL(request_model.url)
                 if destination.is_relative_url:
                     base_url = httpx.URL(call.get('base_url', origin))
-                    request_model.url = str(base_url.join(destination))
+                    destination = base_url.join(destination)
+                    request_model.url = str(destination)
 
                 if self._check_enqueue_strategy(
                     call.get('strategy', EnqueueStrategy.ALL), target_url=destination, origin_url=origin
@@ -574,9 +656,27 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     async def __is_finished_function(self) -> bool:
         request_provider = await self.get_request_provider()
-        return await request_provider.is_finished()
+        is_finished = await request_provider.is_finished()
+
+        if self._max_requests_count_exceeded:
+            self._logger.info(
+                f'The crawler has reached its limit of {self._max_requests_per_crawl} requests per crawl. '
+                f'All ongoing requests have now completed. Total requests processed: '
+                f'{self._statistics.state.requests_finished}. The crawler will now shut down.'
+            )
+            self._logger.info(f'is_finished: {is_finished}')
+            return True
+
+        return is_finished
 
     async def __is_task_ready_function(self) -> bool:
+        if self._max_requests_count_exceeded:
+            self._logger.info(
+                f'The crawler has reached its limit of {self._max_requests_per_crawl} requests per crawl. '
+                f'The crawler will soon shut down. Ongoing requests will be allowed to complete.'
+            )
+            return False
+
         request_provider = await self.get_request_provider()
         return not await request_provider.is_empty()
 
@@ -587,7 +687,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             lambda: request_provider.fetch_next_request(),
             timeout=self._internal_timeout,
             timeout_message=f'Fetching next request failed after {self._internal_timeout.total_seconds()} seconds',
-            logger=logger,
+            logger=self._logger,
             max_retries=3,
         )
 
@@ -605,6 +705,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             send_request=self._prepare_send_request_function(session, proxy_info),
             add_requests=result.add_requests,
             push_data=self._push_data,
+            log=self._logger,
         )
 
         statistics_id = request.id or request.unique_key
@@ -618,7 +719,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 timeout=self._request_handler_timeout,
                 timeout_message='Request handler timed out after '
                 f'{self._request_handler_timeout.total_seconds()} seconds',
-                logger=logger,
+                logger=self._logger,
             )
 
             await self._commit_request_handler_result(crawling_context, result)
@@ -628,7 +729,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 timeout=self._internal_timeout,
                 timeout_message='Marking request as handled timed out after '
                 f'{self._internal_timeout.total_seconds()} seconds',
-                logger=logger,
+                logger=self._logger,
                 max_retries=3,
             )
 
@@ -653,7 +754,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
                     timeout=self._internal_timeout,
                     timeout_message='Handling request failure timed out after '
                     f'{self._internal_timeout.total_seconds()} seconds',
-                    logger=logger,
+                    logger=self._logger,
                 )
 
                 request.state = RequestState.DONE
@@ -661,7 +762,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 request.state = RequestState.ERROR
                 raise
             except Exception as secondary_error:
-                logger.exception(
+                self._logger.exception(
                     'An exception occurred during handling of failed request. This places the crawler '
                     'and its underlying storages into an unknown state and crawling will be terminated.',
                     exc_info=secondary_error,
@@ -676,7 +777,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 raise RuntimeError('SessionError raised in a crawling context without a session') from session_error
 
             if self._should_retry_request(crawling_context, session_error):
-                logger.warning('Encountered a session error, rotating session and retrying')
+                self._logger.warning('Encountered a session error, rotating session and retrying')
 
                 crawling_context.session.retire()
 
@@ -687,33 +788,33 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 await request_provider.reclaim_request(request)
                 self._statistics.error_tracker_retry.add(session_error)
             else:
-                logger.exception('Request failed and reached maximum retries', exc_info=session_error)
+                self._logger.exception('Request failed and reached maximum retries', exc_info=session_error)
 
                 await wait_for(
                     lambda: request_provider.mark_request_as_handled(crawling_context.request),
                     timeout=self._internal_timeout,
                     timeout_message='Marking request as handled timed out after '
                     f'{self._internal_timeout.total_seconds()} seconds',
-                    logger=logger,
+                    logger=self._logger,
                     max_retries=3,
                 )
 
                 self._statistics.record_request_processing_failure(statistics_id)
                 self._statistics.error_tracker.add(session_error)
         except ContextPipelineInterruptedError as interruped_error:
-            logger.debug('The context pipeline was interrupted', exc_info=interruped_error)
+            self._logger.debug('The context pipeline was interrupted', exc_info=interruped_error)
 
             await wait_for(
                 lambda: request_provider.mark_request_as_handled(crawling_context.request),
                 timeout=self._internal_timeout,
                 timeout_message='Marking request as handled timed out after '
                 f'{self._internal_timeout.total_seconds()} seconds',
-                logger=logger,
+                logger=self._logger,
                 max_retries=3,
             )
         except ContextPipelineInitializationError as initialization_error:
             if self._should_retry_request(crawling_context, initialization_error):
-                logger.debug(
+                self._logger.debug(
                     'An exception occurred during the initialization of crawling context, a retry is in order',
                     exc_info=initialization_error,
                 )
@@ -723,21 +824,21 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 request.state = RequestState.DONE
                 await request_provider.reclaim_request(request)
             else:
-                logger.exception('Request failed and reached maximum retries', exc_info=initialization_error)
+                self._logger.exception('Request failed and reached maximum retries', exc_info=initialization_error)
 
                 await wait_for(
                     lambda: request_provider.mark_request_as_handled(crawling_context.request),
                     timeout=self._internal_timeout,
                     timeout_message='Marking request as handled timed out after '
                     f'{self._internal_timeout.total_seconds()} seconds',
-                    logger=logger,
+                    logger=self._logger,
                     max_retries=3,
                 )
 
             if crawling_context.session:
                 crawling_context.session.mark_bad()
         except Exception as internal_error:
-            logger.exception(
+            self._logger.exception(
                 'An exception occurred during handling of a request. This places the crawler '
                 'and its underlying storages into an unknown state and crawling will be terminated.',
                 exc_info=internal_error,

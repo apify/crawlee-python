@@ -31,6 +31,9 @@ def _isolate_test_environment(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     StorageClientManager._local_client = MemoryStorageClient()
     StorageClientManager._cloud_client = None
 
+    # Remove global configuration instance - it may contain settings adjusted by a previous test
+    Configuration._default_instance = None
+
     # Clear creation-related caches to ensure no state is carried over between tests
     monkeypatch.setattr(_creation_management, '_cache_dataset_by_id', {})
     monkeypatch.setattr(_creation_management, '_cache_dataset_by_name', {})

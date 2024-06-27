@@ -52,9 +52,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         rq = await RequestQueue.open(id='my_rq_id')
     """
 
-    # TODO: set this back to 10 seconds once the following issue is resolved:
-    # https://github.com/apify/crawlee-python/issues/203
-    _API_PROCESSED_REQUESTS_DELAY = timedelta(seconds=1)
+    _API_PROCESSED_REQUESTS_DELAY = timedelta(seconds=10)
     """Delay threshold to assume consistency of queue head operations after queue modifications."""
 
     _MAX_CACHED_REQUESTS = 1_000_000
@@ -462,7 +460,9 @@ class RequestQueue(BaseStorage, RequestProvider):
         if len(self._queue_head_dict) > 0 or self._in_progress_count() > 0:
             return False
 
-        is_head_consistent = await self.ensure_head_is_non_empty(ensure_consistency=True)
+        # TODO: set ensure_consistency to True once the following issue is resolved:
+        # https://github.com/apify/crawlee-python/issues/203
+        is_head_consistent = await self.ensure_head_is_non_empty(ensure_consistency=False)
         return is_head_consistent and len(self._queue_head_dict) == 0 and self._in_progress_count() == 0
 
     async def get_info(self) -> RequestQueueMetadata | None:
@@ -484,8 +484,22 @@ class RequestQueue(BaseStorage, RequestProvider):
         limit: int | None = None,
         iteration: int = 0,
     ) -> bool:
-        """Ensure that the queue head is nonempty."""
-        # If is nonempty resolve immediately.
+        """Ensure that the queue head is non-empty.
+
+        The method ensures that the queue head contains items. It may request more items than are currently
+        in progress to guarantee that at least one item is present in the head of the queue.
+
+        Args:
+            ensure_consistency: If True, the query for the queue head is retried until the queue_modified_at is older
+                than query_started_at by at least API_PROCESSED_REQUESTS_DELAY to ensure that the queue head is
+                consistent.
+            limit: The maximum number of items to fetch from the queue.
+            iteration: To manage the recursion depth.
+
+        Returns:
+            True if the queue head is non-empty and consistent, False otherwise.
+        """
+        # If queue head is non-empty, returns True immediately
         if len(self._queue_head_dict) > 0:
             return True
 
@@ -516,12 +530,11 @@ class RequestQueue(BaseStorage, RequestProvider):
             and queue_head.prev_limit < self._MAX_HEAD_LIMIT
         )
 
-        # If ensureConsistency=true then we must ensure that either:
-        # - queueModifiedAt is older than queryStartedAt by at least _API_PROCESSED_REQUESTS_DELAY
-        # - hadMultipleClients=false and this.assumedTotalCount<=this.assumedHandledCount
-        is_database_consistent = (
-            queue_head.query_started_at - queue_head.queue_modified_at.replace(tzinfo=timezone.utc)
-        ).total_seconds() >= (self._API_PROCESSED_REQUESTS_DELAY.total_seconds())
+        # If ensure_consistency is True, we must ensure the database is consistent. It can be ensured if either:
+        # - queue_modified_at is older than query_started_at by at least _API_PROCESSED_REQUESTS_DELAY
+        # - had_multiple_clients is False and _assumed_total_count is less than _assumed_handled_count
+        queue_latency = queue_head.query_started_at - queue_head.queue_modified_at.replace(tzinfo=timezone.utc)
+        is_database_consistent = queue_latency.total_seconds() >= self._API_PROCESSED_REQUESTS_DELAY.total_seconds()
 
         is_locally_consistent = (
             not queue_head.had_multiple_clients and self._assumed_total_count <= self._assumed_handled_count

@@ -1,8 +1,8 @@
 <h1 align="center">
     <a href="https://crawlee.dev">
         <picture>
-          <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/apify/crawlee/master/website/static/img/crawlee-dark.svg?sanitize=true">
-          <img alt="Crawlee" src="https://raw.githubusercontent.com/apify/crawlee/master/website/static/img/crawlee-light.svg?sanitize=true" width="500">
+          <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/apify/crawlee-python/master/website/static/img/crawlee-dark.svg?sanitize=true">
+          <img alt="Crawlee" src="https://raw.githubusercontent.com/apify/crawlee-python/master/website/static/img/crawlee-light.svg?sanitize=true" width="500">
         </picture>
     </a>
     <br>
@@ -11,12 +11,9 @@
 
 Crawlee covers your crawling and scraping end-to-end and **helps you build reliable scrapers. Fast.**
 
-Your crawlers will appear almost human-like and fly under the radar of modern bot protections even with
-the default configuration. Crawlee gives you the tools to crawl the web for links, scrape data, and
-store it to disk or cloud while staying configurable to suit your project's needs.
+Your crawlers will appear almost human-like and fly under the radar of modern bot protections even with the default configuration. Crawlee gives you the tools to crawl the web for links, scrape data, and store it to disk or cloud while staying configurable to suit your project's needs.
 
-We also have a TypeScript implementation of the Crawlee, which you can explore and utilize for your projects.
-Visit our GitHub repository for more information [Crawlee on GitHub](https://github.com/apify/crawlee).
+We also have a TypeScript implementation of the Crawlee, which you can explore and utilize for your projects. Visit our GitHub repository for more information [Crawlee on GitHub](https://github.com/apify/crawlee).
 
 ## Installation
 
@@ -54,25 +51,32 @@ pip install 'crawlee[beautifulsoup,playwright]'
 
 ## Features
 
-- Unified interface for **HTTP and headless browser** crawling.
-- Persistent **queue** for URLs to crawl (breadth & depth-first).
-- Pluggable **storage** of both tabular data and files.
-- Automatic **scaling** with available system resources.
+Why Crawlee is the preferred choice for web scraping and crawling?
+
+### Why use Crawlee instead of just a random HTTP library with an HTML parser?
+
+- Unified interface for **HTTP & headless browser** crawling.
+- Automatic **parallel crawling** based on available system resources.
+- Written in Python with **type hints** - enhances DX (IDE autocompletion) and reduces bugs (static type checking).
+- Automatic **retries** on errors or when you’re getting blocked.
 - Integrated **proxy rotation** and session management.
-- Configurable **request routing** - directing URLs to appropriate handlers.
+- Configurable **request routing** - direct URLs to the appropriate handlers.
+- Persistent **queue for URLs** to crawl.
+- Pluggable **storage** of both tabular data and files.
 - Robust **error handling**.
-- Automatic **retries** when getting blocked.
-- Written in Python with **type hints**, which means better DX and fewer bugs.
+
+### Why to use Crawlee rather than Scrapy?
+
+- Crawlee has out-of-the-box support for **headless browser** crawling (Playwright).
+- Crawlee has a **minimalistic & elegant interface** - Set up your scraper with fewer than 10 lines of code.
+- Complete **type hint** coverage.
+- Based on standard **Asyncio**.
 
 ## Introduction
 
 Crawlee covers your crawling and scraping end-to-end and helps you build reliable scrapers. Fast.
 
-Your crawlers will appear human-like and fly under the radar of modern bot protections even with the default
-configuration. Crawlee gives you the tools to crawl the web for links, scrape data and persistently store it
-in machine-readable formats, without having to worry about the technical details. And thanks to rich configuration
-options, you can tweak almost any aspect of Crawlee to suit your project's needs if the default settings
-don't cut it.
+Your crawlers will appear human-like and fly under the radar of modern bot protections even with the default configuration. Crawlee gives you the tools to crawl the web for links, scrape data and persistently store it in machine-readable formats, without having to worry about the technical details. And thanks to rich configuration options, you can tweak almost any aspect of Crawlee to suit your project's needs if the default settings don't cut it.
 
 ### Crawlers
 
@@ -80,7 +84,7 @@ Crawlee offers a framework for parallel web crawling through a variety of crawle
 
 #### HttpCrawler
 
-[`HttpCrawler`](https://github.com/apify/crawlee-py/tree/master/src/crawlee/http_crawler) provides a framework
+[`HttpCrawler`](https://github.com/apify/crawlee-python/tree/master/src/crawlee/http_crawler) provides a framework
 for the parallel crawling of web pages using plain HTTP requests. The URLs to crawl are fed from a request provider.
 It enables the recursive crawling of websites. The parsing of obtained HTML is the user's responsibility.
 
@@ -92,9 +96,9 @@ some browser crawler instead, e.g. `PlaywrightCrawler`, because it loads the pag
 user-provided request handler to extract page data.
 
 The source URLs are represented using the
-[`Request`](https://github.com/apify/crawlee-py/blob/master/src/crawlee/models.py) objects that are fed from
-[`RequestList`](https://github.com/apify/crawlee-py/blob/master/src/crawlee/storages/request_list.py)
-or [`RequestQueue`](https://github.com/apify/crawlee-py/blob/master/src/crawlee/storages/request_queue.py)
+[`Request`](https://github.com/apify/crawlee-python/blob/master/src/crawlee/models.py) objects that are fed from
+[`RequestList`](https://github.com/apify/crawlee-python/blob/master/src/crawlee/storages/request_list.py)
+or [`RequestQueue`](https://github.com/apify/crawlee-python/blob/master/src/crawlee/storages/request_queue.py)
 instances provided by the request provider option.
 
 The crawler finishes when there are no more Request objects to crawl.
@@ -140,7 +144,7 @@ For further explanation of storages (dataset, request queue) see the storages se
 
 #### BeautifulSoupCrawler
 
-[`BeautifulSoupCrawler`](https://github.com/apify/crawlee-py/tree/master/src/crawlee/beautifulsoup_crawler) extends
+[`BeautifulSoupCrawler`](https://github.com/apify/crawlee-python/tree/master/src/crawlee/beautifulsoup_crawler) extends
 the `HttpCrawler`. It provides the same features and on top of that, it uses
 [BeautifulSoup](https://www.crummy.com/software/BeautifulSoup/) HTML parser.
 
@@ -208,7 +212,7 @@ from crawlee.enqueue_strategy import EnqueueStrategy
 
 #### PlaywrightCrawler
 
-[`PlaywrightCrawler`](https://github.com/apify/crawlee-py/tree/master/src/crawlee/playwright_crawler) extends
+[`PlaywrightCrawler`](https://github.com/apify/crawlee-python/tree/master/src/crawlee/playwright_crawler) extends
 the `BasicCrawler`. It provides the same features and on top of that, it uses
 [Playwright](https://playwright.dev/python) browser automation tool.
 
@@ -304,7 +308,7 @@ With default `.storage/`.
 
 #### Dataset
 
-A [`Dataset`](https://github.com/apify/crawlee-py/blob/master/src/crawlee/storages/dataset.py) is a type
+A [`Dataset`](https://github.com/apify/crawlee-python/blob/master/src/crawlee/storages/dataset.py) is a type
 of storage mainly suitable for storing tabular data.
 
 Datasets are used to store structured data where each object stored has the same attributes, such as online store
@@ -355,7 +359,7 @@ if __name__ == '__main__':
 
 #### Key-value store
 
-The [`KeyValueStore`](https://github.com/apify/crawlee-py/blob/master/src/crawlee/storages/key_value_store.py)
+The [`KeyValueStore`](https://github.com/apify/crawlee-python/blob/master/src/crawlee/storages/key_value_store.py)
 is used for saving and reading data records or files. Each data record is represented by a unique
 key and associated with a MIME content type. Key-value stores are ideal for saving screenshots of web pages, and PDFs
 or to persist the state of crawlers.
@@ -405,7 +409,7 @@ if __name__ == '__main__':
 
 #### Request queue
 
-The [`RequestQueue`](https://github.com/apify/crawlee-py/blob/master/src/crawlee/storages/request_queue.py)
+The [`RequestQueue`](https://github.com/apify/crawlee-python/blob/master/src/crawlee/storages/request_queue.py)
 is a storage of URLs (requests) to crawl. The queue is used for the deep crawling of websites,
 where we start with several URLs and then recursively follow links to other pages. The data structure supports both
 breadth-first and depth-first crawling orders.
@@ -452,7 +456,7 @@ For an example of usage of the request queue with a crawler see the `BeautifulSo
 
 ### Session Management
 
-[​SessionPool](https://github.com/apify/crawlee-py/blob/master/src/crawlee/sessions/session_pool.py)
+[​SessionPool](https://github.com/apify/crawlee-python/blob/master/src/crawlee/sessions/session_pool.py)
 is a class that allows us to handle the rotation of proxy IP addresses along with cookies and other custom
 settings in Crawlee.
 
@@ -515,12 +519,12 @@ Crawlee is open-source and runs anywhere, but since it's developed by [Apify](ht
 
 ## Support
 
-If you find any bug or issue with Crawlee, please [submit an issue on GitHub](https://github.com/apify/crawlee-py/issues). For questions, you can ask on [Stack Overflow](https://stackoverflow.com/questions/tagged/apify), in GitHub Discussions or you can join our [Discord server](https://discord.com/invite/jyEM2PRvMU).
+If you find any bug or issue with Crawlee, please [submit an issue on GitHub](https://github.com/apify/crawlee-python/issues). For questions, you can ask on [Stack Overflow](https://stackoverflow.com/questions/tagged/apify), in GitHub Discussions or you can join our [Discord server](https://discord.com/invite/jyEM2PRvMU).
 
 ## Contributing
 
-Your code contributions are welcome, and you'll be praised for eternity! If you have any ideas for improvements, either submit an issue or create a pull request. For contribution guidelines and the code of conduct, see [CONTRIBUTING.md](https://github.com/apify/crawlee-py/blob/master/CONTRIBUTING.md).
+Your code contributions are welcome, and you'll be praised for eternity! If you have any ideas for improvements, either submit an issue or create a pull request. For contribution guidelines and the code of conduct, see [CONTRIBUTING.md](https://github.com/apify/crawlee-python/blob/master/CONTRIBUTING.md).
 
 ## License
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE.md](https://github.com/apify/crawlee-py/blob/master/LICENSE.md) file for details.
+This project is licensed under the Apache License 2.0 - see the [LICENSE.md](https://github.com/apify/crawlee-python/blob/master/LICENSE.md) file for details.

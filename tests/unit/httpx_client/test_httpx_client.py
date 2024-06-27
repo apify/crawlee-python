@@ -1,3 +1,4 @@
+import os
 from collections.abc import AsyncGenerator
 
 import pytest
@@ -39,16 +40,6 @@ async def proxy(proxy_info: ProxyInfo) -> AsyncGenerator[ProxyInfo, None]:
         yield proxy_info
 
 
-async def test_proxy(proxy: ProxyInfo, httpbin: str) -> None:
-    client = HttpxClient()
-    request = Request(url=f'{httpbin}/status/222', unique_key='42', id='42', user_data={})
-
-    async with Statistics() as statistics:
-        result = await client.crawl(request, None, proxy, statistics)
-
-    assert result.http_response.status_code == 222
-
-
 @pytest.fixture()
 async def disabled_proxy(proxy_info: ProxyInfo) -> AsyncGenerator[ProxyInfo, None]:
     with Proxy(
@@ -65,6 +56,18 @@ async def disabled_proxy(proxy_info: ProxyInfo) -> AsyncGenerator[ProxyInfo, Non
         yield proxy_info
 
 
+@pytest.mark.skipif(os.name == 'nt', reason='Skipped on Windows')
+async def test_proxy(proxy: ProxyInfo, httpbin: str) -> None:
+    client = HttpxClient()
+    request = Request(url=f'{httpbin}/status/222', unique_key='42', id='42', user_data={})
+
+    async with Statistics() as statistics:
+        result = await client.crawl(request, None, proxy, statistics)
+
+    assert result.http_response.status_code == 222
+
+
+@pytest.mark.skipif(os.name == 'nt', reason='Skipped on Windows')
 async def test_proxy_disabled(disabled_proxy: ProxyInfo, httpbin: str) -> None:
     client = HttpxClient()
     request = Request(url=f'{httpbin}/status/222', unique_key='42', id='42', user_data={})
