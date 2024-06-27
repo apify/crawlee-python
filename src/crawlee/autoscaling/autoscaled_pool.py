@@ -65,7 +65,7 @@ class ConcurrencySettings:
         self.max_tasks_per_minute = max_tasks_per_minute
 
 
-class AutoscaledPoolRun:
+class _AutoscaledPoolRun:
     def __init__(self) -> None:
         self.worker_tasks = list[asyncio.Task]()
         """A list of worker tasks currently in progress"""
@@ -159,7 +159,7 @@ class AutoscaledPool:
 
         self._max_tasks_per_minute = concurrency_settings.max_tasks_per_minute
         self._is_paused = False
-        self._current_run: AutoscaledPoolRun | None = None
+        self._current_run: _AutoscaledPoolRun | None = None
 
     async def run(self) -> None:
         """Start the autoscaled pool and return when all tasks are completed and `is_finished_function` returns True.
@@ -169,7 +169,7 @@ class AutoscaledPool:
         if self._current_run is not None:
             raise RuntimeError('The pool is already running')
 
-        run = AutoscaledPoolRun()
+        run = _AutoscaledPoolRun()
         self._current_run = run
 
         logger.debug('Starting the pool')
@@ -269,7 +269,7 @@ class AutoscaledPool:
             f'{system_status!s}'
         )
 
-    async def _worker_task_orchestrator(self, run: AutoscaledPoolRun) -> None:
+    async def _worker_task_orchestrator(self, run: _AutoscaledPoolRun) -> None:
         """Launches worker tasks whenever there is free capacity and a task is ready.
 
         Exits when `is_finished_function` returns True.
@@ -318,7 +318,7 @@ class AutoscaledPool:
             if not run.result.done():
                 run.result.set_result(object())
 
-    def _reap_worker_task(self, task: asyncio.Task, run: AutoscaledPoolRun) -> None:
+    def _reap_worker_task(self, task: asyncio.Task, run: _AutoscaledPoolRun) -> None:
         """A callback for finished worker tasks.
 
         - It interrupts the run in case of an exception,
