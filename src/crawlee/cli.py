@@ -4,9 +4,9 @@ from functools import wraps
 from typing import Annotated, Any, Callable, Coroutine, Union
 
 import httpx
-import inquirer
+import inquirer  # type: ignore
 import typer
-from cookiecutter.main import cookiecutter
+from cookiecutter.main import cookiecutter  # type: ignore
 
 TEMPLATE_LIST_URL = 'https://api.github.com/repos/apify/crawlee-python/contents/templates?ref=project-templates'  # TODO remove the ?ref before merging
 
