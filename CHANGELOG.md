@@ -1,11 +1,16 @@
 # Changelog
 
-## [0.0.7](../../releases/tag/v0.0.7) - Unreleased
+## [0.0.8](../../releases/tag/v0.0.8) - Unreleased
+
+- ...
+
+## [0.0.7](../../releases/tag/v0.0.7) - 2024-06-27
 
 ### Fixes
 
 - selector handling for `RETRY_CSS_SELECTORS` in `_handle_blocked_request` in `BeautifulSoupCrawler`
 - selector handling in `enqueue_links` in `BeautifulSoupCrawler`
+- improve `AutoscaledPool` state management
 
 ## [0.0.6](../../releases/tag/v0.0.6) - 2024-06-25
 
