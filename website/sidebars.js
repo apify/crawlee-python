@@ -13,7 +13,7 @@ module.exports = {
                 'introduction/setting-up',
                 'introduction/first-crawler',
                 'introduction/adding-more-urls',
-                // 'introduction/real-world-project',
+                'introduction/real-world-project',
                 // 'introduction/crawling',
                 // 'introduction/scraping',
                 // 'introduction/saving-data',
