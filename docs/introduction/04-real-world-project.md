@@ -120,15 +120,16 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
-        # Wait for the collection cards to render.
+        # Wait for the collection cards to render on the page. This ensures that
+        # the elements we want to interact with are present in the DOM.
         await context.page.wait_for_selector('.collection-block-item')
 
-        # Execute a function in the browser which targets the collection card elements
-        # and allows their manipulation.
+        # Execute a function within the browser context to target the collection card elements
+        # and extract their text content, trimming any leading or trailing whitespace.
         category_texts = await context.page.eval_on_selector_all(
             '.collection-block-item',
             '(els) => els.map(el => el.textContent.trim())',
-        )  # Extract text content from the collection cards.
+        )
 
         # Log the extracted texts.
         for i, text in enumerate(category_texts):
