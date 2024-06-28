@@ -8,7 +8,7 @@ package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.9"
-crawlee = {version = "^0.0.6", extras = ["playwright"]}
+crawlee = {version = "^0.0.7", extras = ["playwright"]}
 
 
 [build-system]
