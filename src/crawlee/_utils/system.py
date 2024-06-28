@@ -8,7 +8,7 @@ from logging import getLogger
 from typing import Annotated
 
 import psutil
-from pydantic import BaseModel, ConfigDict, Field, PlainValidator
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidator
 
 from crawlee._utils.byte_size import ByteSize
 
@@ -43,8 +43,15 @@ class MemoryInfo(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
-    total_size: Annotated[ByteSize, PlainValidator(ByteSize.validate), Field(alias='totalSize')]
-    current_size: Annotated[ByteSize, PlainValidator(ByteSize.validate), Field(alias='currentSize')]
+    total_size: Annotated[
+        ByteSize, PlainValidator(ByteSize.validate), PlainSerializer(lambda size: size.bytes), Field(alias='totalSize')
+    ]
+    current_size: Annotated[
+        ByteSize,
+        PlainValidator(ByteSize.validate),
+        PlainSerializer(lambda size: size.bytes),
+        Field(alias='currentSize'),
+    ]
     created_at: datetime = Field(
         alias='createdAt',
         default_factory=lambda: datetime.now(timezone.utc),
