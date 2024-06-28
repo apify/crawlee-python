@@ -1,14 +1,14 @@
 # ruff: noqa: FA100 ASYNC100
 import asyncio
 from functools import wraps
-from typing import Annotated, Any, Callable, Coroutine, Union
+from typing import Annotated, Any, Callable, Coroutine, List, Union
 
 import httpx
 import inquirer  # type: ignore
 import typer
 from cookiecutter.main import cookiecutter  # type: ignore
 
-TEMPLATE_LIST_URL = 'https://api.github.com/repos/apify/crawlee-python/contents/templates?ref=project-templates'  # TODO remove the ?ref before merging
+TEMPLATE_LIST_URL = 'https://api.github.com/repos/apify/crawlee-python/contents/templates'
 
 
 def run_async(func: Callable[..., Coroutine]) -> Callable:
@@ -47,7 +47,7 @@ async def create(
     """Bootstrap a new Crawlee project."""
     if template is None:
         templates_response = httpx.get(TEMPLATE_LIST_URL)
-        template_choices: list[str] = [item['name'] for item in templates_response.json() if item['type'] == 'dir']
+        template_choices: List[str] = [item['name'] for item in templates_response.json() if item['type'] == 'dir']
     else:
         template_choices = []
 
@@ -76,7 +76,6 @@ async def create(
 
     cookiecutter(
         'gh:apify/crawlee-python',
-        checkout='project-templates',  # TODO remove this arg before merging
         directory=f'templates/{template}',
         no_input=True,
         extra_context={'project_name': project_name},
