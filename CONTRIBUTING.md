@@ -10,11 +10,19 @@ We use [Poetry](https://python-poetry.org/) for project management. Install it a
 
 ## Dependencies
 
-To install this package and its development dependencies, run `make install-dev`.
+To install this package and its development dependencies, run:
+
+```bash
+make install-dev
+```
 
 ## Code checking
 
-To run all our code checking tools together, just run `make check-code`.
+To execute all code checking tools together, run:
+
+```bash
+make check-code
+```
 
 ### Linting
 
