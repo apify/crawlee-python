@@ -83,7 +83,7 @@ async def main() -> None:
     # And then you add one or more requests to it.
     await rq.add_request('https://crawlee.dev')
 
-    crawler = BeautifulSoupCrawler()
+    crawler = BeautifulSoupCrawler(request_provider=rq)
 
     # Define a request handler and attach it to the crawler using the decorator.
     @crawler.router.default_handler
