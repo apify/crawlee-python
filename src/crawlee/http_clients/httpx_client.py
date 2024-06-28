@@ -46,10 +46,7 @@ def _is_proxy_error(error: httpx.TransportError) -> bool:
     if isinstance(error, httpx.ProxyError):
         return True
 
-    if any(needle in str(error) for needle in ROTATE_PROXY_ERRORS):
-        return True
-
-    return False
+    return bool(any(needle in str(error) for needle in ROTATE_PROXY_ERRORS))
 
 
 class HttpxClient(BaseHttpClient):
