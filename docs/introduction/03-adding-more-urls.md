@@ -97,7 +97,7 @@ if __name__ == '__main__':
 If you need to override the default selection of elements in `enqueue_links`, you can use the `selector` argument.
 
 ```python
-await context.enqueue_links(selector='div.has-link')
+await context.enqueue_links(selector='a.article-link')
 ```
 
 ## Filtering links to same domain
