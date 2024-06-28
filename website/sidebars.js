@@ -1,26 +1,26 @@
 module.exports = {
     docs: [
         'quick-start/quick-start',
-        // {
-        //     type: 'category',
-        //     label: 'Introduction',
-        //     collapsed: false,
-        //     link: {
-        //         type: 'doc',
-        //         id: 'introduction/introduction',
-        //     },
-        //     items: [
-        //         'introduction/setting-up',
-        //         'introduction/first-crawler',
-        //         'introduction/adding-urls',
-        //         'introduction/real-world-project',
-        //         'introduction/crawling',
-        //         'introduction/scraping',
-        //         'introduction/saving-data',
-        //         'introduction/refactoring',
-        //         'introduction/deployment',
-        //     ],
-        // },
+        {
+            type: 'category',
+            label: 'Introduction',
+            collapsed: false,
+            link: {
+                type: 'doc',
+                id: 'introduction/introduction',
+            },
+            items: [
+                'introduction/setting-up',
+                'introduction/first-crawler',
+                'introduction/adding-more-urls',
+                // 'introduction/real-world-project',
+                // 'introduction/crawling',
+                // 'introduction/scraping',
+                // 'introduction/saving-data',
+                // 'introduction/refactoring',
+                // 'introduction/deployment',
+            ],
+        },
         // {
         //     type: 'category',
         //     label: 'Guides',
