@@ -2,7 +2,9 @@
 
 ## [0.0.8](../../releases/tag/v0.0.8) - Unreleased
 
-- ...
+### Adds
+
+- new project bootstrapping via `pipx run crawlee create`
 
 ## [0.0.7](../../releases/tag/v0.0.7) - 2024-06-27
 
