@@ -8,7 +8,7 @@ This example saves data to the default dataset. If the dataset doesn't exist, it
 ```python
 from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 
-crawler = BeautifulSoupCrawler();
+crawler = BeautifulSoupCrawler()
 
 # Function called for each URL
 @crawler.router.default_handler
@@ -18,10 +18,13 @@ async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         "html": context.http_response.text(),
     })
 
-# Run the crawler
-await crawler.run([
-    'http://www.example.com/page-1',
-    'http://www.example.com/page-2',
-    'http://www.example.com/page-3',
-]);
+async def main() -> None:
+    # Run the crawler
+    await crawler.run([
+        'http://www.example.com/page-1',
+        'http://www.example.com/page-2',
+        'http://www.example.com/page-3',
+    ])
+
+asyncio.run(main())
 ```

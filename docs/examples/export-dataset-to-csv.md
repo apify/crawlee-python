@@ -1,9 +1,8 @@
 ---
-id: crawl-all-links-on-a-website
-title: Crawl all links on a website
+id: export-dataset-to-csv
+title: Export a dataset to a single CSV
 ---
 
-This example uses the `enqueue_links()` helper to add new links to the RequestQueue as the crawler navigates from page to page.
 
 ```python
 import asyncio
@@ -17,16 +16,19 @@ crawler = BeautifulSoupCrawler(
 # Function called for each URL
 @crawler.router.default_handler
 async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
-    context.log.info(context.request.url)
-
-    # Enqueue all links (`a` selector) on the page
-    await context.enqueue_links()
+    await context.push_data({
+        'url': context.request.url,
+        'title': context.soup.title.string if context.soup.title else None,
+    })
 
 async def main() -> None:
-    # Run the crawler with initial request
+    # Run the crawler
     await crawler.run([
         'https://crawlee.dev',
     ])
+
+    # Export the data
+    await crawler.export_data("results.csv")  # You can also export a JSON file by changing the extension to '.json'
 
 asyncio.run(main())
 ```
