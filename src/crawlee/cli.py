@@ -1,4 +1,4 @@
-# ruff: noqa: FA100 ASYNC100
+# ruff: noqa: FA100 ASYNC210
 import asyncio
 from functools import wraps
 from typing import Annotated, Any, Callable, Coroutine, List, Union
