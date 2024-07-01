@@ -17,8 +17,9 @@ module.exports = {
                 'introduction/crawling',
                 'introduction/scraping',
                 'introduction/saving-data',
-                // 'introduction/refactoring',
-                // 'introduction/deployment',
+                'introduction/refactoring',
+                // TODO: add once SDK v2 is released
+                // 'introduction/running-in-cloud',
             ],
         },
         // {
