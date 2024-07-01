@@ -15,7 +15,7 @@ module.exports = {
                 'introduction/adding-more-urls',
                 'introduction/real-world-project',
                 'introduction/crawling',
-                // 'introduction/scraping',
+                'introduction/scraping',
                 // 'introduction/saving-data',
                 // 'introduction/refactoring',
                 // 'introduction/deployment',
