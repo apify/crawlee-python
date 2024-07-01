@@ -16,9 +16,10 @@ module.exports = {
                 'introduction/real-world-project',
                 'introduction/crawling',
                 'introduction/scraping',
-                // 'introduction/saving-data',
-                // 'introduction/refactoring',
-                // 'introduction/deployment',
+                'introduction/saving-data',
+                'introduction/refactoring',
+                // TODO: add once SDK v2 is released
+                // 'introduction/running-in-cloud',
             ],
         },
         // {

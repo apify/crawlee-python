@@ -1,6 +1,6 @@
 ---
 id: scraping
-title: 'Scraping'
+title: Scraping
 ---
 
 In the [Real-world project](./real-world-project#choosing-the-data-you-need) chapter, you've created a list of the information you wanted to collect about the products in the example Warehouse store. Let's review that and figure out ways to access the data.
