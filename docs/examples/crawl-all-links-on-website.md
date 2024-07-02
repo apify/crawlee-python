@@ -6,7 +6,7 @@ title: Crawl all links on website
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-This example uses the `enqueue_links()` helper to add new links to the `RequestQueue` as the crawler navigates from page to page.
+This example uses the `enqueue_links()` helper to add new links to the `RequestQueue` as the crawler navigates from page to page. By automatically discovering and enqueuing all links on a given page, the crawler can systematically scrape an entire website. This approach is ideal for web scraping tasks where you need to collect data from multiple interconnected pages.
 
 :::tip
 
@@ -37,7 +37,7 @@ async def main() -> None:
         # Enqueue all links (matching the 'a' selector) found on the page.
         await context.enqueue_links()
 
-    # Run the crawler with the initial request.
+    # Run the crawler with the initial list of requests.
     await crawler.run(['https://crawlee.dev'])
 
 
@@ -68,7 +68,7 @@ async def main() -> None:
         # Enqueue all links (matching the 'a' selector) found on the page.
         await context.enqueue_links()
 
-    # Run the crawler with the initial request.
+    # Run the crawler with the initial list of requests.
     await crawler.run(['https://crawlee.dev'])
 
 

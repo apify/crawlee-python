@@ -3,7 +3,7 @@ id: beautifulsoup-crawler
 title: BeautifulSoup crawler
 ---
 
-This example demonstrates how to use `BeautifulSoupCrawler` to crawl a list of URLs from an external file, load each URL using a plain HTTP request, parse the HTML using the [BeautifulSoup](https://pypi.org/project/beautifulsoup4/) library and extract some data from it - the page title and all `<h1>` tags.
+This example demonstrates how to use `BeautifulSoupCrawler` to crawl a list of URLs, load each URL using a plain HTTP request, parse the HTML using the [BeautifulSoup](https://pypi.org/project/beautifulsoup4/) library and extract some data from it - the page title and all `<h1>`, `<h2>` and `<h3>` tags. This setup is perfect for scraping specific elements from web pages. Thanks to the well-known BeautifulSoup, you can easily navigate the HTML structure and retrieve the data you need with minimal code.
 
 ```python
 import asyncio
@@ -49,7 +49,6 @@ async def main() -> None:
 
     # Run the crawler with the initial list of URLs.
     await crawler.run(['https://crawlee.dev'])
-
 
 if __name__ == '__main__':
     asyncio.run(main())

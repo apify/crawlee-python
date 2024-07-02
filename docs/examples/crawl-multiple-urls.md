@@ -1,12 +1,12 @@
 ---
-id: add-data-to-dataset
-title: Add data to dataset
+id: crawl-multiple-urls
+title: Crawl multiple URLs
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-This example demonstrates how to store data into datasets using the `context.push_data()` helper. This function saves extracted information into the dataset. If the dataset doesn't exist, it will be created automatically. You can also save data to custom datasets by passing `dataset_id` or `dataset_name` to `push_data` method.
+This example demonstrates how to crawl a specified list of URLs using different crawlers. You'll learn how to set up the crawler, define a request handler, and run the crawler with multiple URLs. This setup is useful for scraping data from multiple pages or websites concurrently.
 
 <Tabs groupId="main">
 <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
@@ -24,16 +24,6 @@ async def main() -> None:
     @crawler.router.default_handler
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url} ...')
-
-        # Extract data from the page.
-        data = {
-            'url': context.request.url,
-            'title': context.soup.title.string,
-            'html': str(context.soup)[:1000],
-        }
-
-        # Push the extracted data to the default dataset.
-        await context.push_data(data)
 
     # Run the crawler with the initial list of requests.
     await crawler.run(
@@ -66,16 +56,6 @@ async def main() -> None:
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url} ...')
 
-        # Extract data from the page.
-        data = {
-            'url': context.request.url,
-            'title': await context.page.title(),
-            'html': str(await context.page.content())[:1000],
-        }
-
-        # Push the extracted data to the default dataset.
-        await context.push_data(data)
-
     # Run the crawler with the initial list of requests.
     await crawler.run(
         [
@@ -92,27 +72,3 @@ if __name__ == '__main__':
 
 </TabItem>
 </Tabs>
-
-
-Each item in the dataset will be stored to its own file in the following directory:
-
-```text
-{PROJECT_FOLDER}/storage/datasets/default/
-```
-
-You can also open a dataset manually using an asynchronous constructor `open()`, and interact with it directly:
-
-```python
-from crawlee.storages import Dataset
-
-# ...
-
-async def main() -> None:
-    # Open dataset manually using asynchronous constructor open().
-    dataset = await Dataset.open()
-
-    # Interact with dataset directly.
-    await dataset.push_data({'key': 'value'})
-
-# ...
-```
