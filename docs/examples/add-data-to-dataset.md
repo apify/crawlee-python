@@ -8,20 +8,28 @@ This example demonstrates how to save data to the default dataset using the cont
 ```python
 import asyncio
 
-from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
+from crawlee.http_crawler import HttpCrawler, HttpCrawlingContext
 
 
 async def main() -> None:
-    crawler = BeautifulSoupCrawler()
+    # We are going to use the HttpCrawler for this case.
+    crawler = HttpCrawler()
 
+    # Define the default request handler, which will be called for every request.
     @crawler.router.default_handler
-    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
+    async def request_handler(context: HttpCrawlingContext) -> None:
+        context.log.info(f'Processing {context.request.url} ...')
+
+        # Extract data from the page.
         data = {
             'url': context.request.url,
             'html': context.http_response.text[:1000],
         }
+
+        # Push the extracted data to the default dataset.
         await context.push_data(data)
 
+    # Run the crawler with the initial list of URLs.
     await crawler.run(
         [
             'https://crawlee.dev',
