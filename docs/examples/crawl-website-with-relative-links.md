@@ -3,6 +3,8 @@ id: crawl-website-with-relative-links
 title: Crawl website with relative links
 ---
 
+<!-- TODO: jeste vylepsit text -->
+
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
@@ -10,10 +12,10 @@ When crawling a website, you may encounter different types of links present that
 
 We provide 4 different strategies for crawling relative links:
 
-- `EnqueueStrategy.All` which will enqueue all links found, regardless of the domain they point to.
-- `EnqueueStrategy.SAME_DOMAIN` which will enqueue all links found that have the same domain name, including links from any possible subdomain.
-- `EnqueueStrategy.SAME_HOSTNAME` which will enqueue all links found for the same hostname. This is the **default** strategy.
-- `EnqueueStrategy.SAME_ORIGIN` which will enqueue all links found for the same origin.
+- `EnqueueStrategy.All` - which will enqueue all links found, regardless of the domain they point to.
+- `EnqueueStrategy.SAME_DOMAIN` which will enqueue all links found that have the same domain name, including links from any possible subdomain. They are sharing the same top-level domain and base domain.
+- `EnqueueStrategy.SAME_HOSTNAME` which will enqueue all links found for the exact same hostname. This is the **default** strategy.
+- `EnqueueStrategy.SAME_ORIGIN` which will enqueue all links found for the same origin. The same origin refers to URLs sharing the same protocol, domain, and port.
 
 :::note
 
