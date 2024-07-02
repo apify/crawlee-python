@@ -327,9 +327,6 @@ function main() {
     const thisPackageDocspecDump = fs.readFileSync('docspec-dump.jsonl', 'utf8');
     const thisPackageModules = thisPackageDocspecDump.split('\n').filter((line) => line !== '');
 
-    // const apifySharedDocspecDump = fs.readFileSync('apify-shared-docspec-dump.jsonl', 'utf8');
-    // const apifySharedModules = apifySharedDocspecDump.split('\n').filter((line) => line !== '');
-
     // Convert all the modules, store them in the root object
     for (const module of [...thisPackageModules]) {
         const parsedModule = JSON.parse(module);
