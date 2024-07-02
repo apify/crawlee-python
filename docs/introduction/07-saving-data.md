@@ -82,11 +82,8 @@ And that's it. Unlike earlier, we are being serious now. That's it, you're done.
 
 ```python
 import asyncio
-import logging
 
 from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
-
-logger = logging.getLogger(__name__)
 
 
 async def main() -> None:
@@ -97,7 +94,7 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
-        logger.info(f'Processing {context.request.url}')
+        context.log.info(f'Processing {context.request.url}')
 
         # We're not processing detail pages yet, so we just pass.
         if context.request.label == 'DETAIL':

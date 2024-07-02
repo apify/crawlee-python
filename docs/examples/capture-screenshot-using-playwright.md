@@ -1,6 +1,6 @@
 ---
-id: capture-screenshot-using-playwright
-title: Capture screenshot using Playwright
+id: capture-screenshots-using-playwright
+title: Capture screenshots using Playwright
 ---
 
 This example demonstrates how to capture screenshots of web pages using `PlaywrightCrawler` and store them in the key-value store.

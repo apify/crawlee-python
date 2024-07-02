@@ -7,10 +7,7 @@ Previously you've built a very simple crawler that downloads HTML of a single pa
 
 ```python
 import asyncio
-import logging
 from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
-
-logger = logging.getLogger(__name__)
 
 async def main() -> None:
     crawler = BeautifulSoupCrawler()
@@ -19,7 +16,7 @@ async def main() -> None:
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         url = context.request.url
         title = context.soup.title.string if context.soup.title else ''
-        logger.info(f'The title of {url} is: {title}.')
+        context.log.info(f'The title of {url} is: {title}.')
 
     await crawler.run(['https://crawlee.dev/'])
 
@@ -69,10 +66,7 @@ Since this is the most common case, it is also the `enqueue_links` default.
 
 ```python
 import asyncio
-import logging
 from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
-
-logger = logging.getLogger(__name__)
 
 async def main() -> None:
     # Let's limit our crawls to make our tests shorter and safer.
@@ -82,7 +76,7 @@ async def main() -> None:
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         url = context.request.url
         title = context.soup.title.string if context.soup.title else ''
-        logger.info(f'The title of {url} is: {title}.')
+        context.log.info(f'The title of {url} is: {title}.')
 
         # The enqueue_links function is available as one of the fields of the context.
         # It is also context aware, so it does not require any parameters.

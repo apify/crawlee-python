@@ -69,12 +69,9 @@ Let's continue with the earlier `RequestQueue` example.
 
 ```python
 import asyncio
-import logging
 # Add import of crawler and crawling context.
 from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 from crawlee.storages import RequestQueue
-
-logger = logging.getLogger(__name__)
 
 async def main() -> None:
     # First you create the request queue instance.
@@ -92,7 +89,7 @@ async def main() -> None:
         # See BeautifulSoup documentation for API docs.
         url = context.request.url
         title = context.soup.title.string if context.soup.title else ''
-        logger.info(f'The title of {url} is: {title}.')
+        context.log.info(f'The title of {url} is: {title}.')
 
     await crawler.run()
 
@@ -112,11 +109,8 @@ Earlier we mentioned that you'll learn how to use the `Crawler.add_requests()` m
 
 ```python
 import asyncio
-import logging
 # You don't need to import RequestQueue anymore
 from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
-
-logger = logging.getLogger(__name__)
 
 async def main() -> None:
     crawler = BeautifulSoupCrawler()
@@ -125,7 +119,7 @@ async def main() -> None:
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         url = context.request.url
         title = context.soup.title.string if context.soup.title else ''
-        logger.info(f'The title of {url} is: {title}.')
+        context.log.info(f'The title of {url} is: {title}.')
 
     # Start the crawler with the provided URLs
     await crawler.run(['https://crawlee.dev/'])
