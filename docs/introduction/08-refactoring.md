@@ -34,19 +34,16 @@ In the following code, we've made several changes:
 First, let's define our routes in a separate file:
 
 ```python title="src/routes.py"
-import logging
-
 from crawlee.basic_crawler import Router
 from crawlee.playwright_crawler import PlaywrightCrawlingContext
 
-logger = logging.getLogger(__name__)
 router = Router[PlaywrightCrawlingContext]()
 
 
 @router.default_handler
 async def default_handler(context: PlaywrightCrawlingContext) -> None:
     # This is a fallback route which will handle the start URL.
-    logger.info(f'default_handler is processing {context.request.url}')
+    context.log.info(f'default_handler is processing {context.request.url}')
 
     await context.page.wait_for_selector('.collection-block-item')
 
@@ -59,7 +56,7 @@ async def default_handler(context: PlaywrightCrawlingContext) -> None:
 @router.handler('CATEGORY')
 async def category_handler(context: PlaywrightCrawlingContext) -> None:
     # This replaces the context.request.label == CATEGORY branch of the if clause.
-    logger.info(f'category_handler is processing {context.request.url}')
+    context.log.info(f'category_handler is processing {context.request.url}')
 
     await context.page.wait_for_selector('.product-item > a')
 
@@ -80,7 +77,7 @@ async def category_handler(context: PlaywrightCrawlingContext) -> None:
 @router.handler('DETAIL')
 async def detail_handler(context: PlaywrightCrawlingContext) -> None:
     # This replaces the context.request.label == DETAIL branch of the if clause.
-    logger.info(f'detail_handler is processing {context.request.url}')
+    context.log.info(f'detail_handler is processing {context.request.url}')
 
     url_part = context.request.url.split('/').pop()
     manufacturer = url_part.split('-')[0]
@@ -117,13 +114,10 @@ Next, our main file becomes much simpler and cleaner:
 
 ```python title="src/main.py"
 import asyncio
-import logging
 
 from crawlee.playwright_crawler import PlaywrightCrawler
 
 from .routes import router
-
-logger = logging.getLogger(__name__)
 
 
 async def main() -> None:

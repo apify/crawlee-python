@@ -83,7 +83,7 @@ async def main() -> None:
         # Extract relevant data from the page context.
         data = {
             'url': context.request.url,
-            'title': context.soup.title.text,
+            'title': context.soup.title.string if context.soup.title else None,
         }
         # Store the extracted data.
         await context.push_data(data)

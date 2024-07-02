@@ -1,0 +1,82 @@
+---
+id: crawl-specific-links-on-website
+title: Crawl specific links on website
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+This example demonstrates how to crawl a website while targeting specific patterns of links. By utilizing the `enqueue_links()` helper, you can pass `include` or `exclude` parameters to improve your crawling strategy. This approach ensures that only the links matching the specified patterns are added to the `RequestQueue`. Both `include` and `exclude` support lists of globs or regular expressions. This functionality is great for focusing on relevant sections of a website and avoiding scraping unnecessary or irrelevant content.
+
+<Tabs groupId="main">
+<TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
+
+```python
+import asyncio
+
+from crawlee import Glob
+from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
+
+
+async def main() -> None:
+    crawler = BeautifulSoupCrawler(
+        # Limit the crawl to max requests. Remove or increase it for crawling all links.
+        max_requests_per_crawl=10,
+    )
+
+    # Define the default request handler, which will be called for every request.
+    @crawler.router.default_handler
+    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
+        context.log.info(f'Processing {context.request.url} ...')
+
+        # Enqueue all the documentation links found on the page, except for the examples.
+        await context.enqueue_links(
+            include=[Glob('https://crawlee.dev/docs/**')],
+            exclude=[Glob('https://crawlee.dev/docs/examples')],
+        )
+
+    # Run the crawler with the initial list of requests.
+    await crawler.run(['https://crawlee.dev'])
+
+
+if __name__ == '__main__':
+    asyncio.run(main())
+```
+
+</TabItem>
+<TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
+
+```python
+import asyncio
+
+from crawlee import Glob
+from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
+
+
+async def main() -> None:
+    crawler = PlaywrightCrawler(
+        # Limit the crawl to max requests. Remove or increase it for crawling all links.
+        max_requests_per_crawl=10,
+    )
+
+    # Define the default request handler, which will be called for every request.
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        context.log.info(f'Processing {context.request.url} ...')
+
+        # Enqueue all the documentation links found on the page, except for the examples.
+        await context.enqueue_links(
+            include=[Glob('https://crawlee.dev/docs/**')],
+            exclude=[Glob('https://crawlee.dev/docs/examples')],
+        )
+
+    # Run the crawler with the initial list of requests.
+    await crawler.run(['https://crawlee.dev'])
+
+
+if __name__ == '__main__':
+    asyncio.run(main())
+```
+
+</TabItem>
+</Tabs>

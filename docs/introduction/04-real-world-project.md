@@ -107,12 +107,9 @@ The example below creates a new crawler that visits the start URL and prints the
 
 ```python
 import asyncio
-import logging
 
 # Instead of BeautifulSoupCrawler let's use Playwright to be able to render JavaScript.
 from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
-
-logger = logging.getLogger(__name__)
 
 
 async def main() -> None:
@@ -133,7 +130,7 @@ async def main() -> None:
 
         # Log the extracted texts.
         for i, text in enumerate(category_texts):
-            logger.info(f'CATEGORY_{i + 1}: {text}')
+            context.log.info(f'CATEGORY_{i + 1}: {text}')
 
     await crawler.run(['https://warehouse-theme-metal.myshopify.com/collections'])
 
