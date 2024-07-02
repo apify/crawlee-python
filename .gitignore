@@ -31,3 +31,7 @@ website/build
 website/node_modules
 website/.yarn
 website/.docusaurus
+website/api-typedoc-generated.json
+website/apify-shared-docspec-dump.jsonl
+website/docspec-dump.jsonl
+website/module_shortcuts.json
