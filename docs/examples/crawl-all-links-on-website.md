@@ -34,7 +34,7 @@ async def main() -> None:
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url} ...')
 
-        # Enqueue all links (matching the 'a' selector) found on the page.
+        # Enqueue all links found on the page.
         await context.enqueue_links()
 
     # Run the crawler with the initial list of requests.
@@ -65,7 +65,7 @@ async def main() -> None:
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url} ...')
 
-        # Enqueue all links (matching the 'a' selector) found on the page.
+        # Enqueue all links found on the page.
         await context.enqueue_links()
 
     # Run the crawler with the initial list of requests.
