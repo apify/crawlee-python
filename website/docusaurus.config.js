@@ -1,37 +1,6 @@
 /* eslint-disable global-require,import/no-extraneous-dependencies */
-const webpack = require('webpack');
 const { externalLinkProcessor } = require('./tools/utils/externalLink');
-
-const packages = [
-    'core',
-    'browser-pool',
-    'basic-crawler',
-    'browser-crawler',
-    'http-crawler',
-    'cheerio-crawler',
-    'puppeteer-crawler',
-    'playwright-crawler',
-    'jsdom-crawler',
-    'linkedom-crawler',
-    'memory-storage',
-    'utils',
-    'types',
-];
-const packagesOrder = [
-    '@crawlee/core',
-    '@crawlee/cheerio',
-    '@crawlee/playwright',
-    '@crawlee/puppeteer',
-    '@crawlee/jsdom',
-    '@crawlee/linkedom',
-    '@crawlee/basic',
-    '@crawlee/http',
-    '@crawlee/browser',
-    '@crawlee/memory-storage',
-    '@crawlee/browser-pool',
-    '@crawlee/utils',
-    '@crawlee/types',
-];
+const { groupSort } = require('./transformDocs');
 
 /** @type {Partial<import('@docusaurus/types').DocusaurusConfig>} */
 module.exports = {
@@ -82,21 +51,21 @@ module.exports = {
         ],
     ]),
     plugins: [
-        // [
-        //     'docusaurus-plugin-typedoc-api',
-        //     {
-        //         projectRoot: `${__dirname}/..`,
-        //         changelogs: true,
-        //         readmes: true,
-        //         sortPackages: (a, b) => {
-        //             return packagesOrder.indexOf(a.packageName) - packagesOrder.indexOf(b.packageName);
-        //         },
-        //         packages: packages.map((name) => ({ path: `packages/${name}` })),
-        //         typedocOptions: {
-        //             excludeExternals: false,
-        //         },
-        //     },
-        // ],
+        [
+            '@apify/docusaurus-plugin-typedoc-api',
+            {
+                projectRoot: '.',
+                changelogs: false,
+                readmes: false,
+                packages: [{ path: '.' }],
+                typedocOptions: {
+                    excludeExternals: false,
+                },
+                sortSidebar: groupSort,
+                pathToCurrentVersionTypedocJSON: `${__dirname}/api-typedoc-generated.json`,
+                routeBasePath: 'api',
+            },
+        ],
         // [
         //     '@docusaurus/plugin-client-redirects',
         //     {
@@ -180,13 +149,12 @@ module.exports = {
                     label: 'Examples',
                     position: 'left',
                 },
-                // {
-                //     type: 'custom-api',
-                //     to: 'core',
-                //     label: 'API',
-                //     position: 'left',
-                //     activeBaseRegex: 'api/(?!.*/changelog)',
-                // },
+                {
+                    to: '/api',
+                    label: 'API',
+                    position: 'left',
+                    activeBaseRegex: 'api/(?!.*/changelog)',
+                },
                 // {
                 //     type: 'custom-api',
                 //     to: 'core/changelog',
@@ -256,10 +224,10 @@ module.exports = {
                             label: 'Examples',
                             to: 'docs/examples',
                         },
-                        // {
-                        //     label: 'API reference',
-                        //     to: 'api/core',
-                        // },
+                        {
+                            label: 'API reference',
+                            to: 'api',
+                        },
                         // {
                         //     label: 'Upgrading to v3',
                         //     to: 'docs/upgrading/upgrading-to-v3',
