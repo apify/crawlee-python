@@ -3,12 +3,10 @@ id: add-data-to-dataset
 title: Add data to dataset
 ---
 
-<!-- TODO: jeste vylepsit text -->
-
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-This example demonstrates how to store data into datasets using the `context.push_data()` helper. This function saves extracted information into the dataset. If the dataset doesn't exist, it will be created automatically. You can also save data to custom datasets by passing `dataset_id` or `dataset_name` to `push_data` method.
+This example demonstrates how to store extracted data into datasets using the `context.push_data()` helper function. If the specified dataset does not already exist, it will be created automatically. Additionally, you can save data to custom datasets by providing `dataset_id` or `dataset_name` parameters to the `push_data` method.
 
 <Tabs groupId="main">
 <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
@@ -95,14 +93,13 @@ if __name__ == '__main__':
 </TabItem>
 </Tabs>
 
-
-Each item in the dataset will be stored to its own file in the following directory:
+Each item in the dataset will be stored in its own file within the following directory:
 
 ```text
 {PROJECT_FOLDER}/storage/datasets/default/
 ```
 
-You can also open a dataset manually using an asynchronous constructor `open()`, and interact with it directly:
+For more control, you can also open a dataset manually using the asynchronous constructor `Dataset.open()` and interact with it directly:
 
 ```python
 from crawlee.storages import Dataset

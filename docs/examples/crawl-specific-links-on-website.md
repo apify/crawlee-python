@@ -6,9 +6,7 @@ title: Crawl specific links on website
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-<!-- TODO: jeste vylepsit text -->
-
-This example demonstrates how to crawl the web with matching specific pattern of links. You can pass `include` or `exclude` parameters to the `enqueue_links()` helper. Found links will be added to the `RequestQueue` queue only if they match the specified pattern. Both include and excludes support list of globs or regular expressions for filtering.
+This example demonstrates how to crawl a website while targeting specific patterns of links. By utilizing the `enqueue_links()` helper, you can pass `include` or `exclude` parameters to improve your crawling strategy. This approach ensures that only the links matching the specified patterns are added to the `RequestQueue`. Both `include` and `exclude` support lists of globs or regular expressions. This functionality is great for focusing on relevant sections of a website and avoiding scraping unnecessary or irrelevant content.
 
 <Tabs groupId="main">
 <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">

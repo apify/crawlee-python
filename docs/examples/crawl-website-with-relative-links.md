@@ -3,25 +3,23 @@ id: crawl-website-with-relative-links
 title: Crawl website with relative links
 ---
 
-<!-- TODO: jeste vylepsit text -->
-
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-When crawling a website, you may encounter different types of links present that you may want to crawl. To facilitate the easy crawling of such links, we provide the `enqueue_links()` method on the crawler context, which will automatically find links and add them to the crawler's `RequestQueue`.
-
-We provide 4 different strategies for crawling relative links:
-
-- `EnqueueStrategy.All` - which will enqueue all links found, regardless of the domain they point to.
-- `EnqueueStrategy.SAME_DOMAIN` which will enqueue all links found that have the same domain name, including links from any possible subdomain. They are sharing the same top-level domain and base domain.
-- `EnqueueStrategy.SAME_HOSTNAME` which will enqueue all links found for the exact same hostname. This is the **default** strategy.
-- `EnqueueStrategy.SAME_ORIGIN` which will enqueue all links found for the same origin. The same origin refers to URLs sharing the same protocol, domain, and port.
+When crawling a website, you may encounter various types of links that you wish to include in your crawl. To facilitate this, we provide the `enqueue_links()` method on the crawler context, which will automatically find and add these links to the crawler's `RequestQueue`. This method simplifies the process of handling different types of links, including relative links, by automatically resolving them based on the page's context.
 
 :::note
 
-For these examples, we are using the `BeautifulSoupCrawler`. However the same method is available for the `PlaywrightCrawler` as well. You can use it the exact same way.
+For these examples, we are using the `BeautifulSoupCrawler`. However, the same method is available for the `PlaywrightCrawler` as well. You can use it in exactly the same way.
 
 :::
+
+We provide four distinct strategies for crawling relative links:
+
+- `EnqueueStrategy.All` - Enqueues all links found, regardless of the domain they point to. This strategy is useful when you want to follow every link, including those that navigate to external websites.
+- `EnqueueStrategy.SAME_DOMAIN` - Enqueues all links found that share the same domain name, including any possible subdomains. This strategy ensures that all links within the same top-level and base domain are included.
+- `EnqueueStrategy.SAME_HOSTNAME` - Enqueues all links found for the exact same hostname. This is the **default** strategy, and it restricts the crawl to links that have the same hostname as the current page, excluding subdomains.
+- `EnqueueStrategy.SAME_ORIGIN` - Enqueues all links found that share the same origin. The same origin refers to URLs that share the same protocol, domain, and port, ensuring a strict scope for the crawl.
 
 <Tabs groupId="main">
 <TabItem value="all_links" label="All links">
@@ -45,7 +43,7 @@ async def main() -> None:
         context.log.info(f'Processing {context.request.url} ...')
 
         # Enqueue all links found on the page. Any URLs found will be matched by this strategy,
-        # even if they go off of the site you are currently crawling.
+        # even if they go off the site you are currently crawling.
         await context.enqueue_links(strategy=EnqueueStrategy.ALL)
 
     # Run the crawler with the initial list of requests.

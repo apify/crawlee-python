@@ -3,16 +3,14 @@ id: export-entire-dataset-to-file
 title: Export entire dataset to file
 ---
 
-<!-- TODO: jeste vylepsit text -->
-
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-This dataset example uses the `export_data()` method of the crawler to export the entire default dataset to a single file. You can use either CSV or JSON.
+This example demonstrates how to use the `export_data()` method of the crawler to export the entire default dataset to a single file. This method supports exporting data in either CSV or JSON format.
 
 :::note
 
-For these examples, we are using the `BeautifulSoupCrawler`. However the same method is available for the `PlaywrightCrawler` as well. You can use it the exact same way.
+For these examples, we are using the `BeautifulSoupCrawler`. However, the same method is available for the `PlaywrightCrawler` as well. You can use it in exactly the same way.
 
 :::
 
