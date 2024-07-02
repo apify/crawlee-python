@@ -1,0 +1,14 @@
+loaders:
+  - type: python
+    search_path: [../src]
+processors:
+  - type: filter
+    skip_empty_modules: true
+    documented_only: false
+  - type: crossref
+renderer:
+  type: docusaurus
+  docs_base_path: docs
+  relative_output_path: reference
+  relative_sidebar_path: sidebar.json
+  sidebar_top_level_label: null
