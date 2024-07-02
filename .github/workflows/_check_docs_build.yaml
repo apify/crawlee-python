@@ -22,24 +22,16 @@ jobs:
           corepack enable
           corepack prepare yarn@stable --activate
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Activate cache for Node.js 20
+        uses: actions/setup-node@v4
         with:
-          python-version: 3.12
-
-      - name: Install Python dependencies
-        run: make install-dev
-
-      - name: Build generated API reference
-        run: make build-api-reference
+          cache: 'yarn'
+          cache-dependency-path: 'website/yarn.lock'
 
       - name: Install dependencies and try to build the website
         run: |
-          # go to website dir
           cd website
-          # install website deps
           yarn
-          # build the docs
           yarn build
         env:
           APIFY_SIGNING_TOKEN: ${{ secrets.APIFY_SIGNING_TOKEN }}
