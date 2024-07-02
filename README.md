@@ -13,9 +13,9 @@ Crawlee covers your crawling and scraping end-to-end and **helps you build relia
 
 Your crawlers will appear almost human-like and fly under the radar of modern bot protections even with the default configuration. Crawlee gives you the tools to crawl the web for links, scrape data, and store it to disk or cloud while staying configurable to suit your project's needs.
 
-We also have a TypeScript implementation of the Crawlee, which you can explore and utilize for your projects. Visit our GitHub repository for more information [Crawlee on GitHub](https://github.com/apify/crawlee).
-
 > 👉 **View full documentation, guides and examples on the [Crawlee project website](https://apify.github.io/crawlee-python/)** 👈
+
+We also have a TypeScript implementation of the Crawlee, which you can explore and utilize for your projects. Visit our GitHub repository for more information [Crawlee for JS/TS on GitHub](https://github.com/apify/crawlee).
 
 ## Installation
 
