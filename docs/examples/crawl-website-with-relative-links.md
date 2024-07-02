@@ -33,7 +33,7 @@ from crawlee.enqueue_strategy import EnqueueStrategy
 
 async def main() -> None:
     crawler = BeautifulSoupCrawler(
-        # Limit the crawl to only 10 requests. Remove or increase it for crawling all links.
+        # Limit the crawl to max requests. Remove or increase it for crawling all links.
         max_requests_per_crawl=10,
     )
 
@@ -66,7 +66,7 @@ from crawlee.enqueue_strategy import EnqueueStrategy
 
 async def main() -> None:
     crawler = BeautifulSoupCrawler(
-        # Limit the crawl to only 10 requests. Remove or increase it for crawling all links.
+        # Limit the crawl to max requests. Remove or increase it for crawling all links.
         max_requests_per_crawl=10,
     )
 
@@ -99,7 +99,7 @@ from crawlee.enqueue_strategy import EnqueueStrategy
 
 async def main() -> None:
     crawler = BeautifulSoupCrawler(
-        # Limit the crawl to only 10 requests. Remove or increase it for crawling all links.
+        # Limit the crawl to max requests. Remove or increase it for crawling all links.
         max_requests_per_crawl=10,
     )
 
@@ -132,7 +132,7 @@ from crawlee.enqueue_strategy import EnqueueStrategy
 
 async def main() -> None:
     crawler = BeautifulSoupCrawler(
-        # Limit the crawl to only 10 requests. Remove or increase it for crawling all links.
+        # Limit the crawl to max requests. Remove or increase it for crawling all links.
         max_requests_per_crawl=10,
     )
 

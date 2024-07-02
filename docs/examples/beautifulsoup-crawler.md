@@ -20,7 +20,7 @@ async def main() -> None:
         max_request_retries=1,
         # Increase the timeout for processing each page to 30 seconds.
         request_handler_timeout=timedelta(seconds=30),
-        # Limit the crawl to only 10 requests. Remove or increase it for crawling all links.
+        # Limit the crawl to max requests. Remove or increase it for crawling all links.
         max_requests_per_crawl=10,
     )
 
@@ -44,7 +44,7 @@ async def main() -> None:
         }
 
         # Push the extracted data to the default dataset. In local configuration,
-        # the data will be stored as JSON files in ./storage/datasets/default
+        # the data will be stored as JSON files in ./storage/datasets/default.
         await context.push_data(data)
 
     # Run the crawler with the initial list of URLs.
