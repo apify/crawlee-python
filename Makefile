@@ -51,3 +51,6 @@ check-changelog-entry:
 # The check-code target runs a series of checks equivalent to those performed by pre-commit hooks
 # and the run_checks.yaml GitHub Actions workflow.
 check-code: lint type-check unit-tests check-version-conflict check-changelog-entry
+
+build-api-reference:
+	cd website && ./build_api_reference.sh

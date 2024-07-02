@@ -29,6 +29,17 @@ jobs:
                     corepack enable
                     corepack prepare yarn@stable --activate
 
+            -   name: Set up Python
+                uses: actions/setup-python@v5
+                with:
+                    python-version: 3.8
+    
+            -   name: Install Python dependencies
+                run: make install-dev
+    
+            -   name: Build generated API reference
+                run: make build-api-reference
+
             -   name: Build & deploy docs
                 run: |
                     # go to website dir
