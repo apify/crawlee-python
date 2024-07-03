@@ -104,6 +104,7 @@ from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingCont
 async def main() -> None:
     # Create a crawler instance and provide a request provider (and other optional arguments)
     crawler = PlaywrightCrawler(
+        max_requests_per_crawl=50, # scrape only first 50 pages
         # headless=False,
         # browser_type='firefox',
     )

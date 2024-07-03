@@ -75,7 +75,7 @@ from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCra
 
 async def main() -> None:
     # BeautifulSoupCrawler crawls the web using HTTP requests and parses HTML using the BeautifulSoup library.
-    crawler = BeautifulSoupCrawler()
+    crawler = BeautifulSoupCrawler(max_requests_per_crawl=50)
 
     # Define a request handler to process each crawled page and attach it to the crawler using a decorator.
     @crawler.router.default_handler
