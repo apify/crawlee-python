@@ -30,8 +30,12 @@
 .codeBlock {
     position: absolute;
     top: 40%;
-    max-width: 400px;
+    max-width: 420px;
     width: 100%;
+}
+
+.codeBlock > div > div > div {
+    top: 9px;
 }
 
 .heroBanner {
