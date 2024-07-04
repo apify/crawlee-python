@@ -136,8 +136,8 @@ module.exports = {
             hideOnScroll: true,
             title: 'Crawlee for Python',
             logo: {
-                src: 'img/crawlee-light.svg',
-                srcDark: 'img/crawlee-dark.svg',
+                src: 'img/crawlee-light-new.svg',
+                srcDark: 'img/crawlee-dark-new.svg',
             },
             items: [
                 {

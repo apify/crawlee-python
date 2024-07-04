@@ -230,7 +230,7 @@ nav.navbar .dropdown__menu {
 }
 
 .navbar__logo {
-    height: 3rem;
+    height: 2rem;
 }
 
 .navbar__logo_appendix {
@@ -254,7 +254,7 @@ nav.navbar .dropdown__menu {
 }
 
 .main-wrapper a[class*='sidebarLogo'] img {
-    height: 3rem;
+    height: 2rem;
 }
 
 .main-wrapper a[class*='sidebarLogo'] b {

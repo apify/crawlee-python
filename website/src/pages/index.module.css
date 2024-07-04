@@ -235,8 +235,3 @@ html[data-theme='dark'] .features {
 .features > * {
     margin: 2em 0;
 }
-
-.bottomLogo path:nth-child(1) {
-    fill: url(#gradient-1) !important;
-    stroke: url(#gradient-1) !important;
-}
