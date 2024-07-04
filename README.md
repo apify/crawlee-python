@@ -13,13 +13,13 @@ Crawlee covers your crawling and scraping end-to-end and **helps you build relia
 
 Your crawlers will appear almost human-like and fly under the radar of modern bot protections even with the default configuration. Crawlee gives you the tools to crawl the web for links, scrape data, and store it to disk or cloud while staying configurable to suit your project's needs.
 
-> 👉 **View full documentation, guides and examples on the [Crawlee project website](https://apify.github.io/crawlee-python/)** 👈
+> 👉 **View full documentation, guides and examples on the [Crawlee project website](https://crawlee.dev/python/)** 👈
 
 We also have a TypeScript implementation of the Crawlee, which you can explore and utilize for your projects. Visit our GitHub repository for more information [Crawlee for JS/TS on GitHub](https://github.com/apify/crawlee).
 
 ## Installation
 
-We recommend visiting the [Introduction tutorial](https://apify.github.io/crawlee-python/docs/introduction) in Crawlee documentation for more information.
+We recommend visiting the [Introduction tutorial](https://crawlee.dev/python/docs/introduction) in Crawlee documentation for more information.
 
 Crawlee is available as the [`crawlee`](https://pypi.org/project/crawlee/) PyPI package.
 
@@ -165,7 +165,7 @@ if __name__ == '__main__':
 
 ### More examples
 
-Explore our [Examples](https://apify.github.io/crawlee-python/docs/examples) page in the Crawlee documentation for a wide range of additional use cases and demonstrations.
+Explore our [Examples](https://crawlee.dev/python/docs/examples) page in the Crawlee documentation for a wide range of additional use cases and demonstrations.
 
 ## Running on the Apify platform
 
