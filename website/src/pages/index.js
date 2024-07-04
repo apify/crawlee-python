@@ -61,7 +61,8 @@ function Features() {
     return (
         <section className={clsx('container', styles.features)}>
             <div className="row">
-                <div className="col col--6">
+                {/*<div className="col col--6">*/}
+                <div className="col">
                     <h2>Reliable crawling 🏗️</h2>
                     <p>
                         Crawlee won't fix broken selectors for you (yet), but it helps you <b>build and maintain your crawlers faster</b>.
@@ -70,27 +71,27 @@ function Features() {
                         When a website adds <a href="https://crawlee.dev/docs/guides/javascript-rendering">JavaScript rendering</a>, you don't have to rewrite everything, only switch to
                         one of the browser crawlers. When you later find a great API to speed up your crawls, flip the switch back.
                     </p>
-                    <p>
-                        It keeps your proxies healthy by rotating them smartly with good fingerprints that make your crawlers
-                        look human-like. It's not unblockable,
-                        but <a href="https://blog.apify.com/daltix-python-vs-apify-sdk/" target="_blank" rel="noreferrer"><b>it will save you money in the long run</b></a>.
-                    </p>
+                    {/*<p>*/}
+                    {/*    It keeps your proxies healthy by rotating them smartly with good fingerprints that make your crawlers*/}
+                    {/*    look human-like. It's not unblockable,*/}
+                    {/*    but <a href="https://blog.apify.com/daltix-python-vs-apify-sdk/" target="_blank" rel="noreferrer"><b>it will save you money in the long run</b></a>.*/}
+                    {/*</p>*/}
                     <p>
                         Crawlee is built by people who scrape for a living and use it every day to scrape millions of pages.
                         <a href="https://discord.com/invite/jyEM2PRvMU" target="_blank" rel="noreferrer"><b> Meet our community on Discord</b></a>.
                     </p>
                 </div>
-                <div className="col col--6">
-                    <div className="video-container">
-                        <LiteYouTubeEmbed
-                            id="g1Ll9OlFwEQ"
-                            params="autoplay=1&autohide=1&showinfo=0&rel=0"
-                            title="Crawlee, the web scraping and browser automation library"
-                            poster="maxresdefault"
-                            webp
-                        />
-                    </div>
-                </div>
+                {/*<div className="col col--6">*/}
+                {/*    <div className="video-container">*/}
+                {/*        <LiteYouTubeEmbed*/}
+                {/*            id="g1Ll9OlFwEQ"*/}
+                {/*            params="autoplay=1&autohide=1&showinfo=0&rel=0"*/}
+                {/*            title="Crawlee, the web scraping and browser automation library"*/}
+                {/*            poster="maxresdefault"*/}
+                {/*            webp*/}
+                {/*        />*/}
+                {/*    </div>*/}
+                {/*</div>*/}
             </div>
         </section>
     );

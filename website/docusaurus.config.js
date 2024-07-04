@@ -7,11 +7,11 @@ module.exports = {
     title: 'Crawlee',
     tagline: 'Build reliable crawlers. Fast.',
     url: 'https://crawlee.dev',
-    baseUrl: '/crawlee-python/',
+    baseUrl: '/python/',
     trailingSlash: false,
     organizationName: 'apify',
     projectName: 'crawlee-python',
-    scripts: ['/js/custom.js'],
+    scripts: ['/python/js/custom.js'],
     favicon: 'img/favicon.ico',
     customFields: {
         markdownOptions: {

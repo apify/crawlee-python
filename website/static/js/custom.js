@@ -32,3 +32,7 @@ setInterval(() => {
         load();
     }
 }, 500);
+
+if (window.location.href.startsWith('https://apify.github.io/crawlee-python')) {
+    window.location.href = window.location.href.replace('https://apify.github.io/crawlee-python', 'https://crawlee.dev/python');
+}
