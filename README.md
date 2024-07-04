@@ -169,7 +169,7 @@ Explore our [Examples](https://apify.github.io/crawlee-python/docs/examples) pag
 
 ## Running on the Apify platform
 
-Crawlee is open-source and runs anywhere, but since it's developed by [Apify](https://apify.com), it's easy to set up on the Apify platform and run in the cloud. Visit the [Apify SDK website](https://sdk.apify.com) to learn more about deploying Crawlee to the Apify platform.
+Crawlee is open-source and runs anywhere, but since it's developed by [Apify](https://apify.com), it's easy to set up on the Apify platform and run in the cloud. Visit the [Apify SDK website](https://docs.apify.com/sdk/python/) to learn more about deploying Crawlee to the Apify platform.
 
 ## Support
 
