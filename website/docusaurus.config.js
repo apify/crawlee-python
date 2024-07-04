@@ -11,7 +11,10 @@ module.exports = {
     trailingSlash: false,
     organizationName: 'apify',
     projectName: 'crawlee-python',
-    scripts: ['/python/js/custom.js'],
+    scripts: [
+        '/python/js/custom.js',
+        '/crawlee-python/js/custom.js',
+    ],
     favicon: 'img/favicon.ico',
     customFields: {
         markdownOptions: {
