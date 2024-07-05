@@ -6,7 +6,7 @@ import Gradients from './Gradients';
 const FeatureList = [
     {
         title: 'Python with type hints',
-        Svg: require('../../static/img/features/runs-on-js.svg').default,
+        Svg: require('../../static/img/features/runs-on-py.svg').default,
         description: (
             <>
                 Crawlee for Python is written in a modern way using type hints, providing code completion in your IDE
