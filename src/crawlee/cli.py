@@ -21,12 +21,26 @@ def run_async(func: Callable[..., Coroutine]) -> Callable:
     return wrapper
 
 
-cli = typer.Typer()
+cli = typer.Typer(no_args_is_help=True)
 
 
-@cli.callback()
-def callback() -> None:
-    """An empty callback to force typer into making a CLI with a single command."""
+@cli.callback(invoke_without_command=True)
+def callback(
+    version: Annotated[  # noqa: FBT002
+        bool,
+        typer.Option(
+            '-V',
+            '--version',
+            is_flag=True,
+            help='Print Crawlee version',
+        ),
+    ] = False,
+) -> None:
+    """Implements the 'no command' behavior."""
+    if version:
+        from crawlee import __version__
+
+        typer.echo(__version__)
 
 
 @cli.command()
