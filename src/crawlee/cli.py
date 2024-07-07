@@ -62,7 +62,7 @@ async def create(
 ) -> None:
     """Bootstrap a new Crawlee project."""
     if template is None:
-        templates_response = httpx.get(TEMPLATE_LIST_URL)
+        templates_response = httpx.get(TEMPLATE_LIST_URL, timeout=httpx.Timeout(10))
         template_choices: List[str] = [item['name'] for item in templates_response.json() if item['type'] == 'dir']
     else:
         template_choices = []
