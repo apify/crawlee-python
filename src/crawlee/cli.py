@@ -1,12 +1,14 @@
-# ruff: noqa: FA100 ASYNC210
+# ruff: noqa: FA100 ASYNC210 ASYNC100
 import asyncio
 from functools import wraps
+from pathlib import Path
 from typing import Annotated, Any, Callable, Coroutine, List, Union
 
 import httpx
 import inquirer  # type: ignore
 import typer
 from cookiecutter.main import cookiecutter  # type: ignore
+from rich.progress import Progress, SpinnerColumn, TextColumn
 
 TEMPLATE_LIST_URL = 'https://api.github.com/repos/apify/crawlee-python/contents/templates'
 
@@ -21,12 +23,26 @@ def run_async(func: Callable[..., Coroutine]) -> Callable:
     return wrapper
 
 
-cli = typer.Typer()
+cli = typer.Typer(no_args_is_help=True)
 
 
-@cli.callback()
-def callback() -> None:
-    """An empty callback to force typer into making a CLI with a single command."""
+@cli.callback(invoke_without_command=True)
+def callback(
+    version: Annotated[  # noqa: FBT002
+        bool,
+        typer.Option(
+            '-V',
+            '--version',
+            is_flag=True,
+            help='Print Crawlee version',
+        ),
+    ] = False,
+) -> None:
+    """Implements the 'no command' behavior."""
+    if version:
+        from crawlee import __version__
+
+        typer.echo(__version__)
 
 
 @cli.command()
@@ -46,20 +62,36 @@ async def create(
 ) -> None:
     """Bootstrap a new Crawlee project."""
     if template is None:
-        templates_response = httpx.get(TEMPLATE_LIST_URL)
+        templates_response = httpx.get(TEMPLATE_LIST_URL, timeout=httpx.Timeout(10))
         template_choices: List[str] = [item['name'] for item in templates_response.json() if item['type'] == 'dir']
     else:
         template_choices = []
 
+    while project_name is None:
+        answers = (
+            inquirer.prompt(
+                [
+                    inquirer.Text(
+                        'project_name',
+                        message='Name of the new project folder',
+                        validate=lambda _, it: len(it) > 0,
+                        ignore=project_name is not None,
+                    ),
+                ]
+            )
+            or {}
+        )
+
+        project_path = Path.cwd() / answers['project_name']
+
+        if project_path.exists():
+            typer.echo(f'Folder {project_path} exists', err=True)
+        else:
+            project_name = answers['project_name']
+
     answers = (
         inquirer.prompt(
             [
-                inquirer.Text(
-                    'project_name',
-                    message='Name of the new project folder',
-                    validate=lambda _, it: len(it) > 0,
-                    ignore=project_name is not None,
-                ),
                 inquirer.List(
                     'template',
                     message='Please select the template for your new Crawlee project',
@@ -71,12 +103,20 @@ async def create(
         or {}
     )
 
-    project_name = project_name or answers['project_name']
     template = template or answers['template']
 
-    cookiecutter(
-        'gh:apify/crawlee-python',
-        directory=f'templates/{template}',
-        no_input=True,
-        extra_context={'project_name': project_name},
-    )
+    with Progress(
+        SpinnerColumn(),
+        TextColumn('[progress.description]{task.description}'),
+        transient=True,
+    ) as progress:
+        progress.add_task(description='Bootstrapping...', total=None)
+        cookiecutter(
+            'gh:apify/crawlee-python',
+            directory=f'templates/{template}',
+            no_input=True,
+            extra_context={'project_name': project_name},
+        )
+
+    typer.echo(f'Your project was created in {Path.cwd() / project_name}')
+    typer.echo(f'To run your project, run `cd {project_name}`, `poetry install` and `python -m {project_name}`')
