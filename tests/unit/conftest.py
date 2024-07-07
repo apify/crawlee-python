@@ -25,7 +25,7 @@ def _isolate_test_environment(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
         tmp_path: A unique temporary directory path provided by pytest for test isolation.
     """
     # Set the environment variable for the local storage directory to the temporary path
-    monkeypatch.setenv('CRAWLEE_LOCAL_STORAGE_DIR', str(tmp_path))
+    monkeypatch.setenv('CRAWLEE_STORAGE_DIR', str(tmp_path))
 
     # Reset the local and cloud clients in StorageClientManager
     StorageClientManager._local_client = MemoryStorageClient()
@@ -43,7 +43,7 @@ def _isolate_test_environment(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     monkeypatch.setattr(_creation_management, '_cache_rq_by_name', {})
 
     # Verify that the environment variable is set correctly
-    assert os.environ.get('CRAWLEE_LOCAL_STORAGE_DIR') == str(tmp_path)
+    assert os.environ.get('CRAWLEE_STORAGE_DIR') == str(tmp_path)
 
 
 @pytest.fixture()
@@ -51,7 +51,7 @@ def memory_storage_client(tmp_path: Path) -> MemoryStorageClient:
     cfg = Configuration(
         write_metadata=True,
         persist_storage=True,
-        crawlee_local_storage_dir=str(tmp_path),  # type: ignore
+        crawlee_storage_dir=str(tmp_path),  # type: ignore
     )
     return MemoryStorageClient(cfg)
 
