@@ -170,7 +170,7 @@ class Configuration(BaseSettings):
         str,
         Field(
             validation_alias=AliasChoices(
-                'apify_storage_dir',
+                'apify_local_storage_dir',
                 'crawlee_storage_dir',
             ),
         ),
