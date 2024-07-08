@@ -6,6 +6,10 @@
 
 - new project bootstrapping via `pipx run crawlee create`
 
+### Fixes
+
+- improve error handling in project bootstrapping
+
 ## [0.0.7](../../releases/tag/v0.0.7) - 2024-06-27
 
 ### Fixes
