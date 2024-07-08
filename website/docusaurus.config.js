@@ -165,11 +165,18 @@ module.exports = {
                 //     className: 'changelog',
                 //     activeBaseRegex: 'changelog',
                 // },
-                // {
-                //     to: 'blog',
-                //     label: 'Blog',
-                //     position: 'left',
-                // },
+                {
+                    type: 'doc',
+                    label: 'Changelog',
+                    docId: 'changelog',
+                },
+                {
+                    href: 'https://crawlee.dev/blog',
+                    target: '_self',
+                    rel: 'dofollow',
+                    label: 'Blog',
+                    position: 'left',
+                },
                 // {
                 //     type: 'docsVersionDropdown',
                 //     position: 'left',
