@@ -4,11 +4,11 @@
 
 - TODO
 
-### Related issues
+### Issues
 
 <!-- If applicable, reference any related GitHub issues -->
 
-- TODO
+- Closes: #TODO
 
 ### Testing
 

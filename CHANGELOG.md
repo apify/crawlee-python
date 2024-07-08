@@ -1,10 +1,14 @@
 # Changelog
 
-## [0.0.8](../../releases/tag/v0.0.8) - Unreleased
+## [0.1.0](../../releases/tag/v0.1.0) - Unreleased
 
 ### Adds
 
 - new project bootstrapping via `pipx run crawlee create`
+
+### Fixes
+
+- improve error handling in project bootstrapping
 
 ## [0.0.7](../../releases/tag/v0.0.7) - 2024-06-27
 

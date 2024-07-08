@@ -6,6 +6,7 @@ router = Router[PlaywrightCrawlingContext]()
 
 @router.default_handler
 async def default_handler(context: PlaywrightCrawlingContext) -> None:
+    """Default request handler."""
     title = await context.page.query_selector('title')
     await context.push_data(
         {

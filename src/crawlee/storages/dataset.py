@@ -78,7 +78,7 @@ class Dataset(BaseStorage):
     removal of existing ones. This class is typically used for storing crawling results.
 
     Data can be stored locally or in the cloud, with local storage paths formatted as:
-    `{CRAWLEE_LOCAL_STORAGE_DIR}/datasets/{DATASET_ID}/{INDEX}.json`. Here, `{DATASET_ID}` is either "default" or
+    `{CRAWLEE_STORAGE_DIR}/datasets/{DATASET_ID}/{INDEX}.json`. Here, `{DATASET_ID}` is either "default" or
     a specific dataset ID, and `{INDEX}` represents the zero-based index of the item in the dataset.
 
     To open a dataset, use the `open` class method with an `id`, `name`, or `config`. If unspecified, the default

@@ -11,7 +11,7 @@
 
 Crawlee covers your crawling and scraping end-to-end and **helps you build reliable scrapers. Fast.**
 
-Your crawlers will appear almost human-like and fly under the radar of modern bot protections even with the default configuration. Crawlee gives you the tools to crawl the web for links, scrape data, and store it to disk or cloud while staying configurable to suit your project's needs.
+Your crawlers will appear almost human-like and fly under the radar of modern bot protections even with the default configuration. Crawlee gives you the tools to crawl the web for links, scrape data and persistently store it in machine-readable formats, without having to worry about the technical details. And thanks to rich configuration options, you can tweak almost any aspect of Crawlee to suit your project's needs if the default settings don't cut it.
 
 > 👉 **View full documentation, guides and examples on the [Crawlee project website](https://crawlee.dev/python/)** 👈
 
@@ -23,7 +23,7 @@ We recommend visiting the [Introduction tutorial](https://crawlee.dev/python/doc
 
 Crawlee is available as the [`crawlee`](https://pypi.org/project/crawlee/) PyPI package.
 
-```bash
+```sh
 pip install crawlee
 ```
 
@@ -31,56 +31,45 @@ Additional, optional dependencies unlocking more features are shipped as package
 
 If you plan to use `BeautifulSoupCrawler`, install `crawlee` with `beautifulsoup` extra:
 
-```bash
+```sh
 pip install 'crawlee[beautifulsoup]'
 ```
 
 If you plan to use `PlaywrightCrawler`, install `crawlee` with the `playwright` extra:
 
-```bash
+```sh
 pip install 'crawlee[playwright]'
 ```
 
 Then, install the Playwright dependencies:
 
-```bash
+```sh
 playwright install
 ```
 
 You can install multiple extras at once by using a comma as a separator:
 
-```bash
+```sh
 pip install 'crawlee[beautifulsoup,playwright]'
 ```
 
-## Features
+### With Crawlee CLI
 
-Why Crawlee is the preferred choice for web scraping and crawling?
+The quickest way to get started with Crawlee is by using the Crawlee CLI and selecting one of the prepared templates. First, ensure you have [Pipx](https://pipx.pypa.io/) installed:
 
-### Why use Crawlee instead of just a random HTTP library with an HTML parser?
+```sh
+pipx --help
+```
 
-- Unified interface for **HTTP & headless browser** crawling.
-- Automatic **parallel crawling** based on available system resources.
-- Written in Python with **type hints** - enhances DX (IDE autocompletion) and reduces bugs (static type checking).
-- Automatic **retries** on errors or when you’re getting blocked.
-- Integrated **proxy rotation** and session management.
-- Configurable **request routing** - direct URLs to the appropriate handlers.
-- Persistent **queue for URLs** to crawl.
-- Pluggable **storage** of both tabular data and files.
-- Robust **error handling**.
+Then, run the CLI and choose from the available templates:
 
-### Why to use Crawlee rather than Scrapy?
+```sh
+pipx run crawlee create my-crawler
+```
 
-- Crawlee has out-of-the-box support for **headless browser** crawling (Playwright).
-- Crawlee has a **minimalistic & elegant interface** - Set up your scraper with fewer than 10 lines of code.
-- Complete **type hint** coverage.
-- Based on standard **Asyncio**.
+## Examples
 
-## Introduction
-
-Crawlee covers your crawling and scraping end-to-end and helps you build reliable scrapers. Fast.
-
-Your crawlers will appear human-like and fly under the radar of modern bot protections even with the default configuration. Crawlee gives you the tools to crawl the web for links, scrape data and persistently store it in machine-readable formats, without having to worry about the technical details. And thanks to rich configuration options, you can tweak almost any aspect of Crawlee to suit your project's needs if the default settings don't cut it.
+Here are some practical examples to help you get started with different types of crawlers in Crawlee. Each example demonstrates how to set up and run a crawler for specific use cases, whether you need to handle simple HTML pages or interact with JavaScript-heavy sites.
 
 ### BeautifulSoupCrawler
 
@@ -166,6 +155,29 @@ if __name__ == '__main__':
 ### More examples
 
 Explore our [Examples](https://crawlee.dev/python/docs/examples) page in the Crawlee documentation for a wide range of additional use cases and demonstrations.
+
+## Features
+
+Why Crawlee is the preferred choice for web scraping and crawling?
+
+### Why use Crawlee instead of just a random HTTP library with an HTML parser?
+
+- Unified interface for **HTTP & headless browser** crawling.
+- Automatic **parallel crawling** based on available system resources.
+- Written in Python with **type hints** - enhances DX (IDE autocompletion) and reduces bugs (static type checking).
+- Automatic **retries** on errors or when you’re getting blocked.
+- Integrated **proxy rotation** and session management.
+- Configurable **request routing** - direct URLs to the appropriate handlers.
+- Persistent **queue for URLs** to crawl.
+- Pluggable **storage** of both tabular data and files.
+- Robust **error handling**.
+
+### Why to use Crawlee rather than Scrapy?
+
+- Crawlee has out-of-the-box support for **headless browser** crawling (Playwright).
+- Crawlee has a **minimalistic & elegant interface** - Set up your scraper with fewer than 10 lines of code.
+- Complete **type hint** coverage.
+- Based on standard **Asyncio**.
 
 ## Running on the Apify platform
 
