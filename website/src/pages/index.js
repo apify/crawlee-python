@@ -35,6 +35,11 @@ function Hero() {
                     </div>
                     <div className="row">
                         <div className="col">
+                            <div className={styles.earlyAdopters}>🚀 Crawlee for Python is open to early adopters!</div>
+                        </div>
+                    </div>
+                    <div className="row">
+                        <div className="col">
                             <div className={styles.heroButtons}>
                                 <Link to="docs/introduction" className={styles.getStarted}>Get Started</Link>
                                 <iframe src="https://ghbtns.com/github-btn.html?user=apify&repo=crawlee-python&type=star&count=true&size=large" frameBorder="0" scrolling="0" width="170" height="30" title="GitHub"></iframe>
@@ -127,7 +132,7 @@ async def main() -> None:
 
     # Or work with the data directly.
     const data = await crawler.get_data()
-    print(data.items) # TODO any alternative to \`console.table()\` in python?
+    print(data.items)
 
 
 if __name__ == '__main__':
@@ -144,8 +149,7 @@ function ActorExample() {
                     Crawlee requires <a href="https://www.python.org/" target="_blank" rel="noreferrer"><b>Python 3.9 or higher</b></a>.
                 </Admonition>
                 <p>
-                    The fastest way to try Crawlee out is to use the <b>Crawlee CLI</b> and choose
-                    the <b><a href="https://crawlee.dev/python/docs/quick-start">Getting started</a> example</b>.
+                    The fastest way to try Crawlee out is to use the <b>Crawlee CLI</b> and choose one of the provided templates.
                     The CLI will install all the necessary dependencies and add boilerplate code for you to play with.
                 </p>
                 <CodeBlock className="language-bash">
