@@ -227,6 +227,7 @@ article .card h2 {
 
 nav.navbar .dropdown__menu {
     min-width: 6rem;
+    margin-left: 20px;
 }
 
 .navbar__logo {

@@ -177,6 +177,21 @@ module.exports = {
                     label: 'Blog',
                     position: 'left',
                 },
+                {
+                    type: 'dropdown',
+                    label: 'Python',
+                    position: 'left',
+                    items: [
+                        {
+                            label: 'Node.js',
+                            href: 'https://crawlee.dev',
+                        },
+                        {
+                            label: 'Python',
+                            href: 'https://crawlee.dev/python',
+                        },
+                    ],
+                },
                 // {
                 //     type: 'docsVersionDropdown',
                 //     position: 'left',
