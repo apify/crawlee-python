@@ -30,7 +30,7 @@ Crawlee requires Python 3.9 or later.
 
 Crawlee is available as the [`crawlee`](https://pypi.org/project/crawlee/) PyPI package.
 
-```bash
+```sh
 pip install crawlee
 ```
 
@@ -38,25 +38,25 @@ Additional, optional dependencies unlocking more features are shipped as package
 
 If you plan to use `BeautifulSoupCrawler`, install `crawlee` with `beautifulsoup` extra:
 
-```bash
+```sh
 pip install 'crawlee[beautifulsoup]'
 ```
 
 If you plan to use `PlaywrightCrawler`, install `crawlee` with the `playwright` extra:
 
-```bash
+```sh
 pip install 'crawlee[playwright]'
 ```
 
 Then, install the Playwright dependencies:
 
-```bash
+```sh
 playwright install
 ```
 
 You can install multiple extras at once by using a comma as a separator:
 
-```bash
+```sh
 pip install 'crawlee[beautifulsoup,playwright]'
 ```
 

@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.0.8](../../releases/tag/v0.0.8) - Unreleased
+## [0.1.0](../../releases/tag/v0.1.0) - Unreleased
 
 ### Adds
 

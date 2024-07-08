@@ -10,11 +10,11 @@ To run Crawlee on your computer, ensure you meet the following requirements:
 
 You can verify these by running the following commands:
 
-```bash
+```sh
 python --version
 ```
 
-```bash
+```sh
 pip --version
 ```
 
@@ -22,7 +22,7 @@ pip --version
 
 Crawlee is available as the [`crawlee`](https://pypi.org/project/crawlee/) PyPI package.
 
-```bash
+```sh
 pip install crawlee
 ```
 
@@ -30,35 +30,47 @@ Additional, optional dependencies unlocking more features are shipped as package
 
 If you plan to use `BeautifulSoupCrawler`, install `crawlee` with `beautifulsoup` extra:
 
-```bash
+```sh
 pip install 'crawlee[beautifulsoup]'
 ```
 
 If you plan to use `PlaywrightCrawler`, install `crawlee` with the `playwright` extra:
 
-```bash
+```sh
 pip install 'crawlee[playwright]'
 ```
 
 Then, install the Playwright dependencies:
 
-```bash
+```sh
 playwright install
 ```
 
 You can install multiple extras at once by using a comma as a separator:
 
-```bash
+```sh
 pip install 'crawlee[beautifulsoup,playwright]'
 ```
 
 Verify that Crawlee is successfully installed:
 
-```bash
+```sh
 python -c 'import crawlee; print(crawlee.__version__)'
 ```
 
-<!-- TODO: Update this section once templates are ready -->
+## With Crawlee CLI
+
+The quickest way to get started with Crawlee is by using the Crawlee CLI and selecting one of the prepared templates. First, ensure you have [Pipx](https://pipx.pypa.io/) installed:
+
+```sh
+pipx --help
+```
+
+Then, run the CLI and choose from the available templates:
+
+```sh
+pipx run crawlee create my-crawler
+```
 
 ## Next steps
 

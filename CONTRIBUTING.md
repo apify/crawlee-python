@@ -12,7 +12,7 @@ We use [Poetry](https://python-poetry.org/) for project management. Install it a
 
 To install this package and its development dependencies, run:
 
-```bash
+```sh
 make install-dev
 ```
 
@@ -20,7 +20,7 @@ make install-dev
 
 To execute all code checking tools together, run:
 
-```bash
+```sh
 make check-code
 ```
 
@@ -30,7 +30,7 @@ We utilize [ruff](https://docs.astral.sh/ruff/) for linting, which analyzes code
 
 To run linting:
 
-```bash
+```sh
 make lint
 ```
 
@@ -40,7 +40,7 @@ Our automated code formatting also leverages [ruff](https://docs.astral.sh/ruff/
 
 To run formatting:
 
-```bash
+```sh
 make format
 ```
 
@@ -50,7 +50,7 @@ Type checking is handled by [mypy](https://mypy.readthedocs.io/), verifying code
 
 To run type checking:
 
-```bash
+```sh
 make type-check
 ```
 
@@ -62,13 +62,13 @@ We use [pytest](https://docs.pytest.org/) as a testing framework with many plugi
 
 To run unit tests:
 
-```bash
+```sh
 make unit-tests
 ```
 
 To run unit tests with HTML coverage report:
 
-```bash
+```sh
 make unit-tests-cov
 ```
 
@@ -90,25 +90,25 @@ To run the documentation locally, you need to have Node.js version 20 or higher 
 
 Navigate to the `website/` directory:
 
-```bash
+```sh
 cd website/
 ```
 
 Enable Corepack, which installs Yarn automatically:
 
-```bash
+```sh
 corepack enable
 ```
 
 Install the necessary dependencies:
 
-```bash
+```sh
 yarn
 ```
 
 Start the project in development mode with Hot Module Replacement (HMR):
 
-```bash
+```sh
 yarn start
 ```
 
