@@ -50,14 +50,7 @@ def create(
 ) -> None:
     """Bootstrap a new Crawlee project."""
     try:
-        # Update template choices if template is not provided.
-        if template is None:
-            templates_response = httpx.get(TEMPLATE_LIST_URL, timeout=httpx.Timeout(10))
-            template_choices: list[str] = [item['name'] for item in templates_response.json() if item['type'] == 'dir']
-        else:
-            template_choices = []
-
-        # Get project name.
+        # Prompt for project name if not provided.
         if project_name is None:
             answers = (
                 inquirer.prompt(
@@ -65,8 +58,7 @@ def create(
                         inquirer.Text(
                             name='project_name',
                             message='Name of the new project folder',
-                            validate=lambda _, it: len(it) > 0,
-                            ignore=project_name is not None,
+                            validate=lambda _, value: bool(value.strip()),
                         ),
                     ]
                 )
@@ -75,18 +67,25 @@ def create(
 
             project_name = answers.get('project_name')
 
-            if project_name is None:
+            if not project_name:
                 typer.echo('Project name is required.', err=True)
-                raise typer.Exit
+                raise typer.Exit(1)
 
         project_path = Path.cwd() / project_name
 
         if project_path.exists():
-            typer.echo(f'Folder {project_path} exists, please choose another name.', err=True)
-            raise typer.Exit
+            typer.echo(f'Folder {project_path} already exists. Please choose another name.', err=True)
+            raise typer.Exit(1)
 
-        # Get teamplate choice.
+        template_choices: list[str] = []
 
+        # Fetch available templates if a template is not provided.
+        if template is None:
+            response = httpx.get(TEMPLATE_LIST_URL, timeout=httpx.Timeout(10))
+            response.raise_for_status()
+            template_choices = [item['name'] for item in response.json() if item['type'] == 'dir']
+
+        # Prompt for template choice if not provided.
         if template is None:
             answers = (
                 inquirer.prompt(
@@ -101,29 +100,32 @@ def create(
                 )
                 or {}
             )
-
             template = answers.get('template')
 
-        # Start the bootstrap process.
-        with Progress(
-            SpinnerColumn(),
-            TextColumn('[progress.description]{task.description}'),
-            transient=True,
-        ) as progress:
-            progress.add_task(description='Bootstrapping...', total=None)
-            cookiecutter(
-                template='gh:apify/crawlee-python',
-                directory=f'templates/{template}',
-                no_input=True,
-                extra_context={'project_name': project_name},
+        if project_name and template:
+            # Start the bootstrap process.
+            with Progress(
+                SpinnerColumn(),
+                TextColumn('[progress.description]{task.description}'),
+                transient=True,
+            ) as progress:
+                progress.add_task(description='Bootstrapping...', total=None)
+                cookiecutter(
+                    template='gh:apify/crawlee-python',
+                    directory=f'templates/{template}',
+                    no_input=True,
+                    extra_context={'project_name': project_name},
+                )
+
+            typer.echo(f'Your project "{project_name}" was created.')
+            typer.echo(
+                f'To run it, navigate to the directory: "cd {project_name}", '
+                'install dependencies with "poetry install", '
+                f'and run it using "poetry run python -m {project_name}".'
             )
+            typer.echo(f'See the "{project_name}/README.md" for more information.')
 
-        typer.echo(f'Your project was created in {project_path}.')
-        typer.echo(f'See the created `{project_name}/README.md` file for more information.')
-
+    except httpx.HTTPStatusError as exc:
+        typer.echo(f'Failed to fetch templates: {exc}.', err=True)
     except KeyboardInterrupt:
         typer.echo('Operation cancelled by user.')
-
-
-if __name__ == '__main__':
-    cli()
