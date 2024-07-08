@@ -4,7 +4,7 @@ const { groupSort } = require('./transformDocs');
 
 /** @type {Partial<import('@docusaurus/types').DocusaurusConfig>} */
 module.exports = {
-    title: 'Crawlee',
+    title: 'Crawlee for Python',
     tagline: 'Build reliable crawlers. Fast.',
     url: 'https://crawlee.dev',
     baseUrl: '/python/',
