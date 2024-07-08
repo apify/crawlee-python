@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.1.0](../../releases/tag/v0.1.0) - Unreleased
+## 0.1.0 - Unreleased
 
 ### Adds
 
@@ -10,7 +10,7 @@
 
 - improve error handling in project bootstrapping
 
-## [0.0.7](../../releases/tag/v0.0.7) - 2024-06-27
+## [0.0.7](https://github.com/apify/crawlee-python/releases/tag/v0.0.7) - 2024-06-27
 
 ### Fixes
 
@@ -18,7 +18,7 @@
 - selector handling in `enqueue_links` in `BeautifulSoupCrawler`
 - improve `AutoscaledPool` state management
 
-## [0.0.6](../../releases/tag/v0.0.6) - 2024-06-25
+## [0.0.6](https://github.com/apify/crawlee-python/releases/tag/v0.0.6) - 2024-06-25
 
 ### Adds
 
@@ -32,7 +32,7 @@
 - Handling of relative URLs in `add_requests`
 - Graceful exit in `BasicCrawler.run`
 
-## [0.0.5](../../releases/tag/v0.0.5) - 2024-06-21
+## [0.0.5](https://github.com/apify/crawlee-python/releases/tag/v0.0.5) - 2024-06-21
 
 ### Adds
 
@@ -52,7 +52,7 @@
 
 - Fix type error in persist state of statistics
 
-## [0.0.4](../../releases/tag/v0.0.4) - 2024-05-30
+## [0.0.4](https://github.com/apify/crawlee-python/releases/tag/v0.0.4) - 2024-05-30
 
 - Another internal release, adding statistics capturing, proxy configuration and
 the initial version of browser management and `PlaywrightCrawler`.
@@ -64,7 +64,7 @@ the initial version of browser management and `PlaywrightCrawler`.
 - `BrowserPool`
 - `PlaywrightCrawler`
 
-## [0.0.3](../../releases/tag/v0.0.3) - 2024-05-15
+## [0.0.3](https://github.com/apify/crawlee-python/releases/tag/v0.0.3) - 2024-05-15
 
 - Another internal release, adding mainly session management and `BeautifulSoupCrawler`.
 
@@ -76,7 +76,7 @@ the initial version of browser management and `PlaywrightCrawler`.
 - `BaseStorageClient`
 - `Storages` and `MemoryStorageClient` were refactored
 
-## [0.0.2](../../releases/tag/v0.0.2) - 2024-04-11
+## [0.0.2](https://github.com/apify/crawlee-python/releases/tag/v0.0.2) - 2024-04-11
 
 - The first internal release with `BasicCrawler` and `HttpCrawler`.
 
@@ -89,6 +89,6 @@ the initial version of browser management and `PlaywrightCrawler`.
 - `Storages`
 - `BasicCrawler` & `HttpCrawler`
 
-## [0.0.1](../../releases/tag/v0.0.1) - 2024-01-30
+## [0.0.1](https://github.com/apify/crawlee-python/releases/tag/v0.0.1) - 2024-01-30
 
 - Dummy package `crawlee` was released on PyPI.
