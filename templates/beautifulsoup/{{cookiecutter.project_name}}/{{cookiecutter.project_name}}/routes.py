@@ -6,6 +6,7 @@ router = Router[BeautifulSoupCrawlingContext]()
 
 @router.default_handler
 async def default_handler(context: BeautifulSoupCrawlingContext) -> None:
+    """Default request handler."""
     title = context.soup.find('title')
     await context.push_data(
         {
