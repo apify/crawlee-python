@@ -289,10 +289,9 @@ module.exports = {
             },
         },
         algolia: {
-            // TODO how to deal with this? if we keep things under crawlee.dev, we should use the same index most probably
             appId: '5JC94MPMLY',
-            apiKey: '267679200b833c2ca1255ab276731869', // search only (public) API key
-            indexName: 'crawlee-python',
+            apiKey: '878493fcd7001e3c179b6db6796a999b', // search only (public) API key
+            indexName: 'crawlee_python',
             algoliaOptions: {
                 facetFilters: ['version:VERSION'],
             },
