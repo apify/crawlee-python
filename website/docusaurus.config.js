@@ -190,7 +190,7 @@ module.exports = {
                         },
                         {
                             label: 'Python',
-                            href: 'https://crawlee.dev/python',
+                            href: '#',
                             target: '_self',
                             rel: 'dofollow',
                         },

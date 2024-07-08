@@ -384,6 +384,12 @@ html[data-theme='dark'] .theme-doc-toc-desktop .table-of-contents .table-of-cont
     }
 }
 
+@media (max-width: 400px) {
+    .main-wrapper a[class*=sidebarLogo] img, .navbar__logo {
+        height: 1.5rem;
+    }
+}
+
 html .theme-doc-sidebar-container {
     border: 0;
 }
