@@ -40,8 +40,8 @@ class RequestQueue(BaseStorage, RequestProvider):
     following links. Each URL is uniquely identified by a `unique_key` field, which can be overridden to add the same
     URL multiple times under different keys.
 
-    Local storage path (if `CRAWLEE_LOCAL_STORAGE_DIR` is set):
-    `{CRAWLEE_LOCAL_STORAGE_DIR}/request_queues/{QUEUE_ID}/{REQUEST_ID}.json`, where `{QUEUE_ID}` is the request
+    Local storage path (if `CRAWLEE_STORAGE_DIR` is set):
+    `{CRAWLEE_STORAGE_DIR}/request_queues/{QUEUE_ID}/{REQUEST_ID}.json`, where `{QUEUE_ID}` is the request
     queue's ID (default or specified) and `{REQUEST_ID}` is the request's ID.
 
     Usage includes creating or opening existing queues by ID or name, with named queues retained indefinitely and

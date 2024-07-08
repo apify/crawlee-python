@@ -182,7 +182,7 @@ The JSON file will contain data similar to the following:
 
 :::tip
 
-If you want to change the storage directory, you can set the `CRAWLEE_LOCAL_STORAGE_DIR` environment variable to your preferred path.
+If you want to change the storage directory, you can set the `CRAWLEE_STORAGE_DIR` environment variable to your preferred path.
 
 :::
 

@@ -166,12 +166,12 @@ class Configuration(BaseSettings):
         ),
     ] = None
 
-    local_storage_dir: Annotated[
+    storage_dir: Annotated[
         str,
         Field(
             validation_alias=AliasChoices(
-                'apify_local_storage_dir',
-                'crawlee_local_storage_dir',
+                'apify_storage_dir',
+                'crawlee_storage_dir',
             ),
         ),
     ] = './storage'
