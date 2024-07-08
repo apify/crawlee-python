@@ -4,8 +4,7 @@ const { groupSort } = require('./transformDocs');
 
 /** @type {Partial<import('@docusaurus/types').DocusaurusConfig>} */
 module.exports = {
-    title: 'Crawlee for Python',
-    tagline: 'Build reliable crawlers. Fast.',
+    title: 'Crawlee for Python · Fast, reliable crawlers.',
     url: 'https://crawlee.dev',
     baseUrl: '/python/',
     trailingSlash: false,
@@ -212,7 +211,12 @@ module.exports = {
             darkTheme: require('prism-react-renderer').themes.dracula,
             additionalLanguages: ['docker', 'log', 'bash', 'diff', 'json'],
         },
-        metadata: [],
+        metadata: [
+            // eslint-disable-next-line max-len
+            { name: 'description', content: `Crawlee helps you build and maintain your Python crawlers. It's open source and modern, with type hints for Python to help you catch bugs early.` },
+            // eslint-disable-next-line max-len
+            { name: 'og:description', content: `Crawlee helps you build and maintain your Python crawlers. It's open source and modern, with type hints for Python to help you catch bugs early.` },
+        ],
         image: 'img/crawlee-og.png',
         footer: {
             links: [
