@@ -12,10 +12,11 @@
     },
     "packageRules": [
         {
-            "matchUpdateTypes": ["patch", "minor"],
-            "matchCurrentVersion": "!/^0/",
-            "groupName": "patch/minor dependencies",
-            "groupSlug": "all-non-major",
+            "matchPaths": ["pyproject.toml"],
+            "matchDepTypes": ["devDependencies"],
+            "matchUpdateTypes": ["major", "minor"],
+            "groupName": "major/minor dev dependencies",
+            "groupSlug": "dev-dependencies",
             "automerge": true,
             "automergeType": "branch"
         }
