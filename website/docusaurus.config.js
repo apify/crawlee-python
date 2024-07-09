@@ -131,6 +131,10 @@ module.exports = {
                 hideable: true,
             },
         },
+        announcementBar: {
+            id: 'announcement-bar-',
+            content: `⭐️ If you like Crawlee for Python, give it a star on <a target="_blank" rel="noopener noreferrer" href="https://github.com/apify/crawlee-python">GitHub</a> ⭐`,
+        },
         navbar: {
             hideOnScroll: true,
             title: 'Crawlee for Python',
