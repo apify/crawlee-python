@@ -102,7 +102,7 @@ When no `session_id` is provided, our proxy URLs are rotated round-robin.
 
 ## Inspecting current proxy in Crawlers
 
-`HttpCrawler`, `BeautifulSoupCrawler` and `PlaywrightCrawler` grant access to information about the currently used proxy in their `request_handler` using a <ApiLink to="class/ProxyInfo">`proxy_info`</ApiLink> object. With the `proxyInfo` object, we can easily access the proxy URL.
+`HttpCrawler`, `BeautifulSoupCrawler` and `PlaywrightCrawler` grant access to information about the currently used proxy in their `request_handler` using a <ApiLink to="class/ProxyInfo">`proxy_info`</ApiLink> object. With the `proxy_info` object, we can easily access the proxy URL.
 
 <Tabs groupId="proxy_session_management">
     <TabItem value="http" label="HttpCrawler">
