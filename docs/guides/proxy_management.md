@@ -1,0 +1,101 @@
+---
+id: proxy-management
+title: Proxy management
+description: Using proxies to get around those annoying IP-blocks
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import CodeBlock from '@theme/CodeBlock';
+
+import QuickStartSource from '!!raw-loader!./proxy_management_examples/quick_start.py';
+
+import IntegrationBeautifulSoupSource from '!!raw-loader!./proxy_management_examples/integration_beautifulsoup.py';
+import IntegrationPlaywrightSource from '!!raw-loader!./proxy_management_examples/integration_playwright.py';
+
+import SessionBeautifulSoupSource from '!!raw-loader!./proxy_management_examples/session_beautifulsoup.py';
+import SessionPlaywrightSource from '!!raw-loader!./proxy_management_examples/session_playwright.py';
+
+import InspectionBeautifulSoupSource from '!!raw-loader!./proxy_management_examples/inspecting_beautifulsoup.py';
+import InspectionPlaywrightSource from '!!raw-loader!./proxy_management_examples/inspecting_playwright.py';
+
+[IP address blocking](https://en.wikipedia.org/wiki/IP_address_blocking) is one of the oldest and most effective ways of preventing access to a website. It is therefore paramount for a good web scraping library to provide easy to use but powerful tools which can work around IP blocking. The most powerful weapon in our anti IP blocking arsenal is a [proxy server](https://en.wikipedia.org/wiki/Proxy_server).
+
+With Crawlee we can use our own proxy servers or proxy servers acquired from third-party providers.
+
+[//]: # (Check out the [avoid blocking guide]&#40;./avoid-blocking&#41; for more information about blocking.)
+
+## Quick start
+
+If you already have proxy URLs of your own, you can start using them immediately in only a few lines of code.
+
+<CodeBlock className="language-python">
+    {QuickStartSource}
+</CodeBlock>
+
+Examples of how to use our proxy URLs with crawlers are shown below in [Crawler integration](#crawler-integration) section.
+
+## Proxy configuration
+
+All our proxy needs are managed by the <ApiLink to="class/ProxyConfiguration">`ProxyConfiguration`</ApiLink> class. We create an instance using the `ProxyConfiguration` constructor function based on the provided options.
+
+<!-- <ApiLink to="class/ProxyConfiguration#constructor">`ProxyConfiguration.__init__()`</ApiLink> -->
+
+### Crawler integration
+
+`ProxyConfiguration` integrates seamlessly into <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> and <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>.
+
+<Tabs>
+    <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
+        <CodeBlock className="language-python">
+            {IntegrationBeautifulSoupSource}
+        </CodeBlock>
+    </TabItem>
+    <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
+        <CodeBlock className="language-python">
+            {IntegrationPlaywrightSource}
+        </CodeBlock>
+    </TabItem>
+</Tabs>
+
+Our crawlers will now use the selected proxies for all connections.
+
+### IP Rotation and session management
+
+The <ApiLink to="class/ProxyConfiguration#new_url">`proxy_configuration.new_url()`</ApiLink> method allows us to pass a `session_id` parameter. This creates a `session_id`-`proxy_url` pair, ensuring that subsequent `new_url()` calls with the same `session_id` return the same `proxy_url`. This is extremely useful in scraping, because we want to create the impression of a real user. See the <ApiLink to="class/SessionPool">`SessionPool`</ApiLink> class for more information on how maintaining a real session helps avoid blocking.
+
+<!-- TODO: link session management guide -->
+
+When no `session_id` is provided, our proxy URLs are rotated round-robin.
+
+<Tabs>
+    <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
+        <CodeBlock className="language-python">
+            {SessionBeautifulSoupSource}
+        </CodeBlock>
+    </TabItem>
+    <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
+        <CodeBlock className="language-python">
+            {SessionPlaywrightSource}
+        </CodeBlock>
+    </TabItem>
+</Tabs>
+
+## Inspecting current proxy in crawlers
+
+The `BeautifulSoupCrawler` and `PlaywrightCrawler` provide access to information about the currently used proxy via the request handler using a <ApiLink to="class/ProxyInfo">`proxy_info`</ApiLink> object. This object allows easy access to the proxy URL.
+
+<Tabs>
+    <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
+        <CodeBlock className="language-python">
+            {InspectionBeautifulSoupSource}
+        </CodeBlock>
+    </TabItem>
+    <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
+        <CodeBlock className="language-python">
+            {InspectionPlaywrightSource}
+        </CodeBlock>
+    </TabItem>
+</Tabs>
