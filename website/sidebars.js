@@ -22,22 +22,22 @@ module.exports = {
                 // 'introduction/running-in-cloud',
             ],
         },
-        // {
-        //     type: 'category',
-        //     label: 'Guides',
-        //     link: {
-        //         type: 'generated-index',
-        //         title: 'Guides',
-        //         slug: '/guides',
-        //         keywords: ['guides'],
-        //     },
-        //     items: [
+        {
+            type: 'category',
+            label: 'Guides',
+            link: {
+                type: 'generated-index',
+                title: 'Guides',
+                slug: '/guides',
+                keywords: ['guides'],
+            },
+            items: [
         //         'guides/request-storage',
         //         'guides/result-storage',
         //         'guides/configuration',
         //         'guides/cheerio-crawler-guide',
         //         'guides/javascript-rendering',
-        //         'guides/proxy-management',
+                'guides/proxy-management',
         //         'guides/session-management',
         //         'guides/scaling-crawlers',
         //         'guides/avoid-blocking',
@@ -46,8 +46,8 @@ module.exports = {
         //         'guides/typescript-project',
         //         'guides/docker-images',
         //         'guides/parallel-scraping/parallel-scraping-guide',
-        //     ],
-        // },
+            ],
+        },
         // {
         //     type: 'category',
         //     label: 'Deployment',
