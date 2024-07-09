@@ -39,20 +39,16 @@ async def main() -> None:
         data = []
 
         for post in posts:
+            # Get the HTML elements for the title and rank within each post.
             title_element = await post.query_selector('.title a')
             rank_element = await post.query_selector('.rank')
 
-            title = await context.page.evaluate('(element) => element.innerText', title_element) if title_element else None
-            rank = await context.page.evaluate('(element) => element.innerText', rank_element) if rank_element else None
-            href = await context.page.evaluate('(element) => element.href', title_element) if title_element else None
+            # Extract the data we want from the elements.
+            title = await title_element.inner_text() if title_element else None
+            rank = await rank_element.inner_text() if rank_element else None
+            href = await title_element.get_attribute('href') if title_element else None
 
-            data.append(
-                {
-                    'title': title,
-                    'rank': rank,
-                    'href': href,
-                }
-            )
+            data.append({'title': title, 'rank': rank, 'href': href})
 
         # Push the extracted data to the default dataset. In local configuration,
         # the data will be stored as JSON files in ./storage/datasets/default.
