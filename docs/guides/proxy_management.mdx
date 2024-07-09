@@ -41,8 +41,6 @@ Examples of how to use our proxy URLs with crawlers are shown below in [Crawler 
 
 All our proxy needs are managed by the <ApiLink to="class/ProxyConfiguration">`ProxyConfiguration`</ApiLink> class. We create an instance using the `ProxyConfiguration` constructor function based on the provided options.
 
-<!-- <ApiLink to="class/ProxyConfiguration#constructor">`ProxyConfiguration.__init__()`</ApiLink> -->
-
 ### Crawler integration
 
 `ProxyConfiguration` integrates seamlessly into <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> and <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>.
@@ -66,7 +64,7 @@ Our crawlers will now use the selected proxies for all connections.
 
 The <ApiLink to="class/ProxyConfiguration#new_url">`proxy_configuration.new_url()`</ApiLink> method allows us to pass a `session_id` parameter. This creates a `session_id`-`proxy_url` pair, ensuring that subsequent `new_url()` calls with the same `session_id` return the same `proxy_url`. This is extremely useful in scraping, because we want to create the impression of a real user. See the <ApiLink to="class/SessionPool">`SessionPool`</ApiLink> class for more information on how maintaining a real session helps avoid blocking.
 
-<!-- TODO: link session management guide -->
+{/* TODO: link session management guide */}
 
 When no `session_id` is provided, our proxy URLs are rotated round-robin.
 
