@@ -131,7 +131,7 @@ async def main() -> None:
     await crawler.export_data('./result.csv')
 
     # Or work with the data directly.
-    const data = await crawler.get_data()
+    data = await crawler.get_data()
     print(data.items)
 
 
