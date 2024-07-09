@@ -31,10 +31,13 @@ const FeatureList = [
         Svg: require('../../static/img/features/works-everywhere.svg').default,
         description: (
             <>
-                Switch your crawlers from HTTP to <a href="https://crawlee.dev/python/api/class/BeautifulSoupCrawler">headless browsers</a> in 3 lines of code.
-                Crawlee builds on top of <b>Playwright</b> and adds its own <b>anti-blocking features and human-like fingerprints</b>. Chrome, Firefox and more.
+                Switch your crawlers from HTTP to a <a href="https://crawlee.dev/python/api/class/PlaywrightCrawler">headless browser</a> in 3 lines of code.
+                Crawlee builds on top of <b>Playwright</b> and adds its own features. Chrome, Firefox and more.
             </>
         ),
+
+        // TODO: this is not true yet
+        // Crawlee builds on top of <b>Playwright</b> and adds its own <b>anti-blocking features and human-like fingerprints</b>. Chrome, Firefox and more.
     },
     {
         title: 'Automatic scaling and proxy management',
