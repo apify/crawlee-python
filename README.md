@@ -11,7 +11,7 @@
 
 Crawlee covers your crawling and scraping end-to-end and **helps you build reliable scrapers. Fast.**
 
-> 🚀Crawlee for Python is open to early adopters!
+> 🚀 Crawlee for Python is open to early adopters!
 
 Your crawlers will appear almost human-like and fly under the radar of modern bot protections even with the default configuration. Crawlee gives you the tools to crawl the web for links, scrape data and persistently store it in machine-readable formats, without having to worry about the technical details. And thanks to rich configuration options, you can tweak almost any aspect of Crawlee to suit your project's needs if the default settings don't cut it.
 
