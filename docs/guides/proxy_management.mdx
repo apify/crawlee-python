@@ -76,11 +76,11 @@ Our crawlers will now use the selected proxies for all connections.
 
 ### IP Rotation and session management
 
-&#8203;<ApiLink to="class/ProxyConfiguration#new_url">`proxy_configuration.new_url()`</ApiLink> allows us to pass a `sessionId` parameter. It will then be used to create a `sessionId`-`proxy_url` pair, and subsequent `new_url()` calls with the same `sessionId` will always return the same `proxy_url`. This is extremely useful in scraping, because we want to create the impression of a real user. See <ApiLink to="class/SessionPool">`SessionPool`</ApiLink> class for more information on how keeping a real session helps us avoid blocking.
+&#8203;<ApiLink to="class/ProxyConfiguration#new_url">`proxy_configuration.new_url()`</ApiLink> allows us to pass a `session_id` parameter. It will then be used to create a `session_id`-`proxy_url` pair, and subsequent `new_url()` calls with the same `session_id` will always return the same `proxy_url`. This is extremely useful in scraping, because we want to create the impression of a real user. See <ApiLink to="class/SessionPool">`SessionPool`</ApiLink> class for more information on how keeping a real session helps us avoid blocking.
 
 [//]: # (the [session management guide]&#40;../guides/session-management&#41; and )
 
-When no `sessionId` is provided, our proxy URLs are rotated round-robin.
+When no `session_id` is provided, our proxy URLs are rotated round-robin.
 
 <Tabs groupId="proxy_session_management">
     <TabItem value="http" label="HttpCrawler">

@@ -503,6 +503,10 @@ div[class^=announcementBar_] {
     color: #fff;
 }
 
+div[class^=announcementBar_] button {
+    color: #fff;
+}
+
 .markdown blockquote {
     --ifm-alert-background-color: var(--ifm-color-info-contrast-background);
     --ifm-alert-background-color-highlight: rgba(84,199,236,.15);
