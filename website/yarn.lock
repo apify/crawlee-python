@@ -5911,9 +5911,9 @@ __metadata:
   linkType: hard
 
 "electron-to-chromium@npm:^1.4.796":
-  version: 1.4.818
-  resolution: "electron-to-chromium@npm:1.4.818"
-  checksum: 10c0/1838794032cd13994349bc7a6d16decdddd3d6e36c80cd09385c8d33fccc66f198dac168a9bc3fbde42af5b94008e1766ead6e64a70749116640a20e9859e4eb
+  version: 1.4.820
+  resolution: "electron-to-chromium@npm:1.4.820"
+  checksum: 10c0/7fc22fdfd53a80f811cf8ab1c392006a8b7915f1c127998c19dc377f9cc2c1b62a11df38ce973b6e0be6db4fb2c3bbaf6626e24dfbe7c58fa60849508d7069b4
   languageName: node
   linkType: hard
 
@@ -6504,11 +6504,11 @@ __metadata:
   linkType: hard
 
 "esquery@npm:^1.4.2":
-  version: 1.5.0
-  resolution: "esquery@npm:1.5.0"
+  version: 1.6.0
+  resolution: "esquery@npm:1.6.0"
   dependencies:
     estraverse: "npm:^5.1.0"
-  checksum: 10c0/a084bd049d954cc88ac69df30534043fb2aee5555b56246493f42f27d1e168f00d9e5d4192e46f10290d312dc30dc7d58994d61a609c579c1219d636996f9213
+  checksum: 10c0/cb9065ec605f9da7a76ca6dadb0619dfb611e37a81e318732977d90fab50a256b95fee2d925fba7c2f3f0523aa16f91587246693bc09bc34d5a59575fe6e93d2
   languageName: node
   linkType: hard
 
@@ -7245,8 +7245,8 @@ __metadata:
   linkType: hard
 
 "glob@npm:^10.2.2, glob@npm:^10.3.10, glob@npm:^10.3.7":
-  version: 10.4.3
-  resolution: "glob@npm:10.4.3"
+  version: 10.4.5
+  resolution: "glob@npm:10.4.5"
   dependencies:
     foreground-child: "npm:^3.1.0"
     jackspeak: "npm:^3.1.2"
@@ -7256,7 +7256,7 @@ __metadata:
     path-scurry: "npm:^1.11.1"
   bin:
     glob: dist/esm/bin.mjs
-  checksum: 10c0/bea148e5dae96c17e2764f4764c72376a6ab7072b27a21e861ae4af6f97f3e810d79d67f64de52f63ce1d7fdb73b7306f61c65b48d0f61ca7c8647ce8acaf9a7
+  checksum: 10c0/19a9759ea77b8e3ca0a43c2f07ecddc2ad46216b786bb8f993c445aee80d345925a21e5280c7b7c6c59e860a0154b84e4b2b60321fea92cd3c56b4a7489f160e
   languageName: node
   linkType: hard
 
@@ -8627,15 +8627,15 @@ __metadata:
   linkType: hard
 
 "jackspeak@npm:^3.1.2":
-  version: 3.4.1
-  resolution: "jackspeak@npm:3.4.1"
+  version: 3.4.2
+  resolution: "jackspeak@npm:3.4.2"
   dependencies:
     "@isaacs/cliui": "npm:^8.0.2"
     "@pkgjs/parseargs": "npm:^0.11.0"
   dependenciesMeta:
     "@pkgjs/parseargs":
       optional: true
-  checksum: 10c0/4cba6fc728c5460328c9fcf42f1fa780c204f8456f123b04f4b4c996e1e2af2b28ff25876bcdc19b7639dd6eb6ff6dc4a613d27f67e62cd92c4dfe2123fdaa35
+  checksum: 10c0/31952961f4d0d51831b8973db5c800233dc0f2181c3ca74af96f02cdc5c3f2b3df147a9ce2b56a643bd459036d782fb8c59f8992658d2bb4564753c42bb80c6c
   languageName: node
   linkType: hard
 
@@ -9111,9 +9111,9 @@ __metadata:
   linkType: hard
 
 "lru-cache@npm:^10.0.1, lru-cache@npm:^10.2.0":
-  version: 10.3.1
-  resolution: "lru-cache@npm:10.3.1"
-  checksum: 10c0/3cb426a063bf182892ac614c24b9b971fcfe948e2ffe05316f046a6de32bbcedda956e995c0d845971f38894eb861de9b943ce3163549f1202983a9e771555d2
+  version: 10.4.2
+  resolution: "lru-cache@npm:10.4.2"
+  checksum: 10c0/5d990e30853890cc1f0150b83586a3e680664e938d782a9747a7bc7ebebfd6b74a11739add21ffa319bb05a3db249c4c2b6ec38ed8d4e3084bb7338be1acafc5
   languageName: node
   linkType: hard
 
@@ -12375,13 +12375,13 @@ __metadata:
   linkType: hard
 
 "rimraf@npm:^5.0.0":
-  version: 5.0.8
-  resolution: "rimraf@npm:5.0.8"
+  version: 5.0.9
+  resolution: "rimraf@npm:5.0.9"
   dependencies:
     glob: "npm:^10.3.7"
   bin:
     rimraf: dist/esm/bin.mjs
-  checksum: 10c0/b8782c0443f67814ed29c83f9b34743977535f7228c62885c2db0d2552f94940ef2d6e54056c3344ccc574c1366f768ab62198deafbb61a93eb849d28ced9daa
+  checksum: 10c0/87374682492b9e64de9c6fcbf2c8f209c7a2cd0e9749b3732eef8a62c6f859a9ed996d46f662d9ad5dd38c2c469f8e88de56b6c509026070ee3f06369cac1bc8
   languageName: node
   linkType: hard
 
