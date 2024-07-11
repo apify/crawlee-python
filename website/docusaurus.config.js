@@ -173,6 +173,7 @@ module.exports = {
                     type: 'doc',
                     label: 'Changelog',
                     docId: 'changelog',
+                    className: 'changelog',
                 },
                 {
                     href: 'https://crawlee.dev/blog',
