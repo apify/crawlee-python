@@ -33,10 +33,10 @@ keywords = [
 ]
 
 [tool.poetry.urls]
-"Homepage" = "https://todo.com/"
+"Homepage" = "https://crawlee.dev/python"
 "Apify Homepage" = "https://apify.com"
 "Changelog" = "https://github.com/apify/crawlee-py/blob/master/CHANGELOG.md"
-"Documentation" = "https://todo.com/"
+"Documentation" = "https://crawlee.dev/python/docs/quick-start"
 "Issue Tracker" = "https://github.com/apify/crawlee-py/issues"
 "Repository" = "https://github.com/apify/crawlee-py"
 
