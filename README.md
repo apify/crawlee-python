@@ -57,6 +57,7 @@ pip install 'crawlee[beautifulsoup,playwright]'
 
 ### With Crawlee CLI
 
+
 The quickest way to get started with Crawlee is by using the Crawlee CLI and selecting one of the prepared templates. First, ensure you have [Pipx](https://pipx.pypa.io/) installed:
 
 ```sh
@@ -67,6 +68,12 @@ Then, run the CLI and choose from the available templates:
 
 ```sh
 pipx run crawlee create my-crawler
+```
+
+If you already have `crawlee` installed, you can spin it up by running:
+
+```sh
+crawlee create my-crawler
 ```
 
 ## Examples
