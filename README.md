@@ -69,6 +69,12 @@ Then, run the CLI and choose from the available templates:
 pipx run crawlee create my-crawler
 ```
 
+If you already have `crawlee` installed, you can spin it up by running:
+
+```sh
+crawlee create my-crawler
+```
+
 ## Examples
 
 Here are some practical examples to help you get started with different types of crawlers in Crawlee. Each example demonstrates how to set up and run a crawler for specific use cases, whether you need to handle simple HTML pages or interact with JavaScript-heavy sites.
