@@ -801,8 +801,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
                 self._statistics.record_request_processing_failure(statistics_id)
                 self._statistics.error_tracker.add(session_error)
-        except ContextPipelineInterruptedError as interruped_error:
-            self._logger.debug('The context pipeline was interrupted', exc_info=interruped_error)
+        except ContextPipelineInterruptedError as interrupted_error:
+            self._logger.debug('The context pipeline was interrupted', exc_info=interrupted_error)
 
             await wait_for(
                 lambda: request_provider.mark_request_as_handled(crawling_context.request),
