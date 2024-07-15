@@ -31,13 +31,13 @@ pip install crawlee
 
 Additional, optional dependencies unlocking more features are shipped as package extras.
 
-If you plan to use `BeautifulSoupCrawler`, install `crawlee` with `beautifulsoup` extra:
+If you plan to parse HTML and use CSS selectors, install `crawlee` with `beautifulsoup` extra:
 
 ```sh
 pip install 'crawlee[beautifulsoup]'
 ```
 
-If you plan to use `PlaywrightCrawler`, install `crawlee` with the `playwright` extra:
+If you plan to use a (headless) browser, install `crawlee` with the `playwright` extra:
 
 ```sh
 pip install 'crawlee[playwright]'
@@ -53,6 +53,12 @@ You can install multiple extras at once by using a comma as a separator:
 
 ```sh
 pip install 'crawlee[beautifulsoup,playwright]'
+```
+
+Verify that Crawlee is successfully installed:
+
+```sh
+python -c 'import crawlee; print(crawlee.__version__)'
 ```
 
 ### With Crawlee CLI
@@ -77,7 +83,7 @@ crawlee create my-crawler
 
 ## Examples
 
-Here are some practical examples to help you get started with different types of crawlers in Crawlee. Each example demonstrates how to set up and run a crawler for specific use cases, whether you need to handle simple HTML pages or interact with JavaScript-heavy sites.
+Here are some practical examples to help you get started with different types of crawlers in Crawlee. Each example demonstrates how to set up and run a crawler for specific use cases, whether you need to handle simple HTML pages or interact with JavaScript-heavy sites. A crawler run will create a `storage/` directory in your current working directory.
 
 ### BeautifulSoupCrawler
 
