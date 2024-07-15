@@ -201,4 +201,4 @@ Your code contributions are welcome, and you'll be praised for eternity! If you 
 
 ## License
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE.md](https://github.com/apify/crawlee-python/blob/master/LICENSE.md) file for details.
+This project is licensed under the Apache License 2.0 - see the [LICENSE.md](https://github.com/apify/crawlee-python/blob/master/LICENSE) file for details.
