@@ -23,7 +23,10 @@ if __name__ == '__main__':
         # Loop through the changelog lines to find a matching version heading
         for line in changelog_file:
             # Match version headings formatted as GitHub version tag links in square brackets
-            if re.match(rf'## \[{current_package_version}\].*$', line):
+            if re.match(
+                pattern=rf'## (\[{current_package_version}\].*|\s*{current_package_version}\s*\(Unreleased\)).*$',
+                string=line,
+            ):
                 break
         else:
             raise RuntimeError(f'Changelog lacks entry for version {current_package_version}.')
