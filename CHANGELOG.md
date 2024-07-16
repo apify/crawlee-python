@@ -2,6 +2,10 @@
 
 ## 0.1.1 (Unreleased)
 
+### Features
+
+- Expose `crawler.log` to public.
+
 ### Bug fixes
 
 - Fix Pylance `reportPrivateImportUsage` errors by defining `__all__` in modules `__init__.py`.
