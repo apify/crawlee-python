@@ -202,6 +202,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
             root_logger.addHandler(handler)
             root_logger.setLevel(logging.INFO if not sys.flags.dev_mode else logging.DEBUG)
 
+            # Silence HTTPX logger
+            httpx_logger = logging.getLogger('httpx')
+            httpx_logger.setLevel(logging.WARNING if not sys.flags.dev_mode else logging.INFO)
+
         if not _logger:
             _logger = logging.getLogger(__name__)
 
