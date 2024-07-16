@@ -6,7 +6,6 @@ from .base_request_queue_client import BaseRequestQueueClient
 from .base_request_queue_collection_client import BaseRequestQueueCollectionClient
 from .base_storage_client import BaseStorageClient
 
-
 __all__ = [
     'BaseDatasetClient',
     'BaseDatasetCollectionClient',
