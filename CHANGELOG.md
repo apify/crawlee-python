@@ -2,7 +2,9 @@
 
 ## 0.1.1 (Unreleased)
 
-- ...
+### Bug fixes
+
+- Fix Pylance `reportPrivateImportUsage` errors by defining `__all__` in modules `__init__.py`.
 
 ## [0.1.0](https://github.com/apify/crawlee-python/releases/tag/v0.1.0) (2024-07-09)
 
@@ -10,13 +12,13 @@
 
 - new project bootstrapping via `pipx run crawlee create`
 
-### Bug Fixes
+### Bug fixes
 
 - improve error handling in project bootstrapping
 
 ## [0.0.7](https://github.com/apify/crawlee-python/releases/tag/v0.0.7) (2024-06-27)
 
-### Bug Fixes
+### Bug fixes
 
 - selector handling for `RETRY_CSS_SELECTORS` in `_handle_blocked_request` in `BeautifulSoupCrawler`
 - selector handling in `enqueue_links` in `BeautifulSoupCrawler`
@@ -31,7 +33,7 @@
 - Automatic logging setup
 - Context helper for logging (`context.log`)
 
-### Bug Fixes
+### Bug fixes
 
 - Handling of relative URLs in `add_requests`
 - Graceful exit in `BasicCrawler.run`
@@ -52,7 +54,7 @@
 - Add enqueue links helper to `PlaywrightCrawler`
 - Add max requests per crawl option to `BasicCrawler`
 
-### Bug Fixes
+### Bug fixes
 
 - Fix type error in persist state of statistics
 
