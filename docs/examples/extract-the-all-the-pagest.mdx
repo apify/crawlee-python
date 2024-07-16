@@ -1,0 +1,2713 @@
+i want you to work as an opensource contributer and start enhance the following code snipperts :import asyncio
+
+from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
+
+async def main() -> None:
+crawler = PlaywrightCrawler(
+max_requests_per_crawl=5, # Limit the crawl to 5 requests.
+headless=False, # Show the browser window.
+browser_type='firefox', # Use the Firefox browser.
+)
+
+    # Define the default request handler, which will be called for every request.
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        context.log.info(f'Processing {context.request.url} ...')
+
+        # Enqueue all links found on the page.
+        await context.enqueue_links()
+
+        # Extract data from the page using Playwright API.
+        data = {
+            'url': context.request.url,
+            'title': await context.page.title(),
+            'content': (await context.page.content())[:100],
+        }
+
+        # Push the extracted data to the default dataset.
+        await context.push_data(data)
+
+    # Run the crawler with the initial list of URLs.
+    await crawler.run(['https://crawlee.dev'])
+
+    # Export the entire dataset to a JSON file.
+    await crawler.export_data('results.json')
+
+    # Or work with the data directly.
+    data = await crawler.get_data()
+    crawler._logger.info(f'Extracted data: {data.items}')
+
+if **name** == '**main**':
+asyncio.run(main())
+there is two code snippets provided i want you to try the original code and make sure it;s running then syaty try the following two code an get me the best code that will be higly performance after comparing ach one with the original
+1:
+import asyncio
+from typing import List, Dict, Any
+from crawlee import PlaywrightCrawler, PlaywrightCrawlingContext
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+
+async def extract_page_data(context: PlaywrightCrawlingContext) -> Dict[str, Any]:
+"""Extract data from the current page."""
+try:
+return {
+'url': context.request.url,
+'title': await context.page.title(),
+'content': (await context.page.content())[:100],
+'links': await context.page.evaluate('Array.from(document.links).map(link => link.href)'),
+'meta_description': await context.page.evaluate('document.querySelector("meta[name=description]")?.content || ""'),
+}
+except PlaywrightTimeoutError:
+context.log.error(f"Timeout while extracting data from {context.request.url}")
+return {'url': context.request.url, 'error': 'Timeout during extraction'}
+
+async def request_handler(context: PlaywrightCrawlingContext) -> None:
+"""Handle each request made by the crawler."""
+context.log.info(f'Processing {context.request.url} ...')
+
+    try:
+        # Wait for the content to load
+        await context.page.wait_for_load_state('networkidle')
+
+        # Extract data from the page
+        data = await extract_page_data(context)
+
+        # Push the extracted data to the default dataset
+        await context.push_data(data)
+
+        # Enqueue all links found on the page
+        await context.enqueue_links(
+            strategy='same-domain',  # Only follow links on the same domain
+            transform_request=lambda req: req.modify(label='subpage')
+        )
+    except PlaywrightTimeoutError:
+        context.log.error(f"Timeout while processing {context.request.url}")
+    except Exception as e:
+        context.log.error(f"Error processing {context.request.url}: {str(e)}")
+
+async def main() -> None:
+crawler = PlaywrightCrawler(
+max_requests_per_crawl=10, # Increased limit
+headless=True, # Run in headless mode for production
+browser_type='firefox',
+default_navigation_options={'timeout': 30000}, # 30 seconds timeout
+)
+
+    # Set up the request handler
+    crawler.router.add_default_handler(request_handler)
+
+    # Run the crawler with the initial list of URLs
+    initial_urls = ['https://crawlee.dev', 'https://apify.com']
+    await crawler.run(initial_urls)
+
+    # Export the entire dataset to a JSON file
+    await crawler.export_data('results.json')
+
+    # Work with the data directly
+    data = await crawler.get_data()
+    crawler.log.info(f'Extracted data: {data.items}')
+
+    # Perform some analysis on the extracted data
+    total_links = sum(len(item.get('links', [])) for item in data.items)
+    crawler.log.info(f'Total links found: {total_links}')
+
+if **name** == '**main**':
+asyncio.run(main())
+ChatGPT
+Memory updated
+Let's break down and test the original code and then optimize it by comparing it with the provided snippets. We'll start by running the original code to ensure it works as expected.
+
+Original Code
+python
+Copy code
+import asyncio
+
+from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
+
+async def main() -> None:
+crawler = PlaywrightCrawler(
+max_requests_per_crawl=5, # Limit the crawl to 5 requests.
+headless=False, # Show the browser window.
+browser_type='firefox', # Use the Firefox browser.
+)
+
+    # Define the default request handler, which will be called for every request.
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        context.log.info(f'Processing {context.request.url} ...')
+
+        # Enqueue all links found on the page.
+        await context.enqueue_links()
+
+        # Extract data from the page using Playwright API.
+        data = {
+            'url': context.request.url,
+            'title': await context.page.title(),
+            'content': (await context.page.content())[:100],
+        }
+
+        # Push the extracted data to the default dataset.
+        await context.push_data(data)
+
+    # Run the crawler with the initial list of URLs.
+    await crawler.run(['https://crawlee.dev'])
+
+    # Export the entire dataset to a JSON file.
+    await crawler.export_data('results.json')
+
+    # Or work with the data directly.
+    data = await crawler.get_data()
+    crawler._logger.info(f'Extracted data: {data.items}')
+
+if **name** == '**main**':
+asyncio.run(main())
+Once this is confirmed to be working, we can proceed to test and optimize it with the first improved snippet.
+
+Improved Code Snippet 1
+python
+Copy code
+import asyncio
+from typing import List, Dict, Any
+from crawlee import PlaywrightCrawler, PlaywrightCrawlingContext
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+
+async def extract_page_data(context: PlaywrightCrawlingContext) -> Dict[str, Any]:
+"""Extract data from the current page."""
+try:
+return {
+'url': context.request.url,
+'title': await context.page.title(),
+'content': (await context.page.content())[:100],
+'links': await context.page.evaluate('Array.from(document.links).map(link => link.href)'),
+'meta_description': await context.page.evaluate('document.querySelector("meta[name=description]")?.content || ""'),
+}
+except PlaywrightTimeoutError:
+context.log.error(f"Timeout while extracting data from {context.request.url}")
+return {'url': context.request.url, 'error': 'Timeout during extraction'}
+
+async def request_handler(context: PlaywrightCrawlingContext) -> None:
+"""Handle each request made by the crawler."""
+context.log.info(f'Processing {context.request.url} ...')
+
+    try:
+        # Wait for the content to load
+        await context.page.wait_for_load_state('networkidle')
+
+        # Extract data from the page
+        data = await extract_page_data(context)
+
+        # Push the extracted data to the default dataset
+        await context.push_data(data)
+
+        # Enqueue all links found on the page
+        await context.enqueue_links(
+            strategy='same-domain',  # Only follow links on the same domain
+            transform_request=lambda req: req.modify(label='subpage')
+        )
+    except PlaywrightTimeoutError:
+        context.log.error(f"Timeout while processing {context.request.url}")
+    except Exception as e:
+        context.log.error(f"Error processing {context.request.url}: {str(e)}")
+
+async def main() -> None:
+crawler = PlaywrightCrawler(
+max_requests_per_crawl=10, # Increased limit
+headless=True, # Run in headless mode for production
+browser_type='firefox',
+default_navigation_options={'timeout': 30000}, # 30 seconds timeout
+)
+
+    # Set up the request handler
+    crawler.router.add_default_handler(request_handler)
+
+    # Run the crawler with the initial list of URLs
+    initial_urls = ['https://crawlee.dev', 'https://apify.com']
+    await crawler.run(initial_urls)
+
+    # Export the entire dataset to a JSON file
+    await crawler.export_data('results.json')
+
+    # Work with the data directly
+    data = await crawler.get_data()
+    crawler.log.info(f'Extracted data: {data.items}')
+
+    # Perform some analysis on the extracted data
+    total_links = sum(len(item.get('links', [])) for item in data.items)
+    crawler.log.info(f'Total links found: {total_links}')
+
+if **name** == '**main**':
+asyncio.run(main())
+I'll test both snippets and compare their performance, logging, and error handling. Once I have the results, I will provide you with the optimized and best-performing code.
+
+Before we proceed with testing and comparing the code snippets, let's outline the steps involved:
+
+Run the Original Code:
+
+Ensure the original code snippet runs successfully and captures the necessary data.
+Run Improved Code Snippet 1:
+
+Execute the improved snippet and observe the results.
+Compare the performance and extracted data against the original code.
+Analysis:
+
+Compare the overall performance, error handling, and data extraction capabilities of both snippets.
+Running the Original Code
+Here's the original code snippet to run:
+
+python
+Copy code
+import asyncio
+
+from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
+
+async def main() -> None:
+crawler = PlaywrightCrawler(
+max_requests_per_crawl=5, # Limit the crawl to 5 requests.
+headless=False, # Show the browser window.
+browser_type='firefox', # Use the Firefox browser.
+)
+
+    # Define the default request handler, which will be called for every request.
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        context.log.info(f'Processing {context.request.url} ...')
+
+        # Enqueue all links found on the page.
+        await context.enqueue_links()
+
+        # Extract data from the page using Playwright API.
+        data = {
+            'url': context.request.url,
+            'title': await context.page.title(),
+            'content': (await context.page.content())[:100],
+        }
+
+        # Push the extracted data to the default dataset.
+        await context.push_data(data)
+
+    # Run the crawler with the initial list of URLs.
+    await crawler.run(['https://crawlee.dev'])
+
+    # Export the entire dataset to a JSON file.
+    await crawler.export_data('results.json')
+
+    # Or work with the data directly.
+    data = await crawler.get_data()
+    crawler._logger.info(f'Extracted data: {data.items}')
+
+if **name** == '**main**':
+asyncio.run(main())
+Running Improved Code Snippet 1
+Here's the first improved code snippet to run:
+
+python
+Copy code
+import asyncio
+from typing import List, Dict, Any
+from crawlee import PlaywrightCrawler, PlaywrightCrawlingContext
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+
+async def extract_page_data(context: PlaywrightCrawlingContext) -> Dict[str, Any]:
+"""Extract data from the current page."""
+try:
+return {
+'url': context.request.url,
+'title': await context.page.title(),
+'content': (await context.page.content())[:100],
+'links': await context.page.evaluate('Array.from(document.links).map(link => link.href)'),
+'meta_description': await context.page.evaluate('document.querySelector("meta[name=description]")?.content || ""'),
+}
+except PlaywrightTimeoutError:
+context.log.error(f"Timeout while extracting data from {context.request.url}")
+return {'url': context.request.url, 'error': 'Timeout during extraction'}
+
+async def request_handler(context: PlaywrightCrawlingContext) -> None:
+"""Handle each request made by the crawler."""
+context.log.info(f'Processing {context.request.url} ...')
+
+    try:
+        # Wait for the content to load
+        await context.page.wait_for_load_state('networkidle')
+
+        # Extract data from the page
+        data = await extract_page_data(context)
+
+        # Push the extracted data to the default dataset
+        await context.push_data(data)
+
+        # Enqueue all links found on the page
+        await context.enqueue_links(
+            strategy='same-domain',  # Only follow links on the same domain
+            transform_request=lambda req: req.modify(label='subpage')
+        )
+    except PlaywrightTimeoutError:
+        context.log.error(f"Timeout while processing {context.request.url}")
+    except Exception as e:
+        context.log.error(f"Error processing {context.request.url}: {str(e)}")
+
+async def main() -> None:
+crawler = PlaywrightCrawler(
+max_requests_per_crawl=10, # Increased limit
+headless=True, # Run in headless mode for production
+browser_type='firefox',
+default_navigation_options={'timeout': 30000}, # 30 seconds timeout
+)
+
+    # Set up the request handler
+    crawler.router.add_default_handler(request_handler)
+
+    # Run the crawler with the initial list of URLs
+    initial_urls = ['https://crawlee.dev', 'https://apify.com']
+    await crawler.run(initial_urls)
+
+    # Export the entire dataset to a JSON file
+    await crawler.export_data('results.json')
+
+    # Work with the data directly
+    data = await crawler.get_data()
+    crawler.log.info(f'Extracted data: {data.items}')
+
+    # Perform some analysis on the extracted data
+    total_links = sum(len(item.get('links', [])) for item in data.items)
+    crawler.log.info(f'Total links found: {total_links}')
+
+if **name** == '**main**':
+asyncio.run(main())
+Analysis
+Once both code snippets are executed:
+
+Performance Metrics:
+
+Time taken to complete the crawl.
+Number of successful requests vs. errors.
+Amount of data extracted.
+Error Handling:
+
+Handling of timeouts and unexpected errors.
+Logging quality and usefulness.
+Data Extraction:
+
+Accuracy and completeness of the data extracted.
+Additional data fields (links, meta description) in the improved snippet.
+I'll run both snippets and then provide a detailed comparison and the most optimized code based on the findings.
+
+Since I'm unable to run the code snippets directly in this environment, I'll guide you through the process of running and comparing them on your local machine.
+
+Steps to Run and Compare the Code Snippets
+Set Up Your Environment:
+
+Ensure you have Python and necessary libraries installed. You can install the required libraries using pip:
+bash
+Copy code
+pip install crawlee playwright
+Run the Original Code:
+
+Save the original code in a file, e.g., original_crawler.py.
+Run the script:
+bash
+Copy code
+python original_crawler.py
+Check the results.json file and logs to verify the output.
+Run Improved Code Snippet 1:
+
+Save the improved code snippet in another file, e.g., improved_crawler_1.py.
+Run the script:
+bash
+Copy code
+python improved_crawler_1.py
+Again, check the results.json file and logs for the output.
+Analyze and Compare:
+
+Performance: Note the time taken for each script to complete the crawl.
+Error Handling: Check the logs for any errors and how they were handled.
+Data Extraction: Compare the data in results.json from both runs. Look for:
+The number of entries.
+The completeness of each entry (e.g., presence of links and meta_description in the improved snippet).
+Expected Improvements in Improved Code Snippet 1
+Enhanced Data Extraction:
+
+The improved snippet extracts additional data fields such as links and meta descriptions.
+Better Error Handling:
+
+The snippet handles timeouts and logs errors more robustly.
+Increased Requests per Crawl:
+
+The limit is increased from 5 to 10 requests, potentially increasing data coverage.
+Headless Mode:
+
+Running in headless mode (headless=True) improves performance in production environments.
+Improved Code Snippet 1
+python
+Copy code
+import asyncio
+from typing import List, Dict, Any
+from crawlee import PlaywrightCrawler, PlaywrightCrawlingContext
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+
+async def extract_page_data(context: PlaywrightCrawlingContext) -> Dict[str, Any]:
+"""Extract data from the current page."""
+try:
+return {
+'url': context.request.url,
+'title': await context.page.title(),
+'content': (await context.page.content())[:100],
+'links': await context.page.evaluate('Array.from(document.links).map(link => link.href)'),
+'meta_description': await context.page.evaluate('document.querySelector("meta[name=description]")?.content || ""'),
+}
+except PlaywrightTimeoutError:
+context.log.error(f"Timeout while extracting data from {context.request.url}")
+return {'url': context.request.url, 'error': 'Timeout during extraction'}
+
+async def request_handler(context: PlaywrightCrawlingContext) -> None:
+"""Handle each request made by the crawler."""
+context.log.info(f'Processing {context.request.url} ...')
+
+    try:
+        # Wait for the content to load
+        await context.page.wait_for_load_state('networkidle')
+
+        # Extract data from the page
+        data = await extract_page_data(context)
+
+        # Push the extracted data to the default dataset
+        await context.push_data(data)
+
+        # Enqueue all links found on the page
+        await context.enqueue_links(
+            strategy='same-domain',  # Only follow links on the same domain
+            transform_request=lambda req: req.modify(label='subpage')
+        )
+    except PlaywrightTimeoutError:
+        context.log.error(f"Timeout while processing {context.request.url}")
+    except Exception as e:
+        context.log.error(f"Error processing {context.request.url}: {str(e)}")
+
+async def main() -> None:
+crawler = PlaywrightCrawler(
+max_requests_per_crawl=10, # Increased limit
+headless=True, # Run in headless mode for production
+browser_type='firefox',
+default_navigation_options={'timeout': 30000}, # 30 seconds timeout
+)
+
+    # Set up the request handler
+    crawler.router.add_default_handler(request_handler)
+
+    # Run the crawler with the initial list of URLs
+    initial_urls = ['https://crawlee.dev', 'https://apify.com']
+    await crawler.run(initial_urls)
+
+    # Export the entire dataset to a JSON file
+    await crawler.export_data('results.json')
+
+    # Work with the data directly
+    data = await crawler.get_data()
+    crawler.log.info(f'Extracted data: {data.items}')
+
+    # Perform some analysis on the extracted data
+    total_links = sum(len(item.get('links', [])) for item in data.items)
+    crawler.log.info(f'Total links found: {total_links}')
+
+if **name** == '**main**':
+asyncio.run(main())
+By following these steps, you can determine which code snippet performs better in terms of speed, error handling, and data completeness. Based on these findings, you can further optimize your web crawling solution.
+
+is adding a load balancer or some trvresa proxy techniques will enhance it
+ChatGPT
+Adding a load balancer or using reverse proxy techniques can enhance the performance and reliability of your web crawler, especially if you're dealing with a high volume of requests or need to distribute the load across multiple instances. Here are some ways you can leverage these techniques:
+
+1. Load Balancer
+   A load balancer distributes incoming network traffic across multiple servers, ensuring no single server becomes a bottleneck. It can help with:
+
+Scaling: Distributing the crawling tasks across multiple instances of your crawler.
+Redundancy: Ensuring that if one instance fails, the others can continue processing requests.
+Performance: Reducing the load on individual instances, leading to faster response times.
+Example Setup:
+
+Using Nginx as a Load Balancer:
+
+nginx
+Copy code
+upstream crawler_backend {
+server crawler_instance1:8000;
+server crawler_instance2:8000;
+server crawler_instance3:8000;
+}
+
+server {
+listen 80;
+
+    location / {
+        proxy_pass http://crawler_backend;
+    }
+
+}
+In this setup, Nginx distributes incoming requests to multiple crawler instances running on different ports or hosts. 2. Reverse Proxy
+A reverse proxy sits in front of your backend servers and forwards client requests to the appropriate server. It can provide:
+
+Caching: Reduce the load on the backend by caching responses.
+SSL Termination: Handle SSL encryption, offloading this task from the backend.
+Security: Hide the backend servers from direct access and provide a single point of entry.
+Example Setup:
+
+Using Traefik as a Reverse Proxy:
+
+yaml
+Copy code
+version: '3'
+
+services:
+traefik:
+image: traefik:v2.4
+command: - "--api.insecure=true" - "--providers.docker=true" - "--entrypoints.web.address=:80"
+ports: - "80:80" - "8080:8080"
+volumes: - "/var/run/docker.sock:/var/run/docker.sock"
+networks: - web
+
+crawler:
+image: your_crawler_image
+labels: - "traefik.http.routers.crawler.rule=Host(`crawler.local`)"
+networks: - web
+
+networks:
+web:
+external: true
+Traefik will route requests to your crawler service based on the hostname.
+Implementation Steps
+Dockerize Your Crawler:
+
+Ensure your crawler is containerized so it can be easily scaled and managed by the load balancer or reverse proxy.
+Deploy Multiple Instances:
+
+Deploy multiple instances of your crawler service. You can use Docker Compose, Kubernetes, or other orchestration tools.
+Configure Load Balancer/Reverse Proxy:
+
+Set up a load balancer or reverse proxy (like Nginx, Traefik, HAProxy) to distribute the load across your crawler instances.
+Monitor and Scale:
+
+Use monitoring tools to track the performance of your instances and scale up or down based on the load.
+Example Docker Compose Setup with Traefik
+Here's a complete example using Docker Compose and Traefik:
+
+docker-compose.yml:
+
+yaml
+Copy code
+version: '3.8'
+
+services:
+traefik:
+image: traefik:v2.4
+command: - "--api.insecure=true" - "--providers.docker=true" - "--entrypoints.web.address=:80"
+ports: - "80:80" - "8080:8080"
+volumes: - "/var/run/docker.sock:/var/run/docker.sock"
+networks: - web
+
+crawler_instance1:
+image: your_crawler_image
+labels: - "traefik.http.routers.crawler1.rule=Host(`crawler.local`)"
+networks: - web
+
+crawler_instance2:
+image: your_crawler_image
+labels: - "traefik.http.routers.crawler2.rule=Host(`crawler.local`)"
+networks: - web
+
+networks:
+web:
+external: true
+Summary:
+
+By adding a load balancer or using reverse proxy techniques, you can improve the scalability, reliability, and performance of your web crawler. This setup allows you to handle more requests concurrently and provides a more robust solution for production environments.
+
+how to know how much the folder size and the performance of the code
+ChatGPT
+To measure the folder size and performance of your code, you can use various tools and techniques. Below are methods for both tasks:
+
+1. Measuring Folder Size
+   You can measure the folder size using different tools and commands depending on your operating system.
+
+On Linux/MacOS:
+
+Use the du command:
+
+bash
+Copy code
+du -sh /path/to/your/folder
+-s: Display only the total size.
+-h: Human-readable format (e.g., 1K, 234M, 2G).
+On Windows:
+
+You can use the Get-ChildItem command in PowerShell:
+
+powershell
+Copy code
+Get-ChildItem -Recurse | Measure-Object -Property Length -Sum
+Or, to get a human-readable format:
+
+powershell
+Copy code
+(Get-ChildItem -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB 2. Measuring Code Performance
+To measure the performance of your Python code, you can use:
+
+Time Module: For basic timing.
+Timeit Module: For more precise timing.
+cProfile Module: For profiling the entire script to see where time is spent.
+Basic Timing with Time Module
+You can use the time module to measure the execution time of your code.
+
+python
+Copy code
+import time
+
+start_time = time.time()
+
+# Your code to measure
+
+main()
+
+end_time = time.time()
+print(f"Execution Time: {end_time - start_time} seconds")
+Precise Timing with Timeit Module
+For more accurate measurements, especially for small code snippets, use the timeit module.
+
+python
+Copy code
+import timeit
+
+def your_function(): # Your code to measure
+main()
+
+execution_time = timeit.timeit(your_function, number=1)
+print(f"Execution Time: {execution_time} seconds")
+Profiling with cProfile Module
+For detailed profiling, use the cProfile module.
+
+python
+Copy code
+import cProfile
+
+cProfile.run('main()')
+This will print a detailed report showing how much time was spent in each function.
+
+Integrating Performance Measurement into Your Script
+You can integrate the performance measurement directly into your script. Here’s how you can combine both the time module for overall timing and cProfile for detailed profiling:
+
+python
+Copy code
+import asyncio
+import time
+import cProfile
+import pstats
+from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
+
+async def main() -> None:
+start_time = time.time()
+
+    crawler = PlaywrightCrawler(
+        max_requests_per_crawl=5,
+        headless=False,
+        browser_type='firefox',
+    )
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        context.log.info(f'Processing {context.request.url} ...')
+        await context.enqueue_links()
+        data = {
+            'url': context.request.url,
+            'title': await context.page.title(),
+            'content': (await context.page.content())[:100],
+        }
+        await context.push_data(data)
+
+    await crawler.run(['https://crawlee.dev'])
+    await crawler.export_data('results.json')
+    data = await crawler.get_data()
+    crawler._logger.info(f'Extracted data: {data.items}')
+
+    end_time = time.time()
+    print(f"Execution Time: {end_time - start_time} seconds")
+
+if **name** == '**main**':
+cProfile.run('asyncio.run(main())', 'profile_output')
+
+    # To view the profiling stats
+    p = pstats.Stats('profile_output')
+    p.sort_stats('cumulative').print_stats(10)
+
+Summary
+Folder Size: Use the du command on Linux/MacOS or Get-ChildItem on Windows.
+Code Performance: Use the time, timeit, and cProfile modules in Python to measure and profile your code's execution time.
+By using these tools, you can get a comprehensive view of both the size of your project and its performance characteristics.
+
+ok this is the **main**,py :
+
+import asyncio
+
+from crawlee.playwright_crawler.playwright_crawler import PlaywrightCrawler
+
+from .routes import router
+
+async def main() -> None:
+"""The crawler entry point."""
+crawler = PlaywrightCrawler(
+request_handler=router,
+max_requests_per_crawl=50,
+)
+
+    await crawler.run(
+        [
+            'https://https://fady.gitbook.io/micro-services-deployments-to-digitalocean',
+        ]
+    )
+
+if **name** == '**main**':
+asyncio.run(main())
+and routers.py :
+from crawlee.basic_crawler import Router
+from crawlee.playwright_crawler import PlaywrightCrawlingContext
+
+router = Router[PlaywrightCrawlingContext]()
+
+@router.default_handler
+async def default_handler(context: PlaywrightCrawlingContext) -> None:
+"""Default request handler."""
+title = await context.page.query_selector('title')
+await context.push_data(
+{
+'url': context.request.loaded_url,
+'title': await title.inner_text() if title else None,
+}
+)
+
+    await context.enqueue_links()
+
+analyze them first before making any changes
+
+ChatGPT
+Let's analyze the provided code snippets for **main**.py and routers.py before making any changes.
+
+**main**.py
+This script serves as the entry point for the crawler application. It uses the PlaywrightCrawler class from the crawlee library to initialize and run the crawler with a specific request handler and URL list.
+
+python
+Copy code
+import asyncio
+from crawlee.playwright_crawler.playwright_crawler import PlaywrightCrawler
+from .routes import router
+
+async def main() -> None:
+"""The crawler entry point."""
+crawler = PlaywrightCrawler(
+request_handler=router,
+max_requests_per_crawl=50, # The crawler will process a maximum of 50 requests per run.
+)
+
+    await crawler.run(
+        [
+            'https://https://fady.gitbook.io/micro-services-deployments-to-digitalocean',
+        ]
+    )
+
+if **name** == '**main**':
+asyncio.run(main())
+Analysis of **main**.py
+Imports:
+
+asyncio: Used to run the main function asynchronously.
+PlaywrightCrawler from crawlee.playwright_crawler: The crawler class used to define and run the crawling process.
+router from routes: The request handler imported from another module.
+Main Function:
+
+Initializes a PlaywrightCrawler instance with a specified request handler (router) and a maximum of 50 requests per crawl.
+Runs the crawler with a list of initial URLs (note that the provided URL seems to have a typo with duplicate "https://").
+routes.py
+This script defines the routing logic for the crawler, specifically how requests are handled and processed.
+
+python
+Copy code
+from crawlee.basic_crawler import Router
+from crawlee.playwright_crawler import PlaywrightCrawlingContext
+
+router = Router[PlaywrightCrawlingContext]()
+
+@router.default_handler
+async def default_handler(context: PlaywrightCrawlingContext) -> None:
+"""Default request handler."""
+title = await context.page.query_selector('title')
+await context.push_data(
+{
+'url': context.request.loaded_url,
+'title': await title.inner_text() if title else None,
+}
+)
+
+    await context.enqueue_links()
+
+Analysis of routes.py
+Imports:
+
+Router from crawlee.basic_crawler: A router to manage request handlers.
+PlaywrightCrawlingContext from crawlee.playwright_crawler: Provides context for each crawling request.
+Router Initialization:
+
+Creates a Router instance specifically for PlaywrightCrawlingContext.
+Default Handler:
+
+Defines an asynchronous function default_handler to process each request.
+Extracts the page title and pushes the URL and title to the dataset.
+Enqueues additional links found on the page for further crawling.
+Issues and Improvements
+URL Typo:
+
+The URL in the main.py script has a typo: 'https://https://fady.gitbook.io/micro-services-deployments-to-digitalocean'. It should be corrected.
+Error Handling:
+
+The default_handler lacks error handling. Any errors during extraction or enqueuing should be caught and logged.
+Performance Monitoring:
+
+Adding performance monitoring and logging to measure execution time and resource usage would be beneficial.
+Revised Code with Improvements
+Let's revise the code to address these issues and enhance performance and reliability.
+
+Revised **main**.py:
+
+python
+Copy code
+import asyncio
+import time
+import cProfile
+import pstats
+from crawlee.playwright_crawler.playwright_crawler import PlaywrightCrawler
+from .routes import router
+
+async def main() -> None:
+"""The crawler entry point."""
+start_time = time.time()
+
+    crawler = PlaywrightCrawler(
+        request_handler=router,
+        max_requests_per_crawl=50,
+    )
+
+    await crawler.run(
+        [
+            'https://fady.gitbook.io/micro-services-deployments-to-digitalocean',
+        ]
+    )
+
+    end_time = time.time()
+    print(f"Execution Time: {end_time - start_time} seconds")
+
+if **name** == '**main**':
+cProfile.run('asyncio.run(main())', 'profile_output')
+
+    # To view the profiling stats
+    p = pstats.Stats('profile_output')
+    p.sort_stats('cumulative').print_stats(10)
+
+Revised routes.py:
+
+python
+Copy code
+from crawlee.basic_crawler import Router
+from crawlee.playwright_crawler import PlaywrightCrawlingContext
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+
+router = Router[PlaywrightCrawlingContext]()
+
+@router.default_handler
+async def default_handler(context: PlaywrightCrawlingContext) -> None:
+"""Default request handler."""
+try:
+title_element = await context.page.query_selector('title')
+title = await title_element.inner_text() if title_element else None
+
+        await context.push_data(
+            {
+                'url': context.request.loaded_url,
+                'title': title,
+            }
+        )
+
+        await context.enqueue_links()
+    except PlaywrightTimeoutError:
+        context.log.error(f"Timeout while processing {context.request.url}")
+    except Exception as e:
+        context.log.error(f"Error processing {context.request.url}: {str(e)}")
+
+Summary of Changes
+Fixed URL Typo:
+
+Corrected the URL in **main**.py.
+Added Performance Monitoring:
+
+Measured the execution time using the time module.
+Added profiling using cProfile for detailed performance analysis.
+Added Error Handling:
+
+Included error handling in routes.py to catch and log exceptions during page processing.
+By implementing these changes, the code becomes more robust, easier to monitor, and potentially more performant.
+
+itls extracting injason already but i want a better jason format
+ChatGPT
+To improve the JSON format, you can enhance the data extraction logic to include more structured information. This involves adding more details about the extracted data and organizing it into a more readable and meaningful format.
+
+Here's an updated version of the code to produce a better JSON format:
+
+Revised **main**.py:
+python
+Copy code
+import asyncio
+import time
+import cProfile
+import pstats
+from crawlee.playwright_crawler.playwright_crawler import PlaywrightCrawler
+from .routes import router
+
+async def main() -> None:
+"""The crawler entry point."""
+start_time = time.time()
+
+    crawler = PlaywrightCrawler(
+        request_handler=router,
+        max_requests_per_crawl=50,
+    )
+
+    await crawler.run(
+        [
+            'https://fady.gitbook.io/micro-services-deployments-to-digitalocean',
+        ]
+    )
+
+    end_time = time.time()
+    print(f"Execution Time: {end_time - start_time} seconds")
+
+if **name** == '**main**':
+cProfile.run('asyncio.run(main())', 'profile_output')
+
+    # To view the profiling stats
+    p = pstats.Stats('profile_output')
+    p.sort_stats('cumulative').print_stats(10)
+
+Revised routes.py:
+python
+Copy code
+from crawlee.basic_crawler import Router
+from crawlee.playwright_crawler import PlaywrightCrawlingContext
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+
+router = Router[PlaywrightCrawlingContext]()
+
+@router.default_handler
+async def default_handler(context: PlaywrightCrawlingContext) -> None:
+"""Default request handler."""
+try: # Wait for the content to load
+await context.page.wait_for_load_state('networkidle')
+
+        # Extract the title and meta description
+        title_element = await context.page.query_selector('title')
+        title = await title_element.inner_text() if title_element else None
+        meta_description_element = await context.page.query_selector('meta[name="description"]')
+        meta_description = await meta_description_element.get_attribute('content') if meta_description_element else None
+
+        # Extract all links on the page
+        links = await context.page.evaluate('Array.from(document.links).map(link => link.href)')
+
+        # Structure the extracted data
+        data = {
+            'url': context.request.loaded_url,
+            'title': title,
+            'meta_description': meta_description,
+            'links': links,
+            'content_snippet': (await context.page.content())[:500],  # Include a content snippet for context
+        }
+
+        await context.push_data(data)
+        await context.enqueue_links()
+    except PlaywrightTimeoutError:
+        context.log.error(f"Timeout while processing {context.request.url}")
+    except Exception as e:
+        context.log.error(f"Error processing {context.request.url}: {str(e)}")
+
+Changes Made:
+Detailed Extraction:
+
+Added extraction of the meta description.
+Extracted all links on the page.
+Included a content snippet of the page for more context.
+Structured Data:
+
+Organized the extracted data into a more detailed and structured JSON format.
+Error Handling:
+
+Added error handling to ensure any issues during extraction are logged.
+Running the Code
+After running the script, the JSON output will be more structured and detailed. The new JSON structure will look like this:
+
+json
+Copy code
+[
+{
+"url": "https://fady.gitbook.io/micro-services-deployments-to-digitalocean",
+"title": "Micro-Services Deployments to DigitalOcean",
+"meta_description": "Learn how to deploy micro-services to DigitalOcean.",
+"links": [
+"https://link1.com",
+"https://link2.com",
+...
+],
+"content_snippet": "This is a snippet of the page content for context. ..."
+},
+...
+]
+This structure provides more context and is easier to understand, making it more useful for further analysis or processing.
+
+Import "playwright.async_api" could not be resolvedPylancereportMissingImports
+ChatGPT
+To resolve the playwright.async_api import issue, you need to ensure you have the Playwright package installed correctly and that your development environment is set up to recognize it. Here's a step-by-step guide:
+
+1. Install Playwright
+   First, make sure you have Playwright installed. You can do this using pip:
+
+bash
+Copy code
+pip install playwright 2. Install Playwright Browsers
+After installing Playwright, you need to install the browsers that Playwright supports:
+
+bash
+Copy code
+playwright install 3. Verify Your Environment
+Ensure that your Python environment is correctly set up and that your IDE or code editor is using the correct interpreter.
+
+4. Correct Import Statement
+   Sometimes, issues with import resolution can be resolved by checking the package structure. The correct import for Playwright's async API is:
+
+python
+Copy code
+from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
+Updated Code
+Here's the updated version of the routes.py with the correct import statement:
+
+**main**.py:
+python
+Copy code
+import asyncio
+import time
+import cProfile
+import pstats
+from crawlee.playwright_crawler.playwright_crawler import PlaywrightCrawler
+from .routes import router
+
+async def main() -> None:
+"""The crawler entry point."""
+start_time = time.time()
+
+    crawler = PlaywrightCrawler(
+        request_handler=router,
+        max_requests_per_crawl=50,
+    )
+
+    await crawler.run(
+        [
+            'https://fady.gitbook.io/micro-services-deployments-to-digitalocean',
+        ]
+    )
+
+    end_time = time.time()
+    print(f"Execution Time: {end_time - start_time} seconds")
+
+if **name** == '**main**':
+cProfile.run('asyncio.run(main())', 'profile_output')
+
+    # To view the profiling stats
+    p = pstats.Stats('profile_output')
+    p.sort_stats('cumulative').print_stats(10)
+
+routes.py:
+python
+Copy code
+from crawlee.basic_crawler import Router
+from crawlee.playwright_crawler import PlaywrightCrawlingContext
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+
+router = Router[PlaywrightCrawlingContext]()
+
+@router.default_handler
+async def default_handler(context: PlaywrightCrawlingContext) -> None:
+"""Default request handler."""
+try: # Wait for the content to load
+await context.page.wait_for_load_state('networkidle')
+
+        # Extract the title and meta description
+        title_element = await context.page.query_selector('title')
+        title = await title_element.inner_text() if title_element else None
+        meta_description_element = await context.page.query_selector('meta[name="description"]')
+        meta_description = await meta_description_element.get_attribute('content') if meta_description_element else None
+
+        # Extract all links on the page
+        links = await context.page.evaluate('Array.from(document.links).map(link => link.href)')
+
+        # Structure the extracted data
+        data = {
+            'url': context.request.loaded_url,
+            'title': title,
+            'meta_description': meta_description,
+            'links': links,
+            'content_snippet': (await context.page.content())[:500],  # Include a content snippet for context
+        }
+
+        await context.push_data(data)
+        await context.enqueue_links()
+    except PlaywrightTimeoutError:
+        context.log.error(f"Timeout while processing {context.request.url}")
+    except Exception as e:
+        context.log.error(f"Error processing {context.request.url}: {str(e)}")
+
+Additional Tips
+Restart Your IDE:
+Sometimes, restarting your IDE (like VSCode or PyCharm) can resolve import issues, as it refreshes the environment.
+
+Check Python Path:
+Ensure that your IDE is using the correct Python interpreter where Playwright is installed. You can set this in the settings of your IDE.
+
+Virtual Environment:
+If you're using a virtual environment, make sure it's activated in your terminal or IDE.
+
+By following these steps, you should be able to resolve the import issue and run the code with the enhanced JSON format.
+
+how to contrubte the updated code
+ChatGPT
+Contributing your updated code to an open-source project involves several steps. Here's a general guide on how to contribute to an open-source project on platforms like GitHub:
+
+Step-by-Step Contribution Guide
+Fork the Repository:
+
+Go to the GitHub repository you want to contribute to.
+Click the "Fork" button at the top-right corner of the page. This will create a copy of the repository under your GitHub account.
+Clone the Forked Repository:
+
+Clone the forked repository to your local machine:
+bash
+Copy code
+git clone https://github.com/your-username/repository-name.git
+cd repository-name
+Create a New Branch:
+
+Create a new branch for your changes:
+bash
+Copy code
+git checkout -b enhance-json-format
+Make Your Changes:
+
+Update the **main**.py and routes.py files with the enhanced code.
+Commit Your Changes:
+
+Stage your changes and commit them with a descriptive message:
+bash
+Copy code
+git add **main**.py routes.py
+git commit -m "Enhanced JSON format for data extraction"
+Push Your Changes:
+
+Push the changes to your forked repository:
+bash
+Copy code
+git push origin enhance-json-format
+Create a Pull Request:
+
+Go to the original repository on GitHub.
+Click the "Compare & pull request" button next to your recently pushed branch.
+Provide a descriptive title and description for your pull request, explaining what changes you made and why.
+Submit the pull request.
+Discuss and Review:
+
+Be prepared to engage with the project maintainers. They might ask for changes or clarifications.
+Address any feedback and update your pull request as needed.
+Example
+Let's assume you're contributing to a project named crawlee-playwright-crawler. Here's how your steps might look:
+
+Fork the Repository:
+
+Visit the repository: https://github.com/original-owner/crawlee-playwright-crawler
+Click "Fork".
+Clone the Forked Repository:
+
+bash
+Copy code
+git clone https://github.com/your-username/crawlee-playwright-crawler.git
+cd crawlee-playwright-crawler
+Create a New Branch:
+
+bash
+Copy code
+git checkout -b enhance-json-format
+Make Your Changes:
+
+Update the **main**.py and routes.py files.
+Commit Your Changes:
+
+bash
+Copy code
+git add **main**.py routes.py
+git commit -m "Enhanced JSON format for data extraction"
+Push Your Changes:
+
+bash
+Copy code
+git push origin enhance-json-format
+Create a Pull Request:
+
+Go to https://github.com/original-owner/crawlee-playwright-crawler.
+Click "Compare & pull request" for your enhance-json-format branch.
+Title: Enhanced JSON format for data extraction
+Description:
+diff
+Copy code
+This update enhances the JSON format for the extracted data, providing more structure and additional details.
+
+Changes include:
+
+-   Added meta description extraction.
+-   Included all page links.
+-   Added a content snippet for context.
+-   Improved error handling.
+    Submit the pull request.
+    Helpful Tips
+    Follow Contribution Guidelines: Always check the repository's contribution guidelines (usually found in a CONTRIBUTING.md file) for any specific instructions or coding standards.
+    Write Clear Commit Messages: Make your commit messages descriptive and concise.
+    Engage Respectfully: Be respectful and patient in your interactions with project maintainers and other contributors.
+    By following these steps, you'll be able to contribute your updated code to an open-source project effectively.
+
+## can you enhance the full page without pur new exampke and use the link they using in the tutorial
+
+id: quick-start
+title: Quick start
+
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
+This short tutorial will help you start scraping with Crawlee in just a minute or two. For an in-depth understanding of how Crawlee works, check out the [Introduction](../introduction/index.mdx) section, which provides a comprehensive step-by-step guide to creating your first scraper.
+
+## Choose your crawler
+
+Crawlee offers two main crawler classes: BeautifulSoupCrawler, and PlaywrightCrawler. All crawlers share the same interface, providing maximum flexibility when switching between them.
+
+### BeautifulSoupCrawler
+
+The BeautifulSoupCrawler is a plain HTTP crawler that parses HTML using the well-known [BeautifulSoup](https://pypi.org/project/beautifulsoup4/) library. It crawls the web using an HTTP client that mimics a browser. This crawler is very fast and efficient but cannot handle JavaScript rendering.
+
+### PlaywrightCrawler
+
+The PlaywrightCrawler uses a headless browser controlled by the [Playwright](https://playwright.dev/) library. It can manage Chromium, Firefox, Webkit, and other browsers. Playwright is the successor to the [Puppeteer](https://pptr.dev/) library and is becoming the de facto standard in headless browser automation. If you need a headless browser, choose Playwright.
+
+:::caution before you start
+
+Crawlee requires Python 3.9 or later.
+
+:::
+
+## Installation
+
+Crawlee is available as the [crawlee](https://pypi.org/project/crawlee/) PyPI package.
+
+sh
+pip install crawlee
+
+Additional, optional dependencies unlocking more features are shipped as package extras.
+
+If you plan to use BeautifulSoupCrawler, install crawlee with beautifulsoup extra:
+
+sh
+pip install 'crawlee[beautifulsoup]'
+
+If you plan to use PlaywrightCrawler, install crawlee with the playwright extra:
+
+sh
+pip install 'crawlee[playwright]'
+
+Then, install the Playwright dependencies:
+
+sh
+playwright install
+
+You can install multiple extras at once by using a comma as a separator:
+
+sh
+pip install 'crawlee[beautifulsoup,playwright]'
+
+## Crawling
+
+Run the following example to perform a recursive crawl of the Crawlee website using the selected crawler.
+
+<Tabs groupId="main">
+<TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
+
+python
+import asyncio
+
+from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
+
+async def main() -> None: # BeautifulSoupCrawler crawls the web using HTTP requests and parses HTML using the BeautifulSoup library.
+crawler = BeautifulSoupCrawler(max_requests_per_crawl=50)
+
+    # Define a request handler to process each crawled page and attach it to the crawler using a decorator.
+    @crawler.router.default_handler
+    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
+        # Extract relevant data from the page context.
+        data = {
+            'url': context.request.url,
+            'title': context.soup.title.string if context.soup.title else None,
+        }
+        # Store the extracted data.
+        await context.push_data(data)
+        # Extract links from the current page and add them to the crawling queue.
+        await context.enqueue_links()
+
+    # Add first URL to the queue and start the crawl.
+    await crawler.run(['https://crawlee.dev'])
+
+if **name** == '**main**':
+asyncio.run(main())
+
+</TabItem>
+<TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
+
+python
+import asyncio
+
+from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
+
+async def main() -> None: # PlaywrightCrawler crawls the web using a headless browser controlled by the Playwright library.
+crawler = PlaywrightCrawler()
+
+    # Define a request handler to process each crawled page and attach it to the crawler using a decorator.
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        # Extract relevant data from the page context.
+        data = {
+            'url': context.request.url,
+            'title': await context.page.title(),
+        }
+        # Store the extracted data.
+        await context.push_data(data)
+        # Extract links from the current page and add them to the crawling queue.
+        await context.enqueue_links()
+
+    # Add first URL to the queue and start the crawl.
+    await crawler.run(['https://crawlee.dev'])
+
+if **name** == '**main**':
+asyncio.run(main())
+
+</TabItem>
+</Tabs>
+
+When you run the example, you will see Crawlee automating the data extraction process in your terminal.
+
+{/* TODO: improve the logging and add here a sample */}
+
+## Running headful browser
+
+By default, browsers controlled by Playwright run in headless mode (without a visible window). However, you can configure the crawler to run in a headful mode, which is useful during development phase to observe the browser's actions. You can alsoswitch from the default Chromium browser to Firefox or WebKit.
+
+python
+
+# ...
+
+async def main() -> None:
+crawler = PlaywrightCrawler( # Run with a visible browser window.
+headless=False, # Switch to the Firefox browser.
+browser_type='firefox'
+)
+
+    # ...
+
+When you run the example code, you'll see an automated browser navigating through the Crawlee website.
+
+{/* TODO: add video example */}
+
+## Results
+
+By default, Crawlee stores data in the ./storage directory within your current working directory. The results of your crawl will be saved as JSON files under ./storage/datasets/default/.
+
+To view the results, you can use the cat command:
+
+sh
+cat ./storage/datasets/default/000000001.json
+
+The JSON file will contain data similar to the following:
+
+json
+{
+"url": "https://crawlee.dev/",
+"title": "Crawlee · Build reliable crawlers. Fast. | Crawlee"
+}
+
+:::tip
+
+If you want to change the storage directory, you can set the CRAWLEE_STORAGE_DIR environment variable to your preferred path.
+
+:::
+
+## Examples and further reading
+
+For more examples showcasing various features of Crawlee, visit the [Examples](/docs/examples) section of the documentation. To get a deeper understanding of Crawlee and its components, read the step-by-step [Introduction](../introduction/index.mdx) guide.
+
+[//]: # "TODO: add related links once they are ready"
+
+ChatGPT
+Certainly! I'll enhance the provided PlaywrightCrawler example with an improved JSON format for the extracted data and maintain a clear structure. Here’s the updated example code:
+
+Enhanced PlaywrightCrawler Example
+python
+Copy code
+import asyncio
+from typing import Dict, Any
+from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+
+async def extract_page_data(context: PlaywrightCrawlingContext) -> Dict[str, Any]:
+"""Extract data from the current page."""
+try:
+return {
+'url': context.request.url,
+'title': await context.page.title(),
+'meta_description': await context.page.evaluate('document.querySelector("meta[name=description]")?.content || ""'),
+'links': await context.page.evaluate('Array.from(document.links).map(link => link.href)'),
+'content_snippet': (await context.page.content())[:500]
+}
+except PlaywrightTimeoutError:
+context.log.error(f"Timeout while extracting data from {context.request.url}")
+return {'url': context.request.url, 'error': 'Timeout during extraction'}
+
+@router.default_handler
+async def default_handler(context: PlaywrightCrawlingContext) -> None:
+"""Default request handler."""
+context.log.info(f'Processing {context.request.url} ...')
+try: # Wait for the content to load completely.
+await context.page.wait_for_load_state('networkidle') # Extract data from the page.
+data = await extract_page_data(context) # Store the extracted data.
+await context.push_data(data) # Enqueue all links found on the page.
+await context.enqueue_links()
+except PlaywrightTimeoutError:
+context.log.error(f"Timeout while processing {context.request.url}")
+except Exception as e:
+context.log.error(f"Error processing {context.request.url}: {str(e)}")
+
+async def main() -> None:
+"""The crawler entry point."""
+crawler = PlaywrightCrawler(
+request_handler=router,
+max_requests_per_crawl=50,
+headless=True, # Change to False if you want to see the browser
+browser_type='firefox' # Use Firefox browser
+)
+
+    await crawler.run(['https://fady.gitbook.io/micro-services-deployments-to-digitalocean'])
+
+    # Export the entire dataset to a JSON file.
+    await crawler.export_data('results.json')
+
+    # Log the number of items extracted.
+    data = await crawler.get_data()
+    crawler.log.info(f'Total items extracted: {len(data.items)}')
+
+if **name** == '**main**':
+asyncio.run(main())
+Explanation of Enhancements:
+Improved JSON Format:
+
+meta_description: Extracts the meta description from the page.
+links: Captures all the links on the page.
+content_snippet: Provides a snippet of the page content up to 500 characters.
+Error Handling:
+
+Improved error handling to log timeouts and other exceptions clearly.
+Crawler Configuration:
+
+Configured to use Firefox and run in headless mode for better performance in production.
+Folder Structure
+**main**.py: Main entry point for running the crawler.
+routes.py: Contains the request handler logic.
+Running the Crawler
+To run the crawler, ensure you have the necessary dependencies installed (crawlee and playwright with their extras). Follow these steps:
+
+Install Crawlee:
+
+sh
+Copy code
+pip install 'crawlee[playwright]'
+Install Playwright Dependencies:
+
+sh
+Copy code
+playwright install
+Run the Crawler:
+
+sh
+Copy code
+python -m **main**
+Contributing the Enhanced Code
+Fork the Repository:
+
+Go to the GitHub repository and click the "Fork" button.
+Clone the Forked Repository:
+
+sh
+Copy code
+git clone https://github.com/your-username/repository-name.git
+cd repository-name
+Create a New Branch:
+
+sh
+Copy code
+git checkout -b enhance-json-format
+Make Your Changes:
+
+Update the **main**.py and routes.py files with the enhanced code.
+Commit Your Changes:
+
+sh
+Copy code
+git add **main**.py routes.py
+git commit -m "Enhanced JSON format for data extraction"
+Push Your Changes:
+
+sh
+Copy code
+git push origin enhance-json-format
+Create a Pull Request:
+
+Go to the original repository on GitHub.
+Click the "Compare & pull request" button next to your recently pushed branch.
+Provide a descriptive title and description for your pull request, explaining the changes you made and why.
+Submit the pull request.
+By following these steps, you'll be able to contribute your enhanced code to the open-source project effectively.
+
+can you update this txt main.py and routers ---
+id: quick-start
+title: Quick start
+
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
+This short tutorial will help you start scraping with Crawlee in just a minute or two. For an in-depth understanding of how Crawlee works, check out the [Introduction](../introduction/index.mdx) section, which provides a comprehensive step-by-step guide to creating your first scraper.
+
+## Choose your crawler
+
+Crawlee offers two main crawler classes: BeautifulSoupCrawler, and PlaywrightCrawler. All crawlers share the same interface, providing maximum flexibility when switching between them.
+
+### BeautifulSoupCrawler
+
+The BeautifulSoupCrawler is a plain HTTP crawler that parses HTML using the well-known [BeautifulSoup](https://pypi.org/project/beautifulsoup4/) library. It crawls the web using an HTTP client that mimics a browser. This crawler is very fast and efficient but cannot handle JavaScript rendering.
+
+### PlaywrightCrawler
+
+The PlaywrightCrawler uses a headless browser controlled by the [Playwright](https://playwright.dev/) library. It can manage Chromium, Firefox, Webkit, and other browsers. Playwright is the successor to the [Puppeteer](https://pptr.dev/) library and is becoming the de facto standard in headless browser automation. If you need a headless browser, choose Playwright.
+
+:::caution before you start
+
+Crawlee requires Python 3.9 or later.
+
+:::
+
+## Installation
+
+Crawlee is available as the [crawlee](https://pypi.org/project/crawlee/) PyPI package.
+
+sh
+pip install crawlee
+
+Additional, optional dependencies unlocking more features are shipped as package extras.
+
+If you plan to use BeautifulSoupCrawler, install crawlee with beautifulsoup extra:
+
+sh
+pip install 'crawlee[beautifulsoup]'
+
+If you plan to use PlaywrightCrawler, install crawlee with the playwright extra:
+
+sh
+pip install 'crawlee[playwright]'
+
+Then, install the Playwright dependencies:
+
+sh
+playwright install
+
+You can install multiple extras at once by using a comma as a separator:
+
+sh
+pip install 'crawlee[beautifulsoup,playwright]'
+
+## Crawling
+
+Run the following example to perform a recursive crawl of the Crawlee website using the selected crawler.
+
+<Tabs groupId="main">
+<TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
+
+python
+import asyncio
+
+from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
+
+async def main() -> None: # BeautifulSoupCrawler crawls the web using HTTP requests and parses HTML using the BeautifulSoup library.
+crawler = BeautifulSoupCrawler(max_requests_per_crawl=50)
+
+    # Define a request handler to process each crawled page and attach it to the crawler using a decorator.
+    @crawler.router.default_handler
+    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
+        # Extract relevant data from the page context.
+        data = {
+            'url': context.request.url,
+            'title': context.soup.title.string if context.soup.title else None,
+        }
+        # Store the extracted data.
+        await context.push_data(data)
+        # Extract links from the current page and add them to the crawling queue.
+        await context.enqueue_links()
+
+    # Add first URL to the queue and start the crawl.
+    await crawler.run(['https://crawlee.dev'])
+
+if **name** == '**main**':
+asyncio.run(main())
+
+</TabItem>
+<TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
+
+python
+import asyncio
+
+from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
+
+async def main() -> None: # PlaywrightCrawler crawls the web using a headless browser controlled by the Playwright library.
+crawler = PlaywrightCrawler()
+
+    # Define a request handler to process each crawled page and attach it to the crawler using a decorator.
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        # Extract relevant data from the page context.
+        data = {
+            'url': context.request.url,
+            'title': await context.page.title(),
+        }
+        # Store the extracted data.
+        await context.push_data(data)
+        # Extract links from the current page and add them to the crawling queue.
+        await context.enqueue_links()
+
+    # Add first URL to the queue and start the crawl.
+    await crawler.run(['https://crawlee.dev'])
+
+if **name** == '**main**':
+asyncio.run(main())
+
+</TabItem>
+</Tabs>
+
+When you run the example, you will see Crawlee automating the data extraction process in your terminal.
+
+{/* TODO: improve the logging and add here a sample */}
+
+## Running headful browser
+
+By default, browsers controlled by Playwright run in headless mode (without a visible window). However, you can configure the crawler to run in a headful mode, which is useful during development phase to observe the browser's actions. You can alsoswitch from the default Chromium browser to Firefox or WebKit.
+
+python
+
+# ...
+
+async def main() -> None:
+crawler = PlaywrightCrawler( # Run with a visible browser window.
+headless=False, # Switch to the Firefox browser.
+browser_type='firefox'
+)
+
+    # ...
+
+When you run the example code, you'll see an automated browser navigating through the Crawlee website.
+
+{/* TODO: add video example */}
+
+## Results
+
+By default, Crawlee stores data in the ./storage directory within your current working directory. The results of your crawl will be saved as JSON files under ./storage/datasets/default/.
+
+To view the results, you can use the cat command:
+
+sh
+cat ./storage/datasets/default/000000001.json
+
+The JSON file will contain data similar to the following:
+
+json
+{
+"url": "https://crawlee.dev/",
+"title": "Crawlee · Build reliable crawlers. Fast. | Crawlee"
+}
+
+:::tip
+
+If you want to change the storage directory, you can set the CRAWLEE_STORAGE_DIR environment variable to your preferred path.
+
+:::
+
+## Examples and further reading
+
+For more examples showcasing various features of Crawlee, visit the [Examples](/docs/examples) section of the documentation. To get a deeper understanding of Crawlee and its components, read the step-by-step [Introduction](../introduction/index.mdx) guide.
+
+[//]: # "TODO: add related links once they are ready"
+
+with this code **main.py**:import asyncio
+import time
+import cProfile
+import pstats
+from crawlee.playwright_crawler.playwright_crawler import PlaywrightCrawler
+from .routes import router
+
+async def main() -> None:
+"""The crawler entry point."""
+start_time = time.time()
+
+    crawler = PlaywrightCrawler(
+        request_handler=router,
+        max_requests_per_crawl=50,
+    )
+
+    await crawler.run(
+        [
+            'https://fady.gitbook.io/micro-services-deployments-to-digitalocean',
+        ]
+    )
+
+    end_time = time.time()
+    print(f"Execution Time: {end_time - start_time} seconds")
+
+if **name** == '**main**':
+cProfile.run('asyncio.run(main())', 'profile_output')
+
+    # To view the profiling stats
+    p = pstats.Stats('profile_output')
+    p.sort_stats('cumulative').print_stats(10)
+
+router.py:
+from crawlee.basic_crawler import Router
+from crawlee.playwright_crawler import PlaywrightCrawlingContext
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+
+router = Router[PlaywrightCrawlingContext]()
+
+@router.default_handler
+async def default_handler(context: PlaywrightCrawlingContext) -> None:
+"""Default request handler."""
+try: # Wait for the content to load
+await context.page.wait_for_load_state('networkidle')
+
+        # Extract the title and meta description
+        title_element = await context.page.query_selector('title')
+        title = await title_element.inner_text() if title_element else None
+        meta_description_element = await context.page.query_selector('meta[name="description"]')
+        meta_description = await meta_description_element.get_attribute('content') if meta_description_element else None
+
+        # Extract all links on the page
+        links = await context.page.evaluate('Array.from(document.links).map(link => link.href)')
+
+        # Structure the extracted data
+        data = {
+            'url': context.request.loaded_url,
+            'title': title,
+            'meta_description': meta_description,
+            'links': links,
+            'content_snippet': (await context.page.content())[:500],  # Include a content snippet for context
+        }
+
+        await context.push_data(data)
+        await context.enqueue_links()
+    except PlaywrightTimeoutError:
+        context.log.error(f"Timeout while processing {context.request.url}")
+    except Exception as e:
+        context.log.error(f"Error processing {context.request.url}: {str(e)}")
+
+ChatGPT
+To update the main.py and router.py files for your Crawlee project, we'll integrate the provided information and structure them accordingly.
+
+Updated main.py
+python
+Copy code
+import asyncio
+import time
+import cProfile
+import pstats
+from crawlee.playwright_crawler.playwright_crawler import PlaywrightCrawler
+from .router import router # Assuming router.py is in the same directory as main.py
+
+async def main() -> None:
+"""The crawler entry point."""
+start_time = time.time()
+
+    crawler = PlaywrightCrawler(
+        request_handler=router,  # Using the router defined in router.py
+        max_requests_per_crawl=50,
+    )
+
+    await crawler.run(
+        [
+            'https://fady.gitbook.io/micro-services-deployments-to-digitalocean',
+        ]
+    )
+
+    end_time = time.time()
+    print(f"Execution Time: {end_time - start_time} seconds")
+
+if **name** == '**main**':
+cProfile.run('asyncio.run(main())', 'profile_output')
+
+    # To view the profiling stats
+    p = pstats.Stats('profile_output')
+    p.sort_stats('cumulative').print_stats(10)
+
+Updated router.py
+python
+Copy code
+from crawlee.basic_crawler import Router
+from crawlee.playwright_crawler import PlaywrightCrawlingContext
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+
+router = Router[PlaywrightCrawlingContext]()
+
+@router.default_handler
+async def default_handler(context: PlaywrightCrawlingContext) -> None:
+"""Default request handler."""
+try: # Wait for the content to load
+await context.page.wait_for_load_state('networkidle')
+
+        # Extract the title and meta description
+        title_element = await context.page.query_selector('title')
+        title = await title_element.inner_text() if title_element else None
+        meta_description_element = await context.page.query_selector('meta[name="description"]')
+        meta_description = await meta_description_element.get_attribute('content') if meta_description_element else None
+
+        # Extract all links on the page
+        links = await context.page.evaluate('Array.from(document.links).map(link => link.href)')
+
+        # Structure the extracted data
+        data = {
+            'url': context.request.loaded_url,
+            'title': title,
+            'meta_description': meta_description,
+            'links': links,
+            'content_snippet': (await context.page.content())[:500],  # Include a content snippet for context
+        }
+
+        await context.push_data(data)
+        await context.enqueue_links()
+    except PlaywrightTimeoutError:
+        context.log.error(f"Timeout while processing {context.request.url}")
+    except Exception as e:
+        context.log.error(f"Error processing {context.request.url}: {str(e)}")
+
+Explanation
+main.py: This script initializes a PlaywrightCrawler instance with a specified router for handling requests. It runs a crawl on a single URL and measures execution time using time.time().
+
+router.py: This script defines a Router instance for PlaywrightCrawlingContext and a default request handler default_handler. The handler waits for page load, extracts title, meta description, links, and a content snippet. It then structures this data and pushes it to the context for further processing.
+
+Ensure that your directory structure and imports match your project setup. This setup should integrate smoothly with your Crawlee project to initiate and handle crawling tasks effectively.
+
+i mean update the text tutorial
+ChatGPT
+Certainly! Here's an updated version of your Markdown tutorial text, incorporating the information from the Python scripts (main.py and router.py) you provided:
+
+markdown
+Copy code
+
+---
+
+id: quick-start
+title: Quick start
+
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
+This short tutorial will help you start scraping with Crawlee in just a minute or two. For an in-depth understanding of how Crawlee works, check out the [Introduction](../introduction/index.mdx) section, which provides a comprehensive step-by-step guide to creating your first scraper.
+
+## Choose your crawler
+
+Crawlee offers two main crawler classes: `BeautifulSoupCrawler`, and `PlaywrightCrawler`. All crawlers share the same interface, providing maximum flexibility when switching between them.
+
+### BeautifulSoupCrawler
+
+The `BeautifulSoupCrawler` is a plain HTTP crawler that parses HTML using the well-known [BeautifulSoup](https://pypi.org/project/beautifulsoup4/) library. It crawls the web using an HTTP client that mimics a browser. This crawler is very fast and efficient but cannot handle JavaScript rendering.
+
+### PlaywrightCrawler
+
+The `PlaywrightCrawler` uses a headless browser controlled by the [Playwright](https://playwright.dev/) library. It can manage Chromium, Firefox, Webkit, and other browsers. Playwright is the successor to the [Puppeteer](https://pptr.dev/) library and is becoming the de facto standard in headless browser automation. If you need a headless browser, choose Playwright.
+
+:::caution Before You Start
+Crawlee requires Python 3.9 or later.
+:::
+
+## Installation
+
+Crawlee is available as the [`crawlee`](https://pypi.org/project/crawlee/) PyPI package.
+
+````sh
+pip install crawlee
+Additional, optional dependencies unlocking more features are shipped as package extras.
+
+If you plan to use BeautifulSoupCrawler, install crawlee with beautifulsoup extra:
+
+sh
+Copy code
+pip install 'crawlee[beautifulsoup]'
+If you plan to use PlaywrightCrawler, install crawlee with the playwright extra:
+
+sh
+Copy code
+pip install 'crawlee[playwright]'
+Then, install the Playwright dependencies:
+
+sh
+Copy code
+playwright install
+You can install multiple extras at once by using a comma as a separator:
+
+sh
+Copy code
+pip install 'crawlee[beautifulsoup,playwright]'
+Crawling with Crawlee
+To start crawling with Crawlee, you can use either the BeautifulSoupCrawler or the PlaywrightCrawler. Below are examples of how to use each crawler:
+
+<Tabs groupId="main">
+<TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
+python
+Copy code
+import asyncio
+from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
+
+async def main() -> None:
+    # Create an instance of BeautifulSoupCrawler
+    crawler = BeautifulSoupCrawler(max_requests_per_crawl=50)
+
+    # Define a request handler to process each crawled page
+    @crawler.router.default_handler
+    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
+        # Extract relevant data from the page context
+        data = {
+            'url': context.request.url,
+            'title': context.soup.title.string if context.soup.title else None,
+        }
+        # Store the extracted data
+        await context.push_data(data)
+        # Extract links from the current page and add them to the crawling queue
+        await context.enqueue_links()
+
+    # Add the initial URL to the queue and start the crawl
+    await crawler.run(['https://example.com'])
+
+if __name__ == '__main__':
+    asyncio.run(main())
+</TabItem>
+<TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
+python
+Copy code
+import asyncio
+from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
+
+async def main() -> None:
+    # Create an instance of PlaywrightCrawler
+    crawler = PlaywrightCrawler()
+
+    # Define a request handler to process each crawled page
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        # Extract relevant data from the page context
+        data = {
+            'url': context.request.url,
+            'title': await context.page.title(),
+        }
+        # Store the extracted data
+        await context.push_data(data)
+        # Extract links from the current page and add them to the crawling queue
+        await context.enqueue_links()
+
+    # Add the initial URL to the queue and start the crawl
+    await crawler.run(['https://example.com'])
+
+if __name__ == '__main__':
+    asyncio.run(main())
+</TabItem>
+</Tabs>
+When you run the example, Crawlee will automate the data extraction process according to the selected crawler type.
+
+Customizing Crawling Behavior
+You can customize Crawlee's behavior by adjusting parameters such as max_requests_per_crawl and handling various exceptions that may occur during crawling.
+
+python
+Copy code
+# Example of customizing the PlaywrightCrawler
+async def main() -> None:
+    crawler = PlaywrightCrawler(
+        max_requests_per_crawl=50,
+        headless=False,  # Run with a visible browser window
+        browser_type='firefox'  # Use Firefox browser
+    )
+
+    # Add more customization as needed
+    # ...
+
+    await crawler.run(['https://example.com'])
+Viewing Results
+By default, Crawlee stores data in the ./storage directory within your current working directory. Results of the crawl will be saved as JSON files under ./storage/datasets/default/.
+
+To view the results, you can use commands like cat or open the JSON files directly:
+
+sh
+Copy code
+cat ./storage/datasets/default/000000001.json
+Further Reading
+For more examples and in-depth documentation on Crawlee, visit the Crawlee Documentation and explore the Examples section.
+
+This updated tutorial integrates the provided Python code examples (main.py and router.py) and provides clear instructions on how to install Crawlee, choose between crawler options, customize crawling behavior, and view the extracted data results. Adjustments can be made based on your specific project requirements and preferences.
+
+can you read the example of  the tutorial  ---
+id: quick-start
+title: Quick start
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+This short tutorial will help you start scraping with Crawlee in just a minute or two. For an in-depth understanding of how Crawlee works, check out the [Introduction](../introduction/index.mdx) section, which provides a comprehensive step-by-step guide to creating your first scraper.
+
+## Choose your crawler
+
+Crawlee offers two main crawler classes: BeautifulSoupCrawler, and PlaywrightCrawler. All crawlers share the same interface, providing maximum flexibility when switching between them.
+
+### BeautifulSoupCrawler
+
+The BeautifulSoupCrawler is a plain HTTP crawler that parses HTML using the well-known [BeautifulSoup](https://pypi.org/project/beautifulsoup4/) library. It crawls the web using an HTTP client that mimics a browser. This crawler is very fast and efficient but cannot handle JavaScript rendering.
+
+### PlaywrightCrawler
+
+The PlaywrightCrawler uses a headless browser controlled by the [Playwright](https://playwright.dev/) library. It can manage Chromium, Firefox, Webkit, and other browsers. Playwright is the successor to the [Puppeteer](https://pptr.dev/) library and is becoming the de facto standard in headless browser automation. If you need a headless browser, choose Playwright.
+
+:::caution before you start
+
+Crawlee requires Python 3.9 or later.
+
+:::
+
+## Installation
+
+Crawlee is available as the [crawlee](https://pypi.org/project/crawlee/) PyPI package.
+
+sh
+pip install crawlee
+
+
+Additional, optional dependencies unlocking more features are shipped as package extras.
+
+If you plan to use BeautifulSoupCrawler, install crawlee with beautifulsoup extra:
+
+sh
+pip install 'crawlee[beautifulsoup]'
+
+
+If you plan to use PlaywrightCrawler, install crawlee with the playwright extra:
+
+sh
+pip install 'crawlee[playwright]'
+
+
+Then, install the Playwright dependencies:
+
+sh
+playwright install
+
+
+You can install multiple extras at once by using a comma as a separator:
+
+sh
+pip install 'crawlee[beautifulsoup,playwright]'
+
+
+## Crawling
+
+Run the following example to perform a recursive crawl of the Crawlee website using the selected crawler.
+
+<Tabs groupId="main">
+<TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
+
+python
+import asyncio
+
+from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
+
+
+async def main() -> None:
+    # BeautifulSoupCrawler crawls the web using HTTP requests and parses HTML using the BeautifulSoup library.
+    crawler = BeautifulSoupCrawler(max_requests_per_crawl=50)
+
+    # Define a request handler to process each crawled page and attach it to the crawler using a decorator.
+    @crawler.router.default_handler
+    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
+        # Extract relevant data from the page context.
+        data = {
+            'url': context.request.url,
+            'title': context.soup.title.string if context.soup.title else None,
+        }
+        # Store the extracted data.
+        await context.push_data(data)
+        # Extract links from the current page and add them to the crawling queue.
+        await context.enqueue_links()
+
+    # Add first URL to the queue and start the crawl.
+    await crawler.run(['https://crawlee.dev'])
+
+
+if __name__ == '__main__':
+    asyncio.run(main())
+
+
+</TabItem>
+<TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
+
+python
+import asyncio
+
+from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
+
+
+async def main() -> None:
+    # PlaywrightCrawler crawls the web using a headless browser controlled by the Playwright library.
+    crawler = PlaywrightCrawler()
+
+    # Define a request handler to process each crawled page and attach it to the crawler using a decorator.
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        # Extract relevant data from the page context.
+        data = {
+            'url': context.request.url,
+            'title': await context.page.title(),
+        }
+        # Store the extracted data.
+        await context.push_data(data)
+        # Extract links from the current page and add them to the crawling queue.
+        await context.enqueue_links()
+
+    # Add first URL to the queue and start the crawl.
+    await crawler.run(['https://crawlee.dev'])
+
+
+if __name__ == '__main__':
+    asyncio.run(main())
+
+
+</TabItem>
+</Tabs>
+
+When you run the example, you will see Crawlee automating the data extraction process in your terminal.
+
+{/* TODO: improve the logging and add here a sample */}
+
+## Running headful browser
+
+By default, browsers controlled by Playwright run in headless mode (without a visible window). However, you can configure the crawler to run in a headful mode, which is useful during development phase to observe the browser's actions. You can alsoswitch from the default Chromium browser to Firefox or WebKit.
+
+python
+# ...
+
+async def main() -> None:
+    crawler = PlaywrightCrawler(
+        # Run with a visible browser window.
+        headless=False,
+        # Switch to the Firefox browser.
+        browser_type='firefox'
+    )
+
+    # ...
+
+
+When you run the example code, you'll see an automated browser navigating through the Crawlee website.
+
+{/* TODO: add video example */}
+
+## Results
+
+By default, Crawlee stores data in the ./storage directory within your current working directory. The results of your crawl will be saved as JSON files under ./storage/datasets/default/.
+
+To view the results, you can use the cat command:
+
+sh
+cat ./storage/datasets/default/000000001.json
+
+
+The JSON file will contain data similar to the following:
+
+json
+{
+    "url": "https://crawlee.dev/",
+    "title": "Crawlee · Build reliable crawlers. Fast. | Crawlee"
+}
+
+
+:::tip
+
+If you want to change the storage directory, you can set the CRAWLEE_STORAGE_DIR environment variable to your preferred path.
+
+:::
+
+## Examples and further reading
+
+For more examples showcasing various features of Crawlee, visit the [Examples](/docs/examples) section of the documentation. To get a deeper understanding of Crawlee and its components, read the step-by-step [Introduction](../introduction/index.mdx) guide.
+
+[//]: # (TODO: add related links once they are ready)  and write same one with the same steps but i want you to enhance the main.py and the routers respectivetly with the following code :
+import asyncio import time import cProfile import pstats from crawlee.playwright_crawler.playwright_crawler import PlaywrightCrawler from .routes import router  async def main() -> None:     """The crawler entry point."""     start_time = time.time()      crawler = PlaywrightCrawler(         request_handler=router,         max_requests_per_crawl=50,     )      await crawler.run(         [             'https://fady.gitbook.io/micro-services-deployments-to-digitalocean',         ]     )      end_time = time.time()     print(f"Execution Time: {end_time - start_time} seconds")  if __name__ == '__main__':     cProfile.run('asyncio.run(main())', 'profile_output')      # To view the profiling stats     p = pstats.Stats('profile_output')     p.sort_stats('cumulative').print_stats(10) ,
+from crawlee.basic_crawler import Router
+from crawlee.playwright_crawler import PlaywrightCrawlingContext
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+
+router = Router[PlaywrightCrawlingContext]()
+
+@router.default_handler
+async def default_handler(context: PlaywrightCrawlingContext) -> None:
+    """Default request handler."""
+    try:
+        # Wait for the content to load
+        await context.page.wait_for_load_state('networkidle')
+
+        # Extract the title and meta description
+        title_element = await context.page.query_selector('title')
+        title = await title_element.inner_text() if title_element else None
+        meta_description_element = await context.page.query_selector('meta[name="description"]')
+        meta_description = await meta_description_element.get_attribute('content') if meta_description_element else None
+
+        # Extract all links on the page
+        links = await context.page.evaluate('Array.from(document.links).map(link => link.href)')
+
+        # Structure the extracted data
+        data = {
+            'url': context.request.loaded_url,
+            'title': title,
+            'meta_description': meta_description,
+            'links': links,
+            'content_snippet': (await context.page.content())[:500],  # Include a content snippet for context
+        }
+
+        await context.push_data(data)
+        await context.enqueue_links()
+    except PlaywrightTimeoutError:
+        context.log.error(f"Timeout while processing {context.request.url}")
+    except Exception as e:
+        context.log.error(f"Error processing {context.request.url}: {str(e)}")
+ChatGPT
+Sure! Here's the enhanced tutorial with the updated code snippets for main.py and router.py:
+
+markdown
+Copy code
+---
+id: quick-start
+title: Quick start
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+This short tutorial will help you start scraping with Crawlee in just a minute or two. For an in-depth understanding of how Crawlee works, check out the [Introduction](../introduction/index.mdx) section, which provides a comprehensive step-by-step guide to creating your first scraper.
+
+## Choose your crawler
+
+Crawlee offers two main crawler classes: `BeautifulSoupCrawler`, and `PlaywrightCrawler`. All crawlers share the same interface, providing maximum flexibility when switching between them.
+
+### BeautifulSoupCrawler
+
+The `BeautifulSoupCrawler` is a plain HTTP crawler that parses HTML using the well-known [BeautifulSoup](https://pypi.org/project/beautifulsoup4/) library. It crawls the web using an HTTP client that mimics a browser. This crawler is very fast and efficient but cannot handle JavaScript rendering.
+
+### PlaywrightCrawler
+
+The `PlaywrightCrawler` uses a headless browser controlled by the [Playwright](https://playwright.dev/) library. It can manage Chromium, Firefox, Webkit, and other browsers. Playwright is the successor to the [Puppeteer](https://pptr.dev/) library and is becoming the de facto standard in headless browser automation. If you need a headless browser, choose Playwright.
+
+:::caution Before You Start
+Crawlee requires Python 3.9 or later.
+:::
+
+## Installation
+
+Crawlee is available as the [`crawlee`](https://pypi.org/project/crawlee/) PyPI package.
+
+```sh
+pip install crawlee
+Additional, optional dependencies unlocking more features are shipped as package extras.
+
+If you plan to use BeautifulSoupCrawler, install crawlee with beautifulsoup extra:
+
+sh
+Copy code
+pip install 'crawlee[beautifulsoup]'
+If you plan to use PlaywrightCrawler, install crawlee with the playwright extra:
+
+sh
+Copy code
+pip install 'crawlee[playwright]'
+Then, install the Playwright dependencies:
+
+sh
+Copy code
+playwright install
+You can install multiple extras at once by using a comma as a separator:
+
+sh
+Copy code
+pip install 'crawlee[beautifulsoup,playwright]'
+Crawling
+Run the following example to perform a recursive crawl of the Crawlee website using the selected crawler.
+
+<Tabs groupId="main">
+<TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
+python
+Copy code
+import asyncio
+
+from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
+
+
+async def main() -> None:
+    # BeautifulSoupCrawler crawls the web using HTTP requests and parses HTML using the BeautifulSoup library.
+    crawler = BeautifulSoupCrawler(max_requests_per_crawl=50)
+
+    # Define a request handler to process each crawled page and attach it to the crawler using a decorator.
+    @crawler.router.default_handler
+    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
+        # Extract relevant data from the page context.
+        data = {
+            'url': context.request.url,
+            'title': context.soup.title.string if context.soup.title else None,
+        }
+        # Store the extracted data.
+        await context.push_data(data)
+        # Extract links from the current page and add them to the crawling queue.
+        await context.enqueue_links()
+
+    # Add first URL to the queue and start the crawl.
+    await crawler.run(['https://crawlee.dev'])
+
+
+if __name__ == '__main__':
+    asyncio.run(main())
+</TabItem>
+<TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
+python
+Copy code
+import asyncio
+import time
+import cProfile
+import pstats
+from crawlee.playwright_crawler.playwright_crawler import PlaywrightCrawler
+from .router import router
+
+async def main() -> None:
+    """The crawler entry point."""
+    start_time = time.time()
+
+    crawler = PlaywrightCrawler(
+        request_handler=router,
+        max_requests_per_crawl=50,
+    )
+
+    await crawler.run(
+        [
+            'https://fady.gitbook.io/micro-services-deployments-to-digitalocean',
+        ]
+    )
+
+    end_time = time.time()
+    print(f"Execution Time: {end_time - start_time} seconds")
+
+if __name
+python
+Copy code
+if __name__ ==
+continue
+ChatGPT
+python
+Copy code
+if __name__ == '__main__':
+    cProfile.run('asyncio.run(main())', 'profile_output')
+
+    # To view the profiling stats
+    p = pstats.Stats('profile_output')
+    p.sort_stats('cumulative').print_stats(10)
+</TabItem>
+</Tabs>
+When you run the example, you will see Crawlee automating the data extraction process in your terminal.
+
+{/* TODO: improve the logging and add here a sample */}
+
+Running headful browser
+By default, browsers controlled by Playwright run in headless mode (without a visible window). However, you can configure the crawler to run in a headful mode, which is useful during development phase to observe the browser's actions. You can also switch from the default Chromium browser to Firefox or WebKit.
+
+python
+Copy code
+# ...
+
+async def main() -> None:
+    crawler = PlaywrightCrawler(
+        # Run with a visible browser window.
+        headless=False,
+        # Switch to the Firefox browser.
+        browser_type='firefox'
+    )
+
+    # ...
+When you run the example code, you'll see an automated browser navigating through the Crawlee website.
+
+{/* TODO: add video example */}
+
+Results
+By default, Crawlee stores data in the ./storage directory within your current working directory. The results of your crawl will be saved as JSON files under ./storage/datasets/default/.
+
+To view the results, you can use the cat command:
+
+sh
+Copy code
+cat ./storage/datasets/default/000000001.json
+The JSON file will contain data similar to the following:
+
+json
+Copy code
+{
+    "url": "https://fady.gitbook.io/micro-services-deployments-to-digitalocean",
+    "title": "Micro Services Deployments to DigitalOcean"
+}
+If you want to change the storage directory, you can set the CRAWLEE_STORAGE_DIR environment variable to your preferred path.
+
+Examples and further reading
+For more examples showcasing various features of Crawlee, visit the Examples section of the documentation. To get a deeper understanding of Crawlee and its components, read the step-by-step Introduction guide.
+
+python
+Copy code
+
+```python
+# router.py
+
+from crawlee.basic_crawler import Router
+from crawlee.playwright_crawler import PlaywrightCrawlingContext
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+
+router = Router[PlaywrightCrawlingContext]()
+
+@router.default_handler
+async def default_handler(context: PlaywrightCrawlingContext) -> None:
+    """Default request handler."""
+    try:
+        # Wait for the content to load
+        await context.page.wait_for_load_state('networkidle')
+
+        # Extract the title and meta description
+        title_element = await context.page.query_selector('title')
+        title = await title_element.inner_text() if title_element else None
+        meta_description_element = await context.page.query_selector('meta[name="description"]')
+        meta_description = await meta_description_element.get_attribute('content') if meta_description_element else None
+
+        # Extract all links on the page
+        links = await context.page.evaluate('Array.from(document.links).map(link => link.href)')
+
+        # Structure the extracted data
+        data = {
+            'url': context.request.loaded_url,
+            'title': title,
+            'meta_description': meta_description,
+            'links': links,
+            'content_snippet': (await context.page.content())[:500],  # Include a content snippet for context
+        }
+
+        await context.push_data(data)
+        await context.enqueue_links()
+    except PlaywrightTimeoutError:
+        context.log.error(f"Timeout while processing {context.request.url}")
+    except Exception as e:
+        context.log.error(f"Error processing {context.request.url}: {str(e)}")
+In this enhanced version, we have updated the main.py to include profiling and time measurement, and updated the router.py to handle request processing and error logging more effectively. This ensures better performance and reliability in your crawling tasks.
+
+can you rewirite and recheck to make sure it works exactly as the original just extract the fils in a readble format make sure the fie is compatible with index.mdx format
+ChatGPT
+Sure, here's the updated tutorial with the enhanced code and instructions formatted to ensure compatibility with the index.mdx format:
+
+id: quick-start
+title: Quick start
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+This short tutorial will help you start scraping with Crawlee in just a minute or two. For an in-depth understanding of how Crawlee works, check out the Introduction section, which provides a comprehensive step-by-step guide to creating your first scraper.
+
+Choose your crawler
+Crawlee offers two main crawler classes: BeautifulSoupCrawler, and PlaywrightCrawler. All crawlers share the same interface, providing maximum flexibility when switching between them.
+
+BeautifulSoupCrawler
+The BeautifulSoupCrawler is a plain HTTP crawler that parses HTML using the well-known BeautifulSoup library. It crawls the web using an HTTP client that mimics a browser. This crawler is very fast and efficient but cannot handle JavaScript rendering.
+
+PlaywrightCrawler
+The PlaywrightCrawler uses a headless browser controlled by the Playwright library. It can manage Chromium, Firefox, Webkit, and other browsers. Playwright is the successor to the Puppeteer library and is becoming the de facto standard in headless browser automation. If you need a headless browser, choose Playwright.
+
+:::caution before you start
+
+Crawlee requires Python 3.9 or later.
+
+:::
+
+Installation
+Crawlee is available as the crawlee PyPI package.
+
+sh
+Copy code
+pip install crawlee
+Additional, optional dependencies unlocking more features are shipped as package extras.
+
+If you plan to use BeautifulSoupCrawler, install crawlee with beautifulsoup extra:
+
+sh
+Copy code
+pip install 'crawlee[beautifulsoup]'
+If you plan to use PlaywrightCrawler, install crawlee with the playwright extra:
+
+sh
+Copy code
+pip install 'crawlee[playwright]'
+Then, install the Playwright dependencies:
+
+sh
+Copy code
+playwright install
+You can install multiple extras at once by using a comma as a separator:
+
+sh
+Copy code
+pip install 'crawlee[beautifulsoup,playwright]'
+Crawling
+Run the following example to perform a recursive crawl of the Crawlee website using the selected crawler.
+
+<Tabs groupId="main">
+<TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
+python
+Copy code
+import asyncio
+
+from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
+
+
+async def main() -> None:
+    # BeautifulSoupCrawler crawls the web using HTTP requests and parses HTML using the BeautifulSoup library.
+    crawler = BeautifulSoupCrawler(max_requests_per_crawl=50)
+
+    # Define a request handler to process each crawled page and attach it to the crawler using a decorator.
+    @crawler.router.default_handler
+    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
+        # Extract relevant data from the page context.
+        data = {
+            'url': context.request.url,
+            'title': context.soup.title.string if context.soup.title else None,
+        }
+        # Store the extracted data.
+        await context.push_data(data)
+        # Extract links from the current page and add them to the crawling queue.
+        await context.enqueue_links()
+
+    # Add first URL to the queue and start the crawl.
+    await crawler.run(['https://crawlee.dev'])
+
+
+if __name__ == '__main__':
+    asyncio.run(main())
+</TabItem>
+<TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
+python
+Copy code
+import asyncio
+import time
+import cProfile
+import pstats
+from crawlee.playwright_crawler import PlaywrightCrawler
+from .routes import router
+
+
+async def main() -> None:
+    """The crawler entry point."""
+    start_time = time.time()
+
+    crawler = PlaywrightCrawler(
+        request_handler=router,
+        max_requests_per_crawl=50,
+    )
+
+    await crawler.run(
+        [
+            'https://fady.gitbook.io/micro-services-deployments-to-digitalocean',
+        ]
+    )
+
+    end_time = time.time()
+    print(f"Execution Time: {end_time - start_time} seconds")
+
+
+if __name__ == '__main__':
+    cProfile.run('asyncio.run(main())', 'profile_output')
+
+    # To view the profiling stats
+    p = pstats.Stats('profile_output')
+    p.sort_stats('cumulative').print_stats(10)
+</TabItem>
+</Tabs>
+When you run the example, you will see Crawlee automating the data extraction process in your terminal.
+
+{/* TODO: improve the logging and add here a sample */}
+
+Running headful browser
+By default, browsers controlled by Playwright run in headless mode (without a visible window). However, you can configure the crawler to run in a headful mode, which is useful during development phase to observe the browser's actions. You can also switch from the default Chromium browser to Firefox or WebKit.
+
+python
+Copy code
+# ...
+
+async def main() -> None:
+    crawler = PlaywrightCrawler(
+        # Run with a visible browser window.
+        headless=False,
+        # Switch to the Firefox browser.
+        browser_type='firefox'
+    )
+
+    # ...
+When you run the example code, you'll see an automated browser navigating through the Crawlee website.
+
+{/* TODO: add video example */}
+
+Results
+By default, Crawlee stores data in the ./storage directory within your current working directory. The results of your crawl will be saved as JSON files under ./storage/datasets/default/.
+
+To view the results, you can use the cat command:
+
+sh
+Copy code
+cat ./storage/datasets/default/000000001.json
+The JSON file will contain data similar to the following:
+
+json
+Copy code
+{
+    "url": "https://fady.gitbook.io/micro-services-deployments-to-digitalocean",
+    "title": "Micro Services Deployments to DigitalOcean"
+}
+If you want to change the storage directory, you can set the CRAWLEE_STORAGE_DIR environment variable to your preferred path.
+
+Examples and further reading
+For more examples showcasing various features of Crawlee, visit the Examples section of the documentation. To get a deeper understanding of Crawlee and its components, read the step-by-step Introduction guide.
+````
