@@ -139,7 +139,7 @@ async def main() -> None:
 
     # Or work with the data directly.
     data = await crawler.get_data()
-    crawler._logger.info(f'Extracted data: {data.items}')
+    crawler.log.info(f'Extracted data: {data.items}')
 
 
 if __name__ == '__main__':
