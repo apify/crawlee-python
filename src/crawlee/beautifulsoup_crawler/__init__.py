@@ -6,3 +6,9 @@ except ImportError as exc:
         'To import anything from this subpacakge, you need to install the "beautifulsoup" extra. '
         'For example, if you use pip, run "pip install crawlee[beautifulsoup]".',
     ) from exc
+
+
+__all__ = [
+    'BeautifulSoupCrawler',
+    'BeautifulSoupCrawlingContext',
+]

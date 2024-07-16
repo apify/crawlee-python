@@ -6,3 +6,9 @@ except ImportError as exc:
         'To import anything from this subpacakge, you need to install the "playwright" extra. '
         'For example, if you use pip, run "pip install crawlee[playwright]".',
     ) from exc
+
+
+__all__ = [
+    'PlaywrightCrawlingContext',
+    'PlaywrightCrawler',
+]
