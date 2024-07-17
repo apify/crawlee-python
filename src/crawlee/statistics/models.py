@@ -31,7 +31,6 @@ class FinalStatistics:
     def __str__(self) -> str:
         return json.dumps(
             {k: v.total_seconds() if isinstance(v, timedelta) else v for k, v in asdict(self).items()},
-            indent=2,
         )
 
 
