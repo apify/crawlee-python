@@ -11,7 +11,6 @@ from pydantic import AnyHttpUrl, TypeAdapter
 from typing_extensions import Protocol
 
 from crawlee._utils.crypto import crypto_random_object_id
-from crawlee.configuration import Configuration
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Sequence
@@ -113,9 +112,19 @@ class ProxyConfiguration:
         proxy_urls: list[str] | None = None,
         new_url_function: NewUrlFunction | None = None,
         tiered_proxy_urls: list[list[str]] | None = None,
-        configuration: Configuration | None = None,
     ) -> None:
-        self._configuration = configuration or Configuration.get_global_configuration()
+        """Initialize a proxy configuration object.
+
+        Exactly one of `proxy_urls`, `tiered_proxy_urls` and `new_url_function` must be specified.
+
+        Args:
+            proxy_urls: A list of URLs of proxies that will be rotated in a round-robin fashion
+            tiered_proxy_urls: A list of URL tiers (where a tier is a list of proxy URLs). Crawlers will automatically
+                try to use the left-most (lowest index) tier where blocking does not happen. The proxy URLs in
+                the selected tier will be rotated in a round-robin fashion.
+            new_url_function: A function that returns a proxy URL for a given Request. This provides full control over
+                the proxy selection mechanism.
+        """
         self._next_custom_url_index = 0
         self._used_proxy_urls = dict[str, URL]()
         self._url_validator = TypeAdapter(AnyHttpUrl)
