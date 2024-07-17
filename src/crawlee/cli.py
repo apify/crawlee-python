@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated, Optional, cast
 
 import httpx
 import inquirer  # type: ignore
@@ -71,11 +71,14 @@ def _prompt_for_template() -> str:
     template_choices = [item['name'] for item in response.json() if item['type'] == 'dir']
 
     # Prompt for template choice
-    return ConsoleRender().render(
-        inquirer.List(
-            name='template',
-            message='Please select the template for your new Crawlee project',
-            choices=[(choice[0].upper() + choice[1:], choice) for choice in template_choices],
+    return cast(
+        str,
+        ConsoleRender().render(
+            inquirer.List(
+                name='template',
+                message='Please select the template for your new Crawlee project',
+                choices=[(choice[0].upper() + choice[1:], choice) for choice in template_choices],
+            ),
         ),
     )
 
