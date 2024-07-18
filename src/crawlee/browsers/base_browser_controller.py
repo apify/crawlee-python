@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from collections.abc import MutableMapping
+    from collections.abc import Mapping
     from datetime import datetime, timedelta
 
     from playwright.async_api import Page
@@ -53,7 +53,7 @@ class BaseBrowserController(ABC):
     @abstractmethod
     async def new_page(
         self,
-        page_options: MutableMapping[str, Any] | None = None,
+        page_options: Mapping[str, Any] | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> Page:
         """Create a new page with the given context options.

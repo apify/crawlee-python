@@ -11,7 +11,7 @@ from typing_extensions import override
 from crawlee.browsers.base_browser_controller import BaseBrowserController
 
 if TYPE_CHECKING:
-    from collections.abc import MutableMapping
+    from collections.abc import Mapping
 
     from playwright.async_api import Browser
 
@@ -73,10 +73,10 @@ class PlaywrightBrowserController(BaseBrowserController):
     @override
     async def new_page(
         self,
-        page_options: MutableMapping[str, Any] | None = None,
+        page_options: Mapping[str, Any] | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> Page:
-        page_options = page_options or {}
+        page_options: dict = dict(page_options) or {}
 
         # If "proxy_info" is provided and no proxy is already set in "page_options", configure the proxy.
         if proxy_info and 'proxy' not in page_options:

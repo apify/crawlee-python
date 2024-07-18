@@ -17,7 +17,7 @@ from crawlee.browsers.playwright_browser_plugin import PlaywrightBrowserPlugin
 from crawlee.browsers.types import CrawleePage
 
 if TYPE_CHECKING:
-    from collections.abc import MutableMapping, Sequence
+    from collections.abc import Mapping, Sequence
     from types import TracebackType
 
     from crawlee.browsers.base_browser_plugin import BaseBrowserPlugin
@@ -131,7 +131,7 @@ class BrowserPool:
         return self._inactive_browsers
 
     @property
-    def pages(self) -> MutableMapping[str, CrawleePage]:
+    def pages(self) -> Mapping[str, CrawleePage]:
         """Return the pages in the pool."""
         return self._pages
 
