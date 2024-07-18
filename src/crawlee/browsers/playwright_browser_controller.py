@@ -78,8 +78,8 @@ class PlaywrightBrowserController(BaseBrowserController):
     ) -> Page:
         page_options = page_options or {}
 
-        # Add proxy configuration to the page options if provided.
-        if proxy_info:
+        # If "proxy_info" is provided and no proxy is already set in "page_options", configure the proxy.
+        if proxy_info and 'proxy' not in page_options:
             page_options['proxy'] = {
                 'server': f'{proxy_info.scheme}://{proxy_info.hostname}:{proxy_info.port}',
                 'username': proxy_info.username,
