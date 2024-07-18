@@ -76,7 +76,7 @@ class PlaywrightBrowserController(BaseBrowserController):
         page_options: Mapping[str, Any] | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> Page:
-        page_options: dict = dict(page_options) or {}
+        page_options = dict(page_options) if page_options else {}
 
         # If "proxy_info" is provided and no proxy is already set in "page_options", configure the proxy.
         if proxy_info and 'proxy' not in page_options:
