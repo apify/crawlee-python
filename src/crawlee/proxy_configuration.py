@@ -120,7 +120,7 @@ class ProxyConfiguration:
         Args:
             proxy_urls: A list of URLs of proxies that will be rotated in a round-robin fashion
             tiered_proxy_urls: A list of URL tiers (where a tier is a list of proxy URLs). Crawlers will automatically
-                try to use the left-most (lowest index) tier where blocking does not happen. The proxy URLs in
+                try to use the lowest tier (smallest index) where blocking does not happen. The proxy URLs in
                 the selected tier will be rotated in a round-robin fashion.
             new_url_function: A function that returns a proxy URL for a given Request. This provides full control over
                 the proxy selection mechanism.
