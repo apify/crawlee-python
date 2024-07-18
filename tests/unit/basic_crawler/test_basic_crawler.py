@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
@@ -577,3 +578,9 @@ async def test_max_requests_per_crawl(httpbin: str) -> None:
     assert len(processed_urls) == 3
     assert stats.requests_total == 3
     assert stats.requests_finished == 3
+
+
+def test_crawler_log() -> None:
+    crawler = BasicCrawler()
+    assert isinstance(crawler.log, logging.Logger)
+    crawler.log.info('Test log message')
