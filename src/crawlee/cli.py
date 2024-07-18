@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated, Union
+from typing import Annotated, Optional, cast
 
 import httpx
 import inquirer  # type: ignore
 import typer
 from cookiecutter.main import cookiecutter  # type: ignore
+from inquirer.render.console import ConsoleRender  # type: ignore
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 TEMPLATE_LIST_URL = 'https://api.github.com/repos/apify/crawlee-python/contents/templates'
@@ -34,73 +35,76 @@ def callback(
         typer.echo(__version__)
 
 
-@cli.command()
-def create(
-    project_name: Annotated[
-        Union[str | None],
-        typer.Argument(
-            help='The name of the project and the directory that will be created to contain it. '
-            'If none is given, you will be prompted.'
-        ),
-    ] = None,
-    template: Annotated[
-        Union[str | None],
-        typer.Option(help='The template to be used to create the project. If none is given, you will be prompted.'),
-    ] = None,
-) -> None:
-    """Bootstrap a new Crawlee project."""
-    try:
-        # Prompt for project name if not provided.
-        if project_name is None:
-            answers = (
-                inquirer.prompt(
-                    [
-                        inquirer.Text(
-                            name='project_name',
-                            message='Name of the new project folder',
-                            validate=lambda _, value: bool(value.strip()),
-                        ),
-                    ]
-                )
-                or {}
+def _prompt_for_project_name(initial_project_name: str | None) -> str:
+    """Prompt the user for a non-empty project name that does not lead to an existing folder."""
+    while True:
+        if initial_project_name is not None:
+            project_name = initial_project_name
+            initial_project_name = None
+        else:
+            project_name = ConsoleRender().render(
+                inquirer.Text(
+                    name='project_name',
+                    message='Name of the new project folder',
+                    validate=lambda _, value: bool(value.strip()),
+                ),
             )
 
-            project_name = answers.get('project_name')
-
-            if not project_name:
-                typer.echo('Project name is required.', err=True)
-                raise typer.Exit(1)
+        if not project_name:
+            typer.echo('Project name is required.', err=True)
+            continue
 
         project_path = Path.cwd() / project_name
 
         if project_path.exists():
             typer.echo(f'Folder {project_path} already exists. Please choose another name.', err=True)
-            raise typer.Exit(1)
+            continue
 
-        template_choices: list[str] = []
+        return project_name
 
-        # Fetch available templates if a template is not provided.
-        if template is None:
-            response = httpx.get(TEMPLATE_LIST_URL, timeout=httpx.Timeout(10))
-            response.raise_for_status()
-            template_choices = [item['name'] for item in response.json() if item['type'] == 'dir']
+
+def _prompt_for_template() -> str:
+    """Prompt the user to select a template from a list."""
+    # Fetch available templates
+    response = httpx.get(TEMPLATE_LIST_URL, timeout=httpx.Timeout(10))
+    response.raise_for_status()
+    template_choices = [item['name'] for item in response.json() if item['type'] == 'dir']
+
+    # Prompt for template choice
+    return cast(
+        str,
+        ConsoleRender().render(
+            inquirer.List(
+                name='template',
+                message='Please select the template for your new Crawlee project',
+                choices=[(choice[0].upper() + choice[1:], choice) for choice in template_choices],
+            ),
+        ),
+    )
+
+
+@cli.command()
+def create(
+    project_name: Optional[str] = typer.Argument(
+        default=None,
+        help='The name of the project and the directory that will be created to contain it. '
+        'If none is given, you will be prompted.',
+        show_default=False,
+    ),
+    template: Optional[str] = typer.Option(
+        default=None,
+        help='The template to be used to create the project. If none is given, you will be prompted.',
+        show_default=False,
+    ),
+) -> None:
+    """Bootstrap a new Crawlee project."""
+    try:
+        # Prompt for project name if not provided.
+        project_name = _prompt_for_project_name(project_name)
 
         # Prompt for template choice if not provided.
         if template is None:
-            answers = (
-                inquirer.prompt(
-                    [
-                        inquirer.List(
-                            name='template',
-                            message='Please select the template for your new Crawlee project',
-                            choices=[(choice[0].upper() + choice[1:], choice) for choice in template_choices],
-                            ignore=template is not None,
-                        ),
-                    ]
-                )
-                or {}
-            )
-            template = answers.get('template')
+            template = _prompt_for_template()
 
         if project_name and template:
             # Start the bootstrap process.
