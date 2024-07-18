@@ -86,7 +86,7 @@ When no `session_id` is provided, our proxy URLs are rotated round-robin.
 
 ### Tiered proxies
 
-When you use HTTP proxies in real world crawling scenarios, you have to decide which type of proxy to use to reach a sweetspot between cost efficiency and reliably avoiding blocking. Some websites may allow crawling with no proxy, on some you may get away with using datacenter proxies, which are cheap but likely to get blocked, and sometimes you need to use expensive residential proxies.
+When you use HTTP proxies in real world crawling scenarios, you have to decide which type of proxy to use to reach the sweet spot between cost efficiency and reliably avoiding blocking. Some websites may allow crawling with no proxy, on some you may get away with using datacenter proxies, which are cheap but likely to get blocked, and sometimes you need to use expensive residential proxies.
 
 To take the guesswork out of this process, Crawlee allows you to configure multiple tiers of proxy URLs. When crawling, it will automatically pick the left-most tier where it doesn't encounter blocking. If you organize your proxy server URLs in tiers so that the left-most tier contains the cheapest, least reliable ones and each higher tier contains more expensive, more reliable ones, you will get an optimal anti-blocking performance.
 

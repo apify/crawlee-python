@@ -115,7 +115,7 @@ class ProxyConfiguration:
     ) -> None:
         """Initialize a proxy configuration object.
 
-        Exactly one of `proxy_urls`, `tiered_proxy_urls` and `new_url_function` must be specified.
+        Exactly one of `proxy_urls`, `tiered_proxy_urls` or `new_url_function` must be specified.
 
         Args:
             proxy_urls: A list of URLs of proxies that will be rotated in a round-robin fashion
