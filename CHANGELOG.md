@@ -4,6 +4,7 @@
 
 ### Features
 
+- Integrate proxies into PlaywrightCrawler.
 - Expose `crawler.log` to public.
 
 ### Bug fixes
