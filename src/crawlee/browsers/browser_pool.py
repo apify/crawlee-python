@@ -17,10 +17,11 @@ from crawlee.browsers.playwright_browser_plugin import PlaywrightBrowserPlugin
 from crawlee.browsers.types import CrawleePage
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import MutableMapping, Sequence
     from types import TracebackType
 
     from crawlee.browsers.base_browser_plugin import BaseBrowserPlugin
+    from crawlee.proxy_configuration import ProxyInfo
 
 logger = getLogger(__name__)
 
@@ -130,7 +131,7 @@ class BrowserPool:
         return self._inactive_browsers
 
     @property
-    def pages(self) -> Mapping[str, CrawleePage]:
+    def pages(self) -> MutableMapping[str, CrawleePage]:
         """Return the pages in the pool."""
         return self._pages
 
@@ -180,6 +181,7 @@ class BrowserPool:
         *,
         page_id: str | None = None,
         browser_plugin: BaseBrowserPlugin | None = None,
+        proxy_info: ProxyInfo | None = None,
     ) -> CrawleePage:
         """Opens a new page in a browser using the specified or a random browser plugin.
 
@@ -187,6 +189,7 @@ class BrowserPool:
             page_id: The ID to assign to the new page. If not provided, a random ID is generated.
             browser_plugin: browser_plugin: The browser plugin to use for creating the new page.
                 If not provided, the next plugin in the rotation is used.
+            proxy_info: The proxy configuration to use for the new page.
 
         Returns:
             The newly created browser page.
@@ -200,7 +203,7 @@ class BrowserPool:
         page_id = page_id or crypto_random_object_id(self._GENERATED_PAGE_ID_LENGTH)
         plugin = browser_plugin or next(self._plugins_cycle)
 
-        return await self._get_new_page(page_id, plugin)
+        return await self._get_new_page(page_id, plugin, proxy_info)
 
     async def new_page_with_each_plugin(self) -> Sequence[CrawleePage]:
         """Create a new page with each browser plugin in the pool.
@@ -219,6 +222,7 @@ class BrowserPool:
         self,
         page_id: str,
         plugin: BaseBrowserPlugin,
+        proxy_info: ProxyInfo | None,
     ) -> CrawleePage:
         """Internal method to initialize a new page in a browser using the specified plugin."""
         timeout = self._operation_timeout.total_seconds()
@@ -227,7 +231,10 @@ class BrowserPool:
         try:
             if not browser:
                 browser = await asyncio.wait_for(self._launch_new_browser(plugin), timeout)
-            page = await asyncio.wait_for(browser.new_page(page_options=plugin.page_options), timeout)
+            page = await asyncio.wait_for(
+                browser.new_page(page_options=plugin.page_options, proxy_info=proxy_info),
+                timeout,
+            )
         except asyncio.TimeoutError as exc:
             raise TimeoutError(f'Creating a new page with plugin {plugin} timed out.') from exc
         except RuntimeError as exc:

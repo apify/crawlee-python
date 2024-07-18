@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import MutableMapping
     from types import TracebackType
 
     from crawlee.browsers.base_browser_controller import BaseBrowserController
@@ -29,12 +29,12 @@ class BaseBrowserPlugin(ABC):
 
     @property
     @abstractmethod
-    def browser_options(self) -> Mapping[str, Any]:
+    def browser_options(self) -> MutableMapping[str, Any]:
         """Return the options for a new browser."""
 
     @property
     @abstractmethod
-    def page_options(self) -> Mapping[str, Any]:
+    def page_options(self) -> MutableMapping[str, Any]:
         """Return the options for a new page."""
 
     @property

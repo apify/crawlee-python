@@ -11,9 +11,11 @@ from typing_extensions import override
 from crawlee.browsers.base_browser_controller import BaseBrowserController
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import MutableMapping
 
     from playwright.async_api import Browser
+
+    from crawlee.proxy_configuration import ProxyInfo
 
 
 class PlaywrightBrowserController(BaseBrowserController):
@@ -69,8 +71,20 @@ class PlaywrightBrowserController(BaseBrowserController):
         return self._browser.is_connected()
 
     @override
-    async def new_page(self, page_options: Mapping[str, Any] | None = None) -> Page:
+    async def new_page(
+        self,
+        page_options: MutableMapping[str, Any] | None = None,
+        proxy_info: ProxyInfo | None = None,
+    ) -> Page:
         page_options = page_options or {}
+
+        # Add proxy configuration to the page options if provided.
+        if proxy_info:
+            page_options['proxy'] = {
+                'server': f'{proxy_info.scheme}://{proxy_info.hostname}:{proxy_info.port}',
+                'username': proxy_info.username,
+                'password': proxy_info.password,
+            }
 
         if not self.has_free_capacity:
             raise ValueError('Cannot open more pages in this browser.')

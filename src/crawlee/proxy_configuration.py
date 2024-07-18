@@ -29,6 +29,9 @@ class ProxyInfo:
     url: str
     """The URL of the proxy."""
 
+    scheme: str
+    """The scheme of the proxy."""
+
     hostname: str
     """The hostname of the proxy."""
 
@@ -157,6 +160,7 @@ class ProxyConfiguration:
 
         info = ProxyInfo(
             url=str(url),
+            scheme=url.scheme,
             hostname=url.host,
             port=cast(int, url.port),
             username=url.username,

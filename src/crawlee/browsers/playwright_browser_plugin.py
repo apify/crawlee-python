@@ -12,7 +12,7 @@ from crawlee.browsers.base_browser_plugin import BaseBrowserPlugin
 from crawlee.browsers.playwright_browser_controller import PlaywrightBrowserController
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import MutableMapping
     from types import TracebackType
 
 logger = getLogger(__name__)
@@ -30,8 +30,8 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         self,
         *,
         browser_type: Literal['chromium', 'firefox', 'webkit'] = 'chromium',
-        browser_options: Mapping[str, Any] | None = None,
-        page_options: Mapping[str, Any] | None = None,
+        browser_options: MutableMapping[str, Any] | None = None,
+        page_options: MutableMapping[str, Any] | None = None,
         max_open_pages_per_browser: int = 20,
     ) -> None:
         """Create a new instance.
@@ -58,12 +58,12 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
 
     @property
     @override
-    def browser_options(self) -> Mapping[str, Any]:
+    def browser_options(self) -> MutableMapping[str, Any]:
         return self._browser_options
 
     @property
     @override
-    def page_options(self) -> Mapping[str, Any]:
+    def page_options(self) -> MutableMapping[str, Any]:
         return self._page_options
 
     @property

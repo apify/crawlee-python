@@ -57,14 +57,11 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
 
         super().__init__(**kwargs)
 
-    async def _page_goto(
-        self,
-        context: BasicCrawlingContext,
-    ) -> AsyncGenerator[PlaywrightCrawlingContext, None]:
+    async def _page_goto(self, context: BasicCrawlingContext) -> AsyncGenerator[PlaywrightCrawlingContext, None]:
         if self._browser_pool is None:
             raise ValueError('Browser pool is not initialized.')
 
-        crawlee_page = await self._browser_pool.new_page()
+        crawlee_page = await self._browser_pool.new_page(proxy_info=context.proxy_info)
         await crawlee_page.page.goto(context.request.url)
         context.request.loaded_url = crawlee_page.page.url
 

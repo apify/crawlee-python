@@ -18,6 +18,7 @@ async def proxy_info(unused_tcp_port: int) -> ProxyInfo:
 
     return ProxyInfo(
         url=f'http://{username}:{password}@127.0.0.1:{unused_tcp_port}',
+        scheme='http',
         hostname='127.0.0.1',
         port=unused_tcp_port,
         username=username,

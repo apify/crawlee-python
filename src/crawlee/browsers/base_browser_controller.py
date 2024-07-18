@@ -6,10 +6,12 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import MutableMapping
     from datetime import datetime, timedelta
 
     from playwright.async_api import Page
+
+    from crawlee.proxy_configuration import ProxyInfo
 
 
 class BaseBrowserController(ABC):
@@ -49,11 +51,16 @@ class BaseBrowserController(ABC):
         """Return if the browser is closed."""
 
     @abstractmethod
-    async def new_page(self, page_options: Mapping[str, Any] | None = None) -> Page:
+    async def new_page(
+        self,
+        page_options: MutableMapping[str, Any] | None = None,
+        proxy_info: ProxyInfo | None = None,
+    ) -> Page:
         """Create a new page with the given context options.
 
         Args:
             page_options: Options to configure the new page.
+            proxy_info: The proxy configuration to use for the new page.
 
         Returns:
             Page: The newly created page.
