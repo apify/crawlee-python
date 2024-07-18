@@ -24,10 +24,7 @@ class HttpTransport(httpx.AsyncHTTPTransport):
     """A modified HTTP transport adapter that stores response cookies in a `Session` instead of the httpx client."""
 
     @override
-    async def handle_async_request(
-        self,
-        request: httpx.Request,
-    ) -> httpx.Response:
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         response = await super().handle_async_request(request)
         response.request = request
 

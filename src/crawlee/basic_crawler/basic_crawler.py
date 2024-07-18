@@ -222,6 +222,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._has_finished_before = False
 
     @property
+    def log(self) -> logging.Logger:
+        """The logger used by the crawler."""
+        return self._logger
+
+    @property
     def router(self) -> Router[TCrawlingContext]:
         """The router used to handle each individual crawling request."""
         if self._router is None:
