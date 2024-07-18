@@ -6,6 +6,7 @@
 
 - Fix Pylance `reportPrivateImportUsage` errors by defining `__all__` in modules `__init__.py`.
 - Set `HTTPX` logging level to `WARNING` by default.
+- Fix CLI behavior with existing project folders
 
 ## [0.1.0](https://github.com/apify/crawlee-python/releases/tag/v0.1.0) (2024-07-09)
 
