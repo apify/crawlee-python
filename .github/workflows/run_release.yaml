@@ -78,7 +78,7 @@ jobs:
 
       - name: Commit and push the result
         run: |
-          git commit -am "chore(release): Update changelog"
+          git commit -am "chore(release): Update changelog [skip ci]"
           git push origin master
 
   publish_to_pypi:
