@@ -47,6 +47,40 @@ jobs:
       - name: Dummy step
         run: "true"
 
+  update_changelog:
+    name: Update changelog
+    needs: [run_code_checks, should_release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write # Required for OIDC authentication.
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up git
+        run: |
+          git config --global user.name "Apify Release Bot"
+          git config --global user.email "noreply@apify.com"
+
+      - name: Locally remove beta tags
+        run: |
+          git tags | grep 'b[0-9]' | xargs git tag --delete
+
+      - name: Run git-cliff
+        uses: orhun/git-cliff-action@v3
+        with:
+          config: cliff.toml
+        env:
+          OUTPUT: CHANGELOG.md
+
+      - name: Commit and push the result
+        run: |
+          git commit -am "chore(release): Update changelog"
+          git push origin master
+
   publish_to_pypi:
     name: Publish to PyPI
     needs: [run_code_checks, should_release]
