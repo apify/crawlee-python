@@ -4,7 +4,8 @@
 
 ### Features
 
-- Integrate proxies into PlaywrightCrawler.
+- Support for proxy configuration in `PlaywrightCrawler`.
+- Blocking detection in `PlaywrightCrawler`.
 - Expose `crawler.log` to public.
 
 ### Bug fixes

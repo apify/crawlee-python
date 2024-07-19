@@ -91,7 +91,14 @@ class ExportToFunction(Protocol):
 
 
 class EnqueueLinksFunction(Protocol):
-    """Type of a function for enqueueing links based on a selector."""
+    """Type of a function for enqueueing links based on a selector.
+
+    Args:
+        selector: CSS selector used to find the elements containing the links.
+        label: Label for the newly created `Request` objects, used for request routing.
+        user_data: User data to be provided to the newly created `Request` objects.
+        **kwargs: Additional arguments for the `add_requests` method.
+    """
 
     def __call__(  # noqa: D102
         self,
