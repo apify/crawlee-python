@@ -379,7 +379,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._has_finished_before = True
 
         final_statistics = self._statistics.calculate()
-        self._logger.info(f'Final request statistics: {final_statistics}')
+        self._logger.info('Final request statistics: ')
+        final_statistics.to_table()
 
         return final_statistics
 
