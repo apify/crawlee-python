@@ -15,6 +15,8 @@ if TYPE_CHECKING:
 
     from playwright.async_api import Browser
 
+    from crawlee.proxy_configuration import ProxyInfo
+
 
 class PlaywrightBrowserController(BaseBrowserController):
     """Controller for managing Playwright browser instances and their pages.
@@ -69,8 +71,20 @@ class PlaywrightBrowserController(BaseBrowserController):
         return self._browser.is_connected()
 
     @override
-    async def new_page(self, page_options: Mapping[str, Any] | None = None) -> Page:
-        page_options = page_options or {}
+    async def new_page(
+        self,
+        page_options: Mapping[str, Any] | None = None,
+        proxy_info: ProxyInfo | None = None,
+    ) -> Page:
+        page_options = dict(page_options) if page_options else {}
+
+        # If "proxy_info" is provided and no proxy is already set in "page_options", configure the proxy.
+        if proxy_info and 'proxy' not in page_options:
+            page_options['proxy'] = {
+                'server': f'{proxy_info.scheme}://{proxy_info.hostname}:{proxy_info.port}',
+                'username': proxy_info.username,
+                'password': proxy_info.password,
+            }
 
         if not self.has_free_capacity:
             raise ValueError('Cannot open more pages in this browser.')

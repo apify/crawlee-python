@@ -7,6 +7,8 @@ from datetime import datetime, timedelta
 from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field
+from rich.console import Console
+from rich.table import Table
 from typing_extensions import override
 
 from crawlee._utils.models import timedelta_ms
@@ -26,6 +28,20 @@ class FinalStatistics:
     request_total_duration: timedelta
     requests_total: int
     crawler_runtime: timedelta
+
+    def to_table(self) -> None:
+        """Print out the Final Statistics data as a table."""
+        table = Table()
+        table.add_column('INFO')
+        table.add_column('Statistics')
+
+        str_dict = {k: v.total_seconds() if isinstance(v, timedelta) else v for k, v in asdict(self).items()}
+
+        for k, v in str_dict.items():
+            table.add_row(str(k), str(v))
+
+        console = Console()
+        console.print(table)
 
     @override
     def __str__(self) -> str:
