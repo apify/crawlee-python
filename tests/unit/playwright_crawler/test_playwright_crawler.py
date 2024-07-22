@@ -65,7 +65,7 @@ async def test_nonexistent_url_invokes_error_handler() -> None:
     crawler.failed_request_handler(failed_handler)
 
     @crawler.router.default_handler
-    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+    async def request_handler(_context: PlaywrightCrawlingContext) -> None:
         pass
 
     await crawler.run()
