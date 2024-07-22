@@ -23,7 +23,7 @@
         "@typescript-eslint/eslint-plugin": "7.16.1",
         "@typescript-eslint/parser": "7.16.1",
         "eslint": "8.57.0",
-        "eslint-plugin-react": "7.34.3",
+        "eslint-plugin-react": "7.35.0",
         "eslint-plugin-react-hooks": "4.6.2",
         "fs-extra": "^11.1.0",
         "patch-package": "^8.0.0",
