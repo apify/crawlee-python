@@ -210,7 +210,10 @@ class ProxyConfiguration:
 
         if self._proxy_tier_tracker:
             if request is not None and proxy_tier is None:
-                hostname = URL(request.url).host
+                hostname = request.url.host
+                if hostname is None:
+                    raise ValueError('The request URL does not have a hostname')
+
                 if request.last_proxy_tier is not None:
                     self._proxy_tier_tracker.add_error(hostname, request.last_proxy_tier)
 

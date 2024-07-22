@@ -4,7 +4,9 @@ import re
 from base64 import b64encode
 from hashlib import sha256
 from logging import getLogger
-from urllib.parse import parse_qsl, urlencode, urlparse
+from urllib.parse import parse_qsl, urlencode, urljoin, urlparse
+
+from pydantic import HttpUrl
 
 from crawlee._utils.crypto import compute_short_hash
 
@@ -128,3 +130,17 @@ def compute_unique_key(
 
     # Return the normalized URL as the unique key.
     return normalized_url
+
+
+def is_url_absolute(url: str | HttpUrl) -> bool:
+    """Check if a URL is absolute."""
+    url = url if isinstance(url, str) else str(url)
+    return bool(urlparse(url).netloc)
+
+
+def make_url_absolute(base_url: str | HttpUrl, relative_url: str | HttpUrl) -> HttpUrl:
+    """Make a relative URL absolute by combining it with a base URL."""
+    base_url = base_url if isinstance(base_url, str) else str(base_url)
+    relative_url = relative_url if isinstance(relative_url, str) else str(relative_url)
+    absolute_url = urljoin(base_url, relative_url)
+    return HttpUrl(absolute_url)

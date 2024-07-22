@@ -3,9 +3,11 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Literal
 
+from pydantic import HttpUrl
 from typing_extensions import Unpack
 
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
+from crawlee._utils.requests import is_url_absolute, make_url_absolute
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.basic_crawler.errors import SessionError
 from crawlee.browsers import BrowserPool
@@ -102,13 +104,13 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
 
         async with crawlee_page.page:
             # Navigate to the URL and get response.
-            response = await crawlee_page.page.goto(context.request.url)
+            response = await crawlee_page.page.goto(str(context.request.url))
 
             if response is None:
                 raise SessionError(f'Failed to load the URL: {context.request.url}')
 
             # Set the loaded URL to the actual URL after redirection.
-            context.request.loaded_url = crawlee_page.page.url
+            context.request.loaded_url = HttpUrl(crawlee_page.page.url)
 
             async def enqueue_links(
                 *,
@@ -126,15 +128,19 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 elements = await crawlee_page.page.query_selector_all(selector)
 
                 for element in elements:
-                    href = await element.get_attribute('href')
+                    url = await element.get_attribute('href')
 
-                    if href:
+                    if url:
+                        if not is_url_absolute(url):
+                            url = str(make_url_absolute(context.request.url, url))
+                        url = url.strip()
+
                         link_user_data = user_data.copy()
 
                         if label is not None:
                             link_user_data.setdefault('label', label)
 
-                        request = BaseRequestData.from_url(href.strip(), user_data=link_user_data)
+                        request = BaseRequestData.from_url(url, user_data=link_user_data)
                         requests.append(request)
 
                 await context.add_requests(requests, **kwargs)

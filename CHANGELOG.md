@@ -2,7 +2,14 @@
 
 ## 0.1.2 (Unreleased)
 
-...
+### Features
+
+- Add validation of URLs.
+
+### Bug fixes
+
+- Strip whitespace from href in `enqueue_links`.
+- Use `error_handler` for context pipeline errors.
 
 ## [0.1.1](https://github.com/apify/crawlee-python/releases/tag/v0.1.1) (2024-07-19)
 
