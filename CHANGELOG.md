@@ -4,10 +4,21 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🐛 Bug Fixes
+
+- Also use error_handler for context pipeline errors (#331)
+
+### Bug
+
+- Minor log fix (#341)
+
+## [0.1.1] - 2024-07-19
+
 ### 🚀 Features
 
 - Expose crawler log (#316)
 - Integrate proxies into `PlaywrightCrawler` (#325)
+- Blocking detection for playwright crawler (#328)
 
 ### 🐛 Bug Fixes
 
