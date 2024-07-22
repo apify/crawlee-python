@@ -204,7 +204,7 @@ class ProxyConfiguration:
                 if inspect.isawaitable(result):
                     result = await result
 
-                return URL(cast(str, result)) if result is not None else None, None
+                return URL(result) if result is not None else None, None
             except Exception as e:
                 raise ValueError('The provided "new_url_function" did not return a valid URL') from e
 
