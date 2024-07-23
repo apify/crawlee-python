@@ -7,7 +7,7 @@ from pydantic import HttpUrl
 from typing_extensions import Unpack
 
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
-from crawlee._utils.requests import is_url_absolute, make_url_absolute
+from crawlee._utils.urls import is_url_absolute, make_url_absolute
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.basic_crawler.errors import SessionError
 from crawlee.browsers import BrowserPool
@@ -131,9 +131,10 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                     url = await element.get_attribute('href')
 
                     if url:
+                        url = url.strip()
+
                         if not is_url_absolute(url):
                             url = str(make_url_absolute(context.request.url, url))
-                        url = url.strip()
 
                         link_user_data = user_data.copy()
 

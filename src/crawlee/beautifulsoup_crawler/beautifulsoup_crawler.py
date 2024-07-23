@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup, Tag
 from typing_extensions import Unpack
 
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
-from crawlee._utils.requests import is_url_absolute, make_url_absolute
+from crawlee._utils.urls import is_url_absolute, make_url_absolute
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.basic_crawler.errors import SessionError
 from crawlee.beautifulsoup_crawler.types import BeautifulSoupCrawlingContext
@@ -131,10 +131,11 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
                     link_user_data.setdefault('label', label)
 
                 if (url := link.attrs.get('href')) is not None:
+                    url = url.strip()
+
                     if not is_url_absolute(url):
                         url = str(make_url_absolute(context.request.url, url))
 
-                    url = url.strip()
                     requests.append(BaseRequestData.from_url(url, user_data=link_user_data))
 
             await context.add_requests(requests, **kwargs)

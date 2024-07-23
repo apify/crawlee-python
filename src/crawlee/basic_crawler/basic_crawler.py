@@ -19,7 +19,7 @@ from tldextract import TLDExtract
 from typing_extensions import NotRequired, TypedDict, TypeVar, Unpack, assert_never
 
 from crawlee import Glob
-from crawlee._utils.requests import is_url_absolute, make_url_absolute
+from crawlee._utils.urls import is_url_absolute, make_url_absolute
 from crawlee._utils.wait import wait_for
 from crawlee.autoscaling import AutoscaledPool, ConcurrencySettings
 from crawlee.autoscaling.snapshotter import Snapshotter
