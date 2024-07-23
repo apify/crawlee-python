@@ -97,7 +97,7 @@ jobs:
           if [[ ${{ github.event_name }} = workflow_dispatch ]]; then
             git-cliff --tag v${{ needs.should_release.outputs.version }} > CHANGELOG.md
           else
-            git-cliff > CHANGELOG.md
+            git-cliff --with-tag-message v${{ needs.should_release.outputs.version }} > CHANGELOG.md
           fi
 
       - name: Commit and push the result

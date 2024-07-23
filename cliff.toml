@@ -16,6 +16,8 @@ All notable changes to this project will be documented in this file.\n
 body = """
 {% if version %}\
     ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% elif message %}\
+    ## [{{ message | trim_start_matches(pat="v") }}] - **not yet released**
 {% else %}\
     ## [unreleased]
 {% endif %}\
