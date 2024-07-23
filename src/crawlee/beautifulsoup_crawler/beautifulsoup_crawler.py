@@ -130,7 +130,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
                     link_user_data.setdefault('label', label)
 
                 if (href := link.attrs.get('href')) is not None:
-                    requests.append(BaseRequestData.from_url(href, user_data=link_user_data))
+                    requests.append(BaseRequestData.from_url(href.strip(), user_data=link_user_data))
 
             await context.add_requests(requests, **kwargs)
 
