@@ -6,6 +6,7 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from typing import Annotated, Any, Generic
+from urllib.parse import parse_qs
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 from typing_extensions import Self, TypeVar
@@ -71,12 +72,11 @@ class BaseRequestData(BaseModel):
 
         return result
 
-    def get_query_param_from_url(self, param: str) -> str | None:
+    def get_query_param_from_url(self, param: str, *, default: str | None = None) -> str | None:
         """Get the value of a specific query parameter from the URL."""
-        for key, value in self.url.query_params():
-            if key == param:
-                return value
-        return None
+        query_params = parse_qs(self.url.query)
+        values = query_params.get(param, [default])  # parse_qs returns values as list
+        return values[0]
 
 
 class Request(BaseRequestData):
