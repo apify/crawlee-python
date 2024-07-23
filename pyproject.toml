@@ -67,6 +67,7 @@ sortedcollections = "^2.1.0"
 tldextract = "^5.1.2"
 typer = { version = "^0.12.3", extras = ["all"] }
 typing-extensions = "^4.1.0"
+parsel = { version = "^1.9.1", optional = true }
 
 [tool.poetry.group.dev.dependencies]
 build = "~1.2.0"
@@ -94,6 +95,7 @@ types-python-dateutil = "~2.9.0.20240316"
 [tool.poetry.extras]
 beautifulsoup = ["beautifulsoup4", "lxml", "html5lib"]
 playwright = ["playwright"]
+parsel = ["parsel"]
 
 [tool.poetry.scripts]
 crawlee = "crawlee.cli:cli"
