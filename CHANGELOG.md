@@ -5,6 +5,7 @@
 ### Features
 
 - Add validation of URLs.
+- Implement `ParselCrawler` that adds support for `parsel`.
 
 ### Bug fixes
 
