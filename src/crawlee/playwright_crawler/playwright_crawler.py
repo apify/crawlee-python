@@ -134,7 +134,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                         if label is not None:
                             link_user_data.setdefault('label', label)
 
-                        request = BaseRequestData.from_url(href, user_data=link_user_data)
+                        request = BaseRequestData.from_url(href.strip(), user_data=link_user_data)
                         requests.append(request)
 
                 await context.add_requests(requests, **kwargs)
