@@ -30,12 +30,10 @@ jobs:
       - name: Determine release type
         id: determine-release-type
         run: |
-          if [[ ${{ github.event_name }} = release ]]; then
+          if [[ ${{ github.event_name }} = workflow_dispatch ]]; then
             release_type="final"
           elif [[ ${{ github.event_name }} = push ]]; then
             release_type="beta"
-          elif [[ ${{ github.event_name }} = workflow_dispatch ]]; then
-            release_type=${{ github.event.inputs.release_type }}
           fi
           echo "release_type=${release_type}" >> $GITHUB_OUTPUT
 
