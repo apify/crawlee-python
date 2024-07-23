@@ -4,9 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- Add URL validation (#343)
+
 ### 🐛 Bug Fixes
 
 - Also use error_handler for context pipeline errors (#331)
+- Strip whitespace from href in enqueue_links (#346)
 
 ### Bug
 

@@ -14,7 +14,7 @@ from crawlee.sessions import Session
 class MockContext(BasicCrawlingContext):
     def __init__(self, *, label: str | None) -> None:
         super().__init__(
-            request=Request.from_url(url='42', user_data={'label': label}),
+            request=Request.from_url(url='https://example.com/', user_data={'label': label}),
             session=Session(),
             send_request=AsyncMock(),
             add_requests=AsyncMock(),

@@ -6,8 +6,9 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from typing import Annotated, Any, Generic
+from urllib.parse import parse_qs
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 from typing_extensions import Self, TypeVar
 
 from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
@@ -19,7 +20,7 @@ class BaseRequestData(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
-    url: Annotated[str, Field(min_length=1)]
+    url: Annotated[HttpUrl, Field()]
     """URL of the web page to crawl"""
 
     unique_key: Annotated[str, Field(alias='uniqueKey')]
@@ -49,7 +50,7 @@ class BaseRequestData(BaseModel):
 
     no_retry: Annotated[bool, Field(alias='noRetry')] = False
 
-    loaded_url: Annotated[str | None, Field(alias='loadedUrl')] = None
+    loaded_url: Annotated[HttpUrl | None, Field(alias='loadedUrl')] = None
 
     handled_at: Annotated[datetime | None, Field(alias='handledAt')] = None
 
@@ -70,6 +71,12 @@ class BaseRequestData(BaseModel):
             result.user_data['label'] = label
 
         return result
+
+    def get_query_param_from_url(self, param: str, *, default: str | None = None) -> str | None:
+        """Get the value of a specific query parameter from the URL."""
+        query_params = parse_qs(self.url.query)
+        values = query_params.get(param, [default])  # parse_qs returns values as list
+        return values[0]
 
 
 class Request(BaseRequestData):
@@ -430,7 +437,7 @@ class UnprocessedRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     unique_key: Annotated[str, Field(alias='requestUniqueKey')]
-    url: Annotated[str, Field()]
+    url: Annotated[HttpUrl, Field()]
     method: Annotated[str | None, Field()] = None
 
 

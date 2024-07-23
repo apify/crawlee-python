@@ -23,7 +23,7 @@ async def test_basic_request(httpbin: str) -> None:
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
         assert context.page is not None
-        result['request_url'] = context.request.url
+        result['request_url'] = str(context.request.url)
         result['page_url'] = context.page.url
         result['page_title'] = await context.page.title()
         result['page_content'] = await context.page.content()
@@ -42,12 +42,13 @@ async def test_enqueue_links() -> None:
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
-        visit(context.request.url)
+        url = str(context.request.url)
+        visit(url)
         await context.enqueue_links(include=[Glob('https://crawlee.dev/docs/examples/**')])
 
     await crawler.run(requests)
 
-    visited = {call[0][0] for call in visit.call_args_list}
+    visited: set[str] = {call[0][0] for call in visit.call_args_list}
 
     assert len(visited) >= 10
     assert all(url.startswith('https://crawlee.dev/docs/examples') for url in visited)
