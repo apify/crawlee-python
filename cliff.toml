@@ -41,6 +41,10 @@ postprocessors = [
   # { pattern = '<REPO>', replace = "https://github.com/orhun/git-cliff" }, # replace repository URL
 ]
 
+[bump]
+# With 0.x.y version, breaking commits should only increase the minor version
+breaking_always_bump_major = false
+
 [git]
 # parse the commits based on https://www.conventionalcommits.org
 conventional_commits = true
