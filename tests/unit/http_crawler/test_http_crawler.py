@@ -63,14 +63,18 @@ async def server() -> AsyncGenerator[respx.MockRouter, None]:
         yield mock
 
 
-async def test_fetches_html(crawler: HttpCrawler, mock_request_handler: AsyncMock, server: respx.MockRouter) -> None:
+async def test_fetches_html(
+    crawler: HttpCrawler,
+    mock_request_handler: AsyncMock,
+    server: respx.MockRouter,
+) -> None:
     await crawler.add_requests(['https://test.io/html'])
     await crawler.run()
 
     assert server['html_endpoint'].called
 
     mock_request_handler.assert_called_once()
-    assert mock_request_handler.call_args[0][0].request.url == 'https://test.io/html'
+    assert str(mock_request_handler.call_args[0][0].request.url) == 'https://test.io/html'
 
 
 async def test_handles_redirects(
@@ -80,7 +84,7 @@ async def test_handles_redirects(
     await crawler.run()
 
     mock_request_handler.assert_called_once()
-    assert mock_request_handler.call_args[0][0].request.loaded_url == 'https://test.io/html'
+    assert str(mock_request_handler.call_args[0][0].request.loaded_url) == 'https://test.io/html'
 
     assert server['redirect_endpoint'].called
     assert server['html_endpoint'].called
@@ -93,7 +97,7 @@ async def test_handles_client_errors(
     await crawler.run()
 
     mock_request_handler.assert_called_once()
-    assert mock_request_handler.call_args[0][0].request.loaded_url == 'https://test.io/404'
+    assert str(mock_request_handler.call_args[0][0].request.loaded_url) == 'https://test.io/404'
     assert server['404_endpoint'].called
 
 
@@ -125,7 +129,8 @@ async def test_stores_cookies(httpbin: str) -> None:
 
     @crawler.router.default_handler
     async def handler(context: HttpCrawlingContext) -> None:
-        visit(context.request.url)
+        url = str(context.request.url)
+        visit(url)
         track_session_usage(context.session.id if context.session else None)
 
     await crawler.run()
