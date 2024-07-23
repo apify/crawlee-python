@@ -123,7 +123,7 @@ async def main() -> None:
 
         # Extract data from the page using Playwright API.
         data = {
-            'url': context.request.url,
+            'url': str(context.request.url),
             'title': await context.page.title(),
             'content': (await context.page.content())[:100],
         }

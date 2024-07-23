@@ -108,7 +108,7 @@ async def main() -> None:
 
         # Extract data from the page.
         data = {
-            'url': context.request.url,
+            'url': str(context.request.url),
             'title': context.soup.title.string if context.soup.title else None,
         }
 
@@ -148,7 +148,7 @@ async def main() -> None:
 
         # Extract data from the page.
         data = {
-            'url': context.request.url,
+            'url': str(context.request.url),
             'title': await context.page.title(),
         }
 

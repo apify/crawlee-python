@@ -19,7 +19,7 @@ async def main() -> None:
     async def default_handler(context: PlaywrightCrawlingContext) -> None:
         # Extract data from the page.
         data = {
-            'url': context.request.url,
+            'url': str(context.request.url),
             'title': await context.page.title(),
         }
         context.log.info(f'Extracted data: {data}')

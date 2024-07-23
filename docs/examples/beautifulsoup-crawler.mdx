@@ -36,7 +36,7 @@ async def main() -> None:
 
         # Extract data from the page.
         data = {
-            'url': context.request.url,
+            'url': str(context.request.url),
             'title': context.soup.title.string if context.soup.title else None,
             'h1s': [h1.text for h1 in context.soup.find_all('h1')],
             'h2s': [h2.text for h2 in context.soup.find_all('h2')],

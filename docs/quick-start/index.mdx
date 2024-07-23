@@ -82,7 +82,7 @@ async def main() -> None:
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         # Extract relevant data from the page context.
         data = {
-            'url': context.request.url,
+            'url': str(context.request.url),
             'title': context.soup.title.string if context.soup.title else None,
         }
         # Store the extracted data.
@@ -116,7 +116,7 @@ async def main() -> None:
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
         # Extract relevant data from the page context.
         data = {
-            'url': context.request.url,
+            'url': str(context.request.url),
             'title': await context.page.title(),
         }
         # Store the extracted data.

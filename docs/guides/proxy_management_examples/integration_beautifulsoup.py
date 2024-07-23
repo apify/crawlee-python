@@ -19,7 +19,7 @@ async def main() -> None:
     async def default_handler(context: BeautifulSoupCrawlingContext) -> None:
         # Extract data from the page.
         data = {
-            'url': context.request.url,
+            'url': str(context.request.url),
             'title': context.soup.title.string if context.soup.title else None,
         }
         context.log.info(f'Extracted data: {data}')
