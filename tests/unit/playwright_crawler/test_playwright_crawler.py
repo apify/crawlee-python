@@ -7,8 +7,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from unittest import mock
 
-import pytest
-
 from crawlee import Glob
 from crawlee.playwright_crawler import PlaywrightCrawler
 from crawlee.storages import RequestList
