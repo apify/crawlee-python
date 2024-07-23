@@ -52,7 +52,7 @@ jobs:
 
       - name: Locally remove beta tags
         run: |
-          git tags | grep 'b[0-9]' | xargs git tag --delete
+          git tag | grep 'b[0-9]' | xargs git tag --delete
 
       - name: Install git-cliff
         run: cargo install git-cliff
@@ -82,7 +82,7 @@ jobs:
 
       - name: Locally remove beta tags
         run: |
-          git tags | grep 'b[0-9]' | xargs git tag --delete
+          git tag | grep 'b[0-9]' | xargs git tag --delete
 
       - name: Install git-cliff
         run: cargo install git-cliff
@@ -120,7 +120,7 @@ jobs:
 
       - name: Locally remove beta tags
         run: |
-          git tags | grep 'b[0-9]' | xargs git tag --delete
+          git tag | grep 'b[0-9]' | xargs git tag --delete
 
       - name: Install git-cliff
         run: cargo install git-cliff
