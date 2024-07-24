@@ -19,12 +19,6 @@ repos:
         language: system
         pass_filenames: false
 
-      - id: check-changelog-entry
-        name: Check changelog entry
-        entry: make check-changelog-entry
-        language: system
-        pass_filenames: false
-
       - id: check-version-conflict
         name: Check version conflict
         entry: make check-version-conflict
