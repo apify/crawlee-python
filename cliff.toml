@@ -15,18 +15,18 @@ All notable changes to this project will be documented in this file.\n
 # https://keats.github.io/tera/docs/#introduction
 body = """
 {% if version %}\
-    ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+    ## [{{ version | trim_start_matches(pat="v") }}](<REPO>/releases/tag/{{ version }}) ({{ timestamp | date(format="%Y-%m-%d") }})
 {% elif message %}\
-    ## [{{ message | trim_start_matches(pat="v") }}] - **not yet released**
+    ## {{ message | trim_start_matches(pat="v") }} - **not yet released**
 {% else %}\
-    ## [unreleased]
+    ## unreleased
 {% endif %}\
 {% for group, commits in commits | group_by(attribute="group") %}
     ### {{ group | striptags | trim | upper_first }}
     {% for commit in commits %}
         - {% if commit.scope %}*({{ commit.scope }})* {% endif %}\
             {% if commit.breaking %}[**breaking**] {% endif %}\
-            {{ commit.message | upper_first }}\
+            {{ commit.message | upper_first }} ([{{ commit.id | truncate(length = 7, end = "") }}](<REPO>/commit/{{ commit.id }}))\
     {% endfor %}
 {% endfor %}\n
 """
@@ -38,7 +38,7 @@ footer = """
 trim = true
 # postprocessors
 postprocessors = [
-  # { pattern = '<REPO>', replace = "https://github.com/orhun/git-cliff" }, # replace repository URL
+  { pattern = '<REPO>', replace = "https://github.com/apify/crawlee-python" }, # replace repository URL
 ]
 
 [bump]
@@ -55,7 +55,7 @@ split_commits = false
 # regex for preprocessing the commit messages
 commit_preprocessors = [
   # Replace issue numbers
-  #{ pattern = '\((\w+\s)?#([0-9]+)\)', replace = "([#${2}](<REPO>/issues/${2}))"},
+  { pattern = '\((\w+\s)?#([0-9]+)\)', replace = "([#${2}](<REPO>/issues/${2}))"},
   # Check spelling of the commit with https://github.com/crate-ci/typos
   # If the spelling is incorrect, it will be automatically fixed.
   #{ pattern = '.*', replace_command = 'typos --write-changes -' },
@@ -63,12 +63,16 @@ commit_preprocessors = [
 # regex for parsing and grouping commits
 commit_parsers = [
   { message = "^feat", group = "<!-- 0 -->🚀 Features" },
-  { message = "^fix", group = "<!-- 1 -->🐛 Bug Fixes" },
-  { message = "^docs", group = "<!-- 3 -->📚 Documentation" },
+  { message = "^fix|^bug", group = "<!-- 1 -->🐛 Bug Fixes" },
+  # { message = "^doc", group = "<!-- 3 -->📚 Documentation" },
+  { message = "^doc", skip = true },
   { message = "^perf", group = "<!-- 4 -->⚡ Performance" },
-  { message = "^refactor", group = "<!-- 2 -->🚜 Refactor" },
-  { message = "^style", group = "<!-- 5 -->🎨 Styling" },
-  { message = "^test", group = "<!-- 6 -->🧪 Testing" },
+  # { message = "^refactor", group = "<!-- 2 -->🚜 Refactor" },
+  { message = "^refactor", skip = true },
+  # { message = "^style", group = "<!-- 5 -->🎨 Styling" },
+  { message = "^style", skip = true },
+  # { message = "^test", group = "<!-- 6 -->🧪 Testing" },
+  { message = "^test", skip = true },
   { message = "^chore\\(release\\): prepare for", skip = true },
   { message = "^chore\\(deps.*\\)", skip = true },
   { message = "^chore\\(pr\\)", skip = true },
