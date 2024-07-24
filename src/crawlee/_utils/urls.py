@@ -23,6 +23,7 @@ def extract_query_params(url: str) -> dict[str, list[str]]:
 
 _http_url_adapter = TypeAdapter(AnyHttpUrl)
 
+
 def validate_http_url(value: str | None) -> str | None:
     """Validate the given HTTP URL.
 
