@@ -74,7 +74,7 @@ async def test_fetches_html(
     assert server['html_endpoint'].called
 
     mock_request_handler.assert_called_once()
-    assert str(mock_request_handler.call_args[0][0].request.url) == 'https://test.io/html'
+    assert mock_request_handler.call_args[0][0].request.url == 'https://test.io/html'
 
 
 async def test_handles_redirects(
@@ -84,7 +84,7 @@ async def test_handles_redirects(
     await crawler.run()
 
     mock_request_handler.assert_called_once()
-    assert str(mock_request_handler.call_args[0][0].request.loaded_url) == 'https://test.io/html'
+    assert mock_request_handler.call_args[0][0].request.loaded_url == 'https://test.io/html'
 
     assert server['redirect_endpoint'].called
     assert server['html_endpoint'].called
@@ -97,7 +97,7 @@ async def test_handles_client_errors(
     await crawler.run()
 
     mock_request_handler.assert_called_once()
-    assert str(mock_request_handler.call_args[0][0].request.loaded_url) == 'https://test.io/404'
+    assert mock_request_handler.call_args[0][0].request.loaded_url == 'https://test.io/404'
     assert server['404_endpoint'].called
 
 
@@ -129,8 +129,7 @@ async def test_stores_cookies(httpbin: str) -> None:
 
     @crawler.router.default_handler
     async def handler(context: HttpCrawlingContext) -> None:
-        url = str(context.request.url)
-        visit(url)
+        visit(context.request.url)
         track_session_usage(context.session.id if context.session else None)
 
     await crawler.run()

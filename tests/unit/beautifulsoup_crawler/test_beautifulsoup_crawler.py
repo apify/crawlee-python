@@ -100,8 +100,7 @@ async def test_enqueue_links(server: respx.MockRouter) -> None:
 
     @crawler.router.default_handler
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
-        url = str(context.request.url)
-        visit(url)
+        visit(context.request.url)
         await context.enqueue_links()
 
     await crawler.run()
@@ -125,8 +124,7 @@ async def test_enqueue_links_selector(server: respx.MockRouter) -> None:
 
     @crawler.router.default_handler
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
-        url = str(context.request.url)
-        visit(url)
+        visit(context.request.url)
         await context.enqueue_links(selector='a.foo')
 
     await crawler.run()

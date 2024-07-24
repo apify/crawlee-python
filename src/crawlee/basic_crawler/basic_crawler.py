@@ -13,13 +13,13 @@ from datetime import timedelta
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, AsyncContextManager, Callable, Generic, Literal, Union, cast
+from urllib.parse import ParseResult, urlparse
 
-from pydantic import HttpUrl
 from tldextract import TLDExtract
 from typing_extensions import NotRequired, TypedDict, TypeVar, Unpack, assert_never
 
 from crawlee import Glob
-from crawlee._utils.urls import is_url_absolute, make_url_absolute
+from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
 from crawlee.autoscaling import AutoscaledPool, ConcurrencySettings
 from crawlee.autoscaling.snapshotter import Snapshotter
@@ -519,8 +519,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
         """
         if crawling_context.request.loaded_url is not None and not self._check_enqueue_strategy(
             crawling_context.request.enqueue_strategy,
-            origin_url=crawling_context.request.url,
-            target_url=crawling_context.request.loaded_url,
+            origin_url=urlparse(crawling_context.request.url),
+            target_url=urlparse(crawling_context.request.loaded_url),
         ):
             raise ContextPipelineInterruptedError(
                 f'Skipping URL {crawling_context.request.loaded_url} (redirected from {crawling_context.request.url})'
@@ -532,23 +532,23 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self,
         strategy: EnqueueStrategy,
         *,
-        target_url: HttpUrl,
-        origin_url: HttpUrl,
+        target_url: ParseResult,
+        origin_url: ParseResult,
     ) -> bool:
         """Check if a URL matches the enqueue_strategy."""
         if strategy == EnqueueStrategy.SAME_HOSTNAME:
-            return target_url.host == origin_url.host
+            return target_url.hostname == origin_url.hostname
 
         if strategy == EnqueueStrategy.SAME_DOMAIN:
-            if origin_url.host is None or target_url.host is None:
+            if origin_url.hostname is None or target_url.hostname is None:
                 raise ValueError('Both origin and target URLs must have a hostname')
 
-            origin_domain = self._tld_extractor.extract_str(origin_url.host).domain
-            target_domain = self._tld_extractor.extract_str(target_url.host).domain
+            origin_domain = self._tld_extractor.extract_str(origin_url.hostname).domain
+            target_domain = self._tld_extractor.extract_str(target_url.hostname).domain
             return origin_domain == target_domain
 
         if strategy == EnqueueStrategy.SAME_ORIGIN:
-            return target_url.host == origin_url.host and target_url.scheme == origin_url.scheme
+            return target_url.hostname == origin_url.hostname and target_url.scheme == origin_url.scheme
 
         if strategy == EnqueueStrategy.ALL:
             return True
@@ -557,7 +557,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     def _check_url_patterns(
         self,
-        target_url: HttpUrl,
+        target_url: str,
         include: Sequence[re.Pattern[Any] | Glob] | None,
         exclude: Sequence[re.Pattern[Any] | Glob] | None,
     ) -> bool:
@@ -567,7 +567,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             if isinstance(pattern, Glob):
                 pattern = pattern.regexp  # noqa: PLW2901
 
-            if pattern.match(str(target_url)) is not None:
+            if pattern.match(target_url) is not None:
                 return False
 
         # If there are no `include` patterns and the URL passed all `exclude` patterns, accept the URL
@@ -579,7 +579,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             if isinstance(pattern, Glob):
                 pattern = pattern.regexp  # noqa: PLW2901
 
-            if pattern.match(str(target_url)) is not None:
+            if pattern.match(target_url) is not None:
                 return True
 
         # The URL does not match any `include` pattern - reject it
@@ -700,16 +700,16 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
                     # If the request URL is relative, make it absolute using the origin URL.
                     else:
-                        base_url = HttpUrl(call['base_url']) if call.get('base_url') else origin
-                        absolute_url = make_url_absolute(base_url, request)
-                        dst_request = BaseRequestData.from_url(str(absolute_url))
+                        base_url = call['base_url'] if call.get('base_url') else origin
+                        absolute_url = convert_to_absolute_url(base_url, request)
+                        dst_request = BaseRequestData.from_url(absolute_url)
                 else:
                     dst_request = request
 
                 if self._check_enqueue_strategy(
                     call.get('strategy', EnqueueStrategy.ALL),
-                    target_url=dst_request.url,
-                    origin_url=origin,
+                    target_url=urlparse(dst_request.url),
+                    origin_url=urlparse(origin),
                 ) and self._check_url_patterns(
                     dst_request.url,
                     call.get('include', None),

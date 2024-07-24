@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Optional, cast
 
 import httpx
-from pydantic import HttpUrl
 from typing_extensions import override
 
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
@@ -89,7 +88,7 @@ class HttpxClient(BaseHttpClient):
         client = self._get_client(proxy_info.url if proxy_info else None)
         http_request = client.build_request(
             method=request.method,
-            url=str(request.url),
+            url=request.url,
             headers=request.headers,
             cookies=session.cookies if session else None,
             extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
@@ -120,7 +119,7 @@ class HttpxClient(BaseHttpClient):
                 f'Status code {response.status_code} returned', request=response.request, response=response
             )
 
-        request.loaded_url = HttpUrl(str(response.url))
+        request.loaded_url = str(response.url)
         return HttpCrawlingResult(http_response=response)
 
     @override
