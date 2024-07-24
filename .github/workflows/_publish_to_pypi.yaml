@@ -49,29 +49,3 @@ jobs:
       # Publishes the package to PyPI using PyPA official GitHub action with OIDC authentication.
       - name: Publish package to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
-
-      # If this workflow is not triggered by a GitHub release event, manually create and push a Git tag.
-      - name: Create Git tag with the published version
-        if: github.event_name != 'release'
-        run: |
-          GIT_TAG=v$(python ./scripts/print_current_package_version.py)
-          echo "Current package version retrieved: ${GIT_TAG}"
-
-          echo "Creating Git tag: ${GIT_TAG}"
-          git tag "$GIT_TAG"
-          echo "Git tag ${GIT_TAG} created successfully."
-
-          echo "Pushing Git tag ${GIT_TAG} to the remote repository."
-          git push origin tag "$GIT_TAG"
-          echo "Git tag ${GIT_TAG} pushed successfully."
-
-      # If triggered by a release, upload build artifacts to the associated GitHub release.
-      - name: Upload the build artifacts to release
-        if: github.event_name == 'release'
-        run: |
-          echo "Uploading build artifacts to GitHub release: ${{ github.ref_name }}"
-          gh release upload ${{ github.ref_name }} dist/*
-          echo "Build artifacts uploaded successfully."
-
-        env:
-          GH_TOKEN: ${{ github.token }}
