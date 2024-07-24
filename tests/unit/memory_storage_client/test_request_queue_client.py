@@ -118,7 +118,7 @@ async def test_get_record(request_queue_client: RequestQueueClient) -> None:
 
     request = await request_queue_client.get_request(processed_request.id)
     assert request is not None
-    assert request.url == request.url == request_url
+    assert request.url == request_url
 
     # Non-existent id
     assert (await request_queue_client.get_request('non-existent id')) is None
