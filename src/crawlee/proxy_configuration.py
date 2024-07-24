@@ -4,6 +4,7 @@ import inspect
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
+from urllib.parse import urlparse
 
 from httpx import URL
 from more_itertools import flatten
@@ -210,7 +211,7 @@ class ProxyConfiguration:
 
         if self._proxy_tier_tracker:
             if request is not None and proxy_tier is None:
-                hostname = request.url.host
+                hostname = urlparse(request.url).hostname
                 if hostname is None:
                     raise ValueError('The request URL does not have a hostname')
 
