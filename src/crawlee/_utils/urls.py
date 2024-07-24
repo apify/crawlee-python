@@ -21,14 +21,15 @@ def extract_query_params(url: str) -> dict[str, list[str]]:
     return parse_qs(url_parsed.query)
 
 
+_http_url_adapter = TypeAdapter(AnyHttpUrl)
+
 def validate_http_url(value: str | None) -> str | None:
     """Validate the given HTTP URL.
 
     Raises:
         pydantic.error_wrappers.ValidationError: If the URL is not valid.
     """
-    if value is None:
-        return None
-    adapter = TypeAdapter(AnyHttpUrl)
-    adapter.validate_python(value)
+    if value is not None:
+        _http_url_adapter.validate_python(value)
+
     return value
