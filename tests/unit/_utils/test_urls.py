@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from pydantic.error_wrappers import ValidationError
+from pydantic import ValidationError
 
 from crawlee._utils.urls import convert_to_absolute_url, extract_query_params, is_url_absolute, validate_http_url
 

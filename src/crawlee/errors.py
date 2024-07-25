@@ -4,14 +4,13 @@ from typing import Generic
 
 from typing_extensions import TypeVar
 
-from crawlee.basic_crawler.types import BasicCrawlingContext
+from crawlee.types import BasicCrawlingContext
+
+TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 
 
 class UserDefinedErrorHandlerError(Exception):
     """Wraps an exception thrown from an user-defined error handler."""
-
-
-TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 
 
 class SessionError(Exception):
@@ -23,6 +22,10 @@ class SessionError(Exception):
 
 class ProxyError(SessionError):
     """Raised when a proxy is being blocked or malfunctions."""
+
+
+class HttpStatusCodeError(Exception):
+    """Raised when the response status code indicates an error."""
 
 
 class RequestHandlerError(Exception, Generic[TCrawlingContext]):

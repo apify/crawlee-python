@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from crawlee.models import Request
 from crawlee.proxy_configuration import ProxyConfiguration
 
