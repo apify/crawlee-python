@@ -23,10 +23,6 @@ jobs:
     name: Run unit tests
     uses: ./.github/workflows/_unit_tests.yaml
 
-  check_changelog_entry:
-    name: Check changelog entry
-    uses: ./.github/workflows/_check_changelog_entry.yaml
-
   check_version_conflict:
     name: Check version conflict
     uses: ./.github/workflows/_check_version_conflict.yaml
