@@ -61,9 +61,9 @@ jobs:
         id: version_number
         run: |
           if [[ '${{ github.event_name }}' = workflow_dispatch && '${{ github.event.inputs.release_type }}' = custom ]]; then
-            echo result=$(echo ${{ github.event.inputs.custom_version }} | sed s/^v//) >> $GITHUB_OUTPUT
+            echo result=$(echo ${{ github.event.inputs.custom_version }} | sed s/^v//) | tee -a $GITHUB_OUTPUT
           else
-            echo result=$(git-cliff --bumped-version | sed s/^v//)
+            echo result=$(git-cliff --bumped-version | sed s/^v//) | tee -a $GITHUB_OUTPUT
           fi
 
   update_changelog:
@@ -107,7 +107,7 @@ jobs:
         run: |
           git commit -am "chore(release): Update changelog [skip ci]"
           git push origin master
-          echo commitish=$(git rev-parse HEAD) >> $GITHUB_OUTPUT
+          echo commitish=$(git rev-parse HEAD) | tee -a $GITHUB_OUTPUT
 
   create_github_release:
     name: Create github release
