@@ -60,8 +60,8 @@ jobs:
       - name: Determine version number
         id: version_number
         run: |
-          if [[ ${{ github.event_name }} = workflow_dispatch && ${{ event.inputs.release_type }} = custom ]]; then
-            echo result=$(echo ${{ event.inputs.custom_version }} | sed s/^v//) >> $GITHUB_OUTPUT
+          if [[ ${{ github.event_name }} = workflow_dispatch && ${{ github.event.inputs.release_type }} = custom ]]; then
+            echo result=$(echo ${{ github.event.inputs.custom_version }} | sed s/^v//) >> $GITHUB_OUTPUT
           else
             echo result=$(git-cliff --bumped-version | sed s/^v//)
 
