@@ -1,6 +1,7 @@
 # ruff: noqa: TRY301, FBT002, UP007
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Annotated, Optional, cast
 
@@ -66,7 +67,11 @@ def _prompt_for_project_name(initial_project_name: str | None) -> str:
 def _prompt_for_template() -> str:
     """Prompt the user to select a template from a list."""
     # Fetch available templates
-    response = httpx.get(TEMPLATE_LIST_URL, timeout=httpx.Timeout(10))
+    response = httpx.get(
+        TEMPLATE_LIST_URL,
+        timeout=httpx.Timeout(10),
+        headers=[('Authorization', f'Bearer {os.environ["GH_TOKEN"]}')] if 'GH_TOKEN' in os.environ else [],
+    )
     response.raise_for_status()
     template_choices = [item['name'] for item in response.json() if item['type'] == 'dir']
 
