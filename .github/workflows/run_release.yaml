@@ -43,7 +43,7 @@ jobs:
       )
     runs-on: ubuntu-latest
     outputs:
-      version_number: ${{ steps.version_number.result }}
+      version_number: ${{ steps.version_number.outputs.result }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -106,7 +106,7 @@ jobs:
         id: push
         run: |
           git commit -am "chore(release): Update changelog [skip ci]"
-          git push origin master
+          git push origin master || true
           echo commitish=$(git rev-parse HEAD) | tee -a $GITHUB_OUTPUT
 
   create_github_release:
