@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## 0.1.2 - **not yet released**
+##  - **not yet released**
 
 ### 🚀 Features
 
@@ -13,6 +13,8 @@ All notable changes to this project will be documented in this file.
 - Minor log fix ([#341](https://github.com/apify/crawlee-python/issues/341)) ([0688bf1](https://github.com/apify/crawlee-python/commit/0688bf1860534ab6b2a85dc850bf3d56507ab154))
 - Also use error_handler for context pipeline errors ([#331](https://github.com/apify/crawlee-python/issues/331)) ([7a66445](https://github.com/apify/crawlee-python/commit/7a664456b45c7e429b4c90aaf1c09d5796b93e3d))
 - Strip whitespace from href in enqueue_links ([#346](https://github.com/apify/crawlee-python/issues/346)) ([8a3174a](https://github.com/apify/crawlee-python/commit/8a3174aed24f9eb4f9ac415a79a58685a081cde2))
+- Warn instead of crashing when an empty dataset is being exported ([#342](https://github.com/apify/crawlee-python/issues/342)) ([22b95d1](https://github.com/apify/crawlee-python/commit/22b95d1948d4acd23a010898fa6af2f491e7f514))
+- Avoid Github rate limiting in project bootstrapping test ([#364](https://github.com/apify/crawlee-python/issues/364)) ([992f07f](https://github.com/apify/crawlee-python/commit/992f07f266f7b8433d99e9a179f277995f81eb17))
 
 ## [0.1.1](https://github.com/apify/crawlee-python/releases/tag/v0.1.1) (2024-07-19)
 
