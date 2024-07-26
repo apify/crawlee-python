@@ -55,12 +55,12 @@ jobs:
           git tag | grep 'b[0-9]' | xargs git tag --delete
 
       - name: Install git-cliff
-        run: cargo install git-cliff
+        run: pip install git-cliff
 
       - name: Determine version number
         id: version_number
         run: |
-          if [[ ${{ github.event_name }} = workflow_dispatch && ${{ github.event.inputs.release_type }} = custom ]]; then
+          if [[ '${{ github.event_name }}' = workflow_dispatch && '${{ github.event.inputs.release_type }}' = custom ]]; then
             echo result=$(echo ${{ github.event.inputs.custom_version }} | sed s/^v//) >> $GITHUB_OUTPUT
           else
             echo result=$(git-cliff --bumped-version | sed s/^v//)
@@ -85,7 +85,7 @@ jobs:
           git tag | grep 'b[0-9]' | xargs git tag --delete
 
       - name: Install git-cliff
-        run: cargo install git-cliff
+        run: pip install git-cliff
 
       - name: Set up git
         run: |
@@ -123,7 +123,7 @@ jobs:
           git tag | grep 'b[0-9]' | xargs git tag --delete
 
       - name: Install git-cliff
-        run: cargo install git-cliff
+        run: pip install git-cliff
 
       - name: Generate release notes with git-cliff
         run: git-cliff --tag "v${{ steps.version_number.outputs.result }}" --unreleased --strip all > release_notes.md
