@@ -64,6 +64,7 @@ jobs:
             echo result=$(echo ${{ github.event.inputs.custom_version }} | sed s/^v//) >> $GITHUB_OUTPUT
           else
             echo result=$(git-cliff --bumped-version | sed s/^v//)
+          fi
 
   update_changelog:
     name: Update changelog
