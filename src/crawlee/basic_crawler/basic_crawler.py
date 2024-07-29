@@ -288,7 +288,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
     ) -> RequestProvider:
         """Return the configured request provider. If none is configured, open and return the default request queue."""
         if not self._request_provider:
-            self._request_provider = await RequestQueue.open(id=id, name=name)
+            self._request_provider = await RequestQueue.open(id=id, name=name, configuration=self._configuration)
 
         return self._request_provider
 
@@ -299,7 +299,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         name: str | None = None,
     ) -> Dataset:
         """Return the dataset with the given ID or name. If none is provided, return the default dataset."""
-        return await Dataset.open(id=id, name=name)
+        return await Dataset.open(id=id, name=name, configuration=self._configuration)
 
     async def get_key_value_store(
         self,
@@ -308,7 +308,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         name: str | None = None,
     ) -> KeyValueStore:
         """Return the key-value store with the given ID or name. If none is provided, return the default KVS."""
-        return await KeyValueStore.open(id=id, name=name)
+        return await KeyValueStore.open(id=id, name=name, configuration=self._configuration)
 
     def error_handler(
         self, handler: ErrorHandler[TCrawlingContext | BasicCrawlingContext]
@@ -468,7 +468,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             dataset_id: The ID of the dataset.
             dataset_name: The name of the dataset.
         """
-        dataset = await Dataset.open(id=dataset_id, name=dataset_name)
+        dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
         path = path if isinstance(path, Path) else Path(path)
 
         if content_type is None:
@@ -494,7 +494,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             dataset_name: The name of the dataset.
             kwargs: Keyword arguments to be passed to the dataset's `push_data` method.
         """
-        dataset = await Dataset.open(id=dataset_id, name=dataset_name)
+        dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
         await dataset.push_data(data, **kwargs)
 
     def _should_retry_request(self, crawling_context: BasicCrawlingContext, error: Exception) -> bool:
