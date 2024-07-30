@@ -105,7 +105,7 @@ jobs:
       - name: Commit and push the result
         id: push
         run: |
-          git commit -am "chore(release): Update changelog [skip ci]"
+          git commit -am "chore(release): Update changelog [skip ci]" || true
           git push origin master || true
           echo commitish=$(git rev-parse HEAD) | tee -a $GITHUB_OUTPUT
 
