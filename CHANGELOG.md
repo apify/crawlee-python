@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 - Warn instead of crashing when an empty dataset is being exported ([#342](https://github.com/apify/crawlee-python/issues/342)) ([22b95d1](https://github.com/apify/crawlee-python/commit/22b95d1948d4acd23a010898fa6af2f491e7f514))
 - Avoid Github rate limiting in project bootstrapping test ([#364](https://github.com/apify/crawlee-python/issues/364)) ([992f07f](https://github.com/apify/crawlee-python/commit/992f07f266f7b8433d99e9a179f277995f81eb17))
 - Pass crawler configuration to storages ([#375](https://github.com/apify/crawlee-python/issues/375)) ([b2d3a52](https://github.com/apify/crawlee-python/commit/b2d3a52712abe21f4a4a5db4e20c80afe72c27de))
+- Purge request queue on repeated crawler runs ([#377](https://github.com/apify/crawlee-python/issues/377)) ([7ad3d69](https://github.com/apify/crawlee-python/commit/7ad3d6908e153c590bff72478af7ee3239a249bc))
 
 ## [0.1.1](https://github.com/apify/crawlee-python/releases/tag/v0.1.1) (2024-07-19)
 
