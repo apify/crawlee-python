@@ -112,7 +112,7 @@ jobs:
   create_github_release:
     name: Create github release
     if: github.event_name == 'workflow_dispatch'
-    needs: [update_changelog]
+    needs: [update_changelog, should_release]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
