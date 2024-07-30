@@ -18,6 +18,7 @@ from crawlee.autoscaling import ConcurrencySettings
 from crawlee.basic_crawler import BasicCrawler
 from crawlee.basic_crawler.errors import SessionError, UserDefinedErrorHandlerError
 from crawlee.basic_crawler.types import AddRequestsKwargs, BasicCrawlingContext
+from crawlee.configuration import Configuration
 from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.models import BaseRequestData, Request
 from crawlee.storages import Dataset, KeyValueStore, RequestList, RequestQueue
@@ -607,3 +608,19 @@ async def test_consecutive_runs_purge_request_queue() -> None:
         'http://b.com': 3,
         'http://c.com': 3,
     }
+
+
+async def test_passes_configuration_to_storages() -> None:
+    configuration = Configuration(persist_storage=False, purge_on_start=True)
+
+    crawler = BasicCrawler(configuration=configuration)
+
+    dataset = await crawler.get_dataset()
+    assert dataset._configuration is configuration
+
+    key_value_store = await crawler.get_key_value_store()
+    assert key_value_store._configuration is configuration
+
+    request_provider = await crawler.get_request_provider()
+    assert isinstance(request_provider, RequestQueue)
+    assert request_provider._configuration is configuration
