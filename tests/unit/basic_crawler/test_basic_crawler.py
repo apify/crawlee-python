@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections import Counter
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
@@ -587,6 +588,26 @@ def test_crawler_log() -> None:
     crawler = BasicCrawler()
     assert isinstance(crawler.log, logging.Logger)
     crawler.log.info('Test log message')
+
+
+async def test_consecutive_runs_purge_request_queue() -> None:
+    crawler = BasicCrawler()
+    visit = Mock()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        visit(context.request.url)
+
+    await crawler.run(['http://a.com', 'http://b.com', 'http://c.com'])
+    await crawler.run(['http://a.com', 'http://b.com', 'http://c.com'])
+    await crawler.run(['http://a.com', 'http://b.com', 'http://c.com'])
+
+    counter = Counter(args[0][0] for args in visit.call_args_list)
+    assert counter == {
+        'http://a.com': 3,
+        'http://b.com': 3,
+        'http://c.com': 3,
+    }
 
 
 async def test_passes_configuration_to_storages() -> None:
