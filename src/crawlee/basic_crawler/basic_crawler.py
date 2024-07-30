@@ -324,8 +324,19 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._failed_request_handler = handler
         return handler
 
-    async def run(self, requests: Sequence[str | BaseRequestData | Request] | None = None) -> FinalStatistics:
-        """Run the crawler until all requests are processed."""
+    async def run(
+        self,
+        requests: Sequence[str | BaseRequestData | Request] | None = None,
+        *,
+        purge_request_queue: bool = True,
+    ) -> FinalStatistics:
+        """Run the crawler until all requests are processed.
+
+        Args:
+            requests: The requests to be enqueued before the crawler starts
+            purge_request_queue: If this is `True` and the crawler is not being run for the first time, the default
+                request queue will be purged
+        """
         if self._running:
             raise RuntimeError(
                 'This crawler instance is already running, you can add more requests to it via `crawler.add_requests()`'
@@ -338,6 +349,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
             if self._use_session_pool:
                 await self._session_pool.reset_store()
+
+            request_provider = await self.get_request_provider()
+            if purge_request_queue and isinstance(request_provider, RequestQueue):
+                await request_provider.drop()
+                self._request_provider = await RequestQueue.open(configuration=self._configuration)
 
         if requests is not None:
             await self.add_requests(requests)

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections import Counter
 import json
 import logging
 from dataclasses import dataclass
@@ -586,3 +587,23 @@ def test_crawler_log() -> None:
     crawler = BasicCrawler()
     assert isinstance(crawler.log, logging.Logger)
     crawler.log.info('Test log message')
+
+
+async def test_consecutive_runs_purge_request_queue() -> None:
+    crawler = BasicCrawler()
+    visit = Mock()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        visit(context.request.url)
+
+    await crawler.run(['http://a.com', 'http://b.com', 'http://c.com'])
+    await crawler.run(['http://a.com', 'http://b.com', 'http://c.com'])
+    await crawler.run(['http://a.com', 'http://b.com', 'http://c.com'])
+
+    counter = Counter(args[0][0] for args in visit.call_args_list)
+    assert counter == {
+        'http://a.com': 3,
+        'http://b.com': 3,
+        'http://c.com': 3,
+    }
