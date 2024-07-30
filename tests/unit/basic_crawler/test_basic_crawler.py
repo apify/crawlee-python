@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import asyncio
-from collections import Counter
 import json
 import logging
+from collections import Counter
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
