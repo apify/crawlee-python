@@ -7,6 +7,7 @@ import logging
 from collections import Counter
 from dataclasses import dataclass
 from datetime import timedelta
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest.mock import Mock
 
@@ -25,7 +26,6 @@ from crawlee.storages import Dataset, KeyValueStore, RequestList, RequestQueue
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-    from pathlib import Path
 
     import respx
 
@@ -624,3 +624,15 @@ async def test_passes_configuration_to_storages() -> None:
     request_provider = await crawler.get_request_provider()
     assert isinstance(request_provider, RequestQueue)
     assert request_provider._configuration is configuration
+
+
+async def test_respects_no_persist_storage() -> None:
+    configuration = Configuration(persist_storage=False)
+    crawler = BasicCrawler(configuration=configuration)
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        await context.push_data({'something': 'something'})
+
+    datasets_path = Path(configuration.storage_dir) / 'datasets' / 'default'
+    assert not datasets_path.exists() or list(datasets_path.iterdir()) == []
