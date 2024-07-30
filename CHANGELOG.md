@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 - Strip whitespace from href in enqueue_links ([#346](https://github.com/apify/crawlee-python/issues/346)) ([8a3174a](https://github.com/apify/crawlee-python/commit/8a3174aed24f9eb4f9ac415a79a58685a081cde2))
 - Warn instead of crashing when an empty dataset is being exported ([#342](https://github.com/apify/crawlee-python/issues/342)) ([22b95d1](https://github.com/apify/crawlee-python/commit/22b95d1948d4acd23a010898fa6af2f491e7f514))
 - Avoid Github rate limiting in project bootstrapping test ([#364](https://github.com/apify/crawlee-python/issues/364)) ([992f07f](https://github.com/apify/crawlee-python/commit/992f07f266f7b8433d99e9a179f277995f81eb17))
+- Pass crawler configuration to storages ([#375](https://github.com/apify/crawlee-python/issues/375)) ([b2d3a52](https://github.com/apify/crawlee-python/commit/b2d3a52712abe21f4a4a5db4e20c80afe72c27de))
 
 ## [0.1.1](https://github.com/apify/crawlee-python/releases/tag/v0.1.1) (2024-07-19)
 
