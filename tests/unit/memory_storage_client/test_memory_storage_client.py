@@ -41,10 +41,10 @@ async def test_write_metadata(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    ('persist_storage'),
+    'persist_storage',
     [
-        (True),
-        (False),
+        True,
+        False,
     ],
 )
 async def test_persist_storage(persist_storage: bool, tmp_path: Path) -> None:  # noqa: FBT001
