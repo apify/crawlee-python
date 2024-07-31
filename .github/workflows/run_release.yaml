@@ -75,6 +75,8 @@ jobs:
       id-token: write # Required for OIDC authentication.
     outputs:
       changelog_commitish: ${{ steps.push.commitish }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -114,6 +116,8 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     needs: [update_changelog, should_release]
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
