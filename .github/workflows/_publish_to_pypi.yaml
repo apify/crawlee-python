@@ -2,6 +2,10 @@ name: Publish to PyPI
 
 on:
   workflow_call:
+    inputs:
+      version_number:
+        required: true
+        type: string
 
 jobs:
   publish_to_pypi:
@@ -23,24 +27,37 @@ jobs:
         with:
           python-version: 3.12
 
+      - name: Set up Poetry
+        run: pipx install poetry
+
       - name: Install dependencies
         run: make install-dev
 
-      # Determines the release type based on the event that triggered the workflow.
-      - name: Determine release type
-        id: determine-release-type
+      # Updates the version number in the project's configuration.
+      - name: Set version in pyproject.toml
         run: |
-          if [[ ${{ github.event_name }} = workflow_dispatch ]]; then
-            release_type="final"
-          elif [[ ${{ github.event_name }} = push ]]; then
-            release_type="beta"
+          if [[ ${{ github.event_name }} = push ]]; then
+            # Make a pre-release on push
+            next_beta=$(
+              curl "https://pypi.org/pypi/crawlee/json" | jq --raw-output '
+                [
+                  .releases |
+                    keys |
+                    .[] |
+                    select(startswith("${{ inputs.version_number }}b")) |
+                    split("b") |
+                    .[1] |
+                    tonumber
+                ] |
+                sort_by(- .) |
+                .[0] + 1
+              '
+            )
+            poetry version "${{ inputs.version_number }}b$next_beta"
+          else
+            # ...and a regular release otherwise
+            poetry version '${{ inputs.version_number }}'
           fi
-          echo "release_type=${release_type}" >> $GITHUB_OUTPUT
-
-      # Updates the version number for pre-releases in the project's configuration.
-      - name: Set pre-release version
-        if: steps.determine-release-type.outputs.release_type != 'final'
-        run: python ./scripts/update_version_for_prerelease.py ${{ steps.determine-release-type.outputs.release_type }}
 
       # Builds the package.
       - name: Build package

@@ -146,8 +146,10 @@ jobs:
 
   publish_to_pypi:
     name: Publish to PyPI
-    needs: [create_github_release]
+    needs: [should_release]
     uses: ./.github/workflows/_publish_to_pypi.yaml
+    with:
+      version_number: ${{ needs.should_release.outputs.version_number }}
 
   # TODO: add job for publish package to Conda
   # https://github.com/apify/crawlee-py/issues/104
