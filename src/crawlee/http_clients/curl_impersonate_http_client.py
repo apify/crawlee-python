@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from crawlee.statistics import Statistics
 
 
-class _CurlCffiResponse:
+class _CurlImpersonateResponse:
     """Adapter class for `curl_cffi.requests.Response` to conform to the `HttpResponse` protocol."""
 
     def __init__(self, response: Response) -> None:
@@ -43,7 +43,7 @@ class _CurlCffiResponse:
         return dict(self._response.headers.items())
 
 
-class CurlCffiHttpClient(BaseHttpClient):
+class CurlImpersonateHttpClient(BaseHttpClient):
     """A `curl-cffi` based HTTP client used for making HTTP calls in crawlers (`BasicCrawler` subclasses)."""
 
     def __init__(
@@ -97,7 +97,7 @@ class CurlCffiHttpClient(BaseHttpClient):
         request.loaded_url = response.url
 
         return HttpCrawlingResult(
-            http_response=_CurlCffiResponse(response),
+            http_response=_CurlImpersonateResponse(response),
         )
 
     @override
@@ -127,7 +127,7 @@ class CurlCffiHttpClient(BaseHttpClient):
                 raise ProxyError from exc
             raise
 
-        return _CurlCffiResponse(response)
+        return _CurlImpersonateResponse(response)
 
     def _get_client(self, proxy_url: str | None) -> AsyncSession:
         """Helper to get a HTTP client for the given proxy URL.

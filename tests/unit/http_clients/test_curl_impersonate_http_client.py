@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import pytest
 from curl_cffi.requests.errors import RequestsError
 
-from crawlee.http_clients import CurlCffiHttpClient
+from crawlee.http_clients import CurlImpersonateHttpClient
 from crawlee.models import Request
 from crawlee.statistics import Statistics
 
@@ -15,13 +15,13 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture()
-def http_client() -> CurlCffiHttpClient:
-    return CurlCffiHttpClient()
+def http_client() -> CurlImpersonateHttpClient:
+    return CurlImpersonateHttpClient()
 
 
 @pytest.mark.skipif(os.name == 'nt', reason='Skipped on Windows')
 async def test_crawl_with_proxy(
-    http_client: CurlCffiHttpClient,
+    http_client: CurlImpersonateHttpClient,
     proxy: ProxyInfo,
     httpbin: str,
 ) -> None:
@@ -36,7 +36,7 @@ async def test_crawl_with_proxy(
 
 @pytest.mark.skipif(os.name == 'nt', reason='Skipped on Windows')
 async def test_crawl_with_proxy_disabled(
-    http_client: CurlCffiHttpClient,
+    http_client: CurlImpersonateHttpClient,
     disabled_proxy: ProxyInfo,
     httpbin: str,
 ) -> None:
@@ -52,7 +52,7 @@ async def test_crawl_with_proxy_disabled(
 
 @pytest.mark.skipif(os.name == 'nt', reason='Skipped on Windows')
 async def test_send_request_with_proxy(
-    http_client: CurlCffiHttpClient,
+    http_client: CurlImpersonateHttpClient,
     proxy: ProxyInfo,
     httpbin: str,
 ) -> None:
@@ -64,7 +64,7 @@ async def test_send_request_with_proxy(
 
 @pytest.mark.skipif(os.name == 'nt', reason='Skipped on Windows')
 async def test_send_request_with_proxy_disabled(
-    http_client: CurlCffiHttpClient,
+    http_client: CurlImpersonateHttpClient,
     disabled_proxy: ProxyInfo,
     httpbin: str,
 ) -> None:
