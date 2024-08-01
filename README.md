@@ -28,7 +28,7 @@
     <a href="https://apify.com/resources/crawlee-for-python-webinar">
         <picture>
           <source media="(prefers-color-scheme: dark)" srcset="https://pbs.twimg.com/card_img/1817941805385560065/U9LeYTKD?format=png&name=small">
-          <img alt="Crawlee" src="https://cdn-cms.apify.com/Scraping_with_Crawlee_101_de11e9de45.png" width="500">
+          <img alt="Crawlee" src="https://pbs.twimg.com/card_img/1817941805385560065/U9LeYTKD?format=png&name=small" width="500">
         </picture>
     </a>
     <br>
