@@ -18,9 +18,3 @@ repos:
         entry: make unit-tests
         language: system
         pass_filenames: false
-
-      - id: check-version-conflict
-        name: Check version conflict
-        entry: make check-version-conflict
-        language: system
-        pass_filenames: false
