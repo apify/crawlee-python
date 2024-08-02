@@ -18,7 +18,6 @@ from crawlee.http_crawler import HttpCrawlingContext
 from crawlee.models import BaseRequestData
 
 if TYPE_CHECKING:
-    from crawlee.http_clients import BaseHttpClient
     from crawlee.types import AddRequestsKwargs, BasicCrawlingContext
 
 
@@ -61,7 +60,6 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
                 ignore_http_error_status_codes=ignore_http_error_status_codes,
             ),
         )
-        self._http_client: BaseHttpClient  # since we set it in the line above, it should be initialized
 
         kwargs.setdefault('_logger', logging.getLogger(__name__))
 
@@ -73,10 +71,6 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
             session=context.session,
             proxy_info=context.proxy_info,
             statistics=self._statistics,
-        )
-
-        self.log.info(
-            f'Fetched {context.request.url} - status code: {result.http_response.status_code} - result: {result}'
         )
 
         yield HttpCrawlingContext(

@@ -11,7 +11,6 @@ from crawlee.http_clients import HttpxHttpClient
 from crawlee.http_crawler.types import HttpCrawlingContext
 
 if TYPE_CHECKING:
-    from crawlee.http_clients import BaseHttpClient
     from crawlee.types import BasicCrawlingContext
 
 
@@ -46,7 +45,6 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
                 ignore_http_error_status_codes=ignore_http_error_status_codes,
             ),
         )
-        self._http_client: BaseHttpClient
 
         kwargs.setdefault('_logger', logging.getLogger(__name__))
 
