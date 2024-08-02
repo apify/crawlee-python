@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, cast
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 import httpx
 from typing_extensions import override
@@ -68,12 +68,20 @@ class HttpxHttpClient(BaseHttpClient):
         persist_cookies_per_session: bool = True,
         additional_http_error_status_codes: Iterable[int] = (),
         ignore_http_error_status_codes: Iterable[int] = (),
+        **async_client_kwargs: Any,
     ) -> None:
-        super().__init__(
-            persist_cookies_per_session=persist_cookies_per_session,
-            additional_http_error_status_codes=additional_http_error_status_codes,
-            ignore_http_error_status_codes=ignore_http_error_status_codes,
-        )
+        """Create a new instance.
+
+        Args:
+            persist_cookies_per_session: Whether to persist cookies per HTTP session.
+            additional_http_error_status_codes: Additional HTTP status codes to treat as errors.
+            ignore_http_error_status_codes: HTTP status codes to ignore as errors.
+            async_client_kwargs: Additional keyword arguments for `httpx.AsyncClient`.
+        """
+        self._persist_cookies_per_session = persist_cookies_per_session
+        self._additional_http_error_status_codes = set(additional_http_error_status_codes)
+        self._ignore_http_error_status_codes = set(ignore_http_error_status_codes)
+        self._async_client_kwargs = async_client_kwargs
 
         self._client_by_proxy_url = dict[Optional[str], httpx.AsyncClient]()
 
@@ -161,6 +169,7 @@ class HttpxHttpClient(BaseHttpClient):
                 transport=_HttpxTransport(),
                 proxy=proxy_url,
                 timeout=httpx.Timeout(10),
+                **self._async_client_kwargs,
             )
 
         return self._client_by_proxy_url[proxy_url]

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Iterable, Protocol
+from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     from crawlee.models import Request
@@ -36,24 +36,6 @@ class HttpCrawlingResult:
 
 class BaseHttpClient(ABC):
     """An HTTP client used for making HTTP calls in crawlers (`BasicCrawler` subclasses)."""
-
-    def __init__(
-        self,
-        *,
-        persist_cookies_per_session: bool = True,
-        additional_http_error_status_codes: Iterable[int] = (),
-        ignore_http_error_status_codes: Iterable[int] = (),
-    ) -> None:
-        """Create a new instance.
-
-        Args:
-            persist_cookies_per_session: Whether to persist cookies per HTTP session.
-            additional_http_error_status_codes: Additional HTTP status codes to treat as errors.
-            ignore_http_error_status_codes: HTTP status codes to ignore as errors.
-        """
-        self._persist_cookies_per_session = persist_cookies_per_session
-        self._additional_http_error_status_codes = set(additional_http_error_status_codes)
-        self._ignore_http_error_status_codes = set(ignore_http_error_status_codes)
 
     @abstractmethod
     async def crawl(

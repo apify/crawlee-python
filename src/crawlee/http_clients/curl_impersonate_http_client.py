@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from curl_cffi.requests import AsyncSession
 from curl_cffi.requests.errors import RequestsError
@@ -52,12 +52,20 @@ class CurlImpersonateHttpClient(BaseHttpClient):
         persist_cookies_per_session: bool = True,
         additional_http_error_status_codes: Iterable[int] = (),
         ignore_http_error_status_codes: Iterable[int] = (),
+        **async_session_kwargs: Any,
     ) -> None:
-        super().__init__(
-            persist_cookies_per_session=persist_cookies_per_session,
-            additional_http_error_status_codes=additional_http_error_status_codes,
-            ignore_http_error_status_codes=ignore_http_error_status_codes,
-        )
+        """Create a new instance.
+
+        Args:
+            persist_cookies_per_session: Whether to persist cookies per HTTP session.
+            additional_http_error_status_codes: Additional HTTP status codes to treat as errors.
+            ignore_http_error_status_codes: HTTP status codes to ignore as errors.
+            async_session_kwargs: Additional keyword arguments for `curl_cffi.requests.AsyncSession`.
+        """
+        self._persist_cookies_per_session = persist_cookies_per_session
+        self._additional_http_error_status_codes = set(additional_http_error_status_codes)
+        self._ignore_http_error_status_codes = set(ignore_http_error_status_codes)
+        self._async_session_kwargs = async_session_kwargs
 
         self._client_by_proxy_url = dict[Optional[str], AsyncSession]()
 
@@ -140,7 +148,10 @@ class CurlImpersonateHttpClient(BaseHttpClient):
         If the client for the given proxy URL doesn't exist, it will be created and stored.
         """
         if proxy_url not in self._client_by_proxy_url:
-            self._client_by_proxy_url[proxy_url] = AsyncSession(proxy=proxy_url, timeout=10)
+            self._client_by_proxy_url[proxy_url] = AsyncSession(
+                proxy=proxy_url,
+                **self._async_session_kwargs,
+            )
 
         return self._client_by_proxy_url[proxy_url]
 
