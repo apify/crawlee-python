@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions import Session
     from crawlee.statistics import Statistics
-    from crawlee.types import HttpMethod
+    from crawlee.types import HttpHeaders, HttpMethod
 
 
 class HttpResponse(Protocol):
@@ -72,7 +72,7 @@ class BaseHttpClient(ABC):
         url: str,
         *,
         method: HttpMethod = 'GET',
-        headers: dict[str, str] | None = None,
+        headers: HttpHeaders | None = None,
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> HttpResponse:

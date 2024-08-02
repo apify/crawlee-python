@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Coroutine, Sequence
+from collections.abc import Coroutine, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal, Protocol, Union
@@ -13,7 +13,7 @@ from typing_extensions import NotRequired, TypeAlias, TypedDict, Unpack
 if TYPE_CHECKING:
     from crawlee import Glob
     from crawlee.enqueue_strategy import EnqueueStrategy
-    from crawlee.http_clients.base_http_client import HttpResponse
+    from crawlee.http_clients.base import HttpResponse
     from crawlee.models import BaseRequestData, DatasetItemsListPage, Request
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions.session import Session
@@ -139,7 +139,7 @@ class SendRequestFunction(Protocol):
         url: str,
         *,
         method: HttpMethod = 'GET',
-        headers: dict[str, str] | None = None,
+        headers: HttpHeaders | None = None,
     ) -> Coroutine[None, None, HttpResponse]: ...
 
 
@@ -169,3 +169,42 @@ class RequestHandlerRunResult:
     ) -> None:
         """Track a call to the `add_requests` context helper."""
         self.add_requests_calls.append(AddRequestsFunctionCall(requests=requests, **kwargs))
+
+
+class HttpHeaders(Mapping[str, str]):
+    """An immutable mapping for HTTP headers that ensures case-insensitivity for header names."""
+
+    def __init__(self, headers: Mapping[str, str] | None = None) -> None:
+        """Create a new instance.
+
+        Args:
+            headers: A mapping of header names to values.
+        """
+        # Ensure immutability by sorting and fixing the order.
+        headers = headers or {}
+        headers = {k.lower(): v for k, v in headers.items()}
+        self._headers = dict(sorted(headers.items()))
+
+    def __getitem__(self, key: str) -> str:
+        """Get the value of a header by its name, case-insensitive."""
+        return self._headers[key.lower()]
+
+    def __iter__(self) -> Iterator[str]:
+        """Return an iterator over the header names."""
+        return iter(self._headers)
+
+    def __len__(self) -> int:
+        """Return the number of headers."""
+        return len(self._headers)
+
+    def __repr__(self) -> str:
+        """Return a string representation of the object."""
+        return f'{self.__class__.__name__}({self._headers})'
+
+    def __setitem__(self, key: str, value: str) -> None:
+        """Prevent setting a header, as the object is immutable."""
+        raise TypeError(f'{self.__class__.__name__} is immutable')
+
+    def __delitem__(self, key: str) -> None:
+        """Prevent deleting a header, as the object is immutable."""
+        raise TypeError(f'{self.__class__.__name__} is immutable')

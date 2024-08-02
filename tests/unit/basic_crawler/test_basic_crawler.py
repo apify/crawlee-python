@@ -22,7 +22,7 @@ from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.errors import SessionError, UserDefinedErrorHandlerError
 from crawlee.models import BaseRequestData, Request
 from crawlee.storages import Dataset, KeyValueStore, RequestList, RequestQueue
-from crawlee.types import AddRequestsKwargs, BasicCrawlingContext
+from crawlee.types import AddRequestsKwargs, BasicCrawlingContext, HttpHeaders
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -170,7 +170,7 @@ async def test_calls_error_handler() -> None:
 
     @crawler.error_handler
     async def error_handler(context: BasicCrawlingContext, error: Exception) -> Request:
-        headers = context.request.headers or {}
+        headers = context.request.headers or HttpHeaders()
         custom_retry_count = int(headers.get('custom_retry_count', '0'))
         calls.append((context, error, custom_retry_count))
 
@@ -257,7 +257,7 @@ async def test_send_request_works(respx_mock: respx.MockRouter) -> None:
     )
 
     response_body: Any = None
-    response_headers: dict[str, str] | None = None
+    response_headers: HttpHeaders | None = None
 
     crawler = BasicCrawler(
         request_provider=RequestList(['http://a.com/']),
@@ -270,7 +270,7 @@ async def test_send_request_works(respx_mock: respx.MockRouter) -> None:
 
         response = await context.send_request('http://b.com/')
         response_body = response.read()
-        response_headers = response.headers
+        response_headers = HttpHeaders(response.headers)
 
     await crawler.run()
     assert respx_mock['test_endpoint'].called

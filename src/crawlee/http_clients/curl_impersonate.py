@@ -9,7 +9,6 @@ from typing_extensions import override
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
 from crawlee.errors import HttpStatusCodeError, ProxyError
 from crawlee.http_clients import BaseHttpClient, HttpCrawlingResult, HttpResponse
-from crawlee.types import HttpMethod  # noqa: TCH001
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -20,6 +19,7 @@ if TYPE_CHECKING:
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions import Session
     from crawlee.statistics import Statistics
+    from crawlee.types import HttpHeaders, HttpMethod
 
 
 class _CurlImpersonateResponse:
@@ -120,11 +120,10 @@ class CurlImpersonateHttpClient(BaseHttpClient):
         url: str,
         *,
         method: HttpMethod = 'GET',
-        headers: dict[str, str] | None = None,
+        headers: HttpHeaders | None = None,
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> HttpResponse:
-        headers = headers or {}
         proxy_url = proxy_info.url if proxy_info else None
         client = self._get_client(proxy_url)
 

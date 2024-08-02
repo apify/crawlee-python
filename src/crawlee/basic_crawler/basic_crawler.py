@@ -42,7 +42,7 @@ from crawlee.models import BaseRequestData, DatasetItemsListPage, Request, Reque
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
-from crawlee.types import BasicCrawlingContext, RequestHandlerRunResult, SendRequestFunction
+from crawlee.types import BasicCrawlingContext, HttpHeaders, RequestHandlerRunResult, SendRequestFunction
 
 if TYPE_CHECKING:
     import re
@@ -684,12 +684,12 @@ class BasicCrawler(Generic[TCrawlingContext]):
             url: str,
             *,
             method: HttpMethod = 'GET',
-            headers: dict[str, str] | None = None,
+            headers: HttpHeaders | None = None,
         ) -> HttpResponse:
             return await self._http_client.send_request(
                 url=url,
                 method=method,
-                headers=headers or {},
+                headers=headers,
                 session=session,
                 proxy_info=proxy_info,
             )
