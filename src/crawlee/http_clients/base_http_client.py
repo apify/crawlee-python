@@ -13,29 +13,33 @@ if TYPE_CHECKING:
 
 
 class HttpResponse(Protocol):
-    """Protocol for HTTP responses of the HTTP client."""
+    """This protocol defines the interface that any HTTP response object must implement."""
 
     def read(self) -> bytes:
         """Read the content of the response body."""
 
     @property
     def status_code(self) -> int:
-        """HTTP status code of the response."""
+        """The HTTP status code received from the server."""
 
     @property
     def headers(self) -> dict[str, str]:
-        """HTTP headers of the response."""
+        """The HTTP headers received in the response."""
 
 
 @dataclass(frozen=True)
 class HttpCrawlingResult:
-    """Result of a HTTP-only crawl."""
+    """Result of a HTTP-only crawl.
+
+    Args:
+        http_response: The HTTP response received from the server.
+    """
 
     http_response: HttpResponse
 
 
 class BaseHttpClient(ABC):
-    """An HTTP client used for making HTTP calls in crawlers (`BasicCrawler` subclasses)."""
+    """An abstract base class for HTTP clients used in crawlers (`BasicCrawler` subclasses)."""
 
     @abstractmethod
     async def crawl(

@@ -29,22 +29,23 @@ class _CurlImpersonateResponse:
         self._response = response
 
     def read(self) -> bytes:
-        """Read the content of the response body."""
         return self._response.content
 
     @property
     def status_code(self) -> int:
-        """HTTP status code of the response."""
         return self._response.status_code
 
     @property
     def headers(self) -> dict[str, str]:
-        """HTTP headers of the response."""
         return dict(self._response.headers.items())
 
 
 class CurlImpersonateHttpClient(BaseHttpClient):
-    """A `curl-cffi` based HTTP client used for making HTTP calls in crawlers (`BasicCrawler` subclasses)."""
+    """HTTP client based on the `curl-cffi` library.
+
+    This client uses the `curl-cffi` library to perform HTTP requests in crawlers (`BasicCrawler` subclasses)
+    and to manage sessions, proxies, and error handling.
+    """
 
     def __init__(
         self,

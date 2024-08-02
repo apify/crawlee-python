@@ -26,22 +26,24 @@ class _HttpxResponse:
         self._response = response
 
     def read(self) -> bytes:
-        """Read the content of the response body."""
         return self._response.read()
 
     @property
     def status_code(self) -> int:
-        """HTTP status code of the response."""
         return self._response.status_code
 
     @property
     def headers(self) -> dict[str, str]:
-        """HTTP headers of the response."""
         return dict(self._response.headers.items())
 
 
 class _HttpxTransport(httpx.AsyncHTTPTransport):
-    """A modified HTTP transport adapter that stores response cookies in a `Session` instead of the `HTTPX` client."""
+    """HTTP transport adapter that stores response cookies in a `Session`.
+
+    This transport adapter modifies the handling of HTTP requests to update the session cookies
+    based on the response cookies, ensuring that the cookies are stored in the session object
+    rather than the `HTTPX` client itself.
+    """
 
     @override
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
@@ -60,7 +62,11 @@ class _HttpxTransport(httpx.AsyncHTTPTransport):
 
 
 class HttpxHttpClient(BaseHttpClient):
-    """A `HTTPX` based HTTP client used for making HTTP calls in crawlers (`BasicCrawler` subclasses)."""
+    """HTTP client based on the `HTTPX` library.
+
+    This client uses the `HTTPX` library to perform HTTP requests in crawlers (`BasicCrawler` subclasses)
+    and to manage sessions, proxies, and error handling.
+    """
 
     def __init__(
         self,
@@ -168,7 +174,6 @@ class HttpxHttpClient(BaseHttpClient):
             self._client_by_proxy_url[proxy_url] = httpx.AsyncClient(
                 transport=_HttpxTransport(),
                 proxy=proxy_url,
-                timeout=httpx.Timeout(10),
                 **self._async_client_kwargs,
             )
 
