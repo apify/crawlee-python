@@ -43,8 +43,9 @@ postprocessors = [
 ]
 
 [bump]
-# With 0.x.y version, breaking commits should only increase the minor version
+# With 0.x.y version, breaking commits should only increase the minor version and feature commits should only increase the patch version
 breaking_always_bump_major = false
+features_always_bump_minor = false
 
 [git]
 # parse the commits based on https://www.conventionalcommits.org
