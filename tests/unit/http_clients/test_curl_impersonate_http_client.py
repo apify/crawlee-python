@@ -4,8 +4,8 @@ import os
 from typing import TYPE_CHECKING
 
 import pytest
-from curl_cffi.requests.errors import RequestsError
 
+from crawlee.errors import ProxyError
 from crawlee.http_clients import CurlImpersonateHttpClient
 from crawlee.models import Request
 from crawlee.statistics import Statistics
@@ -43,9 +43,7 @@ async def test_crawl_with_proxy_disabled(
     url = f'{httpbin}/status/222'
     request = Request.from_url(url)
 
-    # Since curl-cffi returns RequestsError with generic message and 400,
-    # we can't distinguish between ProxyError and others.
-    with pytest.raises(RequestsError):
+    with pytest.raises(ProxyError):
         async with Statistics() as statistics:
             await http_client.crawl(request, proxy_info=disabled_proxy, statistics=statistics)
 
@@ -70,7 +68,5 @@ async def test_send_request_with_proxy_disabled(
 ) -> None:
     url = f'{httpbin}/status/222'
 
-    # Since curl-cffi returns RequestsError with generic message and 400,
-    # we can't distinguish between ProxyError and others.
-    with pytest.raises(RequestsError):
+    with pytest.raises(ProxyError):
         await http_client.send_request(url, proxy_info=disabled_proxy)

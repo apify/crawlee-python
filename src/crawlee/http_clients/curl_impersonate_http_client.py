@@ -72,13 +72,18 @@ class CurlImpersonateHttpClient(BaseHttpClient):
     ) -> HttpCrawlingResult:
         client = self._get_client(proxy_info.url if proxy_info else None)
 
-        response = await client.request(
-            method=request.method.upper(),  # curl-cffi requires uppercase method
-            url=request.url,
-            headers=request.headers,
-            cookies=session.cookies if session else None,
-            allow_redirects=True,
-        )
+        try:
+            response = await client.request(
+                method=request.method.upper(),  # curl-cffi requires uppercase method
+                url=request.url,
+                headers=request.headers,
+                cookies=session.cookies if session else None,
+                allow_redirects=True,
+            )
+        except RequestsError as exc:
+            if self._is_proxy_error(exc):
+                raise ProxyError from exc
+            raise
 
         if statistics:
             statistics.register_status_code(response.status_code)
@@ -142,7 +147,11 @@ class CurlImpersonateHttpClient(BaseHttpClient):
     @staticmethod
     def _is_proxy_error(error: RequestsError) -> bool:
         """Helper to check whether the given error is a proxy-related error."""
-        if any(needle in str(error) for needle in ROTATE_PROXY_ERRORS):  # noqa: SIM103
+        if any(needle in str(error) for needle in ROTATE_PROXY_ERRORS):
+            return True
+
+        # Once https://github.com/yifeikong/curl_cffi/issues/361 is resolved, do it better.
+        if 'CONNECT tunnel failed' in str(error):  # noqa: SIM103
             return True
 
         return False
