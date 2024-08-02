@@ -1,5 +1,5 @@
-from .base_http_client import BaseHttpClient, HttpCrawlingResult, HttpResponse
-from .curl_impersonate_http_client import CurlImpersonateHttpClient
-from .httpx_http_client import HttpxHttpClient
+from .base import BaseHttpClient, HttpCrawlingResult, HttpResponse
+from .curl_impersonate import CurlImpersonateHttpClient
+from .httpx import HttpxHttpClient
 
 __all__ = ['BaseHttpClient', 'CurlImpersonateHttpClient', 'HttpCrawlingResult', 'HttpResponse', 'HttpxHttpClient']
