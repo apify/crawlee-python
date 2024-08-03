@@ -13,6 +13,7 @@ from crawlee.browsers import BrowserPool
 from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.models import BaseRequestData
 from crawlee.playwright_crawler.types import PlaywrightCrawlingContext
+from crawlee.playwright_crawler.utils import scroll_to_bottom
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -154,6 +155,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 proxy_info=context.proxy_info,
                 log=context.log,
                 page=crawlee_page.page,
+                scroll_to_bottom=lambda: scroll_to_bottom(crawlee_page.page),
                 response=response,
                 enqueue_links=enqueue_links,
             )
