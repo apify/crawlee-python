@@ -15,12 +15,12 @@ class PlaywrightCrawlingContext(BasicCrawlingContext):
 
     Args:
         page: The Playwright `Page` object.
-        scroll_to_bottom: Scroll to the bottom of the page, handling "infinite scroll".
+        infinite_scroll: Scroll to the bottom of the page, handling loading of additional items.
         response: The Playwright `Response` object.
         enqueue_links: The `PlaywrightCrawler` implementation of the `EnqueueLinksFunction` function.
     """
 
     page: Page
-    scroll_to_bottom: Callable[[], Awaitable[None]]
+    infinite_scroll: Callable[[], Awaitable[None]]
     response: Response
     enqueue_links: EnqueueLinksFunction

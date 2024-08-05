@@ -5,8 +5,8 @@ from playwright.async_api import Page
 from playwright.async_api import Request as PlaywrightRequest
 
 
-async def scroll_to_bottom(page: Page) -> None:
-    """Scroll to the bottom of a page, handling "infinite scrolling"."""
+async def infinite_scroll(page: Page) -> None:
+    """Scroll to the bottom of a page, handling loading of additional items."""
     scrolled_distance = 0
     finished = False
 
