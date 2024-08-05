@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.2.0 - **not yet released**
+
+### 🚀 Features
+
+- Add new curl impersonate HTTP client ([#387](https://github.com/apify/crawlee-python/issues/387)) ([9c06260](https://github.com/apify/crawlee-python/commit/9c06260c0ee958522caa9322001a3186e9e43af4))
+
 ## [0.1.2](https://github.com/apify/crawlee-python/releases/tag/v0.1.2) (2024-07-30)
 
 ### 🚀 Features
