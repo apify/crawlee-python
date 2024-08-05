@@ -67,7 +67,7 @@ Verify that Crawlee is successfully installed:
 python -c 'import crawlee; print(crawlee.__version__)'
 ```
 
-For detail installation information see the [Setting up](../introduction/01-setting-up.mdx) documentation page.
+For detailed installation instructions see the [Setting up](../introduction/01-setting-up.mdx) documentation page.
 
 ### With Crawlee CLI
 
