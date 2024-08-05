@@ -28,24 +28,10 @@ Crawlee requires Python 3.9 or later.
 
 ## Installation
 
-Crawlee is available as the [`crawlee`](https://pypi.org/project/crawlee/) PyPI package.
+Crawlee is available as the [`crawlee`](https://pypi.org/project/crawlee/) PyPI package. The core functionality is included in the base package, with additional features available as optional extras to minimize package size and dependencies. To install Crawlee with all features, run the following command:
 
 ```sh
-pip install crawlee
-```
-
-Additional, optional dependencies unlocking more features are shipped as package extras.
-
-If you plan to use `BeautifulSoupCrawler`, install `crawlee` with `beautifulsoup` extra:
-
-```sh
-pip install 'crawlee[beautifulsoup]'
-```
-
-If you plan to use `PlaywrightCrawler`, install `crawlee` with the `playwright` extra:
-
-```sh
-pip install 'crawlee[playwright]'
+pip install 'crawlee[all]'
 ```
 
 Then, install the Playwright dependencies:
@@ -54,11 +40,13 @@ Then, install the Playwright dependencies:
 playwright install
 ```
 
-You can install multiple extras at once by using a comma as a separator:
+Verify that Crawlee is successfully installed:
 
 ```sh
-pip install 'crawlee[beautifulsoup,playwright]'
+python -c 'import crawlee; print(crawlee.__version__)'
 ```
+
+For detailed installation instructions see the [Setting up](../introduction/01-setting-up.mdx) documentation page.
 
 ## Crawling
 
