@@ -2,14 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.2.0](https://github.com/apify/crawlee-python/releases/tag/v0.2.0) (2024-08-05) - 
+## [0.2.0](https://github.com/apify/crawlee-python/releases/tag/v0.2.0) (2024-08-05)
 
 ### 🚀 Features
 
 - Add new curl impersonate HTTP client ([#387](https://github.com/apify/crawlee-python/issues/387)) ([9c06260](https://github.com/apify/crawlee-python/commit/9c06260c0ee958522caa9322001a3186e9e43af4))
 - *(playwright)* `infinite_scroll` helper ([#393](https://github.com/apify/crawlee-python/issues/393)) ([34f74bd](https://github.com/apify/crawlee-python/commit/34f74bdcffb42a6c876a856e1c89923d9b3e60bd))
 
-## [0.1.2](https://github.com/apify/crawlee-python/releases/tag/v0.1.2) (2024-07-30) - 
+## [0.1.2](https://github.com/apify/crawlee-python/releases/tag/v0.1.2) (2024-07-30)
 
 ### 🚀 Features
 
@@ -25,7 +25,7 @@ All notable changes to this project will be documented in this file.
 - Pass crawler configuration to storages ([#375](https://github.com/apify/crawlee-python/issues/375)) ([b2d3a52](https://github.com/apify/crawlee-python/commit/b2d3a52712abe21f4a4a5db4e20c80afe72c27de))
 - Purge request queue on repeated crawler runs ([#377](https://github.com/apify/crawlee-python/issues/377)) ([7ad3d69](https://github.com/apify/crawlee-python/commit/7ad3d6908e153c590bff72478af7ee3239a249bc))
 
-## [0.1.1](https://github.com/apify/crawlee-python/releases/tag/v0.1.1) (2024-07-19) - 
+## [0.1.1](https://github.com/apify/crawlee-python/releases/tag/v0.1.1) (2024-07-19)
 
 ### 🚀 Features
 
@@ -40,7 +40,7 @@ All notable changes to this project will be documented in this file.
 - Byte size serialization in MemoryInfo ([#245](https://github.com/apify/crawlee-python/issues/245)) ([a030174](https://github.com/apify/crawlee-python/commit/a0301746c2df076d281708344fb906e1c42e0790))
 - Project bootstrapping in existing folder ([#318](https://github.com/apify/crawlee-python/issues/318)) ([c630818](https://github.com/apify/crawlee-python/commit/c630818538e0c37217ab73f6c6da05505ed8b364))
 
-## [0.1.0](https://github.com/apify/crawlee-python/releases/tag/v0.1.0) (2024-07-08) - 
+## [0.1.0](https://github.com/apify/crawlee-python/releases/tag/v0.1.0) (2024-07-08)
 
 ### 🚀 Features
 
@@ -51,7 +51,7 @@ All notable changes to this project will be documented in this file.
 - CLI UX improvements ([#271](https://github.com/apify/crawlee-python/issues/271)) ([123d515](https://github.com/apify/crawlee-python/commit/123d515b224c663577bfe0fab387d0aa11e5e4d4))
 - Error handling in CLI and templates documentation ([#273](https://github.com/apify/crawlee-python/issues/273)) ([61083c3](https://github.com/apify/crawlee-python/commit/61083c33434d431a118538f15bfa9a68c312ab03))
 
-## [0.0.7](https://github.com/apify/crawlee-python/releases/tag/v0.0.7) (2024-06-27) - 
+## [0.0.7](https://github.com/apify/crawlee-python/releases/tag/v0.0.7) (2024-06-27)
 
 ### 🐛 Bug Fixes
 
@@ -60,7 +60,7 @@ All notable changes to this project will be documented in this file.
 - Handle blocked request ([#234](https://github.com/apify/crawlee-python/issues/234)) ([f8ef79f](https://github.com/apify/crawlee-python/commit/f8ef79ffcb7410713182af716d37dbbaad66fdbc))
 - Improve AutoscaledPool state management ([#241](https://github.com/apify/crawlee-python/issues/241)) ([fdea3d1](https://github.com/apify/crawlee-python/commit/fdea3d16b13afe70039d864de861486c760aa0ba))
 
-## [0.0.6](https://github.com/apify/crawlee-python/releases/tag/v0.0.6) (2024-06-25) - 
+## [0.0.6](https://github.com/apify/crawlee-python/releases/tag/v0.0.6) (2024-06-25)
 
 ### 🚀 Features
 
@@ -75,7 +75,7 @@ All notable changes to this project will be documented in this file.
 - Handling of relative URLs in add_requests ([#213](https://github.com/apify/crawlee-python/issues/213)) ([8aa8c57](https://github.com/apify/crawlee-python/commit/8aa8c57f44149caa0e01950a5d773726f261699a))
 - Graceful exit in BasicCrawler.run ([#224](https://github.com/apify/crawlee-python/issues/224)) ([337286e](https://github.com/apify/crawlee-python/commit/337286e1b721cf61f57bc0ff3ead08df1f4f5448))
 
-## [0.0.5](https://github.com/apify/crawlee-python/releases/tag/v0.0.5) (2024-06-21) - 
+## [0.0.5](https://github.com/apify/crawlee-python/releases/tag/v0.0.5) (2024-06-21)
 
 ### 🚀 Features
 
@@ -96,7 +96,7 @@ All notable changes to this project will be documented in this file.
 - Correct return type of storage get_info methods ([#200](https://github.com/apify/crawlee-python/issues/200)) ([332673c](https://github.com/apify/crawlee-python/commit/332673c4fb519b80846df7fb8cd8bb521538a8a4))
 - Type error in statistics persist state ([#206](https://github.com/apify/crawlee-python/issues/206)) ([96ceef6](https://github.com/apify/crawlee-python/commit/96ceef697769cd57bd1a50b6615cf1e70549bd2d))
 
-## [0.0.4](https://github.com/apify/crawlee-python/releases/tag/v0.0.4) (2024-05-30) - 
+## [0.0.4](https://github.com/apify/crawlee-python/releases/tag/v0.0.4) (2024-05-30)
 
 ### 🚀 Features
 
@@ -104,7 +104,7 @@ All notable changes to this project will be documented in this file.
 - Proxy configuration ([#156](https://github.com/apify/crawlee-python/issues/156)) ([5c3753a](https://github.com/apify/crawlee-python/commit/5c3753a5527b1d01f7260b9e4c566e43f956a5e8))
 - Add first version of browser pool and playwright crawler ([#161](https://github.com/apify/crawlee-python/issues/161)) ([2d2a050](https://github.com/apify/crawlee-python/commit/2d2a0505b1c2b1529a8835163ca97d1ec2a6e44a))
 
-## [0.0.3](https://github.com/apify/crawlee-python/releases/tag/v0.0.3) (2024-05-13) - 
+## [0.0.3](https://github.com/apify/crawlee-python/releases/tag/v0.0.3) (2024-05-13)
 
 ### 🚀 Features
 
