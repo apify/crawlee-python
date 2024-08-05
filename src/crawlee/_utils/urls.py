@@ -28,7 +28,7 @@ def validate_http_url(value: str | None) -> str | None:
     """Validate the given HTTP URL.
 
     Raises:
-        pydantic.error_wrappers.ValidationError: If the URL is not valid.
+        pydantic.ValidationError: If the URL is not valid.
     """
     if value is not None:
         _http_url_adapter.validate_python(value)

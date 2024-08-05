@@ -11,18 +11,18 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest.mock import Mock
 
+import httpx
 import pytest
-from httpx import Headers, Response
 
 from crawlee import Glob
 from crawlee.autoscaling import ConcurrencySettings
 from crawlee.basic_crawler import BasicCrawler
-from crawlee.basic_crawler.errors import SessionError, UserDefinedErrorHandlerError
-from crawlee.basic_crawler.types import AddRequestsKwargs, BasicCrawlingContext
 from crawlee.configuration import Configuration
 from crawlee.enqueue_strategy import EnqueueStrategy
+from crawlee.errors import SessionError, UserDefinedErrorHandlerError
 from crawlee.models import BaseRequestData, Request
 from crawlee.storages import Dataset, KeyValueStore, RequestList, RequestQueue
+from crawlee.types import AddRequestsKwargs, BasicCrawlingContext, HttpHeaders
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -170,7 +170,7 @@ async def test_calls_error_handler() -> None:
 
     @crawler.error_handler
     async def error_handler(context: BasicCrawlingContext, error: Exception) -> Request:
-        headers = context.request.headers or {}
+        headers = context.request.headers or HttpHeaders()
         custom_retry_count = int(headers.get('custom_retry_count', '0'))
         calls.append((context, error, custom_retry_count))
 
@@ -252,12 +252,12 @@ async def test_handles_error_in_failed_request_handler() -> None:
 
 
 async def test_send_request_works(respx_mock: respx.MockRouter) -> None:
-    respx_mock.get('http://b.com/', name='test_endpoint').return_value = Response(
+    respx_mock.get('http://b.com/', name='test_endpoint').return_value = httpx.Response(
         status_code=200, json={'hello': 'world'}
     )
 
     response_body: Any = None
-    response_headers: Headers | None = None
+    response_headers: HttpHeaders | None = None
 
     crawler = BasicCrawler(
         request_provider=RequestList(['http://a.com/']),
@@ -270,7 +270,7 @@ async def test_send_request_works(respx_mock: respx.MockRouter) -> None:
 
         response = await context.send_request('http://b.com/')
         response_body = response.read()
-        response_headers = response.headers
+        response_headers = HttpHeaders(response.headers)
 
     await crawler.run()
     assert respx_mock['test_endpoint'].called
@@ -278,7 +278,9 @@ async def test_send_request_works(respx_mock: respx.MockRouter) -> None:
     assert json.loads(response_body) == {'hello': 'world'}
 
     assert response_headers is not None
-    assert response_headers.get('content-type').endswith('/json')
+    content_type = response_headers.get('content-type')
+    assert content_type is not None
+    assert content_type.endswith('/json')
 
 
 @dataclass

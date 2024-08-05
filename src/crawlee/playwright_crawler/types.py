@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from crawlee.basic_crawler.types import BasicCrawlingContext, EnqueueLinksFunction
+from crawlee.types import BasicCrawlingContext, EnqueueLinksFunction
 
 if TYPE_CHECKING:
     from playwright.async_api import Page, Response
