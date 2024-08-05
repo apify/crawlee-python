@@ -2,8 +2,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Optional
 
-from curl_cffi.requests import AsyncSession
-from curl_cffi.requests.errors import RequestsError
+try:
+    from curl_cffi.requests import AsyncSession
+    from curl_cffi.requests.errors import RequestsError
+except ImportError as exc:
+    raise ImportError(
+        "To import anything from this subpackage, you need to install the 'curl-impersonate' extra."
+        "For example, if you use pip, run `pip install 'crawlee[curl-impersonate]'`.",
+    ) from exc
+
 from typing_extensions import override
 
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
