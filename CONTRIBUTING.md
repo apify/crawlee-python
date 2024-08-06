@@ -131,3 +131,35 @@ Publishing new versions to [PyPI](https://pypi.org/project/crawlee) is automated
 - **Beta releases**: On each commit to the master branch, a new beta release is automatically published. The version number is determined based on the latest release and conventional commits. The beta version suffix is incremented by 1 from the last beta release on PyPI.
 - **Stable releases**: A stable version release may be created by triggering the `run_release` GitHub Actions workflow. The version number is determined based on the latest release and conventional commits (`auto` release type), or it may be overriden using the `custom` release type.
 
+### Publishing to PyPI manually
+
+1. **Do not do this unless absolutely necessary.** In all conceivable scenarios, you should use the `run_release` workflow instead.
+2. **Make sure you know what you're doing.**
+
+3. Update the version number:
+
+- Modify the `version` field under `tool.poetry` in `pyproject.toml`.
+
+```toml
+[tool.poetry]
+name = "crawlee"
+version = "x.z.y"
+```
+
+4. Generate the distribution archives for the package:
+
+```shell
+poetry build
+```
+
+5. Set up the PyPI API token for authentication:
+
+```shell
+poetry config pypi-token.pypi YOUR_API_TOKEN
+```
+
+6. Upload the package to PyPI:
+
+```shell
+poetry publish
+```
