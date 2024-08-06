@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Awaitable, Callable
 
-from crawlee.basic_crawler.types import BasicCrawlingContext, EnqueueLinksFunction
+from crawlee.types import BasicCrawlingContext, EnqueueLinksFunction
 
 if TYPE_CHECKING:
     from playwright.async_api import Page, Response
@@ -15,10 +15,12 @@ class PlaywrightCrawlingContext(BasicCrawlingContext):
 
     Args:
         page: The Playwright `Page` object.
+        infinite_scroll: Scroll to the bottom of the page, handling loading of additional items.
         response: The Playwright `Response` object.
         enqueue_links: The `PlaywrightCrawler` implementation of the `EnqueueLinksFunction` function.
     """
 
     page: Page
+    infinite_scroll: Callable[[], Awaitable[None]]
     response: Response
     enqueue_links: EnqueueLinksFunction

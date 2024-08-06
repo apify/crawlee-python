@@ -25,24 +25,24 @@ from crawlee.autoscaling import AutoscaledPool, ConcurrencySettings
 from crawlee.autoscaling.snapshotter import Snapshotter
 from crawlee.autoscaling.system_status import SystemStatus
 from crawlee.basic_crawler.context_pipeline import ContextPipeline
-from crawlee.basic_crawler.errors import (
+from crawlee.basic_crawler.router import Router
+from crawlee.configuration import Configuration
+from crawlee.enqueue_strategy import EnqueueStrategy
+from crawlee.errors import (
     ContextPipelineInitializationError,
     ContextPipelineInterruptedError,
     RequestHandlerError,
     SessionError,
     UserDefinedErrorHandlerError,
 )
-from crawlee.basic_crawler.router import Router
-from crawlee.basic_crawler.types import BasicCrawlingContext, RequestHandlerRunResult, SendRequestFunction
-from crawlee.configuration import Configuration
-from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.events import LocalEventManager
-from crawlee.http_clients import HttpxClient
+from crawlee.http_clients import HttpxHttpClient
 from crawlee.log_config import CrawleeLogFormatter
 from crawlee.models import BaseRequestData, DatasetItemsListPage, Request, RequestState
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
+from crawlee.types import BasicCrawlingContext, HttpHeaders, RequestHandlerRunResult, SendRequestFunction
 
 if TYPE_CHECKING:
     import re
@@ -53,7 +53,7 @@ if TYPE_CHECKING:
     from crawlee.statistics import FinalStatistics, StatisticsState
     from crawlee.storages.dataset import GetDataKwargs, PushDataKwargs
     from crawlee.storages.request_provider import RequestProvider
-    from crawlee.types import JSONSerializable
+    from crawlee.types import HttpMethod, JSONSerializable
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Union[Request, None]]]
@@ -152,7 +152,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             self._router = None
             self.router.default_handler(request_handler)
 
-        self._http_client = http_client or HttpxClient()
+        self._http_client = http_client or HttpxHttpClient()
 
         self._context_pipeline = (_context_pipeline or ContextPipeline()).compose(self._check_url_after_redirects)
 
@@ -683,13 +683,13 @@ class BasicCrawler(Generic[TCrawlingContext]):
         async def send_request(
             url: str,
             *,
-            method: str = 'get',
-            headers: dict[str, str] | None = None,
+            method: HttpMethod = 'GET',
+            headers: HttpHeaders | None = None,
         ) -> HttpResponse:
             return await self._http_client.send_request(
-                url,
+                url=url,
                 method=method,
-                headers=headers or {},
+                headers=headers,
                 session=session,
                 proxy_info=proxy_info,
             )

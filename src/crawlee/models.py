@@ -13,6 +13,7 @@ from typing_extensions import Self, TypeVar
 from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
 from crawlee._utils.urls import extract_query_params, validate_http_url
 from crawlee.enqueue_strategy import EnqueueStrategy
+from crawlee.types import HttpMethod
 
 
 class BaseRequestData(BaseModel):
@@ -35,7 +36,7 @@ class BaseRequestData(BaseModel):
     to override the default behavior and specify which URLs shall be considered equal.
     """
 
-    method: str = 'get'
+    method: HttpMethod = 'GET'
 
     payload: str | None = None
 
@@ -438,7 +439,7 @@ class UnprocessedRequest(BaseModel):
 
     unique_key: Annotated[str, Field(alias='requestUniqueKey')]
     url: Annotated[str, BeforeValidator(validate_http_url), Field()]
-    method: Annotated[str | None, Field()] = None
+    method: Annotated[HttpMethod | None, Field()] = None
 
 
 class BatchRequestsOperationResponse(BaseModel):

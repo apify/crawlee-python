@@ -8,16 +8,17 @@ from typing_extensions import Unpack
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
-from crawlee.basic_crawler.errors import SessionError
 from crawlee.browsers import BrowserPool
 from crawlee.enqueue_strategy import EnqueueStrategy
+from crawlee.errors import SessionError
 from crawlee.models import BaseRequestData
 from crawlee.playwright_crawler.types import PlaywrightCrawlingContext
+from crawlee.playwright_crawler.utils import infinite_scroll
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
-    from crawlee.basic_crawler.types import AddRequestsKwargs, BasicCrawlingContext
+    from crawlee.types import AddRequestsKwargs, BasicCrawlingContext
 
 
 class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
@@ -154,6 +155,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 proxy_info=context.proxy_info,
                 log=context.log,
                 page=crawlee_page.page,
+                infinite_scroll=lambda: infinite_scroll(crawlee_page.page),
                 response=response,
                 enqueue_links=enqueue_links,
             )
