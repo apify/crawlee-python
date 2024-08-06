@@ -1,0 +1,220 @@
+---
+id: saving-data
+title: Saving data
+---
+
+A data extraction job would not be complete without saving the data for later use and processing. You've come to the final and most difficult part of this tutorial so make sure to pay attention very carefully!
+
+## Save data to the dataset
+
+Crawlee provides a `Dataset` class, which acts as an abstraction over tabular storage, making it useful for storing scraping results. First, add the following import to the top of your file:
+
+```python
+from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
+from crawlee.storages.dataset import Dataset
+
+# ...
+```
+
+Next, under the section where you create an instance of your crawler, create an instance of the dataset using the asynchronous constructor `open()`:
+
+```python
+# ...
+
+async def main() -> None:
+    crawler = PlaywrightCrawler()
+    dataset = await Dataset.open()
+
+    # ...
+```
+
+Finally, instead of logging the extracted data to stdout, we can export them to the dataset:
+
+```python
+# ...
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        # ...
+
+        data = {
+            'manufacturer': manufacturer,
+            'title': title,
+            'sku': sku,
+            'price': price,
+            'in_stock': in_stock,
+        }
+
+        # Push the data to the dataset.
+        await dataset.push_data(data)
+
+        # ...
+```
+
+### Using a context helper
+
+Instead of importing a new class and manually creating an instance of the dataset, you can use the context helper `push_data`. Remove the dataset import and instantiation, and replace `dataset.push_data` with the following:
+
+```python
+# ...
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        # ...
+
+        data = {
+            'manufacturer': manufacturer,
+            'title': title,
+            'sku': sku,
+            'price': price,
+            'in_stock': in_stock,
+        }
+
+        # Push the data to the dataset.
+        await context.push_data(data)
+
+        # ...
+```
+
+### Final code
+
+And that's it. Unlike earlier, we are being serious now. That's it, you're done. The final code looks like this:
+
+```python
+import asyncio
+
+from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
+
+
+async def main() -> None:
+    crawler = PlaywrightCrawler(
+        # Let's limit our crawls to make our tests shorter and safer.
+        max_requests_per_crawl=50,
+    )
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        context.log.info(f'Processing {context.request.url}')
+
+        # We're not processing detail pages yet, so we just pass.
+        if context.request.label == 'DETAIL':
+            # Split the URL and get the last part to extract the manufacturer.
+            url_part = context.request.url.split('/').pop()
+            manufacturer = url_part.split('-')[0]
+
+            # Extract the title using the combined selector.
+            title = await context.page.locator('.product-meta h1').text_content()
+
+            # Extract the SKU using its selector.
+            sku = await context.page.locator('span.product-meta__sku-number').text_content()
+
+            # Locate the price element that contains the '$' sign and filter out the visually hidden elements.
+            price_element = context.page.locator('span.price', has_text='$').first
+            current_price_string = await price_element.text_content() or ''
+            raw_price = current_price_string.split('$')[1]
+            price = float(raw_price.replace(',', ''))
+
+            # Locate the element that contains the text 'In stock' and filter out other elements.
+            in_stock_element = context.page.locator(
+                selector='span.product-form__inventory',
+                has_text='In stock',
+            ).first
+            in_stock = await in_stock_element.count() > 0
+
+            # Put it all together in a dictionary.
+            data = {
+                'manufacturer': manufacturer,
+                'title': title,
+                'sku': sku,
+                'price': price,
+                'in_stock': in_stock,
+            }
+
+            # Push the data to the dataset.
+            await context.push_data(data)
+
+        # We are now on a category page. We can use this to paginate through and
+        # enqueue all products, as well as any subsequent pages we find.
+        elif context.request.label == 'CATEGORY':
+            # Wait for the product items to render.
+            await context.page.wait_for_selector('.product-item > a')
+
+            # Enqueue links found within elements matching the provided selector.
+            # These links will be added to the crawling queue with the label DETAIL.
+            await context.enqueue_links(
+                selector='.product-item > a',
+                label='DETAIL',
+            )
+
+            # Find the "Next" button to paginate through the category pages.
+            next_button = await context.page.query_selector('a.pagination__next')
+
+            # If a "Next" button is found, enqueue the next page of results.
+            if next_button:
+                await context.enqueue_links(
+                    selector='a.pagination__next',
+                    label='CATEGORY',
+                )
+
+        # This indicates we're on the start page with no specific label.
+        # On the start page, we want to enqueue all the category pages.
+        else:
+            # Wait for the collection cards to render.
+            await context.page.wait_for_selector('.collection-block-item')
+
+            # Enqueue links found within elements matching the provided selector.
+            # These links will be added to the crawling queue with the label CATEGORY.
+            await context.enqueue_links(
+                selector='.collection-block-item',
+                label='CATEGORY',
+            )
+
+    await crawler.run(['https://warehouse-theme-metal.myshopify.com/collections'])
+
+
+if __name__ == '__main__':
+    asyncio.run(main())
+```
+
+## What `push_data` does?
+
+A helper `context.push_data()` saves data to the default dataset. You can provide additional arguments there like `id` or `name` to open a different dataset. Dataset is a storage designed to hold data in a format similar to a table. Each time you call `context.push_data()` or direct `Dataset.push_data()` a new row in the table is created, with the property names serving as column titles. In the default configuration, the rows are represented as JSON files saved on your file system, but other backend storage systems can be plugged into Crawlee as well. More on that later.
+
+:::info Automatic dataset initialization
+
+Each time you start Crawlee a default `Dataset` is automatically created, so there's no need to initialize it or create an instance first. You can create as many datasets as you want and even give them names. For more details see the `Dataset.open()` function.
+
+:::
+
+{/* TODO: mention result storage guide once it's done
+
+:::info Automatic dataset initialization
+
+Each time you start Crawlee a default `Dataset` is automatically created, so there's no need to initialize it or create an instance first. You can create as many datasets as you want and even give them names. For more details see the [Result storage guide](../guides/result-storage#dataset) and the `Dataset.open()` function.
+
+:::
+*/}
+
+## Finding saved data
+
+Unless you changed the configuration that Crawlee uses locally, which would suggest that you knew what you were doing, and you didn't need this tutorial anyway, you'll find your data in the storage directory that Crawlee creates in the working directory of the running script:
+
+```text
+{PROJECT_FOLDER}/storage/datasets/default/
+```
+
+The above folder will hold all your saved data in numbered files, as they were pushed into the dataset. Each file represents one invocation of `Dataset.push_data()` or one table row.
+
+{/* TODO: add mention of "Result storage guide" once it's ready:
+
+:::tip Single file data storage options
+
+If you would like to store your data in a single big file, instead of many small ones, see the [Result storage guide](../guides/result-storage#key-value-store) for Key-value stores.
+
+:::
+
+*/}
+
+## Next steps
+
+Next, you'll see some improvements that you can add to your crawler code that will make it more readable and maintainable in the long run.

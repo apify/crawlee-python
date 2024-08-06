@@ -133,10 +133,7 @@ async def test_enqueue_links_selector(server: respx.MockRouter) -> None:
     assert server['secondary_index_endpoint'].called
 
     visited = {call[0][0] for call in visit.call_args_list}
-    assert visited == {
-        'https://test.io/',
-        'https://test.io/asdf',
-    }
+    assert visited == {'https://test.io/', 'https://test.io/asdf'}
 
 
 async def test_enqueue_links_with_max_crawl(server: respx.MockRouter) -> None:

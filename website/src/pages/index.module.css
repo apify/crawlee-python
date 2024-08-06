@@ -30,8 +30,12 @@
 .codeBlock {
     position: absolute;
     top: 40%;
-    max-width: 400px;
+    max-width: 420px;
     width: 100%;
+}
+
+.codeBlock > div > div > div {
+    top: 9px;
 }
 
 .heroBanner {
@@ -232,7 +236,12 @@ html[data-theme='dark'] .features {
     margin: 2em 0;
 }
 
-.bottomLogo path:nth-child(1) {
-    fill: url(#gradient-1) !important;
-    stroke: url(#gradient-1) !important;
+.earlyAdopters {
+    border-radius: 100px;
+    background: #272c3d;
+    color: #f2f3fb;
+    padding: 5px 15px;
+    margin: 0 0 30px 0;
+    display: inline-block;
+    border: 1px solid #b3b8d2;
 }

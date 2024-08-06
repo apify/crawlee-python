@@ -1,3 +1,2 @@
 User-agent: *
-Sitemap: https://crawlee.dev/sitemap.xml
-Disallow: *
+Sitemap: https://crawlee.dev/python/sitemap.xml

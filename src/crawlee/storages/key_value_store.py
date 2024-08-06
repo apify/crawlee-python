@@ -20,10 +20,10 @@ class KeyValueStore(BaseStorage):
     Each record is identified by a unique key and associated with a MIME content type. This class is used within
     crawler runs to store inputs and outputs, typically in JSON format, but supports other types as well.
 
-    The data can be stored on a local filesystem or in the cloud, determined by the `CRAWLEE_LOCAL_STORAGE_DIR`
+    The data can be stored on a local filesystem or in the cloud, determined by the `CRAWLEE_STORAGE_DIR`
     environment variable.
 
-    By default, data is stored in `{CRAWLEE_LOCAL_STORAGE_DIR}/key_value_stores/{STORE_ID}/{INDEX}.{EXT}`, where
+    By default, data is stored in `{CRAWLEE_STORAGE_DIR}/key_value_stores/{STORE_ID}/{INDEX}.{EXT}`, where
     `{STORE_ID}` is either "default" or specified by `CRAWLEE_DEFAULT_KEY_VALUE_STORE_ID`, `{KEY}` is the record key,
     and `{EXT}` is the MIME type.
 

@@ -1,10 +1,14 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 from datetime import timedelta
-
-import pytest
+from typing import TYPE_CHECKING
 
 from crawlee.statistics import Statistics
+
+if TYPE_CHECKING:
+    import pytest
 
 
 async def test_periodic_logging(caplog: pytest.LogCaptureFixture) -> None:

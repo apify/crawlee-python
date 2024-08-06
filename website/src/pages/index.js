@@ -35,8 +35,13 @@ function Hero() {
                     </div>
                     <div className="row">
                         <div className="col">
+                            <div className={styles.earlyAdopters}>🚀 Crawlee for Python is open to early adopters!</div>
+                        </div>
+                    </div>
+                    <div className="row">
+                        <div className="col">
                             <div className={styles.heroButtons}>
-                                <Link to="docs/introduction" className={styles.getStarted}>Get Started</Link>
+                                <Link to="/docs/introduction" className={styles.getStarted}>Get Started</Link>
                                 <iframe src="https://ghbtns.com/github-btn.html?user=apify&repo=crawlee-python&type=star&count=true&size=large" frameBorder="0" scrolling="0" width="170" height="30" title="GitHub"></iframe>
                             </div>
                         </div>
@@ -48,8 +53,7 @@ function Hero() {
                     </div>
                     <div className={styles.codeBlock}>
                         <CodeBlock className="language-bash">
-                            pip install crawlee
-                            {/*pipx crawlee create my-crawler*/}
+                            pipx run crawlee create my-crawler
                         </CodeBlock>
                     </div>
                 </div>
@@ -62,36 +66,36 @@ function Features() {
     return (
         <section className={clsx('container', styles.features)}>
             <div className="row">
-                <div className="col col--6">
+                {/*<div className="col col--6">*/}
+                <div className="col">
                     <h2>Reliable crawling 🏗️</h2>
                     <p>
                         Crawlee won't fix broken selectors for you (yet), but it helps you <b>build and maintain your crawlers faster</b>.
                     </p>
                     <p>
-                        When a website adds <a href="https://crawlee.dev/docs/guides/javascript-rendering">JavaScript rendering</a>, you don't have to rewrite everything, only switch to
-                        one of the browser crawlers. When you later find a great API to speed up your crawls, flip the switch back.
+                        When a website adds <a href="https://crawlee.dev/docs/guides/javascript-rendering">JavaScript rendering</a>, you don't have to rewrite everything, only switch to a browser crawler. When you later find a great API to speed up your crawls, flip the switch back.
                     </p>
-                    <p>
-                        It keeps your proxies healthy by rotating them smartly with good fingerprints that make your crawlers
-                        look human-like. It's not unblockable,
-                        but <a href="https://blog.apify.com/daltix-python-vs-apify-sdk/" target="_blank" rel="noreferrer"><b>it will save you money in the long run</b></a>.
-                    </p>
+                    {/*<p>*/}
+                    {/*    It keeps your proxies healthy by rotating them smartly with good fingerprints that make your crawlers*/}
+                    {/*    look human-like. It's not unblockable,*/}
+                    {/*    but <a href="https://blog.apify.com/daltix-python-vs-apify-sdk/" target="_blank" rel="noreferrer"><b>it will save you money in the long run</b></a>.*/}
+                    {/*</p>*/}
                     <p>
                         Crawlee is built by people who scrape for a living and use it every day to scrape millions of pages.
                         <a href="https://discord.com/invite/jyEM2PRvMU" target="_blank" rel="noreferrer"><b> Meet our community on Discord</b></a>.
                     </p>
                 </div>
-                <div className="col col--6">
-                    <div className="video-container">
-                        <LiteYouTubeEmbed
-                            id="g1Ll9OlFwEQ"
-                            params="autoplay=1&autohide=1&showinfo=0&rel=0"
-                            title="Crawlee, the web scraping and browser automation library"
-                            poster="maxresdefault"
-                            webp
-                        />
-                    </div>
-                </div>
+                {/*<div className="col col--6">*/}
+                {/*    <div className="video-container">*/}
+                {/*        <LiteYouTubeEmbed*/}
+                {/*            id="g1Ll9OlFwEQ"*/}
+                {/*            params="autoplay=1&autohide=1&showinfo=0&rel=0"*/}
+                {/*            title="Crawlee, the web scraping and browser automation library"*/}
+                {/*            poster="maxresdefault"*/}
+                {/*            webp*/}
+                {/*        />*/}
+                {/*    </div>*/}
+                {/*</div>*/}
             </div>
         </section>
     );
@@ -103,34 +107,42 @@ from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingCont
 
 
 async def main() -> None:
-    # Create a crawler instance and provide a request provider (and other optional arguments)
     crawler = PlaywrightCrawler(
-        # headless=False,
-        # browser_type='firefox',
+        max_requests_per_crawl=5,  # Limit the crawl to 5 requests.
+        headless=False,  # Show the browser window.
+        browser_type='firefox',  # Use the Firefox browser.
     )
 
+    # Define the default request handler, which will be called for every request.
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        context.log.info(f'Processing {context.request.url} ...')
+
+        # Enqueue all links found on the page.
+        await context.enqueue_links()
+
+        # Extract data from the page using Playwright API.
         data = {
-            'request_url': context.request.url,
-            'page_url': context.page.url,
-            'page_title': await context.page.title(),
-            'page_content': (await context.page.content())[:10000],
+            'url': context.request.url,
+            'title': await context.page.title(),
+            'content': (await context.page.content())[:100],
         }
+
+        # Push the extracted data to the default dataset.
         await context.push_data(data)
 
+    # Run the crawler with the initial list of URLs.
     await crawler.run(['https://crawlee.dev'])
 
-    # Export the whole dataset to a single file in \`./result.csv\`.
-    await crawler.export_data('./result.csv')
+    # Export the entire dataset to a JSON file.
+    await crawler.export_data('results.json')
 
     # Or work with the data directly.
-    const data = await crawler.get_data()
-    print(data.items) # TODO any alternative to \`console.table()\` in python?
+    data = await crawler.get_data()
+    crawler.log.info(f'Extracted data: {data.items}')
 
 
 if __name__ == '__main__':
-    # Add first URL to the queue and start the crawl.
     asyncio.run(main())
 `;
 
@@ -140,25 +152,29 @@ function ActorExample() {
             <div className="col">
                 <h2>Try Crawlee out 👾</h2>
                 <Admonition type="caution" title="before you start">
-                    Crawlee requires <a href="https://www.python.org/" target="_blank" rel="noreferrer"><b>Python 3.9 or higher</b></a>.
+                    Crawlee requires <a href="https://www.python.org/downloads/" target="_blank" rel="noreferrer"><b>Python 3.9 or higher</b></a>.
                 </Admonition>
                 <p>
-                    The fastest way to try Crawlee out is to use the <b>Crawlee CLI</b> and choose
-                    the <b><a href="https://crawlee.dev/python/docs/quick-start">Getting started</a> example</b>.
-                    The CLI will install all the necessary dependencies and add boilerplate code for you to play with.
+                    The fastest way to try Crawlee out is to use the <b>Crawlee CLI</b> and choose one of the provided templates. The CLI will prepare a new project for you, and add boilerplate code for you to play with.
                 </p>
                 <CodeBlock className="language-bash">
-                    pip install crawlee
-                    {/*pipx crawlee create my-crawler*/}
+                    pipx run crawlee create my-crawler
                 </CodeBlock>
                 <p>
-                    If you prefer adding Crawlee <b>into your own project</b>, try the example below.
-                    Because it uses <code>PlaywrightCrawler</code> we also need to install Playwright.
-                    It's not bundled with Crawlee to reduce install size.
+                    If you prefer to integrate Crawlee <b>into your own project</b>, you can follow the example below. Crawlee is available on  <a href="https://pypi.org/project/crawlee/">PyPI</a>, so you can install it using <code>pip</code>. Since it uses <code>PlaywrightCrawler</code>, you will also need to install <code>crawlee</code> package with <code>playwright</code> extra. It is not not included with Crawlee by default to keep the installation size minimal.
                 </p>
                 <CodeBlock className="language-bash">
                     pip install 'crawlee[playwright]'
                 </CodeBlock>
+                <p>
+                    Currently we have Python packages <code>crawlee</code> and <code>playwright</code> installed. There is one more essential requirement: the Playwright browser binaries. You can install them by running:
+                </p>
+                <CodeBlock className="language-bash">
+                    playwright install
+                </CodeBlock>
+                <p>
+                    Now we are ready to execute our first Crawlee project:
+                </p>
                 <RunnableCodeBlock className="language-python" type="playwright-python">
                     {{
                         code: example,
@@ -243,7 +259,6 @@ export default function Home() {
     const { siteConfig } = useDocusaurusContext();
     return (
         <Layout
-            title={`${siteConfig.title} · ${siteConfig.tagline}`}
             description={siteConfig.description}>
             <Hero />
             <Features />

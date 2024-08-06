@@ -1,10 +1,7 @@
 ---
 id: introduction
 title: Introduction
-description: Your first steps into the world of scraping with Crawlee
 ---
-
-import ApiLink from '@site/src/components/ApiLink';
 
 Crawlee covers your crawling and scraping end-to-end and helps you **build reliable scrapers. Fast.**
 
@@ -16,35 +13,40 @@ The goal of the introduction is to provide a step-by-step guide to the most impo
 
 ## 🛠 Features
 
-- Single interface for **HTTP and headless browser** crawling
-- Persistent **queue** for URLs to crawl (breadth & depth first)
-- Pluggable **storage** of both tabular data and files
-- Automatic **scaling** with available system resources
-- Integrated **proxy rotation** and session management
-- Lifecycles customizable with **hooks**
-- **CLI** to bootstrap your projects
-- Configurable **routing**, **error handling** and **retries**
-- **Dockerfiles** ready to deploy
-- Written in **TypeScript** with generics
+Why Crawlee is the preferred choice for web scraping and crawling?
+
+### Why use Crawlee instead of just a random HTTP library with an HTML parser?
+
+- Unified interface for **HTTP & headless browser** crawling.
+- Automatic **parallel crawling** based on available system resources.
+- Written in Python with **type hints** - enhances DX (IDE autocompletion) and reduces bugs (static type checking).
+- Automatic **retries** on errors or when you’re getting blocked.
+- Integrated **proxy rotation** and session management.
+- Configurable **request routing** - direct URLs to the appropriate handlers.
+- Persistent **queue for URLs** to crawl.
+- Pluggable **storage** of both tabular data and files.
+- Robust **error handling**.
+
+### Why to use Crawlee rather than Scrapy?
+
+- Crawlee has out-of-the-box support for **headless browser** crawling (Playwright).
+- Crawlee has a **minimalistic & elegant interface** - Set up your scraper with fewer than 10 lines of code.
+- Complete **type hint** coverage.
+- Based on standard **Asyncio**.
+
+{/* TODO:
 
 ### 👾 HTTP crawling
 
-- Zero config **HTTP2 support**, even for proxies
-- Automatic generation of **browser-like headers**
-- Replication of browser **TLS fingerprints**
-- Integrated fast **HTML parsers**.
-- Yes, you can scrape **JSON APIs** as well
+- ...
+*/}
 
+{/* TODO:
 ### 💻 Real browser crawling
 
-- JavaScript **rendering** and **screenshots**
-- **Headless** and **headful** support
-- Automatic **browser management**
-- Use **Playwright** with the same interface
-- **Chrome**, **Firefox**, **Webkit** and many others
+- ...
+*/}
 
 ## Next steps
 
-Next, you will install Crawlee and learn how to bootstrap projects with the Crawlee CLI.
-
-[//]: # (TODO: rewrite the features based on what we actually provide)
+Next, you will install Crawlee and learn how to bootstrap projects with the prepared Crawlee templates.

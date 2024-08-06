@@ -9,7 +9,6 @@ export default function NavbarLogo() {
                 imageClassName="navbar__logo"
                 titleClassName="navbar__title text--truncate"
             />
-            <span class="navbar__logo_appendix">for Python</span>
         </>
     );
 }

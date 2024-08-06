@@ -1,48 +1,19 @@
 /* eslint-disable global-require,import/no-extraneous-dependencies */
-const webpack = require('webpack');
 const { externalLinkProcessor } = require('./tools/utils/externalLink');
-
-const packages = [
-    'core',
-    'browser-pool',
-    'basic-crawler',
-    'browser-crawler',
-    'http-crawler',
-    'cheerio-crawler',
-    'puppeteer-crawler',
-    'playwright-crawler',
-    'jsdom-crawler',
-    'linkedom-crawler',
-    'memory-storage',
-    'utils',
-    'types',
-];
-const packagesOrder = [
-    '@crawlee/core',
-    '@crawlee/cheerio',
-    '@crawlee/playwright',
-    '@crawlee/puppeteer',
-    '@crawlee/jsdom',
-    '@crawlee/linkedom',
-    '@crawlee/basic',
-    '@crawlee/http',
-    '@crawlee/browser',
-    '@crawlee/memory-storage',
-    '@crawlee/browser-pool',
-    '@crawlee/utils',
-    '@crawlee/types',
-];
+const { groupSort } = require('./transformDocs');
 
 /** @type {Partial<import('@docusaurus/types').DocusaurusConfig>} */
 module.exports = {
-    title: 'Crawlee',
-    tagline: 'Build reliable crawlers. Fast.',
+    title: 'Crawlee for Python · Fast, reliable crawlers.',
     url: 'https://crawlee.dev',
-    baseUrl: '/crawlee-python/',
+    baseUrl: '/python/',
     trailingSlash: false,
     organizationName: 'apify',
     projectName: 'crawlee-python',
-    scripts: ['/js/custom.js'],
+    scripts: [
+        '/python/js/custom.js',
+        '/crawlee-python/js/custom.js',
+    ],
     favicon: 'img/favicon.ico',
     customFields: {
         markdownOptions: {
@@ -82,21 +53,21 @@ module.exports = {
         ],
     ]),
     plugins: [
-        // [
-        //     'docusaurus-plugin-typedoc-api',
-        //     {
-        //         projectRoot: `${__dirname}/..`,
-        //         changelogs: true,
-        //         readmes: true,
-        //         sortPackages: (a, b) => {
-        //             return packagesOrder.indexOf(a.packageName) - packagesOrder.indexOf(b.packageName);
-        //         },
-        //         packages: packages.map((name) => ({ path: `packages/${name}` })),
-        //         typedocOptions: {
-        //             excludeExternals: false,
-        //         },
-        //     },
-        // ],
+        [
+            '@apify/docusaurus-plugin-typedoc-api',
+            {
+                projectRoot: '.',
+                changelogs: false,
+                readmes: false,
+                packages: [{ path: '.' }],
+                typedocOptions: {
+                    excludeExternals: false,
+                },
+                sortSidebar: groupSort,
+                pathToCurrentVersionTypedocJSON: `${__dirname}/api-typedoc-generated.json`,
+                routeBasePath: 'api',
+            },
+        ],
         // [
         //     '@docusaurus/plugin-client-redirects',
         //     {
@@ -160,12 +131,16 @@ module.exports = {
                 hideable: true,
             },
         },
+        announcementBar: {
+            id: 'announcement-bar-',
+            content: `🎉️ <b>Learn about Crawlee for Python from its creators. Join us at 9 am EST on August 5.<a href="https://apify.com/resources/crawlee-for-python-webinar">Sign up now!</a></b> 🥳️`,
+        },
         navbar: {
             hideOnScroll: true,
             title: 'Crawlee for Python',
             logo: {
-                src: 'img/crawlee-light.svg',
-                srcDark: 'img/crawlee-dark.svg',
+                src: 'img/crawlee-light-new.svg',
+                srcDark: 'img/crawlee-dark-new.svg',
             },
             items: [
                 {
@@ -180,13 +155,12 @@ module.exports = {
                     label: 'Examples',
                     position: 'left',
                 },
-                // {
-                //     type: 'custom-api',
-                //     to: 'core',
-                //     label: 'API',
-                //     position: 'left',
-                //     activeBaseRegex: 'api/(?!.*/changelog)',
-                // },
+                {
+                    to: '/api',
+                    label: 'API',
+                    position: 'left',
+                    activeBaseRegex: 'api/(?!.*/changelog)',
+                },
                 // {
                 //     type: 'custom-api',
                 //     to: 'core/changelog',
@@ -195,11 +169,38 @@ module.exports = {
                 //     className: 'changelog',
                 //     activeBaseRegex: 'changelog',
                 // },
-                // {
-                //     to: 'blog',
-                //     label: 'Blog',
-                //     position: 'left',
-                // },
+                {
+                    type: 'doc',
+                    label: 'Changelog',
+                    docId: 'changelog',
+                    className: 'changelog',
+                },
+                {
+                    href: 'https://crawlee.dev/blog',
+                    target: '_self',
+                    rel: 'dofollow',
+                    label: 'Blog',
+                    position: 'left',
+                },
+                {
+                    type: 'dropdown',
+                    label: 'Python',
+                    position: 'left',
+                    items: [
+                        {
+                            label: 'Node.js',
+                            href: 'https://crawlee.dev',
+                            target: '_self',
+                            rel: 'dofollow',
+                        },
+                        {
+                            label: 'Python',
+                            href: '#',
+                            target: '_self',
+                            rel: 'dofollow',
+                        },
+                    ],
+                },
                 // {
                 //     type: 'docsVersionDropdown',
                 //     position: 'left',
@@ -241,7 +242,12 @@ module.exports = {
             darkTheme: require('prism-react-renderer').themes.dracula,
             additionalLanguages: ['docker', 'log', 'bash', 'diff', 'json'],
         },
-        metadata: [],
+        metadata: [
+            // eslint-disable-next-line max-len
+            { name: 'description', content: `Crawlee helps you build and maintain your Python crawlers. It's open source and modern, with type hints for Python to help you catch bugs early.` },
+            // eslint-disable-next-line max-len
+            { name: 'og:description', content: `Crawlee helps you build and maintain your Python crawlers. It's open source and modern, with type hints for Python to help you catch bugs early.` },
+        ],
         image: 'img/crawlee-og.png',
         footer: {
             links: [
@@ -256,10 +262,10 @@ module.exports = {
                             label: 'Examples',
                             to: 'docs/examples',
                         },
-                        // {
-                        //     label: 'API reference',
-                        //     to: 'api/core',
-                        // },
+                        {
+                            label: 'API reference',
+                            to: 'api',
+                        },
                         // {
                         //     label: 'Upgrading to v3',
                         //     to: 'docs/upgrading/upgrading-to-v3',
@@ -314,10 +320,9 @@ module.exports = {
             },
         },
         algolia: {
-            // TODO how to deal with this? if we keep things under crawlee.dev, we should use the same index most probably
             appId: '5JC94MPMLY',
-            apiKey: '267679200b833c2ca1255ab276731869', // search only (public) API key
-            indexName: 'crawlee-python',
+            apiKey: '878493fcd7001e3c179b6db6796a999b', // search only (public) API key
+            indexName: 'crawlee_python',
             algoliaOptions: {
                 facetFilters: ['version:VERSION'],
             },

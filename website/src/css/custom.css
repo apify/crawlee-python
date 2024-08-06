@@ -227,10 +227,11 @@ article .card h2 {
 
 nav.navbar .dropdown__menu {
     min-width: 6rem;
+    margin-left: 20px;
 }
 
 .navbar__logo {
-    height: 3rem;
+    height: 2rem;
 }
 
 .navbar__logo_appendix {
@@ -254,7 +255,7 @@ nav.navbar .dropdown__menu {
 }
 
 .main-wrapper a[class*='sidebarLogo'] img {
-    height: 3rem;
+    height: 2rem;
 }
 
 .main-wrapper a[class*='sidebarLogo'] b {
@@ -376,10 +377,29 @@ html[data-theme='dark'] .theme-doc-toc-desktop .table-of-contents .table-of-cont
     }
 }
 
+@media (max-width: 1480px) {
+    .navbar__item {
+        padding: 4px 24px;
+    }
+}
+
+@media (max-width: 1380px) {
+    .navbar__item {
+        padding: 4px 15px;
+        font-size: 16px;
+    }
+}
+
 @media (min-width: 997px) and (max-width: 1439px) {
     footer .col--offset-9 {
         --ifm-col-width: calc(4 / 12 * 100%);
         margin-left: calc(8 / 12 * 100%);
+    }
+}
+
+@media (max-width: 400px) {
+    .main-wrapper a[class*=sidebarLogo] img, .navbar__logo {
+        height: 1.5rem;
     }
 }
 
@@ -409,6 +429,7 @@ html.plugin-typedoc-api .theme-doc-sidebar-menu > li:nth-child(6)::before {
     padding: 20px 12px;
 }
 
+/*
 html.plugin-typedoc-api .theme-doc-sidebar-menu > li:first-child::before {
     display: block;
     content: 'Core';
@@ -419,6 +440,7 @@ html.plugin-typedoc-api .theme-doc-sidebar-menu > li:nth-child(6)::before {
     content: 'Advanced';
     padding-top: 60px;
 }
+ */
 
 #giscus-comments {
     display: block;
@@ -476,6 +498,8 @@ html[data-theme='dark'] .runnable-code-block svg .apify-logo {
 .prism-code.language-javascript .token-line::before,
 .prism-code.language-json .token-line::before,
 .prism-code.language-json5 .token-line::before,
+.prism-code.language-python .token-line::before,
+.prism-code.language-dockerfile .token-line::before,
 .prism-code.language-XML .token-line::before,
 .prism-code.language-js .token-line::before {
     counter-increment: line-number;
@@ -487,4 +511,33 @@ html[data-theme='dark'] .runnable-code-block svg .apify-logo {
     opacity: .3;
     position: sticky;
     left: var(--ifm-pre-padding);
+}
+
+div[class^=announcementBar_] {
+    background: #4585b6;
+    color: #fff;
+}
+
+div[class^=announcementBar_] button {
+    color: #fff;
+}
+
+.markdown blockquote {
+    --ifm-alert-background-color: var(--ifm-color-info-contrast-background);
+    --ifm-alert-background-color-highlight: rgba(84,199,236,.15);
+    --ifm-alert-foreground-color: var(--ifm-color-info-contrast-foreground);
+    --ifm-alert-border-color: var(--ifm-color-info-dark);
+    --ifm-code-background: var(--ifm-alert-background-color-highlight);
+    --ifm-link-color: var(--ifm-alert-foreground-color);
+    --ifm-link-hover-color: var(--ifm-alert-foreground-color);
+    --ifm-link-decoration: underline;
+    --ifm-tabs-color: var(--ifm-alert-foreground-color);
+    --ifm-tabs-color-active: var(--ifm-alert-foreground-color);
+    --ifm-tabs-color-active-border: var(--ifm-alert-border-color);
+    background-color: var(--ifm-alert-background-color);
+    border: var(--ifm-alert-border-width) solid var(--ifm-alert-border-color);
+    border-left-width: var(--ifm-alert-border-left-width);
+    border-radius: var(--ifm-alert-border-radius);
+    box-shadow: var(--ifm-alert-shadow);
+    padding: var(--ifm-alert-padding-vertical) var(--ifm-alert-padding-horizontal);
 }

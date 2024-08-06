@@ -13,35 +13,36 @@ from datetime import timedelta
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, AsyncContextManager, Callable, Generic, Literal, Union, cast
+from urllib.parse import ParseResult, urlparse
 
-import httpx
 from tldextract import TLDExtract
 from typing_extensions import NotRequired, TypedDict, TypeVar, Unpack, assert_never
 
 from crawlee import Glob
+from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
 from crawlee.autoscaling import AutoscaledPool, ConcurrencySettings
 from crawlee.autoscaling.snapshotter import Snapshotter
 from crawlee.autoscaling.system_status import SystemStatus
 from crawlee.basic_crawler.context_pipeline import ContextPipeline
-from crawlee.basic_crawler.errors import (
+from crawlee.basic_crawler.router import Router
+from crawlee.configuration import Configuration
+from crawlee.enqueue_strategy import EnqueueStrategy
+from crawlee.errors import (
     ContextPipelineInitializationError,
     ContextPipelineInterruptedError,
     RequestHandlerError,
     SessionError,
     UserDefinedErrorHandlerError,
 )
-from crawlee.basic_crawler.router import Router
-from crawlee.basic_crawler.types import BasicCrawlingContext, RequestHandlerRunResult, SendRequestFunction
-from crawlee.configuration import Configuration
-from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.events import LocalEventManager
-from crawlee.http_clients import HttpxClient
+from crawlee.http_clients import HttpxHttpClient
 from crawlee.log_config import CrawleeLogFormatter
 from crawlee.models import BaseRequestData, DatasetItemsListPage, Request, RequestState
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
+from crawlee.types import BasicCrawlingContext, HttpHeaders, RequestHandlerRunResult, SendRequestFunction
 
 if TYPE_CHECKING:
     import re
@@ -52,7 +53,7 @@ if TYPE_CHECKING:
     from crawlee.statistics import FinalStatistics, StatisticsState
     from crawlee.storages.dataset import GetDataKwargs, PushDataKwargs
     from crawlee.storages.request_provider import RequestProvider
-    from crawlee.types import JSONSerializable
+    from crawlee.types import HttpMethod, JSONSerializable
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Union[Request, None]]]
@@ -151,12 +152,12 @@ class BasicCrawler(Generic[TCrawlingContext]):
             self._router = None
             self.router.default_handler(request_handler)
 
-        self._http_client = http_client or HttpxClient()
+        self._http_client = http_client or HttpxHttpClient()
 
         self._context_pipeline = (_context_pipeline or ContextPipeline()).compose(self._check_url_after_redirects)
 
-        self._error_handler: ErrorHandler[TCrawlingContext] | None = None
-        self._failed_request_handler: FailedRequestHandler[TCrawlingContext] | None = None
+        self._error_handler: ErrorHandler[TCrawlingContext | BasicCrawlingContext] | None = None
+        self._failed_request_handler: FailedRequestHandler[TCrawlingContext | BasicCrawlingContext] | None = None
 
         self._max_request_retries = max_request_retries
         self._max_requests_per_crawl = max_requests_per_crawl
@@ -202,6 +203,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
             root_logger.addHandler(handler)
             root_logger.setLevel(logging.INFO if not sys.flags.dev_mode else logging.DEBUG)
 
+            # Silence HTTPX logger
+            httpx_logger = logging.getLogger('httpx')
+            httpx_logger.setLevel(logging.WARNING if not sys.flags.dev_mode else logging.INFO)
+
         if not _logger:
             _logger = logging.getLogger(__name__)
 
@@ -216,6 +221,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         self._running = False
         self._has_finished_before = False
+
+    @property
+    def log(self) -> logging.Logger:
+        """The logger used by the crawler."""
+        return self._logger
 
     @property
     def router(self) -> Router[TCrawlingContext]:
@@ -278,7 +288,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
     ) -> RequestProvider:
         """Return the configured request provider. If none is configured, open and return the default request queue."""
         if not self._request_provider:
-            self._request_provider = await RequestQueue.open(id=id, name=name)
+            self._request_provider = await RequestQueue.open(id=id, name=name, configuration=self._configuration)
 
         return self._request_provider
 
@@ -289,7 +299,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         name: str | None = None,
     ) -> Dataset:
         """Return the dataset with the given ID or name. If none is provided, return the default dataset."""
-        return await Dataset.open(id=id, name=name)
+        return await Dataset.open(id=id, name=name, configuration=self._configuration)
 
     async def get_key_value_store(
         self,
@@ -298,22 +308,35 @@ class BasicCrawler(Generic[TCrawlingContext]):
         name: str | None = None,
     ) -> KeyValueStore:
         """Return the key-value store with the given ID or name. If none is provided, return the default KVS."""
-        return await KeyValueStore.open(id=id, name=name)
+        return await KeyValueStore.open(id=id, name=name, configuration=self._configuration)
 
-    def error_handler(self, handler: ErrorHandler[TCrawlingContext]) -> ErrorHandler[TCrawlingContext]:
+    def error_handler(
+        self, handler: ErrorHandler[TCrawlingContext | BasicCrawlingContext]
+    ) -> ErrorHandler[TCrawlingContext]:
         """Decorator for configuring an error handler (called after a request handler error and before retrying)."""
         self._error_handler = handler
         return handler
 
     def failed_request_handler(
-        self, handler: FailedRequestHandler[TCrawlingContext]
+        self, handler: FailedRequestHandler[TCrawlingContext | BasicCrawlingContext]
     ) -> FailedRequestHandler[TCrawlingContext]:
         """Decorator for configuring a failed request handler (called after max retries are reached)."""
         self._failed_request_handler = handler
         return handler
 
-    async def run(self, requests: Sequence[str | BaseRequestData | Request] | None = None) -> FinalStatistics:
-        """Run the crawler until all requests are processed."""
+    async def run(
+        self,
+        requests: Sequence[str | BaseRequestData | Request] | None = None,
+        *,
+        purge_request_queue: bool = True,
+    ) -> FinalStatistics:
+        """Run the crawler until all requests are processed.
+
+        Args:
+            requests: The requests to be enqueued before the crawler starts
+            purge_request_queue: If this is `True` and the crawler is not being run for the first time, the default
+                request queue will be purged
+        """
         if self._running:
             raise RuntimeError(
                 'This crawler instance is already running, you can add more requests to it via `crawler.add_requests()`'
@@ -326,6 +349,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
             if self._use_session_pool:
                 await self._session_pool.reset_store()
+
+            request_provider = await self.get_request_provider()
+            if purge_request_queue and isinstance(request_provider, RequestQueue):
+                await request_provider.drop()
+                self._request_provider = await RequestQueue.open(configuration=self._configuration)
 
         if requests is not None:
             await self.add_requests(requests)
@@ -456,7 +484,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             dataset_id: The ID of the dataset.
             dataset_name: The name of the dataset.
         """
-        dataset = await Dataset.open(id=dataset_id, name=dataset_name)
+        dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
         path = path if isinstance(path, Path) else Path(path)
 
         if content_type is None:
@@ -482,7 +510,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             dataset_name: The name of the dataset.
             kwargs: Keyword arguments to be passed to the dataset's `push_data` method.
         """
-        dataset = await Dataset.open(id=dataset_id, name=dataset_name)
+        dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
         await dataset.push_data(data, **kwargs)
 
     def _should_retry_request(self, crawling_context: BasicCrawlingContext, error: Exception) -> bool:
@@ -507,8 +535,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
         """
         if crawling_context.request.loaded_url is not None and not self._check_enqueue_strategy(
             crawling_context.request.enqueue_strategy,
-            origin_url=httpx.URL(crawling_context.request.url),
-            target_url=httpx.URL(crawling_context.request.loaded_url),
+            origin_url=urlparse(crawling_context.request.url),
+            target_url=urlparse(crawling_context.request.loaded_url),
         ):
             raise ContextPipelineInterruptedError(
                 f'Skipping URL {crawling_context.request.loaded_url} (redirected from {crawling_context.request.url})'
@@ -517,19 +545,26 @@ class BasicCrawler(Generic[TCrawlingContext]):
         yield crawling_context
 
     def _check_enqueue_strategy(
-        self, strategy: EnqueueStrategy, *, target_url: httpx.URL, origin_url: httpx.URL
+        self,
+        strategy: EnqueueStrategy,
+        *,
+        target_url: ParseResult,
+        origin_url: ParseResult,
     ) -> bool:
         """Check if a URL matches the enqueue_strategy."""
         if strategy == EnqueueStrategy.SAME_HOSTNAME:
-            return target_url.host == origin_url.host
+            return target_url.hostname == origin_url.hostname
 
         if strategy == EnqueueStrategy.SAME_DOMAIN:
-            origin_domain = self._tld_extractor.extract_str(origin_url.host).domain
-            target_domain = self._tld_extractor.extract_str(target_url.host).domain
+            if origin_url.hostname is None or target_url.hostname is None:
+                raise ValueError('Both origin and target URLs must have a hostname')
+
+            origin_domain = self._tld_extractor.extract_str(origin_url.hostname).domain
+            target_domain = self._tld_extractor.extract_str(target_url.hostname).domain
             return origin_domain == target_domain
 
         if strategy == EnqueueStrategy.SAME_ORIGIN:
-            return target_url.host == origin_url.host and target_url.scheme == origin_url.scheme
+            return target_url.hostname == origin_url.hostname and target_url.scheme == origin_url.scheme
 
         if strategy == EnqueueStrategy.ALL:
             return True
@@ -538,7 +573,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     def _check_url_patterns(
         self,
-        target_url: httpx.URL,
+        target_url: str,
         include: Sequence[re.Pattern[Any] | Glob] | None,
         exclude: Sequence[re.Pattern[Any] | Glob] | None,
     ) -> bool:
@@ -548,7 +583,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             if isinstance(pattern, Glob):
                 pattern = pattern.regexp  # noqa: PLW2901
 
-            if pattern.match(str(target_url)) is not None:
+            if pattern.match(target_url) is not None:
                 return False
 
         # If there are no `include` patterns and the URL passed all `exclude` patterns, accept the URL
@@ -560,13 +595,15 @@ class BasicCrawler(Generic[TCrawlingContext]):
             if isinstance(pattern, Glob):
                 pattern = pattern.regexp  # noqa: PLW2901
 
-            if pattern.match(str(target_url)) is not None:
+            if pattern.match(target_url) is not None:
                 return True
 
         # The URL does not match any `include` pattern - reject it
         return False
 
-    async def _handle_request_error(self, crawling_context: TCrawlingContext, error: Exception) -> None:
+    async def _handle_request_retries(
+        self, crawling_context: TCrawlingContext | BasicCrawlingContext, error: Exception
+    ) -> None:
         request_provider = await self.get_request_provider()
         request = crawling_context.request
 
@@ -596,7 +633,39 @@ class BasicCrawler(Generic[TCrawlingContext]):
             await self._handle_failed_request(crawling_context, error)
             self._statistics.record_request_processing_failure(request.id or request.unique_key)
 
-    async def _handle_failed_request(self, crawling_context: TCrawlingContext, error: Exception) -> None:
+    async def _handle_request_error(
+        self, crawling_context: TCrawlingContext | BasicCrawlingContext, error: Exception
+    ) -> None:
+        try:
+            crawling_context.request.state = RequestState.ERROR_HANDLER
+
+            await wait_for(
+                partial(self._handle_request_retries, crawling_context, error),
+                timeout=self._internal_timeout,
+                timeout_message='Handling request failure timed out after '
+                f'{self._internal_timeout.total_seconds()} seconds',
+                logger=self._logger,
+            )
+
+            crawling_context.request.state = RequestState.DONE
+        except UserDefinedErrorHandlerError:
+            crawling_context.request.state = RequestState.ERROR
+            raise
+        except Exception as secondary_error:
+            self._logger.exception(
+                'An exception occurred during handling of failed request. This places the crawler '
+                'and its underlying storages into an unknown state and crawling will be terminated.',
+                exc_info=secondary_error,
+            )
+            crawling_context.request.state = RequestState.ERROR
+            raise
+
+        if crawling_context.session:
+            crawling_context.session.mark_bad()
+
+    async def _handle_failed_request(
+        self, crawling_context: TCrawlingContext | BasicCrawlingContext, error: Exception
+    ) -> None:
         self._logger.exception('Request failed and reached maximum retries', exc_info=error)
         self._statistics.error_tracker.add(error)
 
@@ -614,13 +683,13 @@ class BasicCrawler(Generic[TCrawlingContext]):
         async def send_request(
             url: str,
             *,
-            method: str = 'get',
-            headers: dict[str, str] | None = None,
+            method: HttpMethod = 'GET',
+            headers: HttpHeaders | None = None,
         ) -> HttpResponse:
             return await self._http_client.send_request(
-                url,
+                url=url,
                 method=method,
-                headers=httpx.Headers(headers),
+                headers=headers,
                 session=session,
                 proxy_info=proxy_info,
             )
@@ -631,7 +700,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self, context: BasicCrawlingContext, result: RequestHandlerRunResult
     ) -> None:
         request_provider = await self.get_request_provider()
-        origin = httpx.URL(context.request.loaded_url or context.request.url)
+        origin = context.request.loaded_url or context.request.url
 
         for call in result.add_requests_calls:
             requests = list[BaseRequestData]()
@@ -640,17 +709,29 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 if (limit := call.get('limit')) is not None and len(requests) >= limit:
                     break
 
-                request_model = request if isinstance(request, BaseRequestData) else BaseRequestData.from_url(request)
-                destination = httpx.URL(request_model.url)
-                if destination.is_relative_url:
-                    base_url = httpx.URL(call.get('base_url', origin))
-                    destination = base_url.join(destination)
-                    request_model.url = str(destination)
+                # If the request is a string, convert it to BaseRequestData object.
+                if isinstance(request, str):
+                    if is_url_absolute(request):
+                        dst_request = BaseRequestData.from_url(request)
+
+                    # If the request URL is relative, make it absolute using the origin URL.
+                    else:
+                        base_url = call['base_url'] if call.get('base_url') else origin
+                        absolute_url = convert_to_absolute_url(base_url, request)
+                        dst_request = BaseRequestData.from_url(absolute_url)
+                else:
+                    dst_request = request
 
                 if self._check_enqueue_strategy(
-                    call.get('strategy', EnqueueStrategy.ALL), target_url=destination, origin_url=origin
-                ) and self._check_url_patterns(destination, call.get('include', None), call.get('exclude', None)):
-                    requests.append(request_model)
+                    call.get('strategy', EnqueueStrategy.ALL),
+                    target_url=urlparse(dst_request.url),
+                    origin_url=urlparse(origin),
+                ) and self._check_url_patterns(
+                    dst_request.url,
+                    call.get('include', None),
+                    call.get('exclude', None),
+                ):
+                    requests.append(dst_request)
 
             await request_provider.add_requests_batched(requests)
 
@@ -744,34 +825,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 RequestHandlerError[TCrawlingContext], primary_error
             )  # valid thanks to ContextPipeline
 
-            try:
-                request.state = RequestState.ERROR_HANDLER
-
-                await wait_for(
-                    partial(
-                        self._handle_request_error, primary_error.crawling_context, primary_error.wrapped_exception
-                    ),
-                    timeout=self._internal_timeout,
-                    timeout_message='Handling request failure timed out after '
-                    f'{self._internal_timeout.total_seconds()} seconds',
-                    logger=self._logger,
-                )
-
-                request.state = RequestState.DONE
-            except UserDefinedErrorHandlerError:
-                request.state = RequestState.ERROR
-                raise
-            except Exception as secondary_error:
-                self._logger.exception(
-                    'An exception occurred during handling of failed request. This places the crawler '
-                    'and its underlying storages into an unknown state and crawling will be terminated.',
-                    exc_info=secondary_error,
-                )
-                request.state = RequestState.ERROR
-                raise
-
-            if crawling_context.session:
-                crawling_context.session.mark_bad()
+            self._logger.debug(
+                'An exception occurred in the user-defined request handler',
+                exc_info=primary_error.wrapped_exception,
+            )
+            await self._handle_request_error(primary_error.crawling_context, primary_error.wrapped_exception)
         except SessionError as session_error:
             if not crawling_context.session:
                 raise RuntimeError('SessionError raised in a crawling context without a session') from session_error
@@ -801,8 +859,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
                 self._statistics.record_request_processing_failure(statistics_id)
                 self._statistics.error_tracker.add(session_error)
-        except ContextPipelineInterruptedError as interruped_error:
-            self._logger.debug('The context pipeline was interrupted', exc_info=interruped_error)
+        except ContextPipelineInterruptedError as interrupted_error:
+            self._logger.debug('The context pipeline was interrupted', exc_info=interrupted_error)
 
             await wait_for(
                 lambda: request_provider.mark_request_as_handled(crawling_context.request),
@@ -813,30 +871,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 max_retries=3,
             )
         except ContextPipelineInitializationError as initialization_error:
-            if self._should_retry_request(crawling_context, initialization_error):
-                self._logger.debug(
-                    'An exception occurred during the initialization of crawling context, a retry is in order',
-                    exc_info=initialization_error,
-                )
-
-                request = crawling_context.request
-                request.retry_count += 1
-                request.state = RequestState.DONE
-                await request_provider.reclaim_request(request)
-            else:
-                self._logger.exception('Request failed and reached maximum retries', exc_info=initialization_error)
-
-                await wait_for(
-                    lambda: request_provider.mark_request_as_handled(crawling_context.request),
-                    timeout=self._internal_timeout,
-                    timeout_message='Marking request as handled timed out after '
-                    f'{self._internal_timeout.total_seconds()} seconds',
-                    logger=self._logger,
-                    max_retries=3,
-                )
-
-            if crawling_context.session:
-                crawling_context.session.mark_bad()
+            self._logger.debug(
+                'An exception occurred during the initialization of crawling context',
+                exc_info=initialization_error,
+            )
+            await self._handle_request_error(crawling_context, initialization_error)
         except Exception as internal_error:
             self._logger.exception(
                 'An exception occurred during handling of a request. This places the crawler '

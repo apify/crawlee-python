@@ -4,6 +4,7 @@ import inspect
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
+from urllib.parse import urlparse
 
 from httpx import URL
 from more_itertools import flatten
@@ -11,7 +12,6 @@ from pydantic import AnyHttpUrl, TypeAdapter
 from typing_extensions import Protocol
 
 from crawlee._utils.crypto import crypto_random_object_id
-from crawlee.configuration import Configuration
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Sequence
@@ -28,6 +28,9 @@ class ProxyInfo:
 
     url: str
     """The URL of the proxy."""
+
+    scheme: str
+    """The scheme of the proxy."""
 
     hostname: str
     """The hostname of the proxy."""
@@ -113,9 +116,19 @@ class ProxyConfiguration:
         proxy_urls: list[str] | None = None,
         new_url_function: NewUrlFunction | None = None,
         tiered_proxy_urls: list[list[str]] | None = None,
-        configuration: Configuration | None = None,
     ) -> None:
-        self._configuration = configuration or Configuration.get_global_configuration()
+        """Initialize a proxy configuration object.
+
+        Exactly one of `proxy_urls`, `tiered_proxy_urls` or `new_url_function` must be specified.
+
+        Args:
+            proxy_urls: A list of URLs of proxies that will be rotated in a round-robin fashion
+            tiered_proxy_urls: A list of URL tiers (where a tier is a list of proxy URLs). Crawlers will automatically
+                try to use the lowest tier (smallest index) where blocking does not happen. The proxy URLs in
+                the selected tier will be rotated in a round-robin fashion.
+            new_url_function: A function that returns a proxy URL for a given Request. This provides full control over
+                the proxy selection mechanism.
+        """
         self._next_custom_url_index = 0
         self._used_proxy_urls = dict[str, URL]()
         self._url_validator = TypeAdapter(AnyHttpUrl)
@@ -157,6 +170,7 @@ class ProxyConfiguration:
 
         info = ProxyInfo(
             url=str(url),
+            scheme=url.scheme,
             hostname=url.host,
             port=cast(int, url.port),
             username=url.username,
@@ -191,13 +205,16 @@ class ProxyConfiguration:
                 if inspect.isawaitable(result):
                     result = await result
 
-                return URL(cast(str, result)) if result is not None else None, None
+                return URL(result) if result is not None else None, None
             except Exception as e:
                 raise ValueError('The provided "new_url_function" did not return a valid URL') from e
 
         if self._proxy_tier_tracker:
             if request is not None and proxy_tier is None:
-                hostname = URL(request.url).host
+                hostname = urlparse(request.url).hostname
+                if hostname is None:
+                    raise ValueError('The request URL does not have a hostname')
+
                 if request.last_proxy_tier is not None:
                     self._proxy_tier_tracker.add_error(hostname, request.last_proxy_tier)
 

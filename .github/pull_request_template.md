@@ -4,11 +4,11 @@
 
 - TODO
 
-### Related issues
+### Issues
 
 <!-- If applicable, reference any related GitHub issues -->
 
-- TODO
+- Closes: #TODO
 
 ### Testing
 
@@ -18,5 +18,4 @@
 
 ### Checklist
 
-- [ ] Changes are described in the `CHANGELOG.md`
 - [ ] CI passed

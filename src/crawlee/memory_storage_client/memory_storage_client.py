@@ -77,7 +77,7 @@ class MemoryStorageClient(BaseStorageClient):
     @property
     def storage_dir(self) -> str:
         """Path to the storage directory."""
-        return self._configuration.local_storage_dir
+        return self._configuration.storage_dir
 
     @property
     def datasets_directory(self) -> str:
