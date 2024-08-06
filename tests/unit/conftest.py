@@ -7,13 +7,16 @@ import os
 from typing import TYPE_CHECKING
 
 import pytest
+from proxy import Proxy
 
 from crawlee.configuration import Configuration
 from crawlee.memory_storage_client import MemoryStorageClient
+from crawlee.proxy_configuration import ProxyInfo
 from crawlee.storage_client_manager import StorageClientManager
 from crawlee.storages import _creation_management
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
     from pathlib import Path
 
 
@@ -62,3 +65,49 @@ def memory_storage_client(tmp_path: Path) -> MemoryStorageClient:
 @pytest.fixture()
 def httpbin() -> str:
     return os.environ.get('HTTPBIN_URL', 'https://httpbin.org')
+
+
+@pytest.fixture()
+async def proxy_info(unused_tcp_port: int) -> ProxyInfo:
+    username = 'user'
+    password = 'pass'
+
+    return ProxyInfo(
+        url=f'http://{username}:{password}@127.0.0.1:{unused_tcp_port}',
+        scheme='http',
+        hostname='127.0.0.1',
+        port=unused_tcp_port,
+        username=username,
+        password=password,
+    )
+
+
+@pytest.fixture()
+async def proxy(proxy_info: ProxyInfo) -> AsyncGenerator[ProxyInfo, None]:
+    with Proxy(
+        [
+            '--hostname',
+            proxy_info.hostname,
+            '--port',
+            str(proxy_info.port),
+            '--basic-auth',
+            f'{proxy_info.username}:{proxy_info.password}',
+        ]
+    ):
+        yield proxy_info
+
+
+@pytest.fixture()
+async def disabled_proxy(proxy_info: ProxyInfo) -> AsyncGenerator[ProxyInfo, None]:
+    with Proxy(
+        [
+            '--hostname',
+            proxy_info.hostname,
+            '--port',
+            str(proxy_info.port),
+            '--basic-auth',
+            f'{proxy_info.username}:{proxy_info.password}',
+            '--disable-http-proxy',
+        ]
+    ):
+        yield proxy_info

@@ -133,7 +133,7 @@ module.exports = {
         },
         announcementBar: {
             id: 'announcement-bar-',
-            content: `⭐️ If you like Crawlee for Python, give it a star on <a target="_blank" rel="noopener noreferrer" href="https://github.com/apify/crawlee-python">GitHub</a> ⭐`,
+            content: `🎉️ <b>Learn about Crawlee for Python from its creators. Join us at 9 am EST on August 5.<a href="https://apify.com/resources/crawlee-for-python-webinar">Sign up now!</a></b> 🥳️`,
         },
         navbar: {
             hideOnScroll: true,

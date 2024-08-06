@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import logging
 from typing import TYPE_CHECKING, AsyncIterator, Literal, TextIO, TypedDict, cast
 
 from typing_extensions import NotRequired, Required, Unpack, override
@@ -18,6 +19,9 @@ if TYPE_CHECKING:
     from crawlee.configuration import Configuration
     from crawlee.models import DatasetItemsListPage
     from crawlee.types import JSONSerializable
+
+
+logger = logging.getLogger(__name__)
 
 
 class GetDataKwargs(TypedDict):
@@ -209,8 +213,11 @@ class Dataset(BaseStorage):
             offset += list_items.count
 
         if content_type == 'csv':
-            writer = csv.writer(destination, quoting=csv.QUOTE_MINIMAL)
-            writer.writerows([items[0].keys(), *[item.values() for item in items]])
+            if items:
+                writer = csv.writer(destination, quoting=csv.QUOTE_MINIMAL)
+                writer.writerows([items[0].keys(), *[item.values() for item in items]])
+            else:
+                logger.warning('Attempting to export an empty dataset - no file will be created')
         elif content_type == 'json':
             json.dump(items, destination)
         else:

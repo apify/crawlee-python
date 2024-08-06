@@ -8,16 +8,17 @@ from bs4 import BeautifulSoup, Tag
 from typing_extensions import Unpack
 
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
+from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
-from crawlee.basic_crawler.errors import SessionError
 from crawlee.beautifulsoup_crawler.types import BeautifulSoupCrawlingContext
 from crawlee.enqueue_strategy import EnqueueStrategy
-from crawlee.http_clients import HttpxClient
+from crawlee.errors import SessionError
+from crawlee.http_clients import HttpxHttpClient
 from crawlee.http_crawler import HttpCrawlingContext
 from crawlee.models import BaseRequestData
 
 if TYPE_CHECKING:
-    from crawlee.basic_crawler.types import AddRequestsKwargs, BasicCrawlingContext
+    from crawlee.types import AddRequestsKwargs, BasicCrawlingContext
 
 
 class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
@@ -54,7 +55,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
 
         kwargs.setdefault(
             'http_client',
-            HttpxClient(
+            HttpxHttpClient(
                 additional_http_error_status_codes=additional_http_error_status_codes,
                 ignore_http_error_status_codes=ignore_http_error_status_codes,
             ),
@@ -66,10 +67,10 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
 
     async def _make_http_request(self, context: BasicCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
         result = await self._http_client.crawl(
-            context.request,
-            context.session,
-            context.proxy_info,
-            self._statistics,
+            request=context.request,
+            session=context.session,
+            proxy_info=context.proxy_info,
+            statistics=self._statistics,
         )
 
         yield HttpCrawlingContext(
@@ -129,8 +130,13 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
                 if label is not None:
                     link_user_data.setdefault('label', label)
 
-                if (href := link.attrs.get('href')) is not None:
-                    requests.append(BaseRequestData.from_url(href, user_data=link_user_data))
+                if (url := link.attrs.get('href')) is not None:
+                    url = url.strip()
+
+                    if not is_url_absolute(url):
+                        url = convert_to_absolute_url(context.request.url, url)
+
+                    requests.append(BaseRequestData.from_url(url, user_data=link_user_data))
 
             await context.add_requests(requests, **kwargs)
 

@@ -63,7 +63,11 @@ async def server() -> AsyncGenerator[respx.MockRouter, None]:
         yield mock
 
 
-async def test_fetches_html(crawler: HttpCrawler, mock_request_handler: AsyncMock, server: respx.MockRouter) -> None:
+async def test_fetches_html(
+    crawler: HttpCrawler,
+    mock_request_handler: AsyncMock,
+    server: respx.MockRouter,
+) -> None:
     await crawler.add_requests(['https://test.io/html'])
     await crawler.run()
 

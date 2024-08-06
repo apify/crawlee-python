@@ -6,17 +6,19 @@ from typing import TYPE_CHECKING, Literal
 from typing_extensions import Unpack
 
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
+from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
-from crawlee.basic_crawler.errors import SessionError
 from crawlee.browsers import BrowserPool
 from crawlee.enqueue_strategy import EnqueueStrategy
+from crawlee.errors import SessionError
 from crawlee.models import BaseRequestData
 from crawlee.playwright_crawler.types import PlaywrightCrawlingContext
+from crawlee.playwright_crawler.utils import infinite_scroll
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
-    from crawlee.basic_crawler.types import AddRequestsKwargs, BasicCrawlingContext
+    from crawlee.types import AddRequestsKwargs, BasicCrawlingContext
 
 
 class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
@@ -97,59 +99,66 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
         if self._browser_pool is None:
             raise ValueError('Browser pool is not initialized.')
 
-        # Create a new browser page, navigate to the URL and get response.
+        # Create a new browser page
         crawlee_page = await self._browser_pool.new_page(proxy_info=context.proxy_info)
-        response = await crawlee_page.page.goto(context.request.url)
 
-        if response is None:
-            raise SessionError(f'Failed to load the URL: {context.request.url}')
+        async with crawlee_page.page:
+            # Navigate to the URL and get response.
+            response = await crawlee_page.page.goto(context.request.url)
 
-        # Set the loaded URL to the actual URL after redirection.
-        context.request.loaded_url = crawlee_page.page.url
+            if response is None:
+                raise SessionError(f'Failed to load the URL: {context.request.url}')
 
-        async def enqueue_links(
-            *,
-            selector: str = 'a',
-            label: str | None = None,
-            user_data: dict | None = None,
-            **kwargs: Unpack[AddRequestsKwargs],
-        ) -> None:
-            """The `PlaywrightCrawler` implementation of the `EnqueueLinksFunction` function."""
-            kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
+            # Set the loaded URL to the actual URL after redirection.
+            context.request.loaded_url = crawlee_page.page.url
 
-            requests = list[BaseRequestData]()
-            user_data = user_data or {}
+            async def enqueue_links(
+                *,
+                selector: str = 'a',
+                label: str | None = None,
+                user_data: dict | None = None,
+                **kwargs: Unpack[AddRequestsKwargs],
+            ) -> None:
+                """The `PlaywrightCrawler` implementation of the `EnqueueLinksFunction` function."""
+                kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
 
-            elements = await crawlee_page.page.query_selector_all(selector)
+                requests = list[BaseRequestData]()
+                user_data = user_data or {}
 
-            for element in elements:
-                href = await element.get_attribute('href')
+                elements = await crawlee_page.page.query_selector_all(selector)
 
-                if href:
-                    link_user_data = user_data.copy()
+                for element in elements:
+                    url = await element.get_attribute('href')
 
-                    if label is not None:
-                        link_user_data.setdefault('label', label)
+                    if url:
+                        url = url.strip()
 
-                    request = BaseRequestData.from_url(href, user_data=link_user_data)
-                    requests.append(request)
+                        if not is_url_absolute(url):
+                            url = convert_to_absolute_url(context.request.url, url)
 
-            await context.add_requests(requests, **kwargs)
+                        link_user_data = user_data.copy()
 
-        yield PlaywrightCrawlingContext(
-            request=context.request,
-            session=context.session,
-            add_requests=context.add_requests,
-            send_request=context.send_request,
-            push_data=context.push_data,
-            proxy_info=context.proxy_info,
-            log=context.log,
-            page=crawlee_page.page,
-            response=response,
-            enqueue_links=enqueue_links,
-        )
+                        if label is not None:
+                            link_user_data.setdefault('label', label)
 
-        await crawlee_page.page.close()
+                        request = BaseRequestData.from_url(url, user_data=link_user_data)
+                        requests.append(request)
+
+                await context.add_requests(requests, **kwargs)
+
+            yield PlaywrightCrawlingContext(
+                request=context.request,
+                session=context.session,
+                add_requests=context.add_requests,
+                send_request=context.send_request,
+                push_data=context.push_data,
+                proxy_info=context.proxy_info,
+                log=context.log,
+                page=crawlee_page.page,
+                infinite_scroll=lambda: infinite_scroll(crawlee_page.page),
+                response=response,
+                enqueue_links=enqueue_links,
+            )
 
     async def _handle_blocked_request(
         self,

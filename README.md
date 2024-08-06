@@ -9,6 +9,32 @@
     <small>A web scraping and browser automation library</small>
 </h1>
 
+<p align=center>
+    <a href="https://badge.fury.io/py/crawlee" rel="nofollow">
+        <img src="https://badge.fury.io/py/crawlee.svg" alt="PyPI version" style="max-width: 100%;">
+    </a>
+    <a href="https://pypi.org/project/crawlee/" rel="nofollow">
+        <img src="https://img.shields.io/pypi/dm/crawlee" alt="PyPI - Downloads" style="max-width: 100%;">
+    </a>
+    <a href="https://pypi.org/project/crawlee/" rel="nofollow">
+        <img src="https://img.shields.io/pypi/pyversions/crawlee" alt="PyPI - Python Version" style="max-width: 100%;">
+    </a>
+    <a href="https://discord.gg/jyEM2PRvMU" rel="nofollow">
+        <img src="https://img.shields.io/discord/801163717915574323?label=discord" alt="Chat on discord" style="max-width: 100%;">
+    </a>
+</p>
+
+<h1 align="center">
+    <a href="https://apify.com/resources/crawlee-for-python-webinar">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="https://pbs.twimg.com/card_img/1817941805385560065/U9LeYTKD?format=png&name=small">
+          <img alt="Crawlee" src="https://pbs.twimg.com/card_img/1817941805385560065/U9LeYTKD?format=png&name=small" width="500">
+        </picture>
+    </a>
+    <br>
+    <small> Learn more about Crawlee for Python from the creators of Crawlee. Join us on August 5th at 9 AM EST. <a href="https://apify.com/resources/crawlee-for-python-webinar"> Sign up now!</a></small>
+</h1>
+
 Crawlee covers your crawling and scraping end-to-end and **helps you build reliable scrapers. Fast.**
 
 > 🚀 Crawlee for Python is open to early adopters!
@@ -23,24 +49,10 @@ We also have a TypeScript implementation of the Crawlee, which you can explore a
 
 We recommend visiting the [Introduction tutorial](https://crawlee.dev/python/docs/introduction) in Crawlee documentation for more information.
 
-Crawlee is available as the [`crawlee`](https://pypi.org/project/crawlee/) PyPI package.
+Crawlee is available as the [`crawlee`](https://pypi.org/project/crawlee/) PyPI package. The core functionality is included in the base package, with additional features available as optional extras to minimize package size and dependencies. To install Crawlee with all features, run the following command:
 
 ```sh
-pip install crawlee
-```
-
-Additional, optional dependencies unlocking more features are shipped as package extras.
-
-If you plan to parse HTML and use CSS selectors, install `crawlee` with `beautifulsoup` extra:
-
-```sh
-pip install 'crawlee[beautifulsoup]'
-```
-
-If you plan to use a (headless) browser, install `crawlee` with the `playwright` extra:
-
-```sh
-pip install 'crawlee[playwright]'
+pip install 'crawlee[all]'
 ```
 
 Then, install the Playwright dependencies:
@@ -49,17 +61,13 @@ Then, install the Playwright dependencies:
 playwright install
 ```
 
-You can install multiple extras at once by using a comma as a separator:
-
-```sh
-pip install 'crawlee[beautifulsoup,playwright]'
-```
-
 Verify that Crawlee is successfully installed:
 
 ```sh
 python -c 'import crawlee; print(crawlee.__version__)'
 ```
+
+For detailed installation instructions see the [Setting up](https://crawlee.dev/python/docs/introduction/setting-up) documentation page.
 
 ### With Crawlee CLI
 

@@ -9,6 +9,7 @@ from unittest import mock
 
 from crawlee import Glob
 from crawlee.playwright_crawler import PlaywrightCrawler
+from crawlee.storages import RequestList
 
 if TYPE_CHECKING:
     from crawlee.playwright_crawler import PlaywrightCrawlingContext
@@ -46,7 +47,27 @@ async def test_enqueue_links() -> None:
 
     await crawler.run(requests)
 
-    visited = {call[0][0] for call in visit.call_args_list}
+    visited: set[str] = {call[0][0] for call in visit.call_args_list}
 
     assert len(visited) >= 10
     assert all(url.startswith('https://crawlee.dev/docs/examples') for url in visited)
+
+
+async def test_nonexistent_url_invokes_error_handler() -> None:
+    crawler = PlaywrightCrawler(
+        max_request_retries=4, request_provider=RequestList(['https://this-does-not-exist-22343434.com'])
+    )
+
+    error_handler = mock.AsyncMock(return_value=None)
+    crawler.error_handler(error_handler)
+
+    failed_handler = mock.AsyncMock(return_value=None)
+    crawler.failed_request_handler(failed_handler)
+
+    @crawler.router.default_handler
+    async def request_handler(_context: PlaywrightCrawlingContext) -> None:
+        pass
+
+    await crawler.run()
+    assert error_handler.call_count == 3
+    assert failed_handler.call_count == 1
