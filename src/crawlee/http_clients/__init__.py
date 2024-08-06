@@ -1,4 +1,4 @@
-from .base_http_client import BaseHttpClient, HttpCrawlingResult, HttpResponse
-from .httpx_client import HttpxClient
+from .base import BaseHttpClient, HttpCrawlingResult, HttpResponse
+from .httpx import HttpxHttpClient
 
-__all__ = ['BaseHttpClient', 'HttpCrawlingResult', 'HttpResponse', 'HttpxClient']
+__all__ = ['BaseHttpClient', 'HttpCrawlingResult', 'HttpResponse', 'HttpxHttpClient']

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Awaitable, Callable, Generic, TypeVar
 
-from crawlee.basic_crawler.types import BasicCrawlingContext
+from crawlee.types import BasicCrawlingContext
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext)
 RequestHandler = Callable[[TCrawlingContext], Awaitable[None]]

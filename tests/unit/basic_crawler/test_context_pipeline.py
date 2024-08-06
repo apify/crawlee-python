@@ -8,14 +8,10 @@ from unittest.mock import AsyncMock
 import pytest
 
 from crawlee.basic_crawler import ContextPipeline
-from crawlee.basic_crawler.errors import (
-    ContextPipelineFinalizationError,
-    ContextPipelineInitializationError,
-    RequestHandlerError,
-)
-from crawlee.basic_crawler.types import BasicCrawlingContext
+from crawlee.errors import ContextPipelineFinalizationError, ContextPipelineInitializationError, RequestHandlerError
 from crawlee.models import Request
 from crawlee.sessions.session import Session
+from crawlee.types import BasicCrawlingContext
 
 
 @dataclass(frozen=True)

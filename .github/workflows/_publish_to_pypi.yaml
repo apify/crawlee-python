@@ -2,6 +2,10 @@ name: Publish to PyPI
 
 on:
   workflow_call:
+    inputs:
+      version_number:
+        required: true
+        type: string
 
 jobs:
   publish_to_pypi:
@@ -23,26 +27,37 @@ jobs:
         with:
           python-version: 3.12
 
+      - name: Set up Poetry
+        run: pipx install poetry
+
       - name: Install dependencies
         run: make install-dev
 
-      # Determines the release type based on the event that triggered the workflow.
-      - name: Determine release type
-        id: determine-release-type
+      # Updates the version number in the project's configuration.
+      - name: Set version in pyproject.toml
         run: |
-          if [[ ${{ github.event_name }} = release ]]; then
-            release_type="final"
-          elif [[ ${{ github.event_name }} = push ]]; then
-            release_type="beta"
-          elif [[ ${{ github.event_name }} = workflow_dispatch ]]; then
-            release_type=${{ github.event.inputs.release_type }}
+          if [[ ${{ github.event_name }} = push ]]; then
+            # Make a pre-release on push
+            next_beta=$(
+              curl "https://pypi.org/pypi/crawlee/json" | jq --raw-output '
+                [
+                  .releases |
+                    keys |
+                    .[] |
+                    select(startswith("${{ inputs.version_number }}b")) |
+                    split("b") |
+                    .[1] |
+                    tonumber
+                ] |
+                sort_by(- .) |
+                .[0] + 1
+              '
+            )
+            poetry version "${{ inputs.version_number }}b$next_beta"
+          else
+            # ...and a regular release otherwise
+            poetry version '${{ inputs.version_number }}'
           fi
-          echo "release_type=${release_type}" >> $GITHUB_OUTPUT
-
-      # Updates the version number for pre-releases in the project's configuration.
-      - name: Set pre-release version
-        if: steps.determine-release-type.outputs.release_type != 'final'
-        run: python ./scripts/update_version_for_prerelease.py ${{ steps.determine-release-type.outputs.release_type }}
 
       # Builds the package.
       - name: Build package
@@ -51,29 +66,3 @@ jobs:
       # Publishes the package to PyPI using PyPA official GitHub action with OIDC authentication.
       - name: Publish package to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
-
-      # If this workflow is not triggered by a GitHub release event, manually create and push a Git tag.
-      - name: Create Git tag with the published version
-        if: github.event_name != 'release'
-        run: |
-          GIT_TAG=v$(python ./scripts/print_current_package_version.py)
-          echo "Current package version retrieved: ${GIT_TAG}"
-
-          echo "Creating Git tag: ${GIT_TAG}"
-          git tag "$GIT_TAG"
-          echo "Git tag ${GIT_TAG} created successfully."
-
-          echo "Pushing Git tag ${GIT_TAG} to the remote repository."
-          git push origin tag "$GIT_TAG"
-          echo "Git tag ${GIT_TAG} pushed successfully."
-
-      # If triggered by a release, upload build artifacts to the associated GitHub release.
-      - name: Upload the build artifacts to release
-        if: github.event_name == 'release'
-        run: |
-          echo "Uploading build artifacts to GitHub release: ${{ github.ref_name }}"
-          gh release upload ${{ github.ref_name }} dist/*
-          echo "Build artifacts uploaded successfully."
-
-        env:
-          GH_TOKEN: ${{ github.token }}

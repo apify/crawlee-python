@@ -8,22 +8,22 @@ on:
     tags-ignore:
       - "**" # Ignore all tags to prevent duplicate builds when tags are pushed.
 
-  # Trigger a stable version release when a GitHub release is published.
-  release:
-    types: [published]
-
-  # Allows manual workflow runs from GitHub's UI, with the ability to specify the type of release.
+  # Trigger a stable version release via GitHub's UI, with the ability to specify the type of release.
   workflow_dispatch:
     inputs:
       release_type:
         description: Release type
         required: true
         type: choice
-        default: alpha
+        default: auto
         options:
-          - alpha
-          - beta
-          - final
+          - auto
+          - custom
+      custom_version:
+        description: The custom version to bump to (only for "custom" type)
+        required: false
+        type: string
+        default: ''
 
 jobs:
   run_code_checks:
@@ -36,21 +36,123 @@ jobs:
     name: Check whether to release
     if: |
       github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'release' ||
       (
         github.event_name == 'push' &&
-        !startsWith(github.event.head_commit.message, 'docs') &&
-        !startsWith(github.event.head_commit.message, 'chore')
+        !startsWith(github.event.head_commit.message, 'docs:') &&
+        !startsWith(github.event.head_commit.message, 'chore:') &&
+        !startsWith(github.event.head_commit.message, 'ci:')
       )
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    outputs:
+      version_number: ${{ steps.version_number.outputs.result }}
     steps:
-      - name: Dummy step
-        run: "true"
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Locally remove beta tags
+        run: |
+          git tag | grep 'b[0-9]' | xargs git tag --delete
+
+      - name: Install git-cliff
+        run: pip install git-cliff
+
+      - name: Determine version number
+        id: version_number
+        run: |
+          if [[ '${{ github.event_name }}' = workflow_dispatch && '${{ github.event.inputs.release_type }}' = custom ]]; then
+            echo result=$(echo ${{ github.event.inputs.custom_version }} | sed s/^v//) | tee -a $GITHUB_OUTPUT
+          else
+            echo result=$(git-cliff --bumped-version | sed s/^v//) | tee -a $GITHUB_OUTPUT
+          fi
+
+  update_changelog:
+    name: Update changelog
+    needs: [run_code_checks, should_release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write # Required for OIDC authentication.
+    outputs:
+      changelog_commitish: ${{ steps.commit.commit_long_sha || github.sha }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
+
+      - name: Locally remove beta tags
+        run: |
+          git tag | grep 'b[0-9]' | xargs git tag --delete
+
+      - name: Install git-cliff
+        run: pip install git-cliff
+
+      - name: Generate changelog with git-cliff
+        run: |
+          if [[ ${{ github.event_name }} = workflow_dispatch ]]; then
+            git-cliff --tag v${{ needs.should_release.outputs.version_number }} > CHANGELOG.md
+          else
+            git-cliff --with-tag-message v${{ needs.should_release.outputs.version_number }} > CHANGELOG.md
+          fi
+
+      - name: Install poetry
+        run: pipx install poetry
+
+      - name: Update package version in pyproject.toml
+        run: poetry version ${{ needs.should_release.outputs.version_number }}
+
+      - name: Commit changes
+        id: commit
+        uses: EndBug/add-and-commit@v9
+        with:
+          author_name: Apify Release Bot
+          author_email: noreply@apify.com
+          message: 'chore(release): Update changelog and package version [skip ci]'
+
+  create_github_release:
+    name: Create github release
+    if: github.event_name == 'workflow_dispatch'
+    needs: [update_changelog, should_release]
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Locally remove beta tags
+        run: |
+          git tag | grep 'b[0-9]' | xargs git tag --delete
+
+      - name: Install git-cliff
+        run: pip install git-cliff
+
+      - name: Generate release notes with git-cliff
+        run: git-cliff --tag "v${{ needs.should_release.outputs.version_number }}" --unreleased --strip all > release_notes.md
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.should_release.outputs.version_number }}
+          name: ${{ needs.should_release.outputs.version_number }}
+          target_commitish: ${{ needs.update_changelog.outputs.changelog_commitish }}
+          body_path: release_notes.md
 
   publish_to_pypi:
     name: Publish to PyPI
-    needs: [run_code_checks, should_release]
+    needs: [should_release]
     uses: ./.github/workflows/_publish_to_pypi.yaml
+    with:
+      version_number: ${{ needs.should_release.outputs.version_number }}
 
   # TODO: add job for publish package to Conda
   # https://github.com/apify/crawlee-py/issues/104

@@ -18,5 +18,4 @@
 
 ### Checklist
 
-- [ ] Changes are described in the `CHANGELOG.md`
 - [ ] CI passed

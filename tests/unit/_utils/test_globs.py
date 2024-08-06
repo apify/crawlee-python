@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from crawlee._utils.globs import Glob
 
 

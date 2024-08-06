@@ -105,9 +105,8 @@ class CrawleeLogFormatter(logging.Formatter):
                 f' {Fore.LIGHTBLACK_EX}({json.dumps(extra, ensure_ascii=False, default=str)}){Style.RESET_ALL}'
             )
 
-        # Format the actual log message, and indent everything but the first line
+        # Format the actual log message
         log_string = super().format(record)
-        log_string = textwrap.indent(log_string, _LOG_MESSAGE_INDENT).lstrip()
 
         if self.include_logger_name:
             # Include logger name at the beginning of the log line

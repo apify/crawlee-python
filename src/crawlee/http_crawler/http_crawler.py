@@ -6,12 +6,12 @@ from typing import TYPE_CHECKING, AsyncGenerator, Iterable
 from typing_extensions import Unpack
 
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
-from crawlee.basic_crawler.errors import SessionError
-from crawlee.http_clients import HttpxClient
+from crawlee.errors import SessionError
+from crawlee.http_clients import HttpxHttpClient
 from crawlee.http_crawler.types import HttpCrawlingContext
 
 if TYPE_CHECKING:
-    from crawlee.basic_crawler.types import BasicCrawlingContext
+    from crawlee.types import BasicCrawlingContext
 
 
 class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
@@ -40,7 +40,7 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
 
         kwargs.setdefault(
             'http_client',
-            HttpxClient(
+            HttpxHttpClient(
                 additional_http_error_status_codes=additional_http_error_status_codes,
                 ignore_http_error_status_codes=ignore_http_error_status_codes,
             ),
@@ -52,10 +52,10 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
 
     async def _make_http_request(self, context: BasicCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
         result = await self._http_client.crawl(
-            context.request,
-            context.session,
-            context.proxy_info,
-            self._statistics,
+            request=context.request,
+            session=context.session,
+            proxy_info=context.proxy_info,
+            statistics=self._statistics,
         )
 
         yield HttpCrawlingContext(

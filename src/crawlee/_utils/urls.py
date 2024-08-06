@@ -1,19 +1,36 @@
 from __future__ import annotations
 
-from urllib.parse import urljoin, urlparse
+from urllib.parse import parse_qs, urljoin, urlparse
 
-from pydantic import HttpUrl
+from pydantic import AnyHttpUrl, TypeAdapter
 
 
-def is_url_absolute(url: str | HttpUrl) -> bool:
+def is_url_absolute(url: str) -> bool:
     """Check if a URL is absolute."""
-    url = url if isinstance(url, str) else str(url)
     return bool(urlparse(url).netloc)
 
 
-def make_url_absolute(base_url: str | HttpUrl, relative_url: str | HttpUrl) -> HttpUrl:
-    """Make a relative URL absolute by combining it with a base URL."""
-    base_url = base_url if isinstance(base_url, str) else str(base_url)
-    relative_url = relative_url if isinstance(relative_url, str) else str(relative_url)
-    absolute_url = urljoin(base_url, relative_url)
-    return HttpUrl(absolute_url)
+def convert_to_absolute_url(base_url: str, relative_url: str) -> str:
+    """Convert a relative URL to an absolute URL using a base URL."""
+    return urljoin(base_url, relative_url)
+
+
+def extract_query_params(url: str) -> dict[str, list[str]]:
+    """Extract query parameters from a given URL."""
+    url_parsed = urlparse(url)
+    return parse_qs(url_parsed.query)
+
+
+_http_url_adapter = TypeAdapter(AnyHttpUrl)
+
+
+def validate_http_url(value: str | None) -> str | None:
+    """Validate the given HTTP URL.
+
+    Raises:
+        pydantic.ValidationError: If the URL is not valid.
+    """
+    if value is not None:
+        _http_url_adapter.validate_python(value)
+
+    return value

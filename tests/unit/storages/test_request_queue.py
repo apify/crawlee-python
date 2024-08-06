@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 import pytest
-from pydantic import HttpUrl
 
 from crawlee.models import BaseRequestData, Request
 from crawlee.storages import RequestQueue
@@ -118,7 +117,7 @@ async def test_reclaim_request(request_queue: RequestQueue) -> None:
     # Fetch the request
     next_request = await request_queue.fetch_next_request()
     assert next_request is not None
-    assert HttpUrl(next_request.unique_key) == request.url
+    assert next_request.unique_key == request.url
 
     # Reclaim
     await request_queue.reclaim_request(next_request)
@@ -159,7 +158,7 @@ async def test_add_batched_requests(
         next_request = await request_queue.fetch_next_request()
         assert next_request is not None
 
-        expected_url = HttpUrl(original_request) if isinstance(original_request, str) else original_request.url
+        expected_url = original_request if isinstance(original_request, str) else original_request.url
         assert next_request.url == expected_url
 
     # Confirm the queue is empty after processing all requests

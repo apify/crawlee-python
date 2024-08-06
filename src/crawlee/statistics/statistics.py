@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import math
 from datetime import datetime, timedelta, timezone
-from logging import getLogger
+from logging import Logger, getLogger
 from typing import TYPE_CHECKING, Any, Generic, cast
 
 from typing_extensions import Self, TypeVar
@@ -70,6 +70,7 @@ class Statistics(Generic[TStatisticsState]):
         persist_state_key: str | None = None,
         key_value_store: KeyValueStore | None = None,
         log_message: str = 'Statistics',
+        periodic_message_logger: Logger | None = None,
         log_interval: timedelta = timedelta(minutes=1),
         state_model: type[TStatisticsState] = cast(Any, StatisticsState),  # noqa: B008 - in an ideal world, TStatisticsState would be inferred from this argument, but I haven't managed to do that
     ) -> None:
@@ -97,6 +98,7 @@ class Statistics(Generic[TStatisticsState]):
         self._key_value_store: KeyValueStore | None = key_value_store
 
         self._log_message = log_message
+        self._periodic_message_logger = periodic_message_logger or logger
         self._periodic_logger = RecurringTask(self._log, log_interval)
 
     async def __aenter__(self) -> Self:
@@ -212,7 +214,7 @@ class Statistics(Generic[TStatisticsState]):
 
     def _log(self) -> None:
         stats = self.calculate()
-        logger.info(f'{self._log_message} {stats}')
+        self._periodic_message_logger.info(f'{self._log_message}\n{stats.to_table()}')
 
     async def _maybe_load_statistics(self) -> None:
         if not self._persistence_enabled:
