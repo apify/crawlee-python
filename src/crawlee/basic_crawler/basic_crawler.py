@@ -215,7 +215,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._proxy_configuration = proxy_configuration
         self._statistics = statistics or Statistics(
             event_manager=self._event_manager,
-            log_message=f'{self._logger.name} request statistics',
+            periodic_message_logger=self._logger,
+            log_message='Current request statistics:',
         )
         self._additional_context_managers = _additional_context_managers or []
 
@@ -398,7 +399,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._has_finished_before = True
 
         final_statistics = self._statistics.calculate()
-        self._logger.info(f'Final request statistics: {final_statistics}')
+        self._logger.info(f'Final request statistics: {final_statistics.to_table()}')
 
         return final_statistics
 
