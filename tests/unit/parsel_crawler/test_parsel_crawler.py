@@ -96,7 +96,7 @@ async def test_basic(server: respx.MockRouter) -> None:
 
     @crawler.router.default_handler
     async def request_handler(context: ParselCrawlingContext) -> None:
-        links = context.parsel.css('a::attr(href)').getall()
+        links = context.selector.css('a::attr(href)').getall()
         await handler(links)
 
     await crawler.run()

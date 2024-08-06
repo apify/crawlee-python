@@ -8,17 +8,17 @@ from parsel import Selector
 from typing_extensions import Unpack
 
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
-from crawlee._utils.urls import is_url_absolute, make_url_absolute
+from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
-from crawlee.basic_crawler.errors import SessionError
 from crawlee.enqueue_strategy import EnqueueStrategy
-from crawlee.http_clients import HttpxClient
+from crawlee.errors import SessionError
+from crawlee.http_clients.httpx import HttpxHttpClient
 from crawlee.http_crawler import HttpCrawlingContext
 from crawlee.models import BaseRequestData
 from crawlee.parsel_crawler.types import ParselCrawlingContext
 
 if TYPE_CHECKING:
-    from crawlee.basic_crawler.types import AddRequestsKwargs, BasicCrawlingContext
+    from crawlee.types import AddRequestsKwargs, BasicCrawlingContext
 
 
 class ParselCrawler(BasicCrawler[ParselCrawlingContext]):
@@ -50,7 +50,7 @@ class ParselCrawler(BasicCrawler[ParselCrawlingContext]):
 
         kwargs.setdefault(
             'http_client',
-            HttpxClient(
+            HttpxHttpClient(
                 additional_http_error_status_codes=additional_http_error_status_codes,
                 ignore_http_error_status_codes=ignore_http_error_status_codes,
             ),
@@ -62,10 +62,10 @@ class ParselCrawler(BasicCrawler[ParselCrawlingContext]):
 
     async def _make_http_request(self, context: BasicCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
         result = await self._http_client.crawl(
-            context.request,
-            context.session,
-            context.proxy_info,
-            self._statistics,
+            request=context.request,
+            session=context.session,
+            proxy_info=context.proxy_info,
+            statistics=self._statistics,
         )
 
         yield HttpCrawlingContext(
@@ -89,7 +89,9 @@ class ParselCrawler(BasicCrawler[ParselCrawlingContext]):
                 raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
 
             matched_selectors = [
-                selector for selector in RETRY_CSS_SELECTORS if crawling_context.parsel.css(selector).get() is not None
+                selector
+                for selector in RETRY_CSS_SELECTORS
+                if crawling_context.selector.css(selector).get() is not None
             ]
 
             if matched_selectors:
@@ -104,7 +106,7 @@ class ParselCrawler(BasicCrawler[ParselCrawlingContext]):
         self,
         context: HttpCrawlingContext,
     ) -> AsyncGenerator[ParselCrawlingContext, None]:
-        parsel = await asyncio.to_thread(lambda: Selector(body=context.http_response.read()))
+        parsel_selector = await asyncio.to_thread(lambda: Selector(body=context.http_response.read()))
 
         async def enqueue_links(
             *,
@@ -119,7 +121,7 @@ class ParselCrawler(BasicCrawler[ParselCrawlingContext]):
             user_data = user_data or {}
 
             link: Selector
-            for link in parsel.css(selector):
+            for link in parsel_selector.css(selector):
                 link_user_data = user_data
 
                 if label is not None:
@@ -129,7 +131,7 @@ class ParselCrawler(BasicCrawler[ParselCrawlingContext]):
                     url = url.strip()
 
                     if not is_url_absolute(url):
-                        url = str(make_url_absolute(context.request.url, url))
+                        url = str(convert_to_absolute_url(context.request.url, url))
 
                     requests.append(BaseRequestData.from_url(url, user_data=link_user_data))
 
@@ -145,5 +147,5 @@ class ParselCrawler(BasicCrawler[ParselCrawlingContext]):
             push_data=context.push_data,
             log=context.log,
             http_response=context.http_response,
-            parsel=parsel,
+            selector=parsel_selector,
         )
