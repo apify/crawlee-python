@@ -29,19 +29,22 @@ class FinalStatistics:
     requests_total: int
     crawler_runtime: timedelta
 
-    def to_table(self) -> None:
+    def to_table(self) -> str:
         """Print out the Final Statistics data as a table."""
-        table = Table()
-        table.add_column('INFO')
-        table.add_column('Statistics')
+        table = Table(show_header=False)
+        table.add_column()
+        table.add_column()
 
         str_dict = {k: v.total_seconds() if isinstance(v, timedelta) else v for k, v in asdict(self).items()}
 
         for k, v in str_dict.items():
             table.add_row(str(k), str(v))
 
-        console = Console()
-        console.print(table)
+        console = Console(width=60)
+        with console.capture() as capture:
+            console.print(table, end='\n')
+
+        return capture.get().strip('\n')
 
     @override
     def __str__(self) -> str:
