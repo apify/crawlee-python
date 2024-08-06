@@ -31,6 +31,20 @@ HTTP clients are used by HTTP-based crawlers to make requests to web servers. We
     </TabItem>
 </Tabs>
 
+### Installation
+
+Since `HttpxHttpClient` is the default HTTP client, you don't need to install any additional packages to use it. If you want to use `CurlImpersonateHttpClient`, you need to install `crawlee` with the `curl-impersonate` extra.
+
+```sh
+pip install 'crawlee[curl-impersonate]'
+```
+
+or install all available extras:
+
+```sh
+pip install 'crawlee[all]'
+```
+
 ## How HTTP clients work
 
 We provide an abstract base class, <ApiLink to="class/BaseHttpClient">`BaseHttpClient`</ApiLink>, which defines the necessary interface for all HTTP clients. HTTP clients are responsible for sending requests and receiving responses, as well as managing cookies, headers, and proxies. They provide methods which are called from the crawlers. To implement your own HTTP client, inherit from the `BaseHttpClient` class and implement the required methods.
