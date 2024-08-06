@@ -27,6 +27,7 @@ body = """
         - {% if commit.scope %}*({{ commit.scope }})* {% endif %}\
             {% if commit.breaking %}[**breaking**] {% endif %}\
             {{ commit.message | upper_first }} ([{{ commit.id | truncate(length = 7, end = "") }}](<REPO>/commit/{{ commit.id }}))\
+            {% if commit.github.username %} by [@{{ commit.github.username }}](https://github.com/{{ commit.github.username }}){%- endif %}\
     {% endfor %}
 {% endfor %}\n
 """
@@ -42,8 +43,9 @@ postprocessors = [
 ]
 
 [bump]
-# With 0.x.y version, breaking commits should only increase the minor version
+# With 0.x.y version, breaking commits should only increase the minor version and feature commits should only increase the patch version
 breaking_always_bump_major = false
+features_always_bump_minor = false
 
 [git]
 # parse the commits based on https://www.conventionalcommits.org
@@ -54,8 +56,8 @@ filter_unconventional = true
 split_commits = false
 # regex for preprocessing the commit messages
 commit_preprocessors = [
-  # Replace issue numbers
-  { pattern = '\((\w+\s)?#([0-9]+)\)', replace = "([#${2}](<REPO>/issues/${2}))"},
+  # Replace PR and issue numbers in commit messages
+  { pattern = '.*', replace_command = 'python scripts/preprocess_commit_message.py'},
   # Check spelling of the commit with https://github.com/crate-ci/typos
   # If the spelling is incorrect, it will be automatically fixed.
   #{ pattern = '.*', replace_command = 'typos --write-changes -' },
@@ -94,3 +96,7 @@ topo_order = false
 sort_commits = "oldest"
 # limit the number of commits included in the changelog.
 # limit_commits = 42
+
+[remote.github]
+owner = "apify"
+repo = "crawlee-python"
