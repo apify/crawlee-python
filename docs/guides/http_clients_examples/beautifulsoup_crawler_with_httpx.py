@@ -1,7 +1,7 @@
 import asyncio
 
 from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
-from crawlee.http_clients import HttpxHttpClient
+from crawlee.http_clients.httpx import HttpxHttpClient
 
 
 async def main() -> None:
