@@ -21,6 +21,7 @@ from crawlee.configuration import Configuration
 from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.errors import SessionError, UserDefinedErrorHandlerError
 from crawlee.models import BaseRequestData, Request
+from crawlee.statistics.models import FinalStatistics
 from crawlee.storages import Dataset, KeyValueStore, RequestList, RequestQueue
 from crawlee.types import AddRequestsKwargs, BasicCrawlingContext, HttpHeaders
 
@@ -638,3 +639,51 @@ async def test_respects_no_persist_storage() -> None:
 
     datasets_path = Path(configuration.storage_dir) / 'datasets' / 'default'
     assert not datasets_path.exists() or list(datasets_path.iterdir()) == []
+
+
+async def test_logs_final_statistics(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+    crawler = BasicCrawler(configure_logging=False)
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        await context.push_data({'something': 'something'})
+
+    fake_statistics = FinalStatistics(
+        requests_finished=4,
+        requests_failed=33,
+        retry_histogram=[1, 4, 8],
+        request_avg_failed_duration=timedelta(seconds=99),
+        request_avg_finished_duration=timedelta(milliseconds=483),
+        requests_finished_per_minute=0.33,
+        requests_failed_per_minute=0.1,
+        request_total_duration=timedelta(minutes=12),
+        requests_total=37,
+        crawler_runtime=timedelta(minutes=5),
+    )
+
+    monkeypatch.setattr(crawler._statistics, 'calculate', lambda: fake_statistics)
+
+    result = await crawler.run()
+    assert result is fake_statistics
+
+    final_statistics = next(
+        (record for record in caplog.records if record.msg.startswith('Final')),
+        None,
+    )
+
+    assert final_statistics is not None
+    assert final_statistics.msg.splitlines() == [
+        'Final request statistics:',
+        '┌───────────────────────────────┬───────────┐',
+        '│ requests_finished             │ 4         │',
+        '│ requests_failed               │ 33        │',
+        '│ retry_histogram               │ [1, 4, 8] │',
+        '│ request_avg_failed_duration   │ 99.0      │',
+        '│ request_avg_finished_duration │ 0.483     │',
+        '│ requests_finished_per_minute  │ 0.33      │',
+        '│ requests_failed_per_minute    │ 0.1       │',
+        '│ request_total_duration        │ 720.0     │',
+        '│ requests_total                │ 37        │',
+        '│ crawler_runtime               │ 300.0     │',
+        '└───────────────────────────────┴───────────┘',
+    ]

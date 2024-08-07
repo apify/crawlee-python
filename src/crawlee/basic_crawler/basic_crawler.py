@@ -399,7 +399,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._has_finished_before = True
 
         final_statistics = self._statistics.calculate()
-        self._logger.info(f'Final request statistics: {final_statistics.to_table()}')
+        self._logger.info(f'Final request statistics:\n{final_statistics.to_table()}')
 
         return final_statistics
 
@@ -746,7 +746,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 f'All ongoing requests have now completed. Total requests processed: '
                 f'{self._statistics.state.requests_finished}. The crawler will now shut down.'
             )
-            self._logger.info(f'is_finished: {is_finished}')
             return True
 
         return is_finished
