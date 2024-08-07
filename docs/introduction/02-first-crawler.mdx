@@ -7,9 +7,10 @@ Now, you will build your first crawler. But before you do, let's briefly introdu
 
 ## How Crawlee works
 
-There are 2 main crawler classes available for use in Crawlee.
+There are 3 main crawler classes available for use in Crawlee.
 
 - `BeautifulSoupCrawler`
+- `ParselCrawler`
 - `PlaywrightCrawler`
 
 We'll talk about their differences later. Now, let's talk about what they have in common.
@@ -61,7 +62,7 @@ The code above is for illustration of the request queue concept. Soon you'll lea
 
 ### Building a BeautifulSoupCrawler
 
-Crawlee comes with two main crawler classes: `BeautifulSoupCrawler`, and `PlaywrightCrawler`. You can read their short descriptions in the [Quick start](../quick-start) lesson.
+Crawlee comes with thre main crawler classes: `BeautifulSoupCrawler`, `ParselCrawler`, and `PlaywrightCrawler`. You can read their short descriptions in the [Quick start](../quick-start) lesson.
 
 Unless you have a good reason to start with a different one, you should try building a `BeautifulSoupCrawler` first. It is an HTTP crawler with HTTP2 support, anti-blocking features and integrated HTML parser - [BeautifulSoup](https://pypi.org/project/beautifulsoup4/). It's fast, simple, cheap to run and does not require complicated dependencies. The only downside is that it won't work out of the box for websites which require JavaScript rendering. But you might not need JavaScript rendering at all, because many modern websites use server-side rendering.
 
