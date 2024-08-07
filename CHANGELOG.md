@@ -2,18 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.2.2 - **not yet released**
+
+### 🚀 Features
+
+- Implement ParselCrawler that adds support for Parsel ([#348](https://github.com/apify/crawlee-python/pull/348), closes [#335](https://github.com/apify/crawlee-python/issues/335)) ([a3832e5](https://github.com/apify/crawlee-python/commit/a3832e527f022f32cce4a80055da3b7967b74522)) by [@asymness](https://github.com/asymness)
+
+### 🐛 Bug Fixes
+
+- Remove indentation from statistics logging and print the data in tables ([#322](https://github.com/apify/crawlee-python/pull/322), closes [#306](https://github.com/apify/crawlee-python/issues/306)) ([359b515](https://github.com/apify/crawlee-python/commit/359b515d647f064886f91441c2c01d3099e21035)) by [@TymeeK](https://github.com/TymeeK)
+
 ## [0.2.1](https://github.com/apify/crawlee-python/releases/tag/v0.2.1) (2024-08-05)
 
 ### 🐛 Bug Fixes
 
-- Do not import curl impersonate in http clients init ([#396](https://github.com/apify/crawlee-python/issues/396)) ([3bb8009](https://github.com/apify/crawlee-python/commit/3bb80093e61c1615f869ecd5ab80b061e0e5db36))
+- Do not import curl impersonate in http clients init ([#396](https://github.com/apify/crawlee-python/pull/396)) ([3bb8009](https://github.com/apify/crawlee-python/commit/3bb80093e61c1615f869ecd5ab80b061e0e5db36)) by [@vdusek](https://github.com/vdusek)
 
 ## [0.2.0](https://github.com/apify/crawlee-python/releases/tag/v0.2.0) (2024-08-05)
 
 ### 🚀 Features
 
-- Add new curl impersonate HTTP client ([#387](https://github.com/apify/crawlee-python/issues/387)) ([9c06260](https://github.com/apify/crawlee-python/commit/9c06260c0ee958522caa9322001a3186e9e43af4))
-- *(playwright)* `infinite_scroll` helper ([#393](https://github.com/apify/crawlee-python/issues/393)) ([34f74bd](https://github.com/apify/crawlee-python/commit/34f74bdcffb42a6c876a856e1c89923d9b3e60bd))
+- Add new curl impersonate HTTP client ([#387](https://github.com/apify/crawlee-python/pull/387), closes [#292](https://github.com/apify/crawlee-python/issues/292)) ([9c06260](https://github.com/apify/crawlee-python/commit/9c06260c0ee958522caa9322001a3186e9e43af4)) by [@vdusek](https://github.com/vdusek)
+- *(playwright)* `infinite_scroll` helper ([#393](https://github.com/apify/crawlee-python/pull/393)) ([34f74bd](https://github.com/apify/crawlee-python/commit/34f74bdcffb42a6c876a856e1c89923d9b3e60bd)) by [@janbuchar](https://github.com/janbuchar)
 
 ## [0.1.2](https://github.com/apify/crawlee-python/releases/tag/v0.1.2) (2024-07-30)
 
