@@ -37,3 +37,6 @@ website/docspec-dump.jsonl
 website/module_shortcuts.json
 
 storage
+pullRequestIssues.json
+
+.mise.toml
