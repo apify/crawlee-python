@@ -4,7 +4,7 @@ import asyncio
 from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, TypedDict, TypeVar
 
 from typing_extensions import override
 
@@ -56,6 +56,11 @@ class BoundedSet(Generic[T]):
 
     def clear(self) -> None:
         self._data.clear()
+
+
+class CachedRequest(TypedDict):
+    id: str
+    was_already_handled: bool
 
 
 class RequestQueue(BaseStorage, RequestProvider):
@@ -128,7 +133,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         self._in_progress: set[str] = set()
         self._last_activity = datetime.now(timezone.utc)
         self._recently_handled = BoundedSet(max_length=self._RECENTLY_HANDLED_CACHE_SIZE)
-        self._requests_cache: LRUCache[dict] = LRUCache(max_length=self._MAX_CACHED_REQUESTS)
+        self._requests_cache: LRUCache[CachedRequest] = LRUCache(max_length=self._MAX_CACHED_REQUESTS)
 
     @override
     @property
@@ -604,8 +609,6 @@ class RequestQueue(BaseStorage, RequestProvider):
     def _cache_request(self, cache_key: str, processed_request: ProcessedRequest) -> None:
         self._requests_cache[cache_key] = {
             'id': processed_request.id,
-            'is_handled': processed_request.was_already_handled,
-            'unique_key': processed_request.unique_key,
             'was_already_handled': processed_request.was_already_handled,
         }
 
