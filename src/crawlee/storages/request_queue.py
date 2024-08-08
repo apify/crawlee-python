@@ -5,7 +5,6 @@ from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING
-from typing import OrderedDict as OrderedDictType
 
 from typing_extensions import override
 
@@ -97,7 +96,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         self._internal_timeout_seconds = 5 * 60
         self._assumed_total_count = 0
         self._assumed_handled_count = 0
-        self._queue_head_dict: OrderedDictType[str, str] = OrderedDict()
+        self._queue_head_dict: OrderedDict[str, str] = OrderedDict()
         self._query_queue_head_task: asyncio.Task | None = None
         self._in_progress: set[str] = set()
         self._last_activity = datetime.now(timezone.utc)
@@ -284,7 +283,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         Returns:
             The request or `None` if there are no more pending requests.
         """
-        await self.ensure_head_is_non_empty()
+        await self._ensure_head_is_non_empty()
 
         # We are likely done at this point.
         if len(self._queue_head_dict) == 0:
@@ -431,7 +430,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         Returns:
             bool: `True` if the next call to `RequestQueue.fetchNextRequest` would return `None`, otherwise `False`.
         """
-        await self.ensure_head_is_non_empty()
+        await self._ensure_head_is_non_empty()
         return len(self._queue_head_dict) == 0
 
     async def is_finished(self) -> bool:
@@ -457,7 +456,7 @@ class RequestQueue(BaseStorage, RequestProvider):
 
         # TODO: set ensure_consistency to True once the following issue is resolved:
         # https://github.com/apify/crawlee-python/issues/203
-        is_head_consistent = await self.ensure_head_is_non_empty(ensure_consistency=False)
+        is_head_consistent = await self._ensure_head_is_non_empty(ensure_consistency=False)
         return is_head_consistent and len(self._queue_head_dict) == 0 and self._in_progress_count() == 0
 
     async def get_info(self) -> RequestQueueMetadata | None:
@@ -472,7 +471,7 @@ class RequestQueue(BaseStorage, RequestProvider):
     async def get_total_count(self) -> int:
         return self._assumed_total_count
 
-    async def ensure_head_is_non_empty(
+    async def _ensure_head_is_non_empty(
         self,
         *,
         ensure_consistency: bool = False,
@@ -556,7 +555,7 @@ class RequestQueue(BaseStorage, RequestProvider):
             logger.info(f'Waiting for {delay_seconds} for queue finalization, to ensure data consistency.')
             await asyncio.sleep(delay_seconds)
 
-        return await self.ensure_head_is_non_empty(
+        return await self._ensure_head_is_non_empty(
             ensure_consistency=ensure_consistency,
             limit=next_limit,
             iteration=iteration + 1,
