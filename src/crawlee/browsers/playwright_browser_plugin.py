@@ -92,14 +92,19 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         if not self._playwright:
             raise RuntimeError('Playwright browser plugin is not initialized.')
 
-        if self._browser_type == 'chromium':
-            browser = await self._playwright.chromium.launch(**self._browser_options)
-        elif self._browser_type == 'firefox':
-            browser = await self._playwright.firefox.launch(**self._browser_options)
-        elif self._browser_type == 'webkit':
-            browser = await self._playwright.webkit.launch(**self._browser_options)
-        else:
-            raise ValueError(f'Invalid browser type: {self._browser_type}')
+        if self._browser_type not in ('chromium', 'firefox', 'webkit'):
+            raise ValueError(f'Invalid browser type: {self._browser_type}.')
+
+        module = getattr(self._playwright, self._browser_type, None)
+        if module is None:
+            raise ValueError(f'Invalid browser type: {self._browser_type}.')
+
+        # Determine whether to launch browser with persistent context or not
+        launch_fn = 'launch_persistent_context' if 'user_data_dir' in self._browser_options else 'launch'
+        launch = getattr(module, launch_fn, None)
+        if launch is None:
+            raise RuntimeError(f'Playwright {self._browser_type} browser module does not implement {launch_fn}.')
+        browser = await launch(**self._browser_options)
 
         return PlaywrightBrowserController(
             browser,
