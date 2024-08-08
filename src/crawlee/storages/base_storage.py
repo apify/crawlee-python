@@ -10,9 +10,6 @@ if TYPE_CHECKING:
 class BaseStorage(ABC):
     """Base class for storages."""
 
-    LABEL = 'Unknown'
-    """Human readable label of the storage."""
-
     @property
     @abstractmethod
     def id(self) -> str:
