@@ -4,7 +4,7 @@ import asyncio
 from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 from typing_extensions import override
 
@@ -29,6 +29,33 @@ if TYPE_CHECKING:
     from crawlee.configuration import Configuration
 
 logger = getLogger(__name__)
+
+__all__ = ['RequestQueue']
+
+
+T = TypeVar('T')
+
+
+class BoundedSet(Generic[T]):
+    def __init__(self, max_length: int) -> None:
+        self._max_length = max_length
+        self._data = OrderedDict[T, object]()
+
+    def __contains__(self, item: T) -> bool:
+        found = item in self._data
+        if found:
+            self._data.move_to_end(item, last=True)
+        return found
+
+    def add(self, item: T) -> None:
+        self._data[item]
+        self._data.move_to_end(item)
+
+        if len(self._data) > self._max_length:
+            self._data.popitem(last=False)
+
+    def clear(self) -> None:
+        self._data.clear()
 
 
 class RequestQueue(BaseStorage, RequestProvider):
@@ -100,7 +127,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         self._query_queue_head_task: asyncio.Task | None = None
         self._in_progress: set[str] = set()
         self._last_activity = datetime.now(timezone.utc)
-        self._recently_handled: LRUCache[bool] = LRUCache(max_length=self._RECENTLY_HANDLED_CACHE_SIZE)
+        self._recently_handled = BoundedSet(max_length=self._RECENTLY_HANDLED_CACHE_SIZE)
         self._requests_cache: LRUCache[dict] = LRUCache(max_length=self._MAX_CACHED_REQUESTS)
 
     @override
@@ -207,7 +234,7 @@ class RequestQueue(BaseStorage, RequestProvider):
             not is_handled
             and not was_already_present
             and request_id not in self._in_progress
-            and self._recently_handled.get(request_id) is None
+            and request_id not in self._recently_handled
         ):
             self._assumed_total_count += 1
             self._maybe_add_request_to_queue_head(request_id, forefront=forefront)
@@ -292,7 +319,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         next_request_id, _ = self._queue_head_dict.popitem(last=False)  # ~removeFirst()
 
         # This should never happen, but...
-        if next_request_id in self._in_progress or self._recently_handled.get(next_request_id):
+        if next_request_id in self._in_progress or next_request_id in self._recently_handled:
             logger.warning(
                 'Queue head returned a request that is already in progress?!',
                 extra={
@@ -342,7 +369,7 @@ class RequestQueue(BaseStorage, RequestProvider):
                 'Request fetched from the beginning of queue was already handled',
                 extra={'nextRequestId': next_request_id},
             )
-            self._recently_handled[next_request_id] = True
+            self._recently_handled.add(next_request_id)
             return None
 
         return request
@@ -371,7 +398,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         processed_request.unique_key = request.unique_key
 
         self._in_progress.remove(request.id)
-        self._recently_handled[request.id] = True
+        self._recently_handled.add(request.id)
 
         if not processed_request.was_already_handled:
             self._assumed_handled_count += 1
@@ -594,7 +621,7 @@ class RequestQueue(BaseStorage, RequestProvider):
                 not request.id
                 or not request.unique_key
                 or request.id in self._in_progress
-                or self._recently_handled.get(request.id)
+                or request.id in self._recently_handled
             ):
                 continue
 
