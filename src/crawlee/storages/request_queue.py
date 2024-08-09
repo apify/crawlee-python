@@ -4,8 +4,7 @@ import asyncio
 from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING
-from typing import OrderedDict as OrderedDictType
+from typing import TYPE_CHECKING, Generic, TypedDict, TypeVar
 
 from typing_extensions import override
 
@@ -30,6 +29,40 @@ if TYPE_CHECKING:
     from crawlee.configuration import Configuration
 
 logger = getLogger(__name__)
+
+__all__ = ['RequestQueue']
+
+
+T = TypeVar('T')
+
+
+class BoundedSet(Generic[T]):
+    """A simple set datastructure that removes the least recently accessed item when it reaches `max_length`."""
+
+    def __init__(self, max_length: int) -> None:
+        self._max_length = max_length
+        self._data = OrderedDict[T, object]()
+
+    def __contains__(self, item: T) -> bool:
+        found = item in self._data
+        if found:
+            self._data.move_to_end(item, last=True)
+        return found
+
+    def add(self, item: T) -> None:
+        self._data[item] = True
+        self._data.move_to_end(item)
+
+        if len(self._data) > self._max_length:
+            self._data.popitem(last=False)
+
+    def clear(self) -> None:
+        self._data.clear()
+
+
+class CachedRequest(TypedDict):
+    id: str
+    was_already_handled: bool
 
 
 class RequestQueue(BaseStorage, RequestProvider):
@@ -97,12 +130,12 @@ class RequestQueue(BaseStorage, RequestProvider):
         self._internal_timeout_seconds = 5 * 60
         self._assumed_total_count = 0
         self._assumed_handled_count = 0
-        self._queue_head_dict: OrderedDictType[str, str] = OrderedDict()
+        self._queue_head_dict: OrderedDict[str, str] = OrderedDict()
         self._query_queue_head_task: asyncio.Task | None = None
         self._in_progress: set[str] = set()
         self._last_activity = datetime.now(timezone.utc)
-        self._recently_handled: LRUCache[bool] = LRUCache(max_length=self._RECENTLY_HANDLED_CACHE_SIZE)
-        self._requests_cache: LRUCache[dict] = LRUCache(max_length=self._MAX_CACHED_REQUESTS)
+        self._recently_handled: BoundedSet[str] = BoundedSet(max_length=self._RECENTLY_HANDLED_CACHE_SIZE)
+        self._requests_cache: LRUCache[CachedRequest] = LRUCache(max_length=self._MAX_CACHED_REQUESTS)
 
     @override
     @property
@@ -125,12 +158,16 @@ class RequestQueue(BaseStorage, RequestProvider):
     ) -> RequestQueue:
         from crawlee.storages._creation_management import open_storage
 
-        return await open_storage(
+        storage = await open_storage(
             storage_class=cls,
             id=id,
             name=name,
             configuration=configuration,
         )
+
+        await storage._ensure_head_is_non_empty()  # noqa: SLF001 - accessing private members from factories is OK
+
+        return storage
 
     @override
     async def drop(self, *, timeout: timedelta | None = None) -> None:
@@ -208,7 +245,7 @@ class RequestQueue(BaseStorage, RequestProvider):
             not is_handled
             and not was_already_present
             and request_id not in self._in_progress
-            and self._recently_handled.get(request_id) is None
+            and request_id not in self._recently_handled
         ):
             self._assumed_total_count += 1
             self._maybe_add_request_to_queue_head(request_id, forefront=forefront)
@@ -284,7 +321,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         Returns:
             The request or `None` if there are no more pending requests.
         """
-        await self.ensure_head_is_non_empty()
+        await self._ensure_head_is_non_empty()
 
         # We are likely done at this point.
         if len(self._queue_head_dict) == 0:
@@ -293,7 +330,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         next_request_id, _ = self._queue_head_dict.popitem(last=False)  # ~removeFirst()
 
         # This should never happen, but...
-        if next_request_id in self._in_progress or self._recently_handled.get(next_request_id):
+        if next_request_id in self._in_progress or next_request_id in self._recently_handled:
             logger.warning(
                 'Queue head returned a request that is already in progress?!',
                 extra={
@@ -343,7 +380,7 @@ class RequestQueue(BaseStorage, RequestProvider):
                 'Request fetched from the beginning of queue was already handled',
                 extra={'nextRequestId': next_request_id},
             )
-            self._recently_handled[next_request_id] = True
+            self._recently_handled.add(next_request_id)
             return None
 
         return request
@@ -372,7 +409,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         processed_request.unique_key = request.unique_key
 
         self._in_progress.remove(request.id)
-        self._recently_handled[request.id] = True
+        self._recently_handled.add(request.id)
 
         if not processed_request.was_already_handled:
             self._assumed_handled_count += 1
@@ -431,7 +468,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         Returns:
             bool: `True` if the next call to `RequestQueue.fetchNextRequest` would return `None`, otherwise `False`.
         """
-        await self.ensure_head_is_non_empty()
+        await self._ensure_head_is_non_empty()
         return len(self._queue_head_dict) == 0
 
     async def is_finished(self) -> bool:
@@ -457,7 +494,7 @@ class RequestQueue(BaseStorage, RequestProvider):
 
         # TODO: set ensure_consistency to True once the following issue is resolved:
         # https://github.com/apify/crawlee-python/issues/203
-        is_head_consistent = await self.ensure_head_is_non_empty(ensure_consistency=False)
+        is_head_consistent = await self._ensure_head_is_non_empty(ensure_consistency=False)
         return is_head_consistent and len(self._queue_head_dict) == 0 and self._in_progress_count() == 0
 
     async def get_info(self) -> RequestQueueMetadata | None:
@@ -472,7 +509,7 @@ class RequestQueue(BaseStorage, RequestProvider):
     async def get_total_count(self) -> int:
         return self._assumed_total_count
 
-    async def ensure_head_is_non_empty(
+    async def _ensure_head_is_non_empty(
         self,
         *,
         ensure_consistency: bool = False,
@@ -556,7 +593,7 @@ class RequestQueue(BaseStorage, RequestProvider):
             logger.info(f'Waiting for {delay_seconds} for queue finalization, to ensure data consistency.')
             await asyncio.sleep(delay_seconds)
 
-        return await self.ensure_head_is_non_empty(
+        return await self._ensure_head_is_non_empty(
             ensure_consistency=ensure_consistency,
             limit=next_limit,
             iteration=iteration + 1,
@@ -578,8 +615,6 @@ class RequestQueue(BaseStorage, RequestProvider):
     def _cache_request(self, cache_key: str, processed_request: ProcessedRequest) -> None:
         self._requests_cache[cache_key] = {
             'id': processed_request.id,
-            'is_handled': processed_request.was_already_handled,
-            'unique_key': processed_request.unique_key,
             'was_already_handled': processed_request.was_already_handled,
         }
 
@@ -595,7 +630,7 @@ class RequestQueue(BaseStorage, RequestProvider):
                 not request.id
                 or not request.unique_key
                 or request.id in self._in_progress
-                or self._recently_handled.get(request.id)
+                or request.id in self._recently_handled
             ):
                 continue
 
