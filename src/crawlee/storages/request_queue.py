@@ -37,6 +37,8 @@ T = TypeVar('T')
 
 
 class BoundedSet(Generic[T]):
+    """A simple set datastructure that removes the least recently accessed item when it reaches `max_length`."""
+
     def __init__(self, max_length: int) -> None:
         self._max_length = max_length
         self._data = OrderedDict[T, object]()
