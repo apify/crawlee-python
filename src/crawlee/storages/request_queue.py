@@ -48,7 +48,7 @@ class BoundedSet(Generic[T]):
         return found
 
     def add(self, item: T) -> None:
-        self._data[item]
+        self._data[item] = True
         self._data.move_to_end(item)
 
         if len(self._data) > self._max_length:
@@ -132,7 +132,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         self._query_queue_head_task: asyncio.Task | None = None
         self._in_progress: set[str] = set()
         self._last_activity = datetime.now(timezone.utc)
-        self._recently_handled = BoundedSet(max_length=self._RECENTLY_HANDLED_CACHE_SIZE)
+        self._recently_handled: BoundedSet[str] = BoundedSet(max_length=self._RECENTLY_HANDLED_CACHE_SIZE)
         self._requests_cache: LRUCache[CachedRequest] = LRUCache(max_length=self._MAX_CACHED_REQUESTS)
 
     @override
@@ -156,12 +156,16 @@ class RequestQueue(BaseStorage, RequestProvider):
     ) -> RequestQueue:
         from crawlee.storages._creation_management import open_storage
 
-        return await open_storage(
+        storage = await open_storage(
             storage_class=cls,
             id=id,
             name=name,
             configuration=configuration,
         )
+
+        await storage._ensure_head_is_non_empty()  # noqa: SLF001 - accessing private members from factories is OK
+
+        return storage
 
     @override
     async def drop(self, *, timeout: timedelta | None = None) -> None:
