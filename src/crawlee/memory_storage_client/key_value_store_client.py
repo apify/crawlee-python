@@ -3,13 +3,11 @@ from __future__ import annotations
 import asyncio
 import io
 import os
+import shutil
 from datetime import datetime, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, AsyncContextManager
 
-import aiofiles
-import aioshutil
-from aiofiles.os import makedirs
 from typing_extensions import override
 
 from crawlee._utils.crypto import crypto_random_object_id
@@ -147,7 +145,7 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
                 store.records.clear()
 
                 if os.path.exists(store.resource_directory):
-                    await aioshutil.rmtree(store.resource_directory)
+                    await asyncio.to_thread(shutil.rmtree, store.resource_directory)
 
     @override
     async def list_keys(
@@ -297,7 +295,7 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
         record.content_type = record.content_type or 'application/octet-stream'
 
         # Ensure the directory for the entity exists
-        await makedirs(store_directory, exist_ok=True)
+        await asyncio.to_thread(os.makedirs, store_directory, exist_ok=True)
 
         # Create files for the record
         record_path = os.path.join(store_directory, record_filename)
@@ -307,13 +305,20 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
         if isinstance(record.value, str):
             record.value = record.value.encode('utf-8')
 
-        async with aiofiles.open(record_path, mode='wb') as f:
-            await f.write(record.value)
+        f = await asyncio.to_thread(open, record_path, mode='wb')
+        try:
+            await asyncio.to_thread(f.write, record.value)
+        finally:
+            await asyncio.to_thread(f.close)
 
         if self._memory_storage_client.write_metadata:
-            async with aiofiles.open(record_metadata_path, mode='wb') as f:
+            f = await asyncio.to_thread(open, record_metadata_path, mode='wb')
+
+            try:
                 record_metadata = KeyValueStoreRecordMetadata(key=record.key, content_type=record.content_type)
-                await f.write(record_metadata.model_dump_json(indent=2).encode('utf-8'))
+                await asyncio.to_thread(f.write, record_metadata.model_dump_json(indent=2).encode('utf-8'))
+            finally:
+                await asyncio.to_thread(f.close)
 
     async def delete_persisted_record(self, record: KeyValueStoreRecord) -> None:
         """Delete the specified record from the key-value store."""
@@ -321,7 +326,7 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
         record_filename = self._filename_from_record(record)
 
         # Ensure the directory for the entity exists
-        await makedirs(store_directory, exist_ok=True)
+        await asyncio.to_thread(os.makedirs, store_directory, exist_ok=True)
 
         # Create files for the record
         record_path = os.path.join(store_directory, record_filename)

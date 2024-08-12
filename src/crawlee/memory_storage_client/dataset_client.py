@@ -3,13 +3,11 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import shutil
 from datetime import datetime, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, AsyncContextManager, AsyncIterator
 
-import aiofiles
-import aioshutil
-from aiofiles.os import makedirs
 from typing_extensions import override
 
 from crawlee._utils.crypto import crypto_random_object_id
@@ -147,7 +145,7 @@ class DatasetClient(BaseDatasetClient):
                 dataset.dataset_entries.clear()
 
                 if os.path.exists(dataset.resource_directory):
-                    await aioshutil.rmtree(dataset.resource_directory)
+                    await asyncio.to_thread(shutil.rmtree, dataset.resource_directory)
 
     @override
     async def list_items(
@@ -347,14 +345,17 @@ class DatasetClient(BaseDatasetClient):
             return
 
         # Ensure the directory for the entity exists
-        await makedirs(entity_directory, exist_ok=True)
+        await asyncio.to_thread(os.makedirs, entity_directory, exist_ok=True)
 
         # Save all the new items to the disk
         for idx, item in data:
             file_path = os.path.join(entity_directory, f'{idx}.json')
-            async with aiofiles.open(file_path, mode='wb') as f:
+            f = await asyncio.to_thread(open, file_path, mode='wb')
+            try:
                 s = await json_dumps(item)
-                await f.write(s.encode('utf-8'))
+                await asyncio.to_thread(lambda s=s, f=f: f.write(s.encode('utf-8')))
+            finally:
+                await asyncio.to_thread(f.close)
 
     async def update_timestamps(self, *, has_been_modified: bool) -> None:
         """Update the timestamps of the dataset."""

@@ -3,13 +3,11 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
+import shutil
 from logging import getLogger
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
 
-import aioshutil
-from aiofiles import ospath
-from aiofiles.os import rename, scandir
 from typing_extensions import override
 
 from crawlee.base_storage_client import BaseStorageClient
@@ -190,8 +188,8 @@ class MemoryStorageClient(BaseStorageClient):
          - The local directory containing the default request queue.
         """
         # Key-value stores
-        if await ospath.exists(self.key_value_stores_directory):
-            key_value_store_folders = await scandir(self.key_value_stores_directory)
+        if await asyncio.to_thread(os.path.exists, self.key_value_stores_directory):
+            key_value_store_folders = await asyncio.to_thread(os.scandir, self.key_value_stores_directory)
             for key_value_store_folder in key_value_store_folders:
                 if key_value_store_folder.name.startswith(
                     self._TEMPORARY_DIR_NAME
@@ -201,8 +199,8 @@ class MemoryStorageClient(BaseStorageClient):
                     await self._handle_default_key_value_store(key_value_store_folder.path)
 
         # Datasets
-        if await ospath.exists(self.datasets_directory):
-            dataset_folders = await scandir(self.datasets_directory)
+        if await asyncio.to_thread(os.path.exists, self.datasets_directory):
+            dataset_folders = await asyncio.to_thread(os.scandir, self.datasets_directory)
             for dataset_folder in dataset_folders:
                 if dataset_folder.name == self._configuration.default_dataset_id or dataset_folder.name.startswith(
                     self._TEMPORARY_DIR_NAME
@@ -210,8 +208,8 @@ class MemoryStorageClient(BaseStorageClient):
                     await self._batch_remove_files(dataset_folder.path)
 
         # Request queues
-        if await ospath.exists(self.request_queues_directory):
-            request_queue_folders = await scandir(self.request_queues_directory)
+        if await asyncio.to_thread(os.path.exists, self.request_queues_directory):
+            request_queue_folders = await asyncio.to_thread(os.scandir, self.request_queues_directory)
             for request_queue_folder in request_queue_folders:
                 if (
                     request_queue_folder.name == self._configuration.default_request_queue_id
@@ -227,7 +225,7 @@ class MemoryStorageClient(BaseStorageClient):
         Args:
             folder: Path to the default key-value store directory to clean.
         """
-        folder_exists = await ospath.exists(folder)
+        folder_exists = await asyncio.to_thread(os.path.exists, folder)
         temporary_path = os.path.normpath(os.path.join(folder, '..', self._MIGRATING_KEY_VALUE_STORE_DIR_NAME))
 
         # For optimization, we want to only attempt to copy a few files from the default key-value store
@@ -247,7 +245,7 @@ class MemoryStorageClient(BaseStorageClient):
                 original_file_path = os.path.join(folder, entity)
                 temp_file_path = os.path.join(temporary_path, entity)
                 with contextlib.suppress(Exception):
-                    await rename(original_file_path, temp_file_path)
+                    await asyncio.to_thread(os.rename, original_file_path, temp_file_path)
 
             # Remove the original folder and all its content
             counter = 0
@@ -255,14 +253,14 @@ class MemoryStorageClient(BaseStorageClient):
             done = False
             try:
                 while not done:
-                    await rename(folder, temp_path_for_old_folder)
+                    await asyncio.to_thread(os.rename, folder, temp_path_for_old_folder)
                     done = True
             except Exception:
                 counter += 1
                 temp_path_for_old_folder = os.path.normpath(os.path.join(folder, f'../__OLD_DEFAULT_{counter}__'))
 
             # Replace the temporary folder with the original folder
-            await rename(temporary_path, folder)
+            await asyncio.to_thread(os.rename, temporary_path, folder)
 
             # Remove the old folder
             await self._batch_remove_files(temp_path_for_old_folder)
@@ -277,7 +275,7 @@ class MemoryStorageClient(BaseStorageClient):
             folder: The directory path to remove.
             counter: A counter used for generating temporary directory names in case of conflicts.
         """
-        folder_exists = await ospath.exists(folder)
+        folder_exists = await asyncio.to_thread(os.path.exists, folder)
 
         if folder_exists:
             temporary_folder = (
@@ -288,10 +286,10 @@ class MemoryStorageClient(BaseStorageClient):
 
             try:
                 # Rename the old folder to the new one to allow background deletions
-                await rename(folder, temporary_folder)
+                await asyncio.to_thread(os.rename, folder, temporary_folder)
             except Exception:
                 # Folder exists already, try again with an incremented counter
                 return await self._batch_remove_files(folder, counter + 1)
 
-            await aioshutil.rmtree(temporary_folder, ignore_errors=True)
+            await asyncio.to_thread(shutil.rmtree, temporary_folder, ignore_errors=True)
         return None

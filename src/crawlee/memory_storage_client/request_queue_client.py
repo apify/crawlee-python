@@ -3,14 +3,12 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import shutil
 from datetime import datetime, timezone
 from decimal import Decimal
 from logging import getLogger
 from typing import TYPE_CHECKING
 
-import aiofiles
-import aioshutil
-from aiofiles.os import makedirs
 from sortedcollections import ValueSortedDict  # type: ignore
 from typing_extensions import override
 
@@ -171,7 +169,7 @@ class RequestQueueClient(BaseRequestQueueClient):
                 queue.requests.clear()
 
                 if os.path.exists(queue.resource_directory):
-                    await aioshutil.rmtree(queue.resource_directory)
+                    await asyncio.to_thread(shutil.rmtree, queue.resource_directory)
 
     @override
     async def list_head(self, *, limit: int | None = None) -> RequestQueueHead:
@@ -478,13 +476,16 @@ class RequestQueueClient(BaseRequestQueueClient):
             return
 
         # Ensure the directory for the entity exists
-        await makedirs(entity_directory, exist_ok=True)
+        await asyncio.to_thread(os.makedirs, entity_directory, exist_ok=True)
 
         # Write the request to the file
         file_path = os.path.join(entity_directory, f'{request.id}.json')
-        async with aiofiles.open(file_path, mode='wb') as f:
+        f = await asyncio.to_thread(open, file_path, mode='wb')
+        try:
             s = await json_dumps(request.model_dump())
-            await f.write(s.encode('utf-8'))
+            await asyncio.to_thread(lambda f=f, s=s: f.write(s.encode('utf-8')))
+        finally:
+            f.close()
 
     async def _delete_request_file_from_storage(self, *, request_id: str, entity_directory: str) -> None:
         """Deletes a specific request item from the disk.
@@ -498,7 +499,7 @@ class RequestQueueClient(BaseRequestQueueClient):
             entity_directory: The directory path where the request file is stored.
         """
         # Ensure the directory for the entity exists
-        await makedirs(entity_directory, exist_ok=True)
+        await asyncio.to_thread(os.makedirs, entity_directory, exist_ok=True)
 
         file_path = os.path.join(entity_directory, f'{request_id}.json')
         await force_remove(file_path)
