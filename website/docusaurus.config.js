@@ -133,7 +133,7 @@ module.exports = {
         },
         announcementBar: {
             id: 'announcement-bar-',
-            content: `🎉️ <b>If you like Crawlee for Python, <a href="https://crawlee.dev/python/">star us on GitHub!</a></b> 🥳️`,
+            content: `🎉️ <b>If you like Crawlee for Python, <a href="https://github.com/apify/crawlee-python/">star us on GitHub!</a></b> 🥳️`,
         },
         navbar: {
             hideOnScroll: true,
