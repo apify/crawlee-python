@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import mimetypes
 import os
@@ -8,9 +9,6 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from logging import getLogger
 from typing import TYPE_CHECKING
-
-import aiofiles
-from aiofiles.os import makedirs
 
 from crawlee._utils.data_processing import maybe_parse_body
 from crawlee._utils.file import json_dumps
@@ -53,13 +51,16 @@ async def persist_metadata_if_enabled(*, data: dict, entity_directory: str, writ
         return
 
     # Ensure the directory for the entity exists
-    await makedirs(entity_directory, exist_ok=True)
+    await asyncio.to_thread(os.makedirs, entity_directory, exist_ok=True)
 
     # Write the metadata to the file
     file_path = os.path.join(entity_directory, METADATA_FILENAME)
-    async with aiofiles.open(file_path, mode='wb') as f:
+    f = await asyncio.to_thread(open, file_path, mode='wb')
+    try:
         s = await json_dumps(data)
-        await f.write(s.encode('utf-8'))
+        await asyncio.to_thread(f.write, s.encode('utf-8'))
+    finally:
+        await asyncio.to_thread(f.close)
 
 
 def find_or_create_client_by_id_or_name_inner(

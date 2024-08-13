@@ -4,8 +4,6 @@ import json
 import os
 from typing import TYPE_CHECKING
 
-import aiofiles
-
 from crawlee.consts import METADATA_FILENAME
 from crawlee.memory_storage_client._creation_management import persist_metadata_if_enabled
 
@@ -31,6 +29,6 @@ async def test_persist_metadata_correctly_writes_data(tmp_path: Path) -> None:
     entity_directory = os.path.join(tmp_path, 'data_dir')
     await persist_metadata_if_enabled(data=data, entity_directory=entity_directory, write_metadata=True)
     metadata_path = os.path.join(entity_directory, METADATA_FILENAME)
-    async with aiofiles.open(metadata_path, 'r') as f:
-        content = await f.read()
+    with open(metadata_path) as f:  # noqa: ASYNC230
+        content = f.read()
     assert json.loads(content) == data  # Check if correct data was written
