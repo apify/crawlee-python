@@ -8,7 +8,7 @@ from typing import OrderedDict as OrderedDictType
 T = TypeVar('T')
 
 
-class LRUCache(MutableMapping, Generic[T]):
+class LRUCache(MutableMapping[str, T], Generic[T]):
     """Attempt to reimplement LRUCache from `@apify/datastructures` using `OrderedDict`."""
 
     def __init__(self, max_length: int) -> None:
