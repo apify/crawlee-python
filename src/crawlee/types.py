@@ -35,6 +35,9 @@ class StorageTypes(str, Enum):
     REQUEST_QUEUE = 'Request queue'
 
 
+StorageClientType = Literal['cloud', 'local']
+
+
 class AddRequestsKwargs(TypedDict):
     """Keyword arguments for crawler's `add_requests` method."""
 

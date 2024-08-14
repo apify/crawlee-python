@@ -10,6 +10,7 @@ from crawlee.storages.base_storage import BaseStorage
 if TYPE_CHECKING:
     from crawlee.base_storage_client import BaseStorageClient
     from crawlee.configuration import Configuration
+    from crawlee.types import StorageClientType
 
 T = TypeVar('T')
 
@@ -71,6 +72,7 @@ class KeyValueStore(BaseStorage):
         id: str | None = None,
         name: str | None = None,
         configuration: Configuration | None = None,
+        storage_client_type: StorageClientType | None = None,
     ) -> KeyValueStore:
         from crawlee.storages._creation_management import open_storage
 
@@ -79,6 +81,7 @@ class KeyValueStore(BaseStorage):
             id=id,
             name=name,
             configuration=configuration,
+            storage_client_type=storage_client_type,
         )
 
     @override
