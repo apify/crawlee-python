@@ -156,17 +156,13 @@ class RequestQueue(BaseStorage, RequestProvider):
     ) -> RequestQueue:
         from crawlee.storages._creation_management import open_storage
 
-        storage = await open_storage(
+        return await open_storage(
             storage_class=cls,
             id=id,
             name=name,
             configuration=configuration,
             storage_client_type=storage_client_type,
         )
-
-        await storage._ensure_head_is_non_empty()  # noqa: SLF001 - accessing private members from factories is OK
-
-        return storage
 
     @override
     async def drop(self, *, timeout: timedelta | None = None) -> None:
