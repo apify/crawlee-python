@@ -27,6 +27,15 @@ _services = _Services()
 _default_storage_client_type: StorageClientType = 'local'
 
 
+class ServiceConflictError(RuntimeError):
+    """Thrown when a service is getting reconfigured."""
+
+    def __init__(self, service_name: str, new_value: object, old_value: object) -> None:
+        super().__init__(
+            f"Service '{service_name}' was already set (existing value is '{old_value}', new value is '{new_value}')."
+        )
+
+
 def get_storage_client(*, client_type: StorageClientType | None = None) -> BaseStorageClient:
     """Get the storage client instance for the current environment.
 
@@ -56,6 +65,9 @@ def set_local_storage_client(local_client: BaseStorageClient) -> None:
     Args:
         local_client: The local storage client instance.
     """
+    if (existing_service := _services.get('local_storage_client')) and existing_service is not local_client:
+        raise ServiceConflictError('local_storage_client', local_client, existing_service)
+
     _services['local_storage_client'] = local_client
 
 
@@ -65,6 +77,9 @@ def set_cloud_storage_client(cloud_client: BaseStorageClient) -> None:
     Args:
         cloud_client: The cloud storage client instance.
     """
+    if (existing_service := _services.get('cloud_storage_client')) and existing_service is not cloud_client:
+        raise ServiceConflictError('cloud_storage_client', cloud_client, existing_service)
+
     _services['cloud_storage_client'] = cloud_client
 
 
@@ -88,6 +103,9 @@ def get_configuration_if_set() -> Configuration | None:
 
 def set_configuration(configuration: Configuration) -> None:
     """Set the configuration object."""
+    if (existing_service := _services.get('configuration')) and existing_service is not configuration:
+        raise ServiceConflictError('configuration', configuration, existing_service)
+
     _services['configuration'] = configuration
 
 
@@ -101,4 +119,7 @@ def get_event_manager() -> EventManager:
 
 def set_event_manager(event_manager: EventManager) -> None:
     """Set the event manager."""
+    if (existing_service := _services.get('event_manager')) and existing_service is not event_manager:
+        raise ServiceConflictError('event_manager', event_manager, existing_service)
+
     _services['event_manager'] = event_manager
