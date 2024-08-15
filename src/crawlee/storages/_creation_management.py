@@ -11,7 +11,6 @@ from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 if TYPE_CHECKING:
     from crawlee.base_storage_client import BaseStorageClient
     from crawlee.base_storage_client.types import ResourceClient, ResourceCollectionClient
-    from crawlee.types import StorageClientType
 
 TResource = TypeVar('TResource', Dataset, KeyValueStore, RequestQueue)
 
@@ -123,14 +122,14 @@ def _get_default_storage_id(configuration: Configuration, storage_class: type[TR
 async def open_storage(
     *,
     storage_class: type[TResource],
-    storage_client_type: StorageClientType | None = None,
+    storage_client: BaseStorageClient | None = None,
     configuration: Configuration | None = None,
     id: str | None = None,
     name: str | None = None,
 ) -> TResource:
     """Open either a new storage or restore an existing one and return it."""
     configuration = configuration or Configuration.get_global_configuration()
-    storage_client = service_container.get_storage_client(client_type=storage_client_type)
+    storage_client = storage_client or service_container.get_storage_client()
 
     # Try to restore the storage from cache by name
     if name:

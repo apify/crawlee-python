@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from crawlee.base_storage_client import BaseStorageClient
     from crawlee.configuration import Configuration
     from crawlee.models import DatasetItemsListPage
-    from crawlee.types import JSONSerializable, StorageClientType
+    from crawlee.types import JSONSerializable
 
 
 logger = logging.getLogger(__name__)
@@ -135,7 +135,7 @@ class Dataset(BaseStorage):
         id: str | None = None,
         name: str | None = None,
         configuration: Configuration | None = None,
-        storage_client_type: StorageClientType | None = None,
+        storage_client: BaseStorageClient | None = None,
     ) -> Dataset:
         from crawlee.storages._creation_management import open_storage
 
@@ -144,7 +144,7 @@ class Dataset(BaseStorage):
             id=id,
             name=name,
             configuration=configuration,
-            storage_client_type=storage_client_type,
+            storage_client=storage_client,
         )
 
     @override

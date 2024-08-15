@@ -9,7 +9,6 @@ from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing_extensions import Self
 
-from crawlee import service_container
 from crawlee._utils.models import timedelta_ms
 
 
@@ -208,6 +207,11 @@ class Configuration(BaseSettings):
     @classmethod
     def get_global_configuration(cls) -> Self:
         """Retrieve the global instance of the configuration."""
+        from crawlee import service_container
+
+        if service_container.get_configuration_if_set() is None:
+            service_container.set_configuration(cls())
+
         global_instance = service_container.get_configuration()
 
         if not isinstance(global_instance, cls):

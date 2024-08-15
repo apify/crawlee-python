@@ -29,7 +29,6 @@ if TYPE_CHECKING:
     from crawlee.base_storage_client import BaseStorageClient
     from crawlee.configuration import Configuration
     from crawlee.events.event_manager import EventManager
-    from crawlee.types import StorageClientType
 
 __all__ = ['RequestQueue']
 
@@ -152,7 +151,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         id: str | None = None,
         name: str | None = None,
         configuration: Configuration | None = None,
-        storage_client_type: StorageClientType | None = None,
+        storage_client: BaseStorageClient | None = None,
     ) -> RequestQueue:
         from crawlee.storages._creation_management import open_storage
 
@@ -161,7 +160,7 @@ class RequestQueue(BaseStorage, RequestProvider):
             id=id,
             name=name,
             configuration=configuration,
-            storage_client_type=storage_client_type,
+            storage_client=storage_client,
         )
 
     @override

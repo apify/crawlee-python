@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from typing_extensions import NotRequired, TypedDict
 
@@ -11,7 +11,9 @@ from crawlee.memory_storage_client.memory_storage_client import MemoryStorageCli
 if TYPE_CHECKING:
     from crawlee.base_storage_client.base_storage_client import BaseStorageClient
     from crawlee.events.event_manager import EventManager
-    from crawlee.types import StorageClientType
+
+
+StorageClientType = Literal['cloud', 'local']
 
 
 class _Services(TypedDict):
@@ -77,6 +79,11 @@ def get_configuration() -> Configuration:
         _services['configuration'] = Configuration()
 
     return _services['configuration']
+
+
+def get_configuration_if_set() -> Configuration | None:
+    """Get the configuration object, or None if it hasn't been set yet."""
+    return _services.get('configuration')
 
 
 def set_configuration(configuration: Configuration) -> None:
