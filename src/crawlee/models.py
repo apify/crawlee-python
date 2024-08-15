@@ -350,7 +350,6 @@ class RequestQueueHeadWithLocks(RequestQueueHead):
     """Model for request queue head with locks."""
 
     lock_secs: Annotated[int, Field(alias='lockSecs')]
-    items: Annotated[list[Request], Field(alias='items', default_factory=list)]
 
 
 class BaseListPage(BaseModel):
@@ -449,13 +448,3 @@ class BatchRequestsOperationResponse(BaseModel):
 
     processed_requests: Annotated[list[ProcessedRequest], Field(alias='processedRequests')]
     unprocessed_requests: Annotated[list[UnprocessedRequest], Field(alias='unprocessedRequests')]
-
-
-class RequestListResponse(BaseModel):
-    """Response to a request list call."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-    limit: Annotated[int, Field()]
-    exclusive_start_key: Annotated[str | None, Field(alias='exclusiveStartId')]
-    items: Annotated[list[Request], Field()]

@@ -11,7 +11,6 @@ if TYPE_CHECKING:
         ProcessedRequest,
         ProlongRequestLockResponse,
         Request,
-        RequestListResponse,
         RequestQueueHead,
         RequestQueueHeadWithLocks,
         RequestQueueMetadata,
@@ -184,18 +183,4 @@ class BaseRequestQueueClient(ABC):
 
         Args:
             requests: The requests to delete from the queue.
-        """
-
-    @abstractmethod
-    async def list_requests(
-        self,
-        *,
-        limit: int | None = None,
-        exclusive_start_id: str | None = None,
-    ) -> RequestListResponse:
-        """List requests from the queue.
-
-        Args:
-            limit: How many requests to retrieve.
-            exclusive_start_id: All requests up to this one (including) are skipped from the result.
         """
