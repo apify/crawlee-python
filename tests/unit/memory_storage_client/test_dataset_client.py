@@ -138,3 +138,13 @@ async def test_iterate_items(dataset_client: DatasetClient) -> None:
     assert len(actual_items) == item_count
     assert actual_items[0]['id'] == 0
     assert actual_items[99]['id'] == 99
+
+
+async def test_reuse_dataset(dataset_client: DatasetClient, memory_storage_client: MemoryStorageClient) -> None:
+    item_count = 10
+    await dataset_client.push_items([{'id': i} for i in range(item_count)])
+
+    memory_storage_client.datasets_handled = []  # purge datasets loaded to test create_dataset_from_directory
+    datasets_client = memory_storage_client.datasets()
+    dataset_info = await datasets_client.get_or_create(name='test')
+    assert dataset_info.item_count == item_count
