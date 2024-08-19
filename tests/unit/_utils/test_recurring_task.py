@@ -9,14 +9,14 @@ import pytest
 from crawlee._utils.recurring_task import RecurringTask
 
 
-@pytest.fixture()
+@pytest.fixture
 def function() -> AsyncMock:
     mock_function = AsyncMock()
     mock_function.__name__ = 'mocked_function'  # To avoid issues with the function name in RecurringTask
     return mock_function
 
 
-@pytest.fixture()
+@pytest.fixture
 def delay() -> timedelta:
     return timedelta(milliseconds=30)
 

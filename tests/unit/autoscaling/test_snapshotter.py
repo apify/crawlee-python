@@ -15,13 +15,13 @@ from crawlee.events import EventManager, LocalEventManager
 from crawlee.events.types import EventSystemInfoData
 
 
-@pytest.fixture()
+@pytest.fixture
 def snapshotter() -> Snapshotter:
     mocked_event_manager = AsyncMock(spec=EventManager)
     return Snapshotter(mocked_event_manager)
 
 
-@pytest.fixture()
+@pytest.fixture
 def event_system_data_info() -> EventSystemInfoData:
     return EventSystemInfoData(
         cpu_info=CpuInfo(used_ratio=0.5),

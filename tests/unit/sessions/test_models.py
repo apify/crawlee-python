@@ -9,7 +9,7 @@ from crawlee.sessions.models import SessionModel, SessionPoolModel
 SESSION_CREATED_AT = datetime.now(timezone.utc)
 
 
-@pytest.fixture()
+@pytest.fixture
 def session_direct() -> SessionModel:
     """Provide a SessionModel instance directly using fixed parameters."""
     return SessionModel(
@@ -27,7 +27,7 @@ def session_direct() -> SessionModel:
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def session_args_camel() -> dict:
     """Provide session parameters as dictionary with camel case keys."""
     return {
@@ -45,7 +45,7 @@ def session_args_camel() -> dict:
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def session_args_snake() -> dict:
     """Provide session parameters as dictionary with snake case keys."""
     return {

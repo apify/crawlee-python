@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from crawlee.beautifulsoup_crawler import BeautifulSoupCrawlingContext
 
 
-@pytest.fixture()
+@pytest.fixture
 async def server() -> AsyncGenerator[respx.MockRouter, None]:
     with respx.mock(base_url='https://test.io', assert_all_called=False) as mock:
         mock.get('/', name='index_endpoint').return_value = Response(

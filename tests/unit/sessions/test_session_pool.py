@@ -17,20 +17,20 @@ KVS_NAME = 'test_session_pool'
 PERSIST_STATE_KEY = 'crawlee_session_pool_state'
 
 
-@pytest.fixture()
+@pytest.fixture
 async def kvs() -> AsyncGenerator[KeyValueStore, None]:
     kvs = await KeyValueStore.open(name=KVS_NAME)
     yield kvs
     await kvs.drop()
 
 
-@pytest.fixture()
+@pytest.fixture
 async def event_manager() -> AsyncGenerator[EventManager, None]:
     async with EventManager() as em:
         yield em
 
 
-@pytest.fixture()
+@pytest.fixture
 async def session_pool() -> AsyncGenerator[SessionPool, None]:
     async with SessionPool(max_pool_size=MAX_POOL_SIZE, persistence_enabled=False) as sp:
         yield sp

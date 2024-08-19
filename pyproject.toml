@@ -83,8 +83,8 @@ pytest-only = "~2.1.0"
 pytest-timeout = "~2.3.0"
 pytest-xdist = "~3.6.0"
 respx = "~0.21.0"
-ruff = "~0.5.0"
-setuptools = "~72.1.0"  # setuptools are used by pytest, but not explicitly required
+ruff = "~0.6.0"
+setuptools = "~72.2.0"                    # setuptools are used by pytest, but not explicitly required
 types-beautifulsoup4 = "~4.12.0.20240229"
 types-colorama = "~0.4.15.20240106"
 types-psutil = "~5.9.5.20240205"
@@ -106,34 +106,35 @@ line-length = 120
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
-    "ANN101",  # Missing type annotation for `self` in method
-    "ANN102",  # Missing type annotation for `{name}` in classmethod
-    "ANN401",  # Dynamically typed expressions (typing.Any) are disallowed in {filename}
-    "BLE001",  # Do not catch blind exception
-    "C901",    # `{name}` is too complex
-    "COM812",  # This rule may cause conflicts when used with the formatter
-    "D100",    # Missing docstring in public module
-    "D104",    # Missing docstring in public package
-    "D107",    # Missing docstring in `__init__`
-    "EM",      # flake8-errmsg
-    "G004",    # Logging statement uses f-string
-    "ISC001",  # This rule may cause conflicts when used with the formatter
-    "FIX",     # flake8-fixme
-    "PGH003",  # Use specific rule codes when ignoring type issues
-    "PLR0911", # Too many return statements
-    "PLR0913", # Too many arguments in function definition
-    "PLR0915", # Too many statements
-    "PTH",     # flake8-use-pathlib
-    "PYI034",  # `__aenter__` methods in classes like `{name}` usually return `self` at runtime
-    "PYI036",  # The second argument in `__aexit__` should be annotated with `object` or `BaseException | None`
-    "S102",    # Use of `exec` detected
-    "S105",    # Possible hardcoded password assigned to
-    "S106",    # Possible hardcoded password assigned to argument: "{name}"
-    "S301",    # `pickle` and modules that wrap it can be unsafe when used to deserialize untrusted data, possible security issue
-    "S303",    # Use of insecure MD2, MD4, MD5, or SHA1 hash function
-    "S311",    # Standard pseudo-random generators are not suitable for cryptographic purposes
-    "TD002",   # Missing author in TODO; try: `# TODO(<author_name>): ...` or `# TODO @<author_name>: ...
-    "TRY003",  # Avoid specifying long messages outside the exception class
+    "ANN101",   # Missing type annotation for `self` in method
+    "ANN102",   # Missing type annotation for `{name}` in classmethod
+    "ANN401",   # Dynamically typed expressions (typing.Any) are disallowed in {filename}
+    "ASYNC109", # Async function definition with a `timeout` parameter
+    "BLE001",   # Do not catch blind exception
+    "C901",     # `{name}` is too complex
+    "COM812",   # This rule may cause conflicts when used with the formatter
+    "D100",     # Missing docstring in public module
+    "D104",     # Missing docstring in public package
+    "D107",     # Missing docstring in `__init__`
+    "EM",       # flake8-errmsg
+    "G004",     # Logging statement uses f-string
+    "ISC001",   # This rule may cause conflicts when used with the formatter
+    "FIX",      # flake8-fixme
+    "PGH003",   # Use specific rule codes when ignoring type issues
+    "PLR0911",  # Too many return statements
+    "PLR0913",  # Too many arguments in function definition
+    "PLR0915",  # Too many statements
+    "PTH",      # flake8-use-pathlib
+    "PYI034",   # `__aenter__` methods in classes like `{name}` usually return `self` at runtime
+    "PYI036",   # The second argument in `__aexit__` should be annotated with `object` or `BaseException | None`
+    "S102",     # Use of `exec` detected
+    "S105",     # Possible hardcoded password assigned to
+    "S106",     # Possible hardcoded password assigned to argument: "{name}"
+    "S301",     # `pickle` and modules that wrap it can be unsafe when used to deserialize untrusted data, possible security issue
+    "S303",     # Use of insecure MD2, MD4, MD5, or SHA1 hash function
+    "S311",     # Standard pseudo-random generators are not suitable for cryptographic purposes
+    "TD002",    # Missing author in TODO; try: `# TODO(<author_name>): ...` or `# TODO @<author_name>: ...
+    "TRY003",   # Avoid specifying long messages outside the exception class
 ]
 
 [tool.ruff.format]

@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Sequence
 
 
-@pytest.fixture()
+@pytest.fixture
 async def request_queue() -> AsyncGenerator[RequestQueue, None]:
     rq = await RequestQueue.open()
     yield rq

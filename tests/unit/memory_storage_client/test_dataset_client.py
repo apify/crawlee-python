@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from crawlee.memory_storage_client.dataset_client import DatasetClient
 
 
-@pytest.fixture()
+@pytest.fixture
 async def dataset_client(memory_storage_client: MemoryStorageClient) -> DatasetClient:
     datasets_client = memory_storage_client.datasets()
     dataset_info = await datasets_client.get_or_create(name='test')

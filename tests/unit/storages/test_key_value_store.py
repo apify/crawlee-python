@@ -7,7 +7,7 @@ import pytest
 from crawlee.storages import KeyValueStore
 
 
-@pytest.fixture()
+@pytest.fixture
 async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
     kvs = await KeyValueStore.open()
     yield kvs

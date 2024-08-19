@@ -15,7 +15,7 @@ from crawlee.autoscaling import AutoscaledPool, ConcurrencySettings, SystemStatu
 from crawlee.autoscaling.types import LoadRatioInfo, SystemInfo
 
 
-@pytest.fixture()
+@pytest.fixture
 def system_status() -> SystemStatus | Mock:
     return Mock(spec=SystemStatus)
 

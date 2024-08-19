@@ -7,7 +7,7 @@ import pytest
 from crawlee.sessions.session import Session
 
 
-@pytest.fixture()
+@pytest.fixture
 def session() -> Session:
     return Session(
         id='test_session',

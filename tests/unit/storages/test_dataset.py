@@ -7,7 +7,7 @@ import pytest
 from crawlee.storages import Dataset, KeyValueStore
 
 
-@pytest.fixture()
+@pytest.fixture
 async def dataset() -> AsyncGenerator[Dataset, None]:
     dataset = await Dataset.open()
     yield dataset

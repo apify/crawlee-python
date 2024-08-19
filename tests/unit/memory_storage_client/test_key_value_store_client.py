@@ -29,7 +29,7 @@ TINY_DATA = {'a': 'b'}
 TINY_TEXT = 'abcd'
 
 
-@pytest.fixture()
+@pytest.fixture
 async def key_value_store_client(memory_storage_client: MemoryStorageClient) -> KeyValueStoreClient:
     key_value_stores_client = memory_storage_client.key_value_stores()
     kvs_info = await key_value_stores_client.get_or_create(name='test')
