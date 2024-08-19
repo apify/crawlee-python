@@ -12,7 +12,7 @@ import crawlee.cli
 runner = CliRunner()
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_cookiecutter(monkeypatch: pytest.MonkeyPatch) -> Mock:
     mock_cookiecutter = Mock()
     monkeypatch.setattr(target=crawlee.cli, name='cookiecutter', value=mock_cookiecutter)

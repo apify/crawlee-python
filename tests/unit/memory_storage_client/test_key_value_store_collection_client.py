@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from crawlee.memory_storage_client.key_value_store_collection_client import KeyValueStoreCollectionClient
 
 
-@pytest.fixture()
+@pytest.fixture
 def key_value_stores_client(memory_storage_client: MemoryStorageClient) -> KeyValueStoreCollectionClient:
     return memory_storage_client.key_value_stores()
 

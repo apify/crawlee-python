@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from crawlee.memory_storage_client.dataset_collection_client import DatasetCollectionClient
 
 
-@pytest.fixture()
+@pytest.fixture
 def datasets_client(memory_storage_client: MemoryStorageClient) -> DatasetCollectionClient:
     return memory_storage_client.datasets()
 

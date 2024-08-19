@@ -10,7 +10,7 @@ from crawlee.events import LocalEventManager
 from crawlee.events.types import Event, EventSystemInfoData
 
 
-@pytest.fixture()
+@pytest.fixture
 def listener() -> AsyncMock:
     al = AsyncMock()
     al.__name__ = 'listener'  # To avoid issues with the function name

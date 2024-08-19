@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from crawlee.memory_storage_client.request_queue_collection_client import RequestQueueCollectionClient
 
 
-@pytest.fixture()
+@pytest.fixture
 def request_queues_client(memory_storage_client: MemoryStorageClient) -> RequestQueueCollectionClient:
     return memory_storage_client.request_queues()
 

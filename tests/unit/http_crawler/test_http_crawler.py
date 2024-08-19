@@ -15,17 +15,17 @@ if TYPE_CHECKING:
     from crawlee.http_crawler.types import HttpCrawlingContext
 
 
-@pytest.fixture()
+@pytest.fixture
 async def mock_request_handler() -> Callable[[HttpCrawlingContext], Awaitable[None]] | AsyncMock:
     return AsyncMock()
 
 
-@pytest.fixture()
+@pytest.fixture
 async def crawler(mock_request_handler: Callable[[HttpCrawlingContext], Awaitable[None]]) -> HttpCrawler:
     return HttpCrawler(request_handler=mock_request_handler, request_provider=RequestList())
 
 
-@pytest.fixture()
+@pytest.fixture
 async def server() -> AsyncGenerator[respx.MockRouter, None]:
     with respx.mock(base_url='https://test.io', assert_all_called=False) as mock:
         mock.get('/html', name='html_endpoint').return_value = Response(

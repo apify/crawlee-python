@@ -7,7 +7,7 @@ import pytest
 from crawlee.browsers import PlaywrightBrowserPlugin
 
 
-@pytest.fixture()
+@pytest.fixture
 async def plugin() -> AsyncGenerator[PlaywrightBrowserPlugin, None]:
     async with PlaywrightBrowserPlugin() as plugin:
         yield plugin

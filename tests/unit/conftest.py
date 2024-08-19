@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-@pytest.fixture()
+@pytest.fixture
 def reset_globals(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callable[[], None]:
     def reset() -> None:
         # Set the environment variable for the local storage directory to the temporary path
@@ -61,7 +61,7 @@ def _isolate_test_environment(reset_globals: Callable[[], None]) -> None:
     reset_globals()
 
 
-@pytest.fixture()
+@pytest.fixture
 def memory_storage_client(tmp_path: Path) -> MemoryStorageClient:
     cfg = Configuration(
         write_metadata=True,
@@ -71,12 +71,12 @@ def memory_storage_client(tmp_path: Path) -> MemoryStorageClient:
     return MemoryStorageClient(cfg)
 
 
-@pytest.fixture()
+@pytest.fixture
 def httpbin() -> str:
     return os.environ.get('HTTPBIN_URL', 'https://httpbin.org')
 
 
-@pytest.fixture()
+@pytest.fixture
 async def proxy_info(unused_tcp_port: int) -> ProxyInfo:
     username = 'user'
     password = 'pass'
@@ -91,7 +91,7 @@ async def proxy_info(unused_tcp_port: int) -> ProxyInfo:
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 async def proxy(proxy_info: ProxyInfo) -> AsyncGenerator[ProxyInfo, None]:
     with Proxy(
         [
@@ -106,7 +106,7 @@ async def proxy(proxy_info: ProxyInfo) -> AsyncGenerator[ProxyInfo, None]:
         yield proxy_info
 
 
-@pytest.fixture()
+@pytest.fixture
 async def disabled_proxy(proxy_info: ProxyInfo) -> AsyncGenerator[ProxyInfo, None]:
     with Proxy(
         [

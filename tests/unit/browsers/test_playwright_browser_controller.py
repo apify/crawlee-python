@@ -10,20 +10,20 @@ from playwright.async_api import Browser, Playwright, async_playwright
 from crawlee.browsers import PlaywrightBrowserController
 
 
-@pytest.fixture()
+@pytest.fixture
 async def playwright() -> AsyncGenerator[Playwright, None]:
     async with async_playwright() as playwright:
         yield playwright
 
 
-@pytest.fixture()
+@pytest.fixture
 async def browser(playwright: Playwright) -> AsyncGenerator[Browser, None]:
     browser = await playwright.chromium.launch()
     yield browser
     await browser.close()
 
 
-@pytest.fixture()
+@pytest.fixture
 async def controller(browser: Browser) -> AsyncGenerator[PlaywrightBrowserController, None]:
     controller = PlaywrightBrowserController(browser, max_open_pages_per_browser=2)
     yield controller

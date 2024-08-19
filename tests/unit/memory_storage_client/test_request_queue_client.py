@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from crawlee.memory_storage_client.request_queue_client import RequestQueueClient
 
 
-@pytest.fixture()
+@pytest.fixture
 async def request_queue_client(memory_storage_client: MemoryStorageClient) -> RequestQueueClient:
     request_queues_client = memory_storage_client.request_queues()
     rq_info = await request_queues_client.get_or_create(name='test')

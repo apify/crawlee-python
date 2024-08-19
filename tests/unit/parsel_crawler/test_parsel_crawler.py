@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from crawlee.parsel_crawler import ParselCrawlingContext
 
 
-@pytest.fixture()
+@pytest.fixture
 async def server() -> AsyncGenerator[respx.MockRouter, None]:
     with respx.mock(base_url='https://test.io', assert_all_called=False) as mock:
         mock.get('/', name='index_endpoint').return_value = Response(

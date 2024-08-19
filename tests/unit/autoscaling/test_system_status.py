@@ -18,13 +18,13 @@ from crawlee.autoscaling.types import (
 from crawlee.events import LocalEventManager
 
 
-@pytest.fixture()
+@pytest.fixture
 async def snapshotter() -> AsyncGenerator[Snapshotter, None]:
     async with LocalEventManager() as event_manager, Snapshotter(event_manager) as snapshotter:
         yield snapshotter
 
 
-@pytest.fixture()
+@pytest.fixture
 def now() -> datetime:
     return datetime.now(timezone.utc)
 

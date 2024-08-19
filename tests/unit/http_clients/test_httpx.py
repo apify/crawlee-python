@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from crawlee.proxy_configuration import ProxyInfo
 
 
-@pytest.fixture()
+@pytest.fixture
 def http_client() -> HttpxHttpClient:
     return HttpxHttpClient()
 
