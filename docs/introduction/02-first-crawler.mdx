@@ -9,9 +9,9 @@ Now, you will build your first crawler. But before you do, let's briefly introdu
 
 There are 3 main crawler classes available for use in Crawlee.
 
-- `BeautifulSoupCrawler`
-- `ParselCrawler`
-- `PlaywrightCrawler`
+- <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>
+- <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink>
+- <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>
 
 We'll talk about their differences later. Now, let's talk about what they have in common.
 
@@ -62,9 +62,9 @@ The code above is for illustration of the request queue concept. Soon you'll lea
 
 ### Building a BeautifulSoupCrawler
 
-Crawlee comes with thre main crawler classes: `BeautifulSoupCrawler`, `ParselCrawler`, and `PlaywrightCrawler`. You can read their short descriptions in the [Quick start](../quick-start) lesson.
+Crawlee comes with thre main crawler classes: <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink>, and <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>. You can read their short descriptions in the [Quick start](../quick-start) lesson.
 
-Unless you have a good reason to start with a different one, you should try building a `BeautifulSoupCrawler` first. It is an HTTP crawler with HTTP2 support, anti-blocking features and integrated HTML parser - [BeautifulSoup](https://pypi.org/project/beautifulsoup4/). It's fast, simple, cheap to run and does not require complicated dependencies. The only downside is that it won't work out of the box for websites which require JavaScript rendering. But you might not need JavaScript rendering at all, because many modern websites use server-side rendering.
+Unless you have a good reason to start with a different one, you should try building a <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> first. It is an HTTP crawler with HTTP2 support, anti-blocking features and integrated HTML parser - [BeautifulSoup](https://pypi.org/project/beautifulsoup4/). It's fast, simple, cheap to run and does not require complicated dependencies. The only downside is that it won't work out of the box for websites which require JavaScript rendering. But you might not need JavaScript rendering at all, because many modern websites use server-side rendering.
 
 Let's continue with the earlier `RequestQueue` example.
 
@@ -98,7 +98,7 @@ if __name__ == '__main__':
     asyncio.run(main())
 ```
 
-When you run the example, you will see the title of https://crawlee.dev printed to the log. What really happens is that `BeautifulSoupCrawler` first makes an HTTP request to `https://crawlee.dev`, then parses the received HTML with BeautifulSoup and makes it available as the `context` argument of the request handler.
+When you run the example, you will see the title of https://crawlee.dev printed to the log. What really happens is that <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> first makes an HTTP request to `https://crawlee.dev`, then parses the received HTML with BeautifulSoup and makes it available as the `context` argument of the request handler.
 
 ```log
 [__main__] INFO  The title of "https://crawlee.dev" is "Crawlee · Build reliable crawlers. Fast. | Crawlee".

@@ -3,9 +3,11 @@ id: playwright-crawler
 title: Playwright crawler
 ---
 
-This example demonstrates how to use `PlaywrightCrawler` to recursively scrape the Hacker news website using headless Chromium and Playwright.
+import ApiLink from '@site/src/components/ApiLink';
 
-The `PlaywrightCrawler` manages the browser and page instances, simplifying the process of interacting with web pages. In the request handler, Playwright's API is used to extract data from each post on the page. Specifically, it retrieves the title, rank, and URL of each post. Additionally, the handler enqueues links to the next pages to ensure continuous scraping. This setup is ideal for scraping dynamic web pages where JavaScript execution is required to render the content.
+This example demonstrates how to use <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> to recursively scrape the Hacker news website using headless Chromium and Playwright.
+
+The <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> manages the browser and page instances, simplifying the process of interacting with web pages. In the request handler, Playwright's API is used to extract data from each post on the page. Specifically, it retrieves the title, rank, and URL of each post. Additionally, the handler enqueues links to the next pages to ensure continuous scraping. This setup is ideal for scraping dynamic web pages where JavaScript execution is required to render the content.
 
 ```python
 import asyncio

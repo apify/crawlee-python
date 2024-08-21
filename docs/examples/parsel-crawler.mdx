@@ -3,7 +3,9 @@ id: parsel-crawler
 title: Parsel crawler
 ---
 
-This example shows how to use `ParselCrawler` to crawl a website or a list of URLs. Each URL is loaded using a plain HTTP request and the response is parsed using [Parsel](https://pypi.org/project/parsel/) library which supports CSS and XPath selectors for HTML responses and JMESPath for JSON responses. We can extract data from all kinds of complex HTML structures using XPath. In this example, we will use Parsel to crawl github.com and extract page title, URL and emails found in the webpage. The default handler will scrape data from the current webpage and enqueue all the links found in the webpage for continuous scraping.
+import ApiLink from '@site/src/components/ApiLink';
+
+This example shows how to use <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> to crawl a website or a list of URLs. Each URL is loaded using a plain HTTP request and the response is parsed using [Parsel](https://pypi.org/project/parsel/) library which supports CSS and XPath selectors for HTML responses and JMESPath for JSON responses. We can extract data from all kinds of complex HTML structures using XPath. In this example, we will use Parsel to crawl github.com and extract page title, URL and emails found in the webpage. The default handler will scrape data from the current webpage and enqueue all the links found in the webpage for continuous scraping.
 
 
 ```python
