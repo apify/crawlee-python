@@ -20,52 +20,76 @@ pip --version
 
 ## Installation
 
-Crawlee is available as the [`crawlee`](https://pypi.org/project/crawlee/) PyPI package.
+Crawlee is available as the [`crawlee`](https://pypi.org/project/crawlee/) PyPI package. To install the core package, use:
 
 ```sh
 pip install crawlee
 ```
 
-Additional, optional dependencies unlocking more features are shipped as package extras.
-
-If you plan to parse HTML and use CSS selectors, install `crawlee` with either the `beautifulsoup` or `parsel` extra:
+After installation, verify that Crawlee is installed correctly by checking its version:
 
 ```sh
-pip install 'crawlee[beautifulsoup]'
+python -c 'import crawlee; print(crawlee.__version__)'
 ```
 
-```sh
-pip install 'crawlee[parsel]'
-```
+Crawlee offers several optional features through package extras. You can choose to install only the dependencies you need or install everything if you don't mind the package size.
 
-If you plan to use a (headless) browser, install `crawlee` with the `playwright` extra:
+### Install all features
 
-```sh
-pip install 'crawlee[playwright]'
-```
-
-Then, install the Playwright dependencies:
-
-```sh
-playwright install
-```
-
-You can install multiple extras at once by using a comma as a separator:
-
-```sh
-pip install 'crawlee[beautifulsoup,playwright]'
-```
-
-Or if you do not care about the package size, you can install everything:
+If you do not care about the package size, install Crawlee with all features:
 
 ```sh
 pip install 'crawlee[all]'
 ```
 
-Verify that Crawlee is successfully installed:
+### Installing only specific extras
+
+Depending on your use case, you may want to install specific extras to enable additional functionality:
+
+#### BeautifulSoup
+
+For using the [`BeautifulSoupCrawler`](https://crawlee.dev/python/api/class/BeautifulSoupCrawler), install the `beautifulsoup` extra:
 
 ```sh
-python -c 'import crawlee; print(crawlee.__version__)'
+pip install 'crawlee[beautifulsoup]'
+```
+
+#### Parsel
+
+For using the [`ParselCrawler`](https://crawlee.dev/python/api/class/ParselCrawler), install the `parsel` extra:
+
+```sh
+pip install 'crawlee[parsel]'
+```
+
+#### Curl impersonate
+
+For using the [`CurlImpersonateHttpClient`](https://crawlee.dev/python/api/class/CurlImpersonateHttpClient), install the `curl-impersonate` extra:
+
+```sh
+pip install 'crawlee[curl-impersonate]'
+```
+
+#### Playwright
+
+If you plan to use a (headless) browser with [`PlaywrightCrawler`](https://crawlee.dev/python/api/class/PlaywrightCrawler), install Crawlee with the `playwright` extra:
+
+```sh
+pip install 'crawlee[playwright]'
+```
+
+After installing the playwright extra, install the necessary Playwright dependencies:
+
+```sh
+playwright install
+```
+
+### Installing multiple extras
+
+You can install multiple extras at once by using a comma as a separator:
+
+```sh
+pip install 'crawlee[beautifulsoup,curl-impersonate]'
 ```
 
 ## With Crawlee CLI
