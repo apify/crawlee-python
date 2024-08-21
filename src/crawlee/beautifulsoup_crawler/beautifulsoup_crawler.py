@@ -5,6 +5,7 @@ import logging
 from typing import TYPE_CHECKING, Any, AsyncGenerator, Iterable, Literal
 
 from bs4 import BeautifulSoup, Tag
+from pydantic import ValidationError
 from typing_extensions import Unpack
 
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
@@ -136,7 +137,17 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
                     if not is_url_absolute(url):
                         url = convert_to_absolute_url(context.request.url, url)
 
-                    requests.append(BaseRequestData.from_url(url, user_data=link_user_data))
+                    try:
+                        request = BaseRequestData.from_url(url, user_data=link_user_data)
+                    except ValidationError as exc:
+                        context.log.debug(
+                            f'Skipping URL "{url}" due to invalid format: {exc}. '
+                            'This may be caused by a malformed URL or unsupported URL scheme. '
+                            'Please ensure the URL is correct and retry.'
+                        )
+                        continue
+
+                    requests.append(request)
 
             await context.add_requests(requests, **kwargs)
 

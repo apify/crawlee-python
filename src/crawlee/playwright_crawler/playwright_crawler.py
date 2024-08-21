@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Literal
 
+from pydantic import ValidationError
 from typing_extensions import Unpack
 
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
@@ -141,7 +142,16 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                         if label is not None:
                             link_user_data.setdefault('label', label)
 
-                        request = BaseRequestData.from_url(url, user_data=link_user_data)
+                        try:
+                            request = BaseRequestData.from_url(url, user_data=link_user_data)
+                        except ValidationError as exc:
+                            context.log.debug(
+                                f'Skipping URL "{url}" due to invalid format: {exc}. '
+                                'This may be caused by a malformed URL or unsupported URL scheme. '
+                                'Please ensure the URL is correct and retry.'
+                            )
+                            continue
+
                         requests.append(request)
 
                 await context.add_requests(requests, **kwargs)
