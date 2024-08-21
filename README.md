@@ -24,17 +24,6 @@
     </a>
 </p>
 
-<h1 align="center">
-    <a href="https://apify.com/resources/crawlee-for-python-webinar">
-        <picture>
-          <source media="(prefers-color-scheme: dark)" srcset="https://pbs.twimg.com/card_img/1817941805385560065/U9LeYTKD?format=png&name=small">
-          <img alt="Crawlee" src="https://pbs.twimg.com/card_img/1817941805385560065/U9LeYTKD?format=png&name=small" width="500">
-        </picture>
-    </a>
-    <br>
-    <small> Learn more about Crawlee for Python from the creators of Crawlee. Join us on August 5th at 9 AM EST. <a href="https://apify.com/resources/crawlee-for-python-webinar"> Sign up now!</a></small>
-</h1>
-
 Crawlee covers your crawling and scraping end-to-end and **helps you build reliable scrapers. Fast.**
 
 > 🚀 Crawlee for Python is open to early adopters!
