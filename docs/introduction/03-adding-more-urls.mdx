@@ -3,6 +3,8 @@ id: adding-more-urls
 title: Adding more URLs
 ---
 
+import ApiLink from '@site/src/components/ApiLink';
+
 Previously you've built a very simple crawler that downloads HTML of a single page, reads its title and prints it to the console. This is the original source code:
 
 ```python
@@ -24,7 +26,7 @@ if __name__ == '__main__':
     asyncio.run(main())
 ```
 
-Now you'll use the example from the previous section and improve on it. You'll add more URLs to the queue and thanks to that the crawler will keep going, finding new links, enqueuing them into the `RequestQueue` and then scraping them.
+Now you'll use the example from the previous section and improve on it. You'll add more URLs to the queue and thanks to that the crawler will keep going, finding new links, enqueuing them into the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> and then scraping them.
 
 ## How crawling works
 
@@ -32,21 +34,21 @@ The process is simple:
 
 1. Find new links on the page.
 2. Filter only those pointing to the same domain, in this case [crawlee.dev](https://crawlee.dev/).
-3. Enqueue (add) them to the `RequestQueue`.
+3. Enqueue (add) them to the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>.
 4. Visit the newly enqueued links.
 5. Repeat the process.
 
-In the following paragraphs you will learn about the `enqueue_links` function which simplifies crawling to a single function call.
+In the following paragraphs you will learn about the <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> function which simplifies crawling to a single function call.
 
 :::tip context awareness
 
-The `enqueue_links` function is context aware. It means that it will read the information about the currently crawled page from the context, and you don't need to explicitly provide any arguments. However, you can specify filtering criteria or an enqueuing strategy if desired. It will find the links and automatically add the links to the running crawler's `RequestQueue`.
+The <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> function is context aware. It means that it will read the information about the currently crawled page from the context, and you don't need to explicitly provide any arguments. However, you can specify filtering criteria or an enqueuing strategy if desired. It will find the links and automatically add the links to the running crawler's <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>.
 
 :::
 
 ## Limit your crawls
 
-When you're just testing your code or when your crawler could potentially find millions of links, it's very useful to set a maximum limit of crawled pages. The option is called `max_requests_per_crawl`, is available in all crawlers, and you can set it like this:
+When you're just testing your code or when your crawler could potentially find millions of links, it's very useful to set a maximum limit of crawled pages. The option is called <ApiLink to="class/BasicCrawlerOptions#max_requests_per_crawl">`max_requests_per_crawl`</ApiLink>, is available in all crawlers, and you can set it like this:
 
 ```python
 crawler = BeautifulSoupCrawler(max_requests_per_crawl=20)
@@ -62,7 +64,7 @@ There are numerous approaches to finding links to follow when crawling the web. 
 <a href="https://crawlee.dev/docs/introduction">This is a link to Crawlee introduction</a>
 ```
 
-Since this is the most common case, it is also the `enqueue_links` default.
+Since this is the most common case, it is also the <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> default.
 
 ```python
 import asyncio
@@ -88,7 +90,7 @@ if __name__ == '__main__':
     asyncio.run(main())
 ```
 
-If you need to override the default selection of elements in `enqueue_links`, you can use the `selector` argument.
+If you need to override the default selection of elements in <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink>, you can use the `selector` argument.
 
 ```python
 await context.enqueue_links(selector='a.article-link')
@@ -104,7 +106,7 @@ Websites typically contain a lot of links that lead away from the original page.
 await context.enqueue_links()
 ```
 
-The default behavior of `enqueue_links` is to stay on the same hostname. This **does not include subdomains**. To include subdomains in your crawl, use the `strategy` argument.
+The default behavior of <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> is to stay on the same hostname. This **does not include subdomains**. To include subdomains in your crawl, use the `strategy` argument.
 
 ```python
 # See the EnqueueStrategy object for more strategy options.
@@ -115,11 +117,11 @@ When you run the code, you will see the crawler log the **title** of the first p
 
 ## Skipping duplicate URLs
 
-Skipping of duplicate URLs is critical, because visiting the same page multiple times would lead to duplicate results. This is automatically handled by the `RequestQueue` which deduplicates requests using their `unique_key`. This `unique_key` is automatically generated from the request's URL by lowercasing the URL, lexically ordering query parameters, removing fragments and a few other tweaks that ensure the queue only includes unique URLs.
+Skipping of duplicate URLs is critical, because visiting the same page multiple times would lead to duplicate results. This is automatically handled by the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> which deduplicates requests using their `unique_key`. This `unique_key` is automatically generated from the request's URL by lowercasing the URL, lexically ordering query parameters, removing fragments and a few other tweaks that ensure the queue only includes unique URLs.
 
 ## Advanced filtering arguments
 
-While the defaults for `enqueue_links` can be often exactly what you need, it also gives you fine-grained control over which URLs should be enqueued. One way we already mentioned above. It is using the `EnqueueStrategy`. You can use the `all` strategy if you want to follow every single link, regardless of its domain, or you can enqueue links that target the same domain name with the `same_domain` strategy.
+While the defaults for <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> can be often exactly what you need, it also gives you fine-grained control over which URLs should be enqueued. One way we already mentioned above. It is using the <ApiLink to="enum/EnqueueStrategy">`EnqueueStrategy`</ApiLink>. You can use the `all` strategy if you want to follow every single link, regardless of its domain, or you can enqueue links that target the same domain name with the `same_domain` strategy.
 
 ```python
 # Wanders the internet.
@@ -128,7 +130,7 @@ await enqueue_links(strategy='all')
 
 ### Filter URLs with patterns
 
-For even more control, you can use the `include` or `exclude` parameters, either as glob patterns or regular expressions, to filter the URLs. Refer to the API documentation for `enqueue_links` for detailed information on these and other available options.
+For even more control, you can use the `include` or `exclude` parameters, either as glob patterns or regular expressions, to filter the URLs. Refer to the API documentation for <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> for detailed information on these and other available options.
 
 ```python
 from crawlee import Glob

@@ -3,6 +3,8 @@ id: setting-up
 title: Setting up
 ---
 
+import ApiLink from '@site/src/components/ApiLink';
+
 To run Crawlee on your computer, ensure you meet the following requirements:
 
 1. [Python](https://www.python.org/) 3.9 or higher installed,
@@ -48,7 +50,7 @@ Depending on your use case, you may want to install specific extras to enable ad
 
 #### BeautifulSoup
 
-For using the [`BeautifulSoupCrawler`](https://crawlee.dev/python/api/class/BeautifulSoupCrawler), install the `beautifulsoup` extra:
+For using the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, install the `beautifulsoup` extra:
 
 ```sh
 pip install 'crawlee[beautifulsoup]'
@@ -56,7 +58,7 @@ pip install 'crawlee[beautifulsoup]'
 
 #### Parsel
 
-For using the [`ParselCrawler`](https://crawlee.dev/python/api/class/ParselCrawler), install the `parsel` extra:
+For using the <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink>, install the `parsel` extra:
 
 ```sh
 pip install 'crawlee[parsel]'
@@ -64,7 +66,7 @@ pip install 'crawlee[parsel]'
 
 #### Curl impersonate
 
-For using the [`CurlImpersonateHttpClient`](https://crawlee.dev/python/api/class/CurlImpersonateHttpClient), install the `curl-impersonate` extra:
+For using the <ApiLink to="class/CurlImpersonateHttpClient">`CurlImpersonateHttpClient`</ApiLink>, install the `curl-impersonate` extra:
 
 ```sh
 pip install 'crawlee[curl-impersonate]'
@@ -72,7 +74,7 @@ pip install 'crawlee[curl-impersonate]'
 
 #### Playwright
 
-If you plan to use a (headless) browser with [`PlaywrightCrawler`](https://crawlee.dev/python/api/class/PlaywrightCrawler), install Crawlee with the `playwright` extra:
+If you plan to use a (headless) browser with <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>, install Crawlee with the `playwright` extra:
 
 ```sh
 pip install 'crawlee[playwright]'
