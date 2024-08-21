@@ -7,7 +7,7 @@ import ApiLink from '@site/src/components/ApiLink';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-This example demonstrates how to store extracted data into datasets using the `context.push_data()` helper function. If the specified dataset does not already exist, it will be created automatically. Additionally, you can save data to custom datasets by providing `dataset_id` or `dataset_name` parameters to the `push_data` method.
+This example demonstrates how to store extracted data into datasets using the [`context.push_data`](https://crawlee.dev/python/api/class/PushDataFunction) helper function. If the specified dataset does not already exist, it will be created automatically. Additionally, you can save data to custom datasets by providing `dataset_id` or `dataset_name` parameters to the [`push_data`](https://crawlee.dev/python/api/class/PushDataFunction) method.
 
 <Tabs groupId="main">
 <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
@@ -100,7 +100,7 @@ Each item in the dataset will be stored in its own file within the following dir
 {PROJECT_FOLDER}/storage/datasets/default/
 ```
 
-For more control, you can also open a dataset manually using the asynchronous constructor `Dataset.open()` and interact with it directly:
+For more control, you can also open a dataset manually using the asynchronous constructor [`Dataset.open`](https://crawlee.dev/python/api/class/Dataset) and interact with it directly:
 
 ```python
 from crawlee.storages import Dataset
