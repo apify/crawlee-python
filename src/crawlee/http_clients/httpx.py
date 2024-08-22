@@ -103,9 +103,11 @@ class HttpxHttpClient(BaseHttpClient):
         client = self._get_client(proxy_info.url if proxy_info else None)
 
         http_request = client.build_request(
-            method=request.method,
             url=request.url,
+            method=request.method,
             headers=request.headers,
+            params=request.query_params,
+            data=request.data,
             cookies=session.cookies if session else None,
             extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
         )
@@ -144,6 +146,8 @@ class HttpxHttpClient(BaseHttpClient):
         *,
         method: HttpMethod = 'GET',
         headers: HttpHeaders | None = None,
+        query_params: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> HttpResponse:
@@ -153,6 +157,8 @@ class HttpxHttpClient(BaseHttpClient):
             url=url,
             method=method,
             headers=headers,
+            params=query_params,
+            data=data,
             extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
         )
 
