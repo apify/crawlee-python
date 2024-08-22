@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - Remove indentation from statistics logging and print the data in tables ([#322](https://github.com/apify/crawlee-python/pull/322), closes [#306](https://github.com/apify/crawlee-python/issues/306)) ([359b515](https://github.com/apify/crawlee-python/commit/359b515d647f064886f91441c2c01d3099e21035)) by [@TymeeK](https://github.com/TymeeK)
 - Remove redundant log, fix format ([#408](https://github.com/apify/crawlee-python/pull/408)) ([8d27e39](https://github.com/apify/crawlee-python/commit/8d27e3928c605d6eceb51a948453a15024fa2aa2)) by [@janbuchar](https://github.com/janbuchar)
 - Dequeue items from RequestQueue in the correct order ([#411](https://github.com/apify/crawlee-python/pull/411)) ([96fc33e](https://github.com/apify/crawlee-python/commit/96fc33e2cc4631cae3c50dad9eace6407103a2a9)) by [@janbuchar](https://github.com/janbuchar)
+- Relative URLS supports & If not a URL, pass #417 ([#431](https://github.com/apify/crawlee-python/pull/431), closes [#417](https://github.com/apify/crawlee-python/issues/417)) ([ccd8145](https://github.com/apify/crawlee-python/commit/ccd81454166ece68391cdffedb8efe9e663361d9)) by [@black7375](https://github.com/black7375)
 
 ## [0.2.1](https://github.com/apify/crawlee-python/releases/tag/v0.2.1) (2024-08-05)
 
