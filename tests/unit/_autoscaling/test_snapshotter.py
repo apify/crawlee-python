@@ -174,7 +174,7 @@ def test_memory_load_evaluation_logs_warning_on_high_usage(
     snapshotter: Snapshotter,
 ) -> None:
     mock_logger_warn = MagicMock()
-    monkeypatch.setattr(getLogger('crawlee.autoscaling.snapshotter'), 'warning', mock_logger_warn)
+    monkeypatch.setattr(getLogger('crawlee._autoscaling.snapshotter'), 'warning', mock_logger_warn)
     snapshotter._max_memory_size = ByteSize.from_gb(8)
 
     high_memory_usage = ByteSize.from_gb(8) * 0.9  # 90% of 8 GB
