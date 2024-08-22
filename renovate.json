@@ -6,7 +6,7 @@
     "semanticCommits": "enabled",
     "lockFileMaintenance": {
         "enabled": true,
-        "schedule": ["before 2am"],
+        "schedule": ["before 1am on monday"],
         "automerge": true,
         "automergeType": "branch"
     },
@@ -21,6 +21,6 @@
             "automergeType": "branch"
         }
     ],
-    "schedule": ["every weekday"],
+    "schedule": ["before 1am on monday"],
     "ignoreDeps": ["crawlee", "docusaurus-plugin-typedoc-api"]
 }
