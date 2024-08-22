@@ -42,7 +42,7 @@ class BaseRequestData(BaseModel):
 
     headers: Annotated[dict[str, str] | None, Field(default_factory=dict)] = None
 
-    params: Annotated[dict[str, Any] | None, Field(default_factory=dict)] = None
+    query_params: Annotated[dict[str, Any] | None, Field(default_factory=dict)] = None
 
     data: Annotated[dict[str, Any] | None, Field(default_factory=dict)] = None
 

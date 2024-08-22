@@ -93,7 +93,7 @@ class CurlImpersonateHttpClient(BaseHttpClient):
                 url=request.url,
                 method=request.method.upper(),  # curl-cffi requires uppercase method
                 headers=request.headers,
-                params=request.params,
+                params=request.query_params,
                 data=request.data,
                 cookies=session.cookies if session else None,
                 allow_redirects=True,
@@ -130,7 +130,7 @@ class CurlImpersonateHttpClient(BaseHttpClient):
         *,
         method: HttpMethod = 'GET',
         headers: HttpHeaders | None = None,
-        params: dict[str, Any] | None = None,
+        query_params: dict[str, Any] | None = None,
         data: dict[str, Any] | None = None,
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
@@ -143,7 +143,7 @@ class CurlImpersonateHttpClient(BaseHttpClient):
                 url=url,
                 method=method.upper(),  # curl-cffi requires uppercase method
                 headers=headers,
-                params=params,
+                params=query_params,
                 data=data,
                 cookies=session.cookies if session else None,
                 allow_redirects=True,
