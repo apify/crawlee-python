@@ -40,7 +40,7 @@ def get_storage_client(*, client_type: StorageClientType | None = None) -> BaseS
     """Get the storage client instance for the current environment.
 
     Args:
-        client_type: Allows retrieving a specific storage client type, regardless of where we are running
+        client_type: Allows retrieving a specific storage client type, regardless of where we are running.
 
     Returns:
         The current storage client instance.
