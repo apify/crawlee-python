@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, Any, Generic, cast
 
 from typing_extensions import Self, TypeVar
 
+import crawlee.service_container
 from crawlee._utils.recurring_task import RecurringTask
-from crawlee.events import LocalEventManager
 from crawlee.events.types import Event, EventPersistStateData
 from crawlee.statistics import FinalStatistics, StatisticsPersistedState, StatisticsState
 from crawlee.statistics.error_tracker import ErrorTracker
@@ -85,7 +85,7 @@ class Statistics(Generic[TStatisticsState]):
         self.error_tracker = ErrorTracker()
         self.error_tracker_retry = ErrorTracker()
 
-        self._events = event_manager or LocalEventManager()
+        self._events = event_manager or crawlee.service_container.get_event_manager()
 
         self._requests_in_progress = dict[str, RequestProcessingRecord]()
 

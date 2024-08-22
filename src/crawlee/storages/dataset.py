@@ -135,6 +135,7 @@ class Dataset(BaseStorage):
         id: str | None = None,
         name: str | None = None,
         configuration: Configuration | None = None,
+        storage_client: BaseStorageClient | None = None,
     ) -> Dataset:
         from crawlee.storages._creation_management import open_storage
 
@@ -143,6 +144,7 @@ class Dataset(BaseStorage):
             id=id,
             name=name,
             configuration=configuration,
+            storage_client=storage_client,
         )
 
     @override

@@ -71,6 +71,7 @@ class KeyValueStore(BaseStorage):
         id: str | None = None,
         name: str | None = None,
         configuration: Configuration | None = None,
+        storage_client: BaseStorageClient | None = None,
     ) -> KeyValueStore:
         from crawlee.storages._creation_management import open_storage
 
@@ -79,6 +80,7 @@ class KeyValueStore(BaseStorage):
             id=id,
             name=name,
             configuration=configuration,
+            storage_client=storage_client,
         )
 
     @override

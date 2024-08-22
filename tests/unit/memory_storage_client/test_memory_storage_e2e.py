@@ -5,8 +5,8 @@ from typing import Callable
 
 import pytest
 
+from crawlee import service_container
 from crawlee.models import Request
-from crawlee.storage_client_manager import StorageClientManager
 from crawlee.storages.key_value_store import KeyValueStore
 from crawlee.storages.request_queue import RequestQueue
 
@@ -23,7 +23,7 @@ async def test_actor_memory_storage_client_key_value_store_e2e(
     # Configure purging env var
     monkeypatch.setenv('CRAWLEE_PURGE_ON_START', f'{int(purge_on_start)}')
     # Store old storage client so we have the object reference for comparison
-    old_client = StorageClientManager.get_storage_client()
+    old_client = service_container.get_storage_client()
 
     old_default_kvs = await KeyValueStore.open()
     old_non_default_kvs = await KeyValueStore.open(name='non-default')
@@ -36,7 +36,7 @@ async def test_actor_memory_storage_client_key_value_store_e2e(
     reset_globals()
 
     # Check if we're using a different memory storage instance
-    assert old_client is not StorageClientManager.get_storage_client()
+    assert old_client is not service_container.get_storage_client()
     default_kvs = await KeyValueStore.open()
     assert default_kvs is not old_default_kvs
     non_default_kvs = await KeyValueStore.open(name='non-default')

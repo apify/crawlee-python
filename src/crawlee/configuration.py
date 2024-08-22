@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Annotated, ClassVar, cast
+from typing import Annotated
 
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -21,8 +21,6 @@ class Configuration(BaseSettings):
         default_storage_id: The default storage ID.
         purge_on_start: Whether to purge the storage on start.
     """
-
-    _default_instance: ClassVar[Self | None] = None
 
     model_config = SettingsConfigDict(populate_by_name=True)
 
@@ -206,12 +204,19 @@ class Configuration(BaseSettings):
         ),
     ] = False
 
-    in_cloud: Annotated[bool, Field(alias='crawlee_in_cloud')] = False
-
     @classmethod
     def get_global_configuration(cls) -> Self:
         """Retrieve the global instance of the configuration."""
-        if Configuration._default_instance is None:
-            Configuration._default_instance = cls()
+        from crawlee import service_container
 
-        return cast(Self, Configuration._default_instance)
+        if service_container.get_configuration_if_set() is None:
+            service_container.set_configuration(cls())
+
+        global_instance = service_container.get_configuration()
+
+        if not isinstance(global_instance, cls):
+            raise TypeError(
+                f'Requested global configuration object of type {cls}, but {global_instance.__class__} was found'
+            )
+
+        return global_instance

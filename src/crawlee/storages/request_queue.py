@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import asyncio
 from collections import OrderedDict
+from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, Generic, TypedDict, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypedDict, TypeVar
 
 from typing_extensions import override
 
@@ -12,11 +13,11 @@ from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.lru_cache import LRUCache
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee._utils.wait import wait_for_all_tasks_for_finish
+from crawlee.events.types import Event
 from crawlee.models import (
     BaseRequestData,
     ProcessedRequest,
     Request,
-    RequestQueueHeadState,
     RequestQueueMetadata,
 )
 from crawlee.storages.base_storage import BaseStorage
@@ -27,11 +28,11 @@ if TYPE_CHECKING:
 
     from crawlee.base_storage_client import BaseStorageClient
     from crawlee.configuration import Configuration
-
-logger = getLogger(__name__)
+    from crawlee.events.event_manager import EventManager
 
 __all__ = ['RequestQueue']
 
+logger = getLogger(__name__)
 
 T = TypeVar('T')
 
@@ -63,6 +64,8 @@ class BoundedSet(Generic[T]):
 class CachedRequest(TypedDict):
     id: str
     was_already_handled: bool
+    hydrated: Request | None
+    lock_expires_at: datetime | None
 
 
 class RequestQueue(BaseStorage, RequestProvider):
@@ -85,23 +88,8 @@ class RequestQueue(BaseStorage, RequestProvider):
         rq = await RequestQueue.open(id='my_rq_id')
     """
 
-    _API_PROCESSED_REQUESTS_DELAY = timedelta(seconds=10)
-    """Delay threshold to assume consistency of queue head operations after queue modifications."""
-
     _MAX_CACHED_REQUESTS = 1_000_000
     """Maximum number of requests that can be cached."""
-
-    _MAX_HEAD_LIMIT = 1000
-    """Cap on requests in progress when querying queue head."""
-
-    _MAX_QUERIES_FOR_CONSISTENCY = 6
-    """Maximum attempts to fetch a consistent queue head."""
-
-    _QUERY_HEAD_BUFFER = 3
-    """Multiplier for determining the number of requests to fetch based on in-progress requests."""
-
-    _QUERY_HEAD_MIN_LENGTH = 100
-    """The minimum number of requests fetched when querying the queue head."""
 
     _RECENTLY_HANDLED_CACHE_SIZE = 1000
     """Cache size for recently handled requests."""
@@ -115,6 +103,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         name: str | None,
         configuration: Configuration,
         client: BaseStorageClient,
+        event_manager: EventManager,
     ) -> None:
         self._id = id
         self._name = name
@@ -124,14 +113,21 @@ class RequestQueue(BaseStorage, RequestProvider):
         self._resource_client = client.request_queue(self._id)
         self._resource_collection_client = client.request_queues()
 
+        self._request_lock_time = timedelta(minutes=3)
+        self._queue_paused_for_migration = False
+
+        event_manager.on(event=Event.MIGRATING, listener=lambda _: setattr(self, '_queue_paused_for_migration', True))
+        event_manager.on(event=Event.MIGRATING, listener=lambda _: self._clear_possible_locks())
+        event_manager.on(event=Event.ABORTING, listener=lambda _: self._clear_possible_locks())
+
         # Other internal attributes
         self._tasks = list[asyncio.Task]()
         self._client_key = crypto_random_object_id()
-        self._internal_timeout_seconds = 5 * 60
+        self._internal_timeout = configuration.internal_timeout or timedelta(minutes=5)
         self._assumed_total_count = 0
         self._assumed_handled_count = 0
         self._queue_head_dict: OrderedDict[str, str] = OrderedDict()
-        self._query_queue_head_task: asyncio.Task | None = None
+        self._list_head_and_lock_task: asyncio.Task | None = None
         self._in_progress: set[str] = set()
         self._last_activity = datetime.now(timezone.utc)
         self._recently_handled: BoundedSet[str] = BoundedSet(max_length=self._RECENTLY_HANDLED_CACHE_SIZE)
@@ -155,19 +151,17 @@ class RequestQueue(BaseStorage, RequestProvider):
         id: str | None = None,
         name: str | None = None,
         configuration: Configuration | None = None,
+        storage_client: BaseStorageClient | None = None,
     ) -> RequestQueue:
         from crawlee.storages._creation_management import open_storage
 
-        storage = await open_storage(
+        return await open_storage(
             storage_class=cls,
             id=id,
             name=name,
             configuration=configuration,
+            storage_client=storage_client,
         )
-
-        await storage._ensure_head_is_non_empty()  # noqa: SLF001 - accessing private members from factories is OK
-
-        return storage
 
     @override
     async def drop(self, *, timeout: timedelta | None = None) -> None:
@@ -210,11 +204,7 @@ class RequestQueue(BaseStorage, RequestProvider):
             use_extended_unique_key: Determines whether to use an extended unique key, incorporating the request's
                 method and payload into the unique key computation.
 
-        Returns: A dictionary containing information about the operation, including:
-            - `requestId` The ID of the request.
-            - `uniqueKey` The unique key associated with the request.
-            - `wasAlreadyPresent` (bool): Indicates whether the request was already in the queue.
-            - `wasAlreadyHandled` (bool): Indicates whether the request was already processed.
+        Returns: Information about the processed request.
         """
         request = self._transform_request(request)
         self._last_activity = datetime.now(timezone.utc)
@@ -248,7 +238,6 @@ class RequestQueue(BaseStorage, RequestProvider):
             and request_id not in self._recently_handled
         ):
             self._assumed_total_count += 1
-            self._maybe_add_request_to_queue_head(request_id, forefront=forefront)
 
         return processed_request
 
@@ -290,7 +279,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         # Wait for all tasks to finish if requested
         if wait_for_all_requests_to_be_added:
             await wait_for_all_tasks_for_finish(
-                self._tasks,
+                (remaining_batches_task,),
                 logger=logger,
                 timeout=wait_for_all_requests_to_be_added_timeout,
             )
@@ -321,6 +310,8 @@ class RequestQueue(BaseStorage, RequestProvider):
         Returns:
             The request or `None` if there are no more pending requests.
         """
+        self._last_activity = datetime.now(timezone.utc)
+
         await self._ensure_head_is_non_empty()
 
         # We are likely done at this point.
@@ -340,11 +331,11 @@ class RequestQueue(BaseStorage, RequestProvider):
                 },
             )
             return None
+
         self._in_progress.add(next_request_id)
-        self._last_activity = datetime.now(timezone.utc)
 
         try:
-            request = await self.get_request(next_request_id)
+            request = await self._get_or_hydrate_request(next_request_id)
         except Exception:
             # On error, remove the request from in progress, otherwise it would be there forever
             self._in_progress.remove(next_request_id)
@@ -447,19 +438,18 @@ class RequestQueue(BaseStorage, RequestProvider):
         processed_request.unique_key = request.unique_key
         self._cache_request(unique_key_to_request_id(request.unique_key), processed_request)
 
-        # Wait a little to increase a chance that the next call to fetchNextRequest() will return the request with
-        # updated data. This is to compensate for the limitation of DynamoDB, where writes might not be immediately
-        # visible to subsequent reads.
-        def callback() -> None:
-            if request.id not in self._in_progress:
-                logger.debug(f'The request (ID: {request.id}) is no longer marked as in progress in the queue?!')
-                return
+        if processed_request:
+            # Mark the request as no longer in progress,
+            # as the moment we delete the lock, we could end up also re-fetching the request in a subsequent
+            # _ensure_head_is_non_empty() which could potentially lock the request again
+            self._in_progress.discard(request.id)
 
-            self._in_progress.remove(request.id)
-            # Performance optimization: add request straight to head if possible
-            self._maybe_add_request_to_queue_head(request.id, forefront=forefront)
+            # Try to delete the request lock if possible
+            try:
+                await self._resource_client.delete_request_lock(request.id, forefront=forefront)
+            except Exception as err:
+                logger.debug(f'Failed to delete request lock for request {request.id}', exc_info=err)
 
-        asyncio.get_running_loop().call_later(self._STORAGE_CONSISTENCY_DELAY.total_seconds(), callback)
         return processed_request
 
     async def is_empty(self) -> bool:
@@ -481,21 +471,49 @@ class RequestQueue(BaseStorage, RequestProvider):
         Returns:
             bool: `True` if all requests were already handled and there are no more left. `False` otherwise.
         """
-        seconds_since_last_activity = (datetime.now(timezone.utc) - self._last_activity).total_seconds()
-        if self._in_progress_count() > 0 and seconds_since_last_activity > self._internal_timeout_seconds:
-            message = (
-                f'The request queue seems to be stuck for {self._internal_timeout_seconds}s, resetting internal state.'
+        seconds_since_last_activity = datetime.now(timezone.utc) - self._last_activity
+        if self._in_progress_count() > 0 and seconds_since_last_activity > self._internal_timeout:
+            logger.warning(
+                f'The request queue seems to be stuck for {self._internal_timeout.total_seconds()}s, '
+                'resetting internal state.',
+                extra={
+                    'queue_head_ids_pending': len(self._queue_head_dict),
+                    'in_progress': list(self._in_progress),
+                },
             )
-            logger.warning(message)
-            self._reset()
 
-        if len(self._queue_head_dict) > 0 or self._in_progress_count() > 0:
+            # We only need to reset these two variables, no need to reset all the other stats
+            self._queue_head_dict.clear()
+            self._in_progress.clear()
+
+        if self._queue_head_dict:
+            logger.debug(
+                'There are still ids in the queue head that are pending processing',
+                extra={
+                    'queue_head_ids_pending': len(self._queue_head_dict),
+                },
+            )
+
             return False
 
-        # TODO: set ensure_consistency to True once the following issue is resolved:
-        # https://github.com/apify/crawlee-python/issues/203
-        is_head_consistent = await self._ensure_head_is_non_empty(ensure_consistency=False)
-        return is_head_consistent and len(self._queue_head_dict) == 0 and self._in_progress_count() == 0
+        if self._in_progress:
+            logger.debug(
+                'There are still requests in progress (or zombie)',
+                extra={
+                    'in_progress': list(self._in_progress),
+                },
+            )
+
+            return False
+
+        current_head = await self._resource_client.list_head(limit=2)
+
+        if current_head.items:
+            logger.debug(
+                'Queue head still returned requests that need to be processed (or that are locked by other clients)',
+            )
+
+        return not current_head.items and not self._in_progress
 
     async def get_info(self) -> RequestQueueMetadata | None:
         """Get an object containing general information about the request queue."""
@@ -509,102 +527,73 @@ class RequestQueue(BaseStorage, RequestProvider):
     async def get_total_count(self) -> int:
         return self._assumed_total_count
 
-    async def _ensure_head_is_non_empty(
-        self,
-        *,
-        ensure_consistency: bool = False,
-        limit: int | None = None,
-        iteration: int = 0,
-    ) -> bool:
-        """Ensure that the queue head is non-empty.
+    async def _ensure_head_is_non_empty(self) -> None:
+        # Stop fetching if we are paused for migration
+        if self._queue_paused_for_migration:
+            return
 
-        The method ensures that the queue head contains items. It may request more items than are currently
-        in progress to guarantee that at least one item is present in the head of the queue.
+        # We want to fetch ahead of time to minimize dead time
+        if len(self._queue_head_dict) > 1:
+            return
 
-        Args:
-            ensure_consistency: If True, the query for the queue head is retried until the queue_modified_at is older
-                than query_started_at by at least API_PROCESSED_REQUESTS_DELAY to ensure that the queue head is
-                consistent.
-            limit: The maximum number of items to fetch from the queue.
-            iteration: To manage the recursion depth.
+        if self._list_head_and_lock_task is None:
+            task = asyncio.create_task(self._list_head_and_lock())
 
-        Returns:
-            True if the queue head is non-empty and consistent, False otherwise.
-        """
-        # If queue head is non-empty, returns True immediately
-        if len(self._queue_head_dict) > 0:
-            return True
+            def callback(_: Any) -> None:
+                self._list_head_and_lock_task = None
 
-        if limit is None:
-            limit = max(self._in_progress_count() * self._QUERY_HEAD_BUFFER, self._QUERY_HEAD_MIN_LENGTH)
+            task.add_done_callback(callback)
+            self._list_head_and_lock_task = task
 
-        if self._query_queue_head_task is None:
-            self._query_queue_head_task = asyncio.Task(self._queue_query_head(limit))
+        await self._list_head_and_lock_task
 
-        queue_head: RequestQueueHeadState = await self._query_queue_head_task
-
-        # TODO: I feel this code below can be greatly simplified... (comes from TS implementation *wink*)
-        # https://github.com/apify/apify-sdk-python/issues/142
-
-        # If queue is still empty then one of the following holds:
-        # - the other calls waiting for this task already consumed all the returned requests
-        # - the limit was too low and contained only requests in progress
-        # - the writes from other clients were not propagated yet
-        # - the whole queue was processed and we are done
-
-        # If limit was not reached in the call then there are no more requests to be returned.
-        if queue_head.prev_limit >= self._MAX_HEAD_LIMIT:
-            logger.warning(f'Reached the maximum number of requests in progress (limit: {self._MAX_HEAD_LIMIT})')
-
-        should_repeat_with_higher_limit = (
-            len(self._queue_head_dict) == 0
-            and queue_head.was_limit_reached
-            and queue_head.prev_limit < self._MAX_HEAD_LIMIT
+    async def _list_head_and_lock(self) -> None:
+        response = await self._resource_client.list_and_lock_head(
+            limit=25, lock_secs=int(self._request_lock_time.total_seconds())
         )
 
-        # If ensure_consistency is True, we must ensure the database is consistent. It can be ensured if either:
-        # - queue_modified_at is older than query_started_at by at least _API_PROCESSED_REQUESTS_DELAY
-        # - had_multiple_clients is False and _assumed_total_count is less than _assumed_handled_count
-        queue_latency = queue_head.query_started_at - queue_head.queue_modified_at.replace(tzinfo=timezone.utc)
-        is_database_consistent = queue_latency.total_seconds() >= self._API_PROCESSED_REQUESTS_DELAY.total_seconds()
+        for request in response.items:
+            # Queue head index might be behind the main table, so ensure we don't recycle requests
+            if (
+                not request.id
+                or not request.unique_key
+                or request.id in self._in_progress
+                or request.id in self._recently_handled
+            ):
+                logger.debug(
+                    'Skipping request from queue head, already in progress or recently handled',
+                    extra={
+                        'id': request.id,
+                        'unique_key': request.unique_key,
+                        'in_progress': request.id in self._in_progress,
+                        'recently_handled': request.id in self._recently_handled,
+                    },
+                )
 
-        is_locally_consistent = (
-            not queue_head.had_multiple_clients and self._assumed_total_count <= self._assumed_handled_count
-        )
+                # Remove the lock from the request for now, so that it can be picked up later
+                # This may/may not succeed, but that's fine
+                with suppress(Exception):
+                    await self._resource_client.delete_request_lock(request.id)
 
-        # Consistent information from one source is enough to consider request queue finished.
-        should_repeat_for_consistency = ensure_consistency and not is_database_consistent and not is_locally_consistent
+                continue
 
-        # If both are false then head is consistent and we may exit.
-        if not should_repeat_with_higher_limit and not should_repeat_for_consistency:
-            return True
-
-        # If we are querying for consistency then we limit the number of queries to MAX_QUERIES_FOR_CONSISTENCY.
-        # If this is reached then we return false so that empty() and finished() returns possibly false negative.
-        if not should_repeat_with_higher_limit and iteration > self._MAX_QUERIES_FOR_CONSISTENCY:
-            return False
-
-        next_limit = round(queue_head.prev_limit * 1.5) if should_repeat_with_higher_limit else queue_head.prev_limit
-
-        # If we are repeating for consistency then wait required time.
-        if should_repeat_for_consistency:
-            elapsed_time = (datetime.now(timezone.utc) - queue_head.queue_modified_at).total_seconds()
-            delay_seconds = self._API_PROCESSED_REQUESTS_DELAY.total_seconds() - elapsed_time
-            logger.info(f'Waiting for {delay_seconds} for queue finalization, to ensure data consistency.')
-            await asyncio.sleep(delay_seconds)
-
-        return await self._ensure_head_is_non_empty(
-            ensure_consistency=ensure_consistency,
-            limit=next_limit,
-            iteration=iteration + 1,
-        )
+            self._queue_head_dict[request.id] = request.id
+            self._cache_request(
+                unique_key_to_request_id(request.unique_key),
+                ProcessedRequest(
+                    id=request.id,
+                    unique_key=request.unique_key,
+                    was_already_present=True,
+                    was_already_handled=False,
+                ),
+            )
 
     def _in_progress_count(self) -> int:
         return len(self._in_progress)
 
     def _reset(self) -> None:
         self._queue_head_dict.clear()
-        self._query_queue_head_task = None
+        self._list_head_and_lock_task = None
         self._in_progress.clear()
         self._recently_handled.clear()
         self._assumed_total_count = 0
@@ -616,56 +605,105 @@ class RequestQueue(BaseStorage, RequestProvider):
         self._requests_cache[cache_key] = {
             'id': processed_request.id,
             'was_already_handled': processed_request.was_already_handled,
+            'hydrated': None,
+            'lock_expires_at': None,
         }
 
-    async def _queue_query_head(self, limit: int) -> RequestQueueHeadState:
-        query_started_at = datetime.now(timezone.utc)
+    async def _get_or_hydrate_request(self, request_id: str) -> Request | None:
+        cached_entry = self._requests_cache.get(request_id)
 
-        list_head = await self._resource_client.list_head(limit=limit)
-        list_head_items: list[Request] = list_head.items
+        if not cached_entry:
+            # 2.1. Attempt to prolong the request lock to see if we still own the request
+            prolong_result = await self._prolong_request_lock(request_id)
 
-        for request in list_head_items:
-            # Queue head index might be behind the main table, so ensure we don't recycle requests
-            if (
-                not request.id
-                or not request.unique_key
-                or request.id in self._in_progress
-                or request.id in self._recently_handled
-            ):
-                continue
+            if not prolong_result:
+                return None
 
-            self._queue_head_dict[request.id] = request.id
-            self._cache_request(
-                cache_key=unique_key_to_request_id(request.unique_key),
-                processed_request=ProcessedRequest(
-                    id=request.id,
-                    unique_key=request.unique_key,
-                    was_already_handled=False,
-                    was_already_present=True,
-                ),
+            # 2.1.1. If successful, hydrate the request and return it
+            hydrated_request = await self.get_request(request_id)
+
+            # Queue head index is ahead of the main table and the request is not present in the main table yet
+            # (i.e. getRequest() returned null).
+            if not hydrated_request:
+                # Remove the lock from the request for now, so that it can be picked up later
+                # This may/may not succeed, but that's fine
+                with suppress(Exception):
+                    await self._resource_client.delete_request_lock(request_id)
+
+                return None
+
+            self._requests_cache[request_id] = {
+                'id': request_id,
+                'hydrated': hydrated_request,
+                'was_already_handled': hydrated_request.handled_at is not None,
+                'lock_expires_at': prolong_result,
+            }
+
+            return hydrated_request
+
+        # 1.1. If hydrated, prolong the lock more and return it
+        if cached_entry['hydrated']:
+            # 1.1.1. If the lock expired on the hydrated requests, try to prolong. If we fail, we lost the request
+            # (or it was handled already)
+            if cached_entry['lock_expires_at'] and cached_entry['lock_expires_at'] < datetime.now(timezone.utc):
+                prolonged = await self._prolong_request_lock(cached_entry['id'])
+
+                if not prolonged:
+                    return None
+
+                cached_entry['lock_expires_at'] = prolonged
+
+            return cached_entry['hydrated']
+
+        # 1.2. If not hydrated, try to prolong the lock first (to ensure we keep it in our queue), hydrate and return it
+        prolonged = await self._prolong_request_lock(cached_entry['id'])
+
+        if not prolonged:
+            return None
+
+        # This might still return null if the queue head is inconsistent with the main queue table.
+        hydrated_request = await self.get_request(cached_entry['id'])
+
+        cached_entry['hydrated'] = hydrated_request
+
+        # Queue head index is ahead of the main table and the request is not present in the main table yet
+        # (i.e. getRequest() returned null).
+        if not hydrated_request:
+            # Remove the lock from the request for now, so that it can be picked up later
+            # This may/may not succeed, but that's fine
+            with suppress(Exception):
+                await self._resource_client.delete_request_lock(cached_entry['id'])
+
+            return None
+
+        return hydrated_request
+
+    async def _prolong_request_lock(self, request_id: str) -> datetime | None:
+        try:
+            res = await self._resource_client.prolong_request_lock(
+                request_id, lock_secs=int(self._request_lock_time.total_seconds())
             )
+        except Exception as err:
+            # Most likely we do not own the lock anymore
+            logger.warning(
+                f'Failed to prolong lock for cached request {request_id}, either lost the lock '
+                'or the request was already handled\n',
+                exc_info=err,
+            )
+            return None
+        else:
+            return res.lock_expires_at
 
-        # This is needed so that the next call to _ensureHeadIsNonEmpty() will fetch the queue head again.
-        self._query_queue_head_task = None
+    async def _clear_possible_locks(self) -> None:
+        self._queue_paused_for_migration = True
+        request_id: str | None = None
 
-        return RequestQueueHeadState(
-            was_limit_reached=len(list_head.items) >= limit,
-            prev_limit=limit,
-            queue_modified_at=list_head.queue_modified_at,
-            query_started_at=query_started_at,
-            had_multiple_clients=list_head.had_multiple_clients,
-        )
+        while True:
+            try:
+                request_id, _ = self._queue_head_dict.popitem()
+            except KeyError:
+                break
 
-    def _maybe_add_request_to_queue_head(
-        self,
-        request_id: str,
-        *,
-        forefront: bool,
-    ) -> None:
-        if forefront:
-            self._queue_head_dict[request_id] = request_id
-            # Move to start, i.e. forefront of the queue
-            self._queue_head_dict.move_to_end(request_id, last=False)
-        elif self._assumed_total_count < self._QUERY_HEAD_MIN_LENGTH:
-            # OrderedDict puts the item to the end of the queue by default
-            self._queue_head_dict[request_id] = request_id
+            with suppress(Exception):
+                await self._resource_client.delete_request_lock(request_id)
+                # If this fails, we don't have the lock, or the request was never locked. Either way it's fine

@@ -18,7 +18,7 @@ from urllib.parse import ParseResult, urlparse
 from tldextract import TLDExtract
 from typing_extensions import NotRequired, TypedDict, TypeVar, Unpack, assert_never
 
-from crawlee import Glob
+from crawlee import Glob, service_container
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
 from crawlee.autoscaling import AutoscaledPool, ConcurrencySettings
@@ -26,7 +26,6 @@ from crawlee.autoscaling.snapshotter import Snapshotter
 from crawlee.autoscaling.system_status import SystemStatus
 from crawlee.basic_crawler.context_pipeline import ContextPipeline
 from crawlee.basic_crawler.router import Router
-from crawlee.configuration import Configuration
 from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.errors import (
     ContextPipelineInitializationError,
@@ -35,7 +34,6 @@ from crawlee.errors import (
     SessionError,
     UserDefinedErrorHandlerError,
 )
-from crawlee.events import LocalEventManager
 from crawlee.http_clients import HttpxHttpClient
 from crawlee.log_config import CrawleeLogFormatter
 from crawlee.models import BaseRequestData, DatasetItemsListPage, Request, RequestState
@@ -47,6 +45,8 @@ from crawlee.types import BasicCrawlingContext, HttpHeaders, RequestHandlerRunRe
 if TYPE_CHECKING:
     import re
 
+    from crawlee.configuration import Configuration
+    from crawlee.events.event_manager import EventManager
     from crawlee.http_clients import BaseHttpClient, HttpResponse
     from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
     from crawlee.sessions import Session
@@ -77,6 +77,7 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     retry_on_blocked: NotRequired[bool]
     proxy_configuration: NotRequired[ProxyConfiguration]
     statistics: NotRequired[Statistics[StatisticsState]]
+    event_manager: NotRequired[EventManager]
     configure_logging: NotRequired[bool]
     _context_pipeline: NotRequired[ContextPipeline[TCrawlingContext]]
     _additional_context_managers: NotRequired[Sequence[AsyncContextManager]]
@@ -111,6 +112,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         retry_on_blocked: bool = True,
         proxy_configuration: ProxyConfiguration | None = None,
         statistics: Statistics | None = None,
+        event_manager: EventManager | None = None,
         configure_logging: bool = True,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         _additional_context_managers: Sequence[AsyncContextManager] | None = None,
@@ -138,6 +140,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             retry_on_blocked: If set to True, the crawler will try to automatically bypass any detected bot protection
             proxy_configuration: A HTTP proxy configuration to be used for making requests
             statistics: A preconfigured `Statistics` instance if you wish to use non-default configuration
+            event_manager: A custom `EventManager` instance if you wish to use a non-default one
             configure_logging: If set to True, the crawler will configure the logging infrastructure
             _context_pipeline: Allows extending the request lifecycle and modifying the crawling context.
                 This parameter is meant to be used by child classes, not when BasicCrawler is instantiated directly.
@@ -164,7 +167,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._max_session_rotations = max_session_rotations
 
         self._request_provider = request_provider
-        self._configuration = configuration or Configuration.get_global_configuration()
+        self._configuration = configuration or service_container.get_configuration()
 
         self._request_handler_timeout = request_handler_timeout
         self._internal_timeout = (
@@ -175,8 +178,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         self._tld_extractor = TLDExtract(cache_dir=tempfile.TemporaryDirectory().name)
 
-        self._event_manager = LocalEventManager()  # TODO: switch based on configuration
-        # https://github.com/apify/crawlee-py/issues/83
+        self._event_manager = event_manager or service_container.get_event_manager()
         self._snapshotter = Snapshotter(self._event_manager)
         self._pool = AutoscaledPool(
             system_status=SystemStatus(self._snapshotter),
