@@ -10,7 +10,7 @@ import pytest
 from crawlee.basic_crawler import ContextPipeline
 from crawlee.errors import ContextPipelineFinalizationError, ContextPipelineInitializationError, RequestHandlerError
 from crawlee.models import Request
-from crawlee.sessions.session import Session
+from crawlee.sessions._session import Session
 from crawlee.types import BasicCrawlingContext
 
 

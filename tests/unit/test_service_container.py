@@ -3,9 +3,9 @@ from unittest.mock import Mock
 import pytest
 
 from crawlee import service_container
+from crawlee._memory_storage_client.memory_storage_client import MemoryStorageClient
 from crawlee.configuration import Configuration
-from crawlee.events.local_event_manager import LocalEventManager
-from crawlee.memory_storage_client.memory_storage_client import MemoryStorageClient
+from crawlee.events._local_event_manager import LocalEventManager
 
 
 async def test_get_event_manager() -> None:

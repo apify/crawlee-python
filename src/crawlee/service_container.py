@@ -4,13 +4,13 @@ from typing import TYPE_CHECKING, Literal
 
 from typing_extensions import NotRequired, TypedDict
 
+from crawlee._memory_storage_client.memory_storage_client import MemoryStorageClient
 from crawlee.configuration import Configuration
-from crawlee.events.local_event_manager import LocalEventManager
-from crawlee.memory_storage_client.memory_storage_client import MemoryStorageClient
+from crawlee.events._local_event_manager import LocalEventManager
 
 if TYPE_CHECKING:
-    from crawlee.base_storage_client.base_storage_client import BaseStorageClient
-    from crawlee.events.event_manager import EventManager
+    from crawlee.base_storage_client._base_storage_client import BaseStorageClient
+    from crawlee.events._event_manager import EventManager
 
 
 StorageClientType = Literal['cloud', 'local']

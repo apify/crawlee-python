@@ -10,8 +10,8 @@ import pytest
 from proxy import Proxy
 
 from crawlee import service_container
+from crawlee._memory_storage_client import MemoryStorageClient
 from crawlee.configuration import Configuration
-from crawlee.memory_storage_client import MemoryStorageClient
 from crawlee.proxy_configuration import ProxyInfo
 from crawlee.storages import _creation_management
 

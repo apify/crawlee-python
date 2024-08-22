@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from crawlee.sessions.models import SessionModel, SessionPoolModel
+from crawlee.sessions._models import SessionModel, SessionPoolModel
 
 SESSION_CREATED_AT = datetime.now(timezone.utc)
 

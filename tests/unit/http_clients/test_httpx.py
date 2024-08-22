@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from crawlee._statistics import Statistics
 from crawlee.errors import ProxyError
 from crawlee.http_clients import HttpxHttpClient
 from crawlee.models import Request
-from crawlee.statistics import Statistics
 
 if TYPE_CHECKING:
     from crawlee.proxy_configuration import ProxyInfo

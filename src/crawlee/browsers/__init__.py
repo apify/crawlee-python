@@ -1,7 +1,7 @@
 try:
-    from .browser_pool import BrowserPool
-    from .playwright_browser_controller import PlaywrightBrowserController
-    from .playwright_browser_plugin import PlaywrightBrowserPlugin
+    from ._browser_pool import BrowserPool
+    from ._playwright_browser_controller import PlaywrightBrowserController
+    from ._playwright_browser_plugin import PlaywrightBrowserPlugin
 except ImportError as exc:
     raise ImportError(
         "To import anything from this subpackage, you need to install the 'playwright' extra."

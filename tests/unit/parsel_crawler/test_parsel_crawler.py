@@ -8,7 +8,7 @@ import pytest
 import respx
 from httpx import Response
 
-from crawlee.autoscaling.autoscaled_pool import ConcurrencySettings
+from crawlee._autoscaling.autoscaled_pool import ConcurrencySettings
 from crawlee.models import BaseRequestData
 from crawlee.parsel_crawler import ParselCrawler
 from crawlee.storages import RequestList
