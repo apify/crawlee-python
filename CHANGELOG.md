@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Implement ParselCrawler that adds support for Parsel ([#348](https://github.com/apify/crawlee-python/pull/348), closes [#335](https://github.com/apify/crawlee-python/issues/335)) ([a3832e5](https://github.com/apify/crawlee-python/commit/a3832e527f022f32cce4a80055da3b7967b74522)) by [@asymness](https://github.com/asymness)
+- Add support for filling a web form ([#453](https://github.com/apify/crawlee-python/pull/453), closes [#305](https://github.com/apify/crawlee-python/issues/305)) ([5a125b4](https://github.com/apify/crawlee-python/commit/5a125b464b2619000b92dacad4c3a7faa1869f29)) by [@vdusek](https://github.com/vdusek)
 
 ### 🐛 Bug Fixes
 
