@@ -3,6 +3,8 @@ id: refactoring
 title: Refactoring
 ---
 
+import ApiLink from '@site/src/components/ApiLink';
+
 It may seem that the data is extracted and the crawler is done, but honestly, this is just the beginning. For the sake of brevity, we've completely omitted error handling, proxies, logging, architecture, tests, documentation and other stuff that a reliable software should have. The good thing is, error handling is mostly done by Crawlee itself, so no worries on that front, unless you need some custom magic.
 
 :::info Navigating automatic bot-protextion avoidance
@@ -18,14 +20,14 @@ However, the default configuration, while powerful, may not cover every scenario
 If you want to learn more, browse the [Avoid getting blocked](../guides/avoid-blocking), [Proxy management](../guides/proxy-management) and [Session management](../guides/session-management) guides.
 */}
 
-To promote good coding practices, let's look at how you can use a `Router` class to better structure your crawler code.
+To promote good coding practices, let's look at how you can use a <ApiLink to="class/Router">`Router`</ApiLink> class to better structure your crawler code.
 
 ## Request routing
 
 In the following code, we've made several changes:
 
 - Split the code into multiple files.
-- Added custom instance of `Router` to make our routing cleaner, without if clauses.
+- Added custom instance of <ApiLink to="class/Router">`Router`</ApiLink> to make our routing cleaner, without if clauses.
 - Moved route definitions to a separate `routes.py` file.
 - Simplified the `main.py` file to focus on the general structure of the crawler.
 
@@ -135,7 +137,7 @@ if __name__ == '__main__':
     asyncio.run(main())
 ```
 
-By structuring your code this way, you achieve better separation of concerns, making the code easier to read, manage and extend. The `Router` class keeps your routing logic clean and modular, replacing if clauses with function decorators.
+By structuring your code this way, you achieve better separation of concerns, making the code easier to read, manage and extend. The <ApiLink to="class/Router">`Router`</ApiLink> class keeps your routing logic clean and modular, replacing if clauses with function decorators.
 
 ## Summary
 

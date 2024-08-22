@@ -3,18 +3,19 @@ id: crawl-website-with-relative-links
 title: Crawl website with relative links
 ---
 
+import ApiLink from '@site/src/components/ApiLink';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-When crawling a website, you may encounter various types of links that you wish to include in your crawl. To facilitate this, we provide the `enqueue_links()` method on the crawler context, which will automatically find and add these links to the crawler's `RequestQueue`. This method simplifies the process of handling different types of links, including relative links, by automatically resolving them based on the page's context.
+When crawling a website, you may encounter various types of links that you wish to include in your crawl. To facilitate this, we provide the <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> method on the crawler context, which will automatically find and add these links to the crawler's <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>. This method simplifies the process of handling different types of links, including relative links, by automatically resolving them based on the page's context.
 
 :::note
 
-For these examples, we are using the `BeautifulSoupCrawler`. However, the same method is available for the `PlaywrightCrawler` as well. You can use it in exactly the same way.
+For these examples, we are using the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>. However, the same method is available for the <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> as well. You can use it in exactly the same way.
 
 :::
 
-We provide four distinct strategies for crawling relative links:
+<ApiLink to="enum/EnqueueStrategy">`EnqueueStrategy`</ApiLink> enum provides four distinct strategies for crawling relative links:
 
 - `EnqueueStrategy.All` - Enqueues all links found, regardless of the domain they point to. This strategy is useful when you want to follow every link, including those that navigate to external websites.
 - `EnqueueStrategy.SAME_DOMAIN` - Enqueues all links found that share the same domain name, including any possible subdomains. This strategy ensures that all links within the same top-level and base domain are included.

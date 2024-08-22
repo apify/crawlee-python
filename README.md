@@ -44,7 +44,7 @@ Crawlee is available as the [`crawlee`](https://pypi.org/project/crawlee/) PyPI 
 pip install 'crawlee[all]'
 ```
 
-Then, install the Playwright dependencies:
+Then, install the [Playwright](https://playwright.dev/) dependencies:
 
 ```sh
 playwright install
@@ -84,7 +84,7 @@ Here are some practical examples to help you get started with different types of
 
 ### BeautifulSoupCrawler
 
-The `BeautifulSoupCrawler` downloads web pages using an HTTP library and provides HTML-parsed content to the user. It uses [HTTPX](https://pypi.org/project/httpx/) for HTTP communication and [BeautifulSoup](https://pypi.org/project/beautifulsoup4/) for parsing HTML. It is ideal for projects that require efficient extraction of data from HTML content. This crawler has very good performance since it does not use a browser. However, if you need to execute client-side JavaScript, to get your content, this is not going to be enough and you will need to use PlaywrightCrawler. Also if you want to use this crawler, make sure you install `crawlee` with `beautifulsoup` extra.
+The [`BeautifulSoupCrawler`](https://crawlee.dev/python/api/class/BeautifulSoupCrawler) downloads web pages using an HTTP library and provides HTML-parsed content to the user. By default it uses [`HttpxHttpClient`](https://crawlee.dev/python/api/class/HttpxHttpClient) for HTTP communication and [BeautifulSoup](https://pypi.org/project/beautifulsoup4/) for parsing HTML. It is ideal for projects that require efficient extraction of data from HTML content. This crawler has very good performance since it does not use a browser. However, if you need to execute client-side JavaScript, to get your content, this is not going to be enough and you will need to use [`PlaywrightCrawler`](https://crawlee.dev/python/api/class/PlaywrightCrawler). Also if you want to use this crawler, make sure you install `crawlee` with `beautifulsoup` extra.
 
 ```python
 import asyncio
@@ -124,7 +124,7 @@ if __name__ == '__main__':
 
 ### PlaywrightCrawler
 
-The `PlaywrightCrawler` uses a headless browser to download web pages and provides an API for data extraction. It is built on [Playwright](https://playwright.dev/), an automation library designed for managing headless browsers. It excels at retrieving web pages that rely on client-side JavaScript for content generation, or tasks requiring interaction with JavaScript-driven content. For scenarios where JavaScript execution is unnecessary or higher performance is required, consider using the `BeautifulSoupCrawler`. Also if you want to use this crawler, make sure you install `crawlee` with `playwright` extra.
+The [`PlaywrightCrawler`](https://crawlee.dev/python/api/class/PlaywrightCrawler) uses a headless browser to download web pages and provides an API for data extraction. It is built on [Playwright](https://playwright.dev/), an automation library designed for managing headless browsers. It excels at retrieving web pages that rely on client-side JavaScript for content generation, or tasks requiring interaction with JavaScript-driven content. For scenarios where JavaScript execution is unnecessary or higher performance is required, consider using the [`BeautifulSoupCrawler`](https://crawlee.dev/python/api/class/BeautifulSoupCrawler). Also if you want to use this crawler, make sure you install `crawlee` with `playwright` extra.
 
 ```python
 import asyncio

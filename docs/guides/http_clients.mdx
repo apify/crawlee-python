@@ -16,7 +16,7 @@ HTTP clients are utilized by the HTTP-based crawlers (e.g. <ApiLink to="class/Be
 
 ## How to switch between HTTP clients
 
-In Crawlee we currently have two HTTP clients: <ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink>, which uses the `httpx` library, and <ApiLink to="class/CurlImpersonateHttpClient">`CurlImpersonateHttpClient`</ApiLink>, which uses the `curl-cffi` library. You can switch between them by setting the `http_client` parameter in the Crawler class. The default HTTP client is `HttpxHttpClient`. Below are examples of how to set the HTTP client for the `BeautifulSoupCrawler`.
+In Crawlee we currently have two HTTP clients: <ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink>, which uses the `httpx` library, and <ApiLink to="class/CurlImpersonateHttpClient">`CurlImpersonateHttpClient`</ApiLink>, which uses the `curl-cffi` library. You can switch between them by setting the `http_client` parameter in the Crawler class. The default HTTP client is <ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink>. Below are examples of how to set the HTTP client for the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>.
 
 <Tabs>
     <TabItem value="BeautifulSoupHttpxExample" label="BeautifulSoupCrawler with HTTPX">
@@ -33,7 +33,7 @@ In Crawlee we currently have two HTTP clients: <ApiLink to="class/HttpxHttpClien
 
 ### Installation
 
-Since `HttpxHttpClient` is the default HTTP client, you don't need to install additional packages to use it. If you want to use `CurlImpersonateHttpClient`, you need to install `crawlee` with the `curl-impersonate` extra.
+Since <ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink> is the default HTTP client, you don't need to install additional packages to use it. If you want to use <ApiLink to="class/CurlImpersonateHttpClient">`CurlImpersonateHttpClient`</ApiLink>, you need to install `crawlee` with the `curl-impersonate` extra.
 
 ```sh
 pip install 'crawlee[curl-impersonate]'
@@ -47,4 +47,4 @@ pip install 'crawlee[all]'
 
 ## How HTTP clients work
 
-We provide an abstract base class, <ApiLink to="class/BaseHttpClient">`BaseHttpClient`</ApiLink>, which defines the necessary interface for all HTTP clients. HTTP clients are responsible for sending requests and receiving responses, as well as managing cookies, headers, and proxies. They provide methods that are called from crawlers. To implement your own HTTP client, inherit from the `BaseHttpClient` class and implement the required methods.
+We provide an abstract base class, <ApiLink to="class/BaseHttpClient">`BaseHttpClient`</ApiLink>, which defines the necessary interface for all HTTP clients. HTTP clients are responsible for sending requests and receiving responses, as well as managing cookies, headers, and proxies. They provide methods that are called from crawlers. To implement your own HTTP client, inherit from the <ApiLink to="class/BaseHttpClient">`BaseHttpClient`</ApiLink> class and implement the required methods.
