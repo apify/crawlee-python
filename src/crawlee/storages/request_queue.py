@@ -204,7 +204,7 @@ class RequestQueue(BaseStorage, RequestProvider):
             use_extended_unique_key: Determines whether to use an extended unique key, incorporating the request's
                 method and payload into the unique key computation.
 
-        Returns: Information about the processed request
+        Returns: Information about the processed request.
         """
         request = self._transform_request(request)
         self._last_activity = datetime.now(timezone.utc)
