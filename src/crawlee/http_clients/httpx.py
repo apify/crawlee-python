@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING, Any, Optional, cast
 
 import httpx
@@ -18,9 +17,6 @@ if TYPE_CHECKING:
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.statistics import Statistics
     from crawlee.types import HttpHeaders, HttpMethod
-
-
-logger = logging.getLogger(__name__)
 
 
 class _HttpxResponse:
@@ -106,8 +102,6 @@ class HttpxHttpClient(BaseHttpClient):
     ) -> HttpCrawlingResult:
         client = self._get_client(proxy_info.url if proxy_info else None)
 
-        logger.info(f'Processing request={request} ...')
-
         http_request = client.build_request(
             url=request.url,
             method=request.method,
@@ -117,8 +111,6 @@ class HttpxHttpClient(BaseHttpClient):
             cookies=session.cookies if session else None,
             extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
         )
-
-        logger.info(f'Processing http_request={http_request} ...')
 
         try:
             response = await client.send(http_request, follow_redirects=True)
