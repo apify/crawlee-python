@@ -18,8 +18,7 @@ from urllib.parse import ParseResult, urlparse
 from tldextract import TLDExtract
 from typing_extensions import NotRequired, TypedDict, TypeVar, Unpack, assert_never
 
-import crawlee.service_container
-from crawlee import Glob
+from crawlee import Glob, service_container
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
 from crawlee.autoscaling import AutoscaledPool, ConcurrencySettings
@@ -168,7 +167,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._max_session_rotations = max_session_rotations
 
         self._request_provider = request_provider
-        self._configuration = configuration or crawlee.service_container.get_configuration()
+        self._configuration = configuration or service_container.get_configuration()
 
         self._request_handler_timeout = request_handler_timeout
         self._internal_timeout = (
@@ -179,7 +178,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         self._tld_extractor = TLDExtract(cache_dir=tempfile.TemporaryDirectory().name)
 
-        self._event_manager = event_manager or crawlee.service_container.get_event_manager()
+        self._event_manager = event_manager or service_container.get_event_manager()
         self._snapshotter = Snapshotter(self._event_manager)
         self._pool = AutoscaledPool(
             system_status=SystemStatus(self._snapshotter),
