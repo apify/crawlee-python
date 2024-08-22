@@ -85,7 +85,7 @@ commit_parsers = [
   { message = "^revert", group = "<!-- 9 -->◀️ Revert" },
 ]
 # protect breaking changes from being skipped due to matching a skipping commit_parser
-protect_breaking_commits = false
+protect_breaking_commits = true
 # filter out the commits that are not matched by commit parsers
 filter_commits = false
 # regex for matching git tags
