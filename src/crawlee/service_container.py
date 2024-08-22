@@ -85,6 +85,7 @@ def set_cloud_storage_client(cloud_client: BaseStorageClient) -> None:
 
 def set_default_storage_client_type(client_type: StorageClientType) -> None:
     """Set the default storage client type."""
+    global _default_storage_client_type  # noqa: PLW0603
     _default_storage_client_type = client_type
 
 
