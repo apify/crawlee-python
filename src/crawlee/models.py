@@ -42,6 +42,10 @@ class BaseRequestData(BaseModel):
 
     headers: Annotated[dict[str, str] | None, Field(default_factory=dict)] = None
 
+    params: Annotated[dict[str, Any] | None, Field(default_factory=dict)] = None
+
+    data: Annotated[dict[str, Any] | None, Field(default_factory=dict)] = None
+
     user_data: Annotated[dict[str, Any], Field(alias='userData', default_factory=dict)]
     """Custom user data assigned to the request. Use this to save any request related data to the
     request's scope, keeping them accessible on retries, failures etc.
