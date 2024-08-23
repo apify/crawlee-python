@@ -421,7 +421,7 @@ class ProlongRequestLockResponse(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
-    lock_expires_at: Annotated[datetime, Field(alias="'lockExpiresAt'")]
+    lock_expires_at: Annotated[datetime, Field(alias='lockExpiresAt')]
 
 
 class ProcessedRequest(BaseModel):
