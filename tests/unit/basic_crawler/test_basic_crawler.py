@@ -16,11 +16,11 @@ import pytest
 
 from crawlee import ConcurrencySettings, EnqueueStrategy, Glob
 from crawlee._models import BaseRequestData, Request
-from crawlee._statistics.models import FinalStatistics
 from crawlee._types import AddRequestsKwargs, BasicCrawlingContext, HttpHeaders
 from crawlee.basic_crawler import BasicCrawler
 from crawlee.configuration import Configuration
 from crawlee.errors import SessionError, UserDefinedErrorHandlerError
+from crawlee.statistics import FinalStatistics
 from crawlee.storages import Dataset, KeyValueStore, RequestList, RequestQueue
 
 if TYPE_CHECKING:

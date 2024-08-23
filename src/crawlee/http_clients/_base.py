@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     from crawlee._models import Request
-    from crawlee._statistics import Statistics
     from crawlee._types import HttpHeaders, HttpMethod
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions import Session
+    from crawlee.statistics import Statistics
 
 
 class HttpResponse(Protocol):

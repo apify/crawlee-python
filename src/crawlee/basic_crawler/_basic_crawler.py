@@ -24,7 +24,6 @@ from crawlee._autoscaling.snapshotter import Snapshotter
 from crawlee._autoscaling.system_status import SystemStatus
 from crawlee._log_config import CrawleeLogFormatter
 from crawlee._models import BaseRequestData, DatasetItemsListPage, Request, RequestState
-from crawlee._statistics import Statistics
 from crawlee._types import BasicCrawlingContext, HttpHeaders, RequestHandlerRunResult, SendRequestFunction
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
@@ -39,18 +38,19 @@ from crawlee.errors import (
 from crawlee.http_clients import HttpxHttpClient
 from crawlee.router import Router
 from crawlee.sessions import SessionPool
+from crawlee.statistics import Statistics
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 if TYPE_CHECKING:
     import re
 
-    from crawlee._statistics import FinalStatistics, StatisticsState
     from crawlee._types import ConcurrencySettings, HttpMethod, JsonSerializable
     from crawlee.configuration import Configuration
     from crawlee.events._event_manager import EventManager
     from crawlee.http_clients import BaseHttpClient, HttpResponse
     from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
     from crawlee.sessions import Session
+    from crawlee.statistics import FinalStatistics, StatisticsState
     from crawlee.storages._dataset import GetDataKwargs, PushDataKwargs
     from crawlee.storages._request_provider import RequestProvider
 

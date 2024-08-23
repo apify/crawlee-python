@@ -23,10 +23,10 @@ if TYPE_CHECKING:
     from curl_cffi.requests import Response
 
     from crawlee._models import Request
-    from crawlee._statistics import Statistics
     from crawlee._types import HttpHeaders, HttpMethod
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions import Session
+    from crawlee.statistics import Statistics
 
 
 class _CurlImpersonateResponse:

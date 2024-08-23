@@ -5,7 +5,7 @@ import logging
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
-from crawlee._statistics import Statistics
+from crawlee.statistics import Statistics
 
 if TYPE_CHECKING:
     import pytest

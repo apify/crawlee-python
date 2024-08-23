@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING
 import pytest
 
 from crawlee import Request
-from crawlee._statistics import Statistics
 from crawlee.errors import ProxyError
 from crawlee.http_clients.curl_impersonate import CurlImpersonateHttpClient
+from crawlee.statistics import Statistics
 
 if TYPE_CHECKING:
     from crawlee.proxy_configuration import ProxyInfo

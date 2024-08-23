@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from crawlee._statistics import Statistics
+from crawlee.statistics import Statistics
 
 
 async def test_basic_persistence() -> None:
