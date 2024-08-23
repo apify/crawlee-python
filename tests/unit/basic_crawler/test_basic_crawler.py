@@ -641,6 +641,9 @@ async def test_respects_no_persist_storage() -> None:
 
 
 async def test_logs_final_statistics(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+    # Set the log level to INFO to capture the final statistics log.
+    caplog.set_level(logging.INFO)
+
     crawler = BasicCrawler(configure_logging=False)
 
     @crawler.router.default_handler
