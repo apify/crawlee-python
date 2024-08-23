@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from crawlee.models import Request
+from crawlee import Request
 
 if TYPE_CHECKING:
     from crawlee._memory_storage_client import MemoryStorageClient

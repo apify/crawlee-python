@@ -11,18 +11,18 @@ from typing import TYPE_CHECKING, Any, AsyncContextManager, AsyncIterator
 from typing_extensions import override
 
 from crawlee._memory_storage_client._creation_management import find_or_create_client_by_id_or_name_inner
+from crawlee._models import DatasetItemsListPage, DatasetMetadata
+from crawlee._types import StorageTypes
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import raise_on_duplicate_storage, raise_on_non_existing_storage
 from crawlee._utils.file import force_rename, json_dumps
 from crawlee.base_storage_client import BaseDatasetClient
-from crawlee.models import DatasetItemsListPage, DatasetMetadata
-from crawlee.types import StorageTypes
 
 if TYPE_CHECKING:
     from httpx import Response
 
     from crawlee._memory_storage_client import MemoryStorageClient
-    from crawlee.types import JsonSerializable
+    from crawlee._types import JsonSerializable
 
 logger = getLogger(__name__)
 

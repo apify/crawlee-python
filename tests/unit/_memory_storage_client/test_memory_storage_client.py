@@ -8,10 +8,10 @@ from pathlib import Path
 
 import pytest
 
+from crawlee import Request
 from crawlee._consts import METADATA_FILENAME
 from crawlee._memory_storage_client import MemoryStorageClient
 from crawlee.configuration import Configuration
-from crawlee.models import Request
 
 
 async def test_write_metadata(tmp_path: Path) -> None:

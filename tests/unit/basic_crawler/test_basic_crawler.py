@@ -15,14 +15,15 @@ import httpx
 import pytest
 
 from crawlee import Glob
+from crawlee._autoscaling.types import ConcurrencySettings
+from crawlee._models import BaseRequestData, Request
 from crawlee._statistics.models import FinalStatistics
+from crawlee._types import AddRequestsKwargs, BasicCrawlingContext, HttpHeaders
 from crawlee.basic_crawler import BasicCrawler
 from crawlee.configuration import Configuration
 from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.errors import SessionError, UserDefinedErrorHandlerError
-from crawlee.models import BaseRequestData, Request
 from crawlee.storages import Dataset, KeyValueStore, RequestList, RequestQueue
-from crawlee.types import AddRequestsKwargs, BasicCrawlingContext, ConcurrencySettings, HttpHeaders
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

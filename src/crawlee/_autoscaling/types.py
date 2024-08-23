@@ -8,6 +8,48 @@ if TYPE_CHECKING:
     from crawlee._utils.byte_size import ByteSize
 
 
+class ConcurrencySettings:
+    """Concurrency settings for AutoscaledPool."""
+
+    def __init__(
+        self,
+        min_concurrency: int = 1,
+        max_concurrency: int = 200,
+        max_tasks_per_minute: float = float('inf'),
+        desired_concurrency: int | None = None,
+    ) -> None:
+        """Initialize the ConcurrencySettings.
+
+        Args:
+            min_concurrency: The minimum number of tasks running in parallel. If you set this value too high
+                with respect to the available system memory and CPU, your code might run extremely slow or crash.
+
+            max_concurrency: The maximum number of tasks running in parallel.
+
+            max_tasks_per_minute: The maximum number of tasks per minute the pool can run. By default, this is set
+                to infinity, but you can pass any positive, non-zero number.
+
+            desired_concurrency: The desired number of tasks that should be running parallel on the start of the pool,
+                if there is a large enough supply of them. By default, it is `min_concurrency`.
+        """
+        if desired_concurrency is not None and desired_concurrency < 1:
+            raise ValueError('desired_concurrency must be 1 or larger')
+
+        if min_concurrency < 1:
+            raise ValueError('min_concurrency must be 1 or larger')
+
+        if max_concurrency < min_concurrency:
+            raise ValueError('max_concurrency cannot be less than min_concurrency')
+
+        if max_tasks_per_minute <= 0:
+            raise ValueError('max_tasks_per_minute must be positive')
+
+        self.min_concurrency = min_concurrency
+        self.max_concurrency = max_concurrency
+        self.desired_concurrency = desired_concurrency if desired_concurrency is not None else min_concurrency
+        self.max_tasks_per_minute = max_tasks_per_minute
+
+
 @dataclass
 class LoadRatioInfo:
     """Represents the load ratio of a resource.

@@ -5,8 +5,7 @@ from typing import Callable
 
 import pytest
 
-from crawlee import service_container
-from crawlee.models import Request
+from crawlee import Request, service_container
 from crawlee.storages._key_value_store import KeyValueStore
 from crawlee.storages._request_queue import RequestQueue
 

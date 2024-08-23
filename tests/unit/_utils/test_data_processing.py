@@ -4,6 +4,7 @@ from enum import Enum
 
 import pytest
 
+from crawlee._types import StorageTypes
 from crawlee._utils.data_processing import (
     filter_out_none_values_recursively,
     maybe_extract_enum_member_value,
@@ -11,7 +12,6 @@ from crawlee._utils.data_processing import (
     raise_on_duplicate_storage,
     raise_on_non_existing_storage,
 )
-from crawlee.types import StorageTypes
 
 
 @pytest.mark.parametrize(

@@ -5,10 +5,10 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from crawlee.models import Request
+from crawlee import Request
+from crawlee._types import BasicCrawlingContext
 from crawlee.router import Router
 from crawlee.sessions import Session
-from crawlee.types import BasicCrawlingContext
 
 
 class MockContext(BasicCrawlingContext):

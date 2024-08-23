@@ -10,10 +10,10 @@ from typing import Annotated, Any, Generic
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 from typing_extensions import Self, TypeVar
 
+from crawlee._types import HttpMethod
 from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
 from crawlee._utils.urls import extract_query_params, validate_http_url
 from crawlee.enqueue_strategy import EnqueueStrategy
-from crawlee.types import HttpMethod
 
 
 class BaseRequestData(BaseModel):

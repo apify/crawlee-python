@@ -11,7 +11,7 @@ from crawlee.http_clients import HttpxHttpClient
 from crawlee.http_crawler._http_crawling_context import HttpCrawlingContext
 
 if TYPE_CHECKING:
-    from crawlee.types import BasicCrawlingContext
+    from crawlee._types import BasicCrawlingContext
 
 
 class HttpCrawler(BasicCrawler[HttpCrawlingContext]):

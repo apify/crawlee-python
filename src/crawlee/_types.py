@@ -12,9 +12,9 @@ from typing_extensions import NotRequired, TypeAlias, TypedDict, Unpack
 
 if TYPE_CHECKING:
     from crawlee import Glob
+    from crawlee._models import BaseRequestData, DatasetItemsListPage, Request
     from crawlee.enqueue_strategy import EnqueueStrategy
     from crawlee.http_clients import HttpResponse
-    from crawlee.models import BaseRequestData, DatasetItemsListPage, Request
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions._session import Session
     from crawlee.storages._dataset import ExportToKwargs, GetDataKwargs, PushDataKwargs
@@ -25,48 +25,6 @@ if TYPE_CHECKING:
 JsonSerializable: TypeAlias = Union[str, int, float, bool, None, dict[str, Any], list[Any]]
 
 HttpMethod: TypeAlias = Literal['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH']
-
-
-class ConcurrencySettings:
-    """Concurrency settings for AutoscaledPool."""
-
-    def __init__(
-        self,
-        min_concurrency: int = 1,
-        max_concurrency: int = 200,
-        max_tasks_per_minute: float = float('inf'),
-        desired_concurrency: int | None = None,
-    ) -> None:
-        """Initialize the ConcurrencySettings.
-
-        Args:
-            min_concurrency: The minimum number of tasks running in parallel. If you set this value too high
-                with respect to the available system memory and CPU, your code might run extremely slow or crash.
-
-            max_concurrency: The maximum number of tasks running in parallel.
-
-            max_tasks_per_minute: The maximum number of tasks per minute the pool can run. By default, this is set
-                to infinity, but you can pass any positive, non-zero number.
-
-            desired_concurrency: The desired number of tasks that should be running parallel on the start of the pool,
-                if there is a large enough supply of them. By default, it is `min_concurrency`.
-        """
-        if desired_concurrency is not None and desired_concurrency < 1:
-            raise ValueError('desired_concurrency must be 1 or larger')
-
-        if min_concurrency < 1:
-            raise ValueError('min_concurrency must be 1 or larger')
-
-        if max_concurrency < min_concurrency:
-            raise ValueError('max_concurrency cannot be less than min_concurrency')
-
-        if max_tasks_per_minute <= 0:
-            raise ValueError('max_tasks_per_minute must be positive')
-
-        self.min_concurrency = min_concurrency
-        self.max_concurrency = max_concurrency
-        self.desired_concurrency = desired_concurrency if desired_concurrency is not None else min_concurrency
-        self.max_tasks_per_minute = max_tasks_per_minute
 
 
 class StorageTypes(str, Enum):
@@ -100,7 +58,7 @@ class AddRequestsFunction(Protocol):
     request provider and adds the requests to it.
     """
 
-    def __call__(  # noqa: D102
+    def __call__(
         self,
         requests: Sequence[str | BaseRequestData | Request],
         **kwargs: Unpack[AddRequestsKwargs],
@@ -114,7 +72,7 @@ class GetDataFunction(Protocol):
     dataset and then retrieves the data based on the provided parameters.
     """
 
-    def __call__(  # noqa: D102
+    def __call__(
         self,
         dataset_id: str | None = None,
         dataset_name: str | None = None,
@@ -129,7 +87,7 @@ class PushDataFunction(Protocol):
     dataset and then pushes the provided data to it.
     """
 
-    def __call__(  # noqa: D102
+    def __call__(
         self,
         data: JsonSerializable,
         dataset_id: str | None = None,
@@ -145,7 +103,7 @@ class ExportToFunction(Protocol):
     dataset and then exports its content to the key-value store.
     """
 
-    def __call__(  # noqa: D102
+    def __call__(
         self,
         dataset_id: str | None = None,
         dataset_name: str | None = None,
@@ -163,7 +121,7 @@ class EnqueueLinksFunction(Protocol):
         **kwargs: Additional arguments for the `add_requests` method.
     """
 
-    def __call__(  # noqa: D102
+    def __call__(
         self,
         *,
         selector: str = 'a',
@@ -176,7 +134,7 @@ class EnqueueLinksFunction(Protocol):
 class SendRequestFunction(Protocol):
     """Type of a function for performing an HTTP request."""
 
-    def __call__(  # noqa: D102
+    def __call__(
         self,
         url: str,
         *,

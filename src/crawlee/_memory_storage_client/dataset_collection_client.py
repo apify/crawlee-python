@@ -6,8 +6,8 @@ from typing_extensions import override
 
 from crawlee._memory_storage_client._creation_management import get_or_create_inner
 from crawlee._memory_storage_client.dataset_client import DatasetClient
+from crawlee._models import DatasetListPage, DatasetMetadata
 from crawlee.base_storage_client import BaseDatasetCollectionClient
-from crawlee.models import DatasetListPage, DatasetMetadata
 
 if TYPE_CHECKING:
     from crawlee._memory_storage_client.memory_storage_client import MemoryStorageClient

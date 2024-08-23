@@ -4,6 +4,7 @@ from typing import Any, AsyncGenerator, Awaitable, Callable, Generator, Generic,
 
 from typing_extensions import TypeVar
 
+from crawlee._types import BasicCrawlingContext
 from crawlee.errors import (
     ContextPipelineFinalizationError,
     ContextPipelineInitializationError,
@@ -11,7 +12,6 @@ from crawlee.errors import (
     RequestHandlerError,
     SessionError,
 )
-from crawlee.types import BasicCrawlingContext
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 TMiddlewareCrawlingContext = TypeVar('TMiddlewareCrawlingContext', bound=BasicCrawlingContext)

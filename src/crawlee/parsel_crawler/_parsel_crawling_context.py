@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction
 from crawlee.http_crawler import HttpCrawlingResult
-from crawlee.types import BasicCrawlingContext, EnqueueLinksFunction
 
 if TYPE_CHECKING:
     from parsel import Selector

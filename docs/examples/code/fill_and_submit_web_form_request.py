@@ -1,4 +1,4 @@
-from crawlee.models import Request
+from crawlee import Request
 
 # Prepare a POST request to the form endpoint.
 request = Request.from_url(

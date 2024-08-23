@@ -13,10 +13,10 @@ from crawlee.sessions import Session
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from crawlee._models import Request
     from crawlee._statistics import Statistics
-    from crawlee.models import Request
+    from crawlee._types import HttpHeaders, HttpMethod
     from crawlee.proxy_configuration import ProxyInfo
-    from crawlee.types import HttpHeaders, HttpMethod
 
 
 class _HttpxResponse:

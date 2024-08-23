@@ -9,17 +9,17 @@ from typing import TYPE_CHECKING, Any, Generic, TypedDict, TypeVar
 
 from typing_extensions import override
 
-from crawlee._utils.crypto import crypto_random_object_id
-from crawlee._utils.lru_cache import LRUCache
-from crawlee._utils.requests import unique_key_to_request_id
-from crawlee._utils.wait import wait_for_all_tasks_for_finish
-from crawlee.events._types import Event
-from crawlee.models import (
+from crawlee._models import (
     BaseRequestData,
     ProcessedRequest,
     Request,
     RequestQueueMetadata,
 )
+from crawlee._utils.crypto import crypto_random_object_id
+from crawlee._utils.lru_cache import LRUCache
+from crawlee._utils.requests import unique_key_to_request_id
+from crawlee._utils.wait import wait_for_all_tasks_for_finish
+from crawlee.events._types import Event
 from crawlee.storages._base_storage import BaseStorage
 from crawlee.storages._request_provider import RequestProvider
 

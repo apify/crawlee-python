@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, AsyncContextManager
 if TYPE_CHECKING:
     from httpx import Response
 
-    from crawlee.models import KeyValueStoreListKeysPage, KeyValueStoreMetadata, KeyValueStoreRecord
+    from crawlee._models import KeyValueStoreListKeysPage, KeyValueStoreMetadata, KeyValueStoreRecord
 
 
 class BaseKeyValueStoreClient(ABC):

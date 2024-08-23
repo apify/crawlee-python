@@ -4,7 +4,7 @@ from typing import Generic
 
 from typing_extensions import TypeVar
 
-from crawlee.types import BasicCrawlingContext
+from crawlee._types import BasicCrawlingContext
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 

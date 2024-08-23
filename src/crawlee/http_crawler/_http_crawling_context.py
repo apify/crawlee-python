@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from crawlee._types import BasicCrawlingContext
 from crawlee.http_clients import HttpCrawlingResult
-from crawlee.types import BasicCrawlingContext
 
 
 @dataclass(frozen=True)
