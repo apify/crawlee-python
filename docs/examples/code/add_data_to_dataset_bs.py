@@ -14,7 +14,7 @@ async def main() -> None:
         # Extract data from the page.
         data = {
             'url': context.request.url,
-            'title': context.soup.title.string,
+            'title': context.soup.title.string if context.soup.title else None,
             'html': str(context.soup)[:1000],
         }
 

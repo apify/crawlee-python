@@ -13,7 +13,4 @@ async def main() -> None:
     crawler = PlaywrightCrawler(
         proxy_configuration=proxy_configuration,
         use_session_pool=True,
-        persist_cookies_per_session=True,
     )
-
-    # ...

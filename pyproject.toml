@@ -160,6 +160,11 @@ indent-style = "space"
     "T20",     # flake8-print
     "TRY301",  # Abstract `raise` to an inner function
 ]
+"**/{docs}/**" = [
+    "D",       # Everything from the pydocstyle
+    "INP001",  # File {filename} is part of an implicit namespace package, add an __init__.py
+    "F841",    # Local variable {variable} is assigned to but never used
+]
 
 [tool.ruff.lint.flake8-quotes]
 docstring-quotes = "double"
@@ -196,6 +201,9 @@ warn_redundant_casts = true
 warn_return_any = true
 warn_unreachable = true
 warn_unused_ignores = true
+exclude = [
+    "docs/introduction/code/08_main.py",
+]
 
 [tool.mypy-scrapy]
 ignore_missing_imports = true

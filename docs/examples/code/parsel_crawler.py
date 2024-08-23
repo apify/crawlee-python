@@ -20,8 +20,8 @@ async def main() -> None:
         # Extract data from the page.
         data = {
             'url': context.request.url,
-            'title': context.parsel.xpath('//title/text()').get(),
-            'email_address_list': context.parsel.re(EMAIL_REGEX),
+            'title': context.selector.xpath('//title/text()').get(),
+            'email_address_list': context.selector.re(EMAIL_REGEX),
         }
 
         # Push the extracted data to the default dataset.
