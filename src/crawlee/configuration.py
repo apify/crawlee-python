@@ -11,6 +11,8 @@ from typing_extensions import Self
 
 from crawlee._utils.models import timedelta_ms
 
+__all__ = ['Configuration']
+
 
 class Configuration(BaseSettings):
     """Configuration of the Crawler.

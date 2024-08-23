@@ -6,6 +6,17 @@ from typing_extensions import TypeVar
 
 from crawlee._types import BasicCrawlingContext
 
+__all__ = [
+    'ContextPipelineFinalizationError',
+    'ContextPipelineInitializationError',
+    'ContextPipelineInterruptedError',
+    'HttpStatusCodeError',
+    'ProxyError',
+    'RequestHandlerError',
+    'SessionError',
+    'UserDefinedErrorHandlerError',
+]
+
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 
 

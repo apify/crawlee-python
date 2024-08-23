@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from enum import Enum
 
+__all__ = ['EnqueueStrategy']
+
 
 class EnqueueStrategy(str, Enum):
     """Strategy for deciding which links should be followed and which ones should be ignored."""

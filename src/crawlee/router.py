@@ -4,6 +4,8 @@ from typing import Awaitable, Callable, Generic, TypeVar
 
 from crawlee._types import BasicCrawlingContext
 
+__all__ = ['Router']
+
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext)
 RequestHandler = Callable[[TCrawlingContext], Awaitable[None]]
 
