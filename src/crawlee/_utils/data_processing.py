@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, NoReturn
 from crawlee._utils.file import ContentType, is_content_type
 
 if TYPE_CHECKING:
-    from crawlee.types import StorageTypes
+    from crawlee._types import StorageTypes
 
 
 def filter_out_none_values_recursively(dictionary: dict, *, remove_empty_dicts: bool = False) -> dict | None:

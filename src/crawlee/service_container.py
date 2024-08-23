@@ -5,13 +5,25 @@ from typing import TYPE_CHECKING, Literal
 from typing_extensions import NotRequired, TypedDict
 
 from crawlee.configuration import Configuration
-from crawlee.events.local_event_manager import LocalEventManager
-from crawlee.memory_storage_client.memory_storage_client import MemoryStorageClient
+from crawlee.errors import ServiceConflictError
+from crawlee.events import LocalEventManager
+from crawlee.memory_storage_client import MemoryStorageClient
 
 if TYPE_CHECKING:
-    from crawlee.base_storage_client.base_storage_client import BaseStorageClient
-    from crawlee.events.event_manager import EventManager
+    from crawlee.base_storage_client._base_storage_client import BaseStorageClient
+    from crawlee.events._event_manager import EventManager
 
+__all__ = [
+    'get_storage_client',
+    'set_local_storage_client',
+    'set_cloud_storage_client',
+    'set_default_storage_client_type',
+    'get_configuration',
+    'get_configuration_if_set',
+    'set_configuration',
+    'get_event_manager',
+    'set_event_manager',
+]
 
 StorageClientType = Literal['cloud', 'local']
 
@@ -25,15 +37,6 @@ class _Services(TypedDict):
 
 _services = _Services()
 _default_storage_client_type: StorageClientType = 'local'
-
-
-class ServiceConflictError(RuntimeError):
-    """Thrown when a service is getting reconfigured."""
-
-    def __init__(self, service_name: str, new_value: object, old_value: object) -> None:
-        super().__init__(
-            f"Service '{service_name}' was already set (existing value is '{old_value}', new value is '{new_value}')."
-        )
 
 
 def get_storage_client(*, client_type: StorageClientType | None = None) -> BaseStorageClient:

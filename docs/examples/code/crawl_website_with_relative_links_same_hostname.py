@@ -1,7 +1,7 @@
 import asyncio
 
+from crawlee import EnqueueStrategy
 from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
-from crawlee.enqueue_strategy import EnqueueStrategy
 
 
 async def main() -> None:

@@ -10,7 +10,7 @@ from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 if TYPE_CHECKING:
     from crawlee.base_storage_client import BaseStorageClient
-    from crawlee.base_storage_client.types import ResourceClient, ResourceCollectionClient
+    from crawlee.base_storage_client._types import ResourceClient, ResourceCollectionClient
 
 TResource = TypeVar('TResource', Dataset, KeyValueStore, RequestQueue)
 

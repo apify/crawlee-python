@@ -8,7 +8,7 @@ from httpx import InvalidURL
 from crawlee.proxy_configuration import ProxyConfiguration
 
 if TYPE_CHECKING:
-    from crawlee.models import Request
+    from crawlee import Request
 
 
 async def test_returns_proxy_info() -> None:

@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from crawlee.sessions.session import Session
+from crawlee.sessions._session import Session
 
 
 @pytest.fixture
