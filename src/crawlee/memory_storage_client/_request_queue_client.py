@@ -12,10 +12,6 @@ from typing import TYPE_CHECKING
 from sortedcollections import ValueSortedDict  # type: ignore
 from typing_extensions import override
 
-from crawlee._memory_storage_client._creation_management import (
-    find_or_create_client_by_id_or_name_inner,
-    persist_metadata_if_enabled,
-)
 from crawlee._models import (
     BatchRequestsOperationResponse,
     ProcessedRequest,
@@ -36,11 +32,15 @@ from crawlee._utils.data_processing import (
 from crawlee._utils.file import force_remove, force_rename, json_dumps
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee.base_storage_client import BaseRequestQueueClient
+from crawlee.memory_storage_client._creation_management import (
+    find_or_create_client_by_id_or_name_inner,
+    persist_metadata_if_enabled,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from crawlee._memory_storage_client import MemoryStorageClient
+    from crawlee.memory_storage_client import MemoryStorageClient
 
 logger = getLogger(__name__)
 

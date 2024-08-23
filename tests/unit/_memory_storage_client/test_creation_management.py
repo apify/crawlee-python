@@ -5,7 +5,7 @@ import os
 from typing import TYPE_CHECKING
 
 from crawlee._consts import METADATA_FILENAME
-from crawlee._memory_storage_client._creation_management import persist_metadata_if_enabled
+from crawlee.memory_storage_client._creation_management import persist_metadata_if_enabled
 
 if TYPE_CHECKING:
     from pathlib import Path

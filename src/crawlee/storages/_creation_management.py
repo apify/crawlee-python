@@ -4,8 +4,8 @@ import asyncio
 from typing import TYPE_CHECKING, TypeVar
 
 from crawlee import service_container
-from crawlee._memory_storage_client import MemoryStorageClient
 from crawlee.configuration import Configuration
+from crawlee.memory_storage_client import MemoryStorageClient
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 if TYPE_CHECKING:

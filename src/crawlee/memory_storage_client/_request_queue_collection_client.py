@@ -4,13 +4,13 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
-from crawlee._memory_storage_client._creation_management import get_or_create_inner
-from crawlee._memory_storage_client.request_queue_client import RequestQueueClient
 from crawlee._models import RequestQueueListPage, RequestQueueMetadata
 from crawlee.base_storage_client import BaseRequestQueueCollectionClient
+from crawlee.memory_storage_client._creation_management import get_or_create_inner
+from crawlee.memory_storage_client._request_queue_client import RequestQueueClient
 
 if TYPE_CHECKING:
-    from crawlee._memory_storage_client.memory_storage_client import MemoryStorageClient
+    from crawlee.memory_storage_client._memory_storage_client import MemoryStorageClient
 
 
 class RequestQueueCollectionClient(BaseRequestQueueCollectionClient):

@@ -18,8 +18,8 @@ from crawlee._utils.file import json_dumps
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from crawlee._memory_storage_client import MemoryStorageClient
-    from crawlee._memory_storage_client.key_value_store_client import KeyValueStoreClient
+    from crawlee.memory_storage_client import MemoryStorageClient
+    from crawlee.memory_storage_client._key_value_store_client import KeyValueStoreClient
 
 TINY_PNG = base64.b64decode(
     s='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVQYV2NgYAAAAAMAAWgmWQ0AAAAASUVORK5CYII=',

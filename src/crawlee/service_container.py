@@ -4,9 +4,9 @@ from typing import TYPE_CHECKING, Literal
 
 from typing_extensions import NotRequired, TypedDict
 
-from crawlee._memory_storage_client.memory_storage_client import MemoryStorageClient
 from crawlee.configuration import Configuration
-from crawlee.events._local_event_manager import LocalEventManager
+from crawlee.events import LocalEventManager
+from crawlee.memory_storage_client import MemoryStorageClient
 
 if TYPE_CHECKING:
     from crawlee.base_storage_client._base_storage_client import BaseStorageClient
