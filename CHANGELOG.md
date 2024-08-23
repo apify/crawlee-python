@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## 0.2.2 - **not yet released**
+## 0.3.0 - **not yet released**
 
 ### 🚀 Features
 
@@ -15,6 +15,11 @@ All notable changes to this project will be documented in this file.
 - Remove redundant log, fix format ([#408](https://github.com/apify/crawlee-python/pull/408)) ([8d27e39](https://github.com/apify/crawlee-python/commit/8d27e3928c605d6eceb51a948453a15024fa2aa2)) by [@janbuchar](https://github.com/janbuchar)
 - Dequeue items from RequestQueue in the correct order ([#411](https://github.com/apify/crawlee-python/pull/411)) ([96fc33e](https://github.com/apify/crawlee-python/commit/96fc33e2cc4631cae3c50dad9eace6407103a2a9)) by [@janbuchar](https://github.com/janbuchar)
 - Relative URLS supports & If not a URL, pass #417 ([#431](https://github.com/apify/crawlee-python/pull/431), closes [#417](https://github.com/apify/crawlee-python/issues/417)) ([ccd8145](https://github.com/apify/crawlee-python/commit/ccd81454166ece68391cdffedb8efe9e663361d9)) by [@black7375](https://github.com/black7375)
+- Typo in ProlongRequestLockResponse ([#458](https://github.com/apify/crawlee-python/pull/458)) ([30ccc3a](https://github.com/apify/crawlee-python/commit/30ccc3a4763bc3706a3bbeaedc95f9648f5ba09a)) by [@janbuchar](https://github.com/janbuchar)
+
+### Refactor
+
+- [**breaking**] RequestQueue and service management rehaul ([#429](https://github.com/apify/crawlee-python/pull/429), closes [#83](https://github.com/apify/crawlee-python/issues/83), [#174](https://github.com/apify/crawlee-python/issues/174), [#203](https://github.com/apify/crawlee-python/issues/203), [#423](https://github.com/apify/crawlee-python/issues/423)) ([b155a9f](https://github.com/apify/crawlee-python/commit/b155a9f602a163e891777bef5608072fb5d0156f)) by [@janbuchar](https://github.com/janbuchar)
 
 ## [0.2.1](https://github.com/apify/crawlee-python/releases/tag/v0.2.1) (2024-08-05)
 
