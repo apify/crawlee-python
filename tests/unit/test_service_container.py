@@ -4,6 +4,7 @@ import pytest
 
 from crawlee import service_container
 from crawlee.configuration import Configuration
+from crawlee.errors import ServiceConflictError
 from crawlee.events._local_event_manager import LocalEventManager
 from crawlee.memory_storage_client._memory_storage_client import MemoryStorageClient
 
@@ -24,7 +25,7 @@ async def test_overwrite_event_manager() -> None:
     service_container.set_event_manager(event_manager)
     service_container.set_event_manager(event_manager)
 
-    with pytest.raises(service_container.ServiceConflictError):
+    with pytest.raises(ServiceConflictError):
         service_container.set_event_manager(Mock())
 
 
@@ -44,7 +45,7 @@ async def test_overwrite_configuration() -> None:
     service_container.set_configuration(configuration)
     service_container.set_configuration(configuration)
 
-    with pytest.raises(service_container.ServiceConflictError):
+    with pytest.raises(ServiceConflictError):
         service_container.set_configuration(Mock())
 
 
@@ -75,7 +76,7 @@ async def test_reset_local_storage_client() -> None:
     service_container.set_local_storage_client(storage_client)
     service_container.set_local_storage_client(storage_client)
 
-    with pytest.raises(service_container.ServiceConflictError):
+    with pytest.raises(ServiceConflictError):
         service_container.set_local_storage_client(Mock())
 
 
@@ -85,5 +86,5 @@ async def test_reset_cloud_storage_client() -> None:
     service_container.set_cloud_storage_client(storage_client)
     service_container.set_cloud_storage_client(storage_client)
 
-    with pytest.raises(service_container.ServiceConflictError):
+    with pytest.raises(ServiceConflictError):
         service_container.set_cloud_storage_client(Mock())
