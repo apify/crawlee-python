@@ -18,7 +18,7 @@ from urllib.parse import ParseResult, urlparse
 from tldextract import TLDExtract
 from typing_extensions import NotRequired, TypedDict, TypeVar, Unpack, assert_never
 
-from crawlee import Glob, service_container
+from crawlee import EnqueueStrategy, Glob, service_container
 from crawlee._autoscaling import AutoscaledPool
 from crawlee._autoscaling.snapshotter import Snapshotter
 from crawlee._autoscaling.system_status import SystemStatus
@@ -29,7 +29,6 @@ from crawlee._types import BasicCrawlingContext, HttpHeaders, RequestHandlerRunR
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
 from crawlee.basic_crawler._context_pipeline import ContextPipeline
-from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.errors import (
     ContextPipelineInitializationError,
     ContextPipelineInterruptedError,
@@ -45,9 +44,8 @@ from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 if TYPE_CHECKING:
     import re
 
-    from crawlee._autoscaling.types import ConcurrencySettings
     from crawlee._statistics import FinalStatistics, StatisticsState
-    from crawlee._types import HttpMethod, JsonSerializable
+    from crawlee._types import ConcurrencySettings, HttpMethod, JsonSerializable
     from crawlee.configuration import Configuration
     from crawlee.events._event_manager import EventManager
     from crawlee.http_clients import BaseHttpClient, HttpResponse

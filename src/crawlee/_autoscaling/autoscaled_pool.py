@@ -9,7 +9,7 @@ from datetime import timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING, Awaitable, Callable
 
-from crawlee._autoscaling.types import ConcurrencySettings
+from crawlee._types import ConcurrencySettings
 from crawlee._utils.recurring_task import RecurringTask
 
 if TYPE_CHECKING:

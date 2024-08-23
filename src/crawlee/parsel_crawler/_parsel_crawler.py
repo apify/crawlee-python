@@ -8,11 +8,11 @@ from parsel import Selector
 from pydantic import ValidationError
 from typing_extensions import Unpack
 
+from crawlee import EnqueueStrategy
 from crawlee._models import BaseRequestData
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
-from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.errors import SessionError
 from crawlee.http_clients import HttpxHttpClient
 from crawlee.http_crawler import HttpCrawlingContext

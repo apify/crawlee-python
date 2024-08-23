@@ -13,7 +13,6 @@ from typing_extensions import NotRequired, TypeAlias, TypedDict, Unpack
 if TYPE_CHECKING:
     from crawlee import Glob
     from crawlee._models import BaseRequestData, DatasetItemsListPage, Request
-    from crawlee.enqueue_strategy import EnqueueStrategy
     from crawlee.http_clients import HttpResponse
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions._session import Session
@@ -25,6 +24,54 @@ if TYPE_CHECKING:
 JsonSerializable: TypeAlias = Union[str, int, float, bool, None, dict[str, Any], list[Any]]
 
 HttpMethod: TypeAlias = Literal['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH']
+
+
+class EnqueueStrategy(str, Enum):
+    """Strategy for deciding which links should be followed and which ones should be ignored."""
+
+    ALL = 'all'
+    SAME_DOMAIN = 'same-domain'
+    SAME_HOSTNAME = 'same-hostname'
+    SAME_ORIGIN = 'same-origin'
+
+
+class ConcurrencySettings:
+    """Concurrency settings for AutoscaledPool."""
+
+    def __init__(
+        self,
+        min_concurrency: int = 1,
+        max_concurrency: int = 200,
+        max_tasks_per_minute: float = float('inf'),
+        desired_concurrency: int | None = None,
+    ) -> None:
+        """Creates a new instance.
+
+        Args:
+            min_concurrency: The minimum number of tasks running in parallel. If you set this value too high
+                with respect to the available system memory and CPU, your code might run extremely slow or crash.
+            max_concurrency: The maximum number of tasks running in parallel.
+            max_tasks_per_minute: The maximum number of tasks per minute the pool can run. By default, this is set
+                to infinity, but you can pass any positive, non-zero number.
+            desired_concurrency: The desired number of tasks that should be running parallel on the start of the pool,
+                if there is a large enough supply of them. By default, it is `min_concurrency`.
+        """
+        if desired_concurrency is not None and desired_concurrency < 1:
+            raise ValueError('desired_concurrency must be 1 or larger')
+
+        if min_concurrency < 1:
+            raise ValueError('min_concurrency must be 1 or larger')
+
+        if max_concurrency < min_concurrency:
+            raise ValueError('max_concurrency cannot be less than min_concurrency')
+
+        if max_tasks_per_minute <= 0:
+            raise ValueError('max_tasks_per_minute must be positive')
+
+        self.min_concurrency = min_concurrency
+        self.max_concurrency = max_concurrency
+        self.desired_concurrency = desired_concurrency if desired_concurrency is not None else min_concurrency
+        self.max_tasks_per_minute = max_tasks_per_minute
 
 
 class StorageTypes(str, Enum):

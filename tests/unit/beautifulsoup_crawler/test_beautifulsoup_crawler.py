@@ -7,7 +7,7 @@ import pytest
 import respx
 from httpx import Response
 
-from crawlee._autoscaling.types import ConcurrencySettings
+from crawlee import ConcurrencySettings
 from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler
 from crawlee.storages import RequestList
 
