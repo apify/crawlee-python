@@ -5,24 +5,19 @@ description: Using proxies to get around those annoying IP-blocks
 ---
 
 import ApiLink from '@site/src/components/ApiLink';
-
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import CodeBlock from '@theme/CodeBlock';
 
-import QuickStartSource from '!!raw-loader!./proxy_management_examples/quick_start.py';
-
-import IntegrationBeautifulSoupSource from '!!raw-loader!./proxy_management_examples/integration_beautifulsoup.py';
-import IntegrationPlaywrightSource from '!!raw-loader!./proxy_management_examples/integration_playwright.py';
-
-import SessionBeautifulSoupSource from '!!raw-loader!./proxy_management_examples/session_beautifulsoup.py';
-import SessionPlaywrightSource from '!!raw-loader!./proxy_management_examples/session_playwright.py';
-
-import InspectionBeautifulSoupSource from '!!raw-loader!./proxy_management_examples/inspecting_beautifulsoup.py';
-import InspectionPlaywrightSource from '!!raw-loader!./proxy_management_examples/inspecting_playwright.py';
-
-import TiersBeautifulSoupSource from '!!raw-loader!./proxy_management_examples/tiers_beautifulsoup.py';
-import TiersPlaywrightSource from '!!raw-loader!./proxy_management_examples/tiers_playwright.py';
+import QuickStartExample from '!!raw-loader!./code/proxy_management_quick_start.py';
+import IntegrationBeautifulSoupExample from '!!raw-loader!./code/proxy_management_integration_bs.py';
+import IntegrationPlaywrightExample from '!!raw-loader!./code/proxy_management_integration_pw.py';
+import SessionBeautifulSoupExample from '!!raw-loader!./code/proxy_management_session_bs.py';
+import SessionPlaywrightExample from '!!raw-loader!./code/proxy_management_session_pw.py';
+import InspectionBeautifulSoupExample from '!!raw-loader!./code/proxy_management_inspecting_bs.py';
+import InspectionPlaywrightExample from '!!raw-loader!./code/proxy_management_inspecting_pw.py';
+import TiersBeautifulSoupExample from '!!raw-loader!./code/proxy_management_tiers_bs.py';
+import TiersPlaywrightExample from '!!raw-loader!./code/proxy_management_tiers_pw.py';
 
 [IP address blocking](https://en.wikipedia.org/wiki/IP_address_blocking) is one of the oldest and most effective ways of preventing access to a website. It is therefore paramount for a good web scraping library to provide easy to use but powerful tools which can work around IP blocking. The most powerful weapon in our anti IP blocking arsenal is a [proxy server](https://en.wikipedia.org/wiki/Proxy_server).
 
@@ -35,7 +30,7 @@ With Crawlee we can use our own proxy servers or proxy servers acquired from thi
 If you already have proxy URLs of your own, you can start using them immediately in only a few lines of code.
 
 <CodeBlock className="language-python">
-    {QuickStartSource}
+    {QuickStartExample}
 </CodeBlock>
 
 Examples of how to use our proxy URLs with crawlers are shown below in [Crawler integration](#crawler-integration) section.
@@ -51,12 +46,12 @@ All our proxy needs are managed by the <ApiLink to="class/ProxyConfiguration">`P
 <Tabs>
     <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
         <CodeBlock className="language-python">
-            {IntegrationBeautifulSoupSource}
+            {IntegrationBeautifulSoupExample}
         </CodeBlock>
     </TabItem>
     <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
         <CodeBlock className="language-python">
-            {IntegrationPlaywrightSource}
+            {IntegrationPlaywrightExample}
         </CodeBlock>
     </TabItem>
 </Tabs>
@@ -74,12 +69,12 @@ When no `session_id` is provided, our proxy URLs are rotated round-robin.
 <Tabs>
     <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
         <CodeBlock className="language-python">
-            {SessionBeautifulSoupSource}
+            {SessionBeautifulSoupExample}
         </CodeBlock>
     </TabItem>
     <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
         <CodeBlock className="language-python">
-            {SessionPlaywrightSource}
+            {SessionPlaywrightExample}
         </CodeBlock>
     </TabItem>
 </Tabs>
@@ -95,12 +90,12 @@ In an active tier, Crawlee will alternate between proxies in a round-robin fashi
 <Tabs>
     <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
         <CodeBlock className="language-python">
-            {TiersBeautifulSoupSource}
+            {TiersBeautifulSoupExample}
         </CodeBlock>
     </TabItem>
     <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
         <CodeBlock className="language-python">
-            {TiersPlaywrightSource}
+            {TiersPlaywrightExample}
         </CodeBlock>
     </TabItem>
 </Tabs>
@@ -112,12 +107,12 @@ The <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> an
 <Tabs>
     <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
         <CodeBlock className="language-python">
-            {InspectionBeautifulSoupSource}
+            {InspectionBeautifulSoupExample}
         </CodeBlock>
     </TabItem>
     <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
         <CodeBlock className="language-python">
-            {InspectionPlaywrightSource}
+            {InspectionPlaywrightExample}
         </CodeBlock>
     </TabItem>
 </Tabs>

@@ -1,0 +1,27 @@
+---
+id: crawl-multiple-urls
+title: Crawl multiple URLs
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import CodeBlock from '@theme/CodeBlock';
+
+import BeautifulSoupExample from '!!raw-loader!./code/crawl_multiple_urls_bs.py';
+import PlaywrightExample from '!!raw-loader!./code/crawl_multiple_urls_pw.py';
+
+This example demonstrates how to crawl a specified list of URLs using different crawlers. You'll learn how to set up the crawler, define a request handler, and run the crawler with multiple URLs. This setup is useful for scraping data from multiple pages or websites concurrently.
+
+<Tabs groupId="main">
+    <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
+        <CodeBlock className="language-python">
+            {BeautifulSoupExample}
+        </CodeBlock>
+    </TabItem>
+    <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
+        <CodeBlock className="language-python">
+            {PlaywrightExample}
+        </CodeBlock>
+    </TabItem>
+</Tabs>
