@@ -1,0 +1,27 @@
+---
+id: crawl-specific-links-on-website
+title: Crawl specific links on website
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import CodeBlock from '@theme/CodeBlock';
+
+import BeautifulSoupExample from '!!raw-loader!./code/crawl_specific_links_on_website_bs.py';
+import PlaywrightExample from '!!raw-loader!./code/crawl_specific_links_on_website_pw.py';
+
+This example demonstrates how to crawl a website while targeting specific patterns of links. By utilizing the <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> helper, you can pass `include` or `exclude` parameters to improve your crawling strategy. This approach ensures that only the links matching the specified patterns are added to the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>. Both `include` and `exclude` support lists of globs or regular expressions. This functionality is great for focusing on relevant sections of a website and avoiding scraping unnecessary or irrelevant content.
+
+<Tabs groupId="main">
+    <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
+        <CodeBlock className="language-python">
+            {BeautifulSoupExample}
+        </CodeBlock>
+    </TabItem>
+    <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
+        <CodeBlock className="language-python">
+            {PlaywrightExample}
+        </CodeBlock>
+    </TabItem>
+</Tabs>
