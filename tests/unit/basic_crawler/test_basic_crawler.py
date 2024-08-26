@@ -15,7 +15,7 @@ import httpx
 import pytest
 
 from crawlee import ConcurrencySettings, EnqueueStrategy, Glob
-from crawlee._models import BaseRequestData, Request
+from crawlee._request import BaseRequestData, Request
 from crawlee._types import AddRequestsKwargs, BasicCrawlingContext, HttpHeaders
 from crawlee.basic_crawler import BasicCrawler
 from crawlee.configuration import Configuration

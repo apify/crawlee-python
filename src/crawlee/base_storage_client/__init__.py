@@ -5,6 +5,26 @@ from ._base_key_value_store_collection_client import BaseKeyValueStoreCollection
 from ._base_request_queue_client import BaseRequestQueueClient
 from ._base_request_queue_collection_client import BaseRequestQueueCollectionClient
 from ._base_storage_client import BaseStorageClient
+from ._models import (
+    BatchRequestsOperationResponse,
+    DatasetItemsListPage,
+    DatasetListPage,
+    DatasetMetadata,
+    KeyValueStoreKeyInfo,
+    KeyValueStoreListKeysPage,
+    KeyValueStoreListPage,
+    KeyValueStoreMetadata,
+    KeyValueStoreRecord,
+    KeyValueStoreRecordMetadata,
+    ProcessedRequest,
+    ProlongRequestLockResponse,
+    RequestQueueHead,
+    RequestQueueHeadState,
+    RequestQueueHeadWithLocks,
+    RequestQueueListPage,
+    RequestQueueMetadata,
+    UnprocessedRequest,
+)
 
 __all__ = [
     'BaseDatasetClient',
@@ -14,4 +34,22 @@ __all__ = [
     'BaseRequestQueueClient',
     'BaseRequestQueueCollectionClient',
     'BaseStorageClient',
+    'BatchRequestsOperationResponse',
+    'DatasetItemsListPage',
+    'DatasetListPage',
+    'DatasetMetadata',
+    'KeyValueStoreKeyInfo',
+    'KeyValueStoreListKeysPage',
+    'KeyValueStoreListPage',
+    'KeyValueStoreMetadata',
+    'KeyValueStoreRecord',
+    'KeyValueStoreRecordMetadata',
+    'ProcessedRequest',
+    'ProlongRequestLockResponse',
+    'RequestQueueHead',
+    'RequestQueueHeadState',
+    'RequestQueueHeadWithLocks',
+    'RequestQueueListPage',
+    'RequestQueueMetadata',
+    'UnprocessedRequest',
 ]

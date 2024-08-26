@@ -11,7 +11,9 @@ from logging import getLogger
 from typing import TYPE_CHECKING
 
 from crawlee._consts import METADATA_FILENAME
-from crawlee._models import (
+from crawlee._utils.data_processing import maybe_parse_body
+from crawlee._utils.file import json_dumps
+from crawlee.base_storage_client._models import (
     DatasetMetadata,
     KeyValueStoreMetadata,
     KeyValueStoreRecord,
@@ -19,8 +21,6 @@ from crawlee._models import (
     Request,
     RequestQueueMetadata,
 )
-from crawlee._utils.data_processing import maybe_parse_body
-from crawlee._utils.file import json_dumps
 from crawlee.storages._dataset import Dataset
 from crawlee.storages._key_value_store import KeyValueStore
 from crawlee.storages._request_queue import RequestQueue

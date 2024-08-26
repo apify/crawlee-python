@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from crawlee._models import RequestQueueListPage, RequestQueueMetadata
+    from crawlee.base_storage_client._models import RequestQueueListPage, RequestQueueMetadata
 
 
 class BaseRequestQueueCollectionClient(ABC):

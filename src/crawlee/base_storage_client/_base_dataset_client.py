@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, AsyncContextManager, AsyncIterator
 if TYPE_CHECKING:
     from httpx import Response
 
-    from crawlee._models import DatasetItemsListPage, DatasetMetadata
     from crawlee._types import JsonSerializable
+    from crawlee.base_storage_client._models import DatasetItemsListPage, DatasetMetadata
 
 
 class BaseDatasetClient(ABC):

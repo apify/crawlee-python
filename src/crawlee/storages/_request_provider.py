@@ -4,12 +4,12 @@ from abc import ABC, abstractmethod
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
-from crawlee._models import BaseRequestData, Request
+from crawlee._request import BaseRequestData, Request
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from crawlee._models import ProcessedRequest
+    from crawlee.base_storage_client._models import ProcessedRequest
 
 
 class RequestProvider(ABC):

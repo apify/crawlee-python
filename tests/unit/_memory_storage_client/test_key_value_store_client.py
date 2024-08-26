@@ -10,10 +10,10 @@ from typing import TYPE_CHECKING
 import pytest
 
 from crawlee._consts import METADATA_FILENAME
-from crawlee._models import KeyValueStoreMetadata, KeyValueStoreRecordMetadata
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import maybe_parse_body
 from crawlee._utils.file import json_dumps
+from crawlee.base_storage_client._models import KeyValueStoreMetadata, KeyValueStoreRecordMetadata
 
 if TYPE_CHECKING:
     from pathlib import Path

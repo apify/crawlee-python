@@ -12,16 +12,6 @@ from typing import TYPE_CHECKING
 from sortedcollections import ValueSortedDict  # type: ignore
 from typing_extensions import override
 
-from crawlee._models import (
-    BatchRequestsOperationResponse,
-    ProcessedRequest,
-    ProlongRequestLockResponse,
-    Request,
-    RequestQueueHead,
-    RequestQueueHeadWithLocks,
-    RequestQueueMetadata,
-    UnprocessedRequest,
-)
 from crawlee._types import StorageTypes
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import (
@@ -32,6 +22,16 @@ from crawlee._utils.data_processing import (
 from crawlee._utils.file import force_remove, force_rename, json_dumps
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee.base_storage_client import BaseRequestQueueClient
+from crawlee.base_storage_client._models import (
+    BatchRequestsOperationResponse,
+    ProcessedRequest,
+    ProlongRequestLockResponse,
+    Request,
+    RequestQueueHead,
+    RequestQueueHeadWithLocks,
+    RequestQueueMetadata,
+    UnprocessedRequest,
+)
 from crawlee.memory_storage_client._creation_management import (
     find_or_create_client_by_id_or_name_inner,
     persist_metadata_if_enabled,

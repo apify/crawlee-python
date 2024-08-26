@@ -1,8 +1,5 @@
-# ruff: noqa: TCH003
 from __future__ import annotations
 
-import logging
-import re
 from collections.abc import Coroutine, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
@@ -11,8 +8,12 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol, Union
 from typing_extensions import NotRequired, TypeAlias, TypedDict, Unpack
 
 if TYPE_CHECKING:
+    import logging
+    import re
+
     from crawlee import Glob
-    from crawlee._models import BaseRequestData, DatasetItemsListPage, Request
+    from crawlee._request import BaseRequestData, Request
+    from crawlee.base_storage_client._models import DatasetItemsListPage
     from crawlee.http_clients import HttpResponse
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions._session import Session

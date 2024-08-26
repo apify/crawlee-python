@@ -4,8 +4,8 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
-from crawlee._models import KeyValueStoreListPage, KeyValueStoreMetadata
 from crawlee.base_storage_client import BaseKeyValueStoreCollectionClient
+from crawlee.base_storage_client._models import KeyValueStoreListPage, KeyValueStoreMetadata
 from crawlee.memory_storage_client._creation_management import get_or_create_inner
 from crawlee.memory_storage_client._key_value_store_client import KeyValueStoreClient
 
