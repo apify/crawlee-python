@@ -16,7 +16,7 @@ from crawlee._utils.crypto import crypto_random_object_id
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Sequence
 
-    from crawlee._models import Request
+    from crawlee.base_storage_client._models import Request
 
 __all__ = ['ProxyInfo', 'ProxyConfiguration']
 

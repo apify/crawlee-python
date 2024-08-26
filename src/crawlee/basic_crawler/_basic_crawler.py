@@ -23,7 +23,7 @@ from crawlee._autoscaling import AutoscaledPool
 from crawlee._autoscaling.snapshotter import Snapshotter
 from crawlee._autoscaling.system_status import SystemStatus
 from crawlee._log_config import CrawleeLogFormatter
-from crawlee._models import BaseRequestData, DatasetItemsListPage, Request, RequestState
+from crawlee._request import BaseRequestData, Request, RequestState
 from crawlee._types import BasicCrawlingContext, HttpHeaders, RequestHandlerRunResult, SendRequestFunction
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
@@ -45,6 +45,7 @@ if TYPE_CHECKING:
     import re
 
     from crawlee._types import ConcurrencySettings, HttpMethod, JsonSerializable
+    from crawlee.base_storage_client._models import DatasetItemsListPage
     from crawlee.configuration import Configuration
     from crawlee.events._event_manager import EventManager
     from crawlee.http_clients import BaseHttpClient, HttpResponse

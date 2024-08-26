@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from crawlee._models import BaseRequestData, Request
+from crawlee._request import BaseRequestData, Request
 from crawlee.storages import RequestQueue
 
 if TYPE_CHECKING:

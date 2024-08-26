@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from crawlee._models import (
+    from crawlee.base_storage_client._models import (
         BatchRequestsOperationResponse,
         ProcessedRequest,
         ProlongRequestLockResponse,

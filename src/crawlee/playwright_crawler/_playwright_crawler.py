@@ -7,7 +7,7 @@ from pydantic import ValidationError
 from typing_extensions import Unpack
 
 from crawlee import EnqueueStrategy
-from crawlee._models import BaseRequestData
+from crawlee._request import BaseRequestData
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline

@@ -8,16 +8,16 @@ from typing import TYPE_CHECKING, AsyncIterator, Literal, TextIO, TypedDict, cas
 
 from typing_extensions import NotRequired, Required, Unpack, override
 
-from crawlee._models import DatasetMetadata
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.file import json_dumps
+from crawlee.base_storage_client._models import DatasetMetadata
 from crawlee.storages._base_storage import BaseStorage
 from crawlee.storages._key_value_store import KeyValueStore
 
 if TYPE_CHECKING:
-    from crawlee._models import DatasetItemsListPage
     from crawlee._types import JsonSerializable
     from crawlee.base_storage_client import BaseStorageClient
+    from crawlee.base_storage_client._models import DatasetItemsListPage
     from crawlee.configuration import Configuration
 
 

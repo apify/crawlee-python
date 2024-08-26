@@ -9,7 +9,7 @@ import respx
 from httpx import Response
 
 from crawlee import ConcurrencySettings
-from crawlee._models import BaseRequestData
+from crawlee._request import BaseRequestData
 from crawlee.parsel_crawler import ParselCrawler
 from crawlee.storages import RequestList
 
