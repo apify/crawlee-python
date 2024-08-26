@@ -1,14 +1,12 @@
+import { useActiveDocContext, useLayoutDoc } from '@docusaurus/plugin-content-docs/client';
 import DefaultNavbarItem from '@theme/NavbarItem/DefaultNavbarItem';
+import DocSidebarNavbarItem from '@theme/NavbarItem/DocSidebarNavbarItem';
+import DocsVersionDropdownNavbarItem from '@theme/NavbarItem/DocsVersionDropdownNavbarItem';
+import DocsVersionNavbarItem from '@theme/NavbarItem/DocsVersionNavbarItem';
 import DropdownNavbarItem from '@theme/NavbarItem/DropdownNavbarItem';
+import HtmlNavbarItem from '@theme/NavbarItem/HtmlNavbarItem';
 import LocaleDropdownNavbarItem from '@theme/NavbarItem/LocaleDropdownNavbarItem';
 import SearchNavbarItem from '@theme/NavbarItem/SearchNavbarItem';
-import HtmlNavbarItem from '@theme/NavbarItem/HtmlNavbarItem';
-import DocSidebarNavbarItem from '@theme/NavbarItem/DocSidebarNavbarItem';
-import DocsVersionNavbarItem from '@theme/NavbarItem/DocsVersionNavbarItem';
-import DocsVersionDropdownNavbarItem from '@theme/NavbarItem/DocsVersionDropdownNavbarItem';
-import { useActiveDocContext } from '@docusaurus/plugin-content-docs/client';
-import { useDocsVersion, useLayoutDoc } from '@docusaurus/theme-common/internal';
-import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import React from 'react';
 
 // const versions = require('../../../versions.json');
