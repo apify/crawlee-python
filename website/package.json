@@ -33,12 +33,12 @@
         "typescript": "5.5.4"
     },
     "dependencies": {
-        "@apify/docusaurus-plugin-typedoc-api": "4.2.1",
+        "@apify/docusaurus-plugin-typedoc-api": "^4.2.2",
         "@apify/utilities": "^2.8.0",
-        "@docusaurus/core": "3.4.0",
-        "@docusaurus/mdx-loader": "3.4.0",
-        "@docusaurus/plugin-client-redirects": "3.4.0",
-        "@docusaurus/preset-classic": "3.4.0",
+        "@docusaurus/core": "^3.5.2",
+        "@docusaurus/mdx-loader": "^3.5.2",
+        "@docusaurus/plugin-client-redirects": "^3.5.2",
+        "@docusaurus/preset-classic": "^3.5.2",
         "@giscus/react": "^3.0.0",
         "@mdx-js/react": "^3.0.1",
         "axios": "^1.5.0",
@@ -56,5 +56,5 @@
         "stream-browserify": "^3.0.0",
         "unist-util-visit": "^5.0.0"
     },
-    "packageManager": "yarn@4.4.0"
+    "packageManager": "yarn@4.4.1"
 }
