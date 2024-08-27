@@ -75,22 +75,32 @@ class ExportToKwargs(TypedDict):
 
 
 class Dataset(BaseStorage):
-    """Represents an append-only structured storage, ideal for tabular data akin to database tables.
+    """Represents an append-only structured storage, ideal for tabular data similar to database tables.
 
-    Represents a structured data store similar to a table, where each object (row) has consistent attributes (columns).
-    Datasets operate on an append-only basis, allowing for the addition of new records without the modification or
-    removal of existing ones. This class is typically used for storing crawling results.
+    The `Dataset` class is designed to store structured data, where each entry (row) maintains consistent attributes
+    (columns) across the dataset. It operates in an append-only mode, allowing new records to be added, but not
+    modified or deleted. This makes it particularly useful for storing results from web crawling operations.
 
-    Data can be stored locally or in the cloud, with local storage paths formatted as:
-    `{CRAWLEE_STORAGE_DIR}/datasets/{DATASET_ID}/{INDEX}.json`. Here, `{DATASET_ID}` is either "default" or
-    a specific dataset ID, and `{INDEX}` represents the zero-based index of the item in the dataset.
+    Data can be stored either locally or in the cloud. It depends on the setup of underlying storage client.
+    By default a `MemoryStorageClient` is used, but it can be changed to a different one.
 
-    To open a dataset, use the `open` class method with an `id`, `name`, or `config`. If unspecified, the default
-    dataset for the current crawler run is used. Opening a non-existent dataset by `id` raises an error, while
-    by `name`, it is created.
+    By default, data is stored using the following path structure:
+    ```
+    {CRAWLEE_STORAGE_DIR}/datasets/{DATASET_ID}/{INDEX}.json
+    ```
+    - `{CRAWLEE_STORAGE_DIR}`: The root directory for all storage data specified by the environment variable.
+    - `{DATASET_ID}`: Specifies the dataset, either "default" or a custom dataset ID.
+    - `{INDEX}`: Represents the zero-based index of the record within the dataset.
+
+    To open a dataset, use the `open` class method by specifying an `id`, `name`, or `configuration`. If none are
+    provided, the default dataset for the current crawler run is used. Attempting to open a dataset by `id` that does
+    not exist will raise an error; however, if accessed by `name`, the dataset will be created if it doesn't already
+    exist.
 
     Usage:
-        dataset = await Dataset.open(id='my_dataset_id')
+    ```python
+    dataset = await Dataset.open(id='my_dataset_id')
+    ```
     """
 
     _MAX_PAYLOAD_SIZE = ByteSize.from_mb(9)
