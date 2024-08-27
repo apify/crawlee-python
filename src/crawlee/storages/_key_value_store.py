@@ -41,7 +41,7 @@ class KeyValueStore(BaseStorage):
 
     Usage:
     ```python
-    kvs = await KeyValueStore.open(id='my_kvs_id')
+    kvs = await KeyValueStore.open(name='my_kvs')
     ```
     """
 

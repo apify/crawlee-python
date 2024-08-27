@@ -87,7 +87,7 @@ class RequestQueue(BaseStorage, RequestProvider):
 
     Usage:
     ```python
-    rq = await RequestQueue.open(id='my_rq_id')
+    rq = await RequestQueue.open(name='my_rq')
     ```
     """
 

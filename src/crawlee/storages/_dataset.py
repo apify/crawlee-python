@@ -99,7 +99,7 @@ class Dataset(BaseStorage):
 
     Usage:
     ```python
-    dataset = await Dataset.open(id='my_dataset_id')
+    dataset = await Dataset.open(name='my_dataset')
     ```
     """
 
