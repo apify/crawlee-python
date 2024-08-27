@@ -28,4 +28,11 @@ Here is a list of the updated public imports:
 
 ## Request queue
 
-<!-- TODO -->
+There were internal changes that should not affect the intended usage:
+
+- The unused `BaseRequestQueueClient.list_requests()` method was removed
+- `RequestQueue` internals were updated to match the "Request Queue V2" implementation in Crawlee for JS
+
+## Service container
+
+A new module, `crawlee.service_container`, was added to allow management of "global instances" - currently it contains `Configuration`, `EventManager` and `BaseStorageClient`. The module also replaces the `StorageClientManager` static class. It is likely that its interface will change in the future. If your use case requires working with it, please get in touch - we'll be glad to hear any feedback.
