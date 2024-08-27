@@ -267,7 +267,7 @@ class Snapshotter:
         """
         # TODO: This is just a dummy placeholder. It can be implemented once `StorageClient` is ready.
         # Attribute `self._client_rate_limit_error_retry_count` will be used here.
-        # https://github.com/apify/crawlee-py/issues/60
+        # https://github.com/apify/crawlee-python/issues/60
 
         error_count = 0
         snapshot = ClientSnapshot(error_count=error_count, max_error_count=self._max_client_errors)

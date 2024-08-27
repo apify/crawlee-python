@@ -151,4 +151,4 @@ jobs:
       version_number: ${{ needs.should_release.outputs.version_number }}
 
   # TODO: add job for publish package to Conda
-  # https://github.com/apify/crawlee-py/issues/104
+  # https://github.com/apify/python/issues/104
