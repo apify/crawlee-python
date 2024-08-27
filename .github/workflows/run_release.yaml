@@ -23,7 +23,7 @@ on:
         description: The custom version to bump to (only for "custom" type)
         required: false
         type: string
-        default: ''
+        default: ""
 
 jobs:
   run_code_checks:
@@ -114,7 +114,7 @@ jobs:
         with:
           author_name: Apify Release Bot
           author_email: noreply@apify.com
-          message: 'chore(release): Update changelog and package version [skip ci]'
+          message: "chore(release): Update changelog and package version [skip ci]"
 
   create_github_release:
     name: Create github release
