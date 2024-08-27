@@ -1,5 +1,5 @@
 # TODO: type ignores and crawlee_storage_dir
-# https://github.com/apify/crawlee-py/issues/146
+# https://github.com/apify/crawlee-python/issues/146
 
 from __future__ import annotations
 
