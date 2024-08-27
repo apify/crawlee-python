@@ -15,24 +15,34 @@ T = TypeVar('T')
 
 
 class KeyValueStore(BaseStorage):
-    """Represents a key-value based storage for reading data records or files.
+    """Represents a key-value based storage for reading and writing data records or files.
 
-    Each record is identified by a unique key and associated with a MIME content type. This class is used within
-    crawler runs to store inputs and outputs, typically in JSON format, but supports other types as well.
+    Each data record is identified by a unique key and associated with a specific MIME content type. This class is
+    commonly used in crawler runs to store inputs and outputs, typically in JSON format, but it also supports other
+    content types.
 
-    The data can be stored on a local filesystem or in the cloud, determined by the `CRAWLEE_STORAGE_DIR`
-    environment variable.
+    Data can be stored either locally or in the cloud. It depends on the setup of underlying storage client.
+    By default a `MemoryStorageClient` is used, but it can be changed to a different one.
 
-    By default, data is stored in `{CRAWLEE_STORAGE_DIR}/key_value_stores/{STORE_ID}/{INDEX}.{EXT}`, where
-    `{STORE_ID}` is either "default" or specified by `CRAWLEE_DEFAULT_KEY_VALUE_STORE_ID`, `{KEY}` is the record key,
-    and `{EXT}` is the MIME type.
+    By default, data is stored using the following path structure:
+    ```
+    {CRAWLEE_STORAGE_DIR}/key_value_stores/{STORE_ID}/{KEY}.{EXT}
+    ```
+    - `{CRAWLEE_STORAGE_DIR}`: The root directory for all storage data specified by the environment variable.
+    - `{STORE_ID}`: The identifier for the key-value store, either "default" or as specified by
+      `CRAWLEE_DEFAULT_KEY_VALUE_STORE_ID`.
+    - `{KEY}`: The unique key for the record.
+    - `{EXT}`: The file extension corresponding to the MIME type of the content.
 
-    To open a key-value store, use the class method `open`, providing either an `id` or `name` along with optional
-    `config`. If neither is provided, the default store for the crawler run is used. Opening a non-existent store by
-    `id` raises an error, while a non-existent store by `name` is created.
+    To open a key-value store, use the `open` class method, providing an `id`, `name`, or optional `configuration`.
+    If none are specified, the default store for the current crawler run is used. Attempting to open a store by `id`
+    that does not exist will raise an error; however, if accessed by `name`, the store will be created if it does not
+    already exist.
 
     Usage:
-        kvs = await KeyValueStore.open(id='my_kvs_id')
+    ```python
+    kvs = await KeyValueStore.open(name='my_kvs')
+    ```
     """
 
     def __init__(

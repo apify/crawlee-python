@@ -79,7 +79,12 @@ const groupSort = (g1, g2) => {
 function getGroupName(object) {
     const groupPredicates = {
         'Errors': (x) => x.name.toLowerCase().includes('error'),
-        'Main Classes': (x) => ['Dataset', 'KeyValueStore', 'RequestQueue'].includes(x.name) || x.name.endsWith('Crawler'),
+        'Main Classes': (x) => [
+            'BasicCrawler', 'HttpCrawler', 'BeautifulSoupCrawler', 'ParselCrawler', 'PlaywrightCrawler', 'Dataset',
+            'KeyValueStore', 'RequestQueue', 'MemoryStorageClient', 'HttpxHttpClient', 'CurlImpersonateHttpClient',
+            'Configuration', 'EventManager', 'LocalEventManager', 'Request', 'Session', 'SessionPool', 'BrowserPool',
+            'PlaywrightBrowserController', 'PlaywrightBrowserPlugin', 'Statistics',
+        ].includes(x.name),
         'Helper Classes': (x) => x.kindString === 'Class',
         'Methods': (x) => x.kindString === 'Method',
         'Constructors': (x) => x.kindString === 'Constructor',
@@ -178,12 +183,12 @@ function convertObject(obj, parent, module) {
         }
 
         let typedocType = inferTypedocType(member.datatype);
-        
+
         if (member.decorations?.some(d => ['property', 'dualproperty'].includes(d.name))) {
             typedocKind = TYPEDOC_KINDS['data'];
             typedocType = inferTypedocType(member.return_type ?? member.datatype);
         }
-        
+
         if(parent.kindString === 'Enumeration') {
             typedocKind = TYPEDOC_KINDS['enumValue'];
             typedocType = {

@@ -63,23 +63,32 @@ class CachedRequest(TypedDict):
 
 
 class RequestQueue(BaseStorage, RequestProvider):
-    """Represents a queue storage for HTTP requests to crawl.
+    """Represents a queue storage for managing HTTP requests in web crawling operations.
 
-    Manages a queue of requests with unique URLs for structured deep web crawling with support for both breadth-first
-    and depth-first orders. This queue is designed for crawling websites by starting with initial URLs and recursively
-    following links. Each URL is uniquely identified by a `unique_key` field, which can be overridden to add the same
-    URL multiple times under different keys.
+    The `RequestQueue` class handles a queue of HTTP requests, each identified by a unique URL, to facilitate structured
+    web crawling. It supports both breadth-first and depth-first crawling strategies, allowing for recursive crawling
+    starting from an initial set of URLs. Each URL in the queue is uniquely identified by a `unique_key`, which can be
+    customized to allow the same URL to be added multiple times under different keys.
 
-    Local storage path (if `CRAWLEE_STORAGE_DIR` is set):
-    `{CRAWLEE_STORAGE_DIR}/request_queues/{QUEUE_ID}/{REQUEST_ID}.json`, where `{QUEUE_ID}` is the request
-    queue's ID (default or specified) and `{REQUEST_ID}` is the request's ID.
+    Data can be stored either locally or in the cloud. It depends on the setup of underlying storage client.
+    By default a `MemoryStorageClient` is used, but it can be changed to a different one.
 
-    Usage includes creating or opening existing queues by ID or name, with named queues retained indefinitely and
-    unnamed queues expiring after 7 days unless specified otherwise. Supports mutable operations—URLs can be added
-    and deleted.
+    By default, data is stored using the following path structure:
+    ```
+    {CRAWLEE_STORAGE_DIR}/request_queues/{QUEUE_ID}/{REQUEST_ID}.json
+    ```
+    - `{CRAWLEE_STORAGE_DIR}`: The root directory for all storage data specified by the environment variable.
+    - `{QUEUE_ID}`: The identifier for the request queue, either "default" or as specified.
+    - `{REQUEST_ID}`: The unique identifier for each request in the queue.
+
+    The `RequestQueue` supports both creating new queues and opening existing ones by `id` or `name`. Named queues
+    persist indefinitely, while unnamed queues expire after 7 days unless specified otherwise. The queue supports
+    mutable operations, allowing URLs to be added and removed as needed.
 
     Usage:
-        rq = await RequestQueue.open(id='my_rq_id')
+    ```python
+    rq = await RequestQueue.open(name='my_rq')
+    ```
     """
 
     _MAX_CACHED_REQUESTS = 1_000_000
@@ -176,9 +185,9 @@ class RequestQueue(BaseStorage, RequestProvider):
     ) -> ProcessedRequest:
         """Adds a request to the `RequestQueue` while managing deduplication and positioning within the queue.
 
-        The deduplication of requests relies on the `uniqueKey` field within the request dictionary. If `uniqueKey`
+        The deduplication of requests relies on the `unique_key` field within the request dictionary. If `unique_key`
         exists, it remains unchanged; if it does not, it is generated based on the request's `url`, `method`,
-        and `payload` fields. The generation of `uniqueKey` can be influenced by the `keep_url_fragment` and
+        and `payload` fields. The generation of `unique_key` can be influenced by the `keep_url_fragment` and
         `use_extended_unique_key` flags, which dictate whether to include the URL fragment and the request's method
         and payload, respectively, in its computation.
 
@@ -188,17 +197,15 @@ class RequestQueue(BaseStorage, RequestProvider):
 
         Args:
             request: The request object to be added to the queue. Must include at least the `url` key.
-                Optionaly it can include the `method`, `payload` and `uniqueKey` keys.
-
+                Optionaly it can include the `method`, `payload` and `unique_key` keys.
             forefront: If True, adds the request to the forefront of the queue; otherwise, adds it to the end.
-
             keep_url_fragment: Determines whether the URL fragment (the part of the URL after '#') should be retained
-                in the unique key computation.
+                in the `unique_key` computation.
+            use_extended_unique_key: Determines whether to use an extended `unique_key`, incorporating the request's
+                method and payload into the `unique_key` computation.
 
-            use_extended_unique_key: Determines whether to use an extended unique key, incorporating the request's
-                method and payload into the unique key computation.
-
-        Returns: Information about the processed request.
+        Returns:
+            Information about the processed request.
         """
         request = self._transform_request(request)
         self._last_activity = datetime.now(timezone.utc)
@@ -340,9 +347,9 @@ class RequestQueue(BaseStorage, RequestProvider):
 
         # 1)
         # Queue head index is ahead of the main table and the request is not present in the main table yet
-        # (i.e. getRequest() returned null). In this case, keep the request marked as in progress for a short while,
-        # so that isFinished() doesn't return true and _ensureHeadIsNonEmpty() doesn't not load the request into
-        # the queueHeadDict straight again. After the interval expires, fetchNextRequest() will try to fetch this
+        # (i.e. get_request() returned null). In this case, keep the request marked as in progress for a short while,
+        # so that is_finished() doesn't return true and _ensure_head_is_non_empty() doesn't not load the request into
+        # the queueHeadDict straight again. After the interval expires, fetch_next_request() will try to fetch this
         # request again, until it eventually appears in the main table.
         if request is None:
             logger.debug(
@@ -357,9 +364,9 @@ class RequestQueue(BaseStorage, RequestProvider):
 
         # 2)
         # Queue head index is behind the main table and the underlying request was already handled (by some other
-        # client, since we keep the track of handled requests in recentlyHandled dictionary). We just add the request
-        # to the recentlyHandled dictionary so that next call to _ensureHeadIsNonEmpty() will not put the request again
-        # to queueHeadDict.
+        # client, since we keep the track of handled requests in recently_handled dictionary). We just add the request
+        # to the recently_handled dictionary so that next call to _ensure_head_is_non_empty() will not put the request
+        # again to queue_head_dict.
         if request.handled_at is not None:
             logger.debug(
                 'Request fetched from the beginning of queue was already handled',
@@ -410,7 +417,7 @@ class RequestQueue(BaseStorage, RequestProvider):
     ) -> ProcessedRequest | None:
         """Reclaim a failed request back to the queue.
 
-        The request will be returned for processing later again by another call to `RequestQueue.fetchNextRequest`.
+        The request will be returned for processing later again by another call to `RequestQueue.fetch_next_request`.
 
         Args:
             request: The request to return to the queue.
@@ -425,7 +432,7 @@ class RequestQueue(BaseStorage, RequestProvider):
             logger.debug(f'Cannot reclaim request (ID: {request.id}), because it is not in progress!')
             return None
 
-        # TODO: If request hasn't been changed since the last getRequest(), we don't need to call updateRequest()
+        # TODO: If request hasn't been changed since the last get_request(), we don't need to call update_request()
         # and thus improve performance.
         # https://github.com/apify/apify-sdk-python/issues/143
         processed_request = await self._resource_client.update_request(request, forefront=forefront)
@@ -450,7 +457,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         """Check whether the queue is empty.
 
         Returns:
-            bool: `True` if the next call to `RequestQueue.fetchNextRequest` would return `None`, otherwise `False`.
+            bool: `True` if the next call to `RequestQueue.fetch_next_request` would return `None`, otherwise `False`.
         """
         await self._ensure_head_is_non_empty()
         return len(self._queue_head_dict) == 0
@@ -458,9 +465,8 @@ class RequestQueue(BaseStorage, RequestProvider):
     async def is_finished(self) -> bool:
         """Check whether the queue is finished.
 
-        Due to the nature of distributed storage used by the queue,
-        the function might occasionally return a false negative,
-        but it will never return a false positive.
+        Due to the nature of distributed storage used by the queue, the function might occasionally return a false
+        negative, but it will never return a false positive.
 
         Returns:
             bool: `True` if all requests were already handled and there are no more left. `False` otherwise.
@@ -617,7 +623,7 @@ class RequestQueue(BaseStorage, RequestProvider):
             hydrated_request = await self.get_request(request_id)
 
             # Queue head index is ahead of the main table and the request is not present in the main table yet
-            # (i.e. getRequest() returned null).
+            # (i.e. get_request() returned null).
             if not hydrated_request:
                 # Remove the lock from the request for now, so that it can be picked up later
                 # This may/may not succeed, but that's fine
@@ -661,7 +667,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         cached_entry['hydrated'] = hydrated_request
 
         # Queue head index is ahead of the main table and the request is not present in the main table yet
-        # (i.e. getRequest() returned null).
+        # (i.e. get_request() returned null).
         if not hydrated_request:
             # Remove the lock from the request for now, so that it can be picked up later
             # This may/may not succeed, but that's fine
