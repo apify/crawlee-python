@@ -7,9 +7,9 @@ from typing import AsyncGenerator
 import pytest
 
 from crawlee.events import EventManager
-from crawlee.events.types import Event, EventPersistStateData
+from crawlee.events._types import Event, EventPersistStateData
 from crawlee.sessions import Session, SessionPool
-from crawlee.sessions.models import SessionPoolModel
+from crawlee.sessions._models import SessionPoolModel
 from crawlee.storages import KeyValueStore
 
 MAX_POOL_SIZE = 3

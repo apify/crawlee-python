@@ -14,16 +14,14 @@ from unittest.mock import Mock
 import httpx
 import pytest
 
-from crawlee import Glob
-from crawlee.autoscaling import ConcurrencySettings
+from crawlee import ConcurrencySettings, EnqueueStrategy, Glob
+from crawlee._request import BaseRequestData, Request
+from crawlee._types import AddRequestsKwargs, BasicCrawlingContext, HttpHeaders
 from crawlee.basic_crawler import BasicCrawler
 from crawlee.configuration import Configuration
-from crawlee.enqueue_strategy import EnqueueStrategy
 from crawlee.errors import SessionError, UserDefinedErrorHandlerError
-from crawlee.models import BaseRequestData, Request
-from crawlee.statistics.models import FinalStatistics
+from crawlee.statistics import FinalStatistics
 from crawlee.storages import Dataset, KeyValueStore, RequestList, RequestQueue
-from crawlee.types import AddRequestsKwargs, BasicCrawlingContext, HttpHeaders
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -642,6 +640,9 @@ async def test_respects_no_persist_storage() -> None:
 
 
 async def test_logs_final_statistics(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+    # Set the log level to INFO to capture the final statistics log.
+    caplog.set_level(logging.INFO)
+
     crawler = BasicCrawler(configure_logging=False)
 
     @crawler.router.default_handler

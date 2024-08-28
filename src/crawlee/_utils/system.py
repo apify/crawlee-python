@@ -1,4 +1,5 @@
-# ruff: noqa: TCH003
+# ruff: noqa: TCH001, TCH002, TCH003 (because of Pydantic)
+
 from __future__ import annotations
 
 import os

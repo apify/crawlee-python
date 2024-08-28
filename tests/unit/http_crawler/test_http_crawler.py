@@ -12,7 +12,7 @@ from crawlee.sessions import SessionPool
 from crawlee.storages import RequestList
 
 if TYPE_CHECKING:
-    from crawlee.http_crawler.types import HttpCrawlingContext
+    from crawlee.http_crawler._http_crawling_context import HttpCrawlingContext
 
 
 @pytest.fixture

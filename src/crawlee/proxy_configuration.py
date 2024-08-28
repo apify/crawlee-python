@@ -16,8 +16,7 @@ from crawlee._utils.crypto import crypto_random_object_id
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Sequence
 
-    from crawlee.models import Request
-
+    from crawlee.base_storage_client._models import Request
 
 __all__ = ['ProxyInfo', 'ProxyConfiguration']
 
@@ -51,53 +50,6 @@ class ProxyInfo:
     proxy_tier: int | None = None
 
 
-class ProxyTierTracker:
-    """Tracks the state of currently used proxy tiers and their error frequency for individual crawled domains."""
-
-    def __init__(self, tiered_proxy_urls: list[list[URL]]) -> None:
-        self._tiered_proxy_urls = tiered_proxy_urls
-        self._histogram_by_domain = defaultdict[str, list[int]](lambda: [0 for _tier in tiered_proxy_urls])
-        self._current_tier_by_domain = defaultdict[str, int](lambda: 0)
-
-    @property
-    def all_urls(self) -> Sequence[URL]:
-        return list(flatten(self._tiered_proxy_urls))
-
-    def get_tier_urls(self, tier_number: int) -> Sequence[URL]:
-        return self._tiered_proxy_urls[tier_number]
-
-    def add_error(self, domain: str, tier: int) -> None:
-        self._histogram_by_domain[domain][tier] += 10
-
-    def predict_tier(self, domain: str) -> int:
-        histogram = self._histogram_by_domain[domain]
-        current_tier = self._current_tier_by_domain[domain]
-
-        for index, value in enumerate(histogram):
-            if index == current_tier:
-                continue
-            if value > 0:
-                histogram[index] -= 1
-
-        left = histogram[current_tier - 1] if current_tier > 0 else float('inf')
-        right = histogram[current_tier + 1] if current_tier < len(histogram) - 1 else float('inf')
-
-        if histogram[current_tier] > min(left, right):
-            self._current_tier_by_domain[domain] = current_tier - 1 if left <= right else current_tier + 1
-        elif histogram[current_tier] == left:
-            self._current_tier_by_domain[domain] -= 1
-
-        return self._current_tier_by_domain[domain]
-
-
-class NewUrlFunction(Protocol):
-    def __call__(
-        self,
-        session_id: str | None = None,
-        request: Request | None = None,
-    ) -> str | None | Awaitable[str | None]: ...
-
-
 class ProxyConfiguration:
     """Configures connection to a proxy server with the provided options.
 
@@ -114,7 +66,7 @@ class ProxyConfiguration:
         self,
         *,
         proxy_urls: list[str] | None = None,
-        new_url_function: NewUrlFunction | None = None,
+        new_url_function: _NewUrlFunction | None = None,
         tiered_proxy_urls: list[list[str]] | None = None,
     ) -> None:
         """Initialize a proxy configuration object.
@@ -144,7 +96,7 @@ class ProxyConfiguration:
             [URL(url) for url in proxy_urls if self._url_validator.validate_python(url)] if proxy_urls else []
         )
         self._proxy_tier_tracker = (
-            ProxyTierTracker(
+            _ProxyTierTracker(
                 [[URL(url) for url in tier if self._url_validator.validate_python(url)] for tier in tiered_proxy_urls]
             )
             if tiered_proxy_urls
@@ -242,3 +194,50 @@ class ProxyConfiguration:
             self._next_custom_url_index += 1
 
         return self._used_proxy_urls[session_id], proxy_tier
+
+
+class _ProxyTierTracker:
+    """Tracks the state of currently used proxy tiers and their error frequency for individual crawled domains."""
+
+    def __init__(self, tiered_proxy_urls: list[list[URL]]) -> None:
+        self._tiered_proxy_urls = tiered_proxy_urls
+        self._histogram_by_domain = defaultdict[str, list[int]](lambda: [0 for _tier in tiered_proxy_urls])
+        self._current_tier_by_domain = defaultdict[str, int](lambda: 0)
+
+    @property
+    def all_urls(self) -> Sequence[URL]:
+        return list(flatten(self._tiered_proxy_urls))
+
+    def get_tier_urls(self, tier_number: int) -> Sequence[URL]:
+        return self._tiered_proxy_urls[tier_number]
+
+    def add_error(self, domain: str, tier: int) -> None:
+        self._histogram_by_domain[domain][tier] += 10
+
+    def predict_tier(self, domain: str) -> int:
+        histogram = self._histogram_by_domain[domain]
+        current_tier = self._current_tier_by_domain[domain]
+
+        for index, value in enumerate(histogram):
+            if index == current_tier:
+                continue
+            if value > 0:
+                histogram[index] -= 1
+
+        left = histogram[current_tier - 1] if current_tier > 0 else float('inf')
+        right = histogram[current_tier + 1] if current_tier < len(histogram) - 1 else float('inf')
+
+        if histogram[current_tier] > min(left, right):
+            self._current_tier_by_domain[domain] = current_tier - 1 if left <= right else current_tier + 1
+        elif histogram[current_tier] == left:
+            self._current_tier_by_domain[domain] -= 1
+
+        return self._current_tier_by_domain[domain]
+
+
+class _NewUrlFunction(Protocol):
+    def __call__(
+        self,
+        session_id: str | None = None,
+        request: Request | None = None,
+    ) -> str | None | Awaitable[str | None]: ...

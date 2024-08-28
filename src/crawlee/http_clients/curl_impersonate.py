@@ -22,11 +22,11 @@ if TYPE_CHECKING:
 
     from curl_cffi.requests import Response
 
-    from crawlee.models import Request
+    from crawlee._types import HttpHeaders, HttpMethod
+    from crawlee.base_storage_client._models import Request
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions import Session
     from crawlee.statistics import Statistics
-    from crawlee.types import HttpHeaders, HttpMethod
 
 
 class _CurlImpersonateResponse:
@@ -90,9 +90,11 @@ class CurlImpersonateHttpClient(BaseHttpClient):
 
         try:
             response = await client.request(
-                method=request.method.upper(),  # curl-cffi requires uppercase method
                 url=request.url,
+                method=request.method.upper(),  # curl-cffi requires uppercase method
                 headers=request.headers,
+                params=request.query_params,
+                data=request.data,
                 cookies=session.cookies if session else None,
                 allow_redirects=True,
             )
@@ -128,6 +130,8 @@ class CurlImpersonateHttpClient(BaseHttpClient):
         *,
         method: HttpMethod = 'GET',
         headers: HttpHeaders | None = None,
+        query_params: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> HttpResponse:
@@ -136,9 +140,11 @@ class CurlImpersonateHttpClient(BaseHttpClient):
 
         try:
             response = await client.request(
-                method=method.upper(),  # curl-cffi requires uppercase method
                 url=url,
+                method=method.upper(),  # curl-cffi requires uppercase method
                 headers=headers,
+                params=query_params,
+                data=data,
                 cookies=session.cookies if session else None,
                 allow_redirects=True,
             )

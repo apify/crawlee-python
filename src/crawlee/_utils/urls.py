@@ -7,7 +7,8 @@ from pydantic import AnyHttpUrl, TypeAdapter
 
 def is_url_absolute(url: str) -> bool:
     """Check if a URL is absolute."""
-    return bool(urlparse(url).netloc)
+    url_parsed = urlparse(url)
+    return bool(url_parsed.scheme) and bool(url_parsed.netloc)
 
 
 def convert_to_absolute_url(base_url: str, relative_url: str) -> str:

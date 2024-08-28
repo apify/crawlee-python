@@ -1,6 +1,6 @@
 try:
-    from .parsel_crawler import ParselCrawler
-    from .types import ParselCrawlingContext
+    from ._parsel_crawler import ParselCrawler
+    from ._parsel_crawling_context import ParselCrawlingContext
 except ImportError as exc:
     raise ImportError(
         "To import anything from this subpackage, you need to install the 'parsel' extra."

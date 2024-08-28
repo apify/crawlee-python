@@ -4,7 +4,19 @@ from typing import Generic
 
 from typing_extensions import TypeVar
 
-from crawlee.types import BasicCrawlingContext
+from crawlee._types import BasicCrawlingContext
+
+__all__ = [
+    'ContextPipelineFinalizationError',
+    'ContextPipelineInitializationError',
+    'ContextPipelineInterruptedError',
+    'HttpStatusCodeError',
+    'ProxyError',
+    'RequestHandlerError',
+    'SessionError',
+    'UserDefinedErrorHandlerError',
+    'ServiceConflictError',
+]
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 
@@ -60,3 +72,12 @@ class ContextPipelineFinalizationError(Exception):
 
 class ContextPipelineInterruptedError(Exception):
     """May be thrown in the initialization phase of a middleware to signal that the request should not be processed."""
+
+
+class ServiceConflictError(RuntimeError):
+    """Thrown when a service container is getting reconfigured."""
+
+    def __init__(self, service_name: str, new_value: object, old_value: object) -> None:
+        super().__init__(
+            f"Service '{service_name}' was already set (existing value is '{old_value}', new value is '{new_value}')."
+        )

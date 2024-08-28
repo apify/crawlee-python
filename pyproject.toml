@@ -4,14 +4,14 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "crawlee"
-version = "0.2.2"
+version = "0.3.0"
 description = "Crawlee for Python"
 authors = ["Apify Technologies s.r.o. <support@apify.com>"]
 license = "Apache-2.0"
 readme = "README.md"
 packages = [{ include = "crawlee", from = "src" }]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
@@ -35,10 +35,10 @@ keywords = [
 [tool.poetry.urls]
 "Homepage" = "https://crawlee.dev/python"
 "Apify Homepage" = "https://apify.com"
-"Changelog" = "https://github.com/apify/crawlee-py/blob/master/CHANGELOG.md"
+"Changelog" = "https://crawlee.dev/python/docs/changelog"
 "Documentation" = "https://crawlee.dev/python/docs/quick-start"
-"Issue Tracker" = "https://github.com/apify/crawlee-py/issues"
-"Repository" = "https://github.com/apify/crawlee-py"
+"Issue Tracker" = "https://github.com/apify/crawlee-python/issues"
+"Repository" = "https://github.com/apify/crawlee-python"
 
 # We use inclusive ordered comparison clauses for external packages intentionally in order to enhance Crawlee's
 # compatibility with external packages. This decision was discussed in detail in the following PR:
@@ -84,7 +84,7 @@ pytest-timeout = "~2.3.0"
 pytest-xdist = "~3.6.0"
 respx = "~0.21.0"
 ruff = "~0.6.0"
-setuptools = "~72.2.0"                    # setuptools are used by pytest, but not explicitly required
+setuptools = "~73.0.0"                    # setuptools are used by pytest, but not explicitly required
 types-beautifulsoup4 = "~4.12.0.20240229"
 types-colorama = "~0.4.15.20240106"
 types-psutil = "~5.9.5.20240205"
@@ -98,7 +98,7 @@ playwright = ["playwright"]
 parsel = ["parsel"]
 
 [tool.poetry.scripts]
-crawlee = "crawlee.cli:cli"
+crawlee = "crawlee._cli:cli"
 
 [tool.ruff]
 line-length = 120
@@ -160,6 +160,11 @@ indent-style = "space"
     "T20",     # flake8-print
     "TRY301",  # Abstract `raise` to an inner function
 ]
+"**/{docs}/**" = [
+    "D",       # Everything from the pydocstyle
+    "INP001",  # File {filename} is part of an implicit namespace package, add an __init__.py
+    "F841",    # Local variable {variable} is assigned to but never used
+]
 
 [tool.ruff.lint.flake8-quotes]
 docstring-quotes = "double"
@@ -196,6 +201,9 @@ warn_redundant_casts = true
 warn_return_any = true
 warn_unreachable = true
 warn_unused_ignores = true
+exclude = [
+    "docs/introduction/code/08_main.py",
+]
 
 [tool.mypy-scrapy]
 ignore_missing_imports = true

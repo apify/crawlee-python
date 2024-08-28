@@ -1,5 +1,5 @@
-from crawlee.basic_crawler import Router
 from crawlee.beautifulsoup_crawler import BeautifulSoupCrawlingContext
+from crawlee.router import Router
 
 router = Router[BeautifulSoupCrawlingContext]()
 

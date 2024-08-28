@@ -1,0 +1,119 @@
+---
+id: setting-up
+title: Setting up
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+
+To run Crawlee on your computer, ensure you meet the following requirements:
+
+1. [Python](https://www.python.org/) 3.9 or higher installed,
+2. [Pip](https://pip.pypa.io/en/stable/) installed.
+
+You can verify these by running the following commands:
+
+```sh
+python --version
+```
+
+```sh
+pip --version
+```
+
+## Installation
+
+Crawlee is available as the [`crawlee`](https://pypi.org/project/crawlee/) PyPI package. To install the core package, use:
+
+```sh
+pip install crawlee
+```
+
+After installation, verify that Crawlee is installed correctly by checking its version:
+
+```sh
+python -c 'import crawlee; print(crawlee.__version__)'
+```
+
+Crawlee offers several optional features through package extras. You can choose to install only the dependencies you need or install everything if you don't mind the package size.
+
+### Install all features
+
+If you do not care about the package size, install Crawlee with all features:
+
+```sh
+pip install 'crawlee[all]'
+```
+
+### Installing only specific extras
+
+Depending on your use case, you may want to install specific extras to enable additional functionality:
+
+#### BeautifulSoup
+
+For using the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, install the `beautifulsoup` extra:
+
+```sh
+pip install 'crawlee[beautifulsoup]'
+```
+
+#### Parsel
+
+For using the <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink>, install the `parsel` extra:
+
+```sh
+pip install 'crawlee[parsel]'
+```
+
+#### Curl impersonate
+
+For using the <ApiLink to="class/CurlImpersonateHttpClient">`CurlImpersonateHttpClient`</ApiLink>, install the `curl-impersonate` extra:
+
+```sh
+pip install 'crawlee[curl-impersonate]'
+```
+
+#### Playwright
+
+If you plan to use a (headless) browser with <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>, install Crawlee with the `playwright` extra:
+
+```sh
+pip install 'crawlee[playwright]'
+```
+
+After installing the playwright extra, install the necessary Playwright dependencies:
+
+```sh
+playwright install
+```
+
+### Installing multiple extras
+
+You can install multiple extras at once by using a comma as a separator:
+
+```sh
+pip install 'crawlee[beautifulsoup,curl-impersonate]'
+```
+
+## With Crawlee CLI
+
+The quickest way to get started with Crawlee is by using the Crawlee CLI and selecting one of the prepared templates. First, ensure you have [Pipx](https://pipx.pypa.io/) installed:
+
+```sh
+pipx --help
+```
+
+Then, run the CLI and choose from the available templates:
+
+```sh
+pipx run crawlee create my-crawler
+```
+
+If you already have `crawlee` installed, you can spin it up by running:
+
+```sh
+crawlee create my-crawler
+```
+
+## Next steps
+
+Next, you will learn how to create a very simple crawler and Crawlee components while building it.

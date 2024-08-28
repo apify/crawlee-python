@@ -1,18 +1,18 @@
 # TODO: type ignores and crawlee_storage_dir
-# https://github.com/apify/crawlee-py/issues/146
+# https://github.com/apify/crawlee-python/issues/146
 
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Callable, cast
 
 import pytest
 from proxy import Proxy
 
+from crawlee import service_container
 from crawlee.configuration import Configuration
 from crawlee.memory_storage_client import MemoryStorageClient
 from crawlee.proxy_configuration import ProxyInfo
-from crawlee.storage_client_manager import StorageClientManager
 from crawlee.storages import _creation_management
 
 if TYPE_CHECKING:
@@ -26,12 +26,8 @@ def reset_globals(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callable[[
         # Set the environment variable for the local storage directory to the temporary path
         monkeypatch.setenv('CRAWLEE_STORAGE_DIR', str(tmp_path))
 
-        # Reset the local and cloud clients in StorageClientManager
-        StorageClientManager._local_client = MemoryStorageClient()
-        StorageClientManager._cloud_client = None
-
-        # Remove global configuration instance - it may contain settings adjusted by a previous test
-        Configuration._default_instance = None
+        # Reset services in crawlee.service_container
+        cast(dict, service_container._services).clear()
 
         # Clear creation-related caches to ensure no state is carried over between tests
         monkeypatch.setattr(_creation_management, '_cache_dataset_by_id', {})

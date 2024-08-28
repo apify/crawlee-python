@@ -3,6 +3,7 @@ id: quick-start
 title: Quick start
 ---
 
+import ApiLink from '@site/src/components/ApiLink';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
@@ -10,15 +11,19 @@ This short tutorial will help you start scraping with Crawlee in just a minute o
 
 ## Choose your crawler
 
-Crawlee offers two main crawler classes: `BeautifulSoupCrawler`, and `PlaywrightCrawler`. All crawlers share the same interface, providing maximum flexibility when switching between them.
+Crawlee offers the following main crawler classes: <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink>, and <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>. All crawlers share the same interface, providing maximum flexibility when switching between them.
 
 ### BeautifulSoupCrawler
 
-The `BeautifulSoupCrawler` is a plain HTTP crawler that parses HTML using the well-known [BeautifulSoup](https://pypi.org/project/beautifulsoup4/) library. It crawls the web using an HTTP client that mimics a browser. This crawler is very fast and efficient but cannot handle JavaScript rendering.
+The <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> is a plain HTTP crawler that parses HTML using the well-known [BeautifulSoup](https://pypi.org/project/beautifulsoup4/) library. It crawls the web using an HTTP client that mimics a browser. This crawler is very fast and efficient but cannot handle JavaScript rendering.
+
+### ParselCrawler
+
+The <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> is similar to the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> but uses the [Parsel](https://pypi.org/project/parsel/) library for HTML parsing. Parsel is a lightweight library that provides a CSS selector-based API for extracting data from HTML documents. If you are familiar with the [Scrapy](https://scrapy.org/) framework, you will feel right at home with Parsel. As with the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, the <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> cannot handle JavaScript rendering.
 
 ### PlaywrightCrawler
 
-The `PlaywrightCrawler` uses a headless browser controlled by the [Playwright](https://playwright.dev/) library. It can manage Chromium, Firefox, Webkit, and other browsers. Playwright is the successor to the [Puppeteer](https://pptr.dev/) library and is becoming the de facto standard in headless browser automation. If you need a headless browser, choose Playwright.
+The <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> uses a headless browser controlled by the [Playwright](https://playwright.dev/) library. It can manage Chromium, Firefox, Webkit, and other browsers. Playwright is the successor to the [Puppeteer](https://pptr.dev/) library and is becoming the de facto standard in headless browser automation. If you need a headless browser, choose Playwright.
 
 :::caution before you start
 
@@ -46,7 +51,7 @@ Verify that Crawlee is successfully installed:
 python -c 'import crawlee; print(crawlee.__version__)'
 ```
 
-For detailed installation instructions see the [Setting up](../introduction/01-setting-up.mdx) documentation page.
+For detailed installation instructions see the [Setting up](../introduction/01_setting_up.mdx) documentation page.
 
 ## Crawling
 

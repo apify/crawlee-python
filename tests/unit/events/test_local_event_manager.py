@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from crawlee.events import LocalEventManager
-from crawlee.events.types import Event, EventSystemInfoData
+from crawlee.events._types import Event, EventSystemInfoData
 
 
 @pytest.fixture

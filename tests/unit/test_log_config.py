@@ -5,7 +5,7 @@ import sys
 
 import pytest
 
-from crawlee.log_config import CrawleeLogFormatter
+from crawlee._log_config import CrawleeLogFormatter
 
 
 def get_log_record(level: int, msg: str, exc_info: logging._SysExcInfoType | None = None) -> logging.LogRecord:

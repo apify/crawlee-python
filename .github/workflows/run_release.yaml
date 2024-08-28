@@ -23,13 +23,9 @@ on:
         description: The custom version to bump to (only for "custom" type)
         required: false
         type: string
-        default: ''
+        default: ""
 
 jobs:
-  run_code_checks:
-    name: Run code checks
-    uses: ./.github/workflows/run_code_checks.yaml
-
   # This job determines if the conditions are met for a release to occur. It will proceed if triggered manually,
   # for any published release, or if the commit on push does not begin with "docs" or "chore".
   should_release:
@@ -71,7 +67,7 @@ jobs:
 
   update_changelog:
     name: Update changelog
-    needs: [run_code_checks, should_release]
+    needs: [should_release]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -114,7 +110,7 @@ jobs:
         with:
           author_name: Apify Release Bot
           author_email: noreply@apify.com
-          message: 'chore(release): Update changelog and package version [skip ci]'
+          message: "chore(release): Update changelog and package version [skip ci]"
 
   create_github_release:
     name: Create github release
@@ -155,4 +151,4 @@ jobs:
       version_number: ${{ needs.should_release.outputs.version_number }}
 
   # TODO: add job for publish package to Conda
-  # https://github.com/apify/crawlee-py/issues/104
+  # https://github.com/apify/crawlee-python/issues/104
