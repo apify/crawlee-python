@@ -1,7 +1,9 @@
 name: Update new issue
 
 on:
-  workflow_call:
+  issues:
+    types:
+      - opened
 
 jobs:
   label_issues:
