@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.3.1 - **not yet released**
+
+### 🚀 Features
+
+- Curl http client selects chrome impersonation by default ([#473](https://github.com/apify/crawlee-python/pull/473)) ([82dc939](https://github.com/apify/crawlee-python/commit/82dc93957b1a380ea975564dea5c6ba4639be548)) by [@vdusek](https://github.com/vdusek)
+
 ## [0.3.0](https://github.com/apify/crawlee-python/releases/tag/v0.3.0) (2024-08-27)
 
 ### 🚀 Features
