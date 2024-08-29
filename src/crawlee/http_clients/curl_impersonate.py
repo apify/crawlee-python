@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, Optional
 try:
     from curl_cffi.requests import AsyncSession
     from curl_cffi.requests.errors import RequestsError
+    from curl_cffi.requests.impersonate import BrowserType
 except ImportError as exc:
     raise ImportError(
         "To import anything from this subpackage, you need to install the 'curl-impersonate' extra."
@@ -158,13 +159,24 @@ class CurlImpersonateHttpClient(BaseHttpClient):
     def _get_client(self, proxy_url: str | None) -> AsyncSession:
         """Helper to get a HTTP client for the given proxy URL.
 
-        If the client for the given proxy URL doesn't exist, it will be created and stored.
+        The method checks if an `AsyncSession` already exists for the provided proxy URL. If no session exists,
+        it creates a new one, configured with the specified proxy and additional session options. The new session
+        is then stored for future use.
         """
+        # Check if a session for the given proxy URL has already been created.
         if proxy_url not in self._client_by_proxy_url:
-            self._client_by_proxy_url[proxy_url] = AsyncSession(
-                proxy=proxy_url,
-                **self._async_session_kwargs,
-            )
+            # Prepare a default kwargs for the new session. A provided proxy URL and a chrome for impersonation
+            # are set as default options.
+            kwargs: dict[str, Any] = {
+                'proxy': proxy_url,
+                'impersonate': BrowserType.chrome,
+            }
+
+            # Update the default kwargs with any additional user-provided kwargs.
+            kwargs.update(self._async_session_kwargs)
+
+            # Create and store the new session with the specified kwargs.
+            self._client_by_proxy_url[proxy_url] = AsyncSession(**kwargs)
 
         return self._client_by_proxy_url[proxy_url]
 
