@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import random
 from typing import TYPE_CHECKING, Any, Optional
 
 try:
@@ -166,11 +165,11 @@ class CurlImpersonateHttpClient(BaseHttpClient):
         """
         # Check if a session for the given proxy URL has already been created.
         if proxy_url not in self._client_by_proxy_url:
-            # Prepare a default kwargs for the new session. A provided proxy URL and a randomly selected browser
-            # type for impersonation are set as default options.
+            # Prepare a default kwargs for the new session. A provided proxy URL and a chrome for impersonation
+            # are set as default options.
             kwargs: dict[str, Any] = {
                 'proxy': proxy_url,
-                'impersonate': random.choice(list(BrowserType)),
+                'impersonate': BrowserType.chrome,
             }
 
             # Update the default kwargs with any additional user-provided kwargs.
