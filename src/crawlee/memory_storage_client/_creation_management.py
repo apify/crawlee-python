@@ -181,6 +181,7 @@ def create_dataset_from_directory(
     from crawlee.memory_storage_client._dataset_client import DatasetClient
 
     item_count = 0
+    has_seen_metadata_file = False
     created_at = datetime.now(timezone.utc)
     accessed_at = datetime.now(timezone.utc)
     modified_at = datetime.now(timezone.utc)
@@ -189,6 +190,7 @@ def create_dataset_from_directory(
     metadata_filepath = os.path.join(storage_directory, METADATA_FILENAME)
 
     if os.path.exists(metadata_filepath):
+        has_seen_metadata_file = True
         with open(metadata_filepath, encoding='utf-8') as f:
             json_content = json.load(f)
             resource_info = DatasetMetadata(**json_content)
@@ -202,7 +204,6 @@ def create_dataset_from_directory(
 
     # Load dataset entries
     entries: dict[str, dict] = {}
-    has_seen_metadata_file = False
 
     for entry in os.scandir(storage_directory):
         if entry.is_file():
