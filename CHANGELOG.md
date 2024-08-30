@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.3.2 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Double incrementation of `item_count` ([#443](https://github.com/apify/crawlee-python/pull/443), closes [#442](https://github.com/apify/crawlee-python/issues/442)) ([cd9adf1](https://github.com/apify/crawlee-python/commit/cd9adf15731e8c4a39cb142b6d1a62909cafdc51)) by [@cadlagtrader](https://github.com/cadlagtrader)
+
 ## [0.3.1](https://github.com/apify/crawlee-python/releases/tag/v0.3.1) (2024-08-30)
 
 ### 🚀 Features
