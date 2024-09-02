@@ -71,6 +71,21 @@ async def server() -> AsyncGenerator[respx.MockRouter, None]:
             </html>""",
         )
 
+        mock.get('/json', name='json_endpoint').return_value = Response(
+            200,
+            text="""{
+                "hello": "world"
+            }""",
+        )
+
+        mock.get('/xml', name='xml_endpoint').return_value = Response(
+            200,
+            text="""
+                <?xml version="1.0"?>
+                <hello>world</hello>
+            """,
+        )
+
         generic_response = Response(
             200,
             text="""<html>
@@ -225,3 +240,37 @@ def test_import_error_handled() -> None:
         "To import anything from this subpackage, you need to install the 'parsel' extra."
         "For example, if you use pip, run `pip install 'crawlee[parsel]'`."
     )
+
+
+async def test_json(server: respx.MockRouter) -> None:
+    crawler = ParselCrawler(request_provider=RequestList(['https://test.io/json']))
+    handler = mock.AsyncMock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        result = context.selector.jmespath('hello').getall()
+        await handler(result)
+
+    await crawler.run()
+
+    assert server['json_endpoint'].called
+    assert handler.called
+
+    assert handler.call_args[0][0] == ['world']
+
+
+async def test_xml(server: respx.MockRouter) -> None:
+    crawler = ParselCrawler(request_provider=RequestList(['https://test.io/xml']))
+    handler = mock.AsyncMock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        result = context.selector.css('hello').getall()
+        await handler(result)
+
+    await crawler.run()
+
+    assert server['xml_endpoint'].called
+    assert handler.called
+
+    assert handler.call_args[0][0] == ['<hello>world</hello>']
