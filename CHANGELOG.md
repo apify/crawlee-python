@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 
 - Double incrementation of `item_count` ([#443](https://github.com/apify/crawlee-python/pull/443), closes [#442](https://github.com/apify/crawlee-python/issues/442)) ([cd9adf1](https://github.com/apify/crawlee-python/commit/cd9adf15731e8c4a39cb142b6d1a62909cafdc51)) by [@cadlagtrader](https://github.com/cadlagtrader)
 - Field alias in `BatchRequestsOperationResponse` ([#485](https://github.com/apify/crawlee-python/pull/485)) ([126a862](https://github.com/apify/crawlee-python/commit/126a8629cb5b989a0f9fe22156fb09731a34acd2)) by [@janbuchar](https://github.com/janbuchar)
+- JSON handling with Parsel ([#490](https://github.com/apify/crawlee-python/pull/490), closes [#488](https://github.com/apify/crawlee-python/issues/488)) ([ebf5755](https://github.com/apify/crawlee-python/commit/ebf575539ffb631ae131a1b801cec8f21dd0cf4c)) by [@janbuchar](https://github.com/janbuchar)
 
 ## [0.3.1](https://github.com/apify/crawlee-python/releases/tag/v0.3.1) (2024-08-30)
 
