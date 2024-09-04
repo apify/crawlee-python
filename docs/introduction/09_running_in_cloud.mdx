@@ -1,23 +1,26 @@
 ---
-id: running-in-cloud
-title: Running in cloud
+id: deployment
+title: Running your crawler in the Cloud
+sidebar_label: Running in the Cloud
+description: Deploying Crawlee-python projects to the Apify Platform
 ---
 
+import CodeBlock from '@theme/CodeBlock';
 import MainExample from '!!raw-loader!./code/09_apify_sdk.py';
 
 ## Apify Platform
 
 Crawlee is developed by [**Apify**](https://apify.com), the web scraping and automation platform. You could say it is the **home of Crawlee projects**. In this section you'll see how to deploy the crawler there with just a few simple steps. You can deploy a **Crawlee** project wherever you want, but using the [**Apify Platform**](https://console.apify.com) will give you the best experience.
 
-<!-- In case you want to deploy your Crawlee project to other platforms, check out the [**Deployment**](../deployment) section. -->
+{/*In case you want to deploy your Crawlee project to other platforms, check out the [**Deployment**](../deployment) section.*/}
 
 With a few simple steps, you can convert your Crawlee project into a so-called **Actor**. Actors are serverless micro-apps that are easy to develop, run, share, and integrate. The infra, proxies, and storages are ready to go. [Learn more about Actors](https://apify.com/actors).
 
-<!-- :::info Choosing between Crawlee CLI and Apify CLI for project setup -->
-<!---->
-<!-- We started this guide by using the Crawlee CLI to bootstrap the project - it offers the basic Crawlee templates, including a ready-made `Dockerfile`. If you know you will be deploying your project to the Apify Platform, you might want to start with the Apify CLI instead. It also offers several project templates, and those are all set up to be used on the Apify Platform right ahead. -->
-<!---->
-<!-- ::: -->
+{/*:::info Choosing between Crawlee CLI and Apify CLI for project setup
+
+We started this guide by using the Crawlee CLI to bootstrap the project - it offers the basic Crawlee templates, including a ready-made `Dockerfile`. If you know you will be deploying your project to the Apify Platform, you might want to start with the Apify CLI instead. It also offers several project templates, and those are all set up to be used on the Apify Platform right ahead.
+
+:::*/}
 
 ## Dependencies
 
@@ -94,7 +97,7 @@ This command will create an archive from your project, upload it to the Apify Pl
 
 If you want to learn more about web scraping and browser automation, check out the [Apify Academy](https://developers.apify.com/academy). It's full of courses and tutorials on the topic. From beginner to advanced. And the best thing: **It's free and open source** ❤️
 
-<!-- If you want to do one more project, checkout our tutorial on building a [HackerNews scraper using Crawlee](https://blog.apify.com/crawlee-web-scraping-tutorial/). -->
+{/*If you want to do one more project, checkout our tutorial on building a [HackerNews scraper using Crawlee](https://blog.apify.com/crawlee-web-scraping-tutorial/).*/}
 
 :::
 

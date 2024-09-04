@@ -1,5 +1,6 @@
 import asyncio
 
+# highlight-next-line
 from apify import Actor
 from crawlee.playwright_crawler import PlaywrightCrawler
 
@@ -7,6 +8,7 @@ from .routes import router
 
 
 async def main() -> None:
+    # highlight-next-line
     async with Actor:
         crawler = PlaywrightCrawler(
             # Let's limit our crawls to make our tests shorter and safer.

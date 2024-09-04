@@ -18,6 +18,7 @@ module.exports = {
                 'introduction/scraping',
                 'introduction/saving-data',
                 'introduction/refactoring',
+                'introduction/running-in-cloud',
                 // TODO: add once SDK v2 is released
                 // 'introduction/running-in-cloud',
             ],
