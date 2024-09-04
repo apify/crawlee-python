@@ -206,7 +206,11 @@ async def test_handle_blocked_request(server: respx.MockRouter) -> None:
 
 
 async def test_handle_blocked_status_code(server: respx.MockRouter) -> None:
-    crawler = ParselCrawler(request_provider=RequestList(['https://test.io/blocked']), max_session_rotations=1)
+    crawler = ParselCrawler(
+        request_provider=RequestList(['https://test.io/blocked']),
+        max_session_rotations=1,
+        retry_on_blocked=False,
+    )
 
     # Patch internal calls and run crawler
     with mock.patch.object(

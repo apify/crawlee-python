@@ -26,6 +26,17 @@ async def crawler(mock_request_handler: Callable[[HttpCrawlingContext], Awaitabl
 
 
 @pytest.fixture
+async def crawler_without_retries(
+    mock_request_handler: Callable[[HttpCrawlingContext], Awaitable[None]],
+) -> HttpCrawler:
+    return HttpCrawler(
+        request_handler=mock_request_handler,
+        request_provider=RequestList(),
+        retry_on_blocked=False,
+    )
+
+
+@pytest.fixture
 async def server() -> AsyncGenerator[respx.MockRouter, None]:
     with respx.mock(base_url='https://test.io', assert_all_called=False) as mock:
         mock.get('/html', name='html_endpoint').return_value = Response(
@@ -91,13 +102,17 @@ async def test_handles_redirects(
 
 
 async def test_handles_client_errors(
-    crawler: HttpCrawler, mock_request_handler: AsyncMock, server: respx.MockRouter
+    crawler_without_retries: HttpCrawler,
+    mock_request_handler: AsyncMock,
+    server: respx.MockRouter,
 ) -> None:
+    crawler = crawler_without_retries
+
     await crawler.add_requests(['https://test.io/404'])
     await crawler.run()
 
-    mock_request_handler.assert_called_once()
-    assert mock_request_handler.call_args[0][0].request.loaded_url == 'https://test.io/404'
+    # Request handler should not be called for error status codes.
+    mock_request_handler.assert_not_called()
     assert server['404_endpoint'].called
 
 
@@ -145,11 +160,16 @@ async def test_stores_cookies(httpbin: str) -> None:
     assert session.cookies == {'a': '1', 'b': '2', 'c': '3'}
 
 
-async def test_http_status_statistics(crawler: HttpCrawler, server: respx.MockRouter) -> None:
+async def test_http_status_statistics(
+    crawler_without_retries: HttpCrawler,
+    server: respx.MockRouter,
+) -> None:
+    crawler = crawler_without_retries
+
     await crawler.add_requests([f'https://test.io/500?id={i}' for i in range(100)])
     await crawler.add_requests([f'https://test.io/404?id={i}' for i in range(100)])
     await crawler.add_requests([f'https://test.io/html?id={i}' for i in range(100)])
 
     await crawler.run()
-    assert crawler.statistics.state.requests_with_status_code == {'200': 100, '500': 300, '404': 100}
+    assert crawler.statistics.state.requests_with_status_code == {'200': 100, '500': 100, '404': 100}
     assert len(server['html_endpoint'].calls) == 100

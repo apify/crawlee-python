@@ -6,7 +6,7 @@ import httpx
 from typing_extensions import override
 
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
-from crawlee.errors import HttpStatusCodeError, ProxyError
+from crawlee.errors import ProxyError
 from crawlee.http_clients import BaseHttpClient, HttpCrawlingResult, HttpResponse
 from crawlee.sessions import Session
 
@@ -66,6 +66,11 @@ class HttpxHttpClient(BaseHttpClient):
 
     This client uses the `HTTPX` library to perform HTTP requests in crawlers (`BasicCrawler` subclasses)
     and to manage sessions, proxies, and error handling.
+
+    The client raises an `HttpStatusCodeError` when it encounters an error response, defined by default as any
+    HTTP status code in the range of 400 to 599. The error handling behavior is customizable, allowing the user
+    to specify additional status codes to treat as errors or to exclude specific status codes from being considered
+    errors.
     """
 
     def __init__(
@@ -122,16 +127,11 @@ class HttpxHttpClient(BaseHttpClient):
         if statistics:
             statistics.register_status_code(response.status_code)
 
-        exclude_error = response.status_code in self._ignore_http_error_status_codes
-        include_error = response.status_code in self._additional_http_error_status_codes
-
-        if include_error or (self._is_server_code(response.status_code) and not exclude_error):
-            if include_error:
-                raise HttpStatusCodeError(
-                    f'Status code {response.status_code} (user-configured to be an error) returned'
-                )
-
-            raise HttpStatusCodeError(f'Status code {response.status_code} returned')
+        self._raise_for_error_status_code(
+            response.status_code,
+            self._additional_http_error_status_codes,
+            self._ignore_http_error_status_codes,
+        )
 
         request.loaded_url = str(response.url)
 
@@ -168,6 +168,12 @@ class HttpxHttpClient(BaseHttpClient):
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
             raise
+
+        self._raise_for_error_status_code(
+            response.status_code,
+            self._additional_http_error_status_codes,
+            self._ignore_http_error_status_codes,
+        )
 
         return _HttpxResponse(response)
 

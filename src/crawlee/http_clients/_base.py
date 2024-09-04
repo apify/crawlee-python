@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
+from crawlee.errors import HttpStatusCodeError
+
 if TYPE_CHECKING:
     from crawlee._types import HttpHeaders, HttpMethod
     from crawlee.base_storage_client._models import Request
@@ -52,6 +54,8 @@ class BaseHttpClient(ABC):
     ) -> HttpCrawlingResult:
         """Perform the crawling for a given request.
 
+        This method is called from `crawler.run()`.
+
         Args:
             request: The request to be crawled.
             session: The session associated with the request.
@@ -78,6 +82,8 @@ class BaseHttpClient(ABC):
     ) -> HttpResponse:
         """Send an HTTP request via the client.
 
+        This method is called from `context.send_request()` helper.
+
         Args:
             url: The URL to send the request to.
             method: The HTTP method to use.
@@ -87,12 +93,38 @@ class BaseHttpClient(ABC):
 
         Raises:
             ProxyError: Raised if a proxy-related error occurs.
+            HttpStatusError: Raised if the response status code indicates an error.
 
         Returns:
             The HTTP response received from the server.
         """
 
+    def _raise_for_error_status_code(
+        self,
+        status_code: int,
+        additional_http_error_status_codes: set[int],
+        ignore_http_error_status_codes: set[int],
+    ) -> None:
+        """Raise an exception if the given status code is considered as an error."""
+        exclude_error = status_code in ignore_http_error_status_codes
+        include_error = status_code in additional_http_error_status_codes
+
+        if include_error or (self._is_status_code_error(status_code) and not exclude_error):
+            if include_error:
+                raise HttpStatusCodeError(f'Status code {status_code} (user-configured to be an error) returned.')
+
+            raise HttpStatusCodeError(f'Status code {status_code} returned.')
+
+    def _is_status_code_error(self, value: int) -> bool:
+        """Returns `True` for 4xx or 5xx status codes, `False` otherwise."""
+        return self._is_status_code_client_error(value) or self._is_status_code_server_error(value)
+
     @staticmethod
-    def _is_server_code(status_code: int) -> bool:
-        """Helper to determine if a status code is a server error."""
-        return 500 <= status_code <= 599  # noqa: PLR2004
+    def _is_status_code_client_error(value: int) -> bool:
+        """Returns `True` for 4xx status codes, `False` otherwise."""
+        return 400 <= value <= 499  # noqa: PLR2004
+
+    @staticmethod
+    def _is_status_code_server_error(value: int) -> bool:
+        """Returns `True` for 5xx status codes, `False` otherwise."""
+        return value >= 500  # noqa: PLR2004
