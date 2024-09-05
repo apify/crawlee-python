@@ -18,7 +18,7 @@ from crawlee.events._types import EventSystemInfoData
 @pytest.fixture
 def snapshotter() -> Snapshotter:
     mocked_event_manager = AsyncMock(spec=EventManager)
-    return Snapshotter(mocked_event_manager)
+    return Snapshotter(mocked_event_manager, available_memory_ratio=0.25)
 
 
 @pytest.fixture
@@ -33,7 +33,7 @@ def event_system_data_info() -> EventSystemInfoData:
 
 
 async def test_start_stop_lifecycle() -> None:
-    async with LocalEventManager() as event_manager, Snapshotter(event_manager):
+    async with LocalEventManager() as event_manager, Snapshotter(event_manager, available_memory_ratio=0.25):
         pass
 
 
@@ -169,23 +169,19 @@ def test_snapshot_pruning_keeps_recent_records_unaffected(snapshotter: Snapshott
     assert snapshotter._cpu_snapshots[1].created_at == now
 
 
-def test_memory_load_evaluation_logs_warning_on_high_usage(
-    monkeypatch: pytest.MonkeyPatch,
-    snapshotter: Snapshotter,
-) -> None:
-    mock_logger_warn = MagicMock()
-    monkeypatch.setattr(getLogger('crawlee._autoscaling.snapshotter'), 'warning', mock_logger_warn)
-    snapshotter._max_memory_size = ByteSize.from_gb(8)
+def test_memory_load_evaluation_logs_warning_on_high_usage(caplog: pytest.LogCaptureFixture) -> None:
+    snapshotter = Snapshotter(AsyncMock(spec=EventManager), max_memory_size=ByteSize.from_gb(8))
 
-    high_memory_usage = ByteSize.from_gb(8) * 0.9  # 90% of 8 GB
+    high_memory_usage = ByteSize.from_gb(8) * 0.95  # 90% of 8 GB
 
     snapshotter._evaluate_memory_load(
         current_memory_usage_size=high_memory_usage,
         snapshot_timestamp=datetime.now(timezone.utc),
     )
 
-    assert mock_logger_warn.call_count == 1
-    assert 'Memory is critically overloaded' in mock_logger_warn.call_args[0][0]
+    assert len(caplog.records) == 1
+    assert caplog.records[0].levelname.lower() == 'warning'
+    assert 'Memory is critically overloaded' in caplog.records[0].msg
 
     # It should not log again, since the last log was short time ago
     snapshotter._evaluate_memory_load(
@@ -193,7 +189,7 @@ def test_memory_load_evaluation_logs_warning_on_high_usage(
         snapshot_timestamp=datetime.now(timezone.utc),
     )
 
-    assert mock_logger_warn.call_count == 1
+    assert len(caplog.records) == 1
 
 
 def test_memory_load_evaluation_silent_on_acceptable_usage(
