@@ -39,21 +39,21 @@ module.exports = {
                 },
             ],
         },
-        // {
-        //     type: 'category',
-        //     label: 'Deployment',
-        //     link: {
-        //         type: 'generated-index',
-        //         title: 'Deployment guides',
-        //         description: 'Here you can find guides on how to deploy your crawlers to various cloud providers.',
-        //         slug: '/deployment',
-        //     },
-        //     items: [
-        //         {
-        //             type: 'doc',
-        //             id: 'deployment/apify-platform',
-        //             label: 'Deploy on Apify',
-        //         },
+        {
+            type: 'category',
+            label: 'Deployment',
+            link: {
+                type: 'generated-index',
+                title: 'Deployment guides',
+                description: 'Here you can find guides on how to deploy your crawlers to various cloud providers.',
+                slug: '/deployment',
+            },
+            items: [
+                {
+                    type: 'doc',
+                    id: 'deployment/apify-platform',
+                    label: 'Deploy on Apify',
+                },
         //         {
         //             type: 'category',
         //             label: 'Deploy on AWS',
@@ -70,8 +70,8 @@ module.exports = {
         //                 'deployment/gcp-browsers',
         //             ],
         //         },
-        //     ],
-        // },
+            ],
+        },
         {
             type: 'category',
             label: 'Examples',
