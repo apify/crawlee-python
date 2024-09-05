@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.3.5 - **not yet released**
+
+### 🚀 Features
+
+- Memory usage limit configuration via environment variables ([#502](https://github.com/apify/crawlee-python/pull/502)) ([c62e554](https://github.com/apify/crawlee-python/commit/c62e5545de6a1836f0514ebd3dd695e4fd856844)) by [@janbuchar](https://github.com/janbuchar)
+
 ## [0.3.4](https://github.com/apify/crawlee-python/releases/tag/v0.3.4) (2024-09-05)
 
 ### 🐛 Bug Fixes
