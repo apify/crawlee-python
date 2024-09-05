@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.3.4 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Expose basic crawling context ([#501](https://github.com/apify/crawlee-python/pull/501)) ([b484535](https://github.com/apify/crawlee-python/commit/b484535dbacc5d206a026f55a1d3e58edd375e91)) by [@vdusek](https://github.com/vdusek)
+
 ## [0.3.3](https://github.com/apify/crawlee-python/releases/tag/v0.3.3) (2024-09-05)
 
 ### 🐛 Bug Fixes
