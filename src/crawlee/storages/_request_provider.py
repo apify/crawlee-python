@@ -90,10 +90,10 @@ class RequestProvider(ABC):
 
     def _transform_requests(self, requests: Sequence[str | BaseRequestData | Request]) -> list[Request]:
         """Transforms a list of request-like objects into a list of Request objects."""
-        processed_requests: list[Request] = []
+        processed_requests = dict[str, Request]()
 
         for request in requests:
             processed_request = self._transform_request(request)
-            processed_requests.append(processed_request)
+            processed_requests.setdefault(processed_request.unique_key, processed_request)
 
-        return processed_requests
+        return list(processed_requests.values())
