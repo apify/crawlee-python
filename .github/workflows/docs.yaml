@@ -34,8 +34,10 @@ jobs:
         with:
           python-version: 3.12
 
-      - name: Install Python dependencies
-        run: make install-dev
+      - name: Install dependencies
+        run: |
+          pipx install poetry
+          make install-dev
 
       - name: Build generated API reference
         run: make build-api-reference
