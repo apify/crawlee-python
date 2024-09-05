@@ -172,7 +172,7 @@ def test_snapshot_pruning_keeps_recent_records_unaffected(snapshotter: Snapshott
 def test_memory_load_evaluation_logs_warning_on_high_usage(caplog: pytest.LogCaptureFixture) -> None:
     snapshotter = Snapshotter(AsyncMock(spec=EventManager), max_memory_size=ByteSize.from_gb(8))
 
-    high_memory_usage = ByteSize.from_gb(8) * 0.95  # 90% of 8 GB
+    high_memory_usage = ByteSize.from_gb(8) * 0.95  # 95% of 8 GB
 
     snapshotter._evaluate_memory_load(
         current_memory_usage_size=high_memory_usage,
