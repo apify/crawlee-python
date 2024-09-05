@@ -3,6 +3,8 @@
 # You can also use any other image from Docker Hub.
 FROM apify/actor-python:3.12
 
+RUN apt install -yq git && rm -rf /var/lib/apt/lists/*
+
 RUN pip install -U pip setuptools \
     && pip install poetry \
     && poetry self add poetry-plugin-export
