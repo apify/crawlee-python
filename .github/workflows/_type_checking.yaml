@@ -24,7 +24,9 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: make install-dev
+        run: |
+          pipx install poetry
+          make install-dev
 
       - name: Run type checking
         run: make type-check
