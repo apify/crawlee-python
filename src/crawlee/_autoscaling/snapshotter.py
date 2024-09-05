@@ -38,10 +38,11 @@ class Snapshotter:
         client_snapshot_interval: timedelta = timedelta(milliseconds=1000),
         max_used_cpu_ratio: float = 0.95,
         max_memory_size: ByteSize | None = None,
-        max_used_memory_ratio: float = 0.7,
+        max_used_memory_ratio: float = 0.9,
         max_event_loop_delay: timedelta = timedelta(milliseconds=50),
         max_client_errors: int = 1,
         snapshot_history: timedelta = timedelta(seconds=30),
+        available_memory_ratio: float | None = None,
         reserve_memory_ratio: float = 0.5,
         memory_warning_cooldown_period: timedelta = timedelta(milliseconds=10000),
         client_rate_limit_error_retry_count: int = 2,
@@ -74,6 +75,8 @@ class Snapshotter:
 
             snapshot_history: Sets the time interval for which the snapshots are kept.
 
+            available_memory_ratio: How big part of the system memory should be used if `max_memory_size` is not given.
+
             reserve_memory_ratio: Fraction of memory kept in reserve. Used to calculate critical memory overload
                 threshold.
 
@@ -83,6 +86,9 @@ class Snapshotter:
             client_rate_limit_error_retry_count: Number of retries for a client request before considering it a failure
                 due to rate limiting.
         """
+        if available_memory_ratio is None and max_memory_size is None:
+            raise ValueError('At least one of `available_memory_ratio` or `max_memory_size` must be specified')
+
         self._event_manager = event_manager
         self._event_loop_snapshot_interval = event_loop_snapshot_interval
         self._client_snapshot_interval = client_snapshot_interval
@@ -94,7 +100,9 @@ class Snapshotter:
         self._reserve_memory_ratio = reserve_memory_ratio
         self._memory_warning_cooldown_period = memory_warning_cooldown_period
         self._client_rate_limit_error_retry_count = client_rate_limit_error_retry_count
-        self._max_memory_size = max_memory_size or self._get_default_max_memory_size()
+        self._max_memory_size = max_memory_size or self._get_default_max_memory_size(
+            cast(float, available_memory_ratio)
+        )
 
         self._cpu_snapshots: list[CpuSnapshot] = []
         self._event_loop_snapshots: list[EventLoopSnapshot] = []
@@ -107,9 +115,9 @@ class Snapshotter:
         self._timestamp_of_last_memory_warning: datetime = datetime.now(timezone.utc) - timedelta(hours=1)
 
     @staticmethod
-    def _get_default_max_memory_size() -> ByteSize:
+    def _get_default_max_memory_size(available_memory_ratio: float) -> ByteSize:
         """Default `memory_max_size` is 1/4 of the total system memory."""
-        max_memory_size_in_bytes = int(psutil.virtual_memory().total * 0.25)
+        max_memory_size_in_bytes = int(psutil.virtual_memory().total * available_memory_ratio)
         max_memory_size = ByteSize(max_memory_size_in_bytes)
         logger.info(f'Setting max_memory_size of this run to {max_memory_size}.')
         return max_memory_size

@@ -157,14 +157,14 @@ class Configuration(BaseSettings):
     ] = None
 
     available_memory_ratio: Annotated[
-        float | None,
+        float,
         Field(
             validation_alias=AliasChoices(
                 'apify_available_memory_ratio',
                 'crawlee_available_memory_ratio',
             )
         ),
-    ] = None
+    ] = 0.25
 
     storage_dir: Annotated[
         str,
