@@ -54,10 +54,7 @@ class CurlImpersonateHttpClient(BaseHttpClient):
     This client uses the `curl-cffi` library to perform HTTP requests in crawlers (`BasicCrawler` subclasses)
     and to manage sessions, proxies, and error handling.
 
-    The client raises an `HttpStatusCodeError` when it encounters an error response, defined by default as any
-    HTTP status code in the range of 400 to 599. The error handling behavior is customizable, allowing the user
-    to specify additional status codes to treat as errors or to exclude specific status codes from being considered
-    errors.
+    See the `BaseHttpClient` class for more common information about HTTP clients.
     """
 
     def __init__(
@@ -76,9 +73,11 @@ class CurlImpersonateHttpClient(BaseHttpClient):
             ignore_http_error_status_codes: HTTP status codes to ignore as errors.
             async_session_kwargs: Additional keyword arguments for `curl_cffi.requests.AsyncSession`.
         """
-        self._persist_cookies_per_session = persist_cookies_per_session
-        self._additional_http_error_status_codes = set(additional_http_error_status_codes)
-        self._ignore_http_error_status_codes = set(ignore_http_error_status_codes)
+        super().__init__(
+            persist_cookies_per_session=persist_cookies_per_session,
+            additional_http_error_status_codes=additional_http_error_status_codes,
+            ignore_http_error_status_codes=ignore_http_error_status_codes,
+        )
         self._async_session_kwargs = async_session_kwargs
 
         self._client_by_proxy_url = dict[Optional[str], AsyncSession]()

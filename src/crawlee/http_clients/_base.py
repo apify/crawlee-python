@@ -8,6 +8,8 @@ from crawlee._utils.http import is_status_code_error
 from crawlee.errors import HttpStatusCodeError
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from crawlee._types import HttpHeaders, HttpMethod
     from crawlee.base_storage_client._models import Request
     from crawlee.proxy_configuration import ProxyInfo
@@ -42,7 +44,34 @@ class HttpCrawlingResult:
 
 
 class BaseHttpClient(ABC):
-    """An abstract base class for HTTP clients used in crawlers (`BasicCrawler` subclasses)."""
+    """An abstract base class for HTTP clients used in crawlers (`BasicCrawler` subclasses).
+
+    The specific HTTP client should use `_raise_for_error_status_code` method for checking the status code. This
+    way the consistent behaviour accross different HTTP clients can be maintained. It raises an `HttpStatusCodeError`
+    when it encounters an error response, defined by default as any HTTP status code in the range of 400 to 599.
+    The error handling behavior is customizable, allowing the user to specify additional status codes to treat as
+    errors or to exclude specific status codes from being considered errors. See `additional_http_error_status_codes`
+    and `ignore_http_error_status_codes` arguments in the constructor.
+    """
+
+    @abstractmethod
+    def __init__(
+        self,
+        *,
+        persist_cookies_per_session: bool = True,
+        additional_http_error_status_codes: Iterable[int] = (),
+        ignore_http_error_status_codes: Iterable[int] = (),
+    ) -> None:
+        """Create a new instance.
+
+        Args:
+            persist_cookies_per_session: Whether to persist cookies per HTTP session.
+            additional_http_error_status_codes: Additional HTTP status codes to treat as errors.
+            ignore_http_error_status_codes: HTTP status codes to ignore as errors.
+        """
+        self._persist_cookies_per_session = persist_cookies_per_session
+        self._additional_http_error_status_codes = set(additional_http_error_status_codes)
+        self._ignore_http_error_status_codes = set(ignore_http_error_status_codes)
 
     @abstractmethod
     async def crawl(
