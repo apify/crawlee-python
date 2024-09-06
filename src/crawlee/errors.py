@@ -39,6 +39,11 @@ class ProxyError(SessionError):
 class HttpStatusCodeError(Exception):
     """Raised when the response status code indicates an error."""
 
+    def __init__(self, message: str, status_code: int) -> None:
+        self.status_code = status_code
+        self.message = message
+        super().__init__(f'{message} (status code: {status_code}).')
+
 
 class RequestHandlerError(Exception, Generic[TCrawlingContext]):
     """Wraps an exception thrown from a request handler (router) and extends it with crawling context."""

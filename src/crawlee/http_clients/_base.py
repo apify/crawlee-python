@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
+from crawlee._utils.http import is_status_code_error
 from crawlee.errors import HttpStatusCodeError
 
 if TYPE_CHECKING:
@@ -109,22 +110,8 @@ class BaseHttpClient(ABC):
         exclude_error = status_code in ignore_http_error_status_codes
         include_error = status_code in additional_http_error_status_codes
 
-        if include_error or (self._is_status_code_error(status_code) and not exclude_error):
+        if include_error or (is_status_code_error(status_code) and not exclude_error):
             if include_error:
-                raise HttpStatusCodeError(f'Status code {status_code} (user-configured to be an error) returned.')
+                raise HttpStatusCodeError('Error status code (user-configured) returned.', status_code)
 
-            raise HttpStatusCodeError(f'Status code {status_code} returned.')
-
-    def _is_status_code_error(self, value: int) -> bool:
-        """Returns `True` for 4xx or 5xx status codes, `False` otherwise."""
-        return self._is_status_code_client_error(value) or self._is_status_code_server_error(value)
-
-    @staticmethod
-    def _is_status_code_client_error(value: int) -> bool:
-        """Returns `True` for 4xx status codes, `False` otherwise."""
-        return 400 <= value <= 499  # noqa: PLR2004
-
-    @staticmethod
-    def _is_status_code_server_error(value: int) -> bool:
-        """Returns `True` for 5xx status codes, `False` otherwise."""
-        return value >= 500  # noqa: PLR2004
+            raise HttpStatusCodeError('Error status code returned', status_code)
