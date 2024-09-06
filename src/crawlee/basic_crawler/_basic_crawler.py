@@ -849,9 +849,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 'An exception occurred in the user-defined request handler',
                 exc_info=primary_error.wrapped_exception,
             )
-            crawling_context = primary_error.crawling_context
-            error = primary_error.wrapped_exception
-            await self._handle_request_error(crawling_context, error)
+            await self._handle_request_error(primary_error.crawling_context, primary_error.wrapped_exception)
 
         except SessionError as session_error:
             if not crawling_context.session:

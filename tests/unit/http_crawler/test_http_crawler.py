@@ -177,6 +177,7 @@ async def test_do_not_retry_on_client_erros(crawler: HttpCrawler, server: respx.
     await crawler.add_requests(['https://test.io/bad_request'])
     stats = await crawler.run()
 
+    # by default, client errors are not retried
     assert stats.requests_failed == 1
     assert stats.retry_histogram == [1]
     assert stats.requests_total == 1
@@ -184,16 +185,19 @@ async def test_do_not_retry_on_client_erros(crawler: HttpCrawler, server: respx.
     assert len(server['bad_request_endpoint'].calls) == 1
 
 
-async def test_http_status_statistics(
-    crawler_without_retries: HttpCrawler,
-    server: respx.MockRouter,
-) -> None:
-    crawler = crawler_without_retries
-
-    await crawler.add_requests([f'https://test.io/500?id={i}' for i in range(100)])
-    await crawler.add_requests([f'https://test.io/404?id={i}' for i in range(100)])
-    await crawler.add_requests([f'https://test.io/html?id={i}' for i in range(100)])
+async def test_http_status_statistics(crawler: HttpCrawler, server: respx.MockRouter) -> None:
+    await crawler.add_requests([f'https://test.io/500?id={i}' for i in range(10)])
+    await crawler.add_requests([f'https://test.io/404?id={i}' for i in range(10)])
+    await crawler.add_requests([f'https://test.io/html?id={i}' for i in range(10)])
 
     await crawler.run()
-    assert crawler.statistics.state.requests_with_status_code == {'200': 100, '500': 100, '404': 100}
-    assert len(server['html_endpoint'].calls) == 100
+
+    assert crawler.statistics.state.requests_with_status_code == {
+        '200': 10,
+        '404': 10,  # client errors are not retried by default
+        '500': 30,  # server errors are retried by default
+    }
+
+    assert len(server['html_endpoint'].calls) == 10
+    assert len(server['404_endpoint'].calls) == 10
+    assert len(server['500_endpoint'].calls) == 30

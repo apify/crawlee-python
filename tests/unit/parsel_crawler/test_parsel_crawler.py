@@ -202,9 +202,8 @@ async def test_handle_blocked_request(server: respx.MockRouter) -> None:
     crawler = ParselCrawler(
         request_provider=RequestList(['https://test.io/fdyr']),
         max_session_rotations=1,
-        retry_on_blocked=False,
-        max_request_retries=0,
     )
+
     stats = await crawler.run()
     assert server['incapsula_endpoint'].called
     assert stats.requests_failed == 1
@@ -214,8 +213,6 @@ async def test_handle_blocked_status_code(server: respx.MockRouter) -> None:
     crawler = ParselCrawler(
         request_provider=RequestList(['https://test.io/blocked']),
         max_session_rotations=1,
-        retry_on_blocked=False,
-        max_request_retries=0,
     )
 
     # Patch internal calls and run crawler
