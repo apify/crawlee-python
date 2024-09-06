@@ -8,6 +8,10 @@ All notable changes to this project will be documented in this file.
 
 - Memory usage limit configuration via environment variables ([#502](https://github.com/apify/crawlee-python/pull/502)) ([c62e554](https://github.com/apify/crawlee-python/commit/c62e5545de6a1836f0514ebd3dd695e4fd856844)) by [@janbuchar](https://github.com/janbuchar)
 
+### 🐛 Bug Fixes
+
+- Http clients detect 4xx as errors by default ([#498](https://github.com/apify/crawlee-python/pull/498), closes [#496](https://github.com/apify/crawlee-python/issues/496)) ([1895dca](https://github.com/apify/crawlee-python/commit/1895dca538f415feca37b4a030525c7c0d32f114)) by [@vdusek](https://github.com/vdusek)
+
 ## [0.3.4](https://github.com/apify/crawlee-python/releases/tag/v0.3.4) (2024-09-05)
 
 ### 🐛 Bug Fixes
