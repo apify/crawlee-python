@@ -51,6 +51,7 @@ class RequestHandlerError(Exception, Generic[TCrawlingContext]):
     def __init__(self, wrapped_exception: Exception, crawling_context: TCrawlingContext) -> None:
         self.wrapped_exception = wrapped_exception
         self.crawling_context = crawling_context
+        super().__init__()
 
 
 class ContextPipelineInitializationError(Exception):
@@ -62,6 +63,7 @@ class ContextPipelineInitializationError(Exception):
     def __init__(self, wrapped_exception: Exception, crawling_context: BasicCrawlingContext) -> None:
         self.wrapped_exception = wrapped_exception
         self.crawling_context = crawling_context
+        super().__init__()
 
 
 class ContextPipelineFinalizationError(Exception):
@@ -73,6 +75,7 @@ class ContextPipelineFinalizationError(Exception):
     def __init__(self, wrapped_exception: Exception, crawling_context: BasicCrawlingContext) -> None:
         self.wrapped_exception = wrapped_exception
         self.crawling_context = crawling_context
+        super().__init__()
 
 
 class ContextPipelineInterruptedError(Exception):
