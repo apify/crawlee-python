@@ -22,7 +22,22 @@ async def mock_request_handler() -> Callable[[HttpCrawlingContext], Awaitable[No
 
 @pytest.fixture
 async def crawler(mock_request_handler: Callable[[HttpCrawlingContext], Awaitable[None]]) -> HttpCrawler:
-    return HttpCrawler(request_handler=mock_request_handler, request_provider=RequestList())
+    return HttpCrawler(
+        request_handler=mock_request_handler,
+        request_provider=RequestList(),
+    )
+
+
+@pytest.fixture
+async def crawler_without_retries(
+    mock_request_handler: Callable[[HttpCrawlingContext], Awaitable[None]],
+) -> HttpCrawler:
+    return HttpCrawler(
+        request_handler=mock_request_handler,
+        request_provider=RequestList(),
+        retry_on_blocked=False,
+        max_request_retries=0,
+    )
 
 
 @pytest.fixture
@@ -40,6 +55,15 @@ async def server() -> AsyncGenerator[respx.MockRouter, None]:
 
         mock.get('/redirect', name='redirect_endpoint').return_value = Response(
             301, headers={'Location': 'https://test.io/html'}
+        )
+
+        mock.get('/bad_request', name='bad_request_endpoint').return_value = Response(
+            400,
+            text="""<html>
+                <head>
+                    <title>Bad request</title>
+                </head>
+            </html>""",
         )
 
         mock.get('/404', name='404_endpoint').return_value = Response(
@@ -91,13 +115,17 @@ async def test_handles_redirects(
 
 
 async def test_handles_client_errors(
-    crawler: HttpCrawler, mock_request_handler: AsyncMock, server: respx.MockRouter
+    crawler_without_retries: HttpCrawler,
+    mock_request_handler: AsyncMock,
+    server: respx.MockRouter,
 ) -> None:
+    crawler = crawler_without_retries
+
     await crawler.add_requests(['https://test.io/404'])
     await crawler.run()
 
-    mock_request_handler.assert_called_once()
-    assert mock_request_handler.call_args[0][0].request.loaded_url == 'https://test.io/404'
+    # Request handler should not be called for error status codes.
+    mock_request_handler.assert_not_called()
     assert server['404_endpoint'].called
 
 
@@ -145,11 +173,31 @@ async def test_stores_cookies(httpbin: str) -> None:
     assert session.cookies == {'a': '1', 'b': '2', 'c': '3'}
 
 
+async def test_do_not_retry_on_client_errors(crawler: HttpCrawler, server: respx.MockRouter) -> None:
+    await crawler.add_requests(['https://test.io/bad_request'])
+    stats = await crawler.run()
+
+    # by default, client errors are not retried
+    assert stats.requests_failed == 1
+    assert stats.retry_histogram == [1]
+    assert stats.requests_total == 1
+
+    assert len(server['bad_request_endpoint'].calls) == 1
+
+
 async def test_http_status_statistics(crawler: HttpCrawler, server: respx.MockRouter) -> None:
-    await crawler.add_requests([f'https://test.io/500?id={i}' for i in range(100)])
-    await crawler.add_requests([f'https://test.io/404?id={i}' for i in range(100)])
-    await crawler.add_requests([f'https://test.io/html?id={i}' for i in range(100)])
+    await crawler.add_requests([f'https://test.io/500?id={i}' for i in range(10)])
+    await crawler.add_requests([f'https://test.io/404?id={i}' for i in range(10)])
+    await crawler.add_requests([f'https://test.io/html?id={i}' for i in range(10)])
 
     await crawler.run()
-    assert crawler.statistics.state.requests_with_status_code == {'200': 100, '500': 300, '404': 100}
-    assert len(server['html_endpoint'].calls) == 100
+
+    assert crawler.statistics.state.requests_with_status_code == {
+        '200': 10,
+        '404': 10,  # client errors are not retried by default
+        '500': 30,  # server errors are retried by default
+    }
+
+    assert len(server['html_endpoint'].calls) == 10
+    assert len(server['404_endpoint'].calls) == 10
+    assert len(server['500_endpoint'].calls) == 30

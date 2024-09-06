@@ -15,7 +15,7 @@ except ImportError as exc:
 from typing_extensions import override
 
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
-from crawlee.errors import HttpStatusCodeError, ProxyError
+from crawlee.errors import ProxyError
 from crawlee.http_clients import BaseHttpClient, HttpCrawlingResult, HttpResponse
 
 if TYPE_CHECKING:
@@ -53,6 +53,8 @@ class CurlImpersonateHttpClient(BaseHttpClient):
 
     This client uses the `curl-cffi` library to perform HTTP requests in crawlers (`BasicCrawler` subclasses)
     and to manage sessions, proxies, and error handling.
+
+    See the `BaseHttpClient` class for more common information about HTTP clients.
     """
 
     def __init__(
@@ -71,9 +73,11 @@ class CurlImpersonateHttpClient(BaseHttpClient):
             ignore_http_error_status_codes: HTTP status codes to ignore as errors.
             async_session_kwargs: Additional keyword arguments for `curl_cffi.requests.AsyncSession`.
         """
-        self._persist_cookies_per_session = persist_cookies_per_session
-        self._additional_http_error_status_codes = set(additional_http_error_status_codes)
-        self._ignore_http_error_status_codes = set(ignore_http_error_status_codes)
+        super().__init__(
+            persist_cookies_per_session=persist_cookies_per_session,
+            additional_http_error_status_codes=additional_http_error_status_codes,
+            ignore_http_error_status_codes=ignore_http_error_status_codes,
+        )
         self._async_session_kwargs = async_session_kwargs
 
         self._client_by_proxy_url = dict[Optional[str], AsyncSession]()
@@ -107,16 +111,11 @@ class CurlImpersonateHttpClient(BaseHttpClient):
         if statistics:
             statistics.register_status_code(response.status_code)
 
-        exclude_error = response.status_code in self._ignore_http_error_status_codes
-        include_error = response.status_code in self._additional_http_error_status_codes
-
-        if include_error or (self._is_server_code(response.status_code) and not exclude_error):
-            if include_error:
-                raise HttpStatusCodeError(
-                    f'Status code {response.status_code} (user-configured to be an error) returned',
-                )
-
-            raise HttpStatusCodeError(f'Status code {response.status_code} returned')
+        self._raise_for_error_status_code(
+            response.status_code,
+            self._additional_http_error_status_codes,
+            self._ignore_http_error_status_codes,
+        )
 
         request.loaded_url = response.url
 
@@ -153,6 +152,12 @@ class CurlImpersonateHttpClient(BaseHttpClient):
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
             raise
+
+        self._raise_for_error_status_code(
+            response.status_code,
+            self._additional_http_error_status_codes,
+            self._ignore_http_error_status_codes,
+        )
 
         return _CurlImpersonateResponse(response)
 

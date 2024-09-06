@@ -26,12 +26,14 @@ from crawlee._log_config import CrawleeLogFormatter
 from crawlee._request import BaseRequestData, Request, RequestState
 from crawlee._types import BasicCrawlingContext, HttpHeaders, RequestHandlerRunResult, SendRequestFunction
 from crawlee._utils.byte_size import ByteSize
+from crawlee._utils.http import is_status_code_client_error
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
 from crawlee.basic_crawler._context_pipeline import ContextPipeline
 from crawlee.errors import (
     ContextPipelineInitializationError,
     ContextPipelineInterruptedError,
+    HttpStatusCodeError,
     RequestHandlerError,
     SessionError,
     UserDefinedErrorHandlerError,
@@ -527,6 +529,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
         if crawling_context.request.no_retry:
             return False
 
+        # Do not retry on client errors.
+        if isinstance(error, HttpStatusCodeError) and is_status_code_client_error(error.status_code):
+            return False
+
         if isinstance(error, SessionError):
             return ((crawling_context.request.session_rotation_count or 0) + 1) < self._max_session_rotations
 
@@ -612,7 +618,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
         return False
 
     async def _handle_request_retries(
-        self, crawling_context: TCrawlingContext | BasicCrawlingContext, error: Exception
+        self,
+        crawling_context: TCrawlingContext | BasicCrawlingContext,
+        error: Exception,
     ) -> None:
         request_provider = await self.get_request_provider()
         request = crawling_context.request
@@ -644,7 +652,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
             self._statistics.record_request_processing_failure(request.id or request.unique_key)
 
     async def _handle_request_error(
-        self, crawling_context: TCrawlingContext | BasicCrawlingContext, error: Exception
+        self,
+        crawling_context: TCrawlingContext | BasicCrawlingContext,
+        error: Exception,
     ) -> None:
         try:
             crawling_context.request.state = RequestState.ERROR_HANDLER
@@ -829,6 +839,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 crawling_context.session.mark_good()
 
             self._statistics.record_request_processing_finish(statistics_id)
+
         except RequestHandlerError as primary_error:
             primary_error = cast(
                 RequestHandlerError[TCrawlingContext], primary_error
@@ -839,6 +850,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 exc_info=primary_error.wrapped_exception,
             )
             await self._handle_request_error(primary_error.crawling_context, primary_error.wrapped_exception)
+
         except SessionError as session_error:
             if not crawling_context.session:
                 raise RuntimeError('SessionError raised in a crawling context without a session') from session_error
@@ -868,6 +880,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
                 self._statistics.record_request_processing_failure(statistics_id)
                 self._statistics.error_tracker.add(session_error)
+
         except ContextPipelineInterruptedError as interrupted_error:
             self._logger.debug('The context pipeline was interrupted', exc_info=interrupted_error)
 
@@ -879,12 +892,14 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 logger=self._logger,
                 max_retries=3,
             )
+
         except ContextPipelineInitializationError as initialization_error:
             self._logger.debug(
                 'An exception occurred during the initialization of crawling context',
                 exc_info=initialization_error,
             )
-            await self._handle_request_error(crawling_context, initialization_error)
+            await self._handle_request_error(crawling_context, initialization_error.wrapped_exception)
+
         except Exception as internal_error:
             self._logger.exception(
                 'An exception occurred during handling of a request. This places the crawler '
