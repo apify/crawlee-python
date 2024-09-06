@@ -40,18 +40,18 @@ class HttpStatusCodeError(Exception):
     """Raised when the response status code indicates an error."""
 
     def __init__(self, message: str, status_code: int) -> None:
+        super().__init__(f'{message} (status code: {status_code}).')
         self.status_code = status_code
         self.message = message
-        super().__init__(f'{message} (status code: {status_code}).')
 
 
 class RequestHandlerError(Exception, Generic[TCrawlingContext]):
     """Wraps an exception thrown from a request handler (router) and extends it with crawling context."""
 
     def __init__(self, wrapped_exception: Exception, crawling_context: TCrawlingContext) -> None:
+        super().__init__()
         self.wrapped_exception = wrapped_exception
         self.crawling_context = crawling_context
-        super().__init__()
 
 
 class ContextPipelineInitializationError(Exception):
@@ -61,9 +61,9 @@ class ContextPipelineInitializationError(Exception):
     """
 
     def __init__(self, wrapped_exception: Exception, crawling_context: BasicCrawlingContext) -> None:
+        super().__init__()
         self.wrapped_exception = wrapped_exception
         self.crawling_context = crawling_context
-        super().__init__()
 
 
 class ContextPipelineFinalizationError(Exception):
@@ -73,9 +73,9 @@ class ContextPipelineFinalizationError(Exception):
     """
 
     def __init__(self, wrapped_exception: Exception, crawling_context: BasicCrawlingContext) -> None:
+        super().__init__()
         self.wrapped_exception = wrapped_exception
         self.crawling_context = crawling_context
-        super().__init__()
 
 
 class ContextPipelineInterruptedError(Exception):
