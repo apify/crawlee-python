@@ -338,7 +338,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     async def run(
         self,
-        requests: Sequence[str | BaseRequestData | Request] | None = None,
+        requests: Sequence[str | Request] | None = None,
         *,
         purge_request_queue: bool = True,
     ) -> FinalStatistics:
@@ -430,7 +430,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     async def add_requests(
         self,
-        requests: Sequence[str | BaseRequestData | Request],
+        requests: Sequence[str | Request],
         *,
         batch_size: int = 1000,
         wait_time_between_batches: timedelta = timedelta(0),
@@ -723,24 +723,26 @@ class BasicCrawler(Generic[TCrawlingContext]):
         origin = context.request.loaded_url or context.request.url
 
         for call in result.add_requests_calls:
-            requests = list[BaseRequestData]()
+            requests = list[Request]()
 
             for request in call['requests']:
                 if (limit := call.get('limit')) is not None and len(requests) >= limit:
                     break
 
-                # If the request is a string, convert it to BaseRequestData object.
+                # If the request is a string, convert it to Request object.
                 if isinstance(request, str):
                     if is_url_absolute(request):
-                        dst_request = BaseRequestData.from_url(request)
+                        dst_request = Request.from_url(request)
 
                     # If the request URL is relative, make it absolute using the origin URL.
                     else:
                         base_url = call['base_url'] if call.get('base_url') else origin
                         absolute_url = convert_to_absolute_url(base_url, request)
-                        dst_request = BaseRequestData.from_url(absolute_url)
-                else:
-                    dst_request = request
+                        dst_request = Request.from_url(absolute_url)
+
+                # If the request is a BaseRequestData, convert it to Request object.
+                elif isinstance(request, BaseRequestData):
+                    dst_request = Request.from_base_request_data(request)
 
                 if self._check_enqueue_strategy(
                     call.get('strategy', EnqueueStrategy.ALL),
