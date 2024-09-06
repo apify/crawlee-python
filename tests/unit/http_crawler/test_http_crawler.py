@@ -173,7 +173,7 @@ async def test_stores_cookies(httpbin: str) -> None:
     assert session.cookies == {'a': '1', 'b': '2', 'c': '3'}
 
 
-async def test_do_not_retry_on_client_erros(crawler: HttpCrawler, server: respx.MockRouter) -> None:
+async def test_do_not_retry_on_client_errors(crawler: HttpCrawler, server: respx.MockRouter) -> None:
     await crawler.add_requests(['https://test.io/bad_request'])
     stats = await crawler.run()
 
