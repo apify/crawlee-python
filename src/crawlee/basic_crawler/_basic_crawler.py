@@ -22,7 +22,7 @@ from crawlee import EnqueueStrategy, Glob, service_container
 from crawlee._autoscaling import AutoscaledPool
 from crawlee._autoscaling.snapshotter import Snapshotter
 from crawlee._autoscaling.system_status import SystemStatus
-from crawlee._log_config import CrawleeLogFormatter
+from crawlee._log_config import configure_logger, get_configured_log_level
 from crawlee._request import BaseRequestData, Request, RequestState
 from crawlee._types import BasicCrawlingContext, HttpHeaders, RequestHandlerRunResult, SendRequestFunction
 from crawlee._utils.byte_size import ByteSize
@@ -203,20 +203,14 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._retry_on_blocked = retry_on_blocked
 
         if configure_logging:
-            handler = logging.StreamHandler()
-            handler.setFormatter(CrawleeLogFormatter())
-
             root_logger = logging.getLogger()
-
-            for old_handler in root_logger.handlers[:]:
-                root_logger.removeHandler(old_handler)
-
-            root_logger.addHandler(handler)
-            root_logger.setLevel(logging.INFO if not sys.flags.dev_mode else logging.DEBUG)
+            configure_logger(root_logger, self._configuration, remove_old_handlers=True)
 
             # Silence HTTPX logger
             httpx_logger = logging.getLogger('httpx')
-            httpx_logger.setLevel(logging.WARNING if not sys.flags.dev_mode else logging.INFO)
+            httpx_logger.setLevel(
+                logging.DEBUG if get_configured_log_level(self._configuration) <= logging.DEBUG else logging.WARNING
+            )
 
         if not _logger:
             _logger = logging.getLogger(__name__)

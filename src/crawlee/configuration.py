@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -51,14 +51,14 @@ class Configuration(BaseSettings):
     ] = False
 
     log_level: Annotated[
-        int,
+        Literal['DEBUG', 'INFO', 'WARNING', 'ERROR'],
         Field(
             validation_alias=AliasChoices(
                 'apify_log_level',
                 'crawlee_log_level',
             )
         ),
-    ] = 4  # INFO
+    ] = 'INFO'
 
     default_dataset_id: Annotated[
         str,
