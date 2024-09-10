@@ -26,7 +26,7 @@ We started this guide by using the Crawlee CLI to bootstrap the project - it off
 
 The first step will be installing two new dependencies:
 
-- Apify SDK, a toolkit for working with the Apify Platform. This will allow us to wire the storages (e.g. `RequestQueue` and `Dataset`) to the Apify cloud products. This will be a dependency of our project.
+- Apify SDK, a toolkit for working with the Apify Platform. This will allow us to wire the storages (e.g. [`RequestQueue`](https://docs.apify.com/sdk/python/reference/class/RequestQueue) and [`Dataset`](https://docs.apify.com/sdk/python/reference/class/Dataset)) to the Apify cloud products. This will be a dependency of our project.
 
     ```bash
     poetry add apify
@@ -55,9 +55,9 @@ apify login
 
 ## Adjusting the code
 
-Now that you have your account set up, you will need to adjust the code a tiny bit. We will use the [Apify SDK](https://docs.apify.com/sdk/js/), which will help us to wire the Crawlee storages (like the `RequestQueue`) to their Apify Platform counterparts - otherwise Crawlee would keep things only in memory.
+Now that you have your account set up, you will need to adjust the code a tiny bit. We will use the [Apify SDK](https://docs.apify.com/sdk/python/), which will help us to wire the Crawlee storages (like the [`RequestQueue`](https://docs.apify.com/sdk/python/reference/class/RequestQueue)) to their Apify Platform counterparts - otherwise Crawlee would keep things only in memory.
 
-Open your `src/main.py` file, and wrap everyting in your `main` function with the `Actor` context manager. Your code should look like this:
+Open your `src/main.py` file, and wrap everyting in your `main` function with the [`Actor`](https://docs.apify.com/sdk/python/reference/class/Actor) context manager. Your code should look like this:
 
 <CodeBlock className="language-python" title="src/main.py">
     {MainExample}
@@ -67,7 +67,7 @@ The context manager will configure Crawlee to use the Apify API instead of its d
 
 :::info Understanding `async with Actor` behavior with environment variables
 
-The `Actor` context manager works conditionally based on the environment variables, namely based on the `APIFY_IS_AT_HOME` env var, which is set to `true` on the Apify Platform. This means that your project will remain working the same locally, but will use the Apify API when deployed to the Apify Platform.
+The [`Actor`](https://docs.apify.com/sdk/python/reference/class/Actor) context manager works conditionally based on the environment variables, namely based on the `APIFY_IS_AT_HOME` env var, which is set to `true` on the Apify Platform. This means that your project will remain working the same locally, but will use the Apify API when deployed to the Apify Platform.
 
 :::
 

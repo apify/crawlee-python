@@ -19,8 +19,6 @@ module.exports = {
                 'introduction/saving-data',
                 'introduction/refactoring',
                 'introduction/deployment',
-                // TODO: add once SDK v2 is released
-                // 'introduction/running-in-cloud',
             ],
         },
         {

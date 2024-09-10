@@ -1,6 +1,6 @@
 ---
 id: apify-platform
-title: Apify Platform
+title: Apify platform
 description: Apify platform - large-scale and high-performance web scraping
 ---
 
@@ -126,8 +126,8 @@ There are several things worth mentioning here.
 ### Helper functions for default Key-Value Store and Dataset
 
 To simplify access to the _default_ storages, instead of using the helper functions of respective storage classes, you could use:
-- [`Actor.set_value()`](https://docs.apify.com/sdk/python/reference/class/Actor#set_value), [`Actor.get_value()`](https://docs.apify.com/sdk/python/reference/class/Actor#get_value), [`Actor.get_input()`](https://docs.apify.com/sdk/python/reference/class/Actor#get_input) for `Key-Value Store`
-- [`Actor.push_data()`](https://docs.apify.com/sdk/python/reference/class/Actor#push_data) for `Dataset`
+- [`Actor.set_value()`](https://docs.apify.com/sdk/python/reference/class/Actor#set_value), [`Actor.get_value()`](https://docs.apify.com/sdk/python/reference/class/Actor#get_value), [`Actor.get_input()`](https://docs.apify.com/sdk/python/reference/class/Actor#get_input) for [`Key-Value Store`](https://docs.apify.com/sdk/python/reference/class/KeyValueStore)
+- [`Actor.push_data()`](https://docs.apify.com/sdk/python/reference/class/Actor#push_data) for [`Dataset`](https://docs.apify.com/sdk/python/reference/class/Dataset)
 
 ### Using platform storage in a local Actor
 
@@ -141,7 +141,7 @@ If you don't plan to force usage of the platform storages when running the Actor
 
 ### Getting public url of an item in the platform storage
 
-If you need to share a link to some file stored in a Key-Value Store on Apify Platform, you can use [`get_public_url()`](https://docs.apify.com/sdk/python/reference/class/KeyValueStore#get_public_url) method. It accepts only one parameter: `key` - the key of the item you want to share.
+If you need to share a link to some file stored in a [Key-Value](https://docs.apify.com/sdk/python/reference/class/KeyValueStore) Store on Apify Platform, you can use [`get_public_url()`](https://docs.apify.com/sdk/python/reference/class/KeyValueStore#get_public_url) method. It accepts only one parameter: `key` - the key of the item you want to share.
 
 <CodeBlock language="python">
     {GetPublicUrlSource}
@@ -238,12 +238,7 @@ in the [proxy dashboard](https://console.apify.com/proxy).
 
 ### Apify Proxy vs. Own proxies
 
-The `ProxyConfiguration` class covers both Apify Proxy and custom proxy URLs so that
-you can easily switch between proxy providers. However, some features of the class
-are available only to Apify Proxy users, mainly because Apify Proxy is what
-one would call a super-proxy. It's not a single proxy server, but an API endpoint
-that allows connection through millions of different IP addresses. So the class
-essentially has two modes: Apify Proxy or Own (third party) proxy.
+The [`ProxyConfiguration`](https://docs.apify.com/sdk/python/reference/class/ProxyConfiguration) class covers both Apify Proxy and custom proxy URLs so that you can easily switch between proxy providers. However, some features of the class are available only to Apify Proxy users, mainly because Apify Proxy is what one would call a super-proxy. It's not a single proxy server, but an API endpoint that allows connection through millions of different IP addresses. So the class essentially has two modes: Apify Proxy or Own (third party) proxy.
 
 The difference is easy to remember.
 - If you're using your own proxies - you should create a <ApiLink to="class/ProxyConfiguration">`ProxyConfiguration`</ApiLink> instance directly.
