@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import json
 import logging
+import sys
 import textwrap
-import traceback
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from colorama import Fore, Style, just_fix_windows_console
+from typing_extensions import assert_never
+
+if TYPE_CHECKING:
+    from crawlee.configuration import Configuration
 
 just_fix_windows_console()
 
@@ -29,6 +33,46 @@ _LOG_LEVEL_SHORT_ALIAS = {
 
 # So that all the log messages have the same alignment
 _LOG_MESSAGE_INDENT = ' ' * 6
+
+
+def get_configured_log_level(configuration: Configuration) -> int:
+    verbose_logging_requested = 'verbose_log' in configuration.model_fields_set and configuration.verbose_log
+
+    if 'log_level' in configuration.model_fields_set:
+        if configuration.log_level == 'DEBUG':
+            return logging.DEBUG
+        if configuration.log_level == 'INFO':
+            return logging.INFO
+        if configuration.log_level == 'WARNING':
+            return logging.WARNING
+        if configuration.log_level == 'ERROR':
+            return logging.ERROR
+        if configuration.log_level == 'CRITICAL':
+            return logging.CRITICAL
+
+        assert_never(configuration.log_level)
+
+    if sys.flags.dev_mode or verbose_logging_requested:
+        return logging.DEBUG
+
+    return logging.INFO
+
+
+def configure_logger(
+    logger: logging.Logger,
+    configuration: Configuration,
+    *,
+    remove_old_handlers: bool = False,
+) -> None:
+    handler = logging.StreamHandler()
+    handler.setFormatter(CrawleeLogFormatter())
+
+    if remove_old_handlers:
+        for old_handler in logger.handlers[:]:
+            logger.removeHandler(old_handler)
+
+    logger.addHandler(handler)
+    logger.setLevel(get_configured_log_level(configuration))
 
 
 class CrawleeLogFormatter(logging.Formatter):
@@ -87,15 +131,6 @@ class CrawleeLogFormatter(logging.Formatter):
         level_short_alias = _LOG_LEVEL_SHORT_ALIAS.get(record.levelno, record.levelname)
         level_string = f'{level_color_code}{level_short_alias}{Style.RESET_ALL} '
 
-        # Format the exception, if there is some
-        # Basically just print the traceback and indent it a bit
-        exception_string = ''
-        if record.exc_info:
-            exc_info = record.exc_info
-            record.exc_info = None
-            exception_string = ''.join(traceback.format_exception(*exc_info)).rstrip()
-            exception_string = '\n' + textwrap.indent(exception_string, _LOG_MESSAGE_INDENT)
-
         # Format the extra log record fields, if there were some
         # Just stringify them to JSON and color them gray
         extra_string = ''
@@ -105,8 +140,19 @@ class CrawleeLogFormatter(logging.Formatter):
                 f' {Fore.LIGHTBLACK_EX}({json.dumps(extra, ensure_ascii=False, default=str)}){Style.RESET_ALL}'
             )
 
+        # Call the parent method so that it populates missing fields in the record
+        super().format(record)
+
         # Format the actual log message
-        log_string = super().format(record)
+        log_string = self.formatMessage(record)
+
+        # Format the exception, if there is some
+        # Basically just print the traceback and indent it a bit
+        exception_string = ''
+        if record.exc_text:
+            exception_string = '\n' + textwrap.indent(record.exc_text.rstrip(), _LOG_MESSAGE_INDENT)
+        else:
+            exception_string = ''
 
         if self.include_logger_name:
             # Include logger name at the beginning of the log line
