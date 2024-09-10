@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## 0.3.5 - **not yet released**
+## [0.3.5](https://github.com/apify/crawlee-python/releases/tag/v0.3.5) (2024-09-10)
 
 ### 🚀 Features
 
