@@ -47,6 +47,8 @@ def get_configured_log_level(configuration: Configuration) -> int:
             return logging.WARNING
         if configuration.log_level == 'ERROR':
             return logging.ERROR
+        if configuration.log_level == 'CRITICAL':
+            return logging.CRITICAL
 
         assert_never(configuration.log_level)
 

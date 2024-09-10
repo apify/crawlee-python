@@ -51,7 +51,7 @@ class Configuration(BaseSettings):
     ] = False
 
     log_level: Annotated[
-        Literal['DEBUG', 'INFO', 'WARNING', 'ERROR'],
+        Literal['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
         Field(
             validation_alias=AliasChoices(
                 'apify_log_level',
