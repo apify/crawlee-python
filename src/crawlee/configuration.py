@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import Annotated, Literal
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, BeforeValidator, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing_extensions import Self
 
@@ -58,6 +58,7 @@ class Configuration(BaseSettings):
                 'crawlee_log_level',
             )
         ),
+        BeforeValidator(lambda value: str(value).upper()),
     ] = 'INFO'
 
     default_dataset_id: Annotated[
