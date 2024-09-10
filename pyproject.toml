@@ -166,6 +166,7 @@ indent-style = "space"
     "D",       # Everything from the pydocstyle
     "INP001",  # File {filename} is part of an implicit namespace package, add an __init__.py
     "F841",    # Local variable {variable} is assigned to but never used
+    "N999",    # Invalid module name
 ]
 
 [tool.ruff.lint.flake8-quotes]

@@ -139,6 +139,7 @@ Using each of these methods allows to pass the `force_cloud` keyword argument. I
 If you don't plan to force usage of the platform storages when running the Actor locally, there is no need to use the [`Actor`](https://docs.apify.com/sdk/python/reference/class/Actor) class for it. The Crawlee variants <ApiLink to="class/KeyValueStore#open">`KeyValueStore.open()`</ApiLink>, <ApiLink to="class/Dataset#open">`Dataset.open()`</ApiLink> and <ApiLink to="class/RequestQueue#open">`RequestQueue.open()`</ApiLink> will work the same.
 :::
 
+{/*
 ### Getting public url of an item in the platform storage
 
 If you need to share a link to some file stored in a [Key-Value](https://docs.apify.com/sdk/python/reference/class/KeyValueStore) Store on Apify Platform, you can use [`get_public_url()`](https://docs.apify.com/sdk/python/reference/class/KeyValueStore#get_public_url) method. It accepts only one parameter: `key` - the key of the item you want to share.
@@ -146,6 +147,8 @@ If you need to share a link to some file stored in a [Key-Value](https://docs.ap
 <CodeBlock language="python">
     {GetPublicUrlSource}
 </CodeBlock>
+
+*/}
 
 ### Exporting dataset data
 
