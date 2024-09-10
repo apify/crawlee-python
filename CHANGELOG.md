@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Http clients detect 4xx as errors by default ([#498](https://github.com/apify/crawlee-python/pull/498), closes [#496](https://github.com/apify/crawlee-python/issues/496)) ([1895dca](https://github.com/apify/crawlee-python/commit/1895dca538f415feca37b4a030525c7c0d32f114)) by [@vdusek](https://github.com/vdusek)
+- Correctly handle log level configuration ([#508](https://github.com/apify/crawlee-python/pull/508)) ([7ea8fe6](https://github.com/apify/crawlee-python/commit/7ea8fe69f4a6146a1e417bebff60c08a85e2ca27)) by [@janbuchar](https://github.com/janbuchar)
 
 ## [0.3.4](https://github.com/apify/crawlee-python/releases/tag/v0.3.4) (2024-09-05)
 
