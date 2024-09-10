@@ -20,8 +20,9 @@ if TYPE_CHECKING:
 class HttpResponse(Protocol):
     """This protocol defines the interface that any HTTP response object must implement."""
 
-    def read(self) -> bytes:
-        """Read the content of the response body."""
+    @property
+    def http_version(self) -> str:
+        """The HTTP version used in the response."""
 
     @property
     def status_code(self) -> int:
@@ -31,10 +32,16 @@ class HttpResponse(Protocol):
     def headers(self) -> dict[str, str]:
         """The HTTP headers received in the response."""
 
+    def read(self) -> bytes:
+        """Read the content of the response body."""
+
 
 @dataclass(frozen=True)
 class HttpCrawlingResult:
     """Result of a HTTP-only crawl.
+
+    Mainly for the purpose of composing specific crawling contexts (e.g. `BeautifulSoupCrawlingContext`,
+    `ParselCrawlingContext`, ...).
 
     Args:
         http_response: The HTTP response received from the server.

@@ -19,6 +19,18 @@ def http_client() -> HttpxHttpClient:
     return HttpxHttpClient()
 
 
+async def test_http_1(httpbin: str) -> None:
+    http_client = HttpxHttpClient(http1=True, http2=False)
+    response = await http_client.send_request(httpbin)
+    assert response.http_version == 'HTTP/1.1'
+
+
+async def test_http_2(httpbin: str) -> None:
+    http_client = HttpxHttpClient(http2=True)
+    response = await http_client.send_request(httpbin)
+    assert response.http_version == 'HTTP/2'
+
+
 @pytest.mark.skipif(os.name == 'nt', reason='Skipped on Windows')
 async def test_proxy(
     http_client: HttpxHttpClient,
