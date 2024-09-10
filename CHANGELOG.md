@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.3.6 - **not yet released**
+
+### 🚀 Features
+
+- Add HTTP/2 support for HTTPX client ([#513](https://github.com/apify/crawlee-python/pull/513), closes [#512](https://github.com/apify/crawlee-python/issues/512)) ([0eb0a33](https://github.com/apify/crawlee-python/commit/0eb0a33411096011198e52c393f35730f1a0b6ac)) by [@vdusek](https://github.com/vdusek)
+
 ## [0.3.5](https://github.com/apify/crawlee-python/releases/tag/v0.3.5) (2024-09-10)
 
 ### 🚀 Features
