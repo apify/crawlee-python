@@ -12,13 +12,12 @@ except ImportError as exc:
         "For example, if you use pip, run `pip install 'crawlee[curl-impersonate]'`.",
     ) from exc
 
+from curl_cffi.const import CurlHttpVersion
 from typing_extensions import override
 
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
 from crawlee.errors import ProxyError
 from crawlee.http_clients import BaseHttpClient, HttpCrawlingResult, HttpResponse
-
-from curl_cffi.const import CurlHttpVersion
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
