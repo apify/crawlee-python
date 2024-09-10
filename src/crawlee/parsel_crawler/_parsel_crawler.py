@@ -89,10 +89,12 @@ class ParselCrawler(BasicCrawler[ParselCrawlingContext]):
             if crawling_context.session and crawling_context.session.is_blocked_status_code(status_code=status_code):
                 raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
 
+            parsel = crawling_context.selector
+
             matched_selectors = [
                 selector
                 for selector in RETRY_CSS_SELECTORS
-                if crawling_context.selector.css(selector).get() is not None
+                if parsel.type in ('html', 'xml') and parsel.css(selector).get() is not None
             ]
 
             if matched_selectors:

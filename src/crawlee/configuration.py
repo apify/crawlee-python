@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Annotated
+from typing import Annotated, Literal
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, BeforeValidator, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing_extensions import Self
 
@@ -51,14 +51,15 @@ class Configuration(BaseSettings):
     ] = False
 
     log_level: Annotated[
-        int,
+        Literal['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
         Field(
             validation_alias=AliasChoices(
                 'apify_log_level',
                 'crawlee_log_level',
             )
         ),
-    ] = 4  # INFO
+        BeforeValidator(lambda value: str(value).upper()),
+    ] = 'INFO'
 
     default_dataset_id: Annotated[
         str,
@@ -157,14 +158,14 @@ class Configuration(BaseSettings):
     ] = None
 
     available_memory_ratio: Annotated[
-        float | None,
+        float,
         Field(
             validation_alias=AliasChoices(
                 'apify_available_memory_ratio',
                 'crawlee_available_memory_ratio',
             )
         ),
-    ] = None
+    ] = 0.25
 
     storage_dir: Annotated[
         str,

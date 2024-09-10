@@ -2,11 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
-## 0.3.2 - **not yet released**
+## [0.3.5](https://github.com/apify/crawlee-python/releases/tag/v0.3.5) (2024-09-10)
+
+### 🚀 Features
+
+- Memory usage limit configuration via environment variables ([#502](https://github.com/apify/crawlee-python/pull/502)) ([c62e554](https://github.com/apify/crawlee-python/commit/c62e5545de6a1836f0514ebd3dd695e4fd856844)) by [@janbuchar](https://github.com/janbuchar)
+
+### 🐛 Bug Fixes
+
+- Http clients detect 4xx as errors by default ([#498](https://github.com/apify/crawlee-python/pull/498), closes [#496](https://github.com/apify/crawlee-python/issues/496)) ([1895dca](https://github.com/apify/crawlee-python/commit/1895dca538f415feca37b4a030525c7c0d32f114)) by [@vdusek](https://github.com/vdusek)
+- Correctly handle log level configuration ([#508](https://github.com/apify/crawlee-python/pull/508)) ([7ea8fe6](https://github.com/apify/crawlee-python/commit/7ea8fe69f4a6146a1e417bebff60c08a85e2ca27)) by [@janbuchar](https://github.com/janbuchar)
+
+## [0.3.4](https://github.com/apify/crawlee-python/releases/tag/v0.3.4) (2024-09-05)
+
+### 🐛 Bug Fixes
+
+- Expose basic crawling context ([#501](https://github.com/apify/crawlee-python/pull/501)) ([b484535](https://github.com/apify/crawlee-python/commit/b484535dbacc5d206a026f55a1d3e58edd375e91)) by [@vdusek](https://github.com/vdusek)
+
+## [0.3.3](https://github.com/apify/crawlee-python/releases/tag/v0.3.3) (2024-09-05)
+
+### 🐛 Bug Fixes
+
+- Deduplicate requests by unique key before submitting them to the queue ([#499](https://github.com/apify/crawlee-python/pull/499)) ([6a3e0e7](https://github.com/apify/crawlee-python/commit/6a3e0e78490851c43cefb0497ce34ca52a31a25c)) by [@janbuchar](https://github.com/janbuchar)
+
+## [0.3.2](https://github.com/apify/crawlee-python/releases/tag/v0.3.2) (2024-09-02)
 
 ### 🐛 Bug Fixes
 
 - Double incrementation of `item_count` ([#443](https://github.com/apify/crawlee-python/pull/443), closes [#442](https://github.com/apify/crawlee-python/issues/442)) ([cd9adf1](https://github.com/apify/crawlee-python/commit/cd9adf15731e8c4a39cb142b6d1a62909cafdc51)) by [@cadlagtrader](https://github.com/cadlagtrader)
+- Field alias in `BatchRequestsOperationResponse` ([#485](https://github.com/apify/crawlee-python/pull/485)) ([126a862](https://github.com/apify/crawlee-python/commit/126a8629cb5b989a0f9fe22156fb09731a34acd2)) by [@janbuchar](https://github.com/janbuchar)
+- JSON handling with Parsel ([#490](https://github.com/apify/crawlee-python/pull/490), closes [#488](https://github.com/apify/crawlee-python/issues/488)) ([ebf5755](https://github.com/apify/crawlee-python/commit/ebf575539ffb631ae131a1b801cec8f21dd0cf4c)) by [@janbuchar](https://github.com/janbuchar)
 
 ## [0.3.1](https://github.com/apify/crawlee-python/releases/tag/v0.3.1) (2024-08-30)
 

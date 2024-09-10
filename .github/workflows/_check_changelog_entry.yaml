@@ -22,7 +22,10 @@ jobs:
           python-version: "3.9"
 
       - name: Install dependencies
-        run: make install-dev
+        run: |
+          pipx install poetry
+          make install-dev
+
 
       - name: Check changelog entry
         run: make check-changelog-entry

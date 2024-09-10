@@ -11,7 +11,7 @@ from crawlee.storages._request_provider import RequestProvider
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from crawlee._request import BaseRequestData, Request
+    from crawlee._request import Request
 
 
 class RequestList(RequestProvider):
@@ -19,7 +19,7 @@ class RequestList(RequestProvider):
 
     def __init__(
         self,
-        requests: Sequence[str | BaseRequestData | Request] | None = None,
+        requests: Sequence[str | Request] | None = None,
         name: str | None = None,
     ) -> None:
         """Initialize the RequestList.
@@ -86,7 +86,7 @@ class RequestList(RequestProvider):
     @override
     async def add_requests_batched(
         self,
-        requests: Sequence[str | BaseRequestData | Request],
+        requests: Sequence[str | Request],
         *,
         batch_size: int = 1000,
         wait_time_between_batches: timedelta = timedelta(seconds=1),

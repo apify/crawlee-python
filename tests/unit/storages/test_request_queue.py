@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from crawlee._request import BaseRequestData, Request
+from crawlee import Request
 from crawlee.storages import RequestQueue
 
 if TYPE_CHECKING:
@@ -133,17 +133,16 @@ async def test_reclaim_request(request_queue: RequestQueue) -> None:
 @pytest.mark.parametrize(
     'requests',
     [
-        [BaseRequestData.from_url('https://example.com')],
         [Request.from_url('https://apify.com')],
         ['https://crawlee.dev'],
         [Request.from_url(f'https://example.com/{i}') for i in range(10)],
         [f'https://example.com/{i}' for i in range(15)],
     ],
-    ids=['single-base-request', 'single-request', 'single-url', 'multiple-requests', 'multiple-urls'],
+    ids=['single-request', 'single-url', 'multiple-requests', 'multiple-urls'],
 )
 async def test_add_batched_requests(
     request_queue: RequestQueue,
-    requests: Sequence[str | BaseRequestData | Request],
+    requests: Sequence[str | Request],
 ) -> None:
     request_count = len(requests)
 

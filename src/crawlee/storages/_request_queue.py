@@ -21,7 +21,7 @@ from crawlee.storages._request_provider import RequestProvider
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from crawlee._request import BaseRequestData, Request
+    from crawlee._request import Request
     from crawlee.base_storage_client import BaseStorageClient
     from crawlee.configuration import Configuration
     from crawlee.events import EventManager
@@ -179,7 +179,7 @@ class RequestQueue(BaseStorage, RequestProvider):
 
     async def add_request(
         self,
-        request: Request | BaseRequestData | str,
+        request: str | Request,
         *,
         forefront: bool = False,
     ) -> ProcessedRequest:
@@ -245,7 +245,7 @@ class RequestQueue(BaseStorage, RequestProvider):
     @override
     async def add_requests_batched(
         self,
-        requests: Sequence[str | BaseRequestData | Request],
+        requests: Sequence[str | Request],
         *,
         batch_size: int = 1000,
         wait_time_between_batches: timedelta = timedelta(seconds=1),

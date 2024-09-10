@@ -31,7 +31,9 @@ jobs:
         run: pipx install poetry
 
       - name: Install dependencies
-        run: make install-dev
+        run: |
+          pipx install poetry
+          make install-dev
 
       # Updates the version number in the project's configuration.
       - name: Set version in pyproject.toml
