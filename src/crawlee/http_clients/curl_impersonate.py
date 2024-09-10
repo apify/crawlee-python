@@ -18,6 +18,8 @@ from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
 from crawlee.errors import ProxyError
 from crawlee.http_clients import BaseHttpClient, HttpCrawlingResult, HttpResponse
 
+from curl_cffi.const import CurlHttpVersion
+
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
@@ -36,8 +38,24 @@ class _CurlImpersonateResponse:
     def __init__(self, response: Response) -> None:
         self._response = response
 
-    def read(self) -> bytes:
-        return self._response.content
+    @property
+    def http_version(self) -> str:
+        if self._response.http_version == CurlHttpVersion.NONE:
+            return 'NONE'
+        if self._response.http_version == CurlHttpVersion.V1_0:
+            return 'HTTP/1.0'
+        if self._response.http_version == CurlHttpVersion.V1_1:
+            return 'HTTP/1.1'
+        if self._response.http_version in {
+            CurlHttpVersion.V2_0,
+            CurlHttpVersion.V2TLS,
+            CurlHttpVersion.V2_PRIOR_KNOWLEDGE,
+        }:
+            return 'HTTP/2'
+        if self._response.http_version == CurlHttpVersion.V3:
+            return 'HTTP/3'
+
+        raise ValueError(f'Unknown HTTP version: {self._response.http_version}')
 
     @property
     def status_code(self) -> int:
@@ -46,6 +64,9 @@ class _CurlImpersonateResponse:
     @property
     def headers(self) -> dict[str, str]:
         return dict(self._response.headers.items())
+
+    def read(self) -> bytes:
+        return self._response.content
 
 
 class CurlImpersonateHttpClient(BaseHttpClient):

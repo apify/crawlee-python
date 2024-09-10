@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from logging import getLogger
 from typing import TYPE_CHECKING, Any, Optional, cast
 
 import httpx
@@ -18,6 +19,8 @@ if TYPE_CHECKING:
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.statistics import Statistics
 
+logger = getLogger(__name__)
+
 
 class _HttpxResponse:
     """Adapter class for `httpx.Response` to conform to the `HttpResponse` protocol."""
@@ -25,8 +28,9 @@ class _HttpxResponse:
     def __init__(self, response: httpx.Response) -> None:
         self._response = response
 
-    def read(self) -> bytes:
-        return self._response.read()
+    @property
+    def http_version(self) -> str:
+        return self._response.http_version
 
     @property
     def status_code(self) -> int:
@@ -35,6 +39,9 @@ class _HttpxResponse:
     @property
     def headers(self) -> dict[str, str]:
         return dict(self._response.headers.items())
+
+    def read(self) -> bytes:
+        return self._response.read()
 
 
 class _HttpxTransport(httpx.AsyncHTTPTransport):
@@ -76,6 +83,8 @@ class HttpxHttpClient(BaseHttpClient):
         persist_cookies_per_session: bool = True,
         additional_http_error_status_codes: Iterable[int] = (),
         ignore_http_error_status_codes: Iterable[int] = (),
+        http1: bool = True,
+        http2: bool = True,
         **async_client_kwargs: Any,
     ) -> None:
         """Create a new instance.
@@ -84,6 +93,8 @@ class HttpxHttpClient(BaseHttpClient):
             persist_cookies_per_session: Whether to persist cookies per HTTP session.
             additional_http_error_status_codes: Additional HTTP status codes to treat as errors.
             ignore_http_error_status_codes: HTTP status codes to ignore as errors.
+            http1: Whether to enable HTTP/1.1 support.
+            http2: Whether to enable HTTP/2 support.
             async_client_kwargs: Additional keyword arguments for `httpx.AsyncClient`.
         """
         super().__init__(
@@ -91,6 +102,8 @@ class HttpxHttpClient(BaseHttpClient):
             additional_http_error_status_codes=additional_http_error_status_codes,
             ignore_http_error_status_codes=ignore_http_error_status_codes,
         )
+        self._http1 = http1
+        self._http2 = http2
         self._async_client_kwargs = async_client_kwargs
 
         self._client_by_proxy_url = dict[Optional[str], httpx.AsyncClient]()
@@ -182,11 +195,23 @@ class HttpxHttpClient(BaseHttpClient):
         If the client for the given proxy URL doesn't exist, it will be created and stored.
         """
         if proxy_url not in self._client_by_proxy_url:
-            self._client_by_proxy_url[proxy_url] = httpx.AsyncClient(
-                transport=_HttpxTransport(),
-                proxy=proxy_url,
-                **self._async_client_kwargs,
-            )
+            # Prepare a default kwargs for the new client.
+            kwargs: dict[str, Any] = {
+                'transport': _HttpxTransport(
+                    proxy=proxy_url,
+                    http1=self._http1,
+                    http2=self._http2,
+                ),
+                'proxy': proxy_url,
+                'http1': self._http1,
+                'http2': self._http2,
+            }
+
+            # Update the default kwargs with any additional user-provided kwargs.
+            kwargs.update(self._async_client_kwargs)
+
+            client = httpx.AsyncClient(**kwargs)
+            self._client_by_proxy_url[proxy_url] = client
 
         return self._client_by_proxy_url[proxy_url]
 
