@@ -18,9 +18,9 @@ if TYPE_CHECKING:
 class RequestList(RequestProvider):
     """Represents a (potentially very large) list of URLs to crawl.
 
-    Disclaimer: The `RequestList` class is in an early, alpha version and is not fully implemented. It is currently
-        intended for testing purposes and small-scale projects. The current implementation is only in-memory storage
-        and is very limited. It will be (re)implemented in the future. For more details, see the GitHub issue:
+    Disclaimer: The `RequestList` class is in its early version and is not fully implemented. It is currently
+        intended mainly for testing purposes and small-scale projects. The current implementation is only in-memory
+        storage and is very limited. It will be (re)implemented in the future. For more details, see the GitHub issue:
         https://github.com/apify/crawlee-python/issues/99. For production usage we recommend to use the `RequestQueue`.
     """
 
