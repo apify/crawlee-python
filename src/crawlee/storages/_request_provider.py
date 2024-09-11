@@ -56,6 +56,24 @@ class RequestProvider(ABC):
         """Returns the number of handled requests."""
 
     @abstractmethod
+    async def add_request(
+        self,
+        request: str | Request,
+        *,
+        forefront: bool = False,
+    ) -> ProcessedRequest:
+        """Add a single request to the provider and store it in underlying resource client.
+
+        Args:
+            request: The request object (or its string representation) to be added to the provider.
+            forefront: Determines whether the request should be added to the beginning (if True) or the end (if False)
+                of the provider.
+
+        Returns:
+            Information about the request addition to the provider.
+        """
+
+    @abstractmethod
     async def add_requests_batched(
         self,
         requests: Sequence[str | Request],
