@@ -83,7 +83,7 @@ def normalize_url(url: str, *, keep_url_fragment: bool = False) -> str:
 def compute_unique_key(
     url: str,
     method: str = 'GET',
-    payload: str | None = None,
+    payload: str | bytes | None = None,
     *,
     keep_url_fragment: bool = False,
     use_extended_unique_key: bool = False,
@@ -115,7 +115,13 @@ def compute_unique_key(
 
     # Compute and return the extended unique key if required.
     if use_extended_unique_key:
-        payload_in_bytes = payload.encode() if payload else b''
+        if payload is None:
+            payload_in_bytes = b''
+        elif isinstance(payload, str):
+            payload_in_bytes = payload.encode('utf-8')
+        else:
+            payload_in_bytes = payload
+
         payload_hash = compute_short_hash(payload_in_bytes)
         return f'{normalized_method}({payload_hash}):{normalized_url}'
 
