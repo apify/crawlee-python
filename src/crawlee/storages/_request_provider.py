@@ -105,6 +105,8 @@ class RequestProvider(ABC):
             wait_for_all_requests_to_be_added: If True, wait for all requests to be added before returning.
             wait_for_all_requests_to_be_added_timeout: Timeout for waiting for all requests to be added.
         """
+        for request in requests:
+            await self.add_request(request)
 
     def _transform_request(self, request: str | Request) -> Request:
         """Transforms a request-like object into a Request object."""
