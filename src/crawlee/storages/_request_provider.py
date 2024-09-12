@@ -86,15 +86,14 @@ class RequestProvider(ABC):
             Information about the request addition to the provider.
         """
 
-    @abstractmethod
     async def add_requests_batched(
         self,
         requests: Sequence[str | Request],
         *,
-        batch_size: int = 1000,
-        wait_time_between_batches: timedelta = timedelta(seconds=1),
-        wait_for_all_requests_to_be_added: bool = False,
-        wait_for_all_requests_to_be_added_timeout: timedelta | None = None,
+        batch_size: int = 1000,  # noqa: ARG002
+        wait_time_between_batches: timedelta = timedelta(seconds=1),  # noqa: ARG002
+        wait_for_all_requests_to_be_added: bool = False,  # noqa: ARG002
+        wait_for_all_requests_to_be_added_timeout: timedelta | None = None,  # noqa: ARG002
     ) -> None:
         """Add requests to the underlying resource client in batches.
 
@@ -105,6 +104,7 @@ class RequestProvider(ABC):
             wait_for_all_requests_to_be_added: If True, wait for all requests to be added before returning.
             wait_for_all_requests_to_be_added_timeout: Timeout for waiting for all requests to be added.
         """
+        # Default and dumb implementation.
         for request in requests:
             await self.add_request(request)
 
