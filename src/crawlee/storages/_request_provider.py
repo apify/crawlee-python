@@ -13,7 +13,20 @@ if TYPE_CHECKING:
 
 
 class RequestProvider(ABC):
-    """Provides access to a queue of crawling requests."""
+    """Abstract base class defining the interface and common behaviour for request providers.
+
+    Request providers are used to manage and provide access to a storage of crawling requests.
+
+    Key responsibilities:
+        - Fetching the next request to be processed.
+        - Reclaiming requests that failed during processing, allowing retries.
+        - Marking requests as successfully handled after processing.
+        - Adding new requests to the provider, both individually and in batches.
+        - Managing state information such as the total and handled request counts.
+        - Deleting or dropping the provider from the underlying storage.
+
+    Subclasses of `RequestProvider` should provide specific implementations for each of the abstract methods.
+    """
 
     @property
     @abstractmethod
@@ -56,14 +69,31 @@ class RequestProvider(ABC):
         """Returns the number of handled requests."""
 
     @abstractmethod
+    async def add_request(
+        self,
+        request: str | Request,
+        *,
+        forefront: bool = False,
+    ) -> ProcessedRequest:
+        """Add a single request to the provider and store it in underlying resource client.
+
+        Args:
+            request: The request object (or its string representation) to be added to the provider.
+            forefront: Determines whether the request should be added to the beginning (if True) or the end (if False)
+                of the provider.
+
+        Returns:
+            Information about the request addition to the provider.
+        """
+
     async def add_requests_batched(
         self,
         requests: Sequence[str | Request],
         *,
-        batch_size: int = 1000,
-        wait_time_between_batches: timedelta = timedelta(seconds=1),
-        wait_for_all_requests_to_be_added: bool = False,
-        wait_for_all_requests_to_be_added_timeout: timedelta | None = None,
+        batch_size: int = 1000,  # noqa: ARG002
+        wait_time_between_batches: timedelta = timedelta(seconds=1),  # noqa: ARG002
+        wait_for_all_requests_to_be_added: bool = False,  # noqa: ARG002
+        wait_for_all_requests_to_be_added_timeout: timedelta | None = None,  # noqa: ARG002
     ) -> None:
         """Add requests to the underlying resource client in batches.
 
@@ -74,6 +104,9 @@ class RequestProvider(ABC):
             wait_for_all_requests_to_be_added: If True, wait for all requests to be added before returning.
             wait_for_all_requests_to_be_added_timeout: Timeout for waiting for all requests to be added.
         """
+        # Default and dumb implementation.
+        for request in requests:
+            await self.add_request(request)
 
     def _transform_request(self, request: str | Request) -> Request:
         """Transforms a request-like object into a Request object."""

@@ -76,18 +76,39 @@ class BaseRequestData(BaseModel):
         cls,
         url: str,
         *,
+        method: HttpMethod = 'GET',
+        payload: str | None = None,
         label: str | None = None,
         unique_key: str | None = None,
+        id: str | None = None,
+        keep_url_fragment: bool = False,
+        use_extended_unique_key: bool = False,
         **kwargs: Any,
     ) -> Self:
-        """Create a new `RequestData` instance from a URL."""
-        unique_key = unique_key or compute_unique_key(url)
-        result = cls(url=url, unique_key=unique_key, **kwargs)
+        """Create a new `BaseRequestData` instance from a URL. See `Request.from_url` for more details."""
+        unique_key = unique_key or compute_unique_key(
+            url,
+            method=method,
+            payload=payload,
+            keep_url_fragment=keep_url_fragment,
+            use_extended_unique_key=use_extended_unique_key,
+        )
+
+        id = id or unique_key_to_request_id(unique_key)
+
+        request = cls(
+            url=url,
+            unique_key=unique_key,
+            id=id,
+            method=method,
+            payload=payload,
+            **kwargs,
+        )
 
         if label is not None:
-            result.user_data['label'] = label
+            request.user_data['label'] = label
 
-        return result
+        return request
 
     def get_query_param_from_url(self, param: str, *, default: str | None = None) -> str | None:
         """Get the value of a specific query parameter from the URL."""
@@ -112,21 +133,61 @@ class Request(BaseRequestData):
         cls,
         url: str,
         *,
+        method: HttpMethod = 'GET',
+        payload: str | None = None,
         label: str | None = None,
         unique_key: str | None = None,
         id: str | None = None,
+        keep_url_fragment: bool = False,
+        use_extended_unique_key: bool = False,
         **kwargs: Any,
     ) -> Self:
-        """Create a new `RequestData` instance from a URL."""
-        unique_key = unique_key or compute_unique_key(url)
+        """Create a new `Request` instance from a URL.
+
+        This is recommended constructor for creating new `Request` instances. It generates a `Request` object from
+        a given URL with additional options to customize HTTP method, payload, unique key, and other request
+        properties. If no `unique_key` or `id` is provided, they are computed automatically based on the URL,
+        method and payload. It depends on the `keep_url_fragment` and `use_extended_unique_key` flags.
+
+        Args:
+            url: The URL of the request.
+            method: The HTTP method of the request.
+            payload: The data to be sent as the request body. Typically used with 'POST' or 'PUT' requests.
+            label: A custom label to differentiate between request types. This is stored in `user_data`, and it is
+                used for request routing (different requests go to different handlers).
+            unique_key: A unique key identifying the request. If not provided, it is automatically computed based on
+                the URL and other parameters. Requests with the same `unique_key` are treated as identical.
+            id: A unique identifier for the request. If not provided, it is automatically generated from the
+                `unique_key`.
+            keep_url_fragment: Determines whether the URL fragment (e.g., `#section`) should be included in
+                the `unique_key` computation. This is only relevant when `unique_key` is not provided.
+            use_extended_unique_key: Determines whether to include the HTTP method and payload in the `unique_key`
+                computation. This is only relevant when `unique_key` is not provided.
+            **kwargs: Additional request properties.
+        """
+        unique_key = unique_key or compute_unique_key(
+            url,
+            method=method,
+            payload=payload,
+            keep_url_fragment=keep_url_fragment,
+            use_extended_unique_key=use_extended_unique_key,
+        )
+
         id = id or unique_key_to_request_id(unique_key)
 
-        result = cls(url=url, unique_key=unique_key, id=id, **kwargs)
+        request = cls(
+            url=url,
+            unique_key=unique_key,
+            id=id,
+            method=method,
+            payload=payload,
+            **kwargs,
+        )
 
         if label is not None:
-            result.user_data['label'] = label
+            request.user_data['label'] = label
 
-        return result
+        return request
 
     @classmethod
     def from_base_request_data(cls, base_request_data: BaseRequestData, *, id: str | None = None) -> Self:

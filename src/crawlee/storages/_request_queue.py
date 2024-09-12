@@ -177,36 +177,13 @@ class RequestQueue(BaseStorage, RequestProvider):
         await self._resource_client.delete()
         remove_storage_from_cache(storage_class=self.__class__, id=self._id, name=self._name)
 
+    @override
     async def add_request(
         self,
         request: str | Request,
         *,
         forefront: bool = False,
     ) -> ProcessedRequest:
-        """Adds a request to the `RequestQueue` while managing deduplication and positioning within the queue.
-
-        The deduplication of requests relies on the `unique_key` field within the request dictionary. If `unique_key`
-        exists, it remains unchanged; if it does not, it is generated based on the request's `url`, `method`,
-        and `payload` fields. The generation of `unique_key` can be influenced by the `keep_url_fragment` and
-        `use_extended_unique_key` flags, which dictate whether to include the URL fragment and the request's method
-        and payload, respectively, in its computation.
-
-        The request can be added to the forefront (beginning) or the back of the queue based on the `forefront`
-        parameter. Information about the request's addition to the queue, including whether it was already present or
-        handled, is returned in an output dictionary.
-
-        Args:
-            request: The request object to be added to the queue. Must include at least the `url` key.
-                Optionaly it can include the `method`, `payload` and `unique_key` keys.
-            forefront: If True, adds the request to the forefront of the queue; otherwise, adds it to the end.
-            keep_url_fragment: Determines whether the URL fragment (the part of the URL after '#') should be retained
-                in the `unique_key` computation.
-            use_extended_unique_key: Determines whether to use an extended `unique_key`, incorporating the request's
-                method and payload into the `unique_key` computation.
-
-        Returns:
-            Information about the processed request.
-        """
         request = self._transform_request(request)
         self._last_activity = datetime.now(timezone.utc)
 
