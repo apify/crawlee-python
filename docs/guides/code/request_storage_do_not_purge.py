@@ -15,5 +15,6 @@ async def main() -> None:
 
     await crawler.run(['https://crawlee.dev/'])
 
+
 if __name__ == '__main__':
     asyncio.run(main())
