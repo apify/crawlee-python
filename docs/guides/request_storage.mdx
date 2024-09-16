@@ -24,7 +24,7 @@ This guide explains the different types of request storage available in Crawlee,
 
 ## Request providers overview
 
-All request storage types in Crawlee implement the same interface - <ApiLink to="class/RequestProvider">`RequestProvider`</ApiLink>. This unified interface allows them to be used in a consistent manner, regardless of the storage backend. The request providers are managed by storage clients - subclasses of <ApiLink to="class/BaseStorageClient">`BaseStorageClient`</ApiLink>. For instance, <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink> stores data in memory while also can offload them to the local directory. Data are stored in the following directory structure:
+All request storage types in Crawlee implement the same interface - <ApiLink to="class/RequestProvider">`RequestProvider`</ApiLink>. This unified interface allows them to be used in a consistent manner, regardless of the storage backend. The request providers are managed by storage clients - subclasses of <ApiLink to="class/BaseStorageClient">`BaseStorageClient`</ApiLink>. For instance, <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink> stores data in memory while it can also offload them to the local directory. Data are stored in the following directory structure:
 
 ```text
 {CRAWLEE_STORAGE_DIR}/{request_provider}/{QUEUE_ID}/
