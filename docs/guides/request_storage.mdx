@@ -17,6 +17,9 @@ import RqWithCrawlerExplicitExample from '!!raw-loader!./code/request_storage_rq
 import RlBasicExample from '!!raw-loader!./code/request_storage_rl_basic.py';
 import RlWithCrawlerExample from '!!raw-loader!./code/request_storage_rl_with_crawler.py';
 
+import RsHelperAddRequestsExample from '!!raw-loader!./code/request_storage_helper_add_requests.py';
+import RsHelperEnqueueLinksExample from '!!raw-loader!./code/request_storage_helper_enqueue_links.py';
+
 import RsDoNotPurgeExample from '!!raw-loader!./code/request_storage_do_not_purge.py';
 import RsPurgeExplicitlyExample from '!!raw-loader!./code/request_storage_purge_explicitly.py';
 
@@ -96,15 +99,35 @@ TODO: write this section, once https://github.com/apify/crawlee-python/issues/99
 
 */}
 
+## Request-related helpers
+
+We offer several helper functions to simplify interactions with request storages:
+
+- The <ApiLink to="class/AddRequestsFunction">`add_requests`</ApiLink> function allows you to manually add specific URLs to the configured request storage. In this case, you must explicitly provide the URLs you want to be added to the request storage.
+- The <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> function is designed to find new URLs in the current page and add them to the request storage. You can specify different enqueue strategies or add excluding / including filters to limit the URLs that will be added to the request storage. See [Crawl website with relative links](../examples/crawl-website-with-relative-links) for more details.
+
+<Tabs groupId="request_helpers">
+    <TabItem value="request_helper_add_requests" label="Add requests" default>
+        <CodeBlock className="language-python">
+            {RsHelperAddRequestsExample}
+        </CodeBlock>
+    </TabItem>
+    <TabItem value="request_helper_enqueue_links" label="Enqueue links">
+        <CodeBlock className="language-python">
+            {RsHelperEnqueueLinksExample}
+        </CodeBlock>
+    </TabItem>
+</Tabs>
+
 ## Cleaning up the storages
 
-By default, storages are automatically purged before the crawler starts, unless explicitly configured otherwise, for that case, see <ApiLink to="class/Configuration#purge_on_start">`Configuration.purge_on_start`</ApiLink>. This cleanup happens as soon as a storage is accessed, either when you open a storage (e.g., using <ApiLink to="class/RequestQueue#open">`RequestQueue.open`</ApiLink>) or when interacting with a storage through one of the helper methods (e.g., <ApiLink to="class/BasicCrawler#add_requests">`BasicCrawler.add_requests`</ApiLink>, which implicitly opens the request storage).
+By default, storages are automatically purged before the crawler starts, unless explicitly configured otherwise, for that case, see <ApiLink to="class/Configuration#purge_on_start">`Configuration.purge_on_start`</ApiLink>. This cleanup happens as soon as a storage is accessed, either when you open a storage (e.g. using <ApiLink to="class/RequestQueue#open">`RequestQueue.open`</ApiLink>) or when interacting with a storage through one of the helper methods (e.g. <ApiLink to="class/AddRequestsFunction">`add_requests`</ApiLink> or <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink>, which implicitly opens the configured storage).
 
 <CodeBlock className="language-python">
     {RsDoNotPurgeExample}
 </CodeBlock>
 
-If you do not explicitly interact with storages in your code, the purging will occur automatically when the <ApiLink to="class/BasicCrawler#run">BasicCrawler.run</ApiLink> method is invoked.
+If you do not explicitly interact with storages in your code, the purging will occur automatically when the <ApiLink to="class/BasicCrawler#run">`BasicCrawler.run`</ApiLink> method is invoked.
 
 If you need to purge storages earlier, you can call <ApiLink to="class/MemoryStorageClient#purge_on_start">`MemoryStorageClient.purge_on_start`</ApiLink> directly. This method triggers the purging process for the underlying storage implementation you are currently using.
 
