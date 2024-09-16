@@ -121,7 +121,7 @@ We offer several helper functions to simplify interactions with request storages
 
 ## Cleaning up the storages
 
-By default, storages are automatically purged before the crawler starts, unless explicitly configured otherwise, for that case, see <ApiLink to="class/Configuration#purge_on_start">`Configuration.purge_on_start`</ApiLink>. This cleanup happens as soon as a storage is accessed, either when you open a storage (e.g. using <ApiLink to="class/RequestQueue#open">`RequestQueue.open`</ApiLink>) or when interacting with a storage through one of the helper methods (e.g. <ApiLink to="class/AddRequestsFunction">`add_requests`</ApiLink> or <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink>, which implicitly opens the configured storage).
+Default storages are purged before the crawler starts, unless explicitly configured otherwise. For that case, see <ApiLink to="class/Configuration#purge_on_start">`Configuration.purge_on_start`</ApiLink>. This cleanup happens as soon as a storage is accessed, either when you open a storage (e.g. using <ApiLink to="class/RequestQueue#open">`RequestQueue.open`</ApiLink>) or when interacting with a storage through one of the helper functions (e.g. <ApiLink to="class/AddRequestsFunction">`add_requests`</ApiLink> or <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink>, which implicitly opens the request storage).
 
 <CodeBlock className="language-python">
     {RsDoNotPurgeExample}
