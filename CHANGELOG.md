@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 
 - Add HTTP/2 support for HTTPX client ([#513](https://github.com/apify/crawlee-python/pull/513), closes [#512](https://github.com/apify/crawlee-python/issues/512)) ([0eb0a33](https://github.com/apify/crawlee-python/commit/0eb0a33411096011198e52c393f35730f1a0b6ac)) by [@vdusek](https://github.com/vdusek)
 - Expose extended unique key when creating a new Request ([#515](https://github.com/apify/crawlee-python/pull/515)) ([1807f41](https://github.com/apify/crawlee-python/commit/1807f419e47a815dd706d09acb0f3b3af8cfc691)) by [@vdusek](https://github.com/vdusek)
+- Add header generator and integrate it into HTTPX client ([#530](https://github.com/apify/crawlee-python/pull/530), closes [#402](https://github.com/apify/crawlee-python/issues/402)) ([b63f9f9](https://github.com/apify/crawlee-python/commit/b63f9f98c6613e095546ef544eab271d433e3379)) by [@vdusek](https://github.com/vdusek)
 
 ## [0.3.5](https://github.com/apify/crawlee-python/releases/tag/v0.3.5) (2024-09-10)
 
