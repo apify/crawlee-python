@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 from crawlee import Request
-from crawlee._fingerprint_suite.consts import COMMON_ACCEPT, COMMON_ACCEPT_LANGUAGE, USER_AGENT_POOL
 from crawlee.errors import ProxyError
+from crawlee.fingerprint_suite._consts import COMMON_ACCEPT, COMMON_ACCEPT_LANGUAGE, USER_AGENT_POOL
 from crawlee.http_clients import HttpxHttpClient
 from crawlee.statistics import Statistics
 
@@ -87,7 +87,7 @@ async def test_send_request_with_proxy_disabled(
 
 
 async def test_common_headers() -> None:
-    client = HttpxHttpClient(append_common_headers=True)
+    client = HttpxHttpClient()
 
     response = await client.send_request('https://httpbin.org/get')
     response_dict = json.loads(response.read().decode())

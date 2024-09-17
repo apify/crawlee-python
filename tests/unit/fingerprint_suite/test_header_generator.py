@@ -1,4 +1,4 @@
-from crawlee._fingerprint_suite import HeaderGenerator
+from crawlee.fingerprint_suite import HeaderGenerator
 
 
 def test_get_common_headers() -> None:
