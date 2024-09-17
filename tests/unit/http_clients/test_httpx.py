@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import json
 import os
 from typing import TYPE_CHECKING
 
 import pytest
 
 from crawlee import Request
+from crawlee._fingerprint_suite.consts import COMMON_ACCEPT, COMMON_ACCEPT_LANGUAGE, USER_AGENT_POOL
 from crawlee.errors import ProxyError
 from crawlee.http_clients import HttpxHttpClient
 from crawlee.statistics import Statistics
@@ -82,3 +84,22 @@ async def test_send_request_with_proxy_disabled(
 
     with pytest.raises(ProxyError):
         await http_client.send_request(url, proxy_info=disabled_proxy)
+
+
+async def test_common_headers() -> None:
+    client = HttpxHttpClient(append_common_headers=True)
+
+    response = await client.send_request('https://httpbin.org/get')
+    response_dict = json.loads(response.read().decode())
+    response_headers = response_dict.get('headers', {})
+
+    assert 'Accept' in response_headers
+    assert response_headers['Accept'] == COMMON_ACCEPT
+
+    assert 'Accept-Language' in response_headers
+    assert response_headers['Accept-Language'] == COMMON_ACCEPT_LANGUAGE
+
+    # By default, HTTPX uses its own User-Agent, which should be replaced by the one from the header generator.
+    assert 'User-Agent' in response_headers
+    assert 'python-httpx' not in response_headers['User-Agent']
+    assert response_headers['User-Agent'] in USER_AGENT_POOL

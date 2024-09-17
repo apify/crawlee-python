@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Any, Optional, cast
 import httpx
 from typing_extensions import override
 
+from crawlee._fingerprint_suite import HeaderGenerator
+from crawlee._types import HttpHeaders
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
 from crawlee.errors import ProxyError
 from crawlee.http_clients import BaseHttpClient, HttpCrawlingResult, HttpResponse
@@ -14,7 +16,7 @@ from crawlee.sessions import Session
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from crawlee._types import HttpHeaders, HttpMethod
+    from crawlee._types import HttpMethod
     from crawlee.base_storage_client._models import Request
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.statistics import Statistics
@@ -85,6 +87,7 @@ class HttpxHttpClient(BaseHttpClient):
         ignore_http_error_status_codes: Iterable[int] = (),
         http1: bool = True,
         http2: bool = True,
+        append_common_headers: bool = True,
         **async_client_kwargs: Any,
     ) -> None:
         """Create a new instance.
@@ -95,6 +98,7 @@ class HttpxHttpClient(BaseHttpClient):
             ignore_http_error_status_codes: HTTP status codes to ignore as errors.
             http1: Whether to enable HTTP/1.1 support.
             http2: Whether to enable HTTP/2 support.
+            append_common_headers: Whether to append common headers to each request.
             async_client_kwargs: Additional keyword arguments for `httpx.AsyncClient`.
         """
         super().__init__(
@@ -105,7 +109,9 @@ class HttpxHttpClient(BaseHttpClient):
         self._http1 = http1
         self._http2 = http2
         self._async_client_kwargs = async_client_kwargs
+        self._append_common_headers = append_common_headers
 
+        self._header_generator = HeaderGenerator()
         self._client_by_proxy_url = dict[Optional[str], httpx.AsyncClient]()
 
     @override
@@ -118,11 +124,12 @@ class HttpxHttpClient(BaseHttpClient):
         statistics: Statistics | None = None,
     ) -> HttpCrawlingResult:
         client = self._get_client(proxy_info.url if proxy_info else None)
+        headers = self._get_headers(HttpHeaders(request.headers))
 
         http_request = client.build_request(
             url=request.url,
             method=request.method,
-            headers=request.headers,
+            headers=headers,
             params=request.query_params,
             data=request.data,
             cookies=session.cookies if session else None,
@@ -164,6 +171,7 @@ class HttpxHttpClient(BaseHttpClient):
         proxy_info: ProxyInfo | None = None,
     ) -> HttpResponse:
         client = self._get_client(proxy_info.url if proxy_info else None)
+        headers = self._get_headers(headers)
 
         http_request = client.build_request(
             url=url,
@@ -214,6 +222,16 @@ class HttpxHttpClient(BaseHttpClient):
             self._client_by_proxy_url[proxy_url] = client
 
         return self._client_by_proxy_url[proxy_url]
+
+    def _get_headers(self, explicit_headers: HttpHeaders | None) -> HttpHeaders | None:
+        """Helper to get the headers for a HTTP request."""
+        common_headers = self._header_generator.get_common_headers() if self._append_common_headers else {}
+        headers = HttpHeaders(common_headers)
+
+        if explicit_headers:
+            headers = HttpHeaders({**headers, **explicit_headers})
+
+        return headers if headers else None
 
     @staticmethod
     def _is_proxy_error(error: httpx.TransportError) -> bool:
