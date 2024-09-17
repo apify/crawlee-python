@@ -100,7 +100,6 @@ class HttpxHttpClient(BaseHttpClient):
             ignore_http_error_status_codes: HTTP status codes to ignore as errors.
             http1: Whether to enable HTTP/1.1 support.
             http2: Whether to enable HTTP/2 support.
-            append_common_headers: Whether to append common headers to each request.
             header_generator: Header generator instance to use for generating common headers.
             async_client_kwargs: Additional keyword arguments for `httpx.AsyncClient`.
         """
