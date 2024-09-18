@@ -118,7 +118,24 @@ class BaseRequestData(BaseModel):
 
 
 class Request(BaseRequestData):
-    """A crawling request (as returned from a request queue)."""
+    """Represents a request in the Crawlee framework, containing the necessary information for crawling operations.
+
+    The `Request` class is one of the core components in Crawlee, utilized by various components such as request
+    providers, HTTP clients, crawlers, and more. It encapsulates the essential data for executing web requests,
+    including the URL, HTTP method, headers, payload, and user data. The user data allows custom information
+    to be stored and persisted throughout the request lifecycle, including its retries.
+
+    Key functionalities include managing the request's identifier (`id`), unique key (`unique_key`) that is used
+    for request deduplication, controlling retries, handling state management, and enabling configuration for session
+    rotation and proxy handling.
+
+    The recommended way to create a new instance is by using the `Request.from_url` constructor, which automatically
+    generates a unique key and identifier based on the URL and request parameters.
+
+    ```python
+    request = Request.from_url('https://crawlee.dev')
+    ```
+    """
 
     id: str
 
