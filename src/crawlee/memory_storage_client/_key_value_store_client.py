@@ -305,7 +305,7 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
         if isinstance(record.value, str):
             record.value = record.value.encode('utf-8')
 
-        f = await asyncio.to_thread(open, record_path, mode='wb')
+        f = await asyncio.to_thread(open, record_path, mode='wb', encoding='utf-8')
         try:
             await asyncio.to_thread(f.write, record.value)
         finally:

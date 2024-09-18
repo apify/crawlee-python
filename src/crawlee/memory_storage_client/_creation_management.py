@@ -55,7 +55,7 @@ async def persist_metadata_if_enabled(*, data: dict, entity_directory: str, writ
 
     # Write the metadata to the file
     file_path = os.path.join(entity_directory, METADATA_FILENAME)
-    f = await asyncio.to_thread(open, file_path, mode='wb')
+    f = await asyncio.to_thread(open, file_path, mode='wb', encoding='utf-8')
     try:
         s = await json_dumps(data)
         await asyncio.to_thread(f.write, s.encode('utf-8'))
