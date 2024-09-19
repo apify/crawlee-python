@@ -10,6 +10,10 @@ All notable changes to this project will be documented in this file.
 - Expose extended unique key when creating a new Request ([#515](https://github.com/apify/crawlee-python/pull/515)) ([1807f41](https://github.com/apify/crawlee-python/commit/1807f419e47a815dd706d09acb0f3b3af8cfc691)) by [@vdusek](https://github.com/vdusek)
 - Add header generator and integrate it into HTTPX client ([#530](https://github.com/apify/crawlee-python/pull/530), closes [#402](https://github.com/apify/crawlee-python/issues/402)) ([b63f9f9](https://github.com/apify/crawlee-python/commit/b63f9f98c6613e095546ef544eab271d433e3379)) by [@vdusek](https://github.com/vdusek)
 
+### 🐛 Bug Fixes
+
+- Use explicitly UTF-8 encoding in local storage ([#533](https://github.com/apify/crawlee-python/pull/533), closes [#532](https://github.com/apify/crawlee-python/issues/532)) ([a3a0ab2](https://github.com/apify/crawlee-python/commit/a3a0ab2f6809b7a06319a77dfbf289df78638dea)) by [@vdusek](https://github.com/vdusek)
+
 ## [0.3.5](https://github.com/apify/crawlee-python/releases/tag/v0.3.5) (2024-09-10)
 
 ### 🚀 Features
