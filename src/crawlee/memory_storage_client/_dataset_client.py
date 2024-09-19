@@ -350,7 +350,7 @@ class DatasetClient(BaseDatasetClient):
         # Save all the new items to the disk
         for idx, item in data:
             file_path = os.path.join(entity_directory, f'{idx}.json')
-            f = await asyncio.to_thread(open, file_path, mode='w')
+            f = await asyncio.to_thread(open, file_path, mode='w', encoding='utf-8')
             try:
                 s = await json_dumps(item)
                 await asyncio.to_thread(f.write, s)

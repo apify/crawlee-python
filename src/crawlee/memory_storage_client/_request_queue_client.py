@@ -477,7 +477,7 @@ class RequestQueueClient(BaseRequestQueueClient):
 
         # Write the request to the file
         file_path = os.path.join(entity_directory, f'{request.id}.json')
-        f = await asyncio.to_thread(open, file_path, mode='w')
+        f = await asyncio.to_thread(open, file_path, mode='w', encoding='utf-8')
         try:
             s = await json_dumps(request.model_dump())
             await asyncio.to_thread(f.write, s)
