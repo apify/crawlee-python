@@ -1,0 +1,12 @@
+{
+    "project_name": "crawlee-python-beautifulsoup-project",
+    "__package_name": "{{ cookiecutter.project_name|lower|replace('-', '_') }}",
+    "crawler_type": ["beautifulsoup", "parsel", "playwright"],
+    "package_manager": ["poetry", "pip"],
+    "enable_apify_integration": false,
+    "start_url": "https://crawlee.dev",
+    "_jinja2_env_vars": {
+        "line_statement_prefix": "# %"
+    },
+    "_extensions": ["jinja2.ext.do"]
+}
