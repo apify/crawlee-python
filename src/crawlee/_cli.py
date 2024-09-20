@@ -171,6 +171,8 @@ def create(
                 enable_apify_integration is not None,
             ]
         ):
+            package_name = project_name.replace('-', '_')
+
             # Start the bootstrap process.
             with Progress(
                 SpinnerColumn(),
@@ -193,8 +195,9 @@ def create(
             typer.echo(f'Your project "{project_name}" was created.')
             typer.echo(
                 f'To run it, navigate to the directory: "cd {project_name}", '
-                'install dependencies with "poetry install", '
-                f'and run it using "poetry run python -m {project_name}".'
+                f'and run it using "poetry run python -m {package_name}".'
+                if package_manager == 'poetry'
+                else f'and run it using "python -m {package_name}".'
             )
             typer.echo(f'See the "{project_name}/README.md" for more information.')
 
