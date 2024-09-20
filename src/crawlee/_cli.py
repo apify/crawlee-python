@@ -136,7 +136,8 @@ def create(
         help='The URL where crawling should start. If none is given, you will be prompted.',
     ),
     enable_apify_integration: Optional[bool] = typer.Option(
-        default=None,
+        None,
+        '--apify/--no-apify',
         show_default=False,
         help='Should Apify integration be set up for you? If not given, you will be prompted.',
     ),
@@ -189,6 +190,7 @@ def create(
                         'package_manager': package_manager,
                         'crawler_type': crawler_type,
                         'enable_apify_integration': enable_apify_integration,
+                        'start_url': start_url,
                     },
                 )
 
