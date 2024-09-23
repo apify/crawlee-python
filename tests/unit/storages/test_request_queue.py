@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 import pytest
+from pydantic import ValidationError
 
 from crawlee import Request
 from crawlee.storages import RequestQueue
@@ -162,3 +163,49 @@ async def test_add_batched_requests(
 
     # Confirm the queue is empty after processing all requests
     assert await request_queue.is_empty() is True
+
+
+async def test_invalid_user_data_serialization() -> None:
+    with pytest.raises(ValidationError):
+        Request.from_url(
+            'https://crawlee.dev',
+            user_data={
+                'foo': datetime(year=2020, month=7, day=4, tzinfo=timezone.utc),
+                'bar': {datetime(year=2020, month=4, day=7, tzinfo=timezone.utc)},
+            },
+        )
+
+
+async def test_user_data_serialization(request_queue: RequestQueue) -> None:
+    request = Request.from_url(
+        'https://crawlee.dev',
+        user_data={
+            'hello': 'world',
+            'foo': 42,
+        },
+    )
+
+    await request_queue.add_request(request)
+
+    dequeued_request = await request_queue.fetch_next_request()
+    assert dequeued_request is not None
+
+    assert dequeued_request.user_data['hello'] == 'world'
+    assert dequeued_request.user_data['foo'] == 42
+
+
+async def test_complex_user_data_serialization(request_queue: RequestQueue) -> None:
+    request = Request.from_url('https://crawlee.dev')
+    request.user_data['hello'] = 'world'
+    request.user_data['foo'] = 42
+    request.crawlee_data.max_retries = 1
+
+    await request_queue.add_request(request)
+
+    dequeued_request = await request_queue.fetch_next_request()
+    assert dequeued_request is not None
+
+    data = dequeued_request.model_dump(by_alias=True)
+    assert data['userData']['hello'] == 'world'
+    assert data['userData']['foo'] == 42
+    assert data['userData']['__crawlee'] == {'maxRetries': 1}

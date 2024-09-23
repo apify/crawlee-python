@@ -390,7 +390,7 @@ async def test_enqueue_strategy(test_input: AddRequestsTestInput) -> None:
     crawler = BasicCrawler(request_provider=RequestList([Request.from_url('https://someplace.com/', label='start')]))
 
     @crawler.router.handler('start')
-    async def default_handler(context: BasicCrawlingContext) -> None:
+    async def start_handler(context: BasicCrawlingContext) -> None:
         await context.add_requests(
             test_input.requests,
             **test_input.kwargs,
