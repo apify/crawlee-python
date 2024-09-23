@@ -283,7 +283,7 @@ class Request(BaseRequestData):
         )
 
         if label is not None:
-            cast(UserData, request.user_data).label = label
+            request.user_data['label'] = label
 
         return request
 
