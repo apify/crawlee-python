@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+
 def is_status_code_error(value: int) -> bool:
     """Returns `True` for 4xx or 5xx status codes, `False` otherwise."""
     return is_status_code_client_error(value) or is_status_code_server_error(value)

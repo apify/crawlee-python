@@ -20,7 +20,7 @@ from pydantic import (
 )
 from typing_extensions import Self
 
-from crawlee._types import EnqueueStrategy, HttpMethod
+from crawlee._types import EnqueueStrategy, HttpMethod, HttpPayload, HttpQueryParams
 from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
 from crawlee._utils.urls import extract_query_params, validate_http_url
 
@@ -117,14 +117,17 @@ class BaseRequestData(BaseModel):
     """
 
     method: HttpMethod = 'GET'
+    """HTTP request method."""
 
-    payload: str | None = None
+    headers: Annotated[dict[str, str], Field(default_factory=dict)] = {}
+    """HTTP request headers."""
 
-    headers: Annotated[dict[str, str] | None, Field(default_factory=dict)] = None
+    query_params: Annotated[HttpQueryParams, Field(alias='queryParams', default_factory=dict)] = {}
+    """URL query parameters."""
 
-    query_params: Annotated[dict[str, Any] | None, Field(default_factory=dict)] = None
+    payload: HttpPayload | None = None
 
-    data: Annotated[dict[str, Any] | None, Field(default_factory=dict)] = None
+    data: Annotated[dict[str, Any], Field(default_factory=dict)] = {}
 
     user_data: Annotated[
         dict[str, JsonValue],  # Internally, the model contains `UserData`, this is just for convenience
@@ -139,7 +142,7 @@ class BaseRequestData(BaseModel):
                 exclude_defaults=True,
             )
         ),
-    ]
+    ] = {}
     """Custom user data assigned to the request. Use this to save any request related data to the
     request's scope, keeping them accessible on retries, failures etc.
     """
@@ -158,7 +161,7 @@ class BaseRequestData(BaseModel):
         url: str,
         *,
         method: HttpMethod = 'GET',
-        payload: str | None = None,
+        payload: HttpPayload | None = None,
         label: str | None = None,
         unique_key: str | None = None,
         id: str | None = None,
@@ -232,7 +235,7 @@ class Request(BaseRequestData):
         url: str,
         *,
         method: HttpMethod = 'GET',
-        payload: str | None = None,
+        payload: HttpPayload | None = None,
         label: str | None = None,
         unique_key: str | None = None,
         id: str | None = None,

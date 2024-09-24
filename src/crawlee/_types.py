@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Coroutine, Iterator, Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal, Protocol, Union
@@ -10,6 +10,7 @@ from typing_extensions import NotRequired, TypeAlias, TypedDict, Unpack
 if TYPE_CHECKING:
     import logging
     import re
+    from collections.abc import Coroutine, Iterator, Sequence
 
     from crawlee import Glob
     from crawlee._request import BaseRequestData, Request
@@ -25,6 +26,10 @@ if TYPE_CHECKING:
 JsonSerializable: TypeAlias = Union[str, int, float, bool, None, dict[str, Any], list[Any]]
 
 HttpMethod: TypeAlias = Literal['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH']
+
+HttpQueryParams: TypeAlias = dict[str, str]
+
+HttpPayload: TypeAlias = Union[str, bytes]
 
 
 class EnqueueStrategy(str, Enum):

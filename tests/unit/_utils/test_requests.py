@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 
 from crawlee._utils.requests import compute_unique_key, normalize_url, unique_key_to_request_id
+
+if TYPE_CHECKING:
+    from crawlee._types import HttpMethod, HttpPayload
 
 
 def test_unique_key_to_request_id_length() -> None:
@@ -101,8 +106,8 @@ def test_normalize_url(url: str, expected_output: str, *, keep_url_fragment: boo
 )
 def test_compute_unique_key(
     url: str,
-    method: str,
-    payload: str | None,
+    method: HttpMethod,
+    payload: HttpPayload,
     *,
     keep_url_fragment: bool,
     use_extended_unique_key: bool,

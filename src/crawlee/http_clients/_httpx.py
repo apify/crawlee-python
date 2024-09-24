@@ -16,7 +16,7 @@ from crawlee.sessions import Session
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from crawlee._types import HttpMethod
+    from crawlee._types import HttpMethod, HttpQueryParams
     from crawlee.base_storage_client._models import Request
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.statistics import Statistics
@@ -166,7 +166,7 @@ class HttpxHttpClient(BaseHttpClient):
         *,
         method: HttpMethod = 'GET',
         headers: HttpHeaders | None = None,
-        query_params: dict[str, Any] | None = None,
+        query_params: HttpQueryParams | None = None,
         data: dict[str, Any] | None = None,
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
