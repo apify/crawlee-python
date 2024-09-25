@@ -107,7 +107,7 @@ def test_normalize_url(url: str, expected_output: str, *, keep_url_fragment: boo
 def test_compute_unique_key(
     url: str,
     method: HttpMethod,
-    payload: HttpPayload,
+    payload: HttpPayload | None,
     *,
     keep_url_fragment: bool,
     use_extended_unique_key: bool,
