@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Improve `Request.user_data` serialization ([#540](https://github.com/apify/crawlee-python/pull/540), closes [#524](https://github.com/apify/crawlee-python/issues/524)) ([de29c0e](https://github.com/apify/crawlee-python/commit/de29c0e6b737a9d2544c5382472618dde76eb2a5)) by [@janbuchar](https://github.com/janbuchar)
+- Adopt new version of curl-cffi ([#543](https://github.com/apify/crawlee-python/pull/543)) ([f6fcf48](https://github.com/apify/crawlee-python/commit/f6fcf48d99bfcb4b8e75c5c9c38dc8c265164a10)) by [@vdusek](https://github.com/vdusek)
 
 ## [0.3.6](https://github.com/apify/crawlee-python/releases/tag/v0.3.6) (2024-09-19)
 
