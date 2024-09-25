@@ -4,9 +4,13 @@ import re
 from base64 import b64encode
 from hashlib import sha256
 from logging import getLogger
+from typing import TYPE_CHECKING
 from urllib.parse import parse_qsl, urlencode, urlparse
 
 from crawlee._utils.crypto import compute_short_hash
+
+if TYPE_CHECKING:
+    from crawlee._types import HttpMethod, HttpPayload
 
 logger = getLogger(__name__)
 
@@ -82,8 +86,8 @@ def normalize_url(url: str, *, keep_url_fragment: bool = False) -> str:
 
 def compute_unique_key(
     url: str,
-    method: str = 'GET',
-    payload: str | bytes | None = None,
+    method: HttpMethod = 'GET',
+    payload: HttpPayload | None = None,
     *,
     keep_url_fragment: bool = False,
     use_extended_unique_key: bool = False,
@@ -91,13 +95,13 @@ def compute_unique_key(
     """Computes a unique key for caching & deduplication of requests.
 
     This function computes a unique key by normalizing the provided URL and method.
-    If 'use_extended_unique_key' is True and a payload is provided, the payload is hashed and
+    If `use_extended_unique_key` is True and a payload is provided, the payload is hashed and
     included in the key. Otherwise, the unique key is just the normalized URL.
 
     Args:
         url: The request URL.
         method: The HTTP method, defaults to 'GET'.
-        payload: The request payload, defaults to None.
+        payload: The data to be sent as the request body, defaults to None.
         keep_url_fragment: A flag indicating whether to keep the URL fragment, defaults to False.
         use_extended_unique_key: A flag indicating whether to include a hashed payload in the key, defaults to False.
 

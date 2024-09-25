@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 import asyncio
 from contextlib import suppress
+from typing import TYPE_CHECKING
 
-from playwright.async_api import Page
-from playwright.async_api import Request as PlaywrightRequest
+if TYPE_CHECKING:
+    from playwright.async_api import Page
+    from playwright.async_api import Request as PlaywrightRequest
 
 
 async def infinite_scroll(page: Page) -> None:
