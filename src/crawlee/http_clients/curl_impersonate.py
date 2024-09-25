@@ -6,7 +6,7 @@ try:
     from curl_cffi.requests import AsyncSession
     from curl_cffi.requests.exceptions import ProxyError as CurlProxyError
     from curl_cffi.requests.exceptions import RequestException as CurlRequestError
-    from curl_cffi.requests.impersonate import BrowserType
+    from curl_cffi.requests.impersonate import DEFAULT_CHROME as CURL_DEFAULT_CHROME
 except ImportError as exc:
     raise ImportError(
         "To import anything from this subpackage, you need to install the 'curl-impersonate' extra."
@@ -195,7 +195,7 @@ class CurlImpersonateHttpClient(BaseHttpClient):
             # are set as default options.
             kwargs: dict[str, Any] = {
                 'proxy': proxy_url,
-                'impersonate': BrowserType.chrome124,
+                'impersonate': CURL_DEFAULT_CHROME,
             }
 
             # Update the default kwargs with any additional user-provided kwargs.
