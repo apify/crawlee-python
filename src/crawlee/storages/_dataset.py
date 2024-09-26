@@ -248,8 +248,8 @@ class Dataset(BaseStorage):
         """
         key = cast(str, kwargs.get('key'))
         content_type = kwargs.get('content_type', 'json')
-        to_key_value_store_id = kwargs.get('to_key_value_store_id', None)
-        to_key_value_store_name = kwargs.get('to_key_value_store_name', None)
+        to_key_value_store_id = kwargs.get('to_key_value_store_id')
+        to_key_value_store_name = kwargs.get('to_key_value_store_name')
 
         key_value_store = await KeyValueStore.open(id=to_key_value_store_id, name=to_key_value_store_name)
 
