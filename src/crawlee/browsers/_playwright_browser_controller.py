@@ -42,7 +42,9 @@ class PlaywrightBrowserController(BaseBrowserController):
         Args:
             browser: The browser instance to control.
             max_open_pages_per_browser: The maximum number of pages that can be open at the same time.
-            header_generator: The header generator to use for getting HTTP headers for the pages.
+            header_generator: An optional `HeaderGenerator` instance used to generate and manage HTTP headers for
+                requests made by the browser. By default, a predefined header generator is used. Set to `None` to
+                disable automatic header modifications.
         """
         self._browser = browser
         self._max_open_pages_per_browser = max_open_pages_per_browser
@@ -128,14 +130,15 @@ class PlaywrightBrowserController(BaseBrowserController):
 
     async def _get_new_browser_context(self, proxy_info: ProxyInfo | None = None) -> BrowserContext:
         """Create a new browser context with the specified proxy settings."""
-        user_agent = (
-            self._header_generator.get_user_agent_header(browser_type=self.browser_type)
-            if self._header_generator
-            else None
-        )
-        extra_http_headers = (
-            dict(self._header_generator.get_common_headers()) if self._header_generator else None
-        )
+        if self._header_generator:
+            common_headers = self._header_generator.get_common_headers()
+            sec_ch_ua_headers = self._header_generator.get_sec_ch_ua_headers(browser_type=self.browser_type)
+            user_agent_header = self._header_generator.get_user_agent_header(browser_type=self.browser_type)
+            extra_http_headers = {**common_headers, **sec_ch_ua_headers, **user_agent_header}
+            user_agent = user_agent_header.get('User-Agent')
+        else:
+            extra_http_headers = None
+            user_agent = None
 
         proxy = (
             ProxySettings(
@@ -148,7 +151,7 @@ class PlaywrightBrowserController(BaseBrowserController):
         )
 
         return await self._browser.new_context(
-            user_agent=user_agent.get('User-Agent') if user_agent else None,
+            user_agent=user_agent,
             extra_http_headers=extra_http_headers,
             proxy=proxy,
         )

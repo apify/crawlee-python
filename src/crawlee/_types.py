@@ -235,12 +235,12 @@ class HttpHeaders(Mapping[str, str]):
         """
         # Ensure immutability by sorting and fixing the order.
         headers = headers or {}
-        headers = {k.lower(): v for k, v in headers.items()}
+        headers = {k.capitalize(): v for k, v in headers.items()}
         self._headers = dict(sorted(headers.items()))
 
     def __getitem__(self, key: str) -> str:
         """Get the value of a header by its name, case-insensitive."""
-        return self._headers[key.lower()]
+        return self._headers[key.capitalize()]
 
     def __iter__(self) -> Iterator[str]:
         """Return an iterator over the header names."""
