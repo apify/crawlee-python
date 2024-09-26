@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
-from playwright.async_api import Page
+from playwright.async_api import BrowserContext, Page, ProxySettings
 from typing_extensions import override
 
 from crawlee.browsers._base_browser_controller import BaseBrowserController
+from crawlee.browsers._types import BrowserType
+from crawlee.fingerprint_suite import HeaderGenerator
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -26,17 +28,27 @@ class PlaywrightBrowserController(BaseBrowserController):
     """
 
     AUTOMATION_LIBRARY = 'playwright'
+    _DEFAULT_HEADER_GENERATOR = HeaderGenerator()
 
-    def __init__(self, browser: Browser, *, max_open_pages_per_browser: int = 20) -> None:
+    def __init__(
+        self,
+        browser: Browser,
+        *,
+        max_open_pages_per_browser: int = 20,
+        header_generator: HeaderGenerator | None = _DEFAULT_HEADER_GENERATOR,
+    ) -> None:
         """Create a new instance.
 
         Args:
             browser: The browser instance to control.
             max_open_pages_per_browser: The maximum number of pages that can be open at the same time.
+            header_generator: The header generator to use for getting HTTP headers for the pages.
         """
         self._browser = browser
         self._max_open_pages_per_browser = max_open_pages_per_browser
+        self._header_generator = header_generator
 
+        self._browser_context: BrowserContext | None = None
         self._pages = list[Page]()
         self._last_page_opened_at = datetime.now(timezone.utc)
 
@@ -70,26 +82,25 @@ class PlaywrightBrowserController(BaseBrowserController):
     def is_browser_connected(self) -> bool:
         return self._browser.is_connected()
 
+    @property
+    @override
+    def browser_type(self) -> BrowserType:
+        return cast(BrowserType, self._browser.browser_type.name)
+
     @override
     async def new_page(
         self,
         page_options: Mapping[str, Any] | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> Page:
-        page_options = dict(page_options) if page_options else {}
-
-        # If "proxy_info" is provided and no proxy is already set in "page_options", configure the proxy.
-        if proxy_info and 'proxy' not in page_options:
-            page_options['proxy'] = {
-                'server': f'{proxy_info.scheme}://{proxy_info.hostname}:{proxy_info.port}',
-                'username': proxy_info.username,
-                'password': proxy_info.password,
-            }
+        if not self._browser_context:
+            self._browser_context = await self._get_new_browser_context(proxy_info)
 
         if not self.has_free_capacity:
             raise ValueError('Cannot open more pages in this browser.')
 
-        page = await self._browser.new_page(**page_options)
+        page_options = dict(page_options) if page_options else {}
+        page = await self._browser_context.new_page(**page_options)
 
         # Handle page close event
         page.on(event='close', f=self._on_page_close)
@@ -114,3 +125,30 @@ class PlaywrightBrowserController(BaseBrowserController):
     def _on_page_close(self, page: Page) -> None:
         """Handle actions after a page is closed."""
         self._pages.remove(page)
+
+    async def _get_new_browser_context(self, proxy_info: ProxyInfo | None = None) -> BrowserContext:
+        """Create a new browser context with the specified proxy settings."""
+        user_agent = (
+            self._header_generator.get_user_agent_header(browser_type=self.browser_type)
+            if self._header_generator
+            else None
+        )
+        extra_http_headers = (
+            dict(self._header_generator.get_common_headers()) if self._header_generator else None
+        )
+
+        proxy = (
+            ProxySettings(
+                server=f'{proxy_info.scheme}://{proxy_info.hostname}:{proxy_info.port}',
+                username=proxy_info.username,
+                password=proxy_info.password,
+            )
+            if proxy_info
+            else None
+        )
+
+        return await self._browser.new_context(
+            user_agent=user_agent.get('User-Agent') if user_agent else None,
+            extra_http_headers=extra_http_headers,
+            proxy=proxy,
+        )

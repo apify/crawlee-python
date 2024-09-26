@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
     from playwright.async_api import Page
 
+    from crawlee.browsers._types import BrowserType
     from crawlee.proxy_configuration import ProxyInfo
 
 
@@ -49,6 +50,11 @@ class BaseBrowserController(ABC):
     @abstractmethod
     def is_browser_connected(self) -> bool:
         """Return if the browser is closed."""
+
+    @property
+    @abstractmethod
+    def browser_type(self) -> BrowserType:
+        """Return the type of the browser."""
 
     @abstractmethod
     async def new_page(

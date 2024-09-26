@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from pydantic import ValidationError
 from typing_extensions import Unpack
@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
     from crawlee._types import AddRequestsKwargs, BasicCrawlingContext
+    from crawlee.browsers._types import BrowserType
 
 
 class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
@@ -45,7 +46,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
     def __init__(
         self,
         browser_pool: BrowserPool | None = None,
-        browser_type: Literal['chromium', 'firefox', 'webkit'] | None = None,
+        browser_type: BrowserType | None = None,
         headless: bool | None = None,
         **kwargs: Unpack[BasicCrawlerOptions[PlaywrightCrawlingContext]],
     ) -> None:
