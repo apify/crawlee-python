@@ -24,7 +24,7 @@ class HeaderGenerator:
     """Generates realistic looking or browser-like HTTP headers."""
 
     def get_common_headers(self) -> HttpHeaders:
-        """Get common HTTP headers.
+        """Get common HTTP headers ("Accept", "Accept-Language").
 
         We do not modify the "Accept-Encoding", "Connection" and other headers. They should be included and handled
         by the HTTP client or browser.
