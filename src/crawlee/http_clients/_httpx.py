@@ -231,13 +231,7 @@ class HttpxHttpClient(BaseHttpClient):
             self._header_generator.get_random_user_agent_header() if self._header_generator else HttpHeaders()
         )
         explicit_headers = explicit_headers or HttpHeaders()
-        headers = HttpHeaders(
-            {
-                **common_headers,
-                **user_agent_header,
-                **explicit_headers,
-            }
-        )
+        headers = common_headers | user_agent_header | explicit_headers
         return headers if headers else None
 
     @staticmethod

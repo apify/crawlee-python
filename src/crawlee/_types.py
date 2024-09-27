@@ -261,3 +261,13 @@ class HttpHeaders(Mapping[str, str]):
     def __delitem__(self, key: str) -> None:
         """Prevent deleting a header, as the object is immutable."""
         raise TypeError(f'{self.__class__.__name__} is immutable')
+
+    def __or__(self, other: Mapping[str, str]) -> HttpHeaders:
+        """Return a new instance of `HttpHeaders` combining this one with another one."""
+        combined_headers = {**self._headers, **other}
+        return HttpHeaders(combined_headers)
+
+    def __ror__(self, other: Mapping[str, str]) -> HttpHeaders:
+        """Support reversed | operation (other | self)."""
+        combined_headers = {**other, **self._headers}
+        return HttpHeaders(combined_headers)

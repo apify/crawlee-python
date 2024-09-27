@@ -96,7 +96,7 @@ class PlaywrightBrowserController(BaseBrowserController):
         proxy_info: ProxyInfo | None = None,
     ) -> Page:
         if not self._browser_context:
-            self._browser_context = await self._get_new_browser_context(proxy_info)
+            self._browser_context = await self._create_browser_context(proxy_info)
 
         if not self.has_free_capacity:
             raise ValueError('Cannot open more pages in this browser.')
@@ -128,13 +128,13 @@ class PlaywrightBrowserController(BaseBrowserController):
         """Handle actions after a page is closed."""
         self._pages.remove(page)
 
-    async def _get_new_browser_context(self, proxy_info: ProxyInfo | None = None) -> BrowserContext:
+    async def _create_browser_context(self, proxy_info: ProxyInfo | None = None) -> BrowserContext:
         """Create a new browser context with the specified proxy settings."""
         if self._header_generator:
             common_headers = self._header_generator.get_common_headers()
             sec_ch_ua_headers = self._header_generator.get_sec_ch_ua_headers(browser_type=self.browser_type)
             user_agent_header = self._header_generator.get_user_agent_header(browser_type=self.browser_type)
-            extra_http_headers = {**common_headers, **sec_ch_ua_headers, **user_agent_header}
+            extra_http_headers = dict(common_headers | sec_ch_ua_headers | user_agent_header)
             user_agent = user_agent_header.get('User-Agent')
         else:
             extra_http_headers = None
