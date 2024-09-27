@@ -4,10 +4,18 @@
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
 from unittest import mock
 
 from crawlee import Glob
+from crawlee.fingerprint_suite._consts import (
+    PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA,
+    PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_MOBILE,
+    PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_PLATFORM,
+    PW_CHROMIUM_HEADLESS_DEFAULT_USER_AGENT,
+    PW_FIREFOX_HEADLESS_DEFAULT_USER_AGENT,
+)
 from crawlee.playwright_crawler import PlaywrightCrawler
 from crawlee.storages import RequestList
 
@@ -71,3 +79,55 @@ async def test_nonexistent_url_invokes_error_handler() -> None:
     await crawler.run()
     assert error_handler.call_count == 3
     assert failed_handler.call_count == 1
+
+
+async def test_chromium_headless_headers() -> None:
+    crawler = PlaywrightCrawler(headless=True, browser_type='chromium')
+    headers = dict[str, str]()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        response = await context.response.text()
+        response_headers = dict(json.loads(response)).get('headers', {})
+
+        for key, val in response_headers.items():
+            headers[key] = val
+
+    await crawler.run(['https://httpbin.org/get'])
+
+    assert 'User-Agent' in headers
+    assert 'Sec-Ch-Ua' in headers
+    assert 'Sec-Ch-Ua-Mobile' in headers
+    assert 'Sec-Ch-Ua-Platform' in headers
+
+    assert 'headless' not in headers['Sec-Ch-Ua'].lower()
+    assert 'headless' not in headers['User-Agent'].lower()
+
+    assert headers['Sec-Ch-Ua'] == PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA
+    assert headers['Sec-Ch-Ua-Mobile'] == PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_MOBILE
+    assert headers['Sec-Ch-Ua-Platform'] == PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_PLATFORM
+    assert headers['User-Agent'] == PW_CHROMIUM_HEADLESS_DEFAULT_USER_AGENT
+
+
+async def test_firefox_headless_headers() -> None:
+    crawler = PlaywrightCrawler(headless=True, browser_type='firefox')
+    headers = dict[str, str]()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        response = await context.response.text()
+        response_headers = dict(json.loads(response)).get('headers', {})
+
+        for key, val in response_headers.items():
+            headers[key] = val
+
+    await crawler.run(['https://httpbin.org/get'])
+
+    assert 'User-Agent' in headers
+    assert 'Sec-Ch-Ua' not in headers
+    assert 'Sec-Ch-Ua-Mobile' not in headers
+    assert 'Sec-Ch-Ua-Platform' not in headers
+
+    assert 'headless' not in headers['User-Agent'].lower()
+
+    assert headers['User-Agent'] == PW_FIREFOX_HEADLESS_DEFAULT_USER_AGENT

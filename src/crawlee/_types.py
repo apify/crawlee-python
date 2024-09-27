@@ -235,12 +235,12 @@ class HttpHeaders(Mapping[str, str]):
         """
         # Ensure immutability by sorting and fixing the order.
         headers = headers or {}
-        headers = {k.lower(): v for k, v in headers.items()}
+        headers = {k.capitalize(): v for k, v in headers.items()}
         self._headers = dict(sorted(headers.items()))
 
     def __getitem__(self, key: str) -> str:
         """Get the value of a header by its name, case-insensitive."""
-        return self._headers[key.lower()]
+        return self._headers[key.capitalize()]
 
     def __iter__(self) -> Iterator[str]:
         """Return an iterator over the header names."""
@@ -261,3 +261,13 @@ class HttpHeaders(Mapping[str, str]):
     def __delitem__(self, key: str) -> None:
         """Prevent deleting a header, as the object is immutable."""
         raise TypeError(f'{self.__class__.__name__} is immutable')
+
+    def __or__(self, other: Mapping[str, str]) -> HttpHeaders:
+        """Return a new instance of `HttpHeaders` combining this one with another one."""
+        combined_headers = {**self._headers, **other}
+        return HttpHeaders(combined_headers)
+
+    def __ror__(self, other: Mapping[str, str]) -> HttpHeaders:
+        """Support reversed | operation (other | self)."""
+        combined_headers = {**other, **self._headers}
+        return HttpHeaders(combined_headers)

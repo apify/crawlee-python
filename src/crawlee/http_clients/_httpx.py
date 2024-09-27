@@ -226,12 +226,12 @@ class HttpxHttpClient(BaseHttpClient):
 
     def _combine_headers(self, explicit_headers: HttpHeaders | None) -> HttpHeaders | None:
         """Helper to get the headers for a HTTP request."""
-        common_headers = self._header_generator.get_common_headers() if self._header_generator else {}
-        headers = HttpHeaders(common_headers)
-
-        if explicit_headers:
-            headers = HttpHeaders({**headers, **explicit_headers})
-
+        common_headers = self._header_generator.get_common_headers() if self._header_generator else HttpHeaders()
+        user_agent_header = (
+            self._header_generator.get_random_user_agent_header() if self._header_generator else HttpHeaders()
+        )
+        explicit_headers = explicit_headers or HttpHeaders()
+        headers = common_headers | user_agent_header | explicit_headers
         return headers if headers else None
 
     @staticmethod
