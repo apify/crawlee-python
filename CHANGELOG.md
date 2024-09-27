@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.3.8 - **not yet released**
+
+### 🚀 Features
+
+- Mask Playwright's "headless" headers ([#545](https://github.com/apify/crawlee-python/pull/545), closes [#401](https://github.com/apify/crawlee-python/issues/401)) ([d1445e4](https://github.com/apify/crawlee-python/commit/d1445e4858fd804bb4a2e35efa1d2f5254d8df6b)) by [@vdusek](https://github.com/vdusek)
+
 ## [0.3.7](https://github.com/apify/crawlee-python/releases/tag/v0.3.7) (2024-09-25)
 
 ### 🐛 Bug Fixes
