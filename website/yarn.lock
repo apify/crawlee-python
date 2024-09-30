@@ -6381,9 +6381,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"eslint-plugin-react@npm:7.36.1":
-  version: 7.36.1
-  resolution: "eslint-plugin-react@npm:7.36.1"
+"eslint-plugin-react@npm:7.37.0":
+  version: 7.37.0
+  resolution: "eslint-plugin-react@npm:7.37.0"
   dependencies:
     array-includes: "npm:^3.1.8"
     array.prototype.findlast: "npm:^1.2.5"
@@ -6405,7 +6405,7 @@ __metadata:
     string.prototype.repeat: "npm:^1.0.0"
   peerDependencies:
     eslint: ^3 || ^4 || ^5 || ^6 || ^7 || ^8 || ^9.7
-  checksum: 10c0/8cb37f7fb351213bc44263580ff77627e14e27870fd81dae593e3de2826340b9bd8bbac7ae00fd5de69751a0660b2e51bd26760596f4ae85548f6b1bd76706e6
+  checksum: 10c0/c9b02cd425c2a7c36b07fe223e405ae235500ac98f04898529cd8842c78fdd5b54f7c29189db5d6eab390ac5ac531af6e7b94a1f3fe9ad1e6564f7d78fd0eb6b
   languageName: node
   linkType: hard
 
@@ -12511,7 +12511,7 @@ __metadata:
     crypto-browserify: "npm:^3.12.0"
     docusaurus-gtm-plugin: "npm:^0.0.2"
     eslint: "npm:8.57.0"
-    eslint-plugin-react: "npm:7.36.1"
+    eslint-plugin-react: "npm:7.37.0"
     eslint-plugin-react-hooks: "npm:4.6.2"
     fs-extra: "npm:^11.1.0"
     patch-package: "npm:^8.0.0"
