@@ -865,6 +865,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
             else:
                 self._logger.exception('Request failed and reached maximum retries', exc_info=session_error)
 
+                if self._error_handler:
+                    await self._error_handler(crawling_context, session_error)
+
                 await wait_for(
                     lambda: request_provider.mark_request_as_handled(crawling_context.request),
                     timeout=self._internal_timeout,
