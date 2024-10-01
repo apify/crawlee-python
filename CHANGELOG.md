@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Call `error_handler` for `SessionError` ([#557](https://github.com/apify/crawlee-python/pull/557), closes [#546](https://github.com/apify/crawlee-python/issues/546)) ([e75ac4b](https://github.com/apify/crawlee-python/commit/e75ac4b70cd48a4ca9f8245cea3c5f3c188b8824)) by [@vdusek](https://github.com/vdusek)
+- Extend from `StrEnum` in `RequestState` to fix serialization ([#556](https://github.com/apify/crawlee-python/pull/556), closes [#551](https://github.com/apify/crawlee-python/issues/551)) ([6bf35ba](https://github.com/apify/crawlee-python/commit/6bf35ba4a6913819706ebd1d2c1156a4c62f944e)) by [@vdusek](https://github.com/vdusek)
 
 ## [0.3.7](https://github.com/apify/crawlee-python/releases/tag/v0.3.7) (2024-09-25)
 
