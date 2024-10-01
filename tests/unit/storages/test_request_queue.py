@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from crawlee import Request
+from crawlee._request import RequestState
 from crawlee.storages import RequestQueue
 
 if TYPE_CHECKING:
@@ -199,6 +200,7 @@ async def test_complex_user_data_serialization(request_queue: RequestQueue) -> N
     request.user_data['hello'] = 'world'
     request.user_data['foo'] = 42
     request.crawlee_data.max_retries = 1
+    request.crawlee_data.state = RequestState.ERROR_HANDLER
 
     await request_queue.add_request(request)
 
