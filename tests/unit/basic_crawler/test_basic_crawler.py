@@ -189,7 +189,6 @@ async def test_calls_error_handler() -> None:
     assert calls[1][2] == 1
 
 
-@pytest.mark.only
 async def test_calls_error_handler_for_sesion_errors() -> None:
     crawler = BasicCrawler(
         max_session_rotations=1,
