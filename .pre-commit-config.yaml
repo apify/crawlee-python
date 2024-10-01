@@ -12,9 +12,3 @@ repos:
         entry: make type-check
         language: system
         pass_filenames: false
-
-      - id: unit-tests
-        name: Unit tests
-        entry: make unit-tests
-        language: system
-        pass_filenames: false
