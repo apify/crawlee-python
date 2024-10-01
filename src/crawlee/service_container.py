@@ -39,11 +39,16 @@ _services = _Services()
 _default_storage_client_type: StorageClientType = 'local'
 
 
-def get_storage_client(*, client_type: StorageClientType | None = None) -> BaseStorageClient:
+def get_storage_client(
+    *,
+    client_type: StorageClientType | None = None,
+    configuration: Configuration | None = None,
+) -> BaseStorageClient:
     """Get the storage client instance for the current environment.
 
     Args:
         client_type: Allows retrieving a specific storage client type, regardless of where we are running.
+        configuration: The configuration to use.
 
     Returns:
         The current storage client instance.
@@ -57,7 +62,7 @@ def get_storage_client(*, client_type: StorageClientType | None = None) -> BaseS
         return _services['cloud_storage_client']
 
     if 'local_storage_client' not in _services:
-        _services['local_storage_client'] = MemoryStorageClient()
+        _services['local_storage_client'] = MemoryStorageClient(configuration=configuration)
 
     return _services['local_storage_client']
 
