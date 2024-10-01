@@ -104,9 +104,6 @@ crawlee = "crawlee._cli:cli"
 
 [tool.ruff]
 line-length = 120
-exclude = [
-    "src/crawlee/_utils/str_enum.py",
-]
 
 [tool.ruff.lint]
 select = ["ALL"]
@@ -209,7 +206,6 @@ warn_unreachable = true
 warn_unused_ignores = true
 exclude = [
     "docs/introduction/code/08_main.py",
-    "src/crawlee/_utils/str_enum.py",
 ]
 
 [tool.mypy-scrapy]
@@ -223,9 +219,6 @@ exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",
     "assert_never()"
-]
-omit = [
-    "src/crawlee/_utils/str_enum.py",
 ]
 
 [tool.basedpyright]
