@@ -21,6 +21,7 @@ from pydantic import (
 from typing_extensions import Self
 
 from crawlee._types import EnqueueStrategy, HttpHeaders, HttpMethod, HttpPayload, HttpQueryParams
+from crawlee._utils.http import normalize_and_sort_headers
 from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
 from crawlee._utils.urls import extract_query_params, validate_http_url
 
@@ -122,7 +123,7 @@ class BaseRequestData(BaseModel):
     headers: Annotated[
         HttpHeaders,
         # Normalize headers to lowercase keys and sort them.
-        PlainValidator(lambda headers: dict(sorted({k.lower(): v for k, v in headers.items()}.items()))),
+        PlainValidator(lambda value: normalize_and_sort_headers(value)),
         Field(default_factory={}),
     ] = {}
     """HTTP request headers."""
