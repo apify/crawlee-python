@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import httpx
 import pytest
@@ -187,6 +187,27 @@ async def test_calls_error_handler() -> None:
     # Check the contents of the `custom_retry_count` header added by the error handler
     assert calls[0][2] == 0
     assert calls[1][2] == 1
+
+
+@pytest.mark.only
+async def test_calls_error_handler_for_sesion_errors() -> None:
+    crawler = BasicCrawler(
+        max_session_rotations=1,
+    )
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        raise SessionError('Arbitrary session error for testing purposes')
+
+    error_handler_mock = AsyncMock()
+
+    @crawler.error_handler
+    async def error_handler(context: BasicCrawlingContext, error: Exception) -> None:
+        await error_handler_mock(context, error)
+
+    await crawler.run(['https://crawlee.dev'])
+
+    assert error_handler_mock.call_count == 1
 
 
 async def test_handles_error_in_error_handler() -> None:

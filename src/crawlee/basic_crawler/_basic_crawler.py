@@ -851,6 +851,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
             if not crawling_context.session:
                 raise RuntimeError('SessionError raised in a crawling context without a session') from session_error
 
+            if self._error_handler:
+                await self._error_handler(crawling_context, session_error)
+
             if self._should_retry_request(crawling_context, session_error):
                 self._logger.warning('Encountered a session error, rotating session and retrying')
 
@@ -864,9 +867,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 self._statistics.error_tracker_retry.add(session_error)
             else:
                 self._logger.exception('Request failed and reached maximum retries', exc_info=session_error)
-
-                if self._error_handler:
-                    await self._error_handler(crawling_context, session_error)
 
                 await wait_for(
                     lambda: request_provider.mark_request_as_handled(crawling_context.request),
