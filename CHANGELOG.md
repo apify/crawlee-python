@@ -8,6 +8,10 @@ All notable changes to this project will be documented in this file.
 
 - Mask Playwright's "headless" headers ([#545](https://github.com/apify/crawlee-python/pull/545), closes [#401](https://github.com/apify/crawlee-python/issues/401)) ([d1445e4](https://github.com/apify/crawlee-python/commit/d1445e4858fd804bb4a2e35efa1d2f5254d8df6b)) by [@vdusek](https://github.com/vdusek)
 
+### 🐛 Bug Fixes
+
+- Call `error_handler` for `SessionError` ([#557](https://github.com/apify/crawlee-python/pull/557), closes [#546](https://github.com/apify/crawlee-python/issues/546)) ([e75ac4b](https://github.com/apify/crawlee-python/commit/e75ac4b70cd48a4ca9f8245cea3c5f3c188b8824)) by [@vdusek](https://github.com/vdusek)
+
 ## [0.3.7](https://github.com/apify/crawlee-python/releases/tag/v0.3.7) (2024-09-25)
 
 ### 🐛 Bug Fixes
