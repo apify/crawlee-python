@@ -210,4 +210,7 @@ async def test_complex_user_data_serialization(request_queue: RequestQueue) -> N
     data = dequeued_request.model_dump(by_alias=True)
     assert data['userData']['hello'] == 'world'
     assert data['userData']['foo'] == 42
-    assert data['userData']['__crawlee'] == {'maxRetries': 1}
+    assert data['userData']['__crawlee'] == {
+        'maxRetries': 1,
+        'state': RequestState.ERROR_HANDLER,
+    }
