@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator, MutableMapping
 from datetime import datetime
 from decimal import Decimal
-from enum import Enum
+from enum import IntEnum
 from typing import Annotated, Any, cast
 
 from pydantic import (
@@ -25,7 +25,7 @@ from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
 from crawlee._utils.urls import extract_query_params, validate_http_url
 
 
-class RequestState(Enum):
+class RequestState(IntEnum):
     """Crawlee-specific request handling state."""
 
     UNPROCESSED = 0
