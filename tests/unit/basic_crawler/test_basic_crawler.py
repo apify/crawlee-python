@@ -169,7 +169,7 @@ async def test_calls_error_handler() -> None:
 
     @crawler.error_handler
     async def error_handler(context: BasicCrawlingContext, error: Exception) -> Request:
-        headers = context.request.headers or HttpHeaders()
+        headers = context.request.headers or {}
         custom_retry_count = int(headers.get('custom_retry_count', '0'))
         calls.append((context, error, custom_retry_count))
 
@@ -289,7 +289,7 @@ async def test_send_request_works(respx_mock: respx.MockRouter) -> None:
 
         response = await context.send_request('http://b.com/')
         response_body = response.read()
-        response_headers = HttpHeaders(response.headers)
+        response_headers = response.headers
 
     await crawler.run()
     assert respx_mock['test_endpoint'].called

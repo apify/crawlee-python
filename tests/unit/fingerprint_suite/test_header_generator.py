@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pytest
 
-from crawlee._types import HttpHeaders
 from crawlee.fingerprint_suite import HeaderGenerator
 from crawlee.fingerprint_suite._consts import (
     PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA,
@@ -21,7 +20,6 @@ def test_get_common_headers() -> None:
 
     assert 'Accept' in headers
     assert 'Accept-Language' in headers
-    assert isinstance(headers, HttpHeaders)
 
 
 def test_get_random_user_agent_header() -> None:
@@ -30,7 +28,6 @@ def test_get_random_user_agent_header() -> None:
     headers = header_generator.get_random_user_agent_header()
 
     assert 'User-Agent' in headers
-    assert isinstance(headers, HttpHeaders)
     assert headers['User-Agent'] in USER_AGENT_POOL
 
 
@@ -41,7 +38,6 @@ def test_get_user_agent_header_chromium() -> None:
 
     assert 'User-Agent' in headers
     assert headers['User-Agent'] == PW_CHROMIUM_HEADLESS_DEFAULT_USER_AGENT
-    assert isinstance(headers, HttpHeaders)
 
 
 def test_get_user_agent_header_firefox() -> None:
@@ -51,7 +47,6 @@ def test_get_user_agent_header_firefox() -> None:
 
     assert 'User-Agent' in headers
     assert headers['User-Agent'] == PW_FIREFOX_HEADLESS_DEFAULT_USER_AGENT
-    assert isinstance(headers, HttpHeaders)
 
 
 def test_get_user_agent_header_webkit() -> None:
@@ -61,7 +56,6 @@ def test_get_user_agent_header_webkit() -> None:
 
     assert 'User-Agent' in headers
     assert headers['User-Agent'] == PW_WEBKIT_HEADLESS_DEFAULT_USER_AGENT
-    assert isinstance(headers, HttpHeaders)
 
 
 def test_get_user_agent_header_invalid_browser_type() -> None:
@@ -83,7 +77,6 @@ def test_get_sec_ch_ua_headers_chromium() -> None:
     assert headers['Sec-Ch-Ua-Mobile'] == PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_MOBILE
     assert 'Sec-Ch-Ua-Platform' in headers
     assert headers['Sec-Ch-Ua-Platform'] == PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_PLATFORM
-    assert isinstance(headers, HttpHeaders)
 
 
 def test_get_sec_ch_ua_headers_firefox() -> None:
