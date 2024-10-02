@@ -47,11 +47,9 @@ class HttpHeaders(BaseModel, Mapping[str, str]):
         return self.headers[key.lower()]
 
     def __setitem__(self, key: str, value: str) -> None:
-        # self.headers[key] = value
         raise TypeError(f'{self.__class__.__name__} is immutable')
 
     def __delitem__(self, key: str) -> None:
-        # del self.headers[key]
         raise TypeError(f'{self.__class__.__name__} is immutable')
 
     def __or__(self, other: HttpHeaders) -> HttpHeaders:
@@ -72,9 +70,6 @@ class HttpHeaders(BaseModel, Mapping[str, str]):
 
     def to_dict(self) -> dict[str, str]:
         return dict(self.model_dump().get('headers', {}))
-
-
-# http_headers_adapter = TypeAdapter(HttpHeaders)
 
 
 class RequestState(IntEnum):
