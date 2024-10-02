@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Any, Optional, cast
 import httpx
 from typing_extensions import override
 
+from crawlee._request import HttpHeaders
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
-from crawlee._utils.http import normalize_headers
 from crawlee.errors import ProxyError
 from crawlee.fingerprint_suite import HeaderGenerator
 from crawlee.http_clients import BaseHttpClient, HttpCrawlingResult, HttpResponse
@@ -16,7 +16,7 @@ from crawlee.sessions import Session
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from crawlee._types import HttpHeaders, HttpMethod, HttpQueryParams
+    from crawlee._types import HttpMethod, HttpQueryParams
     from crawlee.base_storage_client._models import Request
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.statistics import Statistics
@@ -40,7 +40,7 @@ class _HttpxResponse:
 
     @property
     def headers(self) -> HttpHeaders:
-        return normalize_headers(self._response.headers)
+        return HttpHeaders(headers=self._response.headers)
 
     def read(self) -> bytes:
         return self._response.read()
@@ -173,11 +173,12 @@ class HttpxHttpClient(BaseHttpClient):
     ) -> HttpResponse:
         client = self._get_client(proxy_info.url if proxy_info else None)
         headers = self._combine_headers(headers)
+        headers_dict = headers.to_dict() if headers else None
 
         http_request = client.build_request(
             url=url,
             method=method,
-            headers=normalize_headers(headers),
+            headers=headers_dict,
             params=query_params,
             data=data,
             extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
@@ -226,9 +227,11 @@ class HttpxHttpClient(BaseHttpClient):
 
     def _combine_headers(self, explicit_headers: HttpHeaders | None) -> HttpHeaders | None:
         """Helper to get the headers for a HTTP request."""
-        common_headers = self._header_generator.get_common_headers() if self._header_generator else {}
-        user_agent_header = self._header_generator.get_random_user_agent_header() if self._header_generator else {}
-        explicit_headers = explicit_headers or {}
+        common_headers = self._header_generator.get_common_headers() if self._header_generator else HttpHeaders()
+        user_agent_header = (
+            self._header_generator.get_random_user_agent_header() if self._header_generator else HttpHeaders()
+        )
+        explicit_headers = explicit_headers or HttpHeaders()
         headers = common_headers | user_agent_header | explicit_headers
         return headers if headers else None
 

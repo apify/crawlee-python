@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from collections.abc import Coroutine, Sequence
 
     from crawlee import Glob
-    from crawlee._request import BaseRequestData, Request
+    from crawlee._request import BaseRequestData, HttpHeaders, Request
     from crawlee.base_storage_client._models import DatasetItemsListPage
     from crawlee.http_clients import HttpResponse
     from crawlee.proxy_configuration import ProxyInfo
@@ -25,8 +25,6 @@ if TYPE_CHECKING:
 JsonSerializable: TypeAlias = Union[str, int, float, bool, None, dict[str, Any], list[Any]]
 
 HttpMethod: TypeAlias = Literal['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH']
-
-HttpHeaders: TypeAlias = dict[str, str]
 
 HttpQueryParams: TypeAlias = dict[str, str]
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator, MutableMapping
+from collections.abc import Iterator, Mapping, MutableMapping
 from datetime import datetime
 from decimal import Decimal
 from enum import IntEnum
@@ -20,10 +20,61 @@ from pydantic import (
 )
 from typing_extensions import Self
 
-from crawlee._types import EnqueueStrategy, HttpHeaders, HttpMethod, HttpPayload, HttpQueryParams
-from crawlee._utils.http import normalize_headers
+from crawlee._types import EnqueueStrategy, HttpMethod, HttpPayload, HttpQueryParams
 from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
 from crawlee._utils.urls import extract_query_params, validate_http_url
+
+
+def _normalize_headers(headers: Mapping[str, str]) -> dict[str, str]:
+    """Converts all header keys to lowercase and returns them sorted by key."""
+    normalized_headers = {k.lower(): v for k, v in headers.items()}
+    sorted_headers = sorted(normalized_headers.items())
+    return dict(sorted_headers)
+
+
+class HttpHeaders(BaseModel, Mapping[str, str]):
+    """A dictionary-like object representing HTTP headers."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    headers: Annotated[
+        dict[str, str],
+        PlainValidator(lambda value: _normalize_headers(value)),
+        Field(default_factory=dict),
+    ] = {}
+
+    def __getitem__(self, key: str) -> str:
+        return self.headers[key.lower()]
+
+    def __setitem__(self, key: str, value: str) -> None:
+        # self.headers[key] = value
+        raise TypeError(f'{self.__class__.__name__} is immutable')
+
+    def __delitem__(self, key: str) -> None:
+        # del self.headers[key]
+        raise TypeError(f'{self.__class__.__name__} is immutable')
+
+    def __or__(self, other: HttpHeaders) -> HttpHeaders:
+        """Return a new instance of `HttpHeaders` combining this one with another one."""
+        combined_headers = {**self.headers, **other}
+        return HttpHeaders(headers=combined_headers)
+
+    def __ror__(self, other: HttpHeaders) -> HttpHeaders:
+        """Support reversed | operation (other | self)."""
+        combined_headers = {**other, **self.headers}
+        return HttpHeaders(headers=combined_headers)
+
+    def __iter__(self) -> Iterator[str]:  # type: ignore
+        yield from self.headers
+
+    def __len__(self) -> int:
+        return len(self.headers)
+
+    def to_dict(self) -> dict[str, str]:
+        return dict(self.model_dump().get('headers', {}))
+
+
+# http_headers_adapter = TypeAdapter(HttpHeaders)
 
 
 class RequestState(IntEnum):
@@ -120,12 +171,7 @@ class BaseRequestData(BaseModel):
     method: HttpMethod = 'GET'
     """HTTP request method."""
 
-    headers: Annotated[
-        HttpHeaders,
-        # Normalize headers to lowercase keys and sort them.
-        PlainValidator(lambda value: normalize_headers(value)),
-        Field(default_factory=dict),
-    ] = {}
+    headers: Annotated[HttpHeaders, Field(default_factory=HttpHeaders())] = HttpHeaders()
     """HTTP request headers."""
 
     query_params: Annotated[HttpQueryParams, Field(alias='queryParams', default_factory=dict)] = {}
