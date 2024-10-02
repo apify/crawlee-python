@@ -64,7 +64,36 @@ FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
 
 
 class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
-    """Copy of the parameter types of `BasicCrawler.__init__` meant for typing forwarded __init__ args in subclasses."""
+    """Defines the available options for configuring `BasicCrawler`.
+
+    This class holds the types of parameters used by the `BasicCrawler` constructor, primarily for type
+    checking in subclasses.
+    It includes options related to request handling, concurrency, session management, proxy usage, and more.
+
+    Attributes:
+        request_provider (Optional[RequestProvider]): Provides requests to be processed.
+        request_handler
+            (Optional[Callable[[TCrawlingContext], Awaitable[None]]]): A function that handles each request.
+        http_client (Optional[BaseHttpClient]): HTTP client for making requests.
+        concurrency_settings (Optional[ConcurrencySettings]): Fine-tuning for concurrency levels.
+        max_request_retries (Optional[int]): Number of retries for failed requests.
+        max_requests_per_crawl
+            (Optional[int]): Limit for the number of requests the crawler should process in a single run.
+        max_session_rotations (Optional[int]): Maximum number of session rotations allowed per request.
+        configuration (Optional[Configuration]): Configuration object for the crawler.
+        request_handler_timeout (Optional[timedelta]): Timeout for individual request handlers.
+        session_pool (Optional[SessionPool]): A pool of sessions to manage request sessions.
+        use_session_pool (Optional[bool]): Whether to enable the session pool.
+        retry_on_blocked (Optional[bool]): Enables automatic retry on blocked requests.
+        proxy_configuration (Optional[ProxyConfiguration]): Proxy configuration for request routing.
+        statistics (Optional[Statistics[StatisticsState]]): Statistics tracking for the crawl process.
+        event_manager (Optional[EventManager]): Manages events triggered during crawling.
+        configure_logging (Optional[bool]): Configures logging for the crawler.
+        _context_pipeline (Optional[ContextPipeline[TCrawlingContext]]): Allows extending request lifecycle.
+        _additional_context_managers
+            (Optional[Sequence[AsyncContextManager]]): Additional context managers for lifecycle management.
+        _logger (Optional[logging.Logger]): Logger instance for consistent logging output.
+    """
 
     request_provider: NotRequired[RequestProvider]
     request_handler: NotRequired[Callable[[TCrawlingContext], Awaitable[None]]]
@@ -88,14 +117,56 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
 
 
 class BasicCrawler(Generic[TCrawlingContext]):
-    """Provides a simple framework for parallel crawling of web pages.
+    """A flexible framework for parallel crawling of web pages.
 
-    The URLs to crawl are fed either from a static list of URLs or from a dynamic queue of URLs enabling recursive
-    crawling of websites.
+    `BasicCrawler` provides low-level crawling functionality,
+    allowing users to define their own request handling and page scraping logic.
+    It supports both static URL lists and dynamic queues for recursive website crawling.
 
-    `BasicCrawler` is a low-level tool that requires the user to implement the page download and data extraction
-    functionality themselves. If we want a crawler that already facilitates this functionality, we should consider using
-    one of its subclasses.
+    It is ideal for scenarios where custom behavior is needed for request processing.
+    For more advanced use cases that require built-in download and extraction features,
+    consider using its subclasses like `HttpCrawler` or `CheerioCrawler`.
+
+    Example:
+        ```python
+        async def handle_request(context):
+            response = await context.http_client.get(context.request.url)
+            print(response.status)
+
+        crawler = BasicCrawler(request_handler=handle_request)
+        await crawler.run()
+        ```
+
+    Args:
+        request_provider (Optional[RequestProvider]): Source of requests for the crawler.
+        request_handler
+            (Optional[Callable[[TCrawlingContext], Awaitable[None]]]): Custom request handler for processing requests.
+        http_client
+            (Optional[BaseHttpClient]): Client for sending HTTP requests.
+        concurrency_settings (Optional[ConcurrencySettings]): Concurrency configuration for the crawler.
+        max_request_retries (int): Number of retries for failed requests. Defaults to 3.
+        max_requests_per_crawl (Optional[int]): Maximum number of requests to process in one crawl run.
+        max_session_rotations (int): Max number of session rotations per request. Defaults to 10.
+        configuration (Optional[Configuration]): Crawler configuration settings.
+        request_handler_timeout
+            (timedelta): Maximum allowed time for each request handler to run. Defaults to 1 minute.
+        session_pool (Optional[SessionPool]): Manages sessions for requests. Defaults to None.
+        use_session_pool (bool): Whether to enable session pooling. Defaults to True.
+        retry_on_blocked (bool): Automatically retries when blocked by bot protection. Defaults to True.
+        proxy_configuration (Optional[ProxyConfiguration]): Proxy settings for routing requests.
+        statistics (Optional[Statistics]): Statistics tracker for monitoring crawling metrics.
+        event_manager (Optional[EventManager]): Event management for lifecycle events during crawling.
+        configure_logging (bool): Enables crawler logging. Defaults to True.
+        _context_pipeline
+            (Optional[ContextPipeline[TCrawlingContext]]): Allows lifecycle extension, mainly for subclasses.
+        _additional_context_managers
+            (Optional[Sequence[AsyncContextManager]]): Extra context managers for managing lifecycle.
+
+    Notes:
+        - This class doesn't perform any page downloads or data extraction out-of-the-box. Users must provide
+          the logic via `request_handler`.
+        - `max_requests_per_crawl` should be configured to avoid infinite crawling loops.
+        - The session pool helps manage sessions and automatically rotates them to avoid being blocked.
     """
 
     def __init__(
@@ -121,35 +192,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
         _additional_context_managers: Sequence[AsyncContextManager] | None = None,
         _logger: logging.Logger | None = None,
     ) -> None:
-        """Initialize the BasicCrawler.
-
-        Args:
-            request_provider: Provides requests to be processed
-            request_handler: A callable to which request handling is delegated
-            http_client: HTTP client to be used for `BasicCrawlingContext.send_request` and HTTP-only crawling.
-            concurrency_settings: Allows fine-tuning concurrency levels
-            max_request_retries: Maximum amount of attempts at processing a request
-            max_requests_per_crawl: Maximum number of pages that the crawler will open. The crawl will stop when
-                the limit is reached. It is recommended to set this value in order to prevent infinite loops in
-                misconfigured crawlers. None means no limit. Due to concurrency_settings, the actual number of pages
-                visited may slightly exceed this value.
-            max_session_rotations: Maximum number of session rotations per request.
-                The crawler will automatically rotate the session in case of a proxy error or if it gets blocked by
-                the website.
-            configuration: Crawler configuration
-            request_handler_timeout: How long is a single request handler allowed to run
-            use_session_pool: Enables using the session pool for crawling
-            session_pool: A preconfigured `SessionPool` instance if you wish to use non-default configuration
-            retry_on_blocked: If set to True, the crawler will try to automatically bypass any detected bot protection
-            proxy_configuration: A HTTP proxy configuration to be used for making requests
-            statistics: A preconfigured `Statistics` instance if you wish to use non-default configuration
-            event_manager: A custom `EventManager` instance if you wish to use a non-default one
-            configure_logging: If set to True, the crawler will configure the logging infrastructure
-            _context_pipeline: Allows extending the request lifecycle and modifying the crawling context.
-                This parameter is meant to be used by child classes, not when BasicCrawler is instantiated directly.
-            _additional_context_managers: Additional context managers to be used in the crawler lifecycle.
-            _logger: A logger instance passed from a child class to ensure consistent labels
-        """
         self._router: Router[TCrawlingContext] | None = None
 
         if isinstance(cast(Router, request_handler), Router):
@@ -230,12 +272,12 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     @property
     def log(self) -> logging.Logger:
-        """The logger used by the crawler."""
+        """The logger used by the crawler for debugging and info-level messages."""
         return self._logger
 
     @property
     def router(self) -> Router[TCrawlingContext]:
-        """The router used to handle each individual crawling request."""
+        """Handles individual crawling requests. Initializes a router if none is set."""
         if self._router is None:
             self._router = Router[TCrawlingContext]()
 
@@ -243,6 +285,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     @router.setter
     def router(self, router: Router[TCrawlingContext]) -> None:
+        """Sets the router, ensuring only one instance is allowed."""
         if self._router is not None:
             raise RuntimeError('A router is already set')
 
@@ -250,19 +293,19 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     @property
     def statistics(self) -> Statistics[StatisticsState]:
-        """Statistics about the current (or last) crawler run."""
+        """Returns statistics about the crawler's current or last run."""
         return self._statistics
 
     @property
     def _max_requests_count_exceeded(self) -> bool:
-        """Whether the maximum number of requests to crawl has been reached."""
+        """Checks if the max number of crawl requests has been reached."""
         if self._max_requests_per_crawl is None:
             return False
 
         return self._statistics.state.requests_finished >= self._max_requests_per_crawl
 
     async def _get_session(self) -> Session | None:
-        """If session pool is being used, try to take a session from it."""
+        """Fetches a session from the pool if session pooling is enabled."""
         if not self._use_session_pool:
             return None
 
@@ -276,7 +319,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         )
 
     async def _get_proxy_info(self, request: Request, session: Session | None) -> ProxyInfo | None:
-        """Retrieve a new ProxyInfo object based on crawler configuration and the current request and session."""
+        """Returns a ProxyInfo object for a request based on the crawlers proxy settings."""
         if not self._proxy_configuration:
             return None
 
@@ -292,7 +335,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         id: str | None = None,
         name: str | None = None,
     ) -> RequestProvider:
-        """Return the configured request provider. If none is configured, open and return the default request queue."""
+        """Returns the configured request provider or opens the default request queue."""
         if not self._request_provider:
             self._request_provider = await RequestQueue.open(id=id, name=name, configuration=self._configuration)
 
@@ -304,7 +347,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         id: str | None = None,
         name: str | None = None,
     ) -> Dataset:
-        """Return the dataset with the given ID or name. If none is provided, return the default dataset."""
+        """Opens and returns the dataset by ID or name, or opens the default dataset if none is provided."""
         return await Dataset.open(id=id, name=name, configuration=self._configuration)
 
     async def get_key_value_store(
@@ -313,20 +356,20 @@ class BasicCrawler(Generic[TCrawlingContext]):
         id: str | None = None,
         name: str | None = None,
     ) -> KeyValueStore:
-        """Return the key-value store with the given ID or name. If none is provided, return the default KVS."""
+        """Opens and returns a key-value store by ID or name, or opens the default one if none is provided."""
         return await KeyValueStore.open(id=id, name=name, configuration=self._configuration)
 
     def error_handler(
         self, handler: ErrorHandler[TCrawlingContext | BasicCrawlingContext]
     ) -> ErrorHandler[TCrawlingContext]:
-        """Decorator for configuring an error handler (called after a request handler error and before retrying)."""
+        """Sets a custom error handler for request retries in case of errors."""
         self._error_handler = handler
         return handler
 
     def failed_request_handler(
         self, handler: FailedRequestHandler[TCrawlingContext | BasicCrawlingContext]
     ) -> FailedRequestHandler[TCrawlingContext]:
-        """Decorator for configuring a failed request handler (called after max retries are reached)."""
+        """Sets a handler for requests that fail after reaching max retries."""
         self._failed_request_handler = handler
         return handler
 
@@ -336,12 +379,14 @@ class BasicCrawler(Generic[TCrawlingContext]):
         *,
         purge_request_queue: bool = True,
     ) -> FinalStatistics:
-        """Run the crawler until all requests are processed.
+        """Runs the crawler until all requests are processed. Optionally purges the request queue for fresh runs.
 
         Args:
-            requests: The requests to be enqueued before the crawler starts
-            purge_request_queue: If this is `True` and the crawler is not being run for the first time, the default
-                request queue will be purged
+            requests: A list of requests to enqueue before the crawl starts.
+            purge_request_queue: Whether to clear the request queue before starting the crawler run.
+
+        Returns:
+            FinalStatistics: Contains the final statistics about the crawler run.
         """
         if self._running:
             raise RuntimeError(
