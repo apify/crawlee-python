@@ -92,6 +92,15 @@ class UserData(BaseModel, MutableMapping[str, JsonValue]):
     def __len__(self) -> int:
         return len(self.__pydantic_extra__)
 
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, BaseModel):
+            return super().__eq__(other)
+
+        if isinstance(other, dict):
+            return self.model_dump() == other
+
+        return NotImplemented
+
 
 user_data_adapter = TypeAdapter(UserData)
 
