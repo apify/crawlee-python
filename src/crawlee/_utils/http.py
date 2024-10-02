@@ -7,8 +7,8 @@ if TYPE_CHECKING:
 
 
 def normalize_headers(headers: HttpHeaders) -> HttpHeaders:
-    """Converts all header keys to capital case and returns them with the sorted."""
-    normalized_headers = {k.capitalize(): v for k, v in headers.items()}
+    """Converts all header keys to lowercase and returns them sorted by key."""
+    normalized_headers = {k.lower(): v for k, v in headers.items()}
     sorted_headers = sorted(normalized_headers.items())
     return dict(sorted_headers)
 
