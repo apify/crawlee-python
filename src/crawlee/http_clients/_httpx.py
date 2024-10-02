@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Any, Optional, cast
 import httpx
 from typing_extensions import override
 
-from crawlee._types import HttpHeaders
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
+from crawlee._utils.http import normalize_headers
 from crawlee.errors import ProxyError
 from crawlee.fingerprint_suite import HeaderGenerator
 from crawlee.http_clients import BaseHttpClient, HttpCrawlingResult, HttpResponse
@@ -16,7 +16,7 @@ from crawlee.sessions import Session
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from crawlee._types import HttpMethod, HttpQueryParams
+    from crawlee._types import HttpHeaders, HttpMethod, HttpQueryParams
     from crawlee.base_storage_client._models import Request
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.statistics import Statistics
@@ -39,8 +39,8 @@ class _HttpxResponse:
         return self._response.status_code
 
     @property
-    def headers(self) -> dict[str, str]:
-        return dict(self._response.headers.items())
+    def headers(self) -> HttpHeaders:
+        return normalize_headers(self._response.headers)
 
     def read(self) -> bytes:
         return self._response.read()
@@ -125,7 +125,7 @@ class HttpxHttpClient(BaseHttpClient):
         statistics: Statistics | None = None,
     ) -> HttpCrawlingResult:
         client = self._get_client(proxy_info.url if proxy_info else None)
-        headers = self._combine_headers(HttpHeaders(request.headers))
+        headers = self._combine_headers(request.headers)
 
         http_request = client.build_request(
             url=request.url,
@@ -177,7 +177,7 @@ class HttpxHttpClient(BaseHttpClient):
         http_request = client.build_request(
             url=url,
             method=method,
-            headers=headers,
+            headers=normalize_headers(headers),
             params=query_params,
             data=data,
             extensions={'crawlee_session': session if self._persist_cookies_per_session else None},

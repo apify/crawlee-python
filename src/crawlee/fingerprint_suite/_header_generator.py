@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 from typing import TYPE_CHECKING
 
+from crawlee._utils.http import normalize_headers
 from crawlee.fingerprint_suite._consts import (
     COMMON_ACCEPT,
     COMMON_ACCEPT_LANGUAGE,
@@ -29,14 +30,16 @@ class HeaderGenerator:
         We do not modify the "Accept-Encoding", "Connection" and other headers. They should be included and handled
         by the HTTP client or browser.
         """
-        return {
+        headers = {
             'Accept': COMMON_ACCEPT,
             'Accept-Language': COMMON_ACCEPT_LANGUAGE,
         }
+        return normalize_headers(headers)
 
     def get_random_user_agent_header(self) -> HttpHeaders:
         """Get a random User-Agent header."""
-        return {'User-Agent': random.choice(USER_AGENT_POOL)}
+        headers = {'User-Agent': random.choice(USER_AGENT_POOL)}
+        return normalize_headers(headers)
 
     def get_user_agent_header(
         self,
@@ -58,7 +61,7 @@ class HeaderGenerator:
         else:
             raise ValueError(f'Unsupported browser type: {browser_type}')
 
-        return headers
+        return normalize_headers(headers)
 
     def get_sec_ch_ua_headers(
         self,
@@ -83,4 +86,4 @@ class HeaderGenerator:
         else:
             raise ValueError(f'Unsupported browser type: {browser_type}')
 
-        return headers
+        return normalize_headers(headers)

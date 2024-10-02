@@ -124,7 +124,7 @@ class BaseRequestData(BaseModel):
         HttpHeaders,
         # Normalize headers to lowercase keys and sort them.
         PlainValidator(lambda value: normalize_headers(value)),
-        Field(default_factory={}),
+        Field(default_factory=dict),
     ] = {}
     """HTTP request headers."""
 

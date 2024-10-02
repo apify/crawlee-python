@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Optional
 
+from crawlee._utils.http import normalize_headers
+
 try:
     from curl_cffi.requests import AsyncSession
     from curl_cffi.requests.exceptions import ProxyError as CurlProxyError
@@ -62,8 +64,8 @@ class _CurlImpersonateResponse:
         return self._response.status_code
 
     @property
-    def headers(self) -> dict[str, str]:
-        return dict(self._response.headers.items())
+    def headers(self) -> HttpHeaders:
+        return normalize_headers(self._response.headers)
 
     def read(self) -> bytes:
         return self._response.content
@@ -163,7 +165,7 @@ class CurlImpersonateHttpClient(BaseHttpClient):
             response = await client.request(
                 url=url,
                 method=method.upper(),  # type: ignore # curl-cffi requires uppercase method
-                headers=headers,
+                headers=normalize_headers(headers),
                 params=query_params,
                 data=data,
                 cookies=session.cookies if session else None,

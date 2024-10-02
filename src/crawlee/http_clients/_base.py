@@ -29,7 +29,7 @@ class HttpResponse(Protocol):
         """The HTTP status code received from the server."""
 
     @property
-    def headers(self) -> dict[str, str]:
+    def headers(self) -> HttpHeaders:
         """The HTTP headers received in the response."""
 
     def read(self) -> bytes:
