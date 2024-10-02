@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Optional, cast
 import httpx
 from typing_extensions import override
 
-from crawlee._request import HttpHeaders
+from crawlee._types import HttpHeaders
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
 from crawlee.errors import ProxyError
 from crawlee.fingerprint_suite import HeaderGenerator
@@ -40,7 +40,7 @@ class _HttpxResponse:
 
     @property
     def headers(self) -> HttpHeaders:
-        return HttpHeaders(headers=self._response.headers)
+        return HttpHeaders(dict(self._response.headers))
 
     def read(self) -> bytes:
         return self._response.read()
@@ -173,12 +173,11 @@ class HttpxHttpClient(BaseHttpClient):
     ) -> HttpResponse:
         client = self._get_client(proxy_info.url if proxy_info else None)
         headers = self._combine_headers(headers)
-        headers_dict = headers.to_dict() if headers else None
 
         http_request = client.build_request(
             url=url,
             method=method,
-            headers=headers_dict,
+            headers=dict(headers) if headers else None,
             params=query_params,
             data=data,
             extensions={'crawlee_session': session if self._persist_cookies_per_session else None},

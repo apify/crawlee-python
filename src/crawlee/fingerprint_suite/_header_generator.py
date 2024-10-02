@@ -3,7 +3,7 @@ from __future__ import annotations
 import random
 from typing import TYPE_CHECKING
 
-from crawlee._request import HttpHeaders
+from crawlee._types import HttpHeaders
 from crawlee.fingerprint_suite._consts import (
     COMMON_ACCEPT,
     COMMON_ACCEPT_LANGUAGE,
@@ -33,12 +33,12 @@ class HeaderGenerator:
             'Accept': COMMON_ACCEPT,
             'Accept-Language': COMMON_ACCEPT_LANGUAGE,
         }
-        return HttpHeaders(headers=headers)
+        return HttpHeaders(headers)
 
     def get_random_user_agent_header(self) -> HttpHeaders:
         """Get a random User-Agent header."""
         headers = {'User-Agent': random.choice(USER_AGENT_POOL)}
-        return HttpHeaders(headers=headers)
+        return HttpHeaders(headers)
 
     def get_user_agent_header(
         self,
@@ -60,7 +60,7 @@ class HeaderGenerator:
         else:
             raise ValueError(f'Unsupported browser type: {browser_type}')
 
-        return HttpHeaders(headers=headers)
+        return HttpHeaders(headers)
 
     def get_sec_ch_ua_headers(
         self,
@@ -85,4 +85,4 @@ class HeaderGenerator:
         else:
             raise ValueError(f'Unsupported browser type: {browser_type}')
 
-        return HttpHeaders(headers=headers)
+        return HttpHeaders(headers)

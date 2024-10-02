@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Literal, Protocol, Union
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Protocol, Union
 
+from pydantic import ConfigDict, Field, PlainValidator, RootModel
 from typing_extensions import NotRequired, TypeAlias, TypedDict, Unpack
 
 if TYPE_CHECKING:
@@ -12,7 +14,7 @@ if TYPE_CHECKING:
     from collections.abc import Coroutine, Sequence
 
     from crawlee import Glob
-    from crawlee._request import BaseRequestData, HttpHeaders, Request
+    from crawlee._request import BaseRequestData, Request
     from crawlee.base_storage_client._models import DatasetItemsListPage
     from crawlee.http_clients import HttpResponse
     from crawlee.proxy_configuration import ProxyInfo
@@ -29,6 +31,50 @@ HttpMethod: TypeAlias = Literal['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT
 HttpQueryParams: TypeAlias = dict[str, str]
 
 HttpPayload: TypeAlias = Union[str, bytes]
+
+
+def _normalize_headers(headers: Mapping[str, str]) -> dict[str, str]:
+    """Converts all header keys to lowercase and returns them sorted by key."""
+    normalized_headers = {k.lower(): v for k, v in headers.items()}
+    sorted_headers = sorted(normalized_headers.items())
+    return dict(sorted_headers)
+
+
+class HttpHeaders(RootModel, Mapping[str, str]):
+    """A dictionary-like object representing HTTP headers."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    root: Annotated[
+        dict[str, str],
+        PlainValidator(lambda value: _normalize_headers(value)),
+        Field(default_factory=dict),
+    ] = {}  # noqa: RUF012
+
+    def __getitem__(self, key: str) -> str:
+        return self.root[key.lower()]
+
+    def __setitem__(self, key: str, value: str) -> None:
+        raise TypeError(f'{self.__class__.__name__} is immutable')
+
+    def __delitem__(self, key: str) -> None:
+        raise TypeError(f'{self.__class__.__name__} is immutable')
+
+    def __or__(self, other: HttpHeaders) -> HttpHeaders:
+        """Return a new instance of `HttpHeaders` combining this one with another one."""
+        combined_headers = {**self.root, **other}
+        return HttpHeaders(combined_headers)
+
+    def __ror__(self, other: HttpHeaders) -> HttpHeaders:
+        """Support reversed | operation (other | self)."""
+        combined_headers = {**other, **self.root}
+        return HttpHeaders(combined_headers)
+
+    def __iter__(self) -> Iterator[str]:  # type: ignore
+        yield from self.root
+
+    def __len__(self) -> int:
+        return len(self.root)
 
 
 class EnqueueStrategy(str, Enum):

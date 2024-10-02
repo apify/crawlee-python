@@ -23,8 +23,8 @@ from crawlee._autoscaling import AutoscaledPool
 from crawlee._autoscaling.snapshotter import Snapshotter
 from crawlee._autoscaling.system_status import SystemStatus
 from crawlee._log_config import configure_logger, get_configured_log_level
-from crawlee._request import BaseRequestData, HttpHeaders, Request, RequestState
-from crawlee._types import BasicCrawlingContext, RequestHandlerRunResult, SendRequestFunction
+from crawlee._request import BaseRequestData, Request, RequestState
+from crawlee._types import BasicCrawlingContext, HttpHeaders, RequestHandlerRunResult, SendRequestFunction
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.http import is_status_code_client_error
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute

@@ -8,15 +8,15 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, Mock
 
 import httpx
 import pytest
 
 from crawlee import ConcurrencySettings, EnqueueStrategy, Glob
-from crawlee._request import BaseRequestData, HttpHeaders, Request
-from crawlee._types import AddRequestsKwargs, BasicCrawlingContext
+from crawlee._request import BaseRequestData, Request
+from crawlee._types import AddRequestsKwargs, BasicCrawlingContext, HttpHeaders
 from crawlee.basic_crawler import BasicCrawler
 from crawlee.configuration import Configuration
 from crawlee.errors import SessionError, UserDefinedErrorHandlerError
@@ -158,7 +158,7 @@ async def test_respects_request_specific_max_retries() -> None:
 async def test_calls_error_handler() -> None:
     # Data structure to better track the calls to the error handler.
     @dataclass(frozen=True)
-    class Call(NamedTuple):
+    class Call:
         url: str
         error: Exception
         custom_retry_count: int
@@ -187,7 +187,7 @@ async def test_calls_error_handler() -> None:
 
         # Update the request to include an incremented custom retry count in the headers and return it.
         request = context.request.model_dump()
-        request['headers'] = HttpHeaders(headers={'custom_retry_count': str(custom_retry_count + 1)})
+        request['headers'] = HttpHeaders({'custom_retry_count': str(custom_retry_count + 1)})
         return Request.model_validate(request)
 
     await crawler.run()
