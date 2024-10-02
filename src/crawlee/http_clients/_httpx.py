@@ -39,8 +39,8 @@ class _HttpxResponse:
         return self._response.status_code
 
     @property
-    def headers(self) -> dict[str, str]:
-        return dict(self._response.headers.items())
+    def headers(self) -> HttpHeaders:
+        return HttpHeaders(dict(self._response.headers))
 
     def read(self) -> bytes:
         return self._response.read()
@@ -125,7 +125,7 @@ class HttpxHttpClient(BaseHttpClient):
         statistics: Statistics | None = None,
     ) -> HttpCrawlingResult:
         client = self._get_client(proxy_info.url if proxy_info else None)
-        headers = self._combine_headers(HttpHeaders(request.headers))
+        headers = self._combine_headers(request.headers)
 
         http_request = client.build_request(
             url=request.url,
@@ -177,7 +177,7 @@ class HttpxHttpClient(BaseHttpClient):
         http_request = client.build_request(
             url=url,
             method=method,
-            headers=headers,
+            headers=dict(headers) if headers else None,
             params=query_params,
             data=data,
             extensions={'crawlee_session': session if self._persist_cookies_per_session else None},

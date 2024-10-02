@@ -156,11 +156,20 @@ async def test_respects_request_specific_max_retries() -> None:
 
 
 async def test_calls_error_handler() -> None:
+    # Data structure to better track the calls to the error handler.
+    @dataclass(frozen=True)
+    class Call:
+        url: str
+        error: Exception
+        custom_retry_count: int
+
+    # List to store the information of calls to the error handler.
+    calls = list[Call]()
+
     crawler = BasicCrawler(
         request_provider=RequestList(['http://a.com/', 'http://b.com/', 'http://c.com/']),
         max_request_retries=3,
     )
-    calls = list[tuple[BasicCrawlingContext, Exception, int]]()
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
@@ -169,24 +178,34 @@ async def test_calls_error_handler() -> None:
 
     @crawler.error_handler
     async def error_handler(context: BasicCrawlingContext, error: Exception) -> Request:
+        # Retrieve or initialize the headers, and extract the current custom retry count.
         headers = context.request.headers or HttpHeaders()
         custom_retry_count = int(headers.get('custom_retry_count', '0'))
-        calls.append((context, error, custom_retry_count))
 
+        # Append the current call information.
+        calls.append(Call(context.request.url, error, custom_retry_count))
+
+        # Update the request to include an incremented custom retry count in the headers and return it.
         request = context.request.model_dump()
-        request['headers']['custom_retry_count'] = str(custom_retry_count + 1)
-
+        request['headers'] = HttpHeaders({'custom_retry_count': str(custom_retry_count + 1)})
         return Request.model_validate(request)
 
     await crawler.run()
 
-    assert len(calls) == 2  # error handler should be called for each retryable request
-    assert calls[0][0].request.url == 'http://b.com/'
-    assert isinstance(calls[0][1], RuntimeError)
+    # Verify that the error handler was called twice
+    assert len(calls) == 2
 
-    # Check the contents of the `custom_retry_count` header added by the error handler
-    assert calls[0][2] == 0
-    assert calls[1][2] == 1
+    # Check the first call...
+    first_call = calls[0]
+    assert first_call.url == 'http://b.com/'
+    assert isinstance(first_call.error, RuntimeError)
+    assert first_call.custom_retry_count == 0
+
+    # Check the second call...
+    second_call = calls[1]
+    assert second_call.url == 'http://b.com/'
+    assert isinstance(second_call.error, RuntimeError)
+    assert second_call.custom_retry_count == 1
 
 
 async def test_calls_error_handler_for_sesion_errors() -> None:
@@ -289,7 +308,7 @@ async def test_send_request_works(respx_mock: respx.MockRouter) -> None:
 
         response = await context.send_request('http://b.com/')
         response_body = response.read()
-        response_headers = HttpHeaders(response.headers)
+        response_headers = response.headers
 
     await crawler.run()
     assert respx_mock['test_endpoint'].called

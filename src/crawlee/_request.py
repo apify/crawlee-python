@@ -20,7 +20,7 @@ from pydantic import (
 )
 from typing_extensions import Self
 
-from crawlee._types import EnqueueStrategy, HttpMethod, HttpPayload, HttpQueryParams
+from crawlee._types import EnqueueStrategy, HttpHeaders, HttpMethod, HttpPayload, HttpQueryParams
 from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
 from crawlee._utils.urls import extract_query_params, validate_http_url
 
@@ -119,7 +119,7 @@ class BaseRequestData(BaseModel):
     method: HttpMethod = 'GET'
     """HTTP request method."""
 
-    headers: Annotated[dict[str, str], Field(default_factory=dict)] = {}
+    headers: Annotated[HttpHeaders, Field(default_factory=HttpHeaders())] = HttpHeaders()
     """HTTP request headers."""
 
     query_params: Annotated[HttpQueryParams, Field(alias='queryParams', default_factory=dict)] = {}
