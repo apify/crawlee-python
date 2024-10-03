@@ -127,7 +127,32 @@ class BasicCrawler(Generic[TCrawlingContext]):
     For more advanced use cases that require built-in download and extraction features,
     consider using its subclasses like `HttpCrawler` or `CheerioCrawler`.
 
-    Example:
+    Args:
+        request_provider: Source of requests for the crawler.
+        request_handler: Custom request handler for processing requests.
+        http_client: Client for sending HTTP requests.
+        concurrency_settings: Concurrency configuration for the crawler.
+        max_request_retries: Number of retries for failed requests. Defaults to 3.
+        max_requests_per_crawl: Maximum number of requests to process in one crawl 
+            run.
+        max_session_rotations: Max number of session rotations per request. 
+            Defaults to 10.
+        configuration: Crawler configuration settings.
+        request_handler_timeout: Maximum allowed time for each request handler to 
+            run. Defaults to 1 minute.
+        session_pool: Manages sessions for requests. Defaults to None.
+        use_session_pool: Whether to enable session pooling. Defaults to True.
+        retry_on_blocked: Automatically retries when blocked by bot protection. 
+            Defaults to True.
+        proxy_configuration: Proxy settings for routing requests.
+        statistics: Statistics tracker for monitoring crawling metrics.
+        event_manager: Event management for lifecycle events during crawling.
+        configure_logging: Enables crawler logging. Defaults to True.
+        _context_pipeline: Allows lifecycle extension, mainly for subclasses.
+        _additional_context_managers: Extra context managers for managing 
+            lifecycle.
+
+    Examples:
         ```python
         async def handle_request(context):
             response = await context.http_client.get(context.request.url)
@@ -137,36 +162,13 @@ class BasicCrawler(Generic[TCrawlingContext]):
         await crawler.run()
         ```
 
-    Args:
-        request_provider (Optional[RequestProvider]): Source of requests for the crawler.
-        request_handler
-            (Optional[Callable[[TCrawlingContext], Awaitable[None]]]): Custom request handler for processing requests.
-        http_client
-            (Optional[BaseHttpClient]): Client for sending HTTP requests.
-        concurrency_settings (Optional[ConcurrencySettings]): Concurrency configuration for the crawler.
-        max_request_retries (int): Number of retries for failed requests. Defaults to 3.
-        max_requests_per_crawl (Optional[int]): Maximum number of requests to process in one crawl run.
-        max_session_rotations (int): Max number of session rotations per request. Defaults to 10.
-        configuration (Optional[Configuration]): Crawler configuration settings.
-        request_handler_timeout
-            (timedelta): Maximum allowed time for each request handler to run. Defaults to 1 minute.
-        session_pool (Optional[SessionPool]): Manages sessions for requests. Defaults to None.
-        use_session_pool (bool): Whether to enable session pooling. Defaults to True.
-        retry_on_blocked (bool): Automatically retries when blocked by bot protection. Defaults to True.
-        proxy_configuration (Optional[ProxyConfiguration]): Proxy settings for routing requests.
-        statistics (Optional[Statistics]): Statistics tracker for monitoring crawling metrics.
-        event_manager (Optional[EventManager]): Event management for lifecycle events during crawling.
-        configure_logging (bool): Enables crawler logging. Defaults to True.
-        _context_pipeline
-            (Optional[ContextPipeline[TCrawlingContext]]): Allows lifecycle extension, mainly for subclasses.
-        _additional_context_managers
-            (Optional[Sequence[AsyncContextManager]]): Extra context managers for managing lifecycle.
-
     Notes:
-        - This class doesn't perform any page downloads or data extraction out-of-the-box. Users must provide
-          the logic via `request_handler`.
-        - `max_requests_per_crawl` should be configured to avoid infinite crawling loops.
-        - The session pool helps manage sessions and automatically rotates them to avoid being blocked.
+        - This class doesn't perform any page downloads or data extraction 
+          out-of-the-box. Users must provide the logic via `request_handler`.
+        - `max_requests_per_crawl` should be configured to avoid infinite 
+          crawling loops.
+        - The session pool helps manage sessions and automatically rotates them 
+          to avoid being blocked.
     """
 
     def __init__(
