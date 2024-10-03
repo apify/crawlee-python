@@ -64,36 +64,7 @@ FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
 
 
 class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
-    """Defines the available options for configuring `BasicCrawler`.
-
-    This class holds the types of parameters used by the `BasicCrawler` constructor, primarily for type
-    checking in subclasses.
-    It includes options related to request handling, concurrency, session management, proxy usage, and more.
-
-    Attributes:
-        request_provider (Optional[RequestProvider]): Provides requests to be processed.
-        request_handler
-            (Optional[Callable[[TCrawlingContext], Awaitable[None]]]): A function that handles each request.
-        http_client (Optional[BaseHttpClient]): HTTP client for making requests.
-        concurrency_settings (Optional[ConcurrencySettings]): Fine-tuning for concurrency levels.
-        max_request_retries (Optional[int]): Number of retries for failed requests.
-        max_requests_per_crawl
-            (Optional[int]): Limit for the number of requests the crawler should process in a single run.
-        max_session_rotations (Optional[int]): Maximum number of session rotations allowed per request.
-        configuration (Optional[Configuration]): Configuration object for the crawler.
-        request_handler_timeout (Optional[timedelta]): Timeout for individual request handlers.
-        session_pool (Optional[SessionPool]): A pool of sessions to manage request sessions.
-        use_session_pool (Optional[bool]): Whether to enable the session pool.
-        retry_on_blocked (Optional[bool]): Enables automatic retry on blocked requests.
-        proxy_configuration (Optional[ProxyConfiguration]): Proxy configuration for request routing.
-        statistics (Optional[Statistics[StatisticsState]]): Statistics tracking for the crawl process.
-        event_manager (Optional[EventManager]): Manages events triggered during crawling.
-        configure_logging (Optional[bool]): Configures logging for the crawler.
-        _context_pipeline (Optional[ContextPipeline[TCrawlingContext]]): Allows extending request lifecycle.
-        _additional_context_managers
-            (Optional[Sequence[AsyncContextManager]]): Additional context managers for lifecycle management.
-        _logger (Optional[logging.Logger]): Logger instance for consistent logging output.
-    """
+    """Copy of the parameter types of `BasicCrawler.__init__` meant for typing forwarded __init__ args in subclasses."""
 
     request_provider: NotRequired[RequestProvider]
     request_handler: NotRequired[Callable[[TCrawlingContext], Awaitable[None]]]
