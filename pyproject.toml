@@ -187,6 +187,7 @@ max-branches = 18
 
 [tool.pytest.ini_options]
 addopts = "-ra"
+asyncio_default_fixture_loop_scope = "function"
 asyncio_mode = "auto"
 timeout = 1200
 
