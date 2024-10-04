@@ -48,6 +48,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
         browser_pool: BrowserPool | None = None,
         browser_type: BrowserType | None = None,
         headless: bool | None = None,
+        max_depth: int | None = None,  # Add max_depth here
         **kwargs: Unpack[BasicCrawlerOptions[PlaywrightCrawlingContext]],
     ) -> None:
         """Create a new instance.
@@ -58,8 +59,10 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 This option should not be used if `browser_pool` is provided.
             headless: Whether to run the browser in headless mode.
                 This option should not be used if `browser_pool` is provided.
+            max_depth: The maximum depth for link enqueuing. Stops further requests after this depth.
             kwargs: Additional arguments to be forwarded to the underlying `BasicCrawler`.
         """
+        self.max_depth = max_depth  # Store max_depth
         if browser_pool:
             # Raise an exception if browser_pool is provided together with headless or browser_type arguments.
             if headless is not None or browser_type is not None:
@@ -122,6 +125,14 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 **kwargs: Unpack[AddRequestsKwargs],
             ) -> None:
                 """The `PlaywrightCrawler` implementation of the `EnqueueLinksFunction` function."""
+                # Check the current depth from metadata
+                current_depth = context.request.metadata.get('depth', 0)
+
+                # Stop further requests if the depth exceeds max_depth
+                if self.max_depth is not None and current_depth >= self.max_depth:
+                    context.log.info(f'Max depth of {self.max_depth} reached. Not enqueueing further links.')
+                    return
+
                 kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
 
                 requests = list[BaseRequestData]()
@@ -144,7 +155,11 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                             link_user_data.setdefault('label', label)
 
                         try:
-                            request = BaseRequestData.from_url(url, user_data=link_user_data)
+                            request = BaseRequestData.from_url(
+                                url, 
+                                user_data=link_user_data,
+                                metadata={'depth': current_depth + 1}  # Increment the depth
+                            )
                         except ValidationError as exc:
                             context.log.debug(
                                 f'Skipping URL "{url}" due to invalid format: {exc}. '
