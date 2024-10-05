@@ -88,30 +88,56 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
 
 
 class BasicCrawler(Generic[TCrawlingContext]):
-    """A versatile web crawler for parallel URL fetching.
+    """A versatile web crawler for parallel URL fetching with extensive features for web scraping.
 
-    Provides a basic framework for crawling websites, allowing customization of request handling and data extraction.
+    BasicCrawler is a highly customizable and efficient web crawling solution that provides:
+    - Automatic scaling based on available system resources and target website's requirements
+    - Smart request routing and handling of different types of URLs
+    - Session management for maintaining persistent connections
+    - Proxy integration and rotation for avoiding IP-based blocking
+    - Automatic retries for failed requests with customizable settings
+    - Built-in statistics tracking for monitoring crawler performance
+    - Event system for fine-grained control over the crawling process
+
+    Basic usage:
+    ```python
+    async def handle_request(context: Context) -> None:
+        url = context.request.url
+        response = await context.send_request()
+        # Process the response here
+    crawler = BasicCrawler(
+        request_handler=handle_request,
+    )
+    await crawler.run()
+    ```
+
+    Advanced features:
+    - Configure concurrency to control parallel processing
+    - Set up automatic retry mechanisms for failed or blocked requests
+    - Utilize session pools for efficient connection management
+    - Integrate proxy services for IP rotation
+    - Monitor detailed statistics about the crawling process
 
     Args:
-        request_provider (Optional[RequestProvider]): The provider for requests to be crawled.
-        request_handler (Optional[Function]): The function to handle individual requests.
-        http_client (Optional[BaseHttpClient]): The HTTP client for making web requests.
-        concurrency_settings (Optional[ConcurrencySettings]): Settings for controlling concurrency.
-        max_request_retries (int, optional): Maximum retry attempts for failed requests (default: 3).
-        max_requests_per_crawl (Optional[int]): Maximum number of requests per crawl (default: no limit).
-        max_session_rotations (int, optional): Maximum session rotations per request (default: 10).
-        configuration (Optional[Configuration]): Crawler configuration settings.
-        request_handler_timeout (timedelta, optional): Request handler timeout (default: 1 minute).
-        use_session_pool (bool, optional): Use session pool (default: True).
-        session_pool (Optional[SessionPool]): Preconfigured session pool.
-        retry_on_blocked (bool, optional): Retry on blocked requests (default: True).
-        proxy_configuration (Optional[ProxyConfiguration]): Proxy configuration.
-        statistics (Optional[Statistics]): Statistics object.
-        event_manager (Optional[EventManager]): Event manager.
-        configure_logging (bool, optional): Configure logging (default: True).
-        _context_pipeline (Optional[ContextPipeline[TCrawlingContext]]): Internal context pipeline.
-        _additional_context_managers (Optional[Sequence[AsyncContextManager]]): Additional context managers.
-        _logger (Optional[logging.Logger]): Logger instance.
+        request_provider: The provider for requests to be crawled.
+        request_handler: The function to handle individual requests.
+        http_client: The HTTP client for making web requests.
+        concurrency_settings: Settings for controlling concurrency.
+        max_request_retries: Maximum retry attempts for failed requests. Defaults to 3.
+        max_requests_per_crawl: Maximum number of requests per crawl. No limit by default.
+        max_session_rotations: Maximum session rotations per request. Defaults to 10.
+        configuration: Crawler configuration settings.
+        request_handler_timeout: Request handler timeout. Defaults to 1 minute.
+        use_session_pool: Whether to use session pool. Defaults to True.
+        session_pool: Preconfigured session pool.
+        retry_on_blocked: Whether to retry on blocked requests. Defaults to True.
+        proxy_configuration: Proxy configuration.
+        statistics: Statistics object.
+        event_manager: Event manager.
+        configure_logging: Whether to configure logging. Defaults to True.
+        _context_pipeline: Internal context pipeline.
+        _additional_context_managers: Additional context managers.
+        _logger: Logger instance.
     """
 
     def __init__(
@@ -140,25 +166,25 @@ class BasicCrawler(Generic[TCrawlingContext]):
         """Initializes the BasicCrawler.
 
         Args:
-            request_provider (RequestProvider): Request provider.
-            request_handler (Callable[[TCrawlingContext], Awaitable[None]]): Request handler.
-            http_client (BaseHttpClient): HTTP client.
-            concurrency_settings (ConcurrencySettings): Concurrency settings.
-            max_request_retries (int, optional): Maximum retries (default: 3).
-            max_requests_per_crawl (int, optional): Maximum requests per crawl.
-            max_session_rotations (int, optional): Maximum session rotations (default: 10).
-            configuration (Configuration): Crawler configuration.
-            request_handler_timeout (timedelta, optional): Request handler timeout (default: 1 minute).
-            use_session_pool (bool, optional): Use session pool (default: True).
-            session_pool (SessionPool): Preconfigured session pool.
-            retry_on_blocked (bool, optional): Retry on blocked requests (default: True).
-            proxy_configuration (ProxyConfiguration): Proxy configuration.
-            statistics (Statistics): Statistics object.
-            event_manager (EventManager): Event manager.
-            configure_logging (bool, optional): Configure logging (default: True).
-            _context_pipeline (ContextPipeline[TCrawlingContext]): Internal context pipeline.
-            _additional_context_managers (Sequence[AsyncContextManager]): Additional context managers.
-            _logger (logging.Logger): Logger instance.
+            request_provider: Request provider.
+            request_handler: Request handler function.
+            http_client: HTTP client.
+            concurrency_settings: Concurrency settings.
+            max_request_retries: Maximum retries. Defaults to 3.
+            max_requests_per_crawl: Maximum requests per crawl.
+            max_session_rotations: Maximum session rotations. Defaults to 10.
+            configuration: Crawler configuration.
+            request_handler_timeout: Request handler timeout. Defaults to 1 minute.
+            use_session_pool: Use session pool. Defaults to True.
+            session_pool: Preconfigured session pool.
+            retry_on_blocked: Retry on blocked requests. Defaults to True.
+            proxy_configuration: Proxy configuration.
+            statistics: Statistics object.
+            event_manager: Event manager.
+            configure_logging: Configure logging. Defaults to True.
+            _context_pipeline: Internal context pipeline.
+            _additional_context_managers: Additional context managers.
+            _logger: Logger instance.
         """
         self._router: Router[TCrawlingContext] | None = None
 
@@ -347,14 +373,14 @@ class BasicCrawler(Generic[TCrawlingContext]):
         *,
         purge_request_queue: bool = True,
     ) -> FinalStatistics:
-        """Runs the crawler until all requests are processed. Optionally purges the request queue for fresh runs.
+        """Run the crawler until all requests are processed.
 
         Args:
             requests: A list of requests to enqueue before the crawl starts.
             purge_request_queue: Whether to clear the request queue before starting the crawler run.
 
         Returns:
-            FinalStatistics: Contains the final statistics about the crawler run.
+            The final statistics about the crawler run.
         """
         if self._running:
             raise RuntimeError(
