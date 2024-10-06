@@ -1,5 +1,4 @@
 from crawlee.browsers import BrowserPool
-from crawlee.browsers._types import BrowserType  # This contains the literal for browser types
 from crawlee.playwright_crawler import PlaywrightCrawler
 
 # Create the browser pool with customized fingerprint options
