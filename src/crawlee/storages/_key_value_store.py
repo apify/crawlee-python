@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING, Any, AsyncIterator, TypeVar, overload
 
 from typing_extensions import override
@@ -157,3 +158,14 @@ class KeyValueStore(BaseStorage):
             return await self._resource_client.delete_record(key)
 
         return await self._resource_client.set_record(key, value, content_type)
+
+    def get_public_url(self, key: str) -> str:
+        """Get the public URL for the given key.
+
+        Args:
+            key: Key of the record for which URL is required
+        Returns:
+            The public URL for the given key.
+        """
+        name = self.name or self._configuration.default_key_value_store_id
+        return f'file://{os.getcwd()}/storage/key_value_stores/{name}/{key}'
