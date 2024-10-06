@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING, Any, AsyncIterator, TypeVar, overload
 
 from typing_extensions import override
@@ -168,4 +167,5 @@ class KeyValueStore(BaseStorage):
             The public URL for the given key.
         """
         name = self.name or self._configuration.default_key_value_store_id
-        return f'file://{os.getcwd()}/storage/key_value_stores/{name}/{key}'
+        storage_dir = self._configuration.storage_dir
+        return f'file://{storage_dir}/storage/key_value_stores/{name}/{key}'

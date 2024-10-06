@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from typing import AsyncGenerator
 
 import pytest
@@ -106,4 +105,7 @@ async def test_static_get_set_value(key_value_store: KeyValueStore) -> None:
 async def test_static_get_public_url(key_value_store: KeyValueStore) -> None:
     await key_value_store.set_value('test-static', 'static')
     public_url = key_value_store.get_public_url('test-static')
-    assert public_url == f'file://{os.getcwd()}/storage/key_value_stores/default/test-static'
+    assert (
+        public_url
+        == f'file://{key_value_store._configuration.storage_dir}/storage/key_value_stores/default/test-static'
+    )
