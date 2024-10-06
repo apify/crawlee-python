@@ -1,5 +1,5 @@
+from crawlee.browsers import BrowserPool, BrowserName, DeviceCategory, OperatingSystemsName
 from crawlee.playwright_crawler import PlaywrightCrawler
-from crawlee.browsers._browser_pool import BrowserPool, BrowserName, DeviceCategory, OperatingSystemsName
 
 # Create the browser pool with customized fingerprint options
 browser_pool = BrowserPool.with_default_plugin(
@@ -25,5 +25,5 @@ browser_pool = BrowserPool.with_default_plugin(
 # Instantiate the PlaywrightCrawler with the customized browser pool
 crawler = PlaywrightCrawler(
     browser_pool=browser_pool,
-    # ...
+    # Additional parameters if needed
 )
