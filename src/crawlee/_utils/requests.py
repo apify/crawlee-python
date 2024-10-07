@@ -119,13 +119,7 @@ def compute_unique_key(
 
     # Compute and return the extended unique key if required.
     if use_extended_unique_key:
-        if payload is None:
-            payload_in_bytes = b''
-        elif isinstance(payload, str):
-            payload_in_bytes = payload.encode('utf-8')
-        else:
-            payload_in_bytes = payload
-
+        payload_in_bytes = b'' if payload is None else str(payload).encode('utf-8')
         payload_hash = compute_short_hash(payload_in_bytes)
         return f'{normalized_method}({payload_hash}):{normalized_url}'
 
