@@ -25,7 +25,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pipx install --python ${{ env.python-version }} poetry
+          pipx install --python ${{ matrix.python-version }} poetry
           make install-dev
 
       - name: Run type checking
