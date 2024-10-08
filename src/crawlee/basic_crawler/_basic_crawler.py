@@ -124,13 +124,13 @@ class BasicCrawler(Generic[TCrawlingContext]):
         http_client: The HTTP client for making web requests.
         concurrency_settings: Settings for controlling concurrency.
         max_request_retries: Maximum retry attempts for failed requests.
-        max_requests_per_crawl: Maximum number of requests per crawl. 
+        max_requests_per_crawl: Maximum number of requests per crawl.
         max_session_rotations: Maximum session rotations per request.
         configuration: Crawler configuration settings.
-        request_handler_timeout: Request handler timeout. 
-        use_session_pool: Whether to use session pool. 
+        request_handler_timeout: Request handler timeout.
+        use_session_pool: Whether to use session pool.
         session_pool: Preconfigured session pool.
-        retry_on_blocked: Whether to retry on blocked requests. 
+        retry_on_blocked: Whether to retry on blocked requests.
         proxy_configuration: Proxy configuration.
         statistics: Statistics object.
         event_manager: Event manager.
@@ -170,11 +170,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
             request_handler: Request handler function.
             http_client: HTTP client.
             concurrency_settings: Concurrency settings.
-            max_request_retries: Maximum retries. 
+            max_request_retries: Maximum retries.
             max_requests_per_crawl: Maximum requests per crawl.
-            max_session_rotations: Maximum session rotations. 
+            max_session_rotations: Maximum session rotations.
             configuration: Crawler configuration.
-            request_handler_timeout: Request handler timeout. 
+            request_handler_timeout: Request handler timeout.
             use_session_pool: Use session pool.
             session_pool: Preconfigured session pool.
             retry_on_blocked: Retry on blocked requests.
