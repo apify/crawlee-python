@@ -30,7 +30,7 @@ async def main() -> None:
     await crawler.run(['https://crawlee.dev'])
 
     # Export the entire dataset to a CSV file.
-    await crawler.export_data_csv('results.csv')
+    await crawler.export_data_csv(path='results.csv')
 
 
 if __name__ == '__main__':

@@ -475,11 +475,12 @@ class BasicCrawler(Generic[TCrawlingContext]):
     async def export_data_csv(
         self,
         path: str | Path,
+        *,
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         **kwargs: Unpack[ExportDataCsvKwargs],
     ) -> None:
-        """Export data from a dataset.
+        """Export data from a dataset to a CSV file.
 
         This helper method simplifies the process of exporting data from a dataset in csv format. It opens the specified
         dataset and then exports the data based on the provided parameters.
@@ -493,19 +494,17 @@ class BasicCrawler(Generic[TCrawlingContext]):
         dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
         path = path if isinstance(path, Path) else Path(path)
 
-        if path.suffix != '.csv':
-            raise ValueError(f'Invalid file format {path}')
-
         return await dataset.write_to_csv(path.open('w', newline=''), **kwargs)
 
     async def export_data_json(
         self,
         path: str | Path,
+        *,
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         **kwargs: Unpack[ExportDataJsonKwargs],
     ) -> None:
-        """Export data from a dataset.
+        """Export data from a dataset to a JSON file.
 
         This helper method simplifies the process of exporting data from a dataset in json format. It opens the
         specified dataset and then exports the data based on the provided parameters.
@@ -518,9 +517,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
         """
         dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
         path = path if isinstance(path, Path) else Path(path)
-
-        if path.suffix != '.json':
-            raise ValueError(f'Invalid file format {path}')
 
         return await dataset.write_to_json(path.open('w', newline=''), **kwargs)
 

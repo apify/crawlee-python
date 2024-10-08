@@ -238,8 +238,8 @@ class Dataset(BaseStorage):
         """Exports the entire dataset into an arbitrary stream.
 
         Args:
-            destination: The stream into which the dataset contents should be written
-            kwargs: Csv parameters for dumping/writing
+            destination: The stream into which the dataset contents should be written.
+            kwargs: Additional keyword arguments for `csv.writer`.
         """
         items: list[dict] = []
         limit = 1000
@@ -262,8 +262,8 @@ class Dataset(BaseStorage):
         """Exports the entire dataset into an arbitrary stream.
 
         Args:
-            destination: The stream into which the dataset contents should be written
-            kwargs: Json parameters for dumping/writing
+            destination: The stream into which the dataset contents should be written.
+            kwargs: Additional keyword arguments for `json.dump`.
         """
         items: list[dict] = []
         limit = 1000
@@ -302,8 +302,10 @@ class Dataset(BaseStorage):
         output = io.StringIO()
         if content_type == 'csv':
             await self.write_to_csv(output)
-        else:
+        elif content_type == 'json':
             await self.write_to_json(output)
+        else:
+            raise ValueError('Unsupported content type, expecting CSV or JSON')
 
         if content_type == 'csv':
             await key_value_store.set_value(key, output.getvalue(), 'text/csv')
