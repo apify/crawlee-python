@@ -25,7 +25,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pipx install poetry
+          pipx install --python "${{ env.pythonLocation }}/bin/python" poetry
           make install-dev
 
       - name: Run linting

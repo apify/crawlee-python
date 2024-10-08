@@ -27,12 +27,9 @@ jobs:
         with:
           python-version: 3.12
 
-      - name: Set up Poetry
-        run: pipx install poetry
-
       - name: Install dependencies
         run: |
-          pipx install poetry
+          pipx install --python "${{ env.pythonLocation }}/bin/python" poetry
           make install-dev
 
       # Updates the version number in the project's configuration.
