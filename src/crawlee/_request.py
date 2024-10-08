@@ -13,14 +13,13 @@ from pydantic import (
     BeforeValidator,
     ConfigDict,
     Field,
-    JsonValue,
     PlainSerializer,
     PlainValidator,
     TypeAdapter,
 )
 from typing_extensions import Self
 
-from crawlee._types import EnqueueStrategy, HttpHeaders, HttpMethod, HttpPayload, HttpQueryParams
+from crawlee._types import EnqueueStrategy, HttpHeaders, HttpMethod, HttpPayload, HttpQueryParams, JsonSerializable
 from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
 from crawlee._utils.urls import extract_query_params, validate_http_url
 
@@ -59,7 +58,7 @@ class CrawleeRequestData(BaseModel):
     forefront: Annotated[bool, Field()] = False
 
 
-class UserData(BaseModel, MutableMapping[str, JsonValue]):
+class UserData(BaseModel, MutableMapping[str, JsonSerializable]):
     """Represents the `user_data` part of a Request.
 
     Apart from the well-known attributes (`label` and `__crawlee`), it can also contain arbitrary JSON-compatible
@@ -67,15 +66,15 @@ class UserData(BaseModel, MutableMapping[str, JsonValue]):
     """
 
     model_config = ConfigDict(extra='allow')
-    __pydantic_extra__: dict[str, JsonValue] = Field(init=False)  # pyright: ignore
+    __pydantic_extra__: dict[str, JsonSerializable] = Field(init=False)  # pyright: ignore
 
     crawlee_data: Annotated[CrawleeRequestData | None, Field(alias='__crawlee')] = None
     label: Annotated[str | None, Field()] = None
 
-    def __getitem__(self, key: str) -> JsonValue:
+    def __getitem__(self, key: str) -> JsonSerializable:
         return self.__pydantic_extra__[key]
 
-    def __setitem__(self, key: str, value: JsonValue) -> None:
+    def __setitem__(self, key: str, value: JsonSerializable) -> None:
         if key == 'label':
             if value is not None and not isinstance(value, str):
                 raise ValueError('`label` must be str or None')
@@ -139,7 +138,7 @@ class BaseRequestData(BaseModel):
     data: Annotated[dict[str, Any], Field(default_factory=dict)] = {}
 
     user_data: Annotated[
-        dict[str, JsonValue],  # Internally, the model contains `UserData`, this is just for convenience
+        dict[str, JsonSerializable],  # Internally, the model contains `UserData`, this is just for convenience
         Field(alias='userData', default_factory=lambda: UserData()),
         PlainValidator(user_data_adapter.validate_python),
         PlainSerializer(
