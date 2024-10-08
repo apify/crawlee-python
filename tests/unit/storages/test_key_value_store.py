@@ -107,5 +107,5 @@ async def test_static_get_public_url(key_value_store: KeyValueStore) -> None:
     public_url = key_value_store.get_public_url('test-static')
     assert (
         public_url
-        == 'file:///private/var/folders/pj/6_vt00rn73n_0jz9wf5wddf80000gn/T/pytest-of-I546563/pytest-0/test_static_get_public_url0/storage/key_value_stores/default/test-static'
+        == f'file://{key_value_store._configuration.storage_dir}/storage/key_value_stores/default/test-static'
     )
