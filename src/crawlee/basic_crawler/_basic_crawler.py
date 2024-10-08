@@ -176,7 +176,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             configuration: Crawler configuration.
             request_handler_timeout: Request handler timeout.
             use_session_pool: Use session pool.
-            session_pool: Preconfigured session pool.
+            session_pool: Pre-configured session pool.
             retry_on_blocked: Retry on blocked requests.
             proxy_configuration: Proxy configuration.
             statistics: Statistics object.
