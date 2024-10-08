@@ -91,13 +91,13 @@ class BasicCrawler(Generic[TCrawlingContext]):
     """A versatile web crawler for parallel URL fetching with extensive features for web scraping.
 
     BasicCrawler is a highly customizable and efficient web crawling solution that provides:
-    - Automatic scaling based on available system resources and target website's requirements
-    - Smart request routing and handling of different types of URLs
-    - Session management for maintaining persistent connections
-    - Proxy integration and rotation for avoiding IP-based blocking
-    - Automatic retries for failed requests with customizable settings
-    - Built-in statistics tracking for monitoring crawler performance
-    - Event system for fine-grained control over the crawling process
+    - Automatic scaling based on available system resources and target website's requirements.
+    - Smart request routing and handling of different types of URLs.
+    - Session management for maintaining persistent connections.
+    - Proxy integration and rotation for avoiding IP-based blocking.
+    - Automatic retries for failed requests with customizable settings.
+    - Built-in statistics tracking for monitoring crawler performance.
+    - Event system for fine-grained control over the crawling process.
 
     Basic usage:
     ```python
@@ -112,29 +112,29 @@ class BasicCrawler(Generic[TCrawlingContext]):
     ```
 
     Advanced features:
-    - Configure concurrency to control parallel processing
-    - Set up automatic retry mechanisms for failed or blocked requests
-    - Utilize session pools for efficient connection management
-    - Integrate proxy services for IP rotation
-    - Monitor detailed statistics about the crawling process
+    - Configure concurrency to control parallel processing.
+    - Set up automatic retry mechanisms for failed or blocked requests.
+    - Utilize session pools for efficient connection management.
+    - Integrate proxy services for IP rotation.
+    - Monitor detailed statistics about the crawling process.
 
     Args:
         request_provider: The provider for requests to be crawled.
         request_handler: The function to handle individual requests.
         http_client: The HTTP client for making web requests.
         concurrency_settings: Settings for controlling concurrency.
-        max_request_retries: Maximum retry attempts for failed requests. Defaults to 3.
-        max_requests_per_crawl: Maximum number of requests per crawl. No limit by default.
-        max_session_rotations: Maximum session rotations per request. Defaults to 10.
+        max_request_retries: Maximum retry attempts for failed requests.
+        max_requests_per_crawl: Maximum number of requests per crawl. 
+        max_session_rotations: Maximum session rotations per request.
         configuration: Crawler configuration settings.
-        request_handler_timeout: Request handler timeout. Defaults to 1 minute.
-        use_session_pool: Whether to use session pool. Defaults to True.
+        request_handler_timeout: Request handler timeout. 
+        use_session_pool: Whether to use session pool. 
         session_pool: Preconfigured session pool.
-        retry_on_blocked: Whether to retry on blocked requests. Defaults to True.
+        retry_on_blocked: Whether to retry on blocked requests. 
         proxy_configuration: Proxy configuration.
         statistics: Statistics object.
         event_manager: Event manager.
-        configure_logging: Whether to configure logging. Defaults to True.
+        configure_logging: Whether to configure logging.
         _context_pipeline: Internal context pipeline.
         _additional_context_managers: Additional context managers.
         _logger: Logger instance.
@@ -170,18 +170,18 @@ class BasicCrawler(Generic[TCrawlingContext]):
             request_handler: Request handler function.
             http_client: HTTP client.
             concurrency_settings: Concurrency settings.
-            max_request_retries: Maximum retries. Defaults to 3.
+            max_request_retries: Maximum retries. 
             max_requests_per_crawl: Maximum requests per crawl.
-            max_session_rotations: Maximum session rotations. Defaults to 10.
+            max_session_rotations: Maximum session rotations. 
             configuration: Crawler configuration.
-            request_handler_timeout: Request handler timeout. Defaults to 1 minute.
-            use_session_pool: Use session pool. Defaults to True.
+            request_handler_timeout: Request handler timeout. 
+            use_session_pool: Use session pool.
             session_pool: Preconfigured session pool.
-            retry_on_blocked: Retry on blocked requests. Defaults to True.
+            retry_on_blocked: Retry on blocked requests.
             proxy_configuration: Proxy configuration.
             statistics: Statistics object.
             event_manager: Event manager.
-            configure_logging: Configure logging. Defaults to True.
+            configure_logging: Configure logging.
             _context_pipeline: Internal context pipeline.
             _additional_context_managers: Additional context managers.
             _logger: Logger instance.
