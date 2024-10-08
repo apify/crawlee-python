@@ -82,6 +82,11 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.12
+
       - name: Locally remove beta tags
         run: |
           git tag | grep 'b[0-9]' | xargs git tag --delete
