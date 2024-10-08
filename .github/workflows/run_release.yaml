@@ -103,7 +103,7 @@ jobs:
           fi
 
       - name: Install poetry
-        run: pipx install --python "${{ env.pythonLocation }}/bin/python" poetry
+        run: pipx install --python ${{ env.pythonLocation }} poetry
 
       - name: Update package version in pyproject.toml
         run: poetry version ${{ needs.should_release.outputs.version_number }}
