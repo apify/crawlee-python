@@ -11,6 +11,7 @@ if TYPE_CHECKING:
         KeyValueStoreMetadata,
         KeyValueStoreRecord,
     )
+    from crawlee.configuration import Configuration
 
 
 class BaseKeyValueStoreClient(ABC):
@@ -113,4 +114,17 @@ class BaseKeyValueStoreClient(ABC):
 
         Args:
             key: The key of the record which to delete
+        """
+
+    @abstractmethod
+    def get_public_url(self, key: str, name: str | None, configuration: Configuration) -> str:
+        """Get the public URL for the given key.
+
+        Args:
+            name: Identifier for the key value store
+            key: Key of the record for which URL is required
+            configuration: Configuration of the key value store
+
+        Returns:
+            The public URL for the given key.
         """

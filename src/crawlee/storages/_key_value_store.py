@@ -163,9 +163,8 @@ class KeyValueStore(BaseStorage):
 
         Args:
             key: Key of the record for which URL is required
+
         Returns:
             The public URL for the given key.
         """
-        name = self.name or self._configuration.default_key_value_store_id
-        storage_dir = self._configuration.storage_dir
-        return f'file://{storage_dir}/storage/key_value_stores/{name}/{key}'
+        return self._resource_client.get_public_url(key, self.name, self._configuration)

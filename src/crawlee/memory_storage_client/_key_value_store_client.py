@@ -30,6 +30,7 @@ from crawlee.memory_storage_client._creation_management import (
 if TYPE_CHECKING:
     from httpx import Response
 
+    from crawlee.configuration import Configuration
     from crawlee.memory_storage_client import MemoryStorageClient
 
 logger = getLogger(__name__)
@@ -286,6 +287,12 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
                 await existing_store_by_id.update_timestamps(has_been_modified=True)
                 if self._memory_storage_client.persist_storage:
                     await existing_store_by_id.delete_persisted_record(record)
+
+    @override
+    def get_public_url(self, key: str, name: str | None, configuration: Configuration) -> str:
+        store_name = name or configuration.default_key_value_store_id
+        storage_dir = configuration.storage_dir
+        return f'file://{storage_dir}/storage/key_value_stores/{store_name}/{key}'
 
     async def persist_record(self, record: KeyValueStoreRecord) -> None:
         """Persist the specified record to the key-value store."""
