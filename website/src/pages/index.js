@@ -21,10 +21,7 @@ function Hero() {
                     <div className={clsx(styles.relative, 'row')}>
                         <div className="col">
                             <h1 className={styles.tagline}>
-                                Crawlee is a web<br /> scraping and browser<br /> automation library
-                            </h1>
-                            <h1 className={styles.tagline}>
-                                Crawlee is a <span>web<br /> scraping</span> and <span>browser<br /> automation</span> library
+                                Build your <span>Python<br /> web crawlers</span><br /> using <span>Crawlee</span> 
                             </h1>
                         </div>
                     </div>
