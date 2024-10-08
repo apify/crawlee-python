@@ -29,7 +29,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pipx install --python "${{ env.pythonLocation }}/bin/python" poetry
+          pipx install --python ${{ env.python-version }} poetry
           make install-dev
 
       # Updates the version number in the project's configuration.
