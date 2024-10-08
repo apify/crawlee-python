@@ -36,7 +36,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pipx install --python ${{ env.pythonLocation }} poetry
+          pipx install --python ${{ env.python-version }} poetry
           make install-dev
 
       - name: Build generated API reference
