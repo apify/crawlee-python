@@ -11,7 +11,6 @@ if TYPE_CHECKING:
         KeyValueStoreMetadata,
         KeyValueStoreRecord,
     )
-    from crawlee.configuration import Configuration
 
 
 class BaseKeyValueStoreClient(ABC):
@@ -117,13 +116,11 @@ class BaseKeyValueStoreClient(ABC):
         """
 
     @abstractmethod
-    def get_public_url(self, key: str, name: str | None, configuration: Configuration) -> str:
+    def get_public_url(self, key: str) -> str:
         """Get the public URL for the given key.
 
         Args:
-            name: Identifier for the key value store
             key: Key of the record for which URL is required
-            configuration: Configuration of the key value store
 
         Returns:
             The public URL for the given key.

@@ -167,4 +167,4 @@ class KeyValueStore(BaseStorage):
         Returns:
             The public URL for the given key.
         """
-        return self._resource_client.get_public_url(key, self.name, self._configuration)
+        return self._resource_client.get_public_url(key)
