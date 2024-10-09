@@ -291,7 +291,7 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
     @override
     def get_public_url(self, key: str, name: str | None, configuration: Configuration) -> str:
         store_name = name or configuration.default_key_value_store_id
-        storage_dir = configuration.storage_dir
+        storage_dir = self._memory_storage_client.storage_dir
         return f'file://{storage_dir}/storage/key_value_stores/{store_name}/{key}'
 
     async def persist_record(self, record: KeyValueStoreRecord) -> None:
