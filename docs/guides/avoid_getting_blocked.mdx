@@ -3,13 +3,10 @@ id: avoid-getting-blocked
 title: Avoid getting blocked
 description: How to avoid getting blocked when scraping using crawlee-python.
 ---
-
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 import CodeBlock from '@theme/CodeBlock';
 
-import PlaywrightSource from '!!raw-loader!./avoid_blocking_playwright.py';
-import PlaywrightFingerprintsOffSource from '!!raw-loader!./avoid_blocking_playwright_fingerprints_off.py';
+import PlaywrightSource from '!!raw-loader!./code/avoid_blocking_playwright.py';
+import PlaywrightFingerprintsOffSource from '!!raw-loader!./code/avoid_blocking_playwright_fingerprints_off.py';
 
 A scraper might get blocked for numerous reasons. Let's narrow it down to the two main ones. The first is a bad or blocked IP address. You can learn about this topic in the [proxy management guide](./proxy-management). The second reason is [browser fingerprints](https://pixelprivacy.com/resources/browser-fingerprinting/) (or signatures), which we will explore more in this guide. Check the [Apify Academy anti-scraping course](https://docs.apify.com/academy/anti-scraping) to gain a deeper theoretical understanding of blocking and learn a few tips and tricks.
 
@@ -23,27 +20,21 @@ Changing browser fingerprints can be a tedious job. Luckily, Crawlee provides th
 
 In certain cases, we want to narrow down the fingerprints used—e.g., specify a certain operating system, locale, or browser. This is also possible with Crawlee; the crawler can have the generation algorithm customized to reflect a particular browser version and more. Let's take a look at the examples below:
 
-<Tabs groupId="avoid_blocking">
-    <TabItem value="playwright" label="PlaywrightCrawler" default>
+
         <CodeBlock language="python">
             {PlaywrightSource}
         </CodeBlock>
-    </TabItem>
-    
-</Tabs>
+  
 
 ## Disabling browser fingerprints
 
 On the contrary, sometimes we want to entirely disable the usage of browser fingerprints. This is easy to do with Crawlee too. All we have to do is set the `use_fingerprints` option to `False` when creating the `BrowserPool`:
 
-<Tabs groupId="avoid_blocking">
-    <TabItem value="playwright" label="PlaywrightCrawler" default>
+
         <CodeBlock language="python">
             {PlaywrightFingerprintsOffSource}
         </CodeBlock>
-    </TabItem>
-   
-</Tabs>
+
 
 
 ## Additional Tips to Avoid Getting Blocked

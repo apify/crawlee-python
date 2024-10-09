@@ -1,5 +1,3 @@
-# Inspiration: https://github.com/apify/crawlee/blob/v3.10.1/packages/browser-pool/src/playwright/playwright-plugin.ts
-
 from __future__ import annotations
 
 from logging import getLogger
@@ -35,6 +33,8 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         browser_options: Mapping[str, Any] | None = None,
         page_options: Mapping[str, Any] | None = None,
         max_open_pages_per_browser: int = 20,
+        fingerprint_generator_options: Mapping[str, Any] | None = None,
+        use_fingerprints: bool = False,
     ) -> None:
         """Create a new instance.
 
@@ -44,11 +44,15 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
             page_options: Options to configure a new page instance.
             max_open_pages_per_browser: The maximum number of pages that can be opened in a single browser instance.
                 Once reached, a new browser instance will be launched to handle the excess.
+            fingerprint_generator_options: Options for generating browser fingerprints.
+            use_fingerprints: Whether to use browser fingerprints.
         """
         self._browser_type = browser_type
         self._browser_options = browser_options or {}
         self._page_options = page_options or {}
         self._max_open_pages_per_browser = max_open_pages_per_browser
+        self._fingerprint_generator_options = fingerprint_generator_options or {}
+        self._use_fingerprints = use_fingerprints
 
         self._playwright_context_manager = async_playwright()
         self._playwright: Playwright | None = None
@@ -72,6 +76,14 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
     @override
     def max_open_pages_per_browser(self) -> int:
         return self._max_open_pages_per_browser
+
+    @property
+    def fingerprint_generator_options(self) -> Mapping[str, Any]:
+        return self._fingerprint_generator_options
+
+    @property
+    def use_fingerprints(self) -> bool:
+        return self._use_fingerprints
 
     @override
     async def __aenter__(self) -> PlaywrightBrowserPlugin:
