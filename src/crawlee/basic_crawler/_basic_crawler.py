@@ -129,7 +129,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         configuration: Crawler configuration settings.
         request_handler_timeout: Request handler timeout.
         use_session_pool: Whether to use session pool.
-        session_pool: Pre-configured session pool.
+        session_pool: Preconfigured session pool.
         retry_on_blocked: Whether to retry on blocked requests.
         proxy_configuration: Proxy configuration.
         statistics: Statistics object.
@@ -163,7 +163,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         _additional_context_managers: Sequence[AsyncContextManager] | None = None,
         _logger: logging.Logger | None = None,
     ) -> None:
-        """Initializes the BasicCrawler.
+        """Initialize the BasicCrawler.
 
         Args:
             request_provider: Request provider.
@@ -176,7 +176,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             configuration: Crawler configuration.
             request_handler_timeout: Request handler timeout.
             use_session_pool: Use session pool.
-            session_pool: Pre-configured session pool.
+            session_pool: Preconfigured session pool.
             retry_on_blocked: Retry on blocked requests.
             proxy_configuration: Proxy configuration.
             statistics: Statistics object.
@@ -271,7 +271,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     @property
     def router(self) -> Router[TCrawlingContext]:
-        """Handles individual crawling requests. Initializes a router if none is set."""
+        """Handle individual crawling requests. Initialize a router if none is set."""
         if self._router is None:
             self._router = Router[TCrawlingContext]()
 
@@ -279,7 +279,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     @router.setter
     def router(self, router: Router[TCrawlingContext]) -> None:
-        """Sets the router, ensuring only one instance is allowed."""
+        """Set the router, ensuring only one instance is allowed."""
         if self._router is not None:
             raise RuntimeError('A router is already set')
 
@@ -287,19 +287,19 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     @property
     def statistics(self) -> Statistics[StatisticsState]:
-        """Returns statistics about the crawler's current or last run."""
+        """Return statistics about the crawler's current or last run."""
         return self._statistics
 
     @property
     def _max_requests_count_exceeded(self) -> bool:
-        """Checks if the max number of crawl requests has been reached."""
+        """Check if the max number of crawl request has been reached."""
         if self._max_requests_per_crawl is None:
             return False
 
         return self._statistics.state.requests_finished >= self._max_requests_per_crawl
 
     async def _get_session(self) -> Session | None:
-        """Fetches a session from the pool if session pooling is enabled."""
+        """Fetch a session from the pool if session pooling is enabled."""
         if not self._use_session_pool:
             return None
 
@@ -313,7 +313,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         )
 
     async def _get_proxy_info(self, request: Request, session: Session | None) -> ProxyInfo | None:
-        """Returns a ProxyInfo object for a request based on the crawlers proxy settings."""
+        """Return a ProxyInfo object for a request based on the crawlers proxy settings."""
         if not self._proxy_configuration:
             return None
 
@@ -329,7 +329,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         id: str | None = None,
         name: str | None = None,
     ) -> RequestProvider:
-        """Returns the configured request provider or opens the default request queue."""
+        """Return the configured request provider or open the default request queue."""
         if not self._request_provider:
             self._request_provider = await RequestQueue.open(id=id, name=name, configuration=self._configuration)
 
@@ -341,7 +341,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         id: str | None = None,
         name: str | None = None,
     ) -> Dataset:
-        """Opens and returns the dataset by ID or name, or opens the default dataset if none is provided."""
+        """Open and return the dataset by ID or name, or open the default dataset if none is provided."""
         return await Dataset.open(id=id, name=name, configuration=self._configuration)
 
     async def get_key_value_store(
@@ -350,20 +350,20 @@ class BasicCrawler(Generic[TCrawlingContext]):
         id: str | None = None,
         name: str | None = None,
     ) -> KeyValueStore:
-        """Opens and returns a key-value store by ID or name, or opens the default one if none is provided."""
+        """Open and return a key-value store by ID or name, or open the default one if none is provided."""
         return await KeyValueStore.open(id=id, name=name, configuration=self._configuration)
 
     def error_handler(
         self, handler: ErrorHandler[TCrawlingContext | BasicCrawlingContext]
     ) -> ErrorHandler[TCrawlingContext]:
-        """Sets a custom error handler for request retries in case of errors."""
+        """Set a custom error handler for request retries in case of errors."""
         self._error_handler = handler
         return handler
 
     def failed_request_handler(
         self, handler: FailedRequestHandler[TCrawlingContext | BasicCrawlingContext]
     ) -> FailedRequestHandler[TCrawlingContext]:
-        """Sets a handler for requests that fail after reaching max retries."""
+        """Set a handler for requests that fail after reaching max retries."""
         self._failed_request_handler = handler
         return handler
 
