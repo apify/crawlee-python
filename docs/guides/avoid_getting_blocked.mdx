@@ -4,6 +4,7 @@ title: Avoid getting blocked
 description: How to avoid getting blocked when scraping using crawlee-python.
 ---
 import CodeBlock from '@theme/CodeBlock';
+import ApiLink from '@site/src/components/ApiLink';
 
 import PlaywrightSource from '!!raw-loader!./code/avoid_blocking_playwright.py';
 import PlaywrightFingerprintsOffSource from '!!raw-loader!./code/avoid_blocking_playwright_fingerprints_off.py';
@@ -14,7 +15,7 @@ A browser fingerprint is a collection of browser attributes and significant feat
 
 ## Using browser fingerprints
 
-Changing browser fingerprints can be a tedious job. Luckily, Crawlee provides this feature with zero configuration necessary—the usage of fingerprints is enabled by default and available in `PlaywrightCrawler`. So whenever we build a scraper using one of these crawlers, the fingerprints are going to be generated for the default browser and the operating system out of the box.
+Changing browser fingerprints can be a tedious job. Luckily, Crawlee provides this feature with zero configuration necessary—the usage of fingerprints is enabled by default and available in <ApiLink to="class/PlaywrightCrawler">PlaywrightCrawler</ApiLink>. So whenever we build a scraper using one of these crawlers, the fingerprints are going to be generated for the default browser and the operating system out of the box.
 
 ## Customizing browser fingerprints
 
@@ -28,7 +29,7 @@ In certain cases, we want to narrow down the fingerprints used—e.g., specify a
 
 ## Disabling browser fingerprints
 
-On the contrary, sometimes we want to entirely disable the usage of browser fingerprints. This is easy to do with Crawlee too. All we have to do is set the `use_fingerprints` option to `False` when creating the `BrowserPool`:
+On the contrary, sometimes we want to entirely disable the usage of browser fingerprints. This is easy to do with Crawlee too. All we have to do is set the `use_fingerprints` option to `False` when creating the <ApiLink to="class/BrowserPool">BrowserPool</ApiLink>:
 
 
         <CodeBlock language="python">
