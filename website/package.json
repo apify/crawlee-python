@@ -23,14 +23,14 @@
         "@typescript-eslint/eslint-plugin": "8.2.0",
         "@typescript-eslint/parser": "8.2.0",
         "eslint": "8.57.0",
-        "eslint-plugin-react": "7.37.0",
+        "eslint-plugin-react": "7.37.1",
         "eslint-plugin-react-hooks": "4.6.2",
         "fs-extra": "^11.1.0",
         "patch-package": "^8.0.0",
         "path-browserify": "^1.0.1",
         "prettier": "^3.0.0",
         "rimraf": "^6.0.0",
-        "typescript": "5.5.4"
+        "typescript": "5.6.2"
     },
     "dependencies": {
         "@apify/docusaurus-plugin-typedoc-api": "^4.2.2",
