@@ -82,6 +82,11 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.12
+
       - name: Locally remove beta tags
         run: |
           git tag | grep 'b[0-9]' | xargs git tag --delete
@@ -98,7 +103,7 @@ jobs:
           fi
 
       - name: Install poetry
-        run: pipx install poetry
+        run: pipx install --python ${{ env.python-version }} poetry
 
       - name: Update package version in pyproject.toml
         run: poetry version ${{ needs.should_release.outputs.version_number }}
