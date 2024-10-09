@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.3.9 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Workaround for JSON value typing problems ([#581](https://github.com/apify/crawlee-python/pull/581), closes [#563](https://github.com/apify/crawlee-python/issues/563)) ([403496a](https://github.com/apify/crawlee-python/commit/403496a53c12810351139a6e073238143ecc5930)) by [@janbuchar](https://github.com/janbuchar)
+
 ## [0.3.8](https://github.com/apify/crawlee-python/releases/tag/v0.3.8) (2024-10-02)
 
 ### 🚀 Features

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Annotated, Any, Literal, Protocol, Union
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Protocol, TypeVar, Union
 
 from pydantic import ConfigDict, Field, PlainValidator, RootModel
 from typing_extensions import NotRequired, TypeAlias, TypedDict, Unpack
@@ -21,10 +21,20 @@ if TYPE_CHECKING:
     from crawlee.sessions._session import Session
     from crawlee.storages._dataset import ExportToKwargs, GetDataKwargs, PushDataKwargs
 
-# Type for representing json-serializable values. It's close enough to the real thing supported
-# by json.parse, and the best we can do until mypy supports recursive types. It was suggested
-# in a discussion with (and approved by) Guido van Rossum, so I'd consider it correct enough.
-JsonSerializable: TypeAlias = Union[str, int, float, bool, None, dict[str, Any], list[Any]]
+    # Workaround for https://github.com/pydantic/pydantic/issues/9445
+    J = TypeVar('J', bound='JsonSerializable')
+    JsonSerializable: TypeAlias = Union[
+        list[J],
+        dict[str, J],
+        str,
+        bool,
+        int,
+        float,
+        None,
+    ]
+else:
+    from pydantic import JsonValue as JsonSerializable
+
 
 HttpMethod: TypeAlias = Literal['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH']
 
