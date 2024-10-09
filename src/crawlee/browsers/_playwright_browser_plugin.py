@@ -1,3 +1,5 @@
+# Inspiration: https://github.com/apify/crawlee/blob/v3.10.1/packages/browser-pool/src/playwright/playwright-plugin.ts
+
 from __future__ import annotations
 
 from logging import getLogger
