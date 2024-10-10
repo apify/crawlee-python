@@ -114,3 +114,14 @@ class BaseKeyValueStoreClient(ABC):
         Args:
             key: The key of the record which to delete
         """
+
+    @abstractmethod
+    async def get_public_url(self, key: str) -> str:
+        """Get the public URL for the given key.
+
+        Args:
+            key: Key of the record for which URL is required
+
+        Returns:
+            The public URL for the given key.
+        """

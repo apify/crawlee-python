@@ -287,6 +287,12 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
                 if self._memory_storage_client.persist_storage:
                     await existing_store_by_id.delete_persisted_record(record)
 
+    @override
+    async def get_public_url(self, key: str) -> str:
+        store_name = self.name or self.id
+        storage_dir = self._memory_storage_client.storage_dir
+        return f'file://{storage_dir}/key_value_stores/{store_name}/{key}.txt'
+
     async def persist_record(self, record: KeyValueStoreRecord) -> None:
         """Persist the specified record to the key-value store."""
         store_directory = self.resource_directory
