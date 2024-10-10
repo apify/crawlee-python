@@ -7,6 +7,8 @@ jobs:
   docs:
     name: Docs build
     runs-on: ubuntu-latest
+    env:
+      PYTHON_VERSION: 3.12
 
     steps:
       - name: Checkout Source code
@@ -25,11 +27,11 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: 3.12
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
         run: |
-          pipx install --python ${{ env.python-version }} poetry
+          pipx install --python ${{ env.PYTHON_VERSION }} poetry
           make install-dev
 
       - name: Build generated API reference

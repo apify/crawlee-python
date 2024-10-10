@@ -8,6 +8,8 @@ jobs:
     name: Check changelog entry
     runs-on: ubuntu-latest
     if: (!startsWith(github.event.pull_request.title, 'docs:'))
+    env:
+      PYTHON_VERSION: 3.12
 
     steps:
       # We need to check out the head commit in case of PRs, and the default ref otherwise (during release).
@@ -19,11 +21,11 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: 3.12
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
         run: |
-          pipx install --python ${{ env.python-version }} poetry
+          pipx install --python ${{ env.PYTHON_VERSION }} poetry
           make install-dev
 
       - name: Check changelog entry
