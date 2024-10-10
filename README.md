@@ -129,38 +129,39 @@ The [`PlaywrightCrawler`](https://crawlee.dev/python/api/class/PlaywrightCrawler
 ```python
 import asyncio
 
-from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
+from crawlee import EnqueueStrategy
+from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 
+# Define the maximum depth for the crawler
+MAX_DEPTH = 3
 
 async def main() -> None:
-    crawler = PlaywrightCrawler(
-        # Limit the crawl to max requests. Remove or increase it for crawling all links.
+    crawler = BeautifulSoupCrawler(
+        # Limit the crawl to max requests. Adjust as needed.
         max_requests_per_crawl=10,
     )
 
-    # Define the default request handler, which will be called for every request.
     @crawler.router.default_handler
-    async def request_handler(context: PlaywrightCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
+        current_depth = context.request.meta.get('depth', 0)
+        
+        context.log.info(f'Processing {context.request.url} at depth {current_depth} ...')
 
-        # Extract data from the page.
-        data = {
-            'url': context.request.url,
-            'title': await context.page.title(),
-        }
-
-        # Push the extracted data to the default dataset.
-        await context.push_data(data)
-
-        # Enqueue all links found on the page.
-        await context.enqueue_links()
+        # Only enqueue links if the current depth is less than the maximum
+        if current_depth < MAX_DEPTH:
+            # Enqueue all links found on the page, incrementing the depth
+            await context.enqueue_links(
+                strategy=EnqueueStrategy.ALL,
+                meta={'depth': current_depth + 1}  # Increment depth for enqueued links
+            )
 
     # Run the crawler with the initial list of requests.
-    await crawler.run(['https://crawlee.dev'])
-
+    # Start with a depth of 0 for the initial URL.
+    await crawler.run([{'url': 'https://crawlee.dev', 'meta': {'depth': 0}}])
 
 if __name__ == '__main__':
     asyncio.run(main())
+
 ```
 
 ### More examples
