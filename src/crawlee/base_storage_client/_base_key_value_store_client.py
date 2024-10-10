@@ -116,7 +116,7 @@ class BaseKeyValueStoreClient(ABC):
         """
 
     @abstractmethod
-    def get_public_url(self, key: str) -> str:
+    async def get_public_url(self, key: str) -> str:
         """Get the public URL for the given key.
 
         Args:

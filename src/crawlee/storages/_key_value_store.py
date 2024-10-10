@@ -158,7 +158,7 @@ class KeyValueStore(BaseStorage):
 
         return await self._resource_client.set_record(key, value, content_type)
 
-    def get_public_url(self, key: str) -> str:
+    async def get_public_url(self, key: str) -> str:
         """Get the public URL for the given key.
 
         Args:
@@ -167,4 +167,4 @@ class KeyValueStore(BaseStorage):
         Returns:
             The public URL for the given key.
         """
-        return self._resource_client.get_public_url(key)
+        return await self._resource_client.get_public_url(key)

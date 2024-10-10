@@ -288,7 +288,7 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
                     await existing_store_by_id.delete_persisted_record(record)
 
     @override
-    def get_public_url(self, key: str) -> str:
+    async def get_public_url(self, key: str) -> str:
         store_name = self.name or self.id
         storage_dir = self._memory_storage_client.storage_dir
         return f'file://{storage_dir}/key_value_stores/{store_name}/{key}.txt'
