@@ -108,5 +108,5 @@ async def test_static_get_public_url(key_value_store: KeyValueStore) -> None:
     await key_value_store.set_value('test-static', 'static')
     public_url = key_value_store.get_public_url('test-static')
 
-    path = unquote(urlparse(public_url).path)
+    path = unquote(urlparse(public_url).path)  # extract path from a 'file:///' URI
     assert Path(path).read_text() == 'static'
