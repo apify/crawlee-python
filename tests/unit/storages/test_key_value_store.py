@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import AsyncGenerator
+from urllib.parse import unquote, urlparse
 
 import pytest
 
@@ -105,7 +107,6 @@ async def test_static_get_set_value(key_value_store: KeyValueStore) -> None:
 async def test_static_get_public_url(key_value_store: KeyValueStore) -> None:
     await key_value_store.set_value('test-static', 'static')
     public_url = key_value_store.get_public_url('test-static')
-    assert (
-        public_url
-        == f'file://{key_value_store._configuration.storage_dir}/storage/key_value_stores/default/test-static'
-    )
+
+    path = unquote(urlparse(public_url).path)
+    assert Path(path).read_text() == 'static'
