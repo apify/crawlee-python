@@ -562,6 +562,22 @@ async def test_context_push_and_get_data(httpbin: str) -> None:
     assert stats.requests_finished == 1
 
 
+async def test_context_push_and_get_data_handler_error() -> None:
+    crawler = BasicCrawler()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        await context.push_data('{"b": 2}')
+        raise RuntimeError('Watch me crash')
+
+    stats = await crawler.run(['https://a.com'])
+
+    assert (await crawler.get_data()).items == []
+    assert stats.requests_total == 1
+    assert stats.requests_finished == 0
+    assert stats.requests_failed == 1
+
+
 async def test_crawler_push_and_export_data(tmp_path: Path) -> None:
     crawler = BasicCrawler()
     dataset = await Dataset.open()
