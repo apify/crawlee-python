@@ -15,7 +15,7 @@ from crawlee.storages._base_storage import BaseStorage
 from crawlee.storages._key_value_store import KeyValueStore
 
 if TYPE_CHECKING:
-    from crawlee._types import JsonSerializable
+    from crawlee._types import JsonSerializable, PushDataKwargs
     from crawlee.base_storage_client import BaseStorageClient
     from crawlee.base_storage_client._models import DatasetItemsListPage
     from crawlee.configuration import Configuration
@@ -52,10 +52,6 @@ class GetDataKwargs(TypedDict):
     skip_hidden: NotRequired[bool]
     flatten: NotRequired[list[str]]
     view: NotRequired[str]
-
-
-class PushDataKwargs(TypedDict):
-    """Keyword arguments for dataset's `push_data` method."""
 
 
 class ExportToKwargs(TypedDict):

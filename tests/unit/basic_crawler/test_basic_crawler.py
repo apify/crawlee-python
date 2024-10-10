@@ -562,6 +562,22 @@ async def test_context_push_and_get_data(httpbin: str) -> None:
     assert stats.requests_finished == 1
 
 
+async def test_context_push_and_get_data_handler_error() -> None:
+    crawler = BasicCrawler()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        await context.push_data('{"b": 2}')
+        raise RuntimeError('Watch me crash')
+
+    stats = await crawler.run(['https://a.com'])
+
+    assert (await crawler.get_data()).items == []
+    assert stats.requests_total == 1
+    assert stats.requests_finished == 0
+    assert stats.requests_failed == 1
+
+
 async def test_crawler_push_and_export_data(tmp_path: Path) -> None:
     crawler = BasicCrawler()
     dataset = await Dataset.open()
@@ -600,6 +616,20 @@ async def test_context_push_and_export_data(httpbin: str, tmp_path: Path) -> Non
     ]
 
     assert (tmp_path / 'dataset.csv').read_bytes() == b'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
+
+
+async def test_context_update_kv_store() -> None:
+    crawler = BasicCrawler()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        store = await context.get_key_value_store()
+        await store.set_value('foo', 'bar')
+
+    await crawler.run(['https://hello.world'])
+
+    store = await crawler.get_key_value_store()
+    assert (await store.get_value('foo')) == 'bar'
 
 
 async def test_max_requests_per_crawl(httpbin: str) -> None:
