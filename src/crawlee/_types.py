@@ -1,9 +1,20 @@
 from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Annotated, Any, Literal, Protocol, TypeVar, Union
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Literal,
+    Optional,
+    Protocol,
+    TypeVar,
+    Union,
+    cast,
+    overload,
+)
 
 from pydantic import ConfigDict, Field, PlainValidator, RootModel
 from typing_extensions import NotRequired, TypeAlias, TypedDict, Unpack
@@ -19,7 +30,8 @@ if TYPE_CHECKING:
     from crawlee.http_clients import HttpResponse
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions._session import Session
-    from crawlee.storages._dataset import ExportToKwargs, GetDataKwargs, PushDataKwargs
+    from crawlee.storages._dataset import ExportToKwargs, GetDataKwargs
+    from crawlee.storages._key_value_store import KeyValueStore
 
     # Workaround for https://github.com/pydantic/pydantic/issues/9445
     J = TypeVar('J', bound='JsonSerializable')
@@ -188,6 +200,10 @@ class GetDataFunction(Protocol):
     ) -> Coroutine[None, None, DatasetItemsListPage]: ...
 
 
+class PushDataKwargs(TypedDict):
+    """Keyword arguments for dataset's `push_data` method."""
+
+
 class PushDataFunction(Protocol):
     """Type of a function for pushing data to the dataset.
 
@@ -202,6 +218,12 @@ class PushDataFunction(Protocol):
         dataset_name: str | None = None,
         **kwargs: Unpack[PushDataKwargs],
     ) -> Coroutine[None, None, None]: ...
+
+
+class PushDataFunctionCall(PushDataKwargs):
+    data: JsonSerializable
+    dataset_id: str | None
+    dataset_name: str | None
 
 
 class ExportToFunction(Protocol):
@@ -251,6 +273,42 @@ class SendRequestFunction(Protocol):
     ) -> Coroutine[None, None, HttpResponse]: ...
 
 
+T = TypeVar('T')
+
+
+class KeyValueStoreInterface(Protocol):
+    """The (limited) part of the `KeyValueStore` interface that should be accessible from a request handler."""
+
+    @overload
+    async def get_value(self, key: str) -> Any: ...
+
+    @overload
+    async def get_value(self, key: str, default_value: T) -> T: ...
+
+    @overload
+    async def get_value(self, key: str, default_value: T | None = None) -> T | None: ...
+
+    async def get_value(self, key: str, default_value: T | None = None) -> T | None: ...
+
+    async def set_value(
+        self,
+        key: str,
+        value: Any,
+        content_type: str | None = None,
+    ) -> None: ...
+
+
+class GetKeyValueStoreFromRequestHandlerFunction(Protocol):
+    """Type of a function for accessing a key-value store from within a request handler."""
+
+    def __call__(
+        self,
+        *,
+        id: str | None = None,
+        name: str | None = None,
+    ) -> Coroutine[None, None, KeyValueStoreInterface]: ...
+
+
 @dataclass(frozen=True)
 class BasicCrawlingContext:
     """Basic crawling context intended to be extended by crawlers."""
@@ -261,14 +319,64 @@ class BasicCrawlingContext:
     send_request: SendRequestFunction
     add_requests: AddRequestsFunction
     push_data: PushDataFunction
+    get_key_value_store: GetKeyValueStoreFromRequestHandlerFunction
     log: logging.Logger
 
 
 @dataclass()
+class KeyValueStoreValue:
+    content: Any
+    content_type: str | None
+
+
+class KeyValueStoreChangeRecords:
+    def __init__(self, actual_key_value_store: KeyValueStore) -> None:
+        self.updates = dict[str, KeyValueStoreValue]()
+        self._actual_key_value_store = actual_key_value_store
+
+    async def set_value(
+        self,
+        key: str,
+        value: Any,
+        content_type: str | None = None,
+    ) -> None:
+        self.updates[key] = KeyValueStoreValue(value, content_type)
+
+    @overload
+    async def get_value(self, key: str) -> Any: ...
+
+    @overload
+    async def get_value(self, key: str, default_value: T) -> T: ...
+
+    @overload
+    async def get_value(self, key: str, default_value: T | None = None) -> T | None: ...
+
+    async def get_value(self, key: str, default_value: T | None = None) -> T | None:
+        if key in self.updates:
+            return cast(T, self.updates[key].content)
+
+        return await self._actual_key_value_store.get_value(key, default_value)
+
+
+class GetKeyValueStoreFunction(Protocol):
+    """Type of a function for accessing the live implementation of a key-value store."""
+
+    def __call__(
+        self,
+        *,
+        id: str | None = None,
+        name: str | None = None,
+    ) -> Coroutine[None, None, KeyValueStore]: ...
+
+
 class RequestHandlerRunResult:
     """Record of calls to storage-related context helpers."""
 
-    add_requests_calls: list[AddRequestsFunctionCall] = field(default_factory=list)
+    def __init__(self, *, key_value_store_getter: GetKeyValueStoreFunction) -> None:
+        self._key_value_store_getter = key_value_store_getter
+        self.add_requests_calls = list[AddRequestsFunctionCall]()
+        self.push_data_calls = list[PushDataFunctionCall]()
+        self.key_value_store_changes = dict[tuple[Optional[str], Optional[str]], KeyValueStoreChangeRecords]()
 
     async def add_requests(
         self,
@@ -276,4 +384,39 @@ class RequestHandlerRunResult:
         **kwargs: Unpack[AddRequestsKwargs],
     ) -> None:
         """Track a call to the `add_requests` context helper."""
-        self.add_requests_calls.append(AddRequestsFunctionCall(requests=requests, **kwargs))
+        self.add_requests_calls.append(
+            AddRequestsFunctionCall(
+                requests=requests,
+                **kwargs,
+            )
+        )
+
+    async def push_data(
+        self,
+        data: JsonSerializable,
+        dataset_id: str | None = None,
+        dataset_name: str | None = None,
+        **kwargs: Unpack[PushDataKwargs],
+    ) -> None:
+        """Track a call to the `push_data` context helper."""
+        self.push_data_calls.append(
+            PushDataFunctionCall(
+                data=data,
+                dataset_id=dataset_id,
+                dataset_name=dataset_name,
+                **kwargs,
+            )
+        )
+
+    async def get_key_value_store(
+        self,
+        *,
+        id: str | None = None,
+        name: str | None = None,
+    ) -> KeyValueStoreInterface:
+        if (id, name) not in self.key_value_store_changes:
+            self.key_value_store_changes[id, name] = KeyValueStoreChangeRecords(
+                await self._key_value_store_getter(id=id, name=name)
+            )
+
+        return self.key_value_store_changes[id, name]

@@ -602,6 +602,20 @@ async def test_context_push_and_export_data(httpbin: str, tmp_path: Path) -> Non
     assert (tmp_path / 'dataset.csv').read_bytes() == b'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
 
 
+async def test_context_update_kv_store() -> None:
+    crawler = BasicCrawler()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        store = await context.get_key_value_store()
+        await store.set_value('foo', 'bar')
+
+    await crawler.run(['https://hello.world'])
+
+    store = await crawler.get_key_value_store()
+    assert (await store.get_value('foo')) == 'bar'
+
+
 async def test_max_requests_per_crawl(httpbin: str) -> None:
     start_urls = [f'{httpbin}/1', f'{httpbin}/2', f'{httpbin}/3', f'{httpbin}/4', f'{httpbin}/5']
     processed_urls = []
