@@ -1,0 +1,49 @@
+---
+id: scaling-crawlers
+title: Scaling our crawlers
+description: To infinity and beyond! ...within limits
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+
+import CodeBlock from '@theme/CodeBlock';
+
+import MaxRequestsPerMinuteSource from '!!raw-loader!./code/max_tasks_per_minute.py';
+import MinMaxConcurrencySource from '!!raw-loader!./code/min_max_concurrency.py';
+
+
+As we build our crawler, we might want to control how many tasks we do to the website at a time. Crawlee provides several options to fine tune how many parallel tasks should be made at any time, how many tasks should be done per minute, and how should scaling work based on the available system resources.
+
+:::tip
+
+All of these options are available on all crawlers Crawlee provides, but for this guide we'll be using the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>. We can see all the options for concurrency settings <ApiLink to="class/ConcurrencySettings">`here`</ApiLink>.
+:::
+
+## `max_tasks_per_minute`
+
+This controls how many total tasks can be processed per minute. It counts the amount of tasks done every second, to ensure there is not a burst of tasks at the `max_concurrency` limit followed by a long period of waiting. By default, it is set to `Infinity` which means the crawler will keep going up to the `max_concurrency`. We would set this if we wanted our crawler to work at full throughput, but also not keep hitting the website we're crawling with non-stop requests.
+
+<CodeBlock language="python">
+    {MaxRequestsPerMinuteSource}
+</CodeBlock>
+
+## `min_concurrency` and `max_concurrency`
+
+These control how many parallel tasks can be run at any time. By default, crawlers will start with one parallel task at a time and scale up over time to a maximum of 200 requests at a time.
+
+:::caution Don't set `min_concurrency` too high!
+
+Setting this option too high compared to the available system resources will make your crawler run extremely slow or might even crash.
+
+It's recommended to leave it at the default value that is provided and letting the crawler scale up and down automatically based on available resources instead.
+
+:::
+
+### `desired_concurrency`
+
+This option specifies the amount of tasks that should be running in parallel at the start of the crawler, assuming there are so many available. It defaults to the same value as `min_concurrency`.
+
+
+<CodeBlock language="python">
+    {MinMaxConcurrencySource}
+</CodeBlock>
