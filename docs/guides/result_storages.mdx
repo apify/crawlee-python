@@ -1,0 +1,79 @@
+import { KeyValueStore, Dataset, purgeDefaultStorages } from 'crawlee';
+
+# Working with Result Storages in Crawlee
+
+## Overview
+
+Crawlee provides result storage types for managing data efficiently during the crawling process. These storage types allow you to save data either in a key-value store or a dataset, depending on the structure and type of the data. The storage system is flexible, allowing you to store data locally on your machine.
+
+### MemoryStorage
+
+At the heart of Crawlee's storage system is the `MemoryStorage` class. During a crawler run, all data is stored in memory and can also be saved to local files. This allows you to persist your data between runs or access it later.
+
+---
+
+## Key-Value Store
+
+The key-value store is ideal for storing data as key-value pairs. This could be anything from text, files (like screenshots or PDFs), or even JSON objects. Each key in the store is unique and associated with some data.
+
+By default, Crawlee sets up a key-value store for each run. You can store the crawler's input and output data in this store, making it easy to manage the crawling process.
+
+### Example: Basic Operations in Key-Value Store
+
+```jsx
+// Get input from the default key-value store
+const input_data = KeyValueStore.getValue('INPUT');
+
+// Save output to the default key-value store
+KeyValueStore.setValue('OUTPUT', { result: 123 });
+
+// Open a custom key-value store
+const custom_store = KeyValueStore.open('my-store');
+
+// Write data to the custom store
+custom_store.setValue('my-key', { foo: 'bar' });
+
+// Read data from the custom store
+const stored_value = custom_store.getValue('my-key');
+
+// Delete a record from the store
+custom_store.setValue('my-key', null);
+
+In the key-value store, data is saved in the local directory defined by the CRAWLEE_STORAGE_DIR environment variable, and the file structure is:
+
+{CRAWLEE_STORAGE_DIR}/key_value_stores/{STORE_ID}/{KEY}.{EXT}
+
+## Dataset
+
+Datasets are designed to store structured data, where each record (or row) follows the same format. This is useful for storing things like product listings, real estate properties, or any other structured data that your crawler extracts.
+
+Datasets are append-only, meaning you can add new records but cannot modify or remove existing ones. This makes datasets ideal for logging or recording each item crawled during a session.
+
+Example: Basic Operations in Dataset
+
+// Add a single record to the default dataset
+Dataset.pushData({ product_name: 'Phone', price: 499.99 });
+
+// Open a custom dataset
+const custom_dataset = Dataset.open('my-dataset');
+
+// Add multiple records
+custom_dataset.pushData([
+    { item: 'Laptop', price: 799.99 },
+    { item: 'Tablet', price: 199.99 }
+]);
+
+Data in the dataset is stored as individual JSON files, with the following file structure:
+
+{CRAWLEE_STORAGE_DIR}/datasets/{DATASET_ID}/{INDEX}.json
+
+Cleaning Up Storages
+
+By default, Crawlee cleans up (purges) result storages before a new crawler run. This ensures that outdated data doesn't interfere with new runs. If you need to manually clean up the storage during a run, you can use the purgeDefaultStorages function.
+
+Example: Purging Storage
+
+// Clean up storage directories
+purgeDefaultStorages();
+
+Calling this function will remove all data from the default storage directories, except for the input data stored under the INPUT key.
