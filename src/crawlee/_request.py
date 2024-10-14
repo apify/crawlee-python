@@ -20,9 +20,10 @@ from pydantic import (
 from typing_extensions import Self
 
 from crawlee._types import EnqueueStrategy, HttpHeaders, HttpMethod, HttpPayload, HttpQueryParams, JsonSerializable
+from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
 from crawlee._utils.urls import extract_query_params, validate_http_url
-from crawlee._utils.crypto import crypto_random_object_id
+
 
 class RequestState(IntEnum):
     """Crawlee-specific request handling state."""
@@ -277,11 +278,8 @@ class Request(BaseRequestData):
             **kwargs: Additional request properties.
         """
         if unique_key is not None and always_enqueue:
-            try:
-                raise ValueError('The `always_enqueue` flag cannot be used when a custom `unique_key` is provided.')
-            except ValueError as e:
-                print(f"Error: {e}")
-        
+            raise ValueError('`always_enqueue` cannot be used with a custom `unique_key`')
+
         unique_key = unique_key or compute_unique_key(
             url,
             method=method,
@@ -292,7 +290,7 @@ class Request(BaseRequestData):
 
         if always_enqueue:
             unique_key += f'_{crypto_random_object_id()}'
-            
+
         id = id or unique_key_to_request_id(unique_key)
 
         request = cls(
