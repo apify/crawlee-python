@@ -141,4 +141,4 @@ def compute_unique_key(
         header_part = '|'.join(header_parts)
         return f'{extended_key}|{header_part}'
 
-    return normalized_url
+    return extended_key
