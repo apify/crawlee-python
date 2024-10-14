@@ -237,15 +237,12 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
         if isinstance(value, io.IOBase):
             raise NotImplementedError('File-like values are not supported in local memory storage')
 
-        if content_type is None:
-            if is_file_or_bytes(value):
-                content_type = 'application/octet-stream'
-            elif isinstance(value, str):
-                content_type = 'text/plain; charset=utf-8'
-            else:
-                content_type = 'application/json; charset=utf-8'
-
-        if 'application/json' in content_type and not is_file_or_bytes(value) and not isinstance(value, str):
+        if (
+            content_type
+            and 'application/json' in content_type
+            and not is_file_or_bytes(value)
+            and not isinstance(value, str)
+        ):
             s = await json_dumps(value)
             value = s.encode('utf-8')
 
@@ -291,7 +288,7 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
     async def get_public_url(self, key: str) -> str:
         store_name = self.name or self.id
         storage_dir = self._memory_storage_client.storage_dir
-        return f'file://{storage_dir}/key_value_stores/{store_name}/{key}.txt'
+        return f'file://{storage_dir}/key_value_stores/{store_name}/{key}'
 
     async def persist_record(self, record: KeyValueStoreRecord) -> None:
         """Persist the specified record to the key-value store."""
