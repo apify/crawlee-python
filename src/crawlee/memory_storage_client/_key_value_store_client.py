@@ -301,7 +301,7 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
         resource_dir = existing_store_by_id.resource_directory
 
         record = await self._get_record_internal(key)
-        return f'file://{resource_dir}/{record.filename if record else key}'
+        return f'file://{resource_dir}/{record.key if record else key}'
 
     async def persist_record(self, record: KeyValueStoreRecord) -> None:
         """Persist the specified record to the key-value store."""
