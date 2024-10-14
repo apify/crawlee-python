@@ -289,10 +289,22 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
 
     @override
     async def get_public_url(self, key: str) -> str:
+        existing_store_by_id = find_or_create_client_by_id_or_name_inner(
+            resource_client_class=KeyValueStoreClient,
+            memory_storage_client=self._memory_storage_client,
+            id=self.id,
+            name=self.name,
+        )
+        if existing_store_by_id is None:
+            raise_on_non_existing_storage(StorageTypes.KEY_VALUE_STORE, self.id)
+
+        resource_dir = existing_store_by_id.resource_directory
+        logger.debug(f'Resource directory: {resource_dir}')
+
         store_name = self.name or self.id
-        storage_dir = self._memory_storage_client.storage_dir
+        key_value_stores_dir = self._memory_storage_client.key_value_stores_directory
         record = await self._get_record_internal(key)
-        return f'file://{storage_dir}/key_value_stores/{store_name}/{record.filename if record else key}'
+        return f'file://{key_value_stores_dir}/{store_name}/{record.filename if record else key}'
 
     async def persist_record(self, record: KeyValueStoreRecord) -> None:
         """Persist the specified record to the key-value store."""
