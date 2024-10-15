@@ -164,6 +164,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 send_request=context.send_request,
                 push_data=context.push_data,
                 proxy_info=context.proxy_info,
+                get_key_value_store=context.get_key_value_store,
                 log=context.log,
                 page=crawlee_page.page,
                 infinite_scroll=lambda: infinite_scroll(crawlee_page.page),
