@@ -1,0 +1,89 @@
+---
+id: result-storage
+title: Result storage
+description: How to store and retrieve data with KeyValueStore and Dataset in Crawlee
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import CodeBlock from '@theme/CodeBlock';
+
+import DatasetBasicExample from '!!raw-loader!./code/result_storage_dataset_basic.py';
+import DatasetExportExample from '!!raw-loader!./code/result_storage_dataset_export.py';
+
+import KvStoreBasicExample from '!!raw-loader!./code/result_storage_kvstore_basic.py';
+import KvStoreJsonExample from '!!raw-loader!./code/result_storage_kvstore_json.py';
+
+import RsPurgeExplicitlyExample from '!!raw-loader!./code/result_storage_purge_explicitly.py';
+
+This guide explains the available result storage options in Crawlee and how to use them to store and retrieve data.
+
+## Result storage overview
+
+Crawlee offers various types of result storage, each tailored for specific tasks. By default, data is saved to a local disk in the directory specified by the `CRAWLEE_STORAGE_DIR` environment variable. If this variable is not set, Crawlee will automatically use `./storage` within the current working directory.
+
+The `MemoryStorage` class manages Crawlee's storage. Throughout the crawler's execution, all data is held in memory, and it is simultaneously written to local files within their respective storage type folders.
+
+## KeyValueStore
+
+The key-value store serves the purpose of saving and retrieving data records or files. Each data record is identified by a unique key and linked to a specific MIME content type. Key-value stores are particularly suited for storing web page screenshots, PDFs, or for maintaining the state of crawlers.
+
+Every Crawlee project run is tied to a default key-value store. By convention, the project’s input and output are saved in this default key-value store under the keys `INPUT` and `OUTPUT`, respectively. Typically, both input and output are in JSON format, though other formats are also acceptable.
+
+In Crawlee, the key-value store is represented by the KeyValueStore class. To facilitate easy access to the default key-value store, Crawlee provides the functions `KeyValueStore.getValue()` and `KeyValueStore.setValue()`.
+
+The following code demonstrates basic operations of key-value stores:
+
+<Tabs groupId="keyvaluestore">
+    <TabItem value="kvstore_basic_example" label="Basic usage" default>
+        <CodeBlock className="language-python">
+            {KvStoreBasicExample}
+        </CodeBlock>
+    </TabItem>
+    <TabItem value="kvstore_json_example" label="Working with JSON">
+        <CodeBlock className="language-python">
+            {KvStoreJsonExample}
+        </CodeBlock>
+    </TabItem>
+</Tabs>
+
+To see a real-world example of how to get the input from the key-value store, see the (Screenshots)[https://crawlee.dev/python/docs/examples/capture-screenshots-using-playwright] example.
+
+## Dataset
+
+Datasets are utilized for storing structured data, where each object contains the same attributes, like products from an online store or listings for real estate. You can visualize a dataset as a table, with each object represented as a row and its attributes as columns. Datasets function as append-only storage, allowing for the addition of new records but preventing modifications or deletions of existing ones.
+
+Every Crawlee project run is linked to a default dataset, which is generally used to store the results specific to that crawler execution. Utilizing this dataset is optional.
+
+In Crawlee, datasets are represented by the Dataset class. To facilitate writing to the default dataset, Crawlee provides the `Dataset.pushData()` function.
+
+The following code demonstrates basic operations of the dataset:
+
+<Tabs groupId="dataset">
+    <TabItem value="dataset_basic_example" label="Basic usage" default>
+        <CodeBlock className="language-python">
+            {DatasetBasicExample}
+        </CodeBlock>
+    </TabItem>
+    <TabItem value="dataset_export_example" label="Export data">
+        <CodeBlock className="language-python">
+            {DatasetExportExample}
+        </CodeBlock>
+    </TabItem>
+</Tabs>
+
+## Cleaning up the storages
+
+Default storages are cleared before the crawler begins, unless specified otherwise. This clearing occurs as soon as we attempt to access any storage (e.g., through `Dataset.open()`) or when using a default storage with one of the helper methods (such as `Dataset.pushData()`, which internally calls `Dataset.open()`). If we do not explicitly interact with storages in our code, the clearing will take place when the crawler's run method is executed. If we need to clear the storages earlier, we can explicitly use the `purgeDefaultStorages()` helper:
+
+<Tabs groupId="cleaningUpStorage">
+    <TabItem value="rs_purge_explicitly_example" label="Basic usage" default>
+        <CodeBlock className="language-python">
+            {RsPurgeExplicitlyExample}
+        </CodeBlock>
+    </TabItem>
+</Tabs>
+
+Invoking this function will clear the default results storage directories, with the exception of the `INPUT` key in the default key-value store directory. This serves as a shortcut to execute the optional `purge` method from the `StorageClient` interface; in other words, it calls the `purge` method of the underlying storage implementation in use. Additionally, this method ensures that the storage is purged only once for a specific execution context, making it safe to call multiple times.
