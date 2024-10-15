@@ -139,7 +139,7 @@ jobs:
         run: pip install git-cliff
 
       - name: Generate release notes with git-cliff
-        run: git-cliff --tag "v${{ needs.should_release.outputs.version_number }}" --unreleased --strip all > release_notes.md
+        run: git-cliff --tag "v${{ needs.should_release.outputs.version_number }}" --unreleased --strip all --config cliff_release.toml > release_notes.md
 
       - name: Create release
         uses: softprops/action-gh-release@v2
