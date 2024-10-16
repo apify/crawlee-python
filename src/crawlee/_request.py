@@ -20,6 +20,7 @@ from pydantic import (
 from typing_extensions import Self
 
 from crawlee._types import EnqueueStrategy, HttpHeaders, HttpMethod, HttpPayload, HttpQueryParams, JsonSerializable
+from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
 from crawlee._utils.urls import extract_query_params, validate_http_url
 
@@ -249,6 +250,7 @@ class Request(BaseRequestData):
         id: str | None = None,
         keep_url_fragment: bool = False,
         use_extended_unique_key: bool = False,
+        always_enqueue: bool = False,
         **kwargs: Any,
     ) -> Self:
         """Create a new `Request` instance from a URL.
@@ -272,8 +274,12 @@ class Request(BaseRequestData):
                 the `unique_key` computation. This is only relevant when `unique_key` is not provided.
             use_extended_unique_key: Determines whether to include the HTTP method and payload in the `unique_key`
                 computation. This is only relevant when `unique_key` is not provided.
+            always_enqueue: If `True`, the request will be enqueued even if it is already present in the queue.
             **kwargs: Additional request properties.
         """
+        if unique_key is not None and always_enqueue:
+            raise ValueError('`always_enqueue` cannot be used with a custom `unique_key`')
+
         unique_key = unique_key or compute_unique_key(
             url,
             method=method,
@@ -281,6 +287,9 @@ class Request(BaseRequestData):
             keep_url_fragment=keep_url_fragment,
             use_extended_unique_key=use_extended_unique_key,
         )
+
+        if always_enqueue:
+            unique_key += f'_{crypto_random_object_id()}'
 
         id = id or unique_key_to_request_id(unique_key)
 
