@@ -90,54 +90,24 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
 class BasicCrawler(Generic[TCrawlingContext]):
     """A versatile web crawler for parallel URL fetching with extensive features for web scraping.
 
-    BasicCrawler is a highly customizable and efficient web crawling solution that provides:
-    - Automatic scaling based on available system resources and target website's requirements.
-    - Smart request routing and handling of different types of URLs.
-    - Session management for maintaining persistent connections.
-    - Proxy integration and rotation for avoiding IP-based blocking.
-    - Automatic retries for failed requests with customizable settings.
-    - Built-in statistics tracking for monitoring crawler performance.
-    - Event system for fine-grained control over the crawling process.
+    Provides advanced web crawling capabilities with automatic scaling, request routing,
+    session management, and proxy integration. The crawler automatically adapts to
+    available system resources and target website requirements while maintaining
+    efficient connection handling and request processing.
 
-    Basic usage:
+    Example:
     ```python
+    from crawlee import BasicCrawler
+
+    crawler = BasicCrawler()
+
+    @crawler.router
     async def handle_request(context: Context) -> None:
         url = context.request.url
         response = await context.send_request()
         # Process the response here
-    crawler = BasicCrawler(
-        request_handler=handle_request,
-    )
     await crawler.run()
     ```
-
-    Advanced features:
-    - Configure concurrency to control parallel processing.
-    - Set up automatic retry mechanisms for failed or blocked requests.
-    - Utilize session pools for efficient connection management.
-    - Integrate proxy services for IP rotation.
-    - Monitor detailed statistics about the crawling process.
-
-    Args:
-        request_provider: The provider for requests to be crawled.
-        request_handler: The function to handle individual requests.
-        http_client: The HTTP client for making web requests.
-        concurrency_settings: Settings for controlling concurrency.
-        max_request_retries: Maximum retry attempts for failed requests.
-        max_requests_per_crawl: Maximum number of requests per crawl.
-        max_session_rotations: Maximum session rotations per request.
-        configuration: Crawler configuration settings.
-        request_handler_timeout: Request handler timeout.
-        use_session_pool: Whether to use session pool.
-        session_pool: Preconfigured session pool.
-        retry_on_blocked: Whether to retry on blocked requests.
-        proxy_configuration: Proxy configuration.
-        statistics: Statistics object.
-        event_manager: Event manager.
-        configure_logging: Whether to configure logging.
-        _context_pipeline: Internal context pipeline.
-        _additional_context_managers: Additional context managers.
-        _logger: Logger instance.
     """
 
     def __init__(
