@@ -88,14 +88,26 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
 
 
 class BasicCrawler(Generic[TCrawlingContext]):
-    """Provides a simple framework for parallel crawling of web pages.
+    """A versatile web crawler for parallel URL fetching with extensive features for web scraping.
 
-    The URLs to crawl are fed either from a static list of URLs or from a dynamic queue of URLs enabling recursive
-    crawling of websites.
+    Provides advanced web crawling capabilities with automatic scaling, request routing,
+    session management, and proxy integration. The crawler automatically adapts to
+    available system resources and target website requirements while maintaining
+    efficient connection handling and request processing.
 
-    `BasicCrawler` is a low-level tool that requires the user to implement the page download and data extraction
-    functionality themselves. If we want a crawler that already facilitates this functionality, we should consider using
-    one of its subclasses.
+    Example:
+    ```python
+    from crawlee import BasicCrawler
+
+    crawler = BasicCrawler()
+
+    @crawler.router
+    async def handle_request(context: Context) -> None:
+        url = context.request.url
+        response = await context.send_request()
+        # Process the response here
+    await crawler.run()
+    ```
     """
 
     def __init__(
@@ -124,31 +136,25 @@ class BasicCrawler(Generic[TCrawlingContext]):
         """Initialize the BasicCrawler.
 
         Args:
-            request_provider: Provides requests to be processed
-            request_handler: A callable to which request handling is delegated
-            http_client: HTTP client to be used for `BasicCrawlingContext.send_request` and HTTP-only crawling.
-            concurrency_settings: Allows fine-tuning concurrency levels
-            max_request_retries: Maximum amount of attempts at processing a request
-            max_requests_per_crawl: Maximum number of pages that the crawler will open. The crawl will stop when
-                the limit is reached. It is recommended to set this value in order to prevent infinite loops in
-                misconfigured crawlers. None means no limit. Due to concurrency_settings, the actual number of pages
-                visited may slightly exceed this value.
-            max_session_rotations: Maximum number of session rotations per request.
-                The crawler will automatically rotate the session in case of a proxy error or if it gets blocked by
-                the website.
-            configuration: Crawler configuration
-            request_handler_timeout: How long is a single request handler allowed to run
-            use_session_pool: Enables using the session pool for crawling
-            session_pool: A preconfigured `SessionPool` instance if you wish to use non-default configuration
-            retry_on_blocked: If set to True, the crawler will try to automatically bypass any detected bot protection
-            proxy_configuration: A HTTP proxy configuration to be used for making requests
-            statistics: A preconfigured `Statistics` instance if you wish to use non-default configuration
-            event_manager: A custom `EventManager` instance if you wish to use a non-default one
-            configure_logging: If set to True, the crawler will configure the logging infrastructure
-            _context_pipeline: Allows extending the request lifecycle and modifying the crawling context.
-                This parameter is meant to be used by child classes, not when BasicCrawler is instantiated directly.
-            _additional_context_managers: Additional context managers to be used in the crawler lifecycle.
-            _logger: A logger instance passed from a child class to ensure consistent labels
+            request_provider: Request provider.
+            request_handler: Request handler function.
+            http_client: HTTP client.
+            concurrency_settings: Concurrency settings.
+            max_request_retries: Maximum retries.
+            max_requests_per_crawl: Maximum requests per crawl.
+            max_session_rotations: Maximum session rotations.
+            configuration: Crawler configuration.
+            request_handler_timeout: Request handler timeout.
+            use_session_pool: Use session pool.
+            session_pool: Preconfigured session pool.
+            retry_on_blocked: Retry on blocked requests.
+            proxy_configuration: Proxy configuration.
+            statistics: Statistics object.
+            event_manager: Event manager.
+            configure_logging: Configure logging.
+            _context_pipeline: Internal context pipeline.
+            _additional_context_managers: Additional context managers.
+            _logger: Logger instance.
         """
         self._router: Router[TCrawlingContext] | None = None
 
@@ -230,12 +236,12 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     @property
     def log(self) -> logging.Logger:
-        """The logger used by the crawler."""
+        """The logger used by the crawler for debugging and info-level messages."""
         return self._logger
 
     @property
     def router(self) -> Router[TCrawlingContext]:
-        """The router used to handle each individual crawling request."""
+        """Handle individual crawling requests. Initialize a router if none is set."""
         if self._router is None:
             self._router = Router[TCrawlingContext]()
 
@@ -243,6 +249,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     @router.setter
     def router(self, router: Router[TCrawlingContext]) -> None:
+        """Set the router, ensuring only one instance is allowed."""
         if self._router is not None:
             raise RuntimeError('A router is already set')
 
@@ -250,19 +257,19 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     @property
     def statistics(self) -> Statistics[StatisticsState]:
-        """Statistics about the current (or last) crawler run."""
+        """Return statistics about the crawler's current or last run."""
         return self._statistics
 
     @property
     def _max_requests_count_exceeded(self) -> bool:
-        """Whether the maximum number of requests to crawl has been reached."""
+        """Check if the max number of crawl request has been reached."""
         if self._max_requests_per_crawl is None:
             return False
 
         return self._statistics.state.requests_finished >= self._max_requests_per_crawl
 
     async def _get_session(self) -> Session | None:
-        """If session pool is being used, try to take a session from it."""
+        """Fetch a session from the pool if session pooling is enabled."""
         if not self._use_session_pool:
             return None
 
@@ -276,7 +283,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         )
 
     async def _get_proxy_info(self, request: Request, session: Session | None) -> ProxyInfo | None:
-        """Retrieve a new ProxyInfo object based on crawler configuration and the current request and session."""
+        """Return a ProxyInfo object for a request based on the crawlers proxy settings."""
         if not self._proxy_configuration:
             return None
 
@@ -292,7 +299,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         id: str | None = None,
         name: str | None = None,
     ) -> RequestProvider:
-        """Return the configured request provider. If none is configured, open and return the default request queue."""
+        """Return the configured request provider or open the default request queue."""
         if not self._request_provider:
             self._request_provider = await RequestQueue.open(id=id, name=name, configuration=self._configuration)
 
@@ -304,7 +311,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         id: str | None = None,
         name: str | None = None,
     ) -> Dataset:
-        """Return the dataset with the given ID or name. If none is provided, return the default dataset."""
+        """Open and return the dataset by ID or name, or open the default dataset if none is provided."""
         return await Dataset.open(id=id, name=name, configuration=self._configuration)
 
     async def get_key_value_store(
@@ -313,20 +320,20 @@ class BasicCrawler(Generic[TCrawlingContext]):
         id: str | None = None,
         name: str | None = None,
     ) -> KeyValueStore:
-        """Return the key-value store with the given ID or name. If none is provided, return the default KVS."""
+        """Open and return a key-value store by ID or name, or open the default one if none is provided."""
         return await KeyValueStore.open(id=id, name=name, configuration=self._configuration)
 
     def error_handler(
         self, handler: ErrorHandler[TCrawlingContext | BasicCrawlingContext]
     ) -> ErrorHandler[TCrawlingContext]:
-        """Decorator for configuring an error handler (called after a request handler error and before retrying)."""
+        """Set a custom error handler for request retries in case of errors."""
         self._error_handler = handler
         return handler
 
     def failed_request_handler(
         self, handler: FailedRequestHandler[TCrawlingContext | BasicCrawlingContext]
     ) -> FailedRequestHandler[TCrawlingContext]:
-        """Decorator for configuring a failed request handler (called after max retries are reached)."""
+        """Set a handler for requests that fail after reaching max retries."""
         self._failed_request_handler = handler
         return handler
 
@@ -339,9 +346,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
         """Run the crawler until all requests are processed.
 
         Args:
-            requests: The requests to be enqueued before the crawler starts
-            purge_request_queue: If this is `True` and the crawler is not being run for the first time, the default
-                request queue will be purged
+            requests: A list of requests to enqueue before the crawl starts.
+            purge_request_queue: Whether to clear the request queue before starting the crawler run.
+
+        Returns:
+            The final statistics about the crawler run.
         """
         if self._running:
             raise RuntimeError(
