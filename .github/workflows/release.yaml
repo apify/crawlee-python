@@ -23,14 +23,14 @@ on:
 
 jobs:
   release_metadata:
+    if: "!startsWith(github.event.head_commit.message, 'docs') && !startsWith(github.event.head_commit.message, 'ci')"
     name: Prepare release metadata
     runs-on: ubuntu-latest
     outputs:
-      version_number: ${{ steps.release_metadata.version_number }}
-      tag_name: ${{ steps.release_metada.tag_name }}
-      changelog: ${{ steps.release_metadata.changelog }}
-      release_notes:: ${{ steps.release_metadata.release_notes }}
-    if: "!startsWith(github.event.head_commit.message, 'docs') && !startsWith(github.event.head_commit.message, 'ci')"
+      version_number: ${{ steps.release_metadata.outputs.version_number }}
+      tag_name: ${{ steps.release_metadata.outputs.tag_name }}
+      changelog: ${{ steps.release_metadata.outputs.changelog }}
+      release_notes:: ${{ steps.release_metadata.outputs.release_notes }}
     steps:
       - uses: apify/workflows/release-metadata@release-metadata-action
         name: Prepare release metadata
@@ -56,7 +56,7 @@ jobs:
     needs: [release_metadata, lint_check, type_check, unit_tests]
     runs-on: ubuntu-latest
     outputs:
-      changelog_commitish: ${{ steps.commit.commit_long_sha || github.sha }}
+      changelog_commitish: ${{ steps.commit.outputs.commit_long_sha || github.sha }}
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       PYTHON_VERSION: 3.12
