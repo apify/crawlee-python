@@ -1,0 +1,121 @@
+name: Create a release
+
+on:
+  # Trigger a stable version release via GitHub's UI, with the ability to specify the type of release.
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: Release type
+        required: true
+        type: choice
+        default: auto
+        options:
+          - auto
+          - custom
+          - patch
+          - minor
+          - major
+      custom_version:
+        description: The custom version to bump to (only for "custom" type)
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  release_metadata:
+    name: Prepare release metadata
+    runs-on: ubuntu-latest
+    outputs:
+      version_number: ${{ steps.release_metadata.version_number }}
+      tag_name: ${{ steps.release_metada.tag_name }}
+      changelog: ${{ steps.release_metadata.changelog }}
+      release_notes:: ${{ steps.release_metadata.release_notes }}
+    if: "!startsWith(github.event.head_commit.message, 'docs') && !startsWith(github.event.head_commit.message, 'ci')"
+    steps:
+      - uses: apify/workflows/release-metadata@release-metadata-action
+        name: Prepare release metadata
+        id: release_metadata
+        with:
+          release_type: ${{ inputs.release_type }}
+          custom_version: ${{ inputs.custom_version }}
+
+  lint_check:
+    name: Lint check
+    uses: apify/workflows/.github/workflows/python_lint_check.yaml@main
+
+  type_check:
+    name: Type check
+    uses: apify/workflows/.github/workflows/python_type_check.yaml@main
+
+  unit_tests:
+    name: Unit tests
+    uses: apify/workflows/.github/workflows/python_unit_tests.yaml@main
+
+  update_changelog:
+    name: Update changelog
+    needs: [release_metadata, lint_check, type_check, unit_tests]
+    runs-on: ubuntu-latest
+    outputs:
+      changelog_commitish: ${{ steps.commit.commit_long_sha || github.sha }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PYTHON_VERSION: 3.12
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install poetry
+        run: pipx install --python ${{ env.PYTHON_VERSION }} poetry
+
+      - name: Update package version in pyproject.toml
+        run: poetry version ${{ needs.release_metadata.outputs.version_number }}
+
+      - name: Update CHANGELOG.md
+        uses: DamianReeves/write-file-action@master
+        with:
+          path: CHANGELOG.md
+          write-mode: overwrite
+          contents: ${{ needs.release_metadata.outputs.changelog }}
+
+      - name: Commit changes
+        id: commit
+        uses: EndBug/add-and-commit@v9
+        with:
+          author_name: Apify Release Bot
+          author_email: noreply@apify.com
+          message: "chore(release): Update changelog and package version [skip ci]"
+
+  create_github_release:
+    name: Create github release
+    needs: [release_metadata, update_changelog]
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.release_metadata.outputs.tag_name }}
+          name: ${{ needs.release_metadata.outputs.version_number }}
+          target_commitish: ${{ needs.update_changelog.outputs.changelog_commitish }}
+          body: ${{ needs.release_metadata.outputs.release_notes }}
+
+  publish_to_pypi:
+    name: Publish to PyPI
+    needs: [release_metadata, update_changelog]
+    uses: ./.github/workflows/_publish_to_pypi.yaml
+    with:
+      package_name: crawlee
+      version_number: ${{ needs.release_metadata.outputs.version_number }}
+      is_prerelease: ''
+
+  # TODO: add job for publish package to Conda
+  # https://github.com/apify/crawlee-python/issues/104

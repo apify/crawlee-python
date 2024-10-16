@@ -3,7 +3,13 @@ name: Publish to PyPI
 on:
   workflow_call:
     inputs:
+      package_name:
+        required: true
+        type: string
       version_number:
+        required: true
+        type: string
+      is_prerelease:
         required: true
         type: string
 
@@ -19,7 +25,7 @@ jobs:
       id-token: write # Required for OIDC authentication.
     environment:
       name: pypi
-      url: https://pypi.org/project/crawlee
+      url: https://pypi.org/project/${{ inputs.package_name }}
 
     steps:
       - name: Checkout repository
@@ -38,10 +44,9 @@ jobs:
       # Updates the version number in the project's configuration.
       - name: Set version in pyproject.toml
         run: |
-          if [[ ${{ github.event_name }} = push ]]; then
-            # Make a pre-release on push
+          if [ -n "${{ inputs.is_prerelease }}" ]; then
             next_beta=$(
-              curl "https://pypi.org/pypi/crawlee/json" | jq --raw-output '
+              curl "https://pypi.org/pypi/${{ inputs.package_name }}/json" | jq --raw-output '
                 [
                   .releases |
                     keys |
