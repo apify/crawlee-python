@@ -34,6 +34,15 @@ Every Crawlee project run is tied to a default key-value store. By convention, t
 
 In Crawlee, the key-value store is represented by the KeyValueStore class. To facilitate easy access to the default key-value store, Crawlee provides the functions `KeyValueStore.getValue()` and `KeyValueStore.setValue()`.
 
+The data is stored in the directory specified by the `CRAWLEE_STORAGE_DIR` environment variable as follows:
+```text
+{CRAWLEE_STORAGE_DIR}/key_value_stores/{STORE_ID}/{KEY}.{EXT}
+```
+- `{CRAWLEE_STORAGE_DIR}`: The root directory for all storage data specified by the environment variable.
+- `{STORE_ID}`: The identifier for the key-value store, either "default" or as specified by `CRAWLEE_DEFAULT_KEY_VALUE_STORE_ID`.
+- `{KEY}`: The unique key for the record.
+- `{EXT}`: The file extension corresponding to the MIME type of the content.
+
 The following code demonstrates basic operations of key-value stores:
 
 <Tabs groupId="keyvaluestore">
@@ -49,7 +58,7 @@ The following code demonstrates basic operations of key-value stores:
     </TabItem>
 </Tabs>
 
-To see a real-world example of how to get the input from the key-value store, see the (Screenshots)[https://crawlee.dev/python/docs/examples/capture-screenshots-using-playwright] example.
+To see a real-world example of how to get the input from the key-value store, see the [Screenshots](https://crawlee.dev/python/docs/examples/capture-screenshots-using-playwright) example.
 
 ## Dataset
 
@@ -58,6 +67,15 @@ Datasets are utilized for storing structured data, where each object contains th
 Every Crawlee project run is linked to a default dataset, which is generally used to store the results specific to that crawler execution. Utilizing this dataset is optional.
 
 In Crawlee, datasets are represented by the Dataset class. To facilitate writing to the default dataset, Crawlee provides the `Dataset.pushData()` function.
+
+The data is stored in the directory specified by the `CRAWLEE_STORAGE_DIR` environment variable as follows:
+
+```text
+{CRAWLEE_STORAGE_DIR}/datasets/{DATASET_ID}/{INDEX}.json
+```
+- `{CRAWLEE_STORAGE_DIR}`: The root directory for all storage data specified by the environment variable.
+- `{DATASET_ID}`: Specifies the dataset, either "default" or a custom dataset ID.
+- `{INDEX}`: Represents the zero-based index of the record within the dataset.
 
 The following code demonstrates basic operations of the dataset:
 

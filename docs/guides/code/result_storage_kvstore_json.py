@@ -2,6 +2,7 @@ import asyncio
 from crawlee.storages import KeyValueStore
 
 async def main() -> None:
+    # Open a key-value store named 'my-json-store'
     kv_store = await KeyValueStore.open(name='my-json-store')
 
     # Save a JSON object
