@@ -7,6 +7,9 @@ on:
         required: true
         type: string
 
+env:
+  PYTHON_VERSION: 3.12
+
 jobs:
   publish_to_pypi:
     name: Publish to PyPI
@@ -17,8 +20,6 @@ jobs:
     environment:
       name: pypi
       url: https://pypi.org/project/crawlee
-    env:
-      PYTHON_VERSION: 3.12
 
     steps:
       - name: Checkout repository
