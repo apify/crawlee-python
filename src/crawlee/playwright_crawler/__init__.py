@@ -1,5 +1,5 @@
 try:
-    from ._playwright_crawler import PlaywrightCrawler
+    from ._playwright_crawler import PlaywrightCrawler, PlaywrightHook
     from ._playwright_crawling_context import PlaywrightCrawlingContext
 except ImportError as exc:
     raise ImportError(
@@ -7,4 +7,4 @@ except ImportError as exc:
         "For example, if you use pip, run `pip install 'crawlee[playwright]'`.",
     ) from exc
 
-__all__ = ['PlaywrightCrawler', 'PlaywrightCrawlingContext']
+__all__ = ['PlaywrightCrawler', 'PlaywrightCrawlingContext', 'PlaywrightHook']
