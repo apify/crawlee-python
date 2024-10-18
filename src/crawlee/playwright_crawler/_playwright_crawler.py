@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Callable, Awaitable
 
 from pydantic import ValidationError
 from typing_extensions import Unpack
@@ -18,10 +18,11 @@ from crawlee.playwright_crawler._utils import infinite_scroll
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
-
     from crawlee._types import AddRequestsKwargs, BasicCrawlingContext
     from crawlee.browsers._types import BrowserType
+    from playwright.async_api import Page
 
+PlaywrightHook = Callable[[PlaywrightCrawlingContext, dict], Awaitable[None]]
 
 class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
     """A crawler that leverages the [Playwright](https://playwright.dev/python/) browser automation library.
@@ -48,6 +49,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
         browser_pool: BrowserPool | None = None,
         browser_type: BrowserType | None = None,
         headless: bool | None = None,
+        pre_navigation_hooks: List[PlaywrightHook] | None = None,
         **kwargs: Unpack[BasicCrawlerOptions[PlaywrightCrawlingContext]],
     ) -> None:
         """Create a new instance.
@@ -58,22 +60,20 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 This option should not be used if `browser_pool` is provided.
             headless: Whether to run the browser in headless mode.
                 This option should not be used if `browser_pool` is provided.
+            pre_navigation_hooks: A list of functions to be executed before each page navigation.
             kwargs: Additional arguments to be forwarded to the underlying `BasicCrawler`.
         """
         if browser_pool:
-            # Raise an exception if browser_pool is provided together with headless or browser_type arguments.
             if headless is not None or browser_type is not None:
                 raise ValueError(
                     'You cannot provide `headless` or `browser_type` arguments when `browser_pool` is provided.'
                 )
-
-        # If browser_pool is not provided, create a new instance of BrowserPool with specified arguments.
         else:
             browser_pool = BrowserPool.with_default_plugin(headless=headless, browser_type=browser_type)
 
         self._browser_pool = browser_pool
+        self._pre_navigation_hooks = pre_navigation_hooks or []
 
-        # Compose the context pipeline with the Playwright-specific context enhancer.
         kwargs['_context_pipeline'] = (
             ContextPipeline().compose(self._make_http_request).compose(self._handle_blocked_request)
         )
@@ -101,17 +101,37 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
         if self._browser_pool is None:
             raise ValueError('Browser pool is not initialized.')
 
-        # Create a new browser page
         crawlee_page = await self._browser_pool.new_page(proxy_info=context.proxy_info)
 
         async with crawlee_page.page:
-            # Navigate to the URL and get response.
-            response = await crawlee_page.page.goto(context.request.url)
+            goto_options = {}
+
+            playwright_context = PlaywrightCrawlingContext(
+                request=context.request,
+                session=context.session,
+                add_requests=context.add_requests,
+                send_request=context.send_request,
+                push_data=context.push_data,
+                proxy_info=context.proxy_info,
+                get_key_value_store=context.get_key_value_store,
+                log=context.log,
+                page=crawlee_page.page,
+                infinite_scroll=lambda: infinite_scroll(crawlee_page.page),
+                response=None,
+                enqueue_links=None,  # We'll set this later
+            )
+
+            # Execute pre-navigation hooks
+            for hook in self._pre_navigation_hooks:
+                await hook(playwright_context, goto_options)
+
+            # Navigate to the URL and get response
+            response = await crawlee_page.page.goto(context.request.url, **goto_options)
 
             if response is None:
                 raise SessionError(f'Failed to load the URL: {context.request.url}')
 
-            # Set the loaded URL to the actual URL after redirection.
+            # Set the loaded URL to the actual URL after redirection
             context.request.loaded_url = crawlee_page.page.url
 
             async def enqueue_links(
@@ -157,20 +177,11 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
 
                 await context.add_requests(requests, **kwargs)
 
-            yield PlaywrightCrawlingContext(
-                request=context.request,
-                session=context.session,
-                add_requests=context.add_requests,
-                send_request=context.send_request,
-                push_data=context.push_data,
-                proxy_info=context.proxy_info,
-                get_key_value_store=context.get_key_value_store,
-                log=context.log,
-                page=crawlee_page.page,
-                infinite_scroll=lambda: infinite_scroll(crawlee_page.page),
-                response=response,
-                enqueue_links=enqueue_links,
-            )
+            # Update the PlaywrightCrawlingContext with the response and enqueue_links function
+            playwright_context.response = response
+            playwright_context.enqueue_links = enqueue_links
+
+            yield playwright_context
 
     async def _handle_blocked_request(
         self,
@@ -190,7 +201,6 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
         if self._retry_on_blocked:
             status_code = crawling_context.response.status
 
-            # Check if the session is blocked based on the HTTP status code.
             if crawling_context.session and crawling_context.session.is_blocked_status_code(status_code=status_code):
                 raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}.')
 
@@ -198,7 +208,6 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 selector for selector in RETRY_CSS_SELECTORS if (await crawling_context.page.query_selector(selector))
             ]
 
-            # Check if the session is blocked based on the response content
             if matched_selectors:
                 raise SessionError(
                     'Assuming the session is blocked - '
