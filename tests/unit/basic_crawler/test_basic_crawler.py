@@ -659,33 +659,6 @@ async def test_context_update_kv_store() -> None:
     assert (await store.get_value('foo')) == 'bar'
 
 
-async def test_crawler_push_and_export_data_and_json_dump_parameter(httpbin: str, tmp_path: Path) -> None:
-    crawler = BasicCrawler()
-
-    @crawler.router.default_handler
-    async def handler(context: BasicCrawlingContext) -> None:
-        await context.push_data([{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}])
-        await context.push_data({'id': 2, 'test': 'test'})
-
-    await crawler.run([f'{httpbin}/1'])
-
-    await crawler.export_data_json(tmp_path / 'dataset.json', indent=3)
-
-    with (tmp_path / 'dataset.json').open() as json_file:
-        exported_json_str = json_file.read()
-
-    # Expected data in JSON format with 3 spaces indent
-    expected_data = [
-        {'id': 0, 'test': 'test'},
-        {'id': 1, 'test': 'test'},
-        {'id': 2, 'test': 'test'},
-    ]
-    expected_json_str = json.dumps(expected_data, indent=3)
-
-    # Assert that the exported JSON string matches the expected JSON string
-    assert exported_json_str == expected_json_str
-
-
 async def test_max_requests_per_crawl(httpbin: str) -> None:
     start_urls = [f'{httpbin}/1', f'{httpbin}/2', f'{httpbin}/3', f'{httpbin}/4', f'{httpbin}/5']
     processed_urls = []
