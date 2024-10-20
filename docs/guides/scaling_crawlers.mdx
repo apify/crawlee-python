@@ -39,7 +39,7 @@ It's recommended to leave it at the default value that is provided and letting t
 
 :::
 
-### `desired_concurrency`
+## `desired_concurrency`
 
 This option specifies the amount of tasks that should be running in parallel at the start of the crawler, assuming there are so many available. It defaults to the same value as `min_concurrency`.
 
@@ -47,3 +47,12 @@ This option specifies the amount of tasks that should be running in parallel at 
 <CodeBlock language="python">
     {MinMaxConcurrencySource}
 </CodeBlock>
+
+## `AutoscaledPool`
+
+`AutoscaledPool` manages a pool of asynchronous resource-intensive tasks that are executed in parallel. The pool only starts new tasks if there is enough free CPU and memory available. If an exception is thrown in any of the tasks, it is propagated and the pool is stopped.
+
+Internally each crawler has an `AutoscaledPool` which takes the above `ConcurrencySettings` as parameter to fine tune the operation. Some of the properties it has are-
+- `desired_concurrency_ratio` - The minimum ratio of concurrency to reach before more scaling up is allowed (a number between `0` and `1`). By default, it is set to `0.9`.
+- `scale_up_step_ratio` and `scale_down_step_ratio` - These values define the fractional amount of desired concurrency to be added or subtracted as the autoscaling pool scales up or down. Both of these values default to `0.05`.
+
