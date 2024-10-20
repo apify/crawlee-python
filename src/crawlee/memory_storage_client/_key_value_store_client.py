@@ -301,7 +301,13 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
         resource_dir = existing_store_by_id.resource_directory
 
         record = await self._get_record_internal(key)
-        return f'file://{resource_dir}/{record.filename if record else key}'
+        record_filename = record.filename if record else key
+
+        if record_filename is None:
+            raise ValueError('Record file name not found')
+
+        record_path = os.path.join(resource_dir, record_filename)
+        return f'file://{record_path}'
 
     async def persist_record(self, record: KeyValueStoreRecord) -> None:
         """Persist the specified record to the key-value store."""
