@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## 0.3.9 - **not yet released**
 
+### 🚀 Features
+
+- Key-value store context helpers ([#584](https://github.com/apify/crawlee-python/pull/584)) ([fc15622](https://github.com/apify/crawlee-python/commit/fc156222c3747fc4cc7bd7666a21769845c7d0d5)) by [@janbuchar](https://github.com/janbuchar)
+
 ### 🐛 Bug Fixes
 
 - Workaround for JSON value typing problems ([#581](https://github.com/apify/crawlee-python/pull/581), closes [#563](https://github.com/apify/crawlee-python/issues/563)) ([403496a](https://github.com/apify/crawlee-python/commit/403496a53c12810351139a6e073238143ecc5930)) by [@janbuchar](https://github.com/janbuchar)

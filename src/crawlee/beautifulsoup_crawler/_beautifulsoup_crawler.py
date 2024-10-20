@@ -81,6 +81,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
             add_requests=context.add_requests,
             send_request=context.send_request,
             push_data=context.push_data,
+            get_key_value_store=context.get_key_value_store,
             log=context.log,
             http_response=result.http_response,
         )
@@ -159,6 +160,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
             add_requests=context.add_requests,
             send_request=context.send_request,
             push_data=context.push_data,
+            get_key_value_store=context.get_key_value_store,
             log=context.log,
             http_response=context.http_response,
             soup=soup,

@@ -46,7 +46,10 @@ format:
 check-code: lint type-check unit-tests
 
 build-api-reference:
-	cd website && ./build_api_reference.sh
+	cd website && poetry run ./build_api_reference.sh
+
+build-docs:
+	cd website && yarn && yarn build
 
 run-doc: build-api-reference
 	cd website && corepack enable && yarn && yarn start

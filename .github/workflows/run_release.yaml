@@ -64,9 +64,24 @@ jobs:
             echo result=$(git-cliff --bumped-version | sed s/^v//) | tee -a $GITHUB_OUTPUT
           fi
 
+  lint_check:
+    name: Lint check
+    needs: [should_release]
+    uses: apify/workflows/.github/workflows/python_lint_check.yaml@main
+
+  type_check:
+    name: Type check
+    needs: [should_release]
+    uses: apify/workflows/.github/workflows/python_type_check.yaml@main
+
+  unit_tests:
+    name: Unit tests
+    needs: [should_release]
+    uses: apify/workflows/.github/workflows/python_unit_tests.yaml@main
+
   update_changelog:
     name: Update changelog
-    needs: [should_release]
+    needs: [should_release, lint_check, type_check, unit_tests]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -121,7 +136,7 @@ jobs:
   create_github_release:
     name: Create github release
     if: github.event_name == 'workflow_dispatch'
-    needs: [update_changelog, should_release]
+    needs: [should_release, lint_check, type_check, unit_tests, update_changelog]
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -151,7 +166,7 @@ jobs:
 
   publish_to_pypi:
     name: Publish to PyPI
-    needs: [should_release]
+    needs: [should_release, lint_check, type_check, unit_tests]
     uses: ./.github/workflows/_publish_to_pypi.yaml
     with:
       version_number: ${{ needs.should_release.outputs.version_number }}

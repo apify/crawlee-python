@@ -2,27 +2,23 @@ name: Run code checks
 
 on:
   # Trigger code checks on opening a new pull request.
-  pull_request_target:
-
-  # Do not trigger code checks on push to the master branch, as they will be triggered
-  # by the release workflow.
-
-  # Trigger code checks on workflow call (e.g. from run release workflow).
-  workflow_call:
+  # Secrets are only made available to the integration tests job, with a manual approval
+  # step required for PRs from forks. This prevents their potential exposure.
+  pull_request:
 
 jobs:
-  run_linting:
-    name: Run linting
-    uses: ./.github/workflows/_linting.yaml
+  lint_check:
+    name: Lint check
+    uses: apify/workflows/.github/workflows/python_lint_check.yaml@main
 
-  run_type_checking:
-    name: Run type checking
-    uses: ./.github/workflows/_type_checking.yaml
+  type_check:
+    name: Type check
+    uses: apify/workflows/.github/workflows/python_type_check.yaml@main
 
-  run_unit_tests:
-    name: Run unit tests
-    uses: ./.github/workflows/_unit_tests.yaml
+  unit_tests:
+    name: Unit tests
+    uses: apify/workflows/.github/workflows/python_unit_tests.yaml@main
 
-  check_docs_build:
-    name: Check docs build
-    uses: ./.github/workflows/_check_docs_build.yaml
+  docs_check:
+    name: Docs check
+    uses: apify/workflows/.github/workflows/python_docs_check.yaml@main
