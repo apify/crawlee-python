@@ -1,38 +1,47 @@
-const { parse } = require('url');
-
-const visit = import('unist-util-visit').then((m) => m.visit);
+import { visit } from 'unist-util-visit';
+import { URL } from 'url';
 
 const internalUrls = ['crawlee.dev'];
 
 /**
- * @param {import('url').UrlWithStringQuery} href
+ * Check if the URL is internal.
+ * 
+ * @param {URL} href - The parsed URL object.
+ * @returns {boolean} - Returns true if the URL is internal.
  */
 function isInternal(href) {
     return internalUrls.some(
-        (internalUrl) => href.host === internalUrl
-            || (!href.protocol && !href.host && (href.pathname || href.hash)),
+        (internalUrl) => href.hostname === internalUrl
+            || (!href.protocol && !href.hostname && (href.pathname || href.hash))
     );
 }
 
 /**
+ * A unified plugin that processes external links.
+ * Adds `target="_blank"` and `rel="noopener"` for external links.
+ * 
  * @type {import('unified').Plugin}
  */
-exports.externalLinkProcessor = () => {
-    return async (tree) => {
-        (await visit)(tree, 'element', (node) => {
+export const externalLinkProcessor = () => {
+    return (tree) => {
+        visit(tree, 'element', (node) => {
             if (
                 node.tagName === 'a'
                 && node.properties
                 && typeof node.properties.href === 'string'
             ) {
-                const href = parse(node.properties.href);
+                try {
+                    const href = new URL(node.properties.href, 'https://example.com'); // Base URL for relative links
 
-                if (!isInternal(href)) {
-                    node.properties.target = '_blank';
-                    node.properties.rel = 'noopener';
-                } else {
-                    node.properties.target = null;
-                    node.properties.rel = null;
+                    if (!isInternal(href)) {
+                        node.properties.target = '_blank';
+                        node.properties.rel = 'noopener';
+                    } else {
+                        node.properties.target = null;
+                        node.properties.rel = null;
+                    }
+                } catch (error) {
+                    console.error(`Error parsing URL: ${node.properties.href}`, error);
                 }
             }
         });
