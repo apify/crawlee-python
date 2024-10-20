@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Any, AsyncGenerator, Iterable, Literal
+from typing import TYPE_CHECKING, Any, AsyncGenerator, Iterable, Literal, Optional
 
 from bs4 import BeautifulSoup, Tag
 from pydantic import ValidationError
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 
 class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
-    """A crawler that fetches the request URL using `httpx` and parses the result with `BeautifulSoup`."""
+    """Crawler that fetches a URL using `httpx` and parses the result with `BeautifulSoup`."""
 
     def __init__(
         self,
@@ -36,14 +36,10 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
         """Initialize the BeautifulSoupCrawler.
 
         Args:
-            parser: The type of parser that should be used by BeautifulSoup
-
-            additional_http_error_status_codes: HTTP status codes that should be considered errors (and trigger a retry)
-
-            ignore_http_error_status_codes: HTTP status codes that are normally considered errors but we want to treat
-                them as successful
-
-            kwargs: Arguments to be forwarded to the underlying BasicCrawler
+            parser: The parser to use with BeautifulSoup (e.g., 'lxml').
+            additional_http_error_status_codes: HTTP status codes treated as errors.
+            ignore_http_error_status_codes: Status codes to be treated as successful responses.
+            kwargs: Arguments forwarded to BasicCrawler.
         """
         self._parser = parser
 
@@ -67,6 +63,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
         super().__init__(**kwargs)
 
     async def _make_http_request(self, context: BasicCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
+        """Perform the HTTP request and yield the result."""
         result = await self._http_client.crawl(
             request=context.request,
             session=context.session,
@@ -89,11 +86,12 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
     async def _handle_blocked_request(
         self, crawling_context: BeautifulSoupCrawlingContext
     ) -> AsyncGenerator[BeautifulSoupCrawlingContext, None]:
+        """Handle cases where the request is blocked."""
         if self._retry_on_blocked:
             status_code = crawling_context.http_response.status_code
 
             if crawling_context.session and crawling_context.session.is_blocked_status_code(status_code=status_code):
-                raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
+                raise SessionError(f'Session blocked by status code {status_code}')
 
             matched_selectors = [
                 selector for selector in RETRY_CSS_SELECTORS if crawling_context.soup.select_one(selector) is not None
@@ -101,8 +99,8 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
 
             if matched_selectors:
                 raise SessionError(
-                    'Assuming the session is blocked - '
-                    f"HTTP response matched the following selectors: {'; '.join(matched_selectors)}"
+                    'Request blocked - '
+                    f'Matched selectors: {", ".join(matched_selectors)}'
                 )
 
         yield crawling_context
@@ -111,25 +109,26 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
         self,
         context: HttpCrawlingContext,
     ) -> AsyncGenerator[BeautifulSoupCrawlingContext, None]:
+        """Parse the HTTP response with BeautifulSoup and yield the result."""
         soup = await asyncio.to_thread(lambda: BeautifulSoup(context.http_response.read(), self._parser))
 
         async def enqueue_links(
             *,
             selector: str = 'a',
-            label: str | None = None,
-            user_data: dict[str, Any] | None = None,
+            label: Optional[str] = None,
+            user_data: Optional[dict[str, Any]] = None,
             **kwargs: Unpack[AddRequestsKwargs],
         ) -> None:
+            """Enqueue links found in the HTML."""
             kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
 
-            requests = list[BaseRequestData]()
+            requests = []
             user_data = user_data or {}
 
-            link: Tag
             for link in soup.select(selector):
-                link_user_data = user_data
+                link_user_data = user_data.copy()
 
-                if label is not None:
+                if label:
                     link_user_data.setdefault('label', label)
 
                 if (url := link.attrs.get('href')) is not None:
@@ -141,11 +140,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
                     try:
                         request = BaseRequestData.from_url(url, user_data=link_user_data)
                     except ValidationError as exc:
-                        context.log.debug(
-                            f'Skipping URL "{url}" due to invalid format: {exc}. '
-                            'This may be caused by a malformed URL or unsupported URL scheme. '
-                            'Please ensure the URL is correct and retry.'
-                        )
+                        context.log.debug(f'Skipping URL "{url}" due to validation error: {exc}')
                         continue
 
                     requests.append(request)
