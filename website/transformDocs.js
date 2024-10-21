@@ -102,7 +102,7 @@ function getGroupName(object) {
 
 // Strips the Optional[] type from the type string, and replaces generic types with just the main type
 function getBaseType(type) {
-    return type?.replace(/Optional\[(.*)\]/g, '$1').replace('ListPage[Dict]', 'ListPage');
+    return type?.replace(/Optional\[(.*)\]/g, '$1').split('[')[0];
 }
 
 // Returns whether a type is a custom class, or a primitive type
@@ -155,6 +155,9 @@ const contextStack = [];
 const getContext = () => contextStack[contextStack.length - 1];
 const popContext = () => contextStack.pop();
 const newContext = (context) => contextStack.push(context);
+
+const forwardAncestorRefs = new Map();
+const backwardAncestorRefs = new Map();
 
 // Converts a docspec object to a Typedoc object, including all its children
 function convertObject(obj, parent, module) {
@@ -300,6 +303,40 @@ function convertObject(obj, parent, module) {
 
             if (typedocMember.kindString === 'Class') {
                 newContext(docstring);
+
+                backwardAncestorRefs.set(member.name, typedocMember);
+
+                if (member.bases?.length > 0) {
+                    member.bases.forEach((base) => {
+                        const unwrappedBaseType = getBaseType(base);
+
+                        const baseTypedocMember = backwardAncestorRefs.get(unwrappedBaseType);
+                        if (baseTypedocMember) {
+                            typedocMember.extendedTypes = [
+                                ...typedocMember.extendedTypes ?? [],
+                                {
+                                    type: 'reference',
+                                    name: baseTypedocMember.name,
+                                    target: baseTypedocMember.id,
+                                }
+                            ];
+
+                            baseTypedocMember.extendedBy = [
+                                ...baseTypedocMember.extendedBy ?? [],
+                                {
+                                    type: 'reference',
+                                    name: typedocMember.name,
+                                    target: typedocMember.id,
+                                }
+                            ]
+                        } else {
+                            forwardAncestorRefs.set(
+                                unwrappedBaseType, 
+                                [...(forwardAncestorRefs.get(unwrappedBaseType) ?? []), typedocMember],
+                            );
+                        }
+                    });
+                }
             }
 
             convertObject(member, typedocMember, module);
@@ -322,6 +359,33 @@ function convertObject(obj, parent, module) {
 
             sortChildren(typedocMember);
             parent.children.push(typedocMember);
+
+            if (typedocMember.kindString === 'Class') {
+                forwardAncestorRefs.get(typedocMember.name)?.forEach((child) => {
+                    child.extendedTypes = [
+                        ...child.extendedTypes ?? [],
+                        {
+                            type: 'reference',
+                            name: typedocMember.name,
+                            target: typedocMember.id,
+                        }
+                    ];
+
+                    typedocMember.extendedBy = [
+                        ...typedocMember.extendedBy ?? [],
+                        {
+                            type: 'reference',
+                            name: child.name,
+                            target: child.id,
+                        }
+                    ]
+
+                    // child.children = [
+                    //     ...typedocMember.children,
+                    //     ...child.children,
+                    // ];
+                });
+            }
         }
     }
 }
