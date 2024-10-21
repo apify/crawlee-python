@@ -42,7 +42,8 @@ jobs:
     with:
       version_number: ${{ needs.release_metadata.outputs.version_number }}
       changelog: ${{ needs.release_metadata.outputs.changelog }}
-      github_token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
+    secrets:
+      APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
 
   publish_to_pypi:
     name: Publish to PyPI
