@@ -78,7 +78,7 @@ const groupSort = (g1, g2) => {
 
 function getGroupName(object) {
     const groupPredicates = {
-        'Errors': (x) => x.name.toLowerCase().includes('error'),
+        'Errors': (x) => x.name.toLowerCase().endsWith('error'),
         'Main Classes': (x) => [
             'BasicCrawler', 'HttpCrawler', 'BeautifulSoupCrawler', 'ParselCrawler', 'PlaywrightCrawler', 'Dataset',
             'KeyValueStore', 'RequestQueue', 'MemoryStorageClient', 'HttpxHttpClient', 'CurlImpersonateHttpClient',
@@ -224,10 +224,6 @@ function convertObject(obj, parent, module) {
                 docstring.returns = docstring.returns.join('\n');
             } catch {
                 // Do nothing
-            }
-
-            if (member.name === 'Configuration') {
-                console.log('configuration!');
             }
 
             if (!docstring.text) {
