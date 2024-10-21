@@ -7,12 +7,28 @@ from logging import getLogger
 from typing import TYPE_CHECKING
 from urllib.parse import parse_qsl, urlencode, urlparse
 
+from crawlee._types import HttpHeaders
 from crawlee._utils.crypto import compute_short_hash
 
 if TYPE_CHECKING:
     from crawlee._types import HttpMethod, HttpPayload
 
 logger = getLogger(__name__)
+
+# List of headers to include in the unique key computation
+WHITELISTED_HEADERS = {'accept', 'accept-language', 'authorization', 'content-type'}
+
+
+def normalize_headers(headers: HttpHeaders) -> HttpHeaders:
+    """Normalize and filter headers based on a predefined whitelist.
+
+    Args:
+        headers: An instance of HttpHeaders type containing HTTP headers
+
+    Returns:
+        An instance of HttpHeaders containing only the whitelisted headers, with lowercase keys and stripped values.
+    """
+    return HttpHeaders({key: value.strip() for key, value in headers.items() if key in WHITELISTED_HEADERS})
 
 
 def unique_key_to_request_id(unique_key: str, *, request_id_length: int = 15) -> str:
@@ -88,6 +104,7 @@ def compute_unique_key(
     url: str,
     method: HttpMethod = 'GET',
     payload: HttpPayload | None = None,
+    headers: HttpHeaders | None = None,
     *,
     keep_url_fragment: bool = False,
     use_extended_unique_key: bool = False,
@@ -96,12 +113,14 @@ def compute_unique_key(
 
     This function computes a unique key by normalizing the provided URL and method.
     If `use_extended_unique_key` is True and a payload is provided, the payload is hashed and
-    included in the key. Otherwise, the unique key is just the normalized URL.
+    included in the key. Otherwise, the unique key is just the normalized URL. Additionally, if
+    HTTP headers are provided, the whitelisted headers is hashed and included in the key.
 
     Args:
         url: The request URL.
         method: The HTTP method, defaults to 'GET'.
         payload: The data to be sent as the request body, defaults to None.
+        headers: The HTTP headers, defaults to None.
         keep_url_fragment: A flag indicating whether to keep the URL fragment, defaults to False.
         use_extended_unique_key: A flag indicating whether to include a hashed payload in the key, defaults to False.
 
@@ -127,7 +146,18 @@ def compute_unique_key(
             payload_in_bytes = payload
 
         payload_hash = compute_short_hash(payload_in_bytes)
-        return f'{normalized_method}({payload_hash}):{normalized_url}'
+
+        # Normalize and hash the whitelisted headers
+        if headers is None:
+            normalized_headers = b''
+        else:
+            filtered_headers = normalize_headers(headers)
+            # Join headers as key-value pairs to compute hash
+            normalized_headers = (','.join(f'{k}:{v}' for k, v in filtered_headers.items())).encode('utf-8')
+
+        headers_hash = compute_short_hash(normalized_headers)
+
+        return f'{normalized_method}({payload_hash},{headers_hash}):{normalized_url}'
 
     # Log information if there is a non-GET request with a payload.
     if normalized_method != 'GET' and payload:
