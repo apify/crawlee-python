@@ -4,7 +4,7 @@ import re
 from base64 import b64encode
 from hashlib import sha256
 from logging import getLogger
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 from urllib.parse import parse_qsl, urlencode, urlparse
 
 from crawlee._utils.crypto import compute_short_hash
@@ -26,13 +26,13 @@ def unique_key_to_request_id(unique_key: str, *, request_id_length: int = 15) ->
         A URL-safe, truncated request ID based on the unique key.
     """
     # Encode the unique key and compute its SHA-256 hash
-    hashed_key = sha256(unique_key.encode("utf-8")).digest()
+    hashed_key = sha256(unique_key.encode('utf-8')).digest()
 
     # Encode the hash in base64 and decode it to get a string
-    base64_encoded = b64encode(hashed_key).decode("utf-8")
+    base64_encoded = b64encode(hashed_key).decode('utf-8')
 
     # Remove characters that are not URL-safe ('+', '/', or '=')
-    url_safe_key = re.sub(r"(\+|\/|=)", "", base64_encoded)
+    url_safe_key = re.sub(r'(\+|\/|=)', '', base64_encoded)
 
     # Truncate the key to the desired length
     return url_safe_key[:request_id_length]
@@ -59,7 +59,7 @@ def normalize_url(url: str, *, keep_url_fragment: bool = False) -> str:
     search_params = dict(parse_qsl(parsed_url.query))  # Convert query to a dict
 
     # Remove any 'utm_' parameters
-    search_params = {k: v for k, v in search_params.items() if not k.startswith("utm_")}
+    search_params = {k: v for k, v in search_params.items() if not k.startswith('utm_')}
 
     # Construct the new query string
     sorted_keys = sorted(search_params.keys())
@@ -71,7 +71,7 @@ def normalize_url(url: str, *, keep_url_fragment: bool = False) -> str:
             query=sorted_query,
             scheme=parsed_url.scheme,
             netloc=parsed_url.netloc,
-            path=parsed_url.path.rstrip("/"),
+            path=parsed_url.path.rstrip('/'),
         )
         .geturl()
         .lower()
@@ -79,20 +79,20 @@ def normalize_url(url: str, *, keep_url_fragment: bool = False) -> str:
 
     # Retain the URL fragment if required
     if not keep_url_fragment:
-        new_url = new_url.split("#")[0]
+        new_url = new_url.split('#')[0]
 
     return new_url
 
 
 def compute_unique_key(
     url: str,
-    method: HttpMethod = "GET",
-    payload: Optional[HttpPayload] = None,
+    method: HttpMethod = 'GET',
+    payload: HttpPayload | None = None,
     *,
     keep_url_fragment: bool = False,
     use_extended_unique_key: bool = False,
-    headers: Optional[dict[str, str]] = None,
-    whitelisted_headers: Optional[list[str]] = None,
+    headers: dict[str, str] | None = None,
+    whitelisted_headers: list[str] | None = None,
 ) -> str:
     """Computes a unique key for caching & deduplication of requests.
 
@@ -116,31 +116,24 @@ def compute_unique_key(
     try:
         normalized_url = normalize_url(url, keep_url_fragment=keep_url_fragment)
     except Exception as exc:
-        logger.warning(f"Failed to normalize URL: {exc}")
+        logger.warning(f'Failed to normalize URL: {exc}')
         normalized_url = url
 
     normalized_method = method.upper()
 
     # Compute the payload hash if required.
     if use_extended_unique_key and payload:
-        if isinstance(payload, str):
-            payload_in_bytes = payload.encode("utf-8")
-        else:
-            payload_in_bytes = payload
+        payload_in_bytes = payload.encode('utf-8') if isinstance(payload, str) else payload
 
         payload_hash = compute_short_hash(payload_in_bytes)
-        extended_key = f"{normalized_method}({payload_hash}):{normalized_url}"
+        extended_key = f'{normalized_method}({payload_hash}):{normalized_url}'
     else:
         extended_key = normalized_url
 
     # Include whitelisted headers in the key.
     if headers and whitelisted_headers:
-        header_parts = [
-            f"{header}:{headers[header]}"
-            for header in whitelisted_headers
-            if header in headers
-        ]
-        header_part = "|".join(header_parts)
-        return f"{extended_key}|{header_part}"
+        header_parts = [f'{header}:{headers[header]}' for header in whitelisted_headers if header in headers]
+        header_part = '|'.join(header_parts)
+        return f'{extended_key}|{header_part}'
 
     return extended_key

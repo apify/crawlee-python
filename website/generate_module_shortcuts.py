@@ -25,7 +25,7 @@ def get_module_shortcuts(module, parent_classes=None):
     return shortcuts
 
 
-def resolve_shortcuts(shortcuts):
+def resolve_shortcuts(shortcuts) -> None:
     """Resolve linked shortcuts.
 
     For example, if there are shortcuts A -> B and B -> C,
