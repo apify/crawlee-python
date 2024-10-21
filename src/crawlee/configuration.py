@@ -18,8 +18,8 @@ class Configuration(BaseSettings):
     """Configuration of the Crawler.
 
     Args:
-        internal_timeout: timeout for internal operations such as marking a request as processed
-        verbose_log: allows verbose logging
+        internal_timeout: Timeout for internal operations such as marking a request as processed.
+        verbose_log: Allows verbose logging.
         default_storage_id: The default storage ID.
         purge_on_start: Whether to purge the storage on start.
     """
