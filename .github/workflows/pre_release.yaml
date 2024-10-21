@@ -38,44 +38,11 @@ jobs:
   update_changelog:
     name: Update changelog
     needs: [release_metadata, lint_check, type_check, unit_tests]
-    runs-on: ubuntu-latest
-    outputs:
-      changelog_commitish: ${{ steps.commit.outputs.commit_long_sha || github.sha }}
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      PYTHON_VERSION: 3.12
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install poetry
-        run: pipx install --python ${{ env.PYTHON_VERSION }} poetry
-
-      - name: Update package version in pyproject.toml
-        run: poetry version ${{ needs.release_metadata.outputs.version_number }}
-
-      - name: Update CHANGELOG.md
-        uses: DamianReeves/write-file-action@master
-        with:
-          path: CHANGELOG.md
-          write-mode: overwrite
-          contents: ${{ needs.release_metadata.outputs.changelog }}
-
-      - name: Commit changes
-        id: commit
-        uses: EndBug/add-and-commit@v9
-        with:
-          author_name: Apify Release Bot
-          author_email: noreply@apify.com
-          message: "chore(release): Update changelog and package version [skip ci]"
+    uses: apify/workflows/.github/workflows/python_bump_and_update_changelog.yaml@release-metadata-action # TODO change branch to main
+    with:
+      version_number: ${{ needs.release_metadata.outputs.version_number }}
+      changelog: ${{ needs.release_metadata.outputs.changelog }}
+      github_token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
 
   publish_to_pypi:
     name: Publish to PyPI
