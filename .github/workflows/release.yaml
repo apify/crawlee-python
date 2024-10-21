@@ -111,10 +111,11 @@ jobs:
   publish_to_pypi:
     name: Publish to PyPI
     needs: [release_metadata, update_changelog]
-    uses: ./.github/workflows/_publish_to_pypi.yaml
+    uses: apify/workflows/.github/workflows/python_publish_to_pypi.yaml@release-metadata-action # TODO change branch to main
     with:
       package_name: crawlee
       version_number: ${{ needs.release_metadata.outputs.version_number }}
+      ref: ${{ needs.update_changelog.changelog_commitish }}
       is_prerelease: ''
 
   # TODO: add job for publish package to Conda
