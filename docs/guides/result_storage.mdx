@@ -11,10 +11,8 @@ import TabItem from '@theme/TabItem';
 import CodeBlock from '@theme/CodeBlock';
 
 import DatasetBasicExample from '!!raw-loader!./code/result_storage_dataset_basic.py';
-import DatasetExportExample from '!!raw-loader!./code/result_storage_dataset_export.py';
 
 import KvStoreBasicExample from '!!raw-loader!./code/result_storage_kvstore_basic.py';
-import KvStoreJsonExample from '!!raw-loader!./code/result_storage_kvstore_json.py';
 
 import RsPurgeExplicitlyExample from '!!raw-loader!./code/result_storage_purge_explicitly.py';
 
@@ -51,11 +49,6 @@ The following code demonstrates basic operations of key-value stores:
             {KvStoreBasicExample}
         </CodeBlock>
     </TabItem>
-    <TabItem value="kvstore_json_example" label="Working with JSON">
-        <CodeBlock className="language-python">
-            {KvStoreJsonExample}
-        </CodeBlock>
-    </TabItem>
 </Tabs>
 
 To see a real-world example of how to get the input from the key-value store, see the [Screenshots](https://crawlee.dev/python/docs/examples/capture-screenshots-using-playwright) example.
@@ -83,11 +76,6 @@ The following code demonstrates basic operations of the dataset:
     <TabItem value="dataset_basic_example" label="Basic usage" default>
         <CodeBlock className="language-python">
             {DatasetBasicExample}
-        </CodeBlock>
-    </TabItem>
-    <TabItem value="dataset_export_example" label="Export data">
-        <CodeBlock className="language-python">
-            {DatasetExportExample}
         </CodeBlock>
     </TabItem>
 </Tabs>

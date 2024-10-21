@@ -1,24 +1,29 @@
 import asyncio
+
+from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 from crawlee.storages import Dataset
 
+
 async def main() -> None:
-    dataset = await Dataset.open(name='my-dataset')
+    crawler = BeautifulSoupCrawler()
+    # Open dataset manually using asynchronous constructor open().
+    dataset = await Dataset.open()
 
-    # Add an item to the dataset
-    await dataset.push_data({'name': 'John Doe', 'age': 30})
+    # A decorator that registers a default handler, invoked for requests without a label or with an unrecognized label.
+    @crawler.router.default_handler
+    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
+        context.log.info(f'Processing {context.request.url} ...')
 
-    # Add multiple items to the dataset
-    await dataset.push_data([
-        {'name': 'Jane Doe', 'age': 25},
-        {'name': 'Alice', 'age': 27},
-    ])
+        # Extract data from the page.
+        data = {
+            'url': context.request.url,
+            'title': context.soup.title.string if context.soup.title else None,
+            'html': str(context.soup)[:1000],
+        }
 
-    # Retrieve all data from the dataset
-    async for item in dataset.iter_data():
-        print(item)
+        # Push the extracted data to the dataset.
+        await dataset.push_data(data)
 
-    # Remove the dataset
-    await dataset.drop()
 
 if __name__ == '__main__':
     asyncio.run(main())

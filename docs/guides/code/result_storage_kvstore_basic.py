@@ -1,23 +1,19 @@
 import asyncio
+
 from crawlee.storages import KeyValueStore
 
+
 async def main() -> None:
-    kv_store = await KeyValueStore.open(name='my-store')
+    store = await KeyValueStore.open()
+    # Store the screenshot in the key-value store.
+    await store.set_value(key='some-key', value={'foo': 'bar'})
 
-    # Save a string value
-    await kv_store.set_value('greeting', 'Hello, world!')
+    # Get value from your defined key-value store
+    value = store.get_value('some-key')
 
-    # Save an integer value
-    await kv_store.set_value('year', 2024)
+    # Delete a record from the named key-value store
+    await store.set_value(key='some-key', value=None)
 
-    # Retrieve values by key
-    greeting = await kv_store.get_value('greeting')
-    year = await kv_store.get_value('year')
-    print(greeting)  # Output: Hello, world!
-    print(year)      # Output: 2024
-
-    # Remove the key-value store
-    await kv_store.drop()
 
 if __name__ == '__main__':
     asyncio.run(main())
