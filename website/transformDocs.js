@@ -151,6 +151,11 @@ let oid = 1;
 
 const symbolIdMap = [];
 
+const contextStack = [];
+const getContext = () => contextStack[contextStack.length - 1];
+const popContext = () => contextStack.pop();
+const newContext = (context) => contextStack.push(context);
+
 // Converts a docspec object to a Typedoc object, including all its children
 function convertObject(obj, parent, module) {
     const rootModuleName = module.name.split('.')[0];
@@ -221,6 +226,14 @@ function convertObject(obj, parent, module) {
                 // Do nothing
             }
 
+            if (member.name === 'Configuration') {
+                console.log('configuration!');
+            }
+
+            if (!docstring.text) {
+                docstring.text = getContext()?.args?.[member.name] ?? '';
+            }
+
             // Create the Typedoc member object
             let typedocMember = {
                 id: oid++,
@@ -228,7 +241,7 @@ function convertObject(obj, parent, module) {
                 module: moduleName, // This is an extension to the original Typedoc structure, to support showing where the member is exported from
                 ...typedocKind,
                 flags: {},
-                comment: member.docstring ? {
+                comment: docstring ? {
                     summary: [{
                         kind: 'text',
                         text: docstring.text,
@@ -289,7 +302,15 @@ function convertObject(obj, parent, module) {
                 typedocMember.kindString = 'Constructor';
             }
 
+            if (typedocMember.kindString === 'Class') {
+                newContext(docstring);
+            }
+
             convertObject(member, typedocMember, module);
+
+            if (typedocMember.kindString === 'Class') {
+                popContext();
+            }
 
             const groupName = getGroupName(typedocMember);
 
