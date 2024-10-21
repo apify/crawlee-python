@@ -79,12 +79,24 @@ jobs:
   publish_to_pypi:
     name: Publish to PyPI
     needs: [release_metadata, update_changelog]
-    uses: apify/workflows/.github/workflows/python_publish_to_pypi.yaml@release-metadata-action # TODO change branch to main
-    with:
-      package_name: crawlee
-      version_number: ${{ needs.release_metadata.outputs.version_number }}
-      ref: ${{ needs.update_changelog.changelog_commitish }}
-      is_prerelease: ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write # Required for OIDC authentication.
+    environment:
+      name: pypi
+      url: https://pypi.org/project/crawlee
+    steps:
+      - name: Prepare distribution
+        uses: apify/workflows/prepare-pypi-distribution@release-metadata-action
+        with: 
+          package_name: crawlee
+          is_prerelease: ""
+          version_number: ${{ needs.release_metadata.outputs.version_number }}
+          ref: ${{ needs.update_changelog.changelog_commitish }}
+      # Publishes the package to PyPI using PyPA official GitHub action with OIDC authentication.
+      - name: Publish package to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
 
-  # TODO: add job for publish package to Conda
-  # https://github.com/apify/crawlee-python/issues/104
+      # TODO: add job for publish package to Conda
+      # https://github.com/apify/crawlee-python/issues/104
