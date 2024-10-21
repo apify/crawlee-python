@@ -80,6 +80,7 @@ module.exports = {
                 sortSidebar: groupSort,
                 pathToCurrentVersionTypedocJSON: `${__dirname}/api-typedoc-generated.json`,
                 routeBasePath: 'api',
+                python: true,
             },
         ],
         // [

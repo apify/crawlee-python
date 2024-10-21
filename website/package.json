@@ -33,7 +33,7 @@
         "typescript": "5.6.2"
     },
     "dependencies": {
-        "@apify/docusaurus-plugin-typedoc-api": "^4.2.2",
+        "@apify/docusaurus-plugin-typedoc-api": "^4.2.6",
         "@apify/utilities": "^2.8.0",
         "@docusaurus/core": "^3.5.2",
         "@docusaurus/mdx-loader": "^3.5.2",
@@ -56,5 +56,5 @@
         "stream-browserify": "^3.0.0",
         "unist-util-visit": "^5.0.0"
     },
-    "packageManager": "yarn@4.4.1"
+    "packageManager": "yarn@4.5.1"
 }
