@@ -554,3 +554,7 @@ div[class^=announcementBar_] button {
 .tsd-returns-title {
     font-size: 16px;
 }
+
+.tsd-api-options {
+    display: none;
+}

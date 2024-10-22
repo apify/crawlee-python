@@ -144,6 +144,8 @@ class ApifyGoogleProcessor(Processor):
             if line.lstrip().startswith("```"):
                 in_codeblock = not in_codeblock
                 current_lines.append(line)
+                if not in_codeblock:
+                    _commit()
                 continue
 
             if in_codeblock:
