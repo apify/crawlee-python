@@ -91,14 +91,12 @@ def compute_unique_key(
     *,
     keep_url_fragment: bool = False,
     use_extended_unique_key: bool = False,
-    headers: dict[str, str] | None = None,
-    whitelisted_headers: list[str] | None = None,
 ) -> str:
     """Computes a unique key for caching & deduplication of requests.
 
     This function computes a unique key by normalizing the provided URL and method.
     If `use_extended_unique_key` is True and a payload is provided, the payload is hashed and
-    included in the key. If headers are provided, the whitelisted headers are also included in the key.
+    included in the key. Otherwise, the unique key is just the normalized URL.
 
     Args:
         url: The request URL.
@@ -106,8 +104,6 @@ def compute_unique_key(
         payload: The data to be sent as the request body, defaults to None.
         keep_url_fragment: A flag indicating whether to keep the URL fragment, defaults to False.
         use_extended_unique_key: A flag indicating whether to include a hashed payload in the key, defaults to False.
-        headers: The HTTP headers to include in the key.
-        whitelisted_headers: The list of whitelisted headers to include in the key.
 
     Returns:
         A string representing the unique key for the request.
@@ -121,19 +117,25 @@ def compute_unique_key(
 
     normalized_method = method.upper()
 
-    # Compute the payload hash if required.
-    if use_extended_unique_key and payload:
-        payload_in_bytes = payload.encode('utf-8') if isinstance(payload, str) else payload
+    # Compute and return the extended unique key if required.
+    if use_extended_unique_key:
+        if payload is None:
+            payload_in_bytes = b''
+        elif isinstance(payload, str):
+            payload_in_bytes = payload.encode('utf-8')
+        else:
+            payload_in_bytes = payload
 
         payload_hash = compute_short_hash(payload_in_bytes)
-        extended_key = f'{normalized_method}({payload_hash}):{normalized_url}'
-    else:
-        extended_key = normalized_url
+        return f'{normalized_method}({payload_hash}):{normalized_url}'
 
-    # Include whitelisted headers in the key.
-    if headers and whitelisted_headers:
-        header_parts = [f'{header}:{headers[header]}' for header in whitelisted_headers if header in headers]
-        header_part = '|'.join(header_parts)
-        return f'{extended_key}|{header_part}'
+    # Log information if there is a non-GET request with a payload.
+    if normalized_method != 'GET' and payload:
+        logger.info(
+            f'We have encountered a {normalized_method} Request with a payload. This is fine. Just letting you know '
+            'that if your requests point to the same URL and differ only in method and payload, you should consider '
+            'using the "use_extended_unique_key" option.'
+        )
 
-    return extended_key
+    # Return the normalized URL as the unique key.
+    return normalized_url
