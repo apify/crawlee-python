@@ -10,6 +10,7 @@ on:
 
 jobs:
   release_metadata:
+    if: "!startsWith(github.event.head_commit.message, 'docs') && !startsWith(github.event.head_commit.message, 'ci')"
     name: Prepare release metadata
     runs-on: ubuntu-latest
     outputs:

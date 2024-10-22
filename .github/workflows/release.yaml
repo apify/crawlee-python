@@ -23,14 +23,13 @@ on:
 
 jobs:
   release_metadata:
-    if: "!startsWith(github.event.head_commit.message, 'docs') && !startsWith(github.event.head_commit.message, 'ci')"
     name: Prepare release metadata
     runs-on: ubuntu-latest
     outputs:
       version_number: ${{ steps.release_metadata.outputs.version_number }}
       tag_name: ${{ steps.release_metadata.outputs.tag_name }}
       changelog: ${{ steps.release_metadata.outputs.changelog }}
-      release_notes:: ${{ steps.release_metadata.outputs.release_notes }}
+      release_notes: ${{ steps.release_metadata.outputs.release_notes }}
     steps:
       - uses: apify/workflows/git-cliff-release@main
         name: Prepare release metadata
