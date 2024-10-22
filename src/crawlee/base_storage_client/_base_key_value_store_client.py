@@ -124,6 +124,7 @@ class BaseKeyValueStoreClient(ABC):
 
         Returns:
             The public URL for the given key.
+
         Raises:
             ValueError: If the key does not exist.
         """
