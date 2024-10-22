@@ -162,7 +162,7 @@ class KeyValueStore(BaseStorage):
         """Get the public URL for the given key.
 
         Args:
-            key: Key of the record for which URL is required
+            key: Key of the record for which URL is required.
 
         Returns:
             The public URL for the given key.
