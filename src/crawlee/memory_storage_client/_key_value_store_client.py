@@ -304,7 +304,7 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
         record_filename = record.filename if record else key
 
         if record_filename is None:
-            raise ValueError('Record file name not found')
+            raise ValueError(f'Record with key "{key}" was not found.')
 
         record_path = os.path.join(resource_dir, record_filename)
         return f'file://{record_path}'
