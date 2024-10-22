@@ -140,7 +140,7 @@ function sortChildren(typedocMember) {
     typedocMember.groups.sort((a, b) => groupSort(a.title, b.title));
 }
 
-// Objects with decorators named 'ignore_docs' or with empty docstrings will be ignored
+// Objects with decorators named 'ignore_docs' will be ignored
 function isHidden(member) {
     return member.decorations?.some(d => d.name === 'ignore_docs') || member.name === 'ignore_docs';
 }
@@ -201,10 +201,6 @@ function convertObject(obj, parent, module) {
             let moduleName = module.name;
             if (fullName in moduleShortcuts) {
                 moduleName = moduleShortcuts[fullName].replace(`.${member.name}`, '');
-            }
-
-            if(member.name === 'Actor' || (member.name.endsWith('Client') && !member.name.endsWith('StorageClient')) || member.name === 'ListPage') {
-                continue;
             }
 
             if (member.name === '_ActorType') {
