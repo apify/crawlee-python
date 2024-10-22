@@ -295,17 +295,17 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
             id=self.id,
             name=self.name,
         )
+
         if existing_store_by_id is None:
             raise_on_non_existing_storage(StorageTypes.KEY_VALUE_STORE, self.id)
 
-        resource_dir = existing_store_by_id.resource_directory
-
         record = await self._get_record_internal(key)
-        record_filename = record.filename if record else key
 
-        if record_filename is None:
+        if not record:
             raise ValueError(f'Record with key "{key}" was not found.')
 
+        resource_dir = existing_store_by_id.resource_directory
+        record_filename = self._filename_from_record(record)
         record_path = os.path.join(resource_dir, record_filename)
         return f'file://{record_path}'
 
