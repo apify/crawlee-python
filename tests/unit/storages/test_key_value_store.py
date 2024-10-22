@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 from typing import AsyncGenerator
+from urllib.parse import urlparse
 
 import pytest
 
@@ -100,3 +102,20 @@ async def test_static_get_set_value(key_value_store: KeyValueStore) -> None:
     await key_value_store.set_value('test-static', 'static')
     value = await key_value_store.get_value('test-static')
     assert value == 'static'
+
+
+async def test_get_public_url_raises_for_non_existing_key(key_value_store: KeyValueStore) -> None:
+    with pytest.raises(ValueError, match='was not found'):
+        await key_value_store.get_public_url('i-do-not-exist')
+
+
+async def test_get_public_url(key_value_store: KeyValueStore) -> None:
+    await key_value_store.set_value('test-static', 'static')
+    public_url = await key_value_store.get_public_url('test-static')
+
+    url = urlparse(public_url)
+    path = url.netloc if url.netloc else url.path
+
+    with open(path) as f:  # noqa: ASYNC230
+        content = await asyncio.to_thread(f.read)
+        assert content == 'static'
