@@ -132,8 +132,8 @@ function sortChildren(typedocMember) {
     for (let group of typedocMember.groups) {
         group.children
             .sort((a, b) => {
-                const firstName = typedocMember.children.find(x => x.id === a).name;
-                const secondName = typedocMember.children.find(x => x.id === b).name;
+                const firstName = typedocMember.children.find(x => x.id === a || x.inheritedFrom?.target == a).name;
+                const secondName = typedocMember.children.find(x => x.id === b || x.inheritedFrom?.target == b).name;
                 return firstName.localeCompare(secondName);
             });
     }
@@ -301,6 +301,8 @@ function convertObject(obj, parent, module) {
                 typedocMember.kindString = 'Constructor';
             }
 
+            convertObject(member, typedocMember, module);
+            
             if (typedocMember.kindString === 'Class') {
                 newContext(docstring);
 
@@ -329,6 +331,40 @@ function convertObject(obj, parent, module) {
                                     target: typedocMember.id,
                                 }
                             ]
+
+                            typedocMember.children = [
+                                ...typedocMember.children ?? [],
+                                ...(baseTypedocMember.children ?? []).map((inheritedChild) => {
+                                    if (typedocMember.children?.some((x) => x.name === inheritedChild.name)) {
+                                        return;
+                                    }
+
+                                    const childId = oid++;
+
+                                    const groupName = getGroupName(inheritedChild);
+                                    const group = typedocMember.groups.find((g) => g.title === groupName);
+
+                                    if (group) {
+                                        group.children.push(inheritedChild.id);
+                                    } else {
+                                        typedocMember.groups.push({
+                                            title: groupName,
+                                            children: [inheritedChild.id],
+                                        });
+                                    }
+
+                                    return {
+                                        ...inheritedChild,
+                                        id: childId,
+                                        inheritedFrom: {
+                                            type: "reference",
+                                            target: inheritedChild.id,
+                                            name: `${baseTypedocMember.name}.${inheritedChild.name}`,
+                                        }
+                                    }
+                                }).filter(x => x),
+                            ]
+                            
                         } else {
                             forwardAncestorRefs.set(
                                 unwrappedBaseType, 
@@ -338,8 +374,6 @@ function convertObject(obj, parent, module) {
                     });
                 }
             }
-
-            convertObject(member, typedocMember, module);
 
             if (typedocMember.kindString === 'Class') {
                 popContext();
@@ -357,13 +391,14 @@ function convertObject(obj, parent, module) {
                 });
             }
 
-            sortChildren(typedocMember);
             parent.children.push(typedocMember);
 
+            sortChildren(typedocMember);
+
             if (typedocMember.kindString === 'Class') {
-                forwardAncestorRefs.get(typedocMember.name)?.forEach((child) => {
-                    child.extendedTypes = [
-                        ...child.extendedTypes ?? [],
+                forwardAncestorRefs.get(typedocMember.name)?.forEach((descendant) => {
+                    descendant.extendedTypes = [
+                        ...descendant.extendedTypes ?? [],
                         {
                             type: 'reference',
                             name: typedocMember.name,
@@ -375,15 +410,45 @@ function convertObject(obj, parent, module) {
                         ...typedocMember.extendedBy ?? [],
                         {
                             type: 'reference',
-                            name: child.name,
-                            target: child.id,
+                            name: descendant.name,
+                            target: descendant.id,
                         }
                     ]
 
-                    // child.children = [
-                    //     ...typedocMember.children,
-                    //     ...child.children,
-                    // ];
+                    descendant.children = [
+                        ...descendant.children ?? [],
+                        ...(typedocMember.children ?? []).map((inheritedChild) => {
+                            if (descendant.children?.some((x) => x.name === inheritedChild.name)) {
+                                return;
+                            }
+
+                            const childId = oid++;
+
+                            const groupName = getGroupName(inheritedChild);
+                            const group = descendant.groups.find((g) => g.title === groupName);
+
+                            if (group) {
+                                group.children.push(inheritedChild.id);
+                            } else {
+                                descendant.groups.push({
+                                    title: groupName,
+                                    children: [inheritedChild.id],
+                                });
+                            }
+
+                            return {
+                                ...inheritedChild,
+                                id: childId,
+                                inheritedFrom: {
+                                    type: "reference",
+                                    target: inheritedChild.id,
+                                    name: `${typedocMember.name}.${inheritedChild.name}`,
+                                }
+                            }
+                        }).filter(x => x),
+                    ]
+
+                    sortChildren(descendant);
                 });
             }
         }
@@ -433,17 +498,17 @@ function main() {
     function fixRefs(obj) {
         for (const child of obj.children ?? []) {
             if (child.type?.type === 'reference') {
-                child.type.id = namesToIds[child.type.name];
+                child.type.target = namesToIds[child.type.name];
             }
             if (child.signatures) {
                 for (const sig of child.signatures) {
                     for (const param of sig.parameters ?? []) {
                         if (param.type?.type === 'reference') {
-                            param.type.id = namesToIds[param.type.name];
+                            param.type.target = namesToIds[param.type.name];
                         }
                     }
                     if (sig.type?.type === 'reference') {
-                        sig.type.id = namesToIds[sig.type.name];
+                        sig.type.target = namesToIds[sig.type.name];
                     }
                 }
             }
