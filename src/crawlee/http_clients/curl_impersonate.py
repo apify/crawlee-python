@@ -16,7 +16,7 @@ except ImportError as exc:
 from curl_cffi.const import CurlHttpVersion
 from typing_extensions import override
 
-from crawlee._types import HttpHeaders
+from crawlee._types import HttpHeaders, HttpPayload
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
 from crawlee.errors import ProxyError
 from crawlee.http_clients import BaseHttpClient, HttpCrawlingResult, HttpResponse
@@ -153,7 +153,7 @@ class CurlImpersonateHttpClient(BaseHttpClient):
         method: HttpMethod = 'GET',
         headers: HttpHeaders | None = None,
         query_params: HttpQueryParams | None = None,
-        data: dict[str, Any] | None = None,
+        payload: HttpPayload | None = None,
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> HttpResponse:
@@ -166,7 +166,7 @@ class CurlImpersonateHttpClient(BaseHttpClient):
                 method=method.upper(),  # type: ignore # curl-cffi requires uppercase method
                 headers=dict(headers) if headers else None,
                 params=query_params,
-                data=data,
+                data=payload,
                 cookies=session.cookies if session else None,
                 allow_redirects=True,
             )

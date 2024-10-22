@@ -18,7 +18,7 @@ async def main() -> None:
     request = Request.from_url(
         url='https://httpbin.org/post',
         method='POST',
-        data={
+        payload={
             'custname': 'John Doe',
             'custtel': '1234567890',
             'custemail': 'johndoe@example.com',

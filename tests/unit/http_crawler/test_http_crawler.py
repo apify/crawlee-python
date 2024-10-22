@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, AsyncGenerator, Awaitable, Callable
 from unittest.mock import AsyncMock, Mock
 
@@ -7,11 +8,15 @@ import pytest
 import respx
 from httpx import Response
 
+from crawlee._request import Request
+from crawlee.http_clients._httpx import HttpxHttpClient
+from crawlee.http_clients.curl_impersonate import CurlImpersonateHttpClient
 from crawlee.http_crawler import HttpCrawler
 from crawlee.sessions import SessionPool
 from crawlee.storages import RequestList
 
 if TYPE_CHECKING:
+    from crawlee.http_clients._base import BaseHttpClient
     from crawlee.http_crawler._http_crawling_context import HttpCrawlingContext
 
 
@@ -201,3 +206,37 @@ async def test_http_status_statistics(crawler: HttpCrawler, server: respx.MockRo
     assert len(server['html_endpoint'].calls) == 10
     assert len(server['404_endpoint'].calls) == 10
     assert len(server['500_endpoint'].calls) == 30
+
+
+@pytest.mark.parametrize(
+    'http_client_class',
+    [CurlImpersonateHttpClient, HttpxHttpClient],
+    ids=['curl', 'httpx'],
+)
+async def test_filling_web_form(http_client_class: type[BaseHttpClient]) -> None:
+    http_client = http_client_class()
+    crawler = HttpCrawler(http_client=http_client)
+
+    form_data = {
+        'custname': 'John Doe',
+        'custtel': '1234567890',
+        'custemail': 'johndoe@example.com',
+        'size': 'large',
+        'topping': '["bacon", "cheese", "mushroom"]',
+        'delivery': '13:00',
+        'comments': 'Please ring the doorbell upon arrival.',
+    }
+
+    @crawler.router.default_handler
+    async def request_handler(context: HttpCrawlingContext) -> None:
+        response = json.loads(context.http_response.read())
+        # The httpbin.org/post endpoint returns the form data in the response.
+        assert response['form'] == form_data
+
+    request = Request.from_url(
+        url='https://httpbin.org/post',
+        method='POST',
+        payload=form_data,
+    )
+
+    await crawler.run([request])
