@@ -22,6 +22,9 @@
     <a href="https://discord.gg/jyEM2PRvMU" rel="nofollow">
         <img src="https://img.shields.io/discord/801163717915574323?label=discord" alt="Chat on discord" style="max-width: 100%;">
     </a>
+    <a href="https://gurubase.io/g/crawlee-python" rel="nofollow">
+        <img src="https://img.shields.io/badge/Gurubase-Ask%20Crawlee%20Python%20Guru-006BFF" alt="Ask Crawlee Guru on Gurubase" style="max-width: 100%;">
+    </a>
 </p>
 
 Crawlee covers your crawling and scraping end-to-end and **helps you build reliable scrapers. Fast.**
