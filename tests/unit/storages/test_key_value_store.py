@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from typing import AsyncGenerator
-from urllib.parse import unquote, urlparse
+from urllib.parse import urlparse
 
 import pytest
 
@@ -108,7 +108,8 @@ async def test_static_get_public_url(key_value_store: KeyValueStore) -> None:
     await key_value_store.set_value('test-static', 'static')
     public_url = await key_value_store.get_public_url('test-static')
 
-    path = unquote(urlparse(public_url).path)  # extract path from a 'file:///' URI
+    url = urlparse(public_url)
+    path = url.netloc if url.netloc else url.path
 
     f = await asyncio.to_thread(open, path, mode='r')
     assert f.read() == 'static'
