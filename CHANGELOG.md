@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Key-value store context helpers ([#584](https://github.com/apify/crawlee-python/pull/584)) ([fc15622](https://github.com/apify/crawlee-python/commit/fc156222c3747fc4cc7bd7666a21769845c7d0d5)) by [@janbuchar](https://github.com/janbuchar)
+- Added get_public_url method to KeyValueStore ([#572](https://github.com/apify/crawlee-python/pull/572), closes [#514](https://github.com/apify/crawlee-python/issues/514)) ([3a4ba8f](https://github.com/apify/crawlee-python/commit/3a4ba8f459903b6288aec40de2c3ca862e36abec)) by [@akshay11298](https://github.com/akshay11298)
 
 ### 🐛 Bug Fixes
 
