@@ -1,0 +1,71 @@
+name: Create a pre-release
+
+on:
+  # Trigger a beta version release (pre-release) on push to the master branch.
+  push:
+    branches:
+      - master
+    tags-ignore:
+      - "**" # Ignore all tags to prevent duplicate builds when tags are pushed.
+
+jobs:
+  release_metadata:
+    name: Prepare release metadata
+    runs-on: ubuntu-latest
+    outputs:
+      version_number: ${{ steps.release_metadata.outputs.version_number }}
+      tag_name: ${{ steps.release_metadata.outputs.tag_name }}
+      changelog: ${{ steps.release_metadata.outputs.changelog }}
+    steps:
+      - uses: apify/workflows/git-cliff-release@main
+        id: release_metadata
+        name: Prepare release metadata
+        with:
+          release_type: prerelease
+
+  lint_check:
+    name: Lint check
+    uses: apify/workflows/.github/workflows/python_lint_check.yaml@main
+
+  type_check:
+    name: Type check
+    uses: apify/workflows/.github/workflows/python_type_check.yaml@main
+
+  unit_tests:
+    name: Unit tests
+    uses: apify/workflows/.github/workflows/python_unit_tests.yaml@main
+
+  update_changelog:
+    name: Update changelog
+    needs: [release_metadata, lint_check, type_check, unit_tests]
+    uses: apify/workflows/.github/workflows/python_bump_and_update_changelog.yaml@main
+    with:
+      version_number: ${{ needs.release_metadata.outputs.version_number }}
+      changelog: ${{ needs.release_metadata.outputs.changelog }}
+    secrets:
+      APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
+
+  publish_to_pypi:
+    name: Publish to PyPI
+    needs: [release_metadata, update_changelog]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write # Required for OIDC authentication.
+    environment:
+      name: pypi
+      url: https://pypi.org/project/crawlee
+    steps:
+      - name: Prepare distribution
+        uses: apify/workflows/prepare-pypi-distribution@main
+        with: 
+          package_name: crawlee
+          is_prerelease: "yes"
+          version_number: ${{ needs.release_metadata.outputs.version_number }}
+          ref: ${{ needs.update_changelog.changelog_commitish }}
+      # Publishes the package to PyPI using PyPA official GitHub action with OIDC authentication.
+      - name: Publish package to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+      # TODO: add job for publish package to Conda
+      # https://github.com/apify/crawlee-python/issues/104
