@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
+import asyncio
 from typing import AsyncGenerator
 from urllib.parse import unquote, urlparse
 
@@ -109,4 +109,6 @@ async def test_static_get_public_url(key_value_store: KeyValueStore) -> None:
     public_url = await key_value_store.get_public_url('test-static')
 
     path = unquote(urlparse(public_url).path)  # extract path from a 'file:///' URI
-    assert Path(path).read_text() == 'static'
+
+    f = await asyncio.to_thread(open, path, mode='r')
+    assert f.read() == 'static'
