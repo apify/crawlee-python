@@ -87,17 +87,17 @@ def normalize_url(url: str, *, keep_url_fragment: bool = False) -> str:
 def compute_unique_key(
     url: str,
     method: HttpMethod = 'GET',
-    payload: HttpPayload | None = None,
     headers: HttpHeaders | None = None,
+    payload: HttpPayload | None = None,
     *,
     keep_url_fragment: bool = False,
     use_extended_unique_key: bool = False,
 ) -> str:
-    """Computes a unique key for caching & deduplication of requests.
+    """Compute a unique key for caching & deduplication of requests.
 
     This function computes a unique key by normalizing the provided URL and method. If `use_extended_unique_key`
     is True and a payload is provided, the payload is hashed and included in the key. Otherwise, the unique key
-    is just the normalized URL. Additionally, if HTTP headers are provided, the whitelisted headers is hashed
+    is just the normalized URL. Additionally, if HTTP headers are provided, the whitelisted headers are hashed
     and included in the key.
 
     Args:
