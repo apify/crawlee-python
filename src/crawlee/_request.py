@@ -133,7 +133,10 @@ class BaseRequestData(BaseModel):
     query_params: Annotated[HttpQueryParams, Field(alias='queryParams', default_factory=dict)] = {}
     """URL query parameters."""
 
-    payload: Annotated[HttpPayload, Field(default_factory=dict)] = {}
+    payload: Annotated[
+        HttpPayload | None,
+        PlainValidator(lambda value: None if value is None else str(value).encode('utf-8')),
+    ] = None
     """HTTP request payload."""
 
     user_data: Annotated[
@@ -181,7 +184,6 @@ class BaseRequestData(BaseModel):
         """Create a new `BaseRequestData` instance from a URL. See `Request.from_url` for more details."""
         headers = headers or HttpHeaders()
         query_params = query_params or {}
-        payload = payload or {}
 
         unique_key = unique_key or compute_unique_key(
             url,
@@ -287,7 +289,6 @@ class Request(BaseRequestData):
         """
         headers = headers or HttpHeaders()
         query_params = query_params or {}
-        payload = payload or {}
 
         unique_key = unique_key or compute_unique_key(
             url,

@@ -132,7 +132,7 @@ class HttpxHttpClient(BaseHttpClient):
             method=request.method,
             headers=headers,
             params=request.query_params,
-            data=request.payload,
+            content=request.payload,
             cookies=session.cookies if session else None,
             extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
         )
@@ -179,7 +179,7 @@ class HttpxHttpClient(BaseHttpClient):
             method=method,
             headers=dict(headers) if headers else None,
             params=query_params,
-            data=payload,
+            content=payload,
             extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
         )
 

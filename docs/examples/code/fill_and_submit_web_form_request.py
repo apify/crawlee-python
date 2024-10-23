@@ -4,13 +4,15 @@ from crawlee import Request
 request = Request.from_url(
     url='https://httpbin.org/post',
     method='POST',
-    payload={
-        'custname': 'John Doe',
-        'custtel': '1234567890',
-        'custemail': 'johndoe@example.com',
-        'size': 'large',
-        'topping': ['bacon', 'cheese', 'mushroom'],
-        'delivery': '13:00',
-        'comments': 'Please ring the doorbell upon arrival.',
-    },
+    payload=str(
+        {
+            'custname': 'John Doe',
+            'custtel': '1234567890',
+            'custemail': 'johndoe@example.com',
+            'size': 'large',
+            'topping': ['bacon', 'cheese', 'mushroom'],
+            'delivery': '13:00',
+            'comments': 'Please ring the doorbell upon arrival.',
+        }
+    ).encode(),
 )

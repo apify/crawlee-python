@@ -236,7 +236,7 @@ async def test_filling_web_form(http_client_class: type[BaseHttpClient]) -> None
     request = Request.from_url(
         url='https://httpbin.org/post',
         method='POST',
-        payload=form_data,
+        payload=str(form_data).encode(),
     )
 
     await crawler.run([request])
