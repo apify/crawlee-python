@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from crawlee._types import HttpHeaders
 from crawlee._utils.requests import compute_unique_key, normalize_url, unique_key_to_request_id
 
 if TYPE_CHECKING:
@@ -78,18 +79,60 @@ def test_normalize_url(url: str, expected_output: str, *, keep_url_fragment: boo
 
 
 @pytest.mark.parametrize(
-    ('url', 'method', 'payload', 'keep_url_fragment', 'use_extended_unique_key', 'expected_output'),
+    ('url', 'method', 'headers', 'payload', 'keep_url_fragment', 'use_extended_unique_key', 'expected_output'),
     [
-        ('http://example.com', 'GET', None, False, False, 'http://example.com'),
-        ('http://example.com', 'POST', None, False, False, 'http://example.com'),
-        ('http://example.com', 'GET', 'data', False, False, 'http://example.com'),
-        ('http://example.com', 'GET', 'data', False, True, 'GET(3a6eb079):http://example.com'),
-        ('http://example.com', 'POST', 'data', False, True, 'POST(3a6eb079):http://example.com'),
-        ('http://example.com#fragment', 'GET', None, True, False, 'http://example.com#fragment'),
-        ('http://example.com#fragment', 'GET', None, False, False, 'http://example.com'),
-        ('http://example.com', 'DELETE', 'test', False, True, 'DELETE(9f86d081):http://example.com'),
-        ('https://example.com?utm_content=test', 'GET', None, False, False, 'https://example.com'),
-        ('https://example.com?utm_content=test', 'GET', None, True, False, 'https://example.com'),
+        ('http://example.com', 'GET', None, None, False, False, 'http://example.com'),
+        ('http://example.com', 'POST', None, None, False, False, 'http://example.com'),
+        ('http://example.com', 'GET', None, 'data', False, False, 'http://example.com'),
+        (
+            'http://example.com',
+            'GET',
+            None,
+            'data',
+            False,
+            True,
+            'GET|e3b0c442|3a6eb079|http://example.com',
+        ),
+        (
+            'http://example.com',
+            'POST',
+            HttpHeaders({'Content-Type': 'application/json'}),
+            'data',
+            False,
+            True,
+            'POST|60d83e70|3a6eb079|http://example.com',
+        ),
+        (
+            'http://example.com',
+            'POST',
+            HttpHeaders({'Content-Type': 'application/json', 'Custom-Header': 'should be ignored'}),
+            'data',
+            False,
+            True,
+            'POST|60d83e70|3a6eb079|http://example.com',
+        ),
+        ('http://example.com#fragment', 'GET', None, None, True, False, 'http://example.com#fragment'),
+        ('http://example.com#fragment', 'GET', None, None, False, False, 'http://example.com'),
+        (
+            'http://example.com',
+            'DELETE',
+            None,
+            'test',
+            False,
+            True,
+            'DELETE|e3b0c442|9f86d081|http://example.com',
+        ),
+        ('https://example.com?utm_content=test', 'GET', None, None, False, False, 'https://example.com'),
+        ('https://example.com?utm_content=test', 'GET', None, None, True, False, 'https://example.com'),
+        (
+            'http://example.com',
+            'GET',
+            HttpHeaders({'Accept': 'text/html'}),
+            None,
+            False,
+            True,
+            'GET|f1614162|e3b0c442|http://example.com',
+        ),
     ],
     ids=[
         'simple_get',
@@ -97,16 +140,19 @@ def test_normalize_url(url: str, expected_output: str, *, keep_url_fragment: boo
         'get_with_payload',
         'get_with_payload_extended',
         'post_with_payload_extended',
+        'post_with_payload_and_headers',
         'get_with_fragment',
         'get_remove_fragment',
         'delete_with_payload_extended',
         'get_remove_utm',
         'get_keep_utm_fragment',
+        'get_with_headers_extended',
     ],
 )
 def test_compute_unique_key(
     url: str,
     method: HttpMethod,
+    headers: HttpHeaders | None,
     payload: HttpPayload | None,
     *,
     keep_url_fragment: bool,
@@ -115,8 +161,9 @@ def test_compute_unique_key(
 ) -> None:
     output = compute_unique_key(
         url,
-        method,
-        payload,
+        method=method,
+        headers=headers,
+        payload=payload,
         keep_url_fragment=keep_url_fragment,
         use_extended_unique_key=use_extended_unique_key,
     )
