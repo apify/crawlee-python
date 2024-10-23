@@ -102,11 +102,11 @@ def compute_unique_key(
 
     Args:
         url: The request URL.
-        method: The HTTP method, defaults to 'GET'.
-        headers: The HTTP headers, defaults to None.
-        payload: The data to be sent as the request body, defaults to None.
-        keep_url_fragment: A flag indicating whether to keep the URL fragment, defaults to False.
-        use_extended_unique_key: A flag indicating whether to include a hashed payload in the key, defaults to False.
+        method: The HTTP method.
+        headers: The HTTP headers.
+        payload: The data to be sent as the request body.
+        keep_url_fragment: A flag indicating whether to keep the URL fragment.
+        use_extended_unique_key: A flag indicating whether to include a hashed payload in the key.
 
     Returns:
         A string representing the unique key for the request.
