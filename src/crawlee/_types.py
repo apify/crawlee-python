@@ -56,8 +56,8 @@ HttpPayload: TypeAlias = Union[str, bytes]
 
 
 def _normalize_headers(headers: Mapping[str, str]) -> dict[str, str]:
-    """Converts all header keys to lowercase and returns them sorted by key."""
-    normalized_headers = {k.lower(): v for k, v in headers.items()}
+    """Converts all header keys to lowercase, strips whitespace, and returns them sorted by key."""
+    normalized_headers = {k.lower().strip(): v.strip() for k, v in headers.items()}
     sorted_headers = sorted(normalized_headers.items())
     return dict(sorted_headers)
 
