@@ -161,9 +161,9 @@ def test_compute_unique_key(
 ) -> None:
     output = compute_unique_key(
         url,
-        method,
-        payload,
-        headers,
+        method=method,
+        headers=headers,
+        payload=payload,
         keep_url_fragment=keep_url_fragment,
         use_extended_unique_key=use_extended_unique_key,
     )
