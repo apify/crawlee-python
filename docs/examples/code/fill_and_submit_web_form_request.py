@@ -1,10 +1,12 @@
+import json
+
 from crawlee import Request
 
 # Prepare a POST request to the form endpoint.
 request = Request.from_url(
     url='https://httpbin.org/post',
     method='POST',
-    payload=str(
+    payload=json.dumps(
         {
             'custname': 'John Doe',
             'custtel': '1234567890',

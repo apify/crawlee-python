@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, AsyncGenerator, Awaitable, Callable
 from unittest.mock import AsyncMock, Mock
+from urllib.parse import urlencode
 
 import pytest
 import respx
@@ -236,7 +237,7 @@ async def test_filling_web_form(http_client_class: type[BaseHttpClient]) -> None
     request = Request.from_url(
         url='https://httpbin.org/post',
         method='POST',
-        payload=str(form_data).encode(),
+        payload=urlencode(form_data).encode(),
     )
 
     await crawler.run([request])

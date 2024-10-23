@@ -1,4 +1,5 @@
 import asyncio
+import json
 
 from crawlee import Request
 from crawlee.http_crawler import HttpCrawler, HttpCrawlingContext
@@ -18,7 +19,7 @@ async def main() -> None:
     request = Request.from_url(
         url='https://httpbin.org/post',
         method='POST',
-        payload=str(
+        payload=json.dumps(
             {
                 'custname': 'John Doe',
                 'custtel': '1234567890',
