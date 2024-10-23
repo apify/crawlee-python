@@ -15,27 +15,53 @@ if TYPE_CHECKING:
 
 
 class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
-    """A crawler that fetches the request URL using `httpx`.
+    """A crawler that performs HTTP requests using a configurable HTTP client.
 
     The `HttpCrawler` class extends `BasicCrawler` to perform web crawling tasks that involve HTTP requests.
-    It uses the `httpx` library for handling HTTP-based operations, supporting configurable error handling
-    and session management. The crawler can manage additional error status codes to trigger retries
-    and exclude specific codes that are generally treated as errors.
+    It supports any HTTP client that implements the `BaseHttpClient` interface, allowing for configurable
+    error handling, session management, and additional HTTP behaviors. The crawler can manage specific error
+    status codes to trigger retries and handle exceptions, as well as exclude codes usually treated as errors.
 
     Usage:
         ```python
         from crawlee.http_crawler import HttpCrawler
+        from crawlee.http_clients import HttpxHttpClient
+        from crawlee import Request
 
-        # Instantiate and configure the HttpCrawler
-        crawler = HttpCrawler(
-            additional_http_error_status_codes=[500, 502],
-            ignore_http_error_status_codes=[404],
-            max_request_retries=3,
-            request_timeout_secs=30,
-        )
+        # Define URLs to crawl with custom metadata
+        urls_to_crawl = [
+            Request(
+                url="https://jsonplaceholder.typicode.com/posts/1",
+                uniqueKey="post_1",
+                id="1"
+            ),
+            Request(
+                url="https://jsonplaceholder.typicode.com/posts/2",
+                uniqueKey="post_2",
+                id="2"
+            )
+        ]
 
-        # Run the crawler to start fetching URLs
-        await crawler.run()
+        async def run_crawler():
+            # Create a custom HTTP client with specific error handling
+            http_client = HttpxHttpClient(
+                additional_http_error_status_codes=[500, 502],
+                ignore_http_error_status_codes=[404],
+                timeout=10
+            )
+
+            # Initialize crawler with custom configuration
+            crawler = HttpCrawler(
+                http_client=http_client,
+                max_request_retries=3
+            )
+            # Start crawling with the defined URLs
+            await crawler.run(urls_to_crawl)
+
+        # Run the crawler using asyncio
+        if __name__ == "__main__":
+            import asyncio
+            asyncio.run(run_crawler())
         ```
     """
 
@@ -49,12 +75,14 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
         """Initialize the HttpCrawler.
 
         Args:
-            additional_http_error_status_codes: HTTP status codes that should be considered errors (and trigger a retry)
+            additional_http_error_status_codes: HTTP status codes that should be considered errors
+                (and trigger a retry).
 
-            ignore_http_error_status_codes: HTTP status codes that are normally considered errors but we want to treat
-                them as successful
+            ignore_http_error_status_codes: HTTP status codes that are normally considered errors but should be treated
+                as successful.
 
-            kwargs: Arguments to be forwarded to the underlying BasicCrawler
+            kwargs: Additional arguments to be forwarded to the underlying `BasicCrawler`. It includes parameters
+                for configuring the HTTP client, logging, and other behaviors.
         """
         kwargs['_context_pipeline'] = (
             ContextPipeline().compose(self._make_http_request).compose(self._handle_blocked_request)
@@ -73,11 +101,11 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
         super().__init__(**kwargs)
 
     async def _make_http_request(self, context: BasicCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
-        """Executes an HTTP request using the `httpx` client with the provided context parameters.
+        """Executes an HTTP request using a configured HTTP client with the provided context parameters.
 
         Args:
-            context: The crawling context containing request, session,
-                and other relevant parameters for the HTTP request.
+            context: The crawling context containing request, session, and other relevant parameters
+                for the HTTP request.
 
         Yields:
             The context object, updated with the HTTP response details.
