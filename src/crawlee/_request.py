@@ -188,6 +188,7 @@ class BaseRequestData(BaseModel):
         unique_key = unique_key or compute_unique_key(
             url,
             method=method,
+            headers=headers,
             payload=payload,
             keep_url_fragment=keep_url_fragment,
             use_extended_unique_key=use_extended_unique_key,
@@ -293,6 +294,7 @@ class Request(BaseRequestData):
         unique_key = unique_key or compute_unique_key(
             url,
             method=method,
+            headers=headers,
             payload=payload,
             keep_url_fragment=keep_url_fragment,
             use_extended_unique_key=use_extended_unique_key,
