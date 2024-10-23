@@ -62,6 +62,39 @@ async def test_consistency_accross_two_clients() -> None:
         await rq_by_id.drop()
 
 
+async def test_deduplication_of_requests_with_custom_unique_key() -> None:
+    await Request.from_url('https://apify.com', unique_key='apify', always_enqueue=True)
+    with pytest.raises(ValueError, match='Request with unique key "apify" is already present in the queue!'):
+        await Request.from_url('https://apify.com', unique_key='apify', always_enqueue=False)
+
+
+async def test_deduplication_of_requests_with_invalid_custom_unique_key() -> None:
+    request_apify_1 = Request.from_url('https://apify.com', unique_key=None, always_enqueue=True)
+    request_apify_2 = Request.from_url('https://apify.com', unique_key='apify', always_enqueue=False)
+
+    rq = await RequestQueue.open(name='my-rq')
+    await rq.add_request(request_apify_1)
+    await rq.add_request(request_apify_2)
+
+    assert await rq.get_total_count() == 2
+
+    assert await rq.fetch_next_request() == request_apify_1
+    assert await rq.fetch_next_request() == request_apify_2
+
+
+async def test_deduplication_of_requests_with_valid_custom_unique_key() -> None:
+    request_apify_1 = Request.from_url('https://apify.com', unique_key='apify', always_enqueue=False)
+    request_apify_2 = Request.from_url('https://apify.com', unique_key='apify', always_enqueue=False)
+
+    rq = await RequestQueue.open(name='my-rq')
+    await rq.add_request(request_apify_1)
+    await rq.add_request(request_apify_2)
+
+    assert await rq.get_total_count() == 1
+
+    assert await rq.fetch_next_request() == request_apify_1
+
+
 async def test_same_references() -> None:
     rq1 = await RequestQueue.open()
     rq2 = await RequestQueue.open()
