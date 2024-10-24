@@ -121,11 +121,12 @@ class ProxyConfiguration:
         if url is None:
             return None
 
+        default_ports = {'http': 80, 'https': 443}
         info = ProxyInfo(
             url=str(url),
             scheme=url.scheme,
             hostname=url.host,
-            port=cast(int, url.port),
+            port=cast(int, url.port or default_ports.get(url.scheme, None)),
             username=url.username,
             password=url.password,
         )
