@@ -11,16 +11,20 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class PlaywrightCrawlingContext(BasicCrawlingContext):
-    """Crawling context used by PlaywrightSoupCrawler.
+    """The crawling context used by the `PlaywrightCrawler`.
 
-    Args:
-        page: The Playwright `Page` object.
-        infinite_scroll: Scroll to the bottom of the page, handling loading of additional items.
-        response: The Playwright `Response` object.
-        enqueue_links: The `PlaywrightCrawler` implementation of the `EnqueueLinksFunction` function.
+    It provides access to key objects as well as utility functions for handling crawling tasks.
     """
 
     page: Page
-    infinite_scroll: Callable[[], Awaitable[None]]
+    """The Playwright `Page` object for the current page."""
+
     response: Response
+    """The Playwright `Response` object containing the response details for the current URL."""
+
     enqueue_links: EnqueueLinksFunction
+    """The Playwright `EnqueueLinksFunction` implementation."""
+
+    infinite_scroll: Callable[[], Awaitable[None]]
+    """A function to perform infinite scrolling on the page. This scrolls to the bottom, triggering
+    the loading of additional content if present."""

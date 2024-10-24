@@ -24,15 +24,14 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
         ignore_http_error_status_codes: Iterable[int] = (),
         **kwargs: Unpack[BasicCrawlerOptions[HttpCrawlingContext]],
     ) -> None:
-        """Initialize the HttpCrawler.
+        """A default constructor.
 
         Args:
-            additional_http_error_status_codes: HTTP status codes that should be considered errors (and trigger a retry)
-
+            additional_http_error_status_codes: HTTP status codes that should be considered errors (and trigger
+                a retry).
             ignore_http_error_status_codes: HTTP status codes that are normally considered errors but we want to treat
-                them as successful
-
-            kwargs: Arguments to be forwarded to the underlying BasicCrawler
+                them as successful.
+            kwargs: Arguments to be forwarded to the underlying `BasicCrawler`.
         """
         kwargs['_context_pipeline'] = (
             ContextPipeline().compose(self._make_http_request).compose(self._handle_blocked_request)

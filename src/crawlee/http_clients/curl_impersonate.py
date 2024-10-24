@@ -87,7 +87,7 @@ class CurlImpersonateHttpClient(BaseHttpClient):
         ignore_http_error_status_codes: Iterable[int] = (),
         **async_session_kwargs: Any,
     ) -> None:
-        """Create a new instance.
+        """A default constructor.
 
         Args:
             persist_cookies_per_session: Whether to persist cookies per HTTP session.

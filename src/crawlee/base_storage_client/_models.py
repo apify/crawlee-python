@@ -129,63 +129,52 @@ class RequestQueueHeadWithLocks(RequestQueueHead):
 
 
 class _BaseListPage(BaseModel):
-    """Model for a single page of storage items returned from a collection list method.
-
-    Args:
-        count: Count of the returned objects on this page.
-        offset: The offset of the first object specified in the API call.
-        limit: The limit on the number of returned objects specified in the API call.
-        total: Total number of objects matching the API call criteria.
-        desc: Whether the listing is descending or not.
-    """
+    """Model for a single page of storage items returned from a collection list method."""
 
     model_config = ConfigDict(populate_by_name=True)
 
     count: Annotated[int, Field(default=0)]
+    """The number of objects returned on this page."""
+
     offset: Annotated[int, Field(default=0)]
+    """The starting position of the first object returned, as specified in the API call."""
+
     limit: Annotated[int, Field(default=0)]
+    """The maximum number of objects to return, as specified in the API call."""
+
     total: Annotated[int, Field(default=0)]
+    """The total number of objects that match the criteria of the API call."""
+
     desc: Annotated[bool, Field(default=False)]
+    """Indicates if the returned list is in descending order."""
 
 
 class DatasetListPage(_BaseListPage):
-    """Model for a single page of dataset items returned from a collection list method.
-
-    Args:
-        items: List of returned dataset items on this page.
-    """
+    """Model for a single page of dataset items returned from a collection list method."""
 
     items: Annotated[list[DatasetMetadata], Field(default_factory=list)]
+    """The list of dataset items returned on this page."""
 
 
 class KeyValueStoreListPage(_BaseListPage):
-    """Model for a single page of key-value store items returned from a collection list method.
-
-    Args:
-        items: List of returned key-value store items on this page.
-    """
+    """Model for a single page of key-value store items returned from a collection list method."""
 
     items: Annotated[list[KeyValueStoreMetadata], Field(default_factory=list)]
+    """The list of key-value store items returned on this page."""
 
 
 class RequestQueueListPage(_BaseListPage):
-    """Model for a single page of request queue items returned from a collection list method.
-
-    Args:
-        items: List of returned request queue items on this page.
-    """
+    """Model for a single page of request queue items returned from a collection list method."""
 
     items: Annotated[list[RequestQueueMetadata], Field(default_factory=list)]
+    """The list of request queue items returned on this page."""
 
 
 class DatasetItemsListPage(_BaseListPage):
-    """Model for a single page of dataset items returned from a collection list method.
-
-    Args:
-        items: List of returned dataset items on this page.
-    """
+    """Model for a single page of dataset items returned from a collection list method."""
 
     items: Annotated[list[dict], Field(default_factory=list)]
+    """The list of dataset items returned on this page."""
 
 
 class ProlongRequestLockResponse(BaseModel):

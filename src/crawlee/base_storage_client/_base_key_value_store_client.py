@@ -69,7 +69,7 @@ class BaseKeyValueStoreClient(ABC):
         """Retrieve the given record from the key-value store.
 
         Args:
-            key: Key of the record to retrieve
+            key: Key of the record to retrieve.
 
         Returns:
             The requested record, or None, if the record does not exist
@@ -80,7 +80,7 @@ class BaseKeyValueStoreClient(ABC):
         """Retrieve the given record from the key-value store, without parsing it.
 
         Args:
-            key: Key of the record to retrieve
+            key: Key of the record to retrieve.
 
         Returns:
             The requested record, or None, if the record does not exist
@@ -91,7 +91,7 @@ class BaseKeyValueStoreClient(ABC):
         """Retrieve the given record from the key-value store, as a stream.
 
         Args:
-            key: Key of the record to retrieve
+            key: Key of the record to retrieve.
 
         Returns:
             The requested record as a context-managed streaming Response, or None, if the record does not exist
@@ -102,9 +102,9 @@ class BaseKeyValueStoreClient(ABC):
         """Set a value to the given record in the key-value store.
 
         Args:
-            key: The key of the record to save the value to
-            value: The value to save into the record
-            content_type: The content type of the saved value
+            key: The key of the record to save the value to.
+            value: The value to save into the record.
+            content_type: The content type of the saved value.
         """
 
     @abstractmethod
@@ -112,7 +112,7 @@ class BaseKeyValueStoreClient(ABC):
         """Delete the specified record from the key-value store.
 
         Args:
-            key: The key of the record which to delete
+            key: The key of the record which to delete.
         """
 
     @abstractmethod

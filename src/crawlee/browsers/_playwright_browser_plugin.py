@@ -36,7 +36,7 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         page_options: Mapping[str, Any] | None = None,
         max_open_pages_per_browser: int = 20,
     ) -> None:
-        """Create a new instance.
+        """A default constructor.
 
         Args:
             browser_type: The type of the browser to launch.

@@ -8,4 +8,4 @@ from crawlee.http_clients import HttpCrawlingResult
 
 @dataclass(frozen=True)
 class HttpCrawlingContext(BasicCrawlingContext, HttpCrawlingResult):
-    """HTTP crawling context."""
+    """The crawling context used by the `HttpCrawler`."""

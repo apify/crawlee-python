@@ -81,8 +81,8 @@ def find_or_create_client_by_id_or_name_inner(
     Args:
         resource_client_class: The class of the resource client.
         memory_storage_client: The memory storage client used to store and retrieve storage clients.
-        id: The unique identifier for the storage client. Defaults to None.
-        name: The name of the storage client. Defaults to None.
+        id: The unique identifier for the storage client.
+        name: The name of the storage client.
 
     Raises:
         ValueError: If both id and name are None.

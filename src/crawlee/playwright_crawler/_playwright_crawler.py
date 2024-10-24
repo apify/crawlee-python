@@ -50,7 +50,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
         headless: bool | None = None,
         **kwargs: Unpack[BasicCrawlerOptions[PlaywrightCrawlingContext]],
     ) -> None:
-        """Create a new instance.
+        """A default constructor.
 
         Args:
             browser_pool: A `BrowserPool` instance to be used for launching the browsers and getting pages.

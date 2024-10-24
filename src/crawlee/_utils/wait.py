@@ -22,15 +22,15 @@ async def wait_for(
 ) -> T:
     """Wait for an async operation to complete.
 
-    If the wait times out, TimeoutError is raised and the future is cancelled.
+    If the wait times out, `TimeoutError` is raised and the future is cancelled.
     Optionally retry on error.
 
     Args:
-        operation: A function that returns the future to wait for
-        timeout: How long should we wait before cancelling the future
-        timeout_message: Message to be included in the TimeoutError in case of timeout
-        max_retries: How many times should the operation be attempted
-        logger: Used to report information about retries as they happen
+        operation: A function that returns the future to wait for.
+        timeout: How long should we wait before cancelling the future.
+        timeout_message: Message to be included in the `TimeoutError` in case of timeout.
+        max_retries: How many times should the operation be attempted.
+        logger: Used to report information about retries as they happen.
     """
     for iteration in range(1, max_retries + 1):
         try:

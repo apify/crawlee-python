@@ -17,46 +17,43 @@ logger = getLogger(__name__)
 
 
 class CpuInfo(BaseModel):
-    """Information about the CPU usage.
-
-    Args:
-        used_ratio: The ratio of CPU currently in use, represented as a float between 0 and 1.
-        created_at: The time at which the measurement was taken.
-    """
+    """Information about the CPU usage."""
 
     model_config = ConfigDict(populate_by_name=True)
 
     used_ratio: Annotated[float, Field(alias='usedRatio')]
+    """The ratio of CPU currently in use, represented as a float between 0 and 1."""
+
     created_at: datetime = Field(
         alias='createdAt',
         default_factory=lambda: datetime.now(timezone.utc),
     )
+    """The time at which the measurement was taken."""
 
 
 class MemoryInfo(BaseModel):
-    """Information about the memory usage.
-
-    Args:
-        total_size: Total memory available in the system.
-        current_size: Memory usage of the current Python process and its children.
-        created_at: The time at which the measurement was taken.
-    """
+    """Information about the memory usage."""
 
     model_config = ConfigDict(populate_by_name=True)
 
     total_size: Annotated[
         ByteSize, PlainValidator(ByteSize.validate), PlainSerializer(lambda size: size.bytes), Field(alias='totalSize')
     ]
+    """Total memory available in the system."""
+
     current_size: Annotated[
         ByteSize,
         PlainValidator(ByteSize.validate),
         PlainSerializer(lambda size: size.bytes),
         Field(alias='currentSize'),
     ]
+    """Memory usage of the current Python process and its children."""
+
     created_at: datetime = Field(
         alias='createdAt',
         default_factory=lambda: datetime.now(timezone.utc),
     )
+    """The time at which the measurement was taken."""
 
 
 def get_cpu_info() -> CpuInfo:
