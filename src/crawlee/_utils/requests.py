@@ -142,13 +142,7 @@ def compute_unique_key(
 
 
 def _get_payload_hash(payload: HttpPayload | None) -> str:
-    if payload is None:
-        payload_in_bytes = b''
-    elif isinstance(payload, str):
-        payload_in_bytes = payload.encode('utf-8')
-    else:
-        payload_in_bytes = payload
-
+    payload_in_bytes = b'' if payload is None else payload
     return compute_short_hash(payload_in_bytes)
 
 

@@ -91,7 +91,7 @@ def test_compute_unique_key_handles_fragments() -> None:
 
 def test_compute_unique_key_handles_payload() -> None:
     url = 'https://crawlee.dev'
-    payload = '{"key": "value"}'
+    payload = b'{"key": "value"}'
 
     # Payload without extended unique key
     uk = compute_unique_key(url, method='POST', payload=payload, use_extended_unique_key=False)
@@ -101,12 +101,8 @@ def test_compute_unique_key_handles_payload() -> None:
     uk = compute_unique_key(url, method='POST', payload=None, use_extended_unique_key=True)
     assert uk == 'POST|e3b0c442|e3b0c442|https://crawlee.dev'
 
-    # Extended unique key and payload is string
-    uk = compute_unique_key(url, method='POST', payload=payload, use_extended_unique_key=True)
-    assert uk == 'POST|e3b0c442|9724c1e2|https://crawlee.dev'
-
     # Extended unique key and payload is bytes
-    uk = compute_unique_key(url, method='POST', payload=payload.encode(), use_extended_unique_key=True)
+    uk = compute_unique_key(url, method='POST', payload=payload, use_extended_unique_key=True)
     assert uk == 'POST|e3b0c442|9724c1e2|https://crawlee.dev'
 
 

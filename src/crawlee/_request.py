@@ -127,15 +127,14 @@ class BaseRequestData(BaseModel):
     method: HttpMethod = 'GET'
     """HTTP request method."""
 
-    headers: Annotated[HttpHeaders, Field(default_factory=HttpHeaders())] = HttpHeaders()
+    headers: Annotated[HttpHeaders, Field(default_factory=HttpHeaders)] = HttpHeaders()
     """HTTP request headers."""
 
     query_params: Annotated[HttpQueryParams, Field(alias='queryParams', default_factory=dict)] = {}
     """URL query parameters."""
 
     payload: HttpPayload | None = None
-
-    data: Annotated[dict[str, Any], Field(default_factory=dict)] = {}
+    """HTTP request payload."""
 
     user_data: Annotated[
         dict[str, JsonSerializable],  # Internally, the model contains `UserData`, this is just for convenience
@@ -169,6 +168,8 @@ class BaseRequestData(BaseModel):
         url: str,
         *,
         method: HttpMethod = 'GET',
+        headers: HttpHeaders | None = None,
+        query_params: HttpQueryParams | None = None,
         payload: HttpPayload | None = None,
         label: str | None = None,
         unique_key: str | None = None,
@@ -178,9 +179,13 @@ class BaseRequestData(BaseModel):
         **kwargs: Any,
     ) -> Self:
         """Create a new `BaseRequestData` instance from a URL. See `Request.from_url` for more details."""
+        headers = headers or HttpHeaders()
+        query_params = query_params or {}
+
         unique_key = unique_key or compute_unique_key(
             url,
             method=method,
+            headers=headers,
             payload=payload,
             keep_url_fragment=keep_url_fragment,
             use_extended_unique_key=use_extended_unique_key,
@@ -193,6 +198,8 @@ class BaseRequestData(BaseModel):
             unique_key=unique_key,
             id=id,
             method=method,
+            headers=headers,
+            query_params=query_params,
             payload=payload,
             **kwargs,
         )
@@ -243,6 +250,8 @@ class Request(BaseRequestData):
         url: str,
         *,
         method: HttpMethod = 'GET',
+        headers: HttpHeaders | None = None,
+        query_params: HttpQueryParams | None = None,
         payload: HttpPayload | None = None,
         label: str | None = None,
         unique_key: str | None = None,
@@ -261,6 +270,8 @@ class Request(BaseRequestData):
         Args:
             url: The URL of the request.
             method: The HTTP method of the request.
+            headers: The HTTP headers of the request.
+            query_params: The query parameters of the URL.
             payload: The data to be sent as the request body. Typically used with 'POST' or 'PUT' requests.
             label: A custom label to differentiate between request types. This is stored in `user_data`, and it is
                 used for request routing (different requests go to different handlers).
@@ -274,9 +285,13 @@ class Request(BaseRequestData):
                 computation. This is only relevant when `unique_key` is not provided.
             **kwargs: Additional request properties.
         """
+        headers = headers or HttpHeaders()
+        query_params = query_params or {}
+
         unique_key = unique_key or compute_unique_key(
             url,
             method=method,
+            headers=headers,
             payload=payload,
             keep_url_fragment=keep_url_fragment,
             use_extended_unique_key=use_extended_unique_key,
@@ -289,6 +304,8 @@ class Request(BaseRequestData):
             unique_key=unique_key,
             id=id,
             method=method,
+            headers=headers,
+            query_params=query_params,
             payload=payload,
             **kwargs,
         )
@@ -376,6 +393,36 @@ class Request(BaseRequestData):
     @forefront.setter
     def forefront(self, new_value: bool) -> None:
         self.crawlee_data.forefront = new_value
+
+    def __eq__(self, other: object) -> bool:
+        """Compare all relevant fields of the `Request` class, excluding deprecated fields `json_` and `order_no`.
+
+        TODO: Remove this method once the issue is resolved.
+        https://github.com/apify/crawlee-python/issues/94
+        """
+        if isinstance(other, Request):
+            return (
+                self.url == other.url
+                and self.unique_key == other.unique_key
+                and self.method == other.method
+                and self.headers == other.headers
+                and self.query_params == other.query_params
+                and self.payload == other.payload
+                and self.user_data == other.user_data
+                and self.retry_count == other.retry_count
+                and self.no_retry == other.no_retry
+                and self.loaded_url == other.loaded_url
+                and self.handled_at == other.handled_at
+                and self.id == other.id
+                and self.label == other.label
+                and self.state == other.state
+                and self.max_retries == other.max_retries
+                and self.session_rotation_count == other.session_rotation_count
+                and self.enqueue_strategy == other.enqueue_strategy
+                and self.last_proxy_tier == other.last_proxy_tier
+                and self.forefront == other.forefront
+            )
+        return NotImplemented
 
 
 class RequestWithLock(Request):

@@ -52,7 +52,7 @@ HttpMethod: TypeAlias = Literal['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT
 
 HttpQueryParams: TypeAlias = dict[str, str]
 
-HttpPayload: TypeAlias = Union[str, bytes]
+HttpPayload: TypeAlias = bytes
 
 
 def _normalize_headers(headers: Mapping[str, str]) -> dict[str, str]:
