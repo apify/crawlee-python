@@ -214,11 +214,12 @@ async def test_http_status_statistics(crawler: HttpCrawler, server: respx.MockRo
     [CurlImpersonateHttpClient, HttpxHttpClient],
     ids=['curl', 'httpx'],
 )
-async def test_filling_web_form(http_client_class: type[BaseHttpClient]) -> None:
+async def test_sending_payload(http_client_class: type[BaseHttpClient]) -> None:
     http_client = http_client_class()
     crawler = HttpCrawler(http_client=http_client)
 
-    form_data = {
+    # Payload, e.g. data from a form submission.
+    payload = {
         'custname': 'John Doe',
         'custtel': '1234567890',
         'custemail': 'johndoe@example.com',
@@ -233,13 +234,13 @@ async def test_filling_web_form(http_client_class: type[BaseHttpClient]) -> None
     @crawler.router.default_handler
     async def request_handler(context: HttpCrawlingContext) -> None:
         response = json.loads(context.http_response.read())
-        # The httpbin.org/post endpoint returns the form data in the response.
+        # The httpbin.org/post endpoint returns the provided payload in the response.
         responses.append(response)
 
     request = Request.from_url(
         url='https://httpbin.org/post',
         method='POST',
-        payload=urlencode(form_data).encode(),
+        payload=urlencode(payload).encode(),
     )
 
     await crawler.run([request])
@@ -247,10 +248,10 @@ async def test_filling_web_form(http_client_class: type[BaseHttpClient]) -> None
     # The request handler should be called once.
     assert len(responses) == 1
 
-    # The reconstructed form data should match the original form data. We have to flatten the values, because
+    # The reconstructed payload data should match the original payload. We have to flatten the values, because
     # parse_qs returns a list of values for each key.
     response_data = {
         k: v[0] if len(v) == 1 else v for k, v in parse_qs(responses[0]['data'].strip("b'").strip("'")).items()
     }
 
-    assert response_data == form_data
+    assert response_data == payload
