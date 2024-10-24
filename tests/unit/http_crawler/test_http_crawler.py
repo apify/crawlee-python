@@ -223,7 +223,7 @@ async def test_filling_web_form(http_client_class: type[BaseHttpClient]) -> None
         'custtel': '1234567890',
         'custemail': 'johndoe@example.com',
         'size': 'large',
-        'topping': '["bacon","cheese","mushroom"]',
+        'topping': '["bacon", "cheese", "mushroom"]',
         'delivery': '13:00',
         'comments': 'Please ring the doorbell upon arrival.',
     }
