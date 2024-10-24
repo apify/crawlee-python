@@ -398,7 +398,7 @@ class RequestQueue(BaseStorage, RequestProvider):
 
         Args:
             request: The request to return to the queue.
-            forefront: Whether to add the request to the head or the end of the queue
+            forefront: Whether to add the request to the head or the end of the queue.
 
         Returns:
             Information about the queue operation. `None` if the given request was not in progress.

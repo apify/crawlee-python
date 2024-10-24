@@ -47,42 +47,30 @@ class Snapshotter:
         memory_warning_cooldown_period: timedelta = timedelta(milliseconds=10000),
         client_rate_limit_error_retry_count: int = 2,
     ) -> None:
-        """Creates a new instance.
+        """A default constructor.
 
         Args:
             event_manager: The event manager used to emit system info events. From data provided by this event
               the CPU and memory usage are read.
-
             event_loop_snapshot_interval: The interval at which the event loop is sampled.
-
             client_snapshot_interval: The interval at which the client is sampled.
-
             max_used_cpu_ratio: Sets the ratio, defining the maximum CPU usage. When the CPU usage is higher than
                 the provided ratio, the CPU is considered overloaded.
-
             max_memory_size: Sets the maximum amount of system memory to be used by the `AutoscaledPool`. If `None`
                 is provided, the max amount of memory to be used is set to one quarter of total system memory.
                 I.e. on a system with 8192 MB, the `AutoscaledPool` will only use up to 2048 MB of memory.
-
             max_used_memory_ratio: Sets the ratio, defining the maximum ratio of memory usage. When the memory usage
                 is higher than the provided ratio of `max_memory_size`, the memory is considered overloaded.
-
             max_event_loop_delay: Sets the maximum delay of the event loop. When the delay is higher than the provided
                 value, the event loop is considered overloaded.
-
             max_client_errors: Sets the maximum number of client errors (HTTP 429). When the number of client errors
                 is higher than the provided number, the client is considered overloaded.
-
             snapshot_history: Sets the time interval for which the snapshots are kept.
-
             available_memory_ratio: How big part of the system memory should be used if `max_memory_size` is not given.
-
             reserve_memory_ratio: Fraction of memory kept in reserve. Used to calculate critical memory overload
                 threshold.
-
             memory_warning_cooldown_period: Minimum time interval between logging successive critical memory overload
                 warnings.
-
             client_rate_limit_error_retry_count: Number of retries for a client request before considering it a failure
                 due to rate limiting.
         """

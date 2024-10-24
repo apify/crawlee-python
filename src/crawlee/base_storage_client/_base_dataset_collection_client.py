@@ -26,10 +26,8 @@ class BaseDatasetCollectionClient(ABC):
         Args:
             id: Optional ID of the dataset to retrieve or create. If provided, the method will attempt
                 to find a dataset with the ID.
-
             name: Optional name of the dataset resource to retrieve or create. If provided, the method will
                 attempt to find a dataset with this name.
-
             schema: Optional schema for the dataset resource to be created.
 
         Returns:

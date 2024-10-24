@@ -45,23 +45,18 @@ class SystemStatus:
         event_loop_overload_threshold: float = 0.6,
         client_overload_threshold: float = 0.3,
     ) -> None:
-        """Creates a new instance.
+        """A default constructor.
 
         Args:
             snapshotter: The `Snapshotter` instance to be queried for `SystemStatus`.
-
             max_snapshot_age: Defines max age of snapshots used in the `SystemStatus.get_current_system_info`
                 measurement.
-
             cpu_overload_threshold: Sets the threshold of overloaded snapshots in the CPU sample.
                 If the sample exceeds this threshold, the system will be considered overloaded.
-
             memory_overload_threshold: Sets the threshold of overloaded snapshots in the memory sample.
                 If the sample exceeds this threshold, the system will be considered overloaded.
-
             event_loop_overload_threshold: Sets the threshold of overloaded snapshots in the event loop sample.
                 If the sample exceeds this threshold, the system will be considered overloaded.
-
             client_overload_threshold: Sets the threshold of overloaded snapshots in the Client sample.
                 If the sample exceeds this threshold, the system will be considered overloaded.
         """

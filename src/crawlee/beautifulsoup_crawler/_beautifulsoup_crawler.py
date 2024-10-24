@@ -33,17 +33,15 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
         ignore_http_error_status_codes: Iterable[int] = (),
         **kwargs: Unpack[BasicCrawlerOptions[BeautifulSoupCrawlingContext]],
     ) -> None:
-        """Initialize the BeautifulSoupCrawler.
+        """A default constructor.
 
         Args:
-            parser: The type of parser that should be used by BeautifulSoup
-
-            additional_http_error_status_codes: HTTP status codes that should be considered errors (and trigger a retry)
-
+            parser: The type of parser that should be used by `BeautifulSoup`.
+            additional_http_error_status_codes: HTTP status codes that should be considered errors (and trigger
+                a retry).
             ignore_http_error_status_codes: HTTP status codes that are normally considered errors but we want to treat
-                them as successful
-
-            kwargs: Arguments to be forwarded to the underlying BasicCrawler
+                them as successful.
+            kwargs: Arguments to be forwarded to the underlying `BasicCrawler`.
         """
         self._parser = parser
 

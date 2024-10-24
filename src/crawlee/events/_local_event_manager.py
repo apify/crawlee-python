@@ -28,7 +28,7 @@ class LocalEventManager(EventManager):
         system_info_interval: timedelta = timedelta(seconds=1),
         **event_manager_options: Unpack[EventManagerOptions],
     ) -> None:
-        """Create a new instance.
+        """A default constructor.
 
         Args:
             system_info_interval: Interval at which `SystemInfo` events are emitted.

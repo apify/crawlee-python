@@ -44,7 +44,7 @@ class EventManager:
         persist_state_interval: timedelta = timedelta(minutes=1),
         close_timeout: timedelta | None = None,
     ) -> None:
-        """Create a new instance.
+        """A default constructor.
 
         Args:
             persist_state_interval: Interval at which `PersistState` events are emitted.

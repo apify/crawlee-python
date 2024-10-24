@@ -42,12 +42,10 @@ class HttpCrawlingResult:
 
     Mainly for the purpose of composing specific crawling contexts (e.g. `BeautifulSoupCrawlingContext`,
     `ParselCrawlingContext`, ...).
-
-    Args:
-        http_response: The HTTP response received from the server.
     """
 
     http_response: HttpResponse
+    """The HTTP response received from the server."""
 
 
 class BaseHttpClient(ABC):
@@ -69,7 +67,7 @@ class BaseHttpClient(ABC):
         additional_http_error_status_codes: Iterable[int] = (),
         ignore_http_error_status_codes: Iterable[int] = (),
     ) -> None:
-        """Create a new instance.
+        """A default constructor.
 
         Args:
             persist_cookies_per_session: Whether to persist cookies per HTTP session.

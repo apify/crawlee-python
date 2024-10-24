@@ -45,17 +45,21 @@ class CrawleeRequestData(BaseModel):
     `BasicCrawler`."""
 
     enqueue_strategy: Annotated[str | None, Field(alias='enqueueStrategy')] = None
+    """The strategy used when enqueueing the request."""
 
     state: RequestState | None = None
     """Describes the request's current lifecycle state."""
 
     session_rotation_count: Annotated[int | None, Field(alias='sessionRotationCount')] = None
+    """The number of finished session rotations for this request."""
 
     skip_navigation: Annotated[bool, Field(alias='skipNavigation')] = False
 
     last_proxy_tier: Annotated[int | None, Field(alias='lastProxyTier')] = None
+    """The last proxy tier used to process the request."""
 
     forefront: Annotated[bool, Field()] = False
+    """Indicate whether the request should be enqueued at the front of the queue."""
 
 
 class UserData(BaseModel, MutableMapping[str, JsonSerializable]):
@@ -69,7 +73,10 @@ class UserData(BaseModel, MutableMapping[str, JsonSerializable]):
     __pydantic_extra__: dict[str, JsonSerializable] = Field(init=False)  # pyright: ignore
 
     crawlee_data: Annotated[CrawleeRequestData | None, Field(alias='__crawlee')] = None
+    """Crawlee-specific configuration stored in the `user_data`."""
+
     label: Annotated[str | None, Field()] = None
+    """Label used for request routing."""
 
     def __getitem__(self, key: str) -> JsonSerializable:
         return self.__pydantic_extra__[key]
@@ -110,7 +117,8 @@ class BaseRequestData(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     url: Annotated[str, BeforeValidator(validate_http_url), Field()]
-    """URL of the web page to crawl"""
+    """The URL of the web page to crawl. Must be a valid HTTP or HTTPS URL, and may include query parameters
+    and fragments."""
 
     unique_key: Annotated[str, Field(alias='uniqueKey')]
     """A unique key identifying the request. Two requests with the same `unique_key` are considered as pointing
@@ -155,12 +163,16 @@ class BaseRequestData(BaseModel):
     """
 
     retry_count: Annotated[int, Field(alias='retryCount')] = 0
+    """Number of times the request has been retried."""
 
     no_retry: Annotated[bool, Field(alias='noRetry')] = False
+    """If set to `True`, the request will not be retried in case of failure."""
 
     loaded_url: Annotated[str | None, BeforeValidator(validate_http_url), Field(alias='loadedUrl')] = None
+    """URL of the web page that was loaded. This can differ from the original URL in case of redirects."""
 
     handled_at: Annotated[datetime | None, Field(alias='handledAt')] = None
+    """Timestamp when the request was handled."""
 
     @classmethod
     def from_url(
@@ -237,12 +249,20 @@ class Request(BaseRequestData):
     """
 
     id: str
+    """A unique identifier for the request. Note that this is not used for deduplication, and should not be confused
+    with `unique_key`."""
 
-    json_: str | None = None  # TODO: get rid of this
-    # https://github.com/apify/crawlee-python/issues/94
+    json_: str | None = None
+    """Deprecated internal field, do not use it.
 
-    order_no: Decimal | None = None  # TODO: get rid of this
-    # https://github.com/apify/crawlee-python/issues/94
+    Should be removed as part of https://github.com/apify/crawlee-python/issues/94.
+    """
+
+    order_no: Decimal | None = None
+    """Deprecated internal field, do not use it.
+
+    Should be removed as part of https://github.com/apify/crawlee-python/issues/94.
+    """
 
     @classmethod
     def from_url(
@@ -329,7 +349,7 @@ class Request(BaseRequestData):
 
     @property
     def crawlee_data(self) -> CrawleeRequestData:
-        """Crawlee-specific configuration stored in the user_data."""
+        """Crawlee-specific configuration stored in the `user_data`."""
         user_data = cast(UserData, self.user_data)
         if user_data.crawlee_data is None:
             user_data.crawlee_data = CrawleeRequestData()
@@ -387,7 +407,7 @@ class Request(BaseRequestData):
 
     @property
     def forefront(self) -> bool:
-        """Should the request be enqueued at the start of the queue?"""
+        """Indicate whether the request should be enqueued at the front of the queue."""
         return self.crawlee_data.forefront
 
     @forefront.setter
@@ -429,3 +449,4 @@ class RequestWithLock(Request):
     """A crawling request with information about locks."""
 
     lock_expires_at: Annotated[datetime, Field(alias='lockExpiresAt')]
+    """The timestamp when the lock expires."""

@@ -26,10 +26,8 @@ class BaseKeyValueStoreCollectionClient(ABC):
         Args:
             id: Optional ID of the key-value store to retrieve or create. If provided, the method will attempt
                 to find a key-value store with the ID.
-
             name: Optional name of the key-value store resource to retrieve or create. If provided, the method will
                 attempt to find a key-value store with this name.
-
             schema: Optional schema for the key-value store resource to be created.
 
         Returns:

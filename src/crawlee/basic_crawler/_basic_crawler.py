@@ -121,14 +121,14 @@ class BasicCrawler(Generic[TCrawlingContext]):
         _additional_context_managers: Sequence[AsyncContextManager] | None = None,
         _logger: logging.Logger | None = None,
     ) -> None:
-        """Initialize the BasicCrawler.
+        """A default constructor.
 
         Args:
-            request_provider: Provides requests to be processed
-            request_handler: A callable to which request handling is delegated
+            request_provider: Provides requests to be processed.
+            request_handler: A callable to which request handling is delegated.
             http_client: HTTP client to be used for `BasicCrawlingContext.send_request` and HTTP-only crawling.
-            concurrency_settings: Allows fine-tuning concurrency levels
-            max_request_retries: Maximum amount of attempts at processing a request
+            concurrency_settings: Allows fine-tuning concurrency levels.
+            max_request_retries: Maximum amount of attempts at processing a request.
             max_requests_per_crawl: Maximum number of pages that the crawler will open. The crawl will stop when
                 the limit is reached. It is recommended to set this value in order to prevent infinite loops in
                 misconfigured crawlers. None means no limit. Due to concurrency_settings, the actual number of pages
@@ -136,19 +136,19 @@ class BasicCrawler(Generic[TCrawlingContext]):
             max_session_rotations: Maximum number of session rotations per request.
                 The crawler will automatically rotate the session in case of a proxy error or if it gets blocked by
                 the website.
-            configuration: Crawler configuration
-            request_handler_timeout: How long is a single request handler allowed to run
-            use_session_pool: Enables using the session pool for crawling
-            session_pool: A preconfigured `SessionPool` instance if you wish to use non-default configuration
-            retry_on_blocked: If set to True, the crawler will try to automatically bypass any detected bot protection
-            proxy_configuration: A HTTP proxy configuration to be used for making requests
-            statistics: A preconfigured `Statistics` instance if you wish to use non-default configuration
-            event_manager: A custom `EventManager` instance if you wish to use a non-default one
-            configure_logging: If set to True, the crawler will configure the logging infrastructure
+            configuration: Crawler configuration.
+            request_handler_timeout: How long a single request handler is allowed to run.
+            use_session_pool: Enables using the session pool for crawling.
+            session_pool: A preconfigured `SessionPool` instance if you wish to use non-default configuration.
+            retry_on_blocked: If set to True, the crawler will try to automatically bypass any detected bot protection.
+            proxy_configuration: A HTTP proxy configuration to be used for making requests.
+            statistics: A preconfigured `Statistics` instance if you wish to use non-default configuration.
+            event_manager: A custom `EventManager` instance if you wish to use a non-default one.
+            configure_logging: If set to True, the crawler will configure the logging infrastructure.
             _context_pipeline: Allows extending the request lifecycle and modifying the crawling context.
                 This parameter is meant to be used by child classes, not when BasicCrawler is instantiated directly.
             _additional_context_managers: Additional context managers to be used in the crawler lifecycle.
-            _logger: A logger instance passed from a child class to ensure consistent labels
+            _logger: A logger instance passed from a child class to ensure consistent labels.
         """
         self._router: Router[TCrawlingContext] | None = None
 
@@ -339,9 +339,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
         """Run the crawler until all requests are processed.
 
         Args:
-            requests: The requests to be enqueued before the crawler starts
+            requests: The requests to be enqueued before the crawler starts.
             purge_request_queue: If this is `True` and the crawler is not being run for the first time, the default
-                request queue will be purged
+                request queue will be purged.
         """
         if self._running:
             raise RuntimeError(
@@ -485,8 +485,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
         dataset and then exports the data based on the provided parameters.
 
         Args:
-            path: The destination path
-            content_type: The output format
+            path: The destination path.
+            content_type: The output format.
             dataset_id: The ID of the dataset.
             dataset_name: The name of the dataset.
         """

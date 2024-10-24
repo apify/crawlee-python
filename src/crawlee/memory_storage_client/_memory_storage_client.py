@@ -44,10 +44,10 @@ class MemoryStorageClient(BaseStorageClient):
     """Name of the directory used to temporarily store files during purges."""
 
     def __init__(self, configuration: Configuration | None = None) -> None:
-        """Create a new instance.
+        """A default constructor.
 
         Args:
-            configuration: Configuration object to use. If None, a default Configuration object will be created.
+            configuration: Configuration object to use. If None, a default instance will be created.
         """
         self._explicit_configuration = configuration
 

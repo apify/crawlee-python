@@ -109,7 +109,7 @@ class BaseDatasetClient(ABC):
 
         Args:
             offset: The number of initial items to skip.
-            limit: The maximum number of items to iterate over. Defaults to no limit.
+            limit: The maximum number of items to iterate over. None means no limit.
             clean: If True, removes empty items and hidden fields, equivalent to 'skip_hidden' and 'skip_empty'.
             desc: If set to True, items are returned in descending order, i.e., newest first.
             fields: Specifies a subset of fields to include in each item.

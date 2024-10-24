@@ -48,6 +48,7 @@ class ProxyInfo:
     Using the same session ID guarantees getting the same proxy URL."""
 
     proxy_tier: int | None = None
+    """The tier of the proxy."""
 
 
 class ProxyConfiguration:
@@ -69,7 +70,7 @@ class ProxyConfiguration:
         new_url_function: _NewUrlFunction | None = None,
         tiered_proxy_urls: list[list[str]] | None = None,
     ) -> None:
-        """Initialize a proxy configuration object.
+        """A default constructor.
 
         Exactly one of `proxy_urls`, `tiered_proxy_urls` or `new_url_function` must be specified.
 

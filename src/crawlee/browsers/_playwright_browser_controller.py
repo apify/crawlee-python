@@ -37,7 +37,7 @@ class PlaywrightBrowserController(BaseBrowserController):
         max_open_pages_per_browser: int = 20,
         header_generator: HeaderGenerator | None = _DEFAULT_HEADER_GENERATOR,
     ) -> None:
-        """Create a new instance.
+        """A default constructor.
 
         Args:
             browser: The browser instance to control.

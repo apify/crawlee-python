@@ -29,7 +29,7 @@ class RequestList(RequestProvider):
         requests: Sequence[str | Request] | None = None,
         name: str | None = None,
     ) -> None:
-        """Initialize the RequestList.
+        """A default constructor.
 
         Args:
             requests: The request objects (or their string representations) to be added to the provider.
