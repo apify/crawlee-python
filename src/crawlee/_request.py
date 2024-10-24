@@ -133,10 +133,7 @@ class BaseRequestData(BaseModel):
     query_params: Annotated[HttpQueryParams, Field(alias='queryParams', default_factory=dict)] = {}
     """URL query parameters."""
 
-    payload: Annotated[
-        HttpPayload | None,
-        PlainValidator(lambda value: None if value is None else str(value).encode('utf-8')),
-    ] = None
+    payload: HttpPayload | None = None
     """HTTP request payload."""
 
     user_data: Annotated[
