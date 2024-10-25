@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Awaitable, Callable
 
 from pydantic import ValidationError
 from typing_extensions import Unpack
@@ -14,6 +14,7 @@ from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipe
 from crawlee.browsers import BrowserPool
 from crawlee.errors import SessionError
 from crawlee.playwright_crawler._playwright_crawling_context import PlaywrightCrawlingContext
+from crawlee.playwright_crawler._playwright_pre_navigation_context import PlaywrightPreNavigationContext
 from crawlee.playwright_crawler._utils import infinite_scroll
 
 if TYPE_CHECKING:
@@ -95,16 +96,41 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
 
         # Compose the context pipeline with the Playwright-specific context enhancer.
         kwargs['_context_pipeline'] = (
-            ContextPipeline().compose(self._make_http_request).compose(self._handle_blocked_request)
+            ContextPipeline().compose(self._open_page).compose(self._navigate).compose(self._handle_blocked_request)
         )
         kwargs['_additional_context_managers'] = [self._browser_pool]
         kwargs.setdefault('_logger', logging.getLogger(__name__))
+        self._pre_navigation_hooks: list[Callable[[PlaywrightPreNavigationContext], Awaitable[None]]] = []
 
         super().__init__(**kwargs)
 
-    async def _make_http_request(
+    async def _open_page(self, context: BasicCrawlingContext) -> AsyncGenerator[PlaywrightPreNavigationContext, None]:
+        if self._browser_pool is None:
+            raise ValueError('Browser pool is not initialized.')
+
+        # Create a new browser page
+        crawlee_page = await self._browser_pool.new_page(proxy_info=context.proxy_info)
+
+        pre_navigation_context = PlaywrightPreNavigationContext(
+            request=context.request,
+            session=context.session,
+            add_requests=context.add_requests,
+            send_request=context.send_request,
+            push_data=context.push_data,
+            proxy_info=context.proxy_info,
+            get_key_value_store=context.get_key_value_store,
+            log=context.log,
+            page=crawlee_page.page,
+        )
+
+        for hook in self._pre_navigation_hooks:
+            await hook(pre_navigation_context)
+
+        yield pre_navigation_context
+
+    async def _navigate(
         self,
-        context: BasicCrawlingContext,
+        context: PlaywrightPreNavigationContext,
     ) -> AsyncGenerator[PlaywrightCrawlingContext, None]:
         """Executes an HTTP request utilizing the `BrowserPool` and the `Playwright` library.
 
@@ -119,21 +145,15 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
             The enhanced crawling context with the Playwright-specific features (page, response, enqueue_links, and
                 infinite_scroll).
         """
-        if self._browser_pool is None:
-            raise ValueError('Browser pool is not initialized.')
-
-        # Create a new browser page
-        crawlee_page = await self._browser_pool.new_page(proxy_info=context.proxy_info)
-
-        async with crawlee_page.page:
+        async with context.page:
             # Navigate to the URL and get response.
-            response = await crawlee_page.page.goto(context.request.url)
+            response = await context.page.goto(context.request.url)
 
             if response is None:
                 raise SessionError(f'Failed to load the URL: {context.request.url}')
 
             # Set the loaded URL to the actual URL after redirection.
-            context.request.loaded_url = crawlee_page.page.url
+            context.request.loaded_url = context.page.url
 
             async def enqueue_links(
                 *,
@@ -148,7 +168,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 requests = list[BaseRequestData]()
                 user_data = user_data or {}
 
-                elements = await crawlee_page.page.query_selector_all(selector)
+                elements = await context.page.query_selector_all(selector)
 
                 for element in elements:
                     url = await element.get_attribute('href')
@@ -187,8 +207,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 proxy_info=context.proxy_info,
                 get_key_value_store=context.get_key_value_store,
                 log=context.log,
-                page=crawlee_page.page,
-                infinite_scroll=lambda: infinite_scroll(crawlee_page.page),
+                page=context.page,
+                infinite_scroll=lambda: infinite_scroll(context.page),
                 response=response,
                 enqueue_links=enqueue_links,
             )
@@ -227,3 +247,11 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 )
 
         yield context
+
+    def pre_navigation_hook(self, hook: Callable[[PlaywrightPreNavigationContext], Awaitable[None]]) -> None:
+        """Register a hook to be called before each navigation.
+
+        Args:
+            hook: A coroutine function to be called before each navigation.
+        """
+        self._pre_navigation_hooks.append(hook)

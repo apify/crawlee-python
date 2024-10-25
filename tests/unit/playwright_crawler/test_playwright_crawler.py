@@ -131,3 +131,18 @@ async def test_firefox_headless_headers() -> None:
     assert 'headless' not in headers['User-Agent'].lower()
 
     assert headers['User-Agent'] == PW_FIREFOX_HEADLESS_DEFAULT_USER_AGENT
+
+
+async def test_pre_navigation_hook() -> None:
+    crawler = PlaywrightCrawler()
+    mock_hook = mock.AsyncMock(return_value=None)
+
+    crawler.pre_navigation_hook(mock_hook)
+
+    @crawler.router.default_handler
+    async def request_handler(_context: PlaywrightCrawlingContext) -> None:
+        pass
+
+    await crawler.run(['https://example.com', 'https://httpbin.org'])
+
+    assert mock_hook.call_count == 2

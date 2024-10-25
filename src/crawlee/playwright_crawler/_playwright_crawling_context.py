@@ -3,21 +3,20 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Awaitable, Callable
 
-from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction
+from crawlee.playwright_crawler._playwright_pre_navigation_context import PlaywrightPreNavigationContext
 
 if TYPE_CHECKING:
-    from playwright.async_api import Page, Response
+    from playwright.async_api import Response
+
+    from crawlee._types import EnqueueLinksFunction
 
 
 @dataclass(frozen=True)
-class PlaywrightCrawlingContext(BasicCrawlingContext):
+class PlaywrightCrawlingContext(PlaywrightPreNavigationContext):
     """The crawling context used by the `PlaywrightCrawler`.
 
     It provides access to key objects as well as utility functions for handling crawling tasks.
     """
-
-    page: Page
-    """The Playwright `Page` object for the current page."""
 
     response: Response
     """The Playwright `Response` object containing the response details for the current URL."""
