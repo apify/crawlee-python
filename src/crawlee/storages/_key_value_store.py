@@ -39,8 +39,11 @@ class KeyValueStore(BaseStorage):
     that does not exist will raise an error; however, if accessed by `name`, the store will be created if it does not
     already exist.
 
-    Usage:
+    ### Usage
+
     ```python
+    from crawlee.storages import KeyValueStore
+
     kvs = await KeyValueStore.open(name='my_kvs')
     ```
     """
