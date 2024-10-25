@@ -55,7 +55,7 @@ if TYPE_CHECKING:
     from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
     from crawlee.sessions import Session
     from crawlee.statistics import FinalStatistics, StatisticsState
-    from crawlee.storages._dataset import GetDataKwargs, PushDataKwargs
+    from crawlee.storages._dataset import GetDataKwargs, PushDataKwargs, ExportDataCsvKwargs, ExportDataJsonKwargs
     from crawlee.storages._request_provider import RequestProvider
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
@@ -475,10 +475,18 @@ class BasicCrawler(Generic[TCrawlingContext]):
     async def export_data(
         self,
         path: str | Path,
-        content_type: Literal['json', 'csv'] | None = None,
+        *,
+        content_type: Literal['csv', 'json'] = 'csv',
         dataset_id: str | None = None,
         dataset_name: str | None = None,
+        **kwargs: Any,
     ) -> None:
+        if content_type == 'csv':
+            self.export_data_csv(path, dataset_id=dataset_id, dataset_name=dataset_name, **kwargs)
+        elif content_type == 'json':
+            self.export_data_json(path, dataset_id=dataset_id, dataset_name=dataset_name, **kwargs)
+        else:
+            raise ValueError(f'Unsupported content type: {content_type}.')
         """Export data from a dataset.
 
         This helper method simplifies the process of exporting data from a dataset. It opens the specified

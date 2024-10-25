@@ -77,6 +77,32 @@ class ExportToKwargs(TypedDict):
     """Name of the key-value store to save the exported file."""
 
 
+class ExportDataJsonKwargs(TypedDict):
+    """Keyword arguments for dataset's `export_data_json` method.
+    Args:
+        ensure_asci: Whether non-ASCII characters should be escaped in the output JSON string.
+        indent: Specifies the number of spaces to use for indentation in the pretty-printed JSON output.
+        sort_keys: Specifies whether the output JSON object should have its keys sorted alphabetically.
+    """
+
+    ensure_asci: NotRequired[bool]
+    indent: NotRequired[int]
+    sort_keys: NotRequired[bool]
+
+
+class ExportDataCsvKwargs(TypedDict):
+    """Keyword arguments for dataset's `export_data_csv` method.
+    Args:
+        delimiter: A character that separates fields in the CSV file.
+        quotechar: A character used to enclose fields containing special characters like the delimiter.
+        quoting: An integer that defines how quotes should be applied.
+    """
+
+    delimiter: NotRequired[str]
+    quotechar: NotRequired[str]
+    quoting: NotRequired[int]
+
+
 class Dataset(BaseStorage):
     """Represents an append-only structured storage, ideal for tabular data similar to database tables.
 
@@ -209,12 +235,12 @@ class Dataset(BaseStorage):
         # https://github.com/apify/apify-sdk-python/issues/140
         return await self._resource_client.list_items(**kwargs)
 
-    async def write_to(self, content_type: Literal['json', 'csv'], destination: TextIO) -> None:
+    async def write_to_csv(self, destination: TextIO, **kwargs: Unpack[ExportDataCsvKwargs]) -> None:
         """Exports the entire dataset into an arbitrary stream.
 
         Args:
-            content_type: Specifies the output format.
             destination: The stream into which the dataset contents should be written.
+            kwargs: Additional keyword arguments for `csv.writer`.
         """
         items: list[dict] = []
         limit = 1000
@@ -227,16 +253,33 @@ class Dataset(BaseStorage):
                 break
             offset += list_items.count
 
-        if content_type == 'csv':
-            if items:
-                writer = csv.writer(destination, quoting=csv.QUOTE_MINIMAL)
-                writer.writerows([items[0].keys(), *[item.values() for item in items]])
-            else:
-                logger.warning('Attempting to export an empty dataset - no file will be created')
-        elif content_type == 'json':
-            json.dump(items, destination)
+        if items:
+            writer = csv.writer(destination, **kwargs)
+            writer.writerows([items[0].keys(), *[item.values() for item in items]])
         else:
-            raise ValueError(f'Unsupported content type: {content_type}')
+            logger.warning('Attempting to export an empty dataset - no file will be created')
+    
+    async def write_to_json(self, destination: TextIO, **kwargs: Unpack[ExportDataJsonKwargs]) -> None:
+        """Exports the entire dataset into an arbitrary stream.
+        Args:
+            destination: The stream into which the dataset contents should be written.
+            kwargs: Additional keyword arguments for `json.dump`.
+        """
+        items: list[dict] = []
+        limit = 1000
+        offset = 0
+
+        while True:
+            list_items = await self._resource_client.list_items(limit=limit, offset=offset)
+            items.extend(list_items.items)
+            if list_items.total <= offset + list_items.count:
+                break
+            offset += list_items.count
+
+        if items:
+            json.dump(items, destination, **kwargs)
+        else:
+            logger.warning('Attempting to export an empty dataset - no file will be created')
 
     async def export_to(self, **kwargs: Unpack[ExportToKwargs]) -> None:
         """Exports the entire dataset into a specified file stored under a key in a key-value store.
@@ -257,7 +300,12 @@ class Dataset(BaseStorage):
         key_value_store = await KeyValueStore.open(id=to_key_value_store_id, name=to_key_value_store_name)
 
         output = io.StringIO()
-        await self.write_to(content_type, output)
+        if content_type == 'csv':
+            await self.write_to_csv(output)
+        elif content_type == 'json':
+            await self.write_to_json(output)
+        else:
+            raise ValueError('Unsupported content type, expecting CSV or JSON')
 
         if content_type == 'csv':
             await key_value_store.set_value(key, output.getvalue(), 'text/csv')
