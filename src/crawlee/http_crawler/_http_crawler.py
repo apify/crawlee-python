@@ -23,7 +23,7 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
     as an input parameter to the constructor.
 
     The HTTP client-based crawlers are ideal for websites that do not require JavaScript execution. However,
-    if you need to execute client-side JavaScript, consider using browser-based crawler like the `PlaywrightCrawler`.
+    if you need to execute client-side JavaScript, consider using a browser-based crawler like the `PlaywrightCrawler`.
 
     ### Usage
 
