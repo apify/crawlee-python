@@ -214,3 +214,22 @@ async def test_complex_user_data_serialization(request_queue: RequestQueue) -> N
         'maxRetries': 1,
         'state': RequestState.ERROR_HANDLER,
     }
+
+
+async def test_always_enqueue_generates_unique_keys(request_queue: RequestQueue) -> None:
+    request_1 = Request.from_url('https://example.com', always_enqueue=True)
+    request_2 = Request.from_url('https://example.com', always_enqueue=True)
+
+    await request_queue.add_request(request_1)
+    await request_queue.add_request(request_2)
+
+    assert (
+        request_1.unique_key != request_2.unique_key
+    ), 'Unique keys should differ for requests with always_enqueue=True.'
+
+    assert await request_queue.get_total_count() == 2
+
+
+async def test_from_url_with_unique_key_and_always_enqueue() -> None:
+    with pytest.raises(ValueError, match='`always_enqueue` cannot be used with a custom `unique_key`'):
+        Request.from_url('https://example.com', unique_key='custom-key', always_enqueue=True)
