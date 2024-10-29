@@ -10,7 +10,7 @@ on:
 
 jobs:
   release_metadata:
-    if: "!startsWith(github.event.head_commit.message, 'docs') && !startsWith(github.event.head_commit.message, 'ci')"
+    if: "!startsWith(github.event.head_commit.message, 'docs') && !startsWith(github.event.head_commit.message, 'ci') && startsWith(github.repository, 'apify/')"
     name: Prepare release metadata
     runs-on: ubuntu-latest
     outputs:
