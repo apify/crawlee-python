@@ -126,8 +126,11 @@ class Dataset(BaseStorage):
     not exist will raise an error; however, if accessed by `name`, the dataset will be created if it doesn't already
     exist.
 
-    Usage:
+    ### Usage
+
     ```python
+    from crawlee.storages import Dataset
+
     dataset = await Dataset.open(name='my_dataset')
     ```
     """

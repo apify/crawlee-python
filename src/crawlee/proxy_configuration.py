@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from httpx import URL
@@ -121,11 +121,17 @@ class ProxyConfiguration:
         if url is None:
             return None
 
+        # httpx.URL port field is None for default ports
+        default_ports = {'http': 80, 'https': 443}
+        port = url.port or default_ports.get(url.scheme)
+        if port is None:
+            raise ValueError(f'Port is None for URL: {url}')
+
         info = ProxyInfo(
             url=str(url),
             scheme=url.scheme,
             hostname=url.host,
-            port=cast(int, url.port),
+            port=port,
             username=url.username,
             password=url.password,
         )

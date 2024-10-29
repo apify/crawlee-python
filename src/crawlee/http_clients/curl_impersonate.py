@@ -77,6 +77,16 @@ class CurlImpersonateHttpClient(BaseHttpClient):
     and to manage sessions, proxies, and error handling.
 
     See the `BaseHttpClient` class for more common information about HTTP clients.
+
+    ### Usage
+
+    ```python
+    from crawlee.http_clients.curl_impersonate import CurlImpersonateHttpClient
+    from crawlee.http_crawler import HttpCrawler  # or any other HTTP client-based crawler
+
+    http_client = CurlImpersonateHttpClient()
+    crawler = HttpCrawler(http_client=http_client)
+    ```
     """
 
     def __init__(
