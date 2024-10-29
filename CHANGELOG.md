@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 
 - Use strip in headers normalization ([#614](https://github.com/apify/crawlee-python/pull/614)) ([a15b21e](https://github.com/apify/crawlee-python/commit/a15b21e51deaf2b67738f95bc2b15c1c16d1775f)) by [@vdusek](https://github.com/vdusek)
 - Merge payload and data fields of Request ([#542](https://github.com/apify/crawlee-python/pull/542)) ([d06fcef](https://github.com/apify/crawlee-python/commit/d06fcef3fee44616ded5f587b9c7313b82a57cc7)) by [@vdusek](https://github.com/vdusek), closes [#560](https://github.com/apify/crawlee-python/issues/560)
+- Default ProxyInfo port if httpx.URL port is None ([#619](https://github.com/apify/crawlee-python/pull/619)) ([8107a6f](https://github.com/apify/crawlee-python/commit/8107a6f97e8f16a330e7d02d3fc6ea34c5f78d77)) by [@steffansafey](https://github.com/steffansafey), closes [#618](https://github.com/apify/crawlee-python/issues/618)
 
 
 <!-- git-cliff-unreleased-end -->
