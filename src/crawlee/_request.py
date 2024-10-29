@@ -324,7 +324,7 @@ class Request(BaseRequestData):
         )
         
         if always_enqueue:
-            unique_key += f'_{crypto_random_object_id()}'
+            unique_key = f'{unique_key}_{crypto_random_object_id()}'
 
         id = id or unique_key_to_request_id(unique_key)
 
