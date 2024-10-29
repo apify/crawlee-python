@@ -24,23 +24,43 @@ if TYPE_CHECKING:
 
 
 class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
-    """A crawler that leverages the [Playwright](https://playwright.dev/python/) browser automation library.
+    """A web crawler that leverages the `Playwright` browser automation library.
 
-    `PlaywrightCrawler` is a subclass of `BasicCrawler`, inheriting all its features, such as autoscaling of requests,
-    request routing, and utilization of `RequestProvider`. Additionally, it offers Playwright-specific methods and
-    properties, like the `page` property for user data extraction, and the `enqueue_links` method for crawling
-    other pages.
+    The `PlaywrightCrawler` builds on top of the `BasicCrawler`, which means it inherits all of its features.
+    On top of that it provides a high level web crawling interface on top of the `Playwright` library. To be more
+    specific, it uses the Crawlee's `BrowserPool` to manage the Playwright's browser instances and the pages they
+    open. You can create your own `BrowserPool` instance and pass it to the `PlaywrightCrawler` constructor, or let
+    the crawler create a new instance with the default settings.
 
-    This crawler is ideal for crawling websites that require JavaScript execution, as it uses headless browsers
-    to download web pages and extract data. For websites that do not require JavaScript, consider using
-    `BeautifulSoupCrawler`, which uses raw HTTP requests, and it is much faster.
+    This crawler is ideal for crawling websites that require JavaScript execution, as it uses real browsers
+    to download web pages and extract data. For websites that do not require JavaScript, consider using one of the
+    HTTP client-based crawlers, such as the `HttpCrawler`, `ParselCrawler`, or `BeautifulSoupCrawler`. They use
+    raw HTTP requests, which means they are much faster.
 
-    `PlaywrightCrawler` opens a new browser page (i.e., tab) for each `Request` object and invokes the user-provided
-    request handler function via the `Router`. Users can interact with the page and extract the data using
-    the Playwright API.
+    ### Usage
 
-    Note that the pool of browser instances used by `PlaywrightCrawler`, and the pages they open, is internally
-    managed by the `BrowserPool`.
+    ```python
+    from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
+
+    crawler = PlaywrightCrawler()
+
+    # Define the default request handler, which will be called for every request.
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        context.log.info(f'Processing {context.request.url} ...')
+
+        # Extract data from the page.
+        data = {
+            'url': context.request.url,
+            'title': await context.page.title(),
+            'response': (await context.response.text())[:100],
+        }
+
+        # Push the extracted data to the default dataset.
+        await context.push_data(data)
+
+    await crawler.run(['https://crawlee.dev/'])
+    ```
     """
 
     def __init__(
@@ -58,7 +78,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 This option should not be used if `browser_pool` is provided.
             headless: Whether to run the browser in headless mode.
                 This option should not be used if `browser_pool` is provided.
-            kwargs: Additional arguments to be forwarded to the underlying `BasicCrawler`.
+            kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
         """
         if browser_pool:
             # Raise an exception if browser_pool is provided together with headless or browser_type arguments.
@@ -86,7 +106,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
         self,
         context: BasicCrawlingContext,
     ) -> AsyncGenerator[PlaywrightCrawlingContext, None]:
-        """Enhance the crawling context with making an HTTP request using Playwright.
+        """Executes an HTTP request utilizing the `BrowserPool` and the `Playwright` library.
 
         Args:
             context: The basic crawling context to be enhanced.
@@ -96,7 +116,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
             SessionError: If the URL cannot be loaded by the browser.
 
         Yields:
-            An enhanced crawling context with Playwright-specific features.
+            The enhanced crawling context with the Playwright-specific features (page, response, enqueue_links, and
+                infinite_scroll).
         """
         if self._browser_pool is None:
             raise ValueError('Browser pool is not initialized.')
@@ -174,28 +195,28 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
 
     async def _handle_blocked_request(
         self,
-        crawling_context: PlaywrightCrawlingContext,
+        context: PlaywrightCrawlingContext,
     ) -> AsyncGenerator[PlaywrightCrawlingContext, None]:
-        """Enhance the crawling context with handling of blocked requests.
+        """Try to detect if the request is blocked based on the HTTP status code or the response content.
 
         Args:
-            crawling_context: The crawling context to be checked for blocking.
+            context: The current crawling context.
 
         Raises:
-            SessionError: If the session is blocked based on the HTTP status code or the response content.
+            SessionError: If the request is considered blocked.
 
         Yields:
-            The original crawling context if the session is not blocked.
+            The original crawling context if no errors are detected.
         """
         if self._retry_on_blocked:
-            status_code = crawling_context.response.status
+            status_code = context.response.status
 
             # Check if the session is blocked based on the HTTP status code.
-            if crawling_context.session and crawling_context.session.is_blocked_status_code(status_code=status_code):
+            if context.session and context.session.is_blocked_status_code(status_code=status_code):
                 raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}.')
 
             matched_selectors = [
-                selector for selector in RETRY_CSS_SELECTORS if (await crawling_context.page.query_selector(selector))
+                selector for selector in RETRY_CSS_SELECTORS if (await context.page.query_selector(selector))
             ]
 
             # Check if the session is blocked based on the response content
@@ -205,4 +226,4 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                     f"HTTP response matched the following selectors: {'; '.join(matched_selectors)}"
                 )
 
-        yield crawling_context
+        yield context

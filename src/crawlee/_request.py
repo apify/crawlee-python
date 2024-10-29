@@ -243,7 +243,11 @@ class Request(BaseRequestData):
     The recommended way to create a new instance is by using the `Request.from_url` constructor, which automatically
     generates a unique key and identifier based on the URL and request parameters.
 
+    ### Usage
+
     ```python
+    from crawlee import Request
+
     request = Request.from_url('https://crawlee.dev')
     ```
     """

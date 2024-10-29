@@ -23,7 +23,40 @@ if TYPE_CHECKING:
 
 
 class ParselCrawler(BasicCrawler[ParselCrawlingContext]):
-    """A crawler that fetches the request URL using `httpx` and parses the result with `Parsel`."""
+    """A web crawler for performing HTTP requests and parsing HTML/XML content.
+
+    The `ParselCrawler` builds on top of the `BasicCrawler`, which means it inherits all of its features.
+    On top of that it implements the HTTP communication using the HTTP clients and HTML/XML parsing using the
+    `Parsel` library. The class allows integration with any HTTP client that implements the `BaseHttpClient`
+    interface. The HTTP client is provided to the crawler as an input parameter to the constructor.
+
+    The HTTP client-based crawlers are ideal for websites that do not require JavaScript execution. However,
+    if you need to execute client-side JavaScript, consider using browser-based crawler like the `PlaywrightCrawler`.
+
+    ### Usage
+
+    ```python
+    from crawlee.parsel_crawler import ParselCrawler, ParselCrawlingContext
+
+    crawler = ParselCrawler()
+
+    # Define the default request handler, which will be called for every request.
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        context.log.info(f'Processing {context.request.url} ...')
+
+        # Extract data from the page.
+        data = {
+            'url': context.request.url,
+            'title': context.selector.css('title').get(),
+        }
+
+        # Push the extracted data to the default dataset.
+        await context.push_data(data)
+
+    await crawler.run(['https://crawlee.dev/'])
+    ```
+    """
 
     def __init__(
         self,
@@ -35,11 +68,11 @@ class ParselCrawler(BasicCrawler[ParselCrawlingContext]):
         """A default constructor.
 
         Args:
-            additional_http_error_status_codes: HTTP status codes that should be considered errors (and trigger
-                a retry).
-            ignore_http_error_status_codes: HTTP status codes that are normally considered errors but we want to treat
-                them as successful.
-            kwargs: Arguments to be forwarded to the underlying `BasicCrawler`.
+            additional_http_error_status_codes: Additional HTTP status codes to treat as errors, triggering
+                automatic retries when encountered.
+            ignore_http_error_status_codes: HTTP status codes typically considered errors but to be treated
+                as successful responses.
+            kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
         """
         kwargs['_context_pipeline'] = (
             ContextPipeline()
@@ -61,6 +94,14 @@ class ParselCrawler(BasicCrawler[ParselCrawlingContext]):
         super().__init__(**kwargs)
 
     async def _make_http_request(self, context: BasicCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
+        """Executes an HTTP request using a configured HTTP client.
+
+        Args:
+            context: The crawling context from the `BasicCrawler`.
+
+        Yields:
+            The enhanced crawling context with the HTTP response.
+        """
         result = await self._http_client.crawl(
             request=context.request,
             session=context.session,
@@ -81,15 +122,26 @@ class ParselCrawler(BasicCrawler[ParselCrawlingContext]):
         )
 
     async def _handle_blocked_request(
-        self, crawling_context: ParselCrawlingContext
+        self, context: ParselCrawlingContext
     ) -> AsyncGenerator[ParselCrawlingContext, None]:
-        if self._retry_on_blocked:
-            status_code = crawling_context.http_response.status_code
+        """Try to detect if the request is blocked based on the HTTP status code or the response content.
 
-            if crawling_context.session and crawling_context.session.is_blocked_status_code(status_code=status_code):
+        Args:
+            context: The current crawling context.
+
+        Raises:
+            SessionError: If the request is considered blocked.
+
+        Yields:
+            The original crawling context if no errors are detected.
+        """
+        if self._retry_on_blocked:
+            status_code = context.http_response.status_code
+
+            if context.session and context.session.is_blocked_status_code(status_code=status_code):
                 raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
 
-            parsel = crawling_context.selector
+            parsel = context.selector
 
             matched_selectors = [
                 selector
@@ -103,12 +155,20 @@ class ParselCrawler(BasicCrawler[ParselCrawlingContext]):
                     f"HTTP response matched the following selectors: {'; '.join(matched_selectors)}"
                 )
 
-        yield crawling_context
+        yield context
 
     async def _parse_http_response(
         self,
         context: HttpCrawlingContext,
     ) -> AsyncGenerator[ParselCrawlingContext, None]:
+        """Parse the HTTP response using the `Parsel` library and implements the `enqueue_links` function.
+
+        Args:
+            context: The current crawling context.
+
+        Yields:
+            The enhanced crawling context with the `Parsel` selector and the `enqueue_links` function.
+        """
         parsel_selector = await asyncio.to_thread(lambda: Selector(body=context.http_response.read()))
 
         async def enqueue_links(
