@@ -517,7 +517,9 @@ class RequestQueueClient(BaseRequestQueueClient):
         id = unique_key_to_request_id(request.unique_key)
 
         if request.id is not None and request.id != id:
-            raise ValueError('Request ID does not match its unique_key.')
+            logger.warning(
+                f'The request ID does not match the ID from the unique_key (request.id={request.id}, id={id}).'
+            )
 
         request_kwargs = {
             **(request.model_dump()),
