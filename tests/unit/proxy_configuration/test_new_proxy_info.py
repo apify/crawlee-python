@@ -120,3 +120,26 @@ async def test_rotates_proxies_with_sessions() -> None:
     info = await config.new_proxy_info(sessions[5], None, None)
     assert info is not None
     assert info.url == proxy_urls[2]
+
+
+@pytest.mark.parametrize(
+    ('url', 'expected_port'),
+    [
+        # Default ports based on the URL scheme
+        ('http://proxy.com', 80),
+        ('https://proxy.com', 443),
+        # Explicit ports specified in the URL
+        ('http://proxy.com:80', 80),
+        ('http://proxy.com:1234', 1234),
+    ],
+)
+async def test_sets_port(url: str, expected_port: int) -> None:
+    """Test that the port property is set correctly.
+
+    The port is inferred from the URL scheme if it is not specified in the URL.
+    """
+    config = ProxyConfiguration(proxy_urls=[url])
+
+    info = await config.new_proxy_info(None, None, None)
+    assert info is not None
+    assert info.port == expected_port
