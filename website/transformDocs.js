@@ -33,6 +33,15 @@ const thisPackagePyprojectToml = fs.readFileSync('../pyproject.toml', 'utf8');
 const thisPackageName = thisPackagePyprojectToml.match(/^name = "(.+)"$/m)[1];
 TAG_PER_PACKAGE[thisPackageName] = 'master';
 
+/**
+ * Parses an union type string into a list of types.
+ * @param {*} typeString 
+ * @returns {string[]} List of type strings.
+ */
+function parseUnionTypeString(typeString) {
+    return typeString.split("|").map((x) => x.trim());
+}
+
 
 // Taken from https://github.com/TypeStrong/typedoc/blob/v0.23.24/src/lib/models/reflections/kind.ts, modified
 const TYPEDOC_KINDS = {
@@ -107,7 +116,7 @@ function getBaseType(type) {
 
 // Returns whether a type is a custom class, or a primitive type
 function isCustomClass(type) {
-    return !['dict', 'list', 'str', 'int', 'float', 'bool'].includes(type.toLowerCase());
+    return !['dict', 'list', 'str', 'int', 'float', 'bool', 'None'].includes(type.toLowerCase());
 }
 
 // Infer the Typedoc type from the docspec type
@@ -117,14 +126,22 @@ function inferTypedocType(docspecType) {
         return undefined;
     }
 
-    // Typically, if a type is a custom class, it will be a reference in Typedoc
-    return isCustomClass(typeWithoutOptional) ? {
-        type: 'reference',
-        name: docspecType
-    } : {
-        type: 'intrinsic',
-        name: docspecType,
-    }
+    let types = parseUnionTypeString(typeWithoutOptional);
+
+    types = types.map((type) => {
+        return isCustomClass(type) ? {
+            type: 'reference',
+            name: type
+        } : {
+            type: 'intrinsic',
+            name: type,
+        }
+    });
+
+    return types.length === 1 ? types[0] : {
+        type: 'union',
+        types,
+    };
 }
 
 // Sorts the groups of a Typedoc member, and sorts the children of each group
@@ -451,6 +468,20 @@ function convertObject(obj, parent, module) {
     }
 }
 
+// Recursively traverse a javascript POJO object, if it contains both 'name' and 'type : reference' keys, add the 'target' key
+// with the corresponding id of the object with the same name
+
+function fixRefs(obj, namesToIds) {
+    for (const key in obj) {
+        if (key === 'name' && obj?.type === 'reference' && namesToIds[obj?.name]) {
+            obj.target = namesToIds[obj?.name];
+        }
+        if (typeof obj[key] === 'object' && obj[key] !== null) {
+            fixRefs(obj[key], namesToIds);
+        }
+    }
+}
+
 function main() {
     // Root object of the Typedoc structure
     const typedocApiReference = {
@@ -490,28 +521,7 @@ function main() {
         }
     }
     collectIds(typedocApiReference);
-
-    function fixRefs(obj) {
-        for (const child of obj.children ?? []) {
-            if (child.type?.type === 'reference') {
-                child.type.target = namesToIds[child.type.name];
-            }
-            if (child.signatures) {
-                for (const sig of child.signatures) {
-                    for (const param of sig.parameters ?? []) {
-                        if (param.type?.type === 'reference') {
-                            param.type.target = namesToIds[param.type.name];
-                        }
-                    }
-                    if (sig.type?.type === 'reference') {
-                        sig.type.target = namesToIds[sig.type.name];
-                    }
-                }
-            }
-            fixRefs(child);
-        }
-    }
-    fixRefs(typedocApiReference);
+    fixRefs(typedocApiReference, namesToIds);
 
     // Sort the children of the root object
     sortChildren(typedocApiReference);
