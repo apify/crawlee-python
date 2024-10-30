@@ -20,9 +20,9 @@ from pydantic import (
 from typing_extensions import Self
 
 from crawlee._types import EnqueueStrategy, HttpHeaders, HttpMethod, HttpPayload, HttpQueryParams, JsonSerializable
+from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
 from crawlee._utils.urls import extract_query_params, validate_http_url
-from crawlee._utils.crypto import crypto_random_object_id
 
 
 class RequestState(IntEnum):
@@ -322,7 +322,7 @@ class Request(BaseRequestData):
             keep_url_fragment=keep_url_fragment,
             use_extended_unique_key=use_extended_unique_key,
         )
-        
+
         if always_enqueue:
             unique_key = f'{unique_key}_{crypto_random_object_id()}'
 

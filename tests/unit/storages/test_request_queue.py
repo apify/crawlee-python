@@ -217,13 +217,8 @@ async def test_complex_user_data_serialization(request_queue: RequestQueue) -> N
 
 
 async def test_deduplication_of_requests_with_custom_unique_key() -> None:
-    with pytest.raises(ValueError, match='always_enqueue cannot be used with a custom unique_key'):
-        await Request.from_url('https://apify.com', unique_key='apify', always_enqueue=True)
-
-    await Request.from_url('https://apify.com', unique_key='apify', always_enqueue=False)
-
-    with pytest.raises(ValueError, match='Request with unique key "apify" is already present in the queue!'):
-        await Request.from_url('https://apify.com', unique_key='apify', always_enqueue=False)
+    with pytest.raises(ValueError, match='`always_enqueue` cannot be used with a custom `unique_key`'):
+        Request.from_url('https://apify.com', unique_key='apify', always_enqueue=True)
 
 
 async def test_deduplication_of_requests_with_invalid_custom_unique_key() -> None:
