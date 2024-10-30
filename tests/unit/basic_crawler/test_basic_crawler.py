@@ -654,6 +654,35 @@ async def test_max_requests_per_crawl(httpbin: str) -> None:
     assert stats.requests_finished == 3
 
 
+async def test_max_crawl_depth(httpbin: str) -> None:
+    processed_urls = []
+
+    start_request = Request.from_url('https://someplace.com/', label='start')
+    start_request.crawl_depth = 2
+
+    # Set max_concurrency to 1 to ensure testing max_requests_per_crawl accurately
+    crawler = BasicCrawler(
+        concurrency_settings=ConcurrencySettings(max_concurrency=1),
+        max_crawl_depth=2,
+        request_provider=RequestList([start_request]),
+    )
+
+    @crawler.router.handler('start')
+    async def start_handler(context: BasicCrawlingContext) -> None:
+        processed_urls.append(context.request.url)
+        await context.add_requests(['https://someplace.com/too-deep'])
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        processed_urls.append(context.request.url)
+
+    stats = await crawler.run()
+
+    assert len(processed_urls) == 1
+    assert stats.requests_total == 1
+    assert stats.requests_finished == 1
+
+
 def test_crawler_log() -> None:
     crawler = BasicCrawler()
     assert isinstance(crawler.log, logging.Logger)
