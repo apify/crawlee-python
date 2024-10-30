@@ -1,6 +1,6 @@
 import asyncio
 
-from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
+from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext, PlaywrightPreNavigationContext
 
 
 async def main() -> None:
@@ -46,6 +46,14 @@ async def main() -> None:
 
         # Find a link to the next page and enqueue it if it exists.
         await context.enqueue_links(selector='.morelink')
+
+    # Define a hook that will be called each time before navigating to a new URL.
+    # The hook receives a context parameter, providing access to the request and
+    # browser page among other things. In this example, we log the URL being
+    # navigated to.
+    @crawler.pre_navigation_hook
+    async def log_navigation_url(context: PlaywrightPreNavigationContext) -> None:
+        context.log.info(f'Navigating to {context.request.url} ...')
 
     # Run the crawler with the initial list of URLs.
     await crawler.run(['https://news.ycombinator.com/'])
