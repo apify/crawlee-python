@@ -52,7 +52,9 @@ class EventManager:
     ) -> None:
         """A default constructor.
 
-        See the `EventManagerOptions` for a detailed description of the arguments.
+        Args:
+            persist_state_interval: Interval between emitted `PersistState` events to maintain state persistence.
+            close_timeout: Optional timeout for canceling pending event listeners if they exceed this duration.
         """
         self._persist_state_interval = persist_state_interval
         self._close_timeout = close_timeout

@@ -180,7 +180,31 @@ class BasicCrawler(Generic[TCrawlingContext]):
     ) -> None:
         """A default constructor.
 
-        See the `BasicCrawlerOptions` for a detailed description of the arguments.
+        Args:
+            request_provider: Provider for requests to be processed by the crawler.
+            request_handler: A callable responsible for handling requests.
+            http_client: HTTP client used by `BasicCrawlingContext.send_request` and the HTTP-based crawling.
+            concurrency_settings: Settings to fine-tune concurrency levels.
+            max_request_retries: Maximum number of attempts to process a single request.
+            max_requests_per_crawl: Maximum number of pages to open during a crawl. The crawl stops upon reaching
+                this limit. Setting this value can help avoid infinite loops in misconfigured crawlers. `None` means
+                no limit. Due to concurrency settings, the actual number of pages visited may slightly exceed
+                this value.
+            max_session_rotations: Maximum number of session rotations per request. The crawler rotates the session
+                if a proxy error occurs or if the website blocks the request.
+            configuration: Crawler configuration.
+            request_handler_timeout: Maximum duration allowed for a single request handler to run.
+            use_session_pool: Enable the use of a session pool for managing sessions during crawling.
+            session_pool: A custom `SessionPool` instance, allowing the use of non-default configuration.
+            retry_on_blocked: If True, the crawler attempts to bypass bot protections automatically.
+            proxy_configuration: HTTP proxy configuration used when making requests.
+            statistics: A custom `Statistics` instance, allowing the use of non-default configuration.
+            event_manager: A custom `EventManager` instance, allowing the use of non-default configuration.
+            configure_logging: If True, the crawler will set up logging infrastructure automatically.
+            _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
+                Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
+            _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
+            _logger: A logger instance, typically provided by a subclass, for consistent logging labels.
         """
         self._router: Router[TCrawlingContext] | None = None
 
