@@ -28,21 +28,20 @@ jobs:
         with:
           release_type: prerelease
 
-  lint_check:
-    name: Lint check
-    uses: apify/workflows/.github/workflows/python_lint_check.yaml@main
-
-  type_check:
-    name: Type check
-    uses: apify/workflows/.github/workflows/python_type_check.yaml@main
-
-  unit_tests:
-    name: Unit tests
-    uses: apify/workflows/.github/workflows/python_unit_tests.yaml@main
+  wait_for_checks:
+    name: Wait for code checks to pass
+    runs-on: ubuntu-latest
+    steps:
+      - uses: lewagon/wait-on-check-action@v1.3.4
+        with:
+          ref: ${{ github.ref }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          check-regexp: "Check - .*"
+          wait-interval: 5
 
   update_changelog:
     name: Update changelog
-    needs: [release_metadata, lint_check, type_check, unit_tests]
+    needs: [release_metadata, wait_for_checks]
     uses: apify/workflows/.github/workflows/python_bump_and_update_changelog.yaml@main
     with:
       version_number: ${{ needs.release_metadata.outputs.version_number }}

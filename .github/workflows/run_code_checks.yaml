@@ -6,19 +6,29 @@ on:
   # step required for PRs from forks. This prevents their potential exposure.
   pull_request:
 
+  # Pushing to the master branch triggers code checks
+  push:
+    branches:
+      - master
+    tags-ignore:
+      - "**" # Ignore all tags to prevent duplicate checks when tags are pushed.
+
+  # It should also be possible to trigger checks manually
+  workflow_dispatch:
+
 jobs:
   lint_check:
-    name: Lint check
+    name: Check - Lint
     uses: apify/workflows/.github/workflows/python_lint_check.yaml@main
 
   type_check:
-    name: Type check
+    name: Check - Types
     uses: apify/workflows/.github/workflows/python_type_check.yaml@main
 
   unit_tests:
-    name: Unit tests
+    name: Check - Unit tests
     uses: apify/workflows/.github/workflows/python_unit_tests.yaml@main
 
   docs_check:
-    name: Docs check
+    name: Try to run docs build
     uses: apify/workflows/.github/workflows/python_docs_check.yaml@main
