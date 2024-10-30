@@ -15,7 +15,7 @@ from docspec import dump_module
 import json
 import os
 
-project_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../../src')
+project_path = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), '../../src'))
 
 context = Context(directory='.')
 loader = PythonLoader(search_path=[project_path])
@@ -43,4 +43,11 @@ for processor in processors:
 for module in modules:
     dump.append(dump_module(module))
 
-print(json.dumps(dump, indent=4))
+repo_root_path = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), '../../'))
+
+print(
+    json.dumps(dump, indent=4).replace(
+        repo_root_path,
+        'REPO_ROOT_PLACEHOLDER'
+    )
+)

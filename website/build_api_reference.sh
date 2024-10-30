@@ -1,18 +1,7 @@
 #!/bin/bash
 
-# On macOS, sed requires a space between -i and '' to specify no backup should be done
-# On Linux, sed requires no space between -i and '' to specify no backup should be done
-sed_no_backup() {
-    if [[ $(uname) = "Darwin" ]]; then
-        sed -i '' "$@"
-    else
-        sed -i'' "$@"
-    fi
-}
-
 # Create docspec dump of this package's source code through pydoc-markdown
 python ./pydoc-markdown/generate_ast.py > docspec-dump.jsonl
-sed_no_backup "s#${PWD}/..#REPO_ROOT_PLACEHOLDER#g" docspec-dump.jsonl
 
 rm -rf "${apify_shared_tempdir}"
 
