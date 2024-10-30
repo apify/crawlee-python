@@ -35,6 +35,7 @@ website/api-typedoc-generated.json
 website/apify-shared-docspec-dump.jsonl
 website/docspec-dump.jsonl
 website/module_shortcuts.json
+website/typedoc-types*
 
 storage
 pullRequestIssues.json

@@ -4,6 +4,7 @@ const fs = require('fs');
 const { spawnSync } = require('child_process');
 
 const moduleShortcuts = require('./module_shortcuts.json');
+const path = require('path');
 
 const REPO_ROOT_PLACEHOLDER = 'REPO_ROOT_PLACEHOLDER';
 
@@ -32,16 +33,6 @@ for (const pkg of ['apify', 'apify_client', 'apify_shared']) {
 const thisPackagePyprojectToml = fs.readFileSync('../pyproject.toml', 'utf8');
 const thisPackageName = thisPackagePyprojectToml.match(/^name = "(.+)"$/m)[1];
 TAG_PER_PACKAGE[thisPackageName] = 'master';
-
-/**
- * Parses an union type string into a list of types.
- * @param {*} typeString 
- * @returns {string[]} List of type strings.
- */
-function parseUnionTypeString(typeString) {
-    return typeString.split("|").map((x) => x.trim());
-}
-
 
 // Taken from https://github.com/TypeStrong/typedoc/blob/v0.23.24/src/lib/models/reflections/kind.ts, modified
 const TYPEDOC_KINDS = {
@@ -114,34 +105,48 @@ function getBaseType(type) {
     return type?.replace(/Optional\[(.*)\]/g, '$1').split('[')[0];
 }
 
-// Returns whether a type is a custom class, or a primitive type
-function isCustomClass(type) {
-    return !['dict', 'list', 'str', 'int', 'float', 'bool', 'None'].includes(type.toLowerCase());
+const typedocTypes = [];
+
+function parseTypes(typedocTypes) {
+    fs.writeFileSync(
+        path.join(__dirname, 'typedoc-types.raw'),
+        JSON.stringify(
+            typedocTypes
+            .map(x => 
+                x.name?.replaceAll(/#.*/g, '').replaceAll('\n', '').trim() ?? x.name
+            )
+            .filter(x=>x)
+        )
+    );
+
+    spawnSync('python', ['parse_types.py', 'typedoc-types.raw']);
+
+    const parsedTypes = JSON.parse(
+        fs.readFileSync(
+            path.join(__dirname, 'typedoc-types-parsed.json'),
+            'utf8'
+        )
+    );
+
+    for (type of typedocTypes) {
+        const parsedType = parsedTypes[type.name];
+
+        if (parsedType) {
+            for (const key in parsedType) {
+                type[key] = parsedType[key];
+            }
+        }
+    }
 }
 
 // Infer the Typedoc type from the docspec type
 function inferTypedocType(docspecType) {
-    const typeWithoutOptional = getBaseType(docspecType);
-    if (!typeWithoutOptional) {
-        return undefined;
-    }
+    typedocTypes.push({
+        name: docspecType,
+        type: 'reference',
+    })
 
-    let types = parseUnionTypeString(typeWithoutOptional);
-
-    types = types.map((type) => {
-        return isCustomClass(type) ? {
-            type: 'reference',
-            name: type
-        } : {
-            type: 'intrinsic',
-            name: type,
-        }
-    });
-
-    return types.length === 1 ? types[0] : {
-        type: 'union',
-        types,
-    };
+    return typedocTypes[typedocTypes.length - 1];
 }
 
 // Sorts the groups of a Typedoc member, and sorts the children of each group
@@ -511,6 +516,9 @@ function main() {
     for (const module of thisPackageModules) {
         convertObject(module, typedocApiReference, module);
     };
+
+    // Runs the Python AST parser on the collected types to get rich type information
+    parseTypes(typedocTypes);
 
     // Recursively fix references (collect names->ids of all the named entities and then inject those in the reference objects)
     const namesToIds = {};
