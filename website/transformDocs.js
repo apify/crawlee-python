@@ -30,7 +30,7 @@ for (const pkg of ['apify', 'apify_client', 'apify_shared']) {
 }
 
 // For the current package, set the tag to 'master'
-const thisPackagePyprojectToml = fs.readFileSync('../pyproject.toml', 'utf8');
+const thisPackagePyprojectToml = fs.readFileSync(path.join(__dirname, '..', '/pyproject.toml'), 'utf8');
 const thisPackageName = thisPackagePyprojectToml.match(/^name = "(.+)"$/m)[1];
 TAG_PER_PACKAGE[thisPackageName] = 'master';
 
@@ -112,9 +112,7 @@ function parseTypes(typedocTypes) {
         path.join(__dirname, 'typedoc-types.raw'),
         JSON.stringify(
             typedocTypes
-            .map(x => 
-                x.name?.replaceAll(/#.*/g, '').replaceAll('\n', '').trim() ?? x.name
-            )
+            .map(x => x.name)
             .filter(x=>x)
         )
     );
@@ -142,7 +140,7 @@ function parseTypes(typedocTypes) {
 // Infer the Typedoc type from the docspec type
 function inferTypedocType(docspecType) {
     typedocTypes.push({
-        name: docspecType,
+        name: docspecType?.replaceAll(/#.*/g, '').replaceAll('\n', '').trim() ?? docspecType,
         type: 'reference',
     })
 
@@ -265,6 +263,7 @@ function convertObject(obj, parent, module) {
                     }],
                 } : undefined,
                 type: typedocType,
+                decorations: member.decorations?.map(x => x.name),
                 children: [],
                 groups: [],
                 sources: [{
@@ -348,15 +347,14 @@ function convertObject(obj, parent, module) {
                                     name: typedocMember.name,
                                     target: typedocMember.id,
                                 }
-                            ]
+                            ];
 
-                            typedocMember.children = [
-                                ...typedocMember.children ?? [],
-                                ...(baseTypedocMember.children ?? []).map((inheritedChild) => {
-                                    if (typedocMember.children?.some((x) => x.name === inheritedChild.name)) {
-                                        return;
-                                    }
+                            typedocMember.children = typedocMember.children ?? [];
 
+                            for (const inheritedChild of baseTypedocMember.children ?? []) {
+                                let ownChild = typedocMember.children?.find((x) => x.name === inheritedChild.name);
+
+                                if (!ownChild) {
                                     const childId = oid++;
 
                                     const groupName = getGroupName(inheritedChild);
@@ -371,7 +369,7 @@ function convertObject(obj, parent, module) {
                                         });
                                     }
 
-                                    return {
+                                    typedocMember.children.push({
                                         ...inheritedChild,
                                         id: childId,
                                         inheritedFrom: {
@@ -379,10 +377,21 @@ function convertObject(obj, parent, module) {
                                             target: inheritedChild.id,
                                             name: `${baseTypedocMember.name}.${inheritedChild.name}`,
                                         }
+                                    });
+                                } else if (!ownChild.comment.summary[0].text) {
+                                    ownChild.inheritedFrom = {
+                                        type: "reference",
+                                        target: inheritedChild.id,
+                                        name: `${baseTypedocMember.name}.${inheritedChild.name}`,
                                     }
-                                }).filter(x => x),
-                            ]
-                            
+
+                                    for (let key in inheritedChild) {
+                                        if(key !== 'id' && key !== 'inheritedFrom') {
+                                            ownChild[key] = inheritedChild[key];
+                                        }
+                                    }
+                                }
+                            }  
                         } else {
                             forwardAncestorRefs.set(
                                 unwrappedBaseType, 
@@ -433,13 +442,13 @@ function convertObject(obj, parent, module) {
                         }
                     ]
 
-                    descendant.children = [
-                        ...descendant.children ?? [],
-                        ...(typedocMember.children ?? []).map((inheritedChild) => {
-                            if (descendant.children?.some((x) => x.name === inheritedChild.name)) {
-                                return;
-                            }
+                    descendant.children = descendant.children ?? [];
 
+
+                    for (const inheritedChild of typedocMember.children ?? []) {
+                        const ownChild = descendant.children?.find((ownChild) => ownChild.name === inheritedChild.name);
+
+                        if (!ownChild) {
                             const childId = oid++;
 
                             const groupName = getGroupName(inheritedChild);
@@ -454,7 +463,7 @@ function convertObject(obj, parent, module) {
                                 });
                             }
 
-                            return {
+                            descendant.children.push({
                                 ...inheritedChild,
                                 id: childId,
                                 inheritedFrom: {
@@ -462,9 +471,21 @@ function convertObject(obj, parent, module) {
                                     target: inheritedChild.id,
                                     name: `${typedocMember.name}.${inheritedChild.name}`,
                                 }
+                            });
+                        } else if (!ownChild.comment.summary[0].text) {
+                            ownChild.inheritedFrom = {
+                                type: "reference",
+                                target: inheritedChild.id,
+                                name: `${typedocMember.name}.${inheritedChild.name}`,
                             }
-                        }).filter(x => x),
-                    ]
+
+                            for (let key in inheritedChild) {
+                                if(key !== 'id' && key !== 'inheritedFrom') {
+                                    ownChild[key] = inheritedChild[key];
+                                }
+                            }
+                        }
+                    }
 
                     sortChildren(descendant);
                 });
@@ -509,7 +530,7 @@ function main() {
     };
 
     // Load the docspec dump files of this module and of apify-shared
-    const thisPackageDocspecDump = fs.readFileSync('docspec-dump.jsonl', 'utf8');
+    const thisPackageDocspecDump = fs.readFileSync(path.join(__dirname, 'docspec-dump.jsonl'), 'utf8');
     const thisPackageModules = JSON.parse(thisPackageDocspecDump)
 
     // Convert all the modules, store them in the root object
@@ -537,7 +558,7 @@ function main() {
     typedocApiReference.symbolIdMap = Object.fromEntries(Object.entries(symbolIdMap));
 
     // Write the Typedoc structure to the output file
-    fs.writeFileSync('./api-typedoc-generated.json', JSON.stringify(typedocApiReference, null, 4));
+    fs.writeFileSync(path.join(__dirname, 'api-typedoc-generated.json'), JSON.stringify(typedocApiReference, null, 4));
 }
 
 if (require.main === module) {
