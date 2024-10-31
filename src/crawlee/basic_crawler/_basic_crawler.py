@@ -12,7 +12,7 @@ from contextlib import AsyncExitStack, suppress
 from datetime import timedelta
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, AsyncContextManager, Callable, Generic, Literal, Union, cast
+from typing import TYPE_CHECKING, Any, AsyncContextManager, Callable, Generic, Union, cast
 from urllib.parse import ParseResult, urlparse
 
 from tldextract import TLDExtract
@@ -55,7 +55,7 @@ if TYPE_CHECKING:
     from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
     from crawlee.sessions import Session
     from crawlee.statistics import FinalStatistics, StatisticsState
-    from crawlee.storages._dataset import GetDataKwargs, PushDataKwargs
+    from crawlee.storages._dataset import ExportDataCsvKwargs, ExportDataJsonKwargs, GetDataKwargs, PushDataKwargs
     from crawlee.storages._request_provider import RequestProvider
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
@@ -531,13 +531,43 @@ class BasicCrawler(Generic[TCrawlingContext]):
     async def export_data(
         self,
         path: str | Path,
-        content_type: Literal['json', 'csv'] | None = None,
         dataset_id: str | None = None,
         dataset_name: str | None = None,
     ) -> None:
         """Export data from a dataset.
 
         This helper method simplifies the process of exporting data from a dataset. It opens the specified
+        dataset and then exports the data based on the provided parameters. If you need to pass options
+        specific to the output format, use the `export_data_csv` or `export_data_json` method instead.
+
+        Args:
+            path: The destination path.
+            dataset_id: The ID of the dataset.
+            dataset_name: The name of the dataset.
+        """
+        dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
+
+        path = path if isinstance(path, Path) else Path(path)
+        destination = path.open('w', newline='')
+
+        if path.suffix == '.csv':
+            await dataset.write_to_csv(destination)
+        elif path.suffix == '.json':
+            await dataset.write_to_json(destination)
+        else:
+            raise ValueError(f'Unsupported file extension: {path.suffix}')
+
+    async def export_data_csv(
+        self,
+        path: str | Path,
+        *,
+        dataset_id: str | None = None,
+        dataset_name: str | None = None,
+        **kwargs: Unpack[ExportDataCsvKwargs],
+    ) -> None:
+        """Export data from a dataset to a CSV file.
+
+        This helper method simplifies the process of exporting data from a dataset in csv format. It opens the specified
         dataset and then exports the data based on the provided parameters.
 
         Args:
@@ -545,12 +575,36 @@ class BasicCrawler(Generic[TCrawlingContext]):
             content_type: The output format.
             dataset_id: The ID of the dataset.
             dataset_name: The name of the dataset.
+            kwargs: Extra configurations for dumping/writing in csv format.
         """
         dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
         path = path if isinstance(path, Path) else Path(path)
 
-        final_content_type = content_type or ('csv' if path.suffix == '.csv' else 'json')
-        return await dataset.write_to(final_content_type, path.open('w', newline=''))
+        return await dataset.write_to_csv(path.open('w', newline=''), **kwargs)
+
+    async def export_data_json(
+        self,
+        path: str | Path,
+        *,
+        dataset_id: str | None = None,
+        dataset_name: str | None = None,
+        **kwargs: Unpack[ExportDataJsonKwargs],
+    ) -> None:
+        """Export data from a dataset to a JSON file.
+
+        This helper method simplifies the process of exporting data from a dataset in json format. It opens the
+        specified dataset and then exports the data based on the provided parameters.
+
+        Args:
+            path: The destination path
+            dataset_id: The ID of the dataset.
+            dataset_name: The name of the dataset.
+            kwargs: Extra configurations for dumping/writing in json format.
+        """
+        dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
+        path = path if isinstance(path, Path) else Path(path)
+
+        return await dataset.write_to_json(path.open('w', newline=''), **kwargs)
 
     async def _push_data(
         self,
