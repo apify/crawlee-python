@@ -287,6 +287,28 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
                 if self._memory_storage_client.persist_storage:
                     await existing_store_by_id.delete_persisted_record(record)
 
+    @override
+    async def get_public_url(self, key: str) -> str:
+        existing_store_by_id = find_or_create_client_by_id_or_name_inner(
+            resource_client_class=KeyValueStoreClient,
+            memory_storage_client=self._memory_storage_client,
+            id=self.id,
+            name=self.name,
+        )
+
+        if existing_store_by_id is None:
+            raise_on_non_existing_storage(StorageTypes.KEY_VALUE_STORE, self.id)
+
+        record = await self._get_record_internal(key)
+
+        if not record:
+            raise ValueError(f'Record with key "{key}" was not found.')
+
+        resource_dir = existing_store_by_id.resource_directory
+        record_filename = self._filename_from_record(record)
+        record_path = os.path.join(resource_dir, record_filename)
+        return f'file://{record_path}'
+
     async def persist_record(self, record: KeyValueStoreRecord) -> None:
         """Persist the specified record to the key-value store."""
         store_directory = self.resource_directory

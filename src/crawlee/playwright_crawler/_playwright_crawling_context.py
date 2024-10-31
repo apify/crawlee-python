@@ -3,24 +3,27 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Awaitable, Callable
 
-from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction
+from crawlee.playwright_crawler._playwright_pre_navigation_context import PlaywrightPreNavigationContext
 
 if TYPE_CHECKING:
-    from playwright.async_api import Page, Response
+    from playwright.async_api import Response
+
+    from crawlee._types import EnqueueLinksFunction
 
 
 @dataclass(frozen=True)
-class PlaywrightCrawlingContext(BasicCrawlingContext):
-    """Crawling context used by PlaywrightSoupCrawler.
+class PlaywrightCrawlingContext(PlaywrightPreNavigationContext):
+    """The crawling context used by the `PlaywrightCrawler`.
 
-    Args:
-        page: The Playwright `Page` object.
-        infinite_scroll: Scroll to the bottom of the page, handling loading of additional items.
-        response: The Playwright `Response` object.
-        enqueue_links: The `PlaywrightCrawler` implementation of the `EnqueueLinksFunction` function.
+    It provides access to key objects as well as utility functions for handling crawling tasks.
     """
 
-    page: Page
-    infinite_scroll: Callable[[], Awaitable[None]]
     response: Response
+    """The Playwright `Response` object containing the response details for the current URL."""
+
     enqueue_links: EnqueueLinksFunction
+    """The Playwright `EnqueueLinksFunction` implementation."""
+
+    infinite_scroll: Callable[[], Awaitable[None]]
+    """A function to perform infinite scrolling on the page. This scrolls to the bottom, triggering
+    the loading of additional content if present."""

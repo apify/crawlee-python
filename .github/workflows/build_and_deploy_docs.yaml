@@ -31,22 +31,6 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Install Node dependencies
-        run: |
-          npm install
-          npm update @apify/docs-theme
-        working-directory: ./website
-
-      # We do this as early as possible to prevent conflicts if someone else would push something in the meantime
-      - name: Commit the updated package.json and lockfile
-        run: |
-          git config user.name 'GitHub Actions'
-          git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add website/package.json
-          git add website/package-lock.json
-          git diff-index --quiet HEAD || git commit -m 'chore: Automatic docs theme update [skip ci]' || true
-          git push
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:

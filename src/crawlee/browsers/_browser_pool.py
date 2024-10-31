@@ -49,7 +49,7 @@ class BrowserPool:
         identify_inactive_browsers_interval: timedelta = timedelta(seconds=20),
         close_inactive_browsers_interval: timedelta = timedelta(seconds=30),
     ) -> None:
-        """Create a new instance.
+        """A default constructor.
 
         Args:
             plugins: Browser plugins serve as wrappers around various browser automation libraries,

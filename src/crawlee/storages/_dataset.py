@@ -25,49 +25,56 @@ logger = logging.getLogger(__name__)
 
 
 class GetDataKwargs(TypedDict):
-    """Keyword arguments for dataset's `get_data` method.
-
-    Args:
-        offset: Skips the specified number of items at the start.
-        limit: The maximum number of items to retrieve. Unlimited if None.
-        clean: Returns only non-empty items and excludes hidden fields. Shortcut for skip_hidden and skip_empty.
-        desc: Set True to sort results in descending order.
-        fields: Fields to include in each item. Sorts fields as specified if provided.
-        omit: Fields to exclude from each item.
-        unwind: Unwinds items by a specified array field, turning each element into a separate item.
-        skip_empty: Excludes empty items from the results if True.
-        skip_hidden: Excludes fields starting with '#' if True.
-        flatten: Fields to be flattened in returned items.
-        view: Specifies the dataset view to be used.
-    """
+    """Keyword arguments for dataset's `get_data` method."""
 
     offset: NotRequired[int]
+    """Skips the specified number of items at the start."""
+
     limit: NotRequired[int]
+    """The maximum number of items to retrieve. Unlimited if None."""
+
     clean: NotRequired[bool]
+    """Returns only non-empty items and excludes hidden fields. Shortcut for skip_hidden and skip_empty."""
+
     desc: NotRequired[bool]
+    """Set to True to sort results in descending order."""
+
     fields: NotRequired[list[str]]
+    """Fields to include in each item. Sorts fields as specified if provided."""
+
     omit: NotRequired[list[str]]
+    """Fields to exclude from each item."""
+
     unwind: NotRequired[str]
+    """Unwinds items by a specified array field, turning each element into a separate item."""
+
     skip_empty: NotRequired[bool]
+    """Excludes empty items from the results if True."""
+
     skip_hidden: NotRequired[bool]
+    """Excludes fields starting with '#' if True."""
+
     flatten: NotRequired[list[str]]
+    """Fields to be flattened in returned items."""
+
     view: NotRequired[str]
+    """Specifies the dataset view to be used."""
 
 
 class ExportToKwargs(TypedDict):
-    """Keyword arguments for dataset's `export_to` method.
-
-    Args:
-        key: The key under which to save the data.
-        content_type: The format in which to export the data. Either 'json' or 'csv'.
-        to_key_value_store_id: ID of the key-value store to save the exported file.
-        to_key_value_store_name: Name of the key-value store to save the exported file.
-    """
+    """Keyword arguments for dataset's `export_to` method."""
 
     key: Required[str]
+    """The key under which to save the data."""
+
     content_type: NotRequired[Literal['json', 'csv']]
+    """The format in which to export the data. Either 'json' or 'csv'."""
+
     to_key_value_store_id: NotRequired[str]
+    """ID of the key-value store to save the exported file."""
+
     to_key_value_store_name: NotRequired[str]
+    """Name of the key-value store to save the exported file."""
 
 
 class ExportDataJsonKwargs(TypedDict):
@@ -121,8 +128,11 @@ class Dataset(BaseStorage):
     not exist will raise an error; however, if accessed by `name`, the dataset will be created if it doesn't already
     exist.
 
-    Usage:
+    ### Usage
+
     ```python
+    from crawlee.storages import Dataset
+
     dataset = await Dataset.open(name='my_dataset')
     ```
     """
@@ -234,8 +244,13 @@ class Dataset(BaseStorage):
         """Exports the entire dataset into an arbitrary stream.
 
         Args:
+<<<<<<< HEAD
             destination: The stream into which the dataset contents should be written.
             kwargs: Additional keyword arguments for `csv.writer`.
+=======
+            content_type: Specifies the output format.
+            destination: The stream into which the dataset contents should be written.
+>>>>>>> origin/master
         """
         items: list[dict] = []
         limit = 1000

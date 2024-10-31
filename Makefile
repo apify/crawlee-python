@@ -1,6 +1,6 @@
 .PHONY: clean install-dev build publish-to-pypi lint type-check unit-tests unit-tests-cov integration-tests format check-code build-api-reference run-doc
 
-DIRS_WITH_CODE = src tests scripts docs
+DIRS_WITH_CODE = src tests docs
 
 # This is default for local testing, but GitHub workflows override it to a higher value in CI
 INTEGRATION_TESTS_CONCURRENCY = 1
@@ -49,7 +49,7 @@ build-api-reference:
 	cd website && poetry run ./build_api_reference.sh
 
 build-docs:
-	cd website && yarn && yarn build
+	cd website && corepack enable && yarn && yarn build
 
 run-doc: build-api-reference
 	cd website && corepack enable && yarn && yarn start

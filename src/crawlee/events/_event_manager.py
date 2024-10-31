@@ -25,10 +25,16 @@ logger = getLogger(__name__)
 
 
 class EventManagerOptions(TypedDict):
-    """Parameter types for subclass __init__ methods, copied from EventManager.__init__."""
+    """Arguments for the `EventManager` constructor.
+
+    It is intended for typing forwarded `__init__` arguments in the subclasses.
+    """
 
     persist_state_interval: NotRequired[timedelta]
+    """Interval between emitted `PersistState` events to maintain state persistence."""
+
     close_timeout: NotRequired[timedelta | None]
+    """Optional timeout for canceling pending event listeners if they exceed this duration."""
 
 
 class EventManager:
@@ -44,11 +50,11 @@ class EventManager:
         persist_state_interval: timedelta = timedelta(minutes=1),
         close_timeout: timedelta | None = None,
     ) -> None:
-        """Create a new instance.
+        """A default constructor.
 
         Args:
-            persist_state_interval: Interval at which `PersistState` events are emitted.
-            close_timeout: Optional timeout after which the pending event listeners are canceled.
+            persist_state_interval: Interval between emitted `PersistState` events to maintain state persistence.
+            close_timeout: Optional timeout for canceling pending event listeners if they exceed this duration.
         """
         self._persist_state_interval = persist_state_interval
         self._close_timeout = close_timeout

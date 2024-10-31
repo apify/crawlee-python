@@ -214,3 +214,35 @@ async def test_complex_user_data_serialization(request_queue: RequestQueue) -> N
         'maxRetries': 1,
         'state': RequestState.ERROR_HANDLER,
     }
+
+
+async def test_deduplication_of_requests_with_custom_unique_key() -> None:
+    with pytest.raises(ValueError, match='`always_enqueue` cannot be used with a custom `unique_key`'):
+        Request.from_url('https://apify.com', unique_key='apify', always_enqueue=True)
+
+
+async def test_deduplication_of_requests_with_invalid_custom_unique_key() -> None:
+    request_1 = Request.from_url('https://apify.com', always_enqueue=True)
+    request_2 = Request.from_url('https://apify.com', always_enqueue=True)
+
+    rq = await RequestQueue.open(name='my-rq')
+    await rq.add_request(request_1)
+    await rq.add_request(request_2)
+
+    assert await rq.get_total_count() == 2
+
+    assert await rq.fetch_next_request() == request_1
+    assert await rq.fetch_next_request() == request_2
+
+
+async def test_deduplication_of_requests_with_valid_custom_unique_key() -> None:
+    request_1 = Request.from_url('https://apify.com')
+    request_2 = Request.from_url('https://apify.com')
+
+    rq = await RequestQueue.open(name='my-rq')
+    await rq.add_request(request_1)
+    await rq.add_request(request_2)
+
+    assert await rq.get_total_count() == 1
+
+    assert await rq.fetch_next_request() == request_1

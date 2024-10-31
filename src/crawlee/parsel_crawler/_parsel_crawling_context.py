@@ -12,7 +12,13 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class ParselCrawlingContext(HttpCrawlingResult, BasicCrawlingContext):
-    """Crawling context used by ParselCrawler."""
+    """The crawling context used by the `ParselCrawler`.
+
+    It provides access to key objects as well as utility functions for handling crawling tasks.
+    """
 
     selector: Selector
+    """The Parsel `Selector` object for the current page."""
+
     enqueue_links: EnqueueLinksFunction
+    """The Parsel `EnqueueLinksFunction` implementation."""

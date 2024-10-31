@@ -85,8 +85,11 @@ class RequestQueue(BaseStorage, RequestProvider):
     persist indefinitely, while unnamed queues expire after 7 days unless specified otherwise. The queue supports
     mutable operations, allowing URLs to be added and removed as needed.
 
-    Usage:
+    ### Usage
+
     ```python
+    from crawlee.storages import RequestQueue
+
     rq = await RequestQueue.open(name='my_rq')
     ```
     """
@@ -398,7 +401,7 @@ class RequestQueue(BaseStorage, RequestProvider):
 
         Args:
             request: The request to return to the queue.
-            forefront: Whether to add the request to the head or the end of the queue
+            forefront: Whether to add the request to the head or the end of the queue.
 
         Returns:
             Information about the queue operation. `None` if the given request was not in progress.

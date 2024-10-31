@@ -16,7 +16,7 @@ except ImportError as exc:
 from curl_cffi.const import CurlHttpVersion
 from typing_extensions import override
 
-from crawlee._types import HttpHeaders
+from crawlee._types import HttpHeaders, HttpPayload
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
 from crawlee.errors import ProxyError
 from crawlee.http_clients import BaseHttpClient, HttpCrawlingResult, HttpResponse
@@ -77,6 +77,16 @@ class CurlImpersonateHttpClient(BaseHttpClient):
     and to manage sessions, proxies, and error handling.
 
     See the `BaseHttpClient` class for more common information about HTTP clients.
+
+    ### Usage
+
+    ```python
+    from crawlee.http_clients.curl_impersonate import CurlImpersonateHttpClient
+    from crawlee.http_crawler import HttpCrawler  # or any other HTTP client-based crawler
+
+    http_client = CurlImpersonateHttpClient()
+    crawler = HttpCrawler(http_client=http_client)
+    ```
     """
 
     def __init__(
@@ -87,7 +97,7 @@ class CurlImpersonateHttpClient(BaseHttpClient):
         ignore_http_error_status_codes: Iterable[int] = (),
         **async_session_kwargs: Any,
     ) -> None:
-        """Create a new instance.
+        """A default constructor.
 
         Args:
             persist_cookies_per_session: Whether to persist cookies per HTTP session.
@@ -153,7 +163,7 @@ class CurlImpersonateHttpClient(BaseHttpClient):
         method: HttpMethod = 'GET',
         headers: HttpHeaders | None = None,
         query_params: HttpQueryParams | None = None,
-        data: dict[str, Any] | None = None,
+        payload: HttpPayload | None = None,
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> HttpResponse:
@@ -166,7 +176,7 @@ class CurlImpersonateHttpClient(BaseHttpClient):
                 method=method.upper(),  # type: ignore # curl-cffi requires uppercase method
                 headers=dict(headers) if headers else None,
                 params=query_params,
-                data=data,
+                data=payload,
                 cookies=session.cookies if session else None,
                 allow_redirects=True,
             )

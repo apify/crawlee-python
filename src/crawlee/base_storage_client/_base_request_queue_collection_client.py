@@ -26,10 +26,8 @@ class BaseRequestQueueCollectionClient(ABC):
         Args:
             id: Optional ID of the request queue to retrieve or create. If provided, the method will attempt
                 to find a request queue with the ID.
-
             name: Optional name of the request queue resource to retrieve or create. If provided, the method will
                 attempt to find a request queue with this name.
-
             schema: Optional schema for the request queue resource to be created.
 
         Returns:

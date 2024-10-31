@@ -12,7 +12,13 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class BeautifulSoupCrawlingContext(HttpCrawlingResult, BasicCrawlingContext):
-    """Crawling context used by BeautifulSoupCrawler."""
+    """The crawling context used by the `BeautifulSoupCrawler`.
+
+    It provides access to key objects as well as utility functions for handling crawling tasks.
+    """
 
     soup: BeautifulSoup
+    """The `BeautifulSoup` object for the current page."""
+
     enqueue_links: EnqueueLinksFunction
+    """The BeautifulSoup `EnqueueLinksFunction` implementation."""

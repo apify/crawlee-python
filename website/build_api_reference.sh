@@ -11,7 +11,7 @@ sed_no_backup() {
 }
 
 # Create docspec dump of this package's source code through pydoc-markdown
-poetry run pydoc-markdown --quiet --dump > docspec-dump.jsonl
+python ./pydoc-markdown/generate_ast.py > docspec-dump.jsonl
 sed_no_backup "s#${PWD}/..#REPO_ROOT_PLACEHOLDER#g" docspec-dump.jsonl
 
 rm -rf "${apify_shared_tempdir}"

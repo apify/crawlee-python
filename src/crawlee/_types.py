@@ -52,12 +52,12 @@ HttpMethod: TypeAlias = Literal['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT
 
 HttpQueryParams: TypeAlias = dict[str, str]
 
-HttpPayload: TypeAlias = Union[str, bytes]
+HttpPayload: TypeAlias = bytes
 
 
 def _normalize_headers(headers: Mapping[str, str]) -> dict[str, str]:
-    """Converts all header keys to lowercase and returns them sorted by key."""
-    normalized_headers = {k.lower(): v for k, v in headers.items()}
+    """Converts all header keys to lowercase, strips whitespace, and returns them sorted by key."""
+    normalized_headers = {k.lower().strip(): v.strip() for k, v in headers.items()}
     sorted_headers = sorted(normalized_headers.items())
     return dict(sorted_headers)
 
@@ -118,7 +118,7 @@ class ConcurrencySettings:
         max_tasks_per_minute: float = float('inf'),
         desired_concurrency: int | None = None,
     ) -> None:
-        """Creates a new instance.
+        """A default constructor.
 
         Args:
             min_concurrency: The minimum number of tasks running in parallel. If you set this value too high
@@ -242,7 +242,9 @@ class ExportToFunction(Protocol):
 
 
 class EnqueueLinksFunction(Protocol):
-    """Type of a function for enqueueing links based on a selector.
+    """A function type for enqueueing new URLs to crawl, based on elements selected by a CSS selector.
+
+    This function is used to extract and enqueue new URLs from the current page for further crawling.
 
     Args:
         selector: CSS selector used to find the elements containing the links.

@@ -54,38 +54,28 @@ class AutoscaledPool:
         scale_up_step_ratio: float = 0.05,
         scale_down_step_ratio: float = 0.05,
     ) -> None:
-        """Initialize the AutoscaledPool.
+        """A default constructor.
 
         Args:
             system_status: Provides data about system utilization (load).
-
             run_task_function: A function that performs an asynchronous resource-intensive task.
-
             is_task_ready_function: A function that indicates whether `run_task_function` should be called. This
                 function is called every time there is free capacity for a new task and it should indicate whether
                 it should start a new task or not by resolving to either `True` or `False`. Besides its obvious use,
                 it is also useful for task throttling to save resources.
-
             is_finished_function: A function that is called only when there are no tasks to be processed. If it
                 resolves to `True` then the pool's run finishes. Being called only when there are no tasks being
                 processed means that as long as `is_task_ready_function` keeps resolving to `True`,
                 `is_finished_function` will never be called. To abort a run, use the `abort` method.
-
             task_timeout: Timeout in which the `run_task_function` needs to finish.
-
             autoscale_interval: Defines how often the pool should attempt to adjust the desired concurrency based on
                 the latest system status. Setting it lower than 1 might have a severe impact on performance. We suggest
                 using a value from 5 to 20.
-
             logging_interval: Specifies a period in which the instance logs its state, in seconds.
-
             desired_concurrency_ratio: Minimum level of desired concurrency to reach before more scaling up is allowed.
-
             scale_up_step_ratio: Defines the fractional amount of desired concurrency to be added with each scaling up.
-
             scale_down_step_ratio: Defines the amount of desired concurrency to be subtracted with each scaling down.
-
-            concurrency_settings: Settings of concurrency levels
+            concurrency_settings: Settings of concurrency levels.
         """
         self._system_status = system_status
 

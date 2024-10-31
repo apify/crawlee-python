@@ -78,7 +78,7 @@ const groupSort = (g1, g2) => {
 
 function getGroupName(object) {
     const groupPredicates = {
-        'Errors': (x) => x.name.toLowerCase().includes('error'),
+        'Errors': (x) => x.name.toLowerCase().endsWith('error'),
         'Main Classes': (x) => [
             'BasicCrawler', 'HttpCrawler', 'BeautifulSoupCrawler', 'ParselCrawler', 'PlaywrightCrawler', 'Dataset',
             'KeyValueStore', 'RequestQueue', 'MemoryStorageClient', 'HttpxHttpClient', 'CurlImpersonateHttpClient',
@@ -102,7 +102,7 @@ function getGroupName(object) {
 
 // Strips the Optional[] type from the type string, and replaces generic types with just the main type
 function getBaseType(type) {
-    return type?.replace(/Optional\[(.*)\]/g, '$1').replace('ListPage[Dict]', 'ListPage');
+    return type?.replace(/Optional\[(.*)\]/g, '$1').split('[')[0];
 }
 
 // Returns whether a type is a custom class, or a primitive type
@@ -132,36 +132,15 @@ function sortChildren(typedocMember) {
     for (let group of typedocMember.groups) {
         group.children
             .sort((a, b) => {
-                const firstName = typedocMember.children.find(x => x.id === a).name;
-                const secondName = typedocMember.children.find(x => x.id === b).name;
+                const firstName = typedocMember.children.find(x => x.id === a || x.inheritedFrom?.target == a).name;
+                const secondName = typedocMember.children.find(x => x.id === b || x.inheritedFrom?.target == b).name;
                 return firstName.localeCompare(secondName);
             });
     }
     typedocMember.groups.sort((a, b) => groupSort(a.title, b.title));
 }
 
-// Parses the arguments and return value description of a method from its docstring
-function extractArgsAndReturns(docstring) {
-    const parameters = (docstring
-        .split('Args:')[1] ?? '').split('Returns:')[0] // Get the part between Args: and Returns:
-        .split(/(^|\n)\s*([\w]+)\s*\(.*?\)\s*:\s*/) // Magic regex which splits the arguments into an array, and removes the argument types
-        .filter(x => x.length > 1) // Remove empty strings
-        .reduce((acc, curr, idx, arr) => { // Collect the argument names and types into an object
-            if(idx % 2 === 0){
-                return {...acc, [curr]: arr[idx+1]} // If the index is even, the current string is an argument name, and the next string is its type
-            }
-            return acc;
-        }, {});
-
-    const returns = (docstring
-        .split('Returns:')[1] ?? '').split('Raises:')[0] // Get the part between Returns: and Raises:
-        .split(':')[1]?.trim() || undefined; // Split the return value into its type and description, return description
-
-
-    return { parameters, returns };
-}
-
-// Objects with decorators named 'ignore_docs' or with empty docstrings will be ignored
+// Objects with decorators named 'ignore_docs' will be ignored
 function isHidden(member) {
     return member.decorations?.some(d => d.name === 'ignore_docs') || member.name === 'ignore_docs';
 }
@@ -171,6 +150,14 @@ function isHidden(member) {
 let oid = 1;
 
 const symbolIdMap = [];
+
+const contextStack = [];
+const getContext = () => contextStack[contextStack.length - 1];
+const popContext = () => contextStack.pop();
+const newContext = (context) => contextStack.push(context);
+
+const forwardAncestorRefs = new Map();
+const backwardAncestorRefs = new Map();
 
 // Converts a docspec object to a Typedoc object, including all its children
 function convertObject(obj, parent, module) {
@@ -216,6 +203,32 @@ function convertObject(obj, parent, module) {
                 moduleName = moduleShortcuts[fullName].replace(`.${member.name}`, '');
             }
 
+            if (member.name === '_ActorType') {
+                member.name = 'Actor';
+            }
+
+            let docstring = { text: member.docstring?.content ?? '' };
+            try {
+                docstring = JSON.parse(docstring.text);
+
+                docstring.args = docstring.sections.find((section) => Object.keys(section)[0] === 'Arguments')['Arguments'] ?? [];
+
+                docstring.args = docstring.args.reduce((acc, arg) => {
+                    acc[arg.param] = arg.desc;
+                    return acc;
+                }, {});
+
+                docstring.returns = docstring.sections.find((section) => Object.keys(section)[0] === 'Returns')['Returns'] ?? [];
+
+                docstring.returns = docstring.returns.join('\n');
+            } catch {
+                // Do nothing
+            }
+
+            if (!docstring.text) {
+                docstring.text = getContext()?.args?.[member.name] ?? '';
+            }
+
             // Create the Typedoc member object
             let typedocMember = {
                 id: oid++,
@@ -223,10 +236,10 @@ function convertObject(obj, parent, module) {
                 module: moduleName, // This is an extension to the original Typedoc structure, to support showing where the member is exported from
                 ...typedocKind,
                 flags: {},
-                comment: member.docstring ? {
+                comment: docstring ? {
                     summary: [{
                         kind: 'text',
-                        text: member.docstring?.content,
+                        text: docstring.text,
                     }],
                 } : undefined,
                 type: typedocType,
@@ -241,8 +254,6 @@ function convertObject(obj, parent, module) {
             };
 
             if(typedocMember.kindString === 'Method') {
-                const { parameters, returns } = extractArgsAndReturns(member.docstring?.content ?? '');
-
                 typedocMember.signatures = [{
                     id: oid++,
                     name: member.name,
@@ -250,14 +261,13 @@ function convertObject(obj, parent, module) {
                     kind: 4096,
                     kindString: 'Call signature',
                     flags: {},
-                    comment: member.docstring ? {
+                    comment: docstring.text ? {
                         summary: [{
                             kind: 'text',
-                            text: member.docstring?.content
-                                .replace(/\**(Args|Arguments|Returns)[\s\S]+/, ''),
+                            text: docstring?.text,
                         }],
-                        blockTags: returns ? [
-                            { tag: '@returns', content: [{ kind: 'text', text: returns }] },
+                        blockTags: docstring?.returns ? [
+                            { tag: '@returns', content: [{ kind: 'text', text: docstring.returns }] },
                         ] : undefined,
                     } : undefined,
                     type: inferTypedocType(member.return_type),
@@ -271,10 +281,10 @@ function convertObject(obj, parent, module) {
                             'keyword-only': arg.type === 'KEYWORD_ONLY' ? 'true' : undefined,
                         },
                         type: inferTypedocType(arg.datatype),
-                        comment: parameters[arg.name] ? {
+                        comment: docstring.args?.[arg.name] ? {
                             summary: [{
                                 kind: 'text',
-                                text: parameters[arg.name]
+                                text: docstring.args[arg.name]
                             }]
                         } : undefined,
                         defaultValue: arg.default_value,
@@ -288,6 +298,82 @@ function convertObject(obj, parent, module) {
             }
 
             convertObject(member, typedocMember, module);
+            
+            if (typedocMember.kindString === 'Class') {
+                newContext(docstring);
+
+                backwardAncestorRefs.set(member.name, typedocMember);
+
+                if (member.bases?.length > 0) {
+                    member.bases.forEach((base) => {
+                        const unwrappedBaseType = getBaseType(base);
+
+                        const baseTypedocMember = backwardAncestorRefs.get(unwrappedBaseType);
+                        if (baseTypedocMember) {
+                            typedocMember.extendedTypes = [
+                                ...typedocMember.extendedTypes ?? [],
+                                {
+                                    type: 'reference',
+                                    name: baseTypedocMember.name,
+                                    target: baseTypedocMember.id,
+                                }
+                            ];
+
+                            baseTypedocMember.extendedBy = [
+                                ...baseTypedocMember.extendedBy ?? [],
+                                {
+                                    type: 'reference',
+                                    name: typedocMember.name,
+                                    target: typedocMember.id,
+                                }
+                            ]
+
+                            typedocMember.children = [
+                                ...typedocMember.children ?? [],
+                                ...(baseTypedocMember.children ?? []).map((inheritedChild) => {
+                                    if (typedocMember.children?.some((x) => x.name === inheritedChild.name)) {
+                                        return;
+                                    }
+
+                                    const childId = oid++;
+
+                                    const groupName = getGroupName(inheritedChild);
+                                    const group = typedocMember.groups.find((g) => g.title === groupName);
+
+                                    if (group) {
+                                        group.children.push(inheritedChild.id);
+                                    } else {
+                                        typedocMember.groups.push({
+                                            title: groupName,
+                                            children: [inheritedChild.id],
+                                        });
+                                    }
+
+                                    return {
+                                        ...inheritedChild,
+                                        id: childId,
+                                        inheritedFrom: {
+                                            type: "reference",
+                                            target: inheritedChild.id,
+                                            name: `${baseTypedocMember.name}.${inheritedChild.name}`,
+                                        }
+                                    }
+                                }).filter(x => x),
+                            ]
+                            
+                        } else {
+                            forwardAncestorRefs.set(
+                                unwrappedBaseType, 
+                                [...(forwardAncestorRefs.get(unwrappedBaseType) ?? []), typedocMember],
+                            );
+                        }
+                    });
+                }
+            }
+
+            if (typedocMember.kindString === 'Class') {
+                popContext();
+            }
 
             const groupName = getGroupName(typedocMember);
 
@@ -301,8 +387,66 @@ function convertObject(obj, parent, module) {
                 });
             }
 
-            sortChildren(typedocMember);
             parent.children.push(typedocMember);
+
+            sortChildren(typedocMember);
+
+            if (typedocMember.kindString === 'Class') {
+                forwardAncestorRefs.get(typedocMember.name)?.forEach((descendant) => {
+                    descendant.extendedTypes = [
+                        ...descendant.extendedTypes ?? [],
+                        {
+                            type: 'reference',
+                            name: typedocMember.name,
+                            target: typedocMember.id,
+                        }
+                    ];
+
+                    typedocMember.extendedBy = [
+                        ...typedocMember.extendedBy ?? [],
+                        {
+                            type: 'reference',
+                            name: descendant.name,
+                            target: descendant.id,
+                        }
+                    ]
+
+                    descendant.children = [
+                        ...descendant.children ?? [],
+                        ...(typedocMember.children ?? []).map((inheritedChild) => {
+                            if (descendant.children?.some((x) => x.name === inheritedChild.name)) {
+                                return;
+                            }
+
+                            const childId = oid++;
+
+                            const groupName = getGroupName(inheritedChild);
+                            const group = descendant.groups.find((g) => g.title === groupName);
+
+                            if (group) {
+                                group.children.push(inheritedChild.id);
+                            } else {
+                                descendant.groups.push({
+                                    title: groupName,
+                                    children: [inheritedChild.id],
+                                });
+                            }
+
+                            return {
+                                ...inheritedChild,
+                                id: childId,
+                                inheritedFrom: {
+                                    type: "reference",
+                                    target: inheritedChild.id,
+                                    name: `${typedocMember.name}.${inheritedChild.name}`,
+                                }
+                            }
+                        }).filter(x => x),
+                    ]
+
+                    sortChildren(descendant);
+                });
+            }
         }
     }
 }
@@ -330,12 +474,11 @@ function main() {
 
     // Load the docspec dump files of this module and of apify-shared
     const thisPackageDocspecDump = fs.readFileSync('docspec-dump.jsonl', 'utf8');
-    const thisPackageModules = thisPackageDocspecDump.split('\n').filter((line) => line !== '');
+    const thisPackageModules = JSON.parse(thisPackageDocspecDump)
 
     // Convert all the modules, store them in the root object
-    for (const module of [...thisPackageModules]) {
-        const parsedModule = JSON.parse(module);
-        convertObject(parsedModule, typedocApiReference, parsedModule);
+    for (const module of thisPackageModules) {
+        convertObject(module, typedocApiReference, module);
     };
 
     // Recursively fix references (collect names->ids of all the named entities and then inject those in the reference objects)
@@ -351,17 +494,17 @@ function main() {
     function fixRefs(obj) {
         for (const child of obj.children ?? []) {
             if (child.type?.type === 'reference') {
-                child.type.id = namesToIds[child.type.name];
+                child.type.target = namesToIds[child.type.name];
             }
             if (child.signatures) {
                 for (const sig of child.signatures) {
                     for (const param of sig.parameters ?? []) {
                         if (param.type?.type === 'reference') {
-                            param.type.id = namesToIds[param.type.name];
+                            param.type.target = namesToIds[param.type.name];
                         }
                     }
                     if (sig.type?.type === 'reference') {
-                        sig.type.id = namesToIds[sig.type.name];
+                        sig.type.target = namesToIds[sig.type.name];
                     }
                 }
             }

@@ -16,7 +16,7 @@ from crawlee.sessions import Session
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from crawlee._types import HttpMethod, HttpQueryParams
+    from crawlee._types import HttpMethod, HttpPayload, HttpQueryParams
     from crawlee.base_storage_client._models import Request
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.statistics import Statistics
@@ -77,6 +77,16 @@ class HttpxHttpClient(BaseHttpClient):
     and to manage sessions, proxies, and error handling.
 
     See the `BaseHttpClient` class for more common information about HTTP clients.
+
+    ### Usage
+
+    ```python
+    from crawlee.http_clients import HttpxHttpClient
+    from crawlee.http_crawler import HttpCrawler  # or any other HTTP client-based crawler
+
+    http_client = HttpxHttpClient()
+    crawler = HttpCrawler(http_client=http_client)
+    ```
     """
 
     _DEFAULT_HEADER_GENERATOR = HeaderGenerator()
@@ -92,7 +102,7 @@ class HttpxHttpClient(BaseHttpClient):
         header_generator: HeaderGenerator | None = _DEFAULT_HEADER_GENERATOR,
         **async_client_kwargs: Any,
     ) -> None:
-        """Create a new instance.
+        """A default constructor.
 
         Args:
             persist_cookies_per_session: Whether to persist cookies per HTTP session.
@@ -132,7 +142,7 @@ class HttpxHttpClient(BaseHttpClient):
             method=request.method,
             headers=headers,
             params=request.query_params,
-            data=request.data,
+            content=request.payload,
             cookies=session.cookies if session else None,
             extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
         )
@@ -167,7 +177,7 @@ class HttpxHttpClient(BaseHttpClient):
         method: HttpMethod = 'GET',
         headers: HttpHeaders | None = None,
         query_params: HttpQueryParams | None = None,
-        data: dict[str, Any] | None = None,
+        payload: HttpPayload | None = None,
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> HttpResponse:
@@ -179,7 +189,7 @@ class HttpxHttpClient(BaseHttpClient):
             method=method,
             headers=dict(headers) if headers else None,
             params=query_params,
-            data=data,
+            content=payload,
             extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
         )
 

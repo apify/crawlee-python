@@ -39,8 +39,11 @@ class KeyValueStore(BaseStorage):
     that does not exist will raise an error; however, if accessed by `name`, the store will be created if it does not
     already exist.
 
-    Usage:
+    ### Usage
+
     ```python
+    from crawlee.storages import KeyValueStore
+
     kvs = await KeyValueStore.open(name='my_kvs')
     ```
     """
@@ -157,3 +160,14 @@ class KeyValueStore(BaseStorage):
             return await self._resource_client.delete_record(key)
 
         return await self._resource_client.set_record(key, value, content_type)
+
+    async def get_public_url(self, key: str) -> str:
+        """Get the public URL for the given key.
+
+        Args:
+            key: Key of the record for which URL is required.
+
+        Returns:
+            The public URL for the given key.
+        """
+        return await self._resource_client.get_public_url(key)
