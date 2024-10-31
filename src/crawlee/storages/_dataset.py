@@ -104,7 +104,7 @@ class ExportDataJsonKwargs(TypedDict):
     ensure_ascii: NotRequired[bool]
     check_circular: NotRequired[bool]
     allow_nan: NotRequired[bool]
-    cls: NotRequired[json.JSONEncoder]
+    cls: NotRequired[type[json.JSONEncoder]]
     indent: NotRequired[int]
     separators: NotRequired[tuple[str, str]]
     default: NotRequired[Callable]
