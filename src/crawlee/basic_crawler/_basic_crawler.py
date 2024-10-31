@@ -537,7 +537,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
         """Export data from a dataset.
 
         This helper method simplifies the process of exporting data from a dataset. It opens the specified
-        dataset and then exports the data based on the provided parameters.
+        dataset and then exports the data based on the provided parameters. If you need to pass options
+        specific to the output format, use the `export_data_csv` or `export_data_json` method instead.
 
         Args:
             path: The destination path.
@@ -551,8 +552,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         if path.suffix == '.csv':
             await dataset.write_to_csv(destination)
-        else:
+        elif path.suffix == '.json':
             await dataset.write_to_json(destination)
+        else:
+            raise ValueError(f'Unsupported file extension: {path.suffix}')
 
     async def export_data_csv(
         self,
