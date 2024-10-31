@@ -244,13 +244,8 @@ class Dataset(BaseStorage):
         """Exports the entire dataset into an arbitrary stream.
 
         Args:
-<<<<<<< HEAD
             destination: The stream into which the dataset contents should be written.
             kwargs: Additional keyword arguments for `csv.writer`.
-=======
-            content_type: Specifies the output format.
-            destination: The stream into which the dataset contents should be written.
->>>>>>> origin/master
         """
         items: list[dict] = []
         limit = 1000
