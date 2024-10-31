@@ -528,6 +528,32 @@ class BasicCrawler(Generic[TCrawlingContext]):
         dataset = await Dataset.open(id=dataset_id, name=dataset_name)
         return await dataset.get_data(**kwargs)
 
+    async def export_data(
+        self,
+        path: str | Path,
+        dataset_id: str | None = None,
+        dataset_name: str | None = None,
+    ) -> None:
+        """Export data from a dataset.
+
+        This helper method simplifies the process of exporting data from a dataset. It opens the specified
+        dataset and then exports the data based on the provided parameters.
+
+        Args:
+            path: The destination path.
+            dataset_id: The ID of the dataset.
+            dataset_name: The name of the dataset.
+        """
+        dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
+
+        path = path if isinstance(path, Path) else Path(path)
+        destination = path.open('w', newline='')
+
+        if path.suffix == '.csv':
+            await dataset.write_to_csv(destination)
+        else:
+            await dataset.write_to_json(destination)
+
     async def export_data_csv(
         self,
         path: str | Path,
