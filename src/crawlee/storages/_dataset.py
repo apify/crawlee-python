@@ -81,12 +81,12 @@ class ExportDataJsonKwargs(TypedDict):
     """Keyword arguments for dataset's `export_data_json` method.
 
     Args:
-        ensure_asci: Whether non-ASCII characters should be escaped in the output JSON string.
+        ensure_ascii: Whether non-ASCII characters should be escaped in the output JSON string.
         indent: Specifies the number of spaces to use for indentation in the pretty-printed JSON output.
         sort_keys: Specifies whether the output JSON object should have its keys sorted alphabetically.
     """
 
-    ensure_asci: NotRequired[bool]
+    ensure_ascii: NotRequired[bool]
     indent: NotRequired[int]
     sort_keys: NotRequired[bool]
 
