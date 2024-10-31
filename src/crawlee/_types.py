@@ -50,8 +50,6 @@ else:
 
 HttpMethod: TypeAlias = Literal['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH']
 
-HttpQueryParams: TypeAlias = dict[str, str]
-
 HttpPayload: TypeAlias = bytes
 
 

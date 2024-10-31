@@ -10,7 +10,7 @@ from crawlee.errors import HttpStatusCodeError
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from crawlee._types import HttpHeaders, HttpMethod, HttpPayload, HttpQueryParams
+    from crawlee._types import HttpHeaders, HttpMethod, HttpPayload
     from crawlee.base_storage_client._models import Request
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions import Session
@@ -112,7 +112,6 @@ class BaseHttpClient(ABC):
         *,
         method: HttpMethod = 'GET',
         headers: HttpHeaders | None = None,
-        query_params: HttpQueryParams | None = None,
         payload: HttpPayload | None = None,
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
@@ -125,7 +124,6 @@ class BaseHttpClient(ABC):
             url: The URL to send the request to.
             method: The HTTP method to use.
             headers: The headers to include in the request.
-            query_params: The query parameters to include in the request.
             payload: The data to be sent as the request body.
             session: The session associated with the request.
             proxy_info: The information about the proxy to be used.
