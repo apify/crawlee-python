@@ -246,7 +246,7 @@ async def test_sending_payload(http_client_class: type[BaseHttpClient]) -> None:
     await crawler.run([request])
 
     # The request handler should be called once.
-    assert len(responses) == 1
+    assert len(responses) == 1, 'The request handler should be called once.'
 
     # The reconstructed payload data should match the original payload. We have to flatten the values, because
     # parse_qs returns a list of values for each key.
@@ -254,4 +254,37 @@ async def test_sending_payload(http_client_class: type[BaseHttpClient]) -> None:
         k: v[0] if len(v) == 1 else v for k, v in parse_qs(responses[0]['data'].strip("b'").strip("'")).items()
     }
 
-    assert response_data == payload
+    assert response_data == payload, 'The reconstructed payload data should match the original payload.'
+
+
+@pytest.mark.parametrize(
+    'http_client_class',
+    [CurlImpersonateHttpClient, HttpxHttpClient],
+    ids=['curl', 'httpx'],
+)
+async def test_sending_url_query_params(http_client_class: type[BaseHttpClient]) -> None:
+    http_client = http_client_class()
+    crawler = HttpCrawler(http_client=http_client)
+
+    responses = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: HttpCrawlingContext) -> None:
+        response = json.loads(context.http_response.read())
+        # The httpbin.org/get endpoint returns the provided query parameters in the response.
+        responses.append(response)
+
+    base_url = 'https://httpbin.org/get'
+    query_params = {'param1': 'value1', 'param2': 'value2'}
+    request = Request.from_url(url=f'{base_url}?{urlencode(query_params)}')
+
+    await crawler.run([request])
+
+    # The request handler should be called once.
+    assert len(responses) == 1, 'The request handler should be called once.'
+
+    # Validate the response query parameters.
+    response_args = responses[0]['args']
+    assert (
+        response_args == query_params
+    ), 'The reconstructed query parameters should match the original query parameters.'
