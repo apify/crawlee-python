@@ -306,6 +306,7 @@ class Request(BaseRequestData):
             use_extended_unique_key: Determines whether to include the HTTP method and payload in the `unique_key`
                 computation. This is only relevant when `unique_key` is not provided.
             always_enqueue: If set to `True`, the request will be enqueued even if it is already present in the queue.
+                Using this is not allowed when a custom `unique_key` is also provided and will result in a `ValueError`.
             **kwargs: Additional request properties.
         """
         if unique_key is not None and always_enqueue:
