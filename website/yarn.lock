@@ -223,9 +223,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@apify/docusaurus-plugin-typedoc-api@npm:^4.2.6":
-  version: 4.2.6
-  resolution: "@apify/docusaurus-plugin-typedoc-api@npm:4.2.6"
+"@apify/docusaurus-plugin-typedoc-api@npm:^4.2.7":
+  version: 4.2.7
+  resolution: "@apify/docusaurus-plugin-typedoc-api@npm:4.2.7"
   dependencies:
     "@docusaurus/plugin-content-docs": "npm:^3.5.2"
     "@docusaurus/types": "npm:^3.5.2"
@@ -241,7 +241,7 @@ __metadata:
     "@docusaurus/mdx-loader": ^3.5.2
     react: ">=18.0.0"
     typescript: ^5.0.0
-  checksum: 10c0/93bd5e1d7ded644520bed15733b44e9e5547f04d7dd3c46a7137b950e17ceb6fabff41b85da659aeaf299d2026962a6d35be46c9041929dc5ba4388afd718aeb
+  checksum: 10c0/0ed51d0b454bb476ee72b9a6fd57eabd1ccfff20c56f0a713eab38d059c5cca1254b7b310d71a05b1b4e6c936c118ea261d59ff3e3a40724aed7a43b9d5c8940
   languageName: node
   linkType: hard
 
@@ -5188,6 +5188,51 @@ __metadata:
   checksum: 10c0/0382a9ed13208f8bfc22ca2f62b364855207dffdb73dc26e150ade78c3093f1cf56172df2dd460c8caf2afa91c0ed4ec8a88c62f8f9cd1cf423d26506aa8797a
   languageName: node
   linkType: hard
+
+"crawlee@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "crawlee@workspace:."
+  dependencies:
+    "@apify/docusaurus-plugin-typedoc-api": "npm:^4.2.7"
+    "@apify/eslint-config-ts": "npm:^0.4.0"
+    "@apify/tsconfig": "npm:^0.1.0"
+    "@apify/utilities": "npm:^2.8.0"
+    "@docusaurus/core": "npm:^3.5.2"
+    "@docusaurus/mdx-loader": "npm:^3.5.2"
+    "@docusaurus/module-type-aliases": "npm:3.4.0"
+    "@docusaurus/plugin-client-redirects": "npm:^3.5.2"
+    "@docusaurus/preset-classic": "npm:^3.5.2"
+    "@docusaurus/types": "npm:3.4.0"
+    "@giscus/react": "npm:^3.0.0"
+    "@mdx-js/react": "npm:^3.0.1"
+    "@types/react": "npm:^18.0.28"
+    "@typescript-eslint/eslint-plugin": "npm:8.2.0"
+    "@typescript-eslint/parser": "npm:8.2.0"
+    axios: "npm:^1.5.0"
+    buffer: "npm:^6.0.3"
+    clsx: "npm:^2.0.0"
+    crypto-browserify: "npm:^3.12.0"
+    docusaurus-gtm-plugin: "npm:^0.0.2"
+    eslint: "npm:8.57.0"
+    eslint-plugin-react: "npm:7.37.1"
+    eslint-plugin-react-hooks: "npm:4.6.2"
+    fs-extra: "npm:^11.1.0"
+    patch-package: "npm:^8.0.0"
+    path-browserify: "npm:^1.0.1"
+    prettier: "npm:^3.0.0"
+    prism-react-renderer: "npm:^2.1.0"
+    process: "npm:^0.11.10"
+    prop-types: "npm:^15.8.1"
+    raw-loader: "npm:^4.0.2"
+    react: "npm:^18.2.0"
+    react-dom: "npm:^18.2.0"
+    react-lite-youtube-embed: "npm:^2.3.52"
+    rimraf: "npm:^6.0.0"
+    stream-browserify: "npm:^3.0.0"
+    typescript: "npm:5.6.2"
+    unist-util-visit: "npm:^5.0.0"
+  languageName: unknown
+  linkType: soft
 
 "create-ecdh@npm:^4.0.0":
   version: 4.0.4
@@ -12525,51 +12570,6 @@ __metadata:
   checksum: 10c0/f6f0df78817e78287c766687aed4d5accbebc308a8e7e673fb085b9977473c1f139f0c5335d353f172a915bb288098430755d2ad3c4f30612f4dd0c901cd2c3a
   languageName: node
   linkType: hard
-
-"root-workspace-0b6124@workspace:.":
-  version: 0.0.0-use.local
-  resolution: "root-workspace-0b6124@workspace:."
-  dependencies:
-    "@apify/docusaurus-plugin-typedoc-api": "npm:^4.2.6"
-    "@apify/eslint-config-ts": "npm:^0.4.0"
-    "@apify/tsconfig": "npm:^0.1.0"
-    "@apify/utilities": "npm:^2.8.0"
-    "@docusaurus/core": "npm:^3.5.2"
-    "@docusaurus/mdx-loader": "npm:^3.5.2"
-    "@docusaurus/module-type-aliases": "npm:3.4.0"
-    "@docusaurus/plugin-client-redirects": "npm:^3.5.2"
-    "@docusaurus/preset-classic": "npm:^3.5.2"
-    "@docusaurus/types": "npm:3.4.0"
-    "@giscus/react": "npm:^3.0.0"
-    "@mdx-js/react": "npm:^3.0.1"
-    "@types/react": "npm:^18.0.28"
-    "@typescript-eslint/eslint-plugin": "npm:8.2.0"
-    "@typescript-eslint/parser": "npm:8.2.0"
-    axios: "npm:^1.5.0"
-    buffer: "npm:^6.0.3"
-    clsx: "npm:^2.0.0"
-    crypto-browserify: "npm:^3.12.0"
-    docusaurus-gtm-plugin: "npm:^0.0.2"
-    eslint: "npm:8.57.0"
-    eslint-plugin-react: "npm:7.37.1"
-    eslint-plugin-react-hooks: "npm:4.6.2"
-    fs-extra: "npm:^11.1.0"
-    patch-package: "npm:^8.0.0"
-    path-browserify: "npm:^1.0.1"
-    prettier: "npm:^3.0.0"
-    prism-react-renderer: "npm:^2.1.0"
-    process: "npm:^0.11.10"
-    prop-types: "npm:^15.8.1"
-    raw-loader: "npm:^4.0.2"
-    react: "npm:^18.2.0"
-    react-dom: "npm:^18.2.0"
-    react-lite-youtube-embed: "npm:^2.3.52"
-    rimraf: "npm:^6.0.0"
-    stream-browserify: "npm:^3.0.0"
-    typescript: "npm:5.6.2"
-    unist-util-visit: "npm:^5.0.0"
-  languageName: unknown
-  linkType: soft
 
 "rtl-detect@npm:^1.0.4":
   version: 1.1.2

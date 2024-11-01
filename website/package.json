@@ -1,4 +1,5 @@
 {
+    "name": "crawlee",
     "scripts": {
         "examples": "docusaurus-examples",
         "postinstall": "npx patch-package",
@@ -33,7 +34,7 @@
         "typescript": "5.6.2"
     },
     "dependencies": {
-        "@apify/docusaurus-plugin-typedoc-api": "^4.2.6",
+        "@apify/docusaurus-plugin-typedoc-api": "^4.2.7",
         "@apify/utilities": "^2.8.0",
         "@docusaurus/core": "^3.5.2",
         "@docusaurus/mdx-loader": "^3.5.2",
