@@ -66,9 +66,7 @@ typedoc_types_path = sys.argv[1]
 
 with open(typedoc_types_path, "r") as f:
     typedoc_out = {}
-    expressions = f.read()
-
-    expressions = json.loads(expressions)
+    expressions = json.load(f)
 
     for expression in expressions:
         try:
