@@ -1,4 +1,5 @@
 {
+    "name": "crawlee",
     "scripts": {
         "examples": "docusaurus-examples",
         "postinstall": "npx patch-package",
