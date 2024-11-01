@@ -2,13 +2,13 @@ repos:
   - repo: local
     hooks:
       - id: lint
-        name: Linting
+        name: Lint check
         entry: make lint
         language: system
         pass_filenames: false
 
       - id: type-check
-        name: Type checking
+        name: Type check
         entry: make type-check
         language: system
         pass_filenames: false
