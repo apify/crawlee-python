@@ -21,7 +21,10 @@ function Hero() {
                     <div className={clsx(styles.relative, 'row')}>
                         <div className="col">
                             <h1 className={styles.tagline}>
-                                Build your <span>Python<br /> web crawlers</span><br /> using <span>Crawlee</span> 
+                                Build your Python<br/> web crawlers<br/> using Crawlee
+                            </h1>
+                            <h1 className={styles.tagline}>
+                                Build your <span>Python<br/> web crawlers</span><br/> using <span>Crawlee</span>
                             </h1>
                         </div>
                     </div>
