@@ -179,6 +179,53 @@ const newContext = (context) => contextStack.push(context);
 const forwardAncestorRefs = new Map();
 const backwardAncestorRefs = new Map();
 
+function injectInheritedChildren(ancestor, descendant) {
+    descendant.children = descendant.children ?? [];
+
+    for (const inheritedChild of ancestor.children ?? []) {
+        let ownChild = descendant.children?.find((x) => x.name === inheritedChild.name);
+
+        if (!ownChild) {
+            const childId = oid++;
+
+            const groupName = getGroupName(inheritedChild);
+            const group = descendant.groups.find((g) => g.title === groupName);
+
+            if (group) {
+                group.children.push(inheritedChild.id);
+            } else {
+                descendant.groups.push({
+                    title: groupName,
+                    children: [inheritedChild.id],
+                });
+            }
+
+            descendant.children.push({
+                ...inheritedChild,
+                id: childId,
+                inheritedFrom: {
+                    type: "reference",
+                    target: inheritedChild.id,
+                    name: `${ancestor.name}.${inheritedChild.name}`,
+                }
+            });
+        } else if (!ownChild.comment.summary[0].text) {
+            ownChild.inheritedFrom = {
+                type: "reference",
+                target: inheritedChild.id,
+                name: `${ancestor.name}.${inheritedChild.name}`,
+            }
+
+            for (let key in inheritedChild) {
+                if(key !== 'id' && key !== 'inheritedFrom') {
+                    ownChild[key] = inheritedChild[key];
+                }
+            }
+        }
+    }  
+}
+
+
 // Converts a docspec object to a Typedoc object, including all its children
 function convertObject(obj, parent, module) {
     const rootModuleName = module.name.split('.')[0];
@@ -349,49 +396,7 @@ function convertObject(obj, parent, module) {
                                 }
                             ];
 
-                            typedocMember.children = typedocMember.children ?? [];
-
-                            for (const inheritedChild of baseTypedocMember.children ?? []) {
-                                let ownChild = typedocMember.children?.find((x) => x.name === inheritedChild.name);
-
-                                if (!ownChild) {
-                                    const childId = oid++;
-
-                                    const groupName = getGroupName(inheritedChild);
-                                    const group = typedocMember.groups.find((g) => g.title === groupName);
-
-                                    if (group) {
-                                        group.children.push(inheritedChild.id);
-                                    } else {
-                                        typedocMember.groups.push({
-                                            title: groupName,
-                                            children: [inheritedChild.id],
-                                        });
-                                    }
-
-                                    typedocMember.children.push({
-                                        ...inheritedChild,
-                                        id: childId,
-                                        inheritedFrom: {
-                                            type: "reference",
-                                            target: inheritedChild.id,
-                                            name: `${baseTypedocMember.name}.${inheritedChild.name}`,
-                                        }
-                                    });
-                                } else if (!ownChild.comment.summary[0].text) {
-                                    ownChild.inheritedFrom = {
-                                        type: "reference",
-                                        target: inheritedChild.id,
-                                        name: `${baseTypedocMember.name}.${inheritedChild.name}`,
-                                    }
-
-                                    for (let key in inheritedChild) {
-                                        if(key !== 'id' && key !== 'inheritedFrom') {
-                                            ownChild[key] = inheritedChild[key];
-                                        }
-                                    }
-                                }
-                            }  
+                            injectInheritedChildren(baseTypedocMember, typedocMember);
                         } else {
                             forwardAncestorRefs.set(
                                 unwrappedBaseType, 
@@ -442,50 +447,7 @@ function convertObject(obj, parent, module) {
                         }
                     ]
 
-                    descendant.children = descendant.children ?? [];
-
-
-                    for (const inheritedChild of typedocMember.children ?? []) {
-                        const ownChild = descendant.children?.find((ownChild) => ownChild.name === inheritedChild.name);
-
-                        if (!ownChild) {
-                            const childId = oid++;
-
-                            const groupName = getGroupName(inheritedChild);
-                            const group = descendant.groups.find((g) => g.title === groupName);
-
-                            if (group) {
-                                group.children.push(inheritedChild.id);
-                            } else {
-                                descendant.groups.push({
-                                    title: groupName,
-                                    children: [inheritedChild.id],
-                                });
-                            }
-
-                            descendant.children.push({
-                                ...inheritedChild,
-                                id: childId,
-                                inheritedFrom: {
-                                    type: "reference",
-                                    target: inheritedChild.id,
-                                    name: `${typedocMember.name}.${inheritedChild.name}`,
-                                }
-                            });
-                        } else if (!ownChild.comment.summary[0].text) {
-                            ownChild.inheritedFrom = {
-                                type: "reference",
-                                target: inheritedChild.id,
-                                name: `${typedocMember.name}.${inheritedChild.name}`,
-                            }
-
-                            for (let key in inheritedChild) {
-                                if(key !== 'id' && key !== 'inheritedFrom') {
-                                    ownChild[key] = inheritedChild[key];
-                                }
-                            }
-                        }
-                    }
+                    injectInheritedChildren(typedocMember, descendant);
 
                     sortChildren(descendant);
                 });
