@@ -19,7 +19,7 @@ from pydantic import (
 )
 from typing_extensions import Self
 
-from crawlee._types import EnqueueStrategy, HttpHeaders, HttpMethod, HttpPayload, HttpQueryParams, JsonSerializable
+from crawlee._types import EnqueueStrategy, HttpHeaders, HttpMethod, HttpPayload, JsonSerializable
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
 from crawlee._utils.urls import extract_query_params, validate_http_url
@@ -139,9 +139,6 @@ class BaseRequestData(BaseModel):
     headers: Annotated[HttpHeaders, Field(default_factory=HttpHeaders)] = HttpHeaders()
     """HTTP request headers."""
 
-    query_params: Annotated[HttpQueryParams, Field(alias='queryParams', default_factory=dict)] = {}
-    """URL query parameters."""
-
     payload: HttpPayload | None = None
     """HTTP request payload."""
 
@@ -182,7 +179,6 @@ class BaseRequestData(BaseModel):
         *,
         method: HttpMethod = 'GET',
         headers: HttpHeaders | None = None,
-        query_params: HttpQueryParams | None = None,
         payload: HttpPayload | None = None,
         label: str | None = None,
         unique_key: str | None = None,
@@ -193,7 +189,6 @@ class BaseRequestData(BaseModel):
     ) -> Self:
         """Create a new `BaseRequestData` instance from a URL. See `Request.from_url` for more details."""
         headers = headers or HttpHeaders()
-        query_params = query_params or {}
 
         unique_key = unique_key or compute_unique_key(
             url,
@@ -212,7 +207,6 @@ class BaseRequestData(BaseModel):
             id=id,
             method=method,
             headers=headers,
-            query_params=query_params,
             payload=payload,
             **kwargs,
         )
@@ -276,7 +270,6 @@ class Request(BaseRequestData):
         *,
         method: HttpMethod = 'GET',
         headers: HttpHeaders | None = None,
-        query_params: HttpQueryParams | None = None,
         payload: HttpPayload | None = None,
         label: str | None = None,
         unique_key: str | None = None,
@@ -297,7 +290,6 @@ class Request(BaseRequestData):
             url: The URL of the request.
             method: The HTTP method of the request.
             headers: The HTTP headers of the request.
-            query_params: The query parameters of the URL.
             payload: The data to be sent as the request body. Typically used with 'POST' or 'PUT' requests.
             label: A custom label to differentiate between request types. This is stored in `user_data`, and it is
                 used for request routing (different requests go to different handlers).
@@ -317,7 +309,6 @@ class Request(BaseRequestData):
             raise ValueError('`always_enqueue` cannot be used with a custom `unique_key`')
 
         headers = headers or HttpHeaders()
-        query_params = query_params or {}
 
         unique_key = unique_key or compute_unique_key(
             url,
@@ -339,7 +330,6 @@ class Request(BaseRequestData):
             id=id,
             method=method,
             headers=headers,
-            query_params=query_params,
             payload=payload,
             **kwargs,
         )
@@ -440,7 +430,6 @@ class Request(BaseRequestData):
                 and self.unique_key == other.unique_key
                 and self.method == other.method
                 and self.headers == other.headers
-                and self.query_params == other.query_params
                 and self.payload == other.payload
                 and self.user_data == other.user_data
                 and self.retry_count == other.retry_count

@@ -16,7 +16,7 @@ from crawlee.sessions import Session
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from crawlee._types import HttpMethod, HttpPayload, HttpQueryParams
+    from crawlee._types import HttpMethod, HttpPayload
     from crawlee.base_storage_client._models import Request
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.statistics import Statistics
@@ -141,7 +141,6 @@ class HttpxHttpClient(BaseHttpClient):
             url=request.url,
             method=request.method,
             headers=headers,
-            params=request.query_params,
             content=request.payload,
             cookies=session.cookies if session else None,
             extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
@@ -176,7 +175,6 @@ class HttpxHttpClient(BaseHttpClient):
         *,
         method: HttpMethod = 'GET',
         headers: HttpHeaders | None = None,
-        query_params: HttpQueryParams | None = None,
         payload: HttpPayload | None = None,
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
@@ -188,7 +186,6 @@ class HttpxHttpClient(BaseHttpClient):
             url=url,
             method=method,
             headers=dict(headers) if headers else None,
-            params=query_params,
             content=payload,
             extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
         )
