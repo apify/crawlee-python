@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.4.0 - **not yet released**
+## [0.4.0](https://github.com/apify/crawlee-python/releases/tag/v0.4.0) (2024-11-01)
 
 ### 🚀 Features
 
@@ -23,7 +22,6 @@ All notable changes to this project will be documented in this file.
 - Remove Request.query_params field ([#639](https://github.com/apify/crawlee-python/pull/639)) ([6ec0ec4](https://github.com/apify/crawlee-python/commit/6ec0ec4fa0cef9b8bf893e70d99f068675c9c54c)) by [@vdusek](https://github.com/vdusek), closes [#615](https://github.com/apify/crawlee-python/issues/615)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.3.9](https://github.com/apify/crawlee-python/releases/tag/v0.3.9) (2024-10-23)
 
 ### 🚀 Features
