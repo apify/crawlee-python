@@ -11,7 +11,13 @@ import TabItem from '@theme/TabItem';
 import CodeBlock from '@theme/CodeBlock';
 
 import DatasetBasicExample from '!!raw-loader!./code/result_storage_dataset_basic.py';
+import DatasetWithCrawler from '!!raw-loader!./code/result_storage_dataset_with_crawler.py';
+import DatasetWithCrawerExplicit from '!!raw-loader!./code/result_storage_dataset_with_crawler_explicit.py';
+
 import KvStoreBasicExample from '!!raw-loader!./code/result_storage_kvs_basic.py';
+import KvStoreWithCrawler from '!!raw-loader!./code/result_storage_kvs_with_crawler.py';
+import KvStoreWithCrawlerExplicit from '!!raw-loader!./code/result_storage_kvs_with_crawler_explicit.py';
+
 import RsPurgeExplicitlyExample from '!!raw-loader!./code/result_storage_purge_explicitly.py';
 
 This guide explains the available result storage options in Crawlee and how to use them to store and retrieve data.
@@ -39,9 +45,23 @@ By default, data is stored using the following path structure:
 
 The following code demonstrates basic operations of key-value stores:
 
-<CodeBlock className="language-python">
-    {KvStoreBasicExample}
-</CodeBlock>
+<Tabs groupId="kv_storage">
+    <TabItem value="kvs_basic_example" label="Basic usage" default>
+        <CodeBlock className="language-python">
+            {KvStoreBasicExample}
+        </CodeBlock>
+    </TabItem>
+    <TabItem value="kvs_with_crawler" label="Usage with Crawler">
+        <CodeBlock className="language-python">
+            {KvStoreWithCrawler}
+        </CodeBlock>
+    </TabItem>
+    <TabItem value="kvs_with_crawler_explicit" label="Explicit usage with Crawler" default>
+        <CodeBlock className="language-python">
+            {KvStoreWithCrawlerExplicit}
+        </CodeBlock>
+    </TabItem>
+</Tabs>
 
 To see a real-world example of how to get the input from the key-value store, see the [Screenshots](https://crawlee.dev/python/docs/examples/capture-screenshots-using-playwright) example.
 
@@ -63,9 +83,23 @@ By default, data is stored using the following path structure:
 
 The following code demonstrates basic operations of the dataset:
 
-<CodeBlock className="language-python">
-    {DatasetBasicExample}
-</CodeBlock>
+<Tabs groupId="dataset_storage">
+    <TabItem value="dataset_basic_example" label="Basic usage" default>
+        <CodeBlock className="language-python">
+            {DatasetBasicExample}
+        </CodeBlock>
+    </TabItem>
+    <TabItem value="dataset_with_crawler" label="Usage with Crawler">
+        <CodeBlock className="language-python">
+            {DatasetWithCrawler}
+        </CodeBlock>
+    </TabItem>
+    <TabItem value="dataset_with_crawler_explicit" label="Explicit usage with Crawler" default>
+        <CodeBlock className="language-python">
+            {DatasetWithCrawerExplicit}
+        </CodeBlock>
+    </TabItem>
+</Tabs>
 
 ## Cleaning up the storages
 
