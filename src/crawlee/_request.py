@@ -62,6 +62,9 @@ class CrawleeRequestData(BaseModel):
     forefront: Annotated[bool, Field()] = False
     """Indicate whether the request should be enqueued at the front of the queue."""
 
+    crawl_depth: Annotated[int, Field(alias='crawlDepth')] = 0
+    """The depth of the request in the crawl tree."""
+
 
 class UserData(BaseModel, MutableMapping[str, JsonSerializable]):
     """Represents the `user_data` part of a Request.
@@ -359,6 +362,15 @@ class Request(BaseRequestData):
             user_data.crawlee_data = CrawleeRequestData()
 
         return user_data.crawlee_data
+
+    @property
+    def crawl_depth(self) -> int:
+        """The depth of the request in the crawl tree."""
+        return self.crawlee_data.crawl_depth
+
+    @crawl_depth.setter
+    def crawl_depth(self, new_value: int) -> None:
+        self.crawlee_data.crawl_depth = new_value
 
     @property
     def state(self) -> RequestState | None:

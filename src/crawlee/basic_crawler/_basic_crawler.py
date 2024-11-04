@@ -120,6 +120,10 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     configure_logging: NotRequired[bool]
     """If True, the crawler will set up logging infrastructure automatically."""
 
+    max_crawl_depth: NotRequired[int | None]
+    """Limits crawl depth from 0 (initial requests) up to the specified `max_crawl_depth`.
+    Requests at the maximum depth are processed, but no further links are enqueued."""
+
     _context_pipeline: NotRequired[ContextPipeline[TCrawlingContext]]
     """Enables extending the request lifecycle and modifying the crawling context. Intended for use by
     subclasses rather than direct instantiation of `BasicCrawler`."""
@@ -174,6 +178,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         statistics: Statistics | None = None,
         event_manager: EventManager | None = None,
         configure_logging: bool = True,
+        max_crawl_depth: int | None = None,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         _additional_context_managers: Sequence[AsyncContextManager] | None = None,
         _logger: logging.Logger | None = None,
@@ -201,6 +206,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             statistics: A custom `Statistics` instance, allowing the use of non-default configuration.
             event_manager: A custom `EventManager` instance, allowing the use of non-default configuration.
             configure_logging: If True, the crawler will set up logging infrastructure automatically.
+            max_crawl_depth: Maximum crawl depth. If set, the crawler will stop crawling after reaching this depth.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
             _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
@@ -283,6 +289,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         self._running = False
         self._has_finished_before = False
+        self._max_crawl_depth = max_crawl_depth
 
     @property
     def log(self) -> logging.Logger:
@@ -841,14 +848,21 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 else:
                     dst_request = Request.from_base_request_data(request)
 
-                if self._check_enqueue_strategy(
-                    add_requests_call.get('strategy', EnqueueStrategy.ALL),
-                    target_url=urlparse(dst_request.url),
-                    origin_url=urlparse(origin),
-                ) and self._check_url_patterns(
-                    dst_request.url,
-                    add_requests_call.get('include', None),
-                    add_requests_call.get('exclude', None),
+                # Update the crawl depth of the request.
+                dst_request.crawl_depth = context.request.crawl_depth + 1
+
+                if (
+                    (self._max_crawl_depth is None or dst_request.crawl_depth <= self._max_crawl_depth)
+                    and self._check_enqueue_strategy(
+                        add_requests_call.get('strategy', EnqueueStrategy.ALL),
+                        target_url=urlparse(dst_request.url),
+                        origin_url=urlparse(origin),
+                    )
+                    and self._check_url_patterns(
+                        dst_request.url,
+                        add_requests_call.get('include', None),
+                        add_requests_call.get('exclude', None),
+                    )
                 ):
                     requests.append(dst_request)
 
