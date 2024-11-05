@@ -73,6 +73,8 @@ class RequestQueueClient(BaseRequestQueueClient):
         self.file_operation_lock = asyncio.Lock()
         self._last_used_timestamp = Decimal(0.0)
 
+        self._in_progress = set[str]()
+
     @property
     def resource_info(self) -> RequestQueueMetadata:
         """Get the resource info for the request queue client."""
@@ -171,7 +173,7 @@ class RequestQueueClient(BaseRequestQueueClient):
                     await asyncio.to_thread(shutil.rmtree, queue.resource_directory)
 
     @override
-    async def list_head(self, *, limit: int | None = None) -> RequestQueueHead:
+    async def list_head(self, *, limit: int | None = None, skip_in_progress: bool = False) -> RequestQueueHead:
         existing_queue_by_id = find_or_create_client_by_id_or_name_inner(
             resource_client_class=RequestQueueClient,
             memory_storage_client=self._memory_storage_client,
@@ -196,6 +198,9 @@ class RequestQueueClient(BaseRequestQueueClient):
                 if len(requests) == limit:
                     break
 
+                if skip_in_progress and request_key in self._in_progress:
+                    continue
+
                 request = existing_queue_by_id.requests.get(request_key)
 
                 # Check that the request still exists and was not handled,
@@ -214,7 +219,11 @@ class RequestQueueClient(BaseRequestQueueClient):
 
     @override
     async def list_and_lock_head(self, *, lock_secs: int, limit: int | None = None) -> RequestQueueHeadWithLocks:
-        result = await self.list_head(limit=limit)
+        result = await self.list_head(limit=limit, skip_in_progress=True)
+
+        for item in result.items:
+            self._in_progress.add(item.id)
+
         return RequestQueueHeadWithLocks(
             lock_secs=lock_secs,
             limit=result.limit,
@@ -344,6 +353,9 @@ class RequestQueueClient(BaseRequestQueueClient):
                 persist_storage=self._memory_storage_client.persist_storage,
             )
 
+            if request.handled_at is not None:
+                self._in_progress.discard(request.id)
+
             return ProcessedRequest(
                 id=request_model.id,
                 unique_key=request_model.unique_key,
@@ -395,7 +407,7 @@ class RequestQueueClient(BaseRequestQueueClient):
         *,
         forefront: bool = False,
     ) -> None:
-        return None
+        self._in_progress.discard(request_id)
 
     @override
     async def batch_add_requests(
