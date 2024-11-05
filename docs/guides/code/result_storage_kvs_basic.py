@@ -1,23 +1,25 @@
-# Import the asyncio module to support asynchronous programming
 import asyncio
 
-# Import KeyValueStore from the crawlee.storages module
 from crawlee.storages import KeyValueStore
 
 
 async def main() -> None:
-    # Open a KeyValueStore asynchronously (e.g., for storing key-value pairs)
-    store = await KeyValueStore.open()
+    # Open the key-value store, if it does not exist, it will be created.
+    # Leave name empty to use the default KVS.
+    kvs = await KeyValueStore.open()
 
-    # Set a key-value pair in the store with the key 'some-key' and the value {'foo': 'bar'}
-    await store.set_value(key='some-key', value={'foo': 'bar'})
+    # Set a value associated with 'some-key'.
+    await kvs.set_value(key='some-key', value={'foo': 'bar'})
 
-    # Retrieve the value associated with 'some-key' from the store
-    value = store.get_value('some-key')
+    # Get the value associated with 'some-key'.
+    value = kvs.get_value('some-key')
+    # Do something with it...
 
-    # Delete the value associated with 'some-key' by setting its value to None
-    await store.set_value(key='some-key', value=None)
+    # Delete the value associated with 'some-key' by setting it to None.
+    await kvs.set_value(key='some-key', value=None)
 
+    # Remove the key-value store.
+    await kvs.drop()
 
 if __name__ == '__main__':
     asyncio.run(main())
