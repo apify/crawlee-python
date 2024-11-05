@@ -9,15 +9,15 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import CodeBlock from '@theme/CodeBlock';
 
-import QuickStartExample from '!!raw-loader!./code/proxy_management_quick_start.py';
-import IntegrationBeautifulSoupExample from '!!raw-loader!./code/proxy_management_integration_bs.py';
-import IntegrationPlaywrightExample from '!!raw-loader!./code/proxy_management_integration_pw.py';
-import SessionBeautifulSoupExample from '!!raw-loader!./code/proxy_management_session_bs.py';
-import SessionPlaywrightExample from '!!raw-loader!./code/proxy_management_session_pw.py';
-import InspectionBeautifulSoupExample from '!!raw-loader!./code/proxy_management_inspecting_bs.py';
-import InspectionPlaywrightExample from '!!raw-loader!./code/proxy_management_inspecting_pw.py';
-import TiersBeautifulSoupExample from '!!raw-loader!./code/proxy_management_tiers_bs.py';
-import TiersPlaywrightExample from '!!raw-loader!./code/proxy_management_tiers_pw.py';
+import QuickStartExample from '!!raw-loader!./code/proxy_management/quick_start.py';
+import IntegrationBsExample from '!!raw-loader!./code/proxy_management/integration_bs.py';
+import IntegrationPwExample from '!!raw-loader!./code/proxy_management/integration_pw.py';
+import SessionBsExample from '!!raw-loader!./code/proxy_management/session_bs.py';
+import SessionPwExample from '!!raw-loader!./code/proxy_management/session_pw.py';
+import InspectionBsExample from '!!raw-loader!./code/proxy_management/inspecting_bs.py';
+import InspectionPwExample from '!!raw-loader!./code/proxy_management/inspecting_pw.py';
+import TiersBsExample from '!!raw-loader!./code/proxy_management/tiers_bs.py';
+import TiersPwExample from '!!raw-loader!./code/proxy_management/tiers_pw.py';
 
 [IP address blocking](https://en.wikipedia.org/wiki/IP_address_blocking) is one of the oldest and most effective ways of preventing access to a website. It is therefore paramount for a good web scraping library to provide easy to use but powerful tools which can work around IP blocking. The most powerful weapon in our anti IP blocking arsenal is a [proxy server](https://en.wikipedia.org/wiki/Proxy_server).
 
@@ -46,12 +46,12 @@ All our proxy needs are managed by the <ApiLink to="class/ProxyConfiguration">`P
 <Tabs>
     <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
         <CodeBlock className="language-python">
-            {IntegrationBeautifulSoupExample}
+            {IntegrationBsExample}
         </CodeBlock>
     </TabItem>
     <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
         <CodeBlock className="language-python">
-            {IntegrationPlaywrightExample}
+            {IntegrationPwExample}
         </CodeBlock>
     </TabItem>
 </Tabs>
@@ -69,12 +69,12 @@ When no `session_id` is provided, our proxy URLs are rotated round-robin.
 <Tabs>
     <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
         <CodeBlock className="language-python">
-            {SessionBeautifulSoupExample}
+            {SessionBsExample}
         </CodeBlock>
     </TabItem>
     <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
         <CodeBlock className="language-python">
-            {SessionPlaywrightExample}
+            {SessionPwExample}
         </CodeBlock>
     </TabItem>
 </Tabs>
@@ -90,12 +90,12 @@ In an active tier, Crawlee will alternate between proxies in a round-robin fashi
 <Tabs>
     <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
         <CodeBlock className="language-python">
-            {TiersBeautifulSoupExample}
+            {TiersBsExample}
         </CodeBlock>
     </TabItem>
     <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
         <CodeBlock className="language-python">
-            {TiersPlaywrightExample}
+            {TiersPwExample}
         </CodeBlock>
     </TabItem>
 </Tabs>
@@ -107,12 +107,12 @@ The <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> an
 <Tabs>
     <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
         <CodeBlock className="language-python">
-            {InspectionBeautifulSoupExample}
+            {InspectionBsExample}
         </CodeBlock>
     </TabItem>
     <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
         <CodeBlock className="language-python">
-            {InspectionPlaywrightExample}
+            {InspectionPwExample}
         </CodeBlock>
     </TabItem>
 </Tabs>

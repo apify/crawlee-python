@@ -9,16 +9,16 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import CodeBlock from '@theme/CodeBlock';
 
-import DatasetBasicExample from '!!raw-loader!./code/result_storage_dataset_basic.py';
-import DatasetWithCrawlerExample from '!!raw-loader!./code/result_storage_dataset_with_crawler.py';
-import DatasetWithCrawerExplicitExample from '!!raw-loader!./code/result_storage_dataset_with_crawler_explicit.py';
+import DatasetBasicExample from '!!raw-loader!./code/result_storage/dataset_basic.py';
+import DatasetWithCrawlerExample from '!!raw-loader!./code/result_storage/dataset_with_crawler.py';
+import DatasetWithCrawerExplicitExample from '!!raw-loader!./code/result_storage/dataset_with_crawler_explicit.py';
+import KvsBasicExample from '!!raw-loader!./code/result_storage/kvs_basic.py';
+import KvsWithCrawlerExample from '!!raw-loader!./code/result_storage/kvs_with_crawler.py';
+import KvsWithCrawlerExplicitExample from '!!raw-loader!./code/result_storage/kvs_with_crawler_explicit.py';
 
-import KvsBasicExample from '!!raw-loader!./code/result_storage_kvs_basic.py';
-import KvsWithCrawlerExample from '!!raw-loader!./code/result_storage_kvs_with_crawler.py';
-import KvsWithCrawlerExplicitExample from '!!raw-loader!./code/result_storage_kvs_with_crawler_explicit.py';
-
-import RsDoNotPurgeExample from '!!raw-loader!./code/request_storage_do_not_purge.py';
-import RsPurgeExplicitlyExample from '!!raw-loader!./code/request_storage_purge_explicitly.py';
+{/* Import these 2 examples from request storage since they are the same. */}
+import RsDoNotPurgeExample from '!!raw-loader!./code/request_storage/do_not_purge.py';
+import RsPurgeExplicitlyExample from '!!raw-loader!./code/request_storage/purge_explicitly.py';
 
 This guide explains the available result storage options in Crawlee and how to use them to store and retrieve data.
 
