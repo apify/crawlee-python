@@ -21,5 +21,6 @@ async def main() -> None:
     # Remove the key-value store.
     await kvs.drop()
 
+
 if __name__ == '__main__':
     asyncio.run(main())
