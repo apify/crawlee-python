@@ -198,7 +198,7 @@ class RequestQueueClient(BaseRequestQueueClient):
                 if len(requests) == limit:
                     break
 
-                if skip_in_progress and request_key in self._in_progress:
+                if skip_in_progress and request_key in existing_queue_by_id._in_progress:  # noqa: SLF001
                     continue
 
                 request = existing_queue_by_id.requests.get(request_key)
@@ -219,10 +219,20 @@ class RequestQueueClient(BaseRequestQueueClient):
 
     @override
     async def list_and_lock_head(self, *, lock_secs: int, limit: int | None = None) -> RequestQueueHeadWithLocks:
+        existing_queue_by_id = find_or_create_client_by_id_or_name_inner(
+            resource_client_class=RequestQueueClient,
+            memory_storage_client=self._memory_storage_client,
+            id=self.id,
+            name=self.name,
+        )
+
+        if existing_queue_by_id is None:
+            raise_on_non_existing_storage(StorageTypes.REQUEST_QUEUE, self.id)
+
         result = await self.list_head(limit=limit, skip_in_progress=True)
 
         for item in result.items:
-            self._in_progress.add(item.id)
+            existing_queue_by_id._in_progress.add(item.id)  # noqa: SLF001
 
         return RequestQueueHeadWithLocks(
             lock_secs=lock_secs,
@@ -354,7 +364,7 @@ class RequestQueueClient(BaseRequestQueueClient):
             )
 
             if request.handled_at is not None:
-                self._in_progress.discard(request.id)
+                existing_queue_by_id._in_progress.discard(request.id)  # noqa: SLF001
 
             return ProcessedRequest(
                 id=request_model.id,
@@ -407,7 +417,17 @@ class RequestQueueClient(BaseRequestQueueClient):
         *,
         forefront: bool = False,
     ) -> None:
-        self._in_progress.discard(request_id)
+        existing_queue_by_id = find_or_create_client_by_id_or_name_inner(
+            resource_client_class=RequestQueueClient,
+            memory_storage_client=self._memory_storage_client,
+            id=self.id,
+            name=self.name,
+        )
+
+        if existing_queue_by_id is None:
+            raise_on_non_existing_storage(StorageTypes.REQUEST_QUEUE, self.id)
+
+        existing_queue_by_id._in_progress.discard(request_id)  # noqa: SLF001
 
     @override
     async def batch_add_requests(
