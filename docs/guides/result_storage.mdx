@@ -1,0 +1,130 @@
+---
+id: result-storage
+title: Result storage
+description: How to store and retrieve the scraping results in Crawlee.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import CodeBlock from '@theme/CodeBlock';
+
+import DatasetBasicExample from '!!raw-loader!./code/result_storage_dataset_basic.py';
+import DatasetWithCrawlerExample from '!!raw-loader!./code/result_storage_dataset_with_crawler.py';
+import DatasetWithCrawerExplicitExample from '!!raw-loader!./code/result_storage_dataset_with_crawler_explicit.py';
+
+import KvsBasicExample from '!!raw-loader!./code/result_storage_kvs_basic.py';
+import KvsWithCrawlerExample from '!!raw-loader!./code/result_storage_kvs_with_crawler.py';
+import KvsWithCrawlerExplicitExample from '!!raw-loader!./code/result_storage_kvs_with_crawler_explicit.py';
+
+import RsDoNotPurgeExample from '!!raw-loader!./code/request_storage_do_not_purge.py';
+import RsPurgeExplicitlyExample from '!!raw-loader!./code/request_storage_purge_explicitly.py';
+
+This guide explains the available result storage options in Crawlee and how to use them to store and retrieve data.
+
+## Introduction
+
+Crawlee provides multiple result storage options, each suited to specific use cases. By default, data is saved to a local directory specified by the `CRAWLEE_STORAGE_DIR` environment variable. If this variable is not set, Crawlee defaults to using `./storage` within the current working directory.
+
+Result storages are managed by storage clients, which are subclasses of the <ApiLink to="class/BaseStorageClient">`BaseStorageClient`</ApiLink>. For example, the <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink> stores data in memory and can also offload them to the local directory. Data are stored in the following directory structure:
+
+```text
+{CRAWLEE_STORAGE_DIR}/{result_storage}/{QUEUE_ID}/
+```
+:::note
+
+Local directory is specified by the `CRAWLEE_STORAGE_DIR` environment variable with default value `./storage`. `{QUEUE_ID}` is the name or ID of the specific storage. The default value is `default`, unless we override it by setting the `CRAWLEE_DEFAULT_DATASET_ID` or `CRAWLEE_DEFAULT_KEY_VALUE_STORE_ID` environment variables.
+
+:::
+
+## Dataset
+
+The <ApiLink to="class/Dataset">`Dataset`</ApiLink> is designed for storing structured data, where each entry has a consistent set of attributes, such as products in an online store or real estate listings. Think of a <ApiLink to="class/Dataset">`Dataset`</ApiLink> as a table: each entry corresponds to a row, with attributes represented as columns. Datasets are append-only, allowing you to add new records but not modify or delete existing ones. Every Crawlee project run is associated with a default dataset, typically used to store results specific to that crawler execution. However, using this dataset is optional.
+
+By default, data are stored using the following path structure:
+
+```text
+{CRAWLEE_STORAGE_DIR}/datasets/{DATASET_ID}/{INDEX}.json
+```
+- `{CRAWLEE_STORAGE_DIR}`: The root directory for all storage data specified by the environment variable.
+- `{DATASET_ID}`: The dataset's ID, "default" by default.
+- `{INDEX}`: Represents the zero-based index of the record within the dataset.
+
+The following code demonstrates basic operations of the dataset:
+
+<Tabs groupId="dataset_storage">
+    <TabItem value="dataset_basic_example" label="Basic usage" default>
+        <CodeBlock className="language-python">
+            {DatasetBasicExample}
+        </CodeBlock>
+    </TabItem>
+    <TabItem value="dataset_with_crawler" label="Usage with Crawler">
+        <CodeBlock className="language-python">
+            {DatasetWithCrawlerExample}
+        </CodeBlock>
+    </TabItem>
+    <TabItem value="dataset_with_crawler_explicit" label="Explicit usage with Crawler" default>
+        <CodeBlock className="language-python">
+            {DatasetWithCrawerExplicitExample}
+        </CodeBlock>
+    </TabItem>
+</Tabs>
+
+## Key-value store
+
+The <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink> is designed to save and retrieve data records or files efficiently. Each record is uniquely identified by a key and is associated with a specific MIME type, making the <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink> ideal for tasks like saving web page screenshots, PDFs, or tracking the state of crawlers.
+
+By default, data are stored using the following path structure:
+
+```text
+{CRAWLEE_STORAGE_DIR}/key_value_stores/{STORE_ID}/{KEY}.{EXT}
+```
+- `{CRAWLEE_STORAGE_DIR}`: The root directory for all storage data specified by the environment variable.
+- `{STORE_ID}`: The KVS's ID, "default" by default.
+- `{KEY}`: The unique key for the record.
+- `{EXT}`: The file extension corresponding to the MIME type of the content.
+
+The following code demonstrates the usage of the <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>:
+
+<Tabs groupId="kv_storage">
+    <TabItem value="kvs_basic_example" label="Basic usage" default>
+        <CodeBlock className="language-python">
+            {KvsBasicExample}
+        </CodeBlock>
+    </TabItem>
+    <TabItem value="kvs_with_crawler" label="Usage with Crawler">
+        <CodeBlock className="language-python">
+            {KvsWithCrawlerExample}
+        </CodeBlock>
+    </TabItem>
+    <TabItem value="kvs_with_crawler_explicit" label="Explicit usage with Crawler" default>
+        <CodeBlock className="language-python">
+            {KvsWithCrawlerExplicitExample}
+        </CodeBlock>
+    </TabItem>
+</Tabs>
+
+To see a real-world example of how to get the input from the key-value store, see the [Screenshots](https://crawlee.dev/python/docs/examples/capture-screenshots-using-playwright) example.
+
+## Result-related helpers
+
+We offer several helper functions to simplify interactions with result storages:
+
+- The <ApiLink to="class/PushDataFunction">`push_data`</ApiLink> function allows you to manually add data to the dataset. You can optionally specify the dataset ID or its name.
+- The <ApiLink to="class/GetKeyValueStoreFunction">`get_key_value_store`</ApiLink> function retrieves the key-value store for the current crawler run. If the KVS does not exist, it will be created. You can also specify the KVS's ID or its name.
+
+## Cleaning up the storages
+
+Default storages are purged before the crawler starts, unless explicitly configured otherwise. For that case, see <ApiLink to="class/Configuration#purge_on_start">`Configuration.purge_on_start`</ApiLink>. This cleanup happens as soon as a storage is accessed, either when you open a storage (e.g. using <ApiLink to="class/Dataset#open">`Dataset.open`</ApiLink>, <ApiLink to="class/KeyValueStore#open">`KeyValueStore.open`</ApiLink>) or when interacting with a storage through one of the helper functions (e.g. <ApiLink to="class/PushDataFunction">`push_data`</ApiLink>), which implicitly opens the result storage).
+
+<CodeBlock className="language-python">
+    {RsDoNotPurgeExample}
+</CodeBlock>
+
+If you do not explicitly interact with storages in your code, the purging will occur automatically when the <ApiLink to="class/BasicCrawler#run">`BasicCrawler.run`</ApiLink> method is invoked.
+
+If you need to purge storages earlier, you can call <ApiLink to="class/MemoryStorageClient#purge_on_start">`MemoryStorageClient.purge_on_start`</ApiLink> directly. This method triggers the purging process for the underlying storage implementation you are currently using.
+
+<CodeBlock className="language-python">
+    {RsPurgeExplicitlyExample}
+</CodeBlock>
