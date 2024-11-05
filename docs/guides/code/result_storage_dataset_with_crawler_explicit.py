@@ -5,32 +5,33 @@ from crawlee.storages import Dataset
 
 
 async def main() -> None:
-    # Open a named dataset asynchronously for shared use across handler functions
-    dataset = await Dataset.open(name='shared-store')
+    # Open the dataset, if it does not exist, it will be created.
+    # Leave name empty to use the default dataset.
+    dataset = await Dataset.open()
 
-    # Initialize the BeautifulSoupCrawler instance
+    # Create a new crawler (it can be any subclass of BasicCrawler).
     crawler = BeautifulSoupCrawler()
 
-    # Define the handler function with access to the shared dataset
+    # Define the default request handler, which will be called for every request.
     @crawler.router.default_handler
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url} ...')
 
-        # Extract relevant data from the page
+        # Extract data from the page.
         data = {
             'url': context.request.url,
             'title': context.soup.title.string if context.soup.title else None,
-            'html_snippet': str(context.soup)[:1000],  # First 1000 characters of HTML
         }
 
-        # Use the shared Dataset instance to store data
+        # Push the extracted data to the dataset.
         await dataset.push_data(data)
-        context.log.info(f"Data stored in 'shared-dataset' for {context.request.url}")
 
-    # Start the crawler with a list of URLs
-    await crawler.run(['https://example.com'])
+    # Run the crawler with the initial URLs.
+    await crawler.run(['https://crawlee.dev'])
+
+    # Export the dataset to the key-value store.
+    await dataset.export_to(key='dataset', content_type='csv')
 
 
-# Run the main function using asyncio
 if __name__ == '__main__':
     asyncio.run(main())
