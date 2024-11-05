@@ -1,33 +1,35 @@
 import asyncio
 
-from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
+from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
 from crawlee.storages import KeyValueStore
 
 
 async def main() -> None:
-    # Open a named KeyValueStore asynchronously for shared use
-    store = await KeyValueStore.open(name='shared-store')
+    # Open the key-value store, if it does not exist, it will be created.
+    # Leave name empty to use the default KVS.
+    kvs = await KeyValueStore.open()
 
-    # Initialize the BeautifulSoupCrawler instance
-    crawler = BeautifulSoupCrawler()
+    # Create a new Playwright crawler.
+    crawler = PlaywrightCrawler()
 
-    # Define the handler function with access to the shared KeyValueStore
+    # Define the default request handler, which will be called for every request.
     @crawler.router.default_handler
-    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url} ...')
 
-        # Extract the title from the page
-        title = context.soup.title.string if context.soup.title else 'No title'
+        # Capture the screenshot of the page using Playwright's API.
+        screenshot = await context.page.screenshot()
+        name = context.request.url.split('/')[-1]
 
-        # Prepare data to be stored
-        data = {'title': title, 'url': context.request.url}
+        # Store the screenshot in the key-value store.
+        await kvs.set_value(
+            key=f'screenshot-{name}',
+            value=screenshot,
+            content_type='image/png',
+        )
 
-        # Use the shared KeyValueStore instance to store data
-        await store.set_value(key=context.request.url, value=data)
-        context.log.info(f"Stored data in 'shared-store' for {context.request.url}")
-
-    # Start the crawler with a list of URLs
-    await crawler.run(['https://example.com'])
+    # Run the crawler with the initial URLs.
+    await crawler.run(['https://crawlee.dev'])
 
 
 if __name__ == '__main__':
