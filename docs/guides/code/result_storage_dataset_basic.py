@@ -1,21 +1,26 @@
 import asyncio
 
-# Import the Dataset class to manage data storage
 from crawlee.storages import Dataset
 
 
 async def main() -> None:
-    # Open a default dataset using the asynchronous constructor.
-    # This dataset is used to store data in the Crawlee storage.
+    # Open the dataset, if it does not exist, it will be created.
+    # Leave name empty to use the default dataset.
     dataset = await Dataset.open()
 
-    # Push a single row of data (a dictionary) to the named dataset.
+    # Push a single row of data.
     await dataset.push_data({'foo': 'bar'})
 
-    # Push multiple rows of data (a list of dictionaries) to the named dataset.
+    # Push multiple rows of data (anything JSON-serializable can be pushed).
     await dataset.push_data([{'foo': 'bar2', 'col2': 'val2'}, {'col3': 123}])
 
+    # Fetch all data from the dataset.
+    data = await dataset.get_data()
+    # Do something with it...
 
-# Run the main function in an asynchronous event loop
+    # Remove the dataset.
+    await dataset.drop()
+
+
 if __name__ == '__main__':
     asyncio.run(main())
