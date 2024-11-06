@@ -223,7 +223,6 @@ class Snapshotter:
             event_data: System info data from which memory usage is read.
         """
         snapshot = MemorySnapshot(
-            total_size=event_data.memory_info.total_size,
             current_size=event_data.memory_info.current_size,
             max_memory_size=self._max_memory_size,
             max_used_memory_ratio=self._max_used_memory_ratio,
