@@ -9,12 +9,13 @@ from pydantic import AliasChoices, BeforeValidator, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing_extensions import Self
 
+from crawlee._utils.docs import docs_group
 from crawlee._utils.models import timedelta_ms
 
 __all__ = ['Configuration']
 
 
-@docs_group("Data structures")
+@docs_group('Data structures')
 class Configuration(BaseSettings):
     """Configuration of the Crawler.
 

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, AsyncIterator, Literal, TextIO, TypedDict, cas
 from typing_extensions import NotRequired, Required, Unpack, override
 
 from crawlee._utils.byte_size import ByteSize
+from crawlee._utils.docs import docs_group
 from crawlee._utils.file import json_dumps
 from crawlee.base_storage_client._models import DatasetMetadata
 from crawlee.storages._base_storage import BaseStorage
@@ -150,7 +151,7 @@ class ExportDataCsvKwargs(TypedDict):
     """When True, raises an exception on bad CSV input. Defaults to False."""
 
 
-@docs_group("Classes")
+@docs_group('Classes')
 class Dataset(BaseStorage):
     """Represents an append-only structured storage, ideal for tabular data similar to database tables.
 

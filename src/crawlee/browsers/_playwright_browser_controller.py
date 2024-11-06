@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, cast
 from playwright.async_api import BrowserContext, Page, ProxySettings
 from typing_extensions import override
 
+from crawlee._utils.docs import docs_group
 from crawlee.browsers._base_browser_controller import BaseBrowserController
 from crawlee.browsers._types import BrowserType
 from crawlee.fingerprint_suite import HeaderGenerator
@@ -20,7 +21,7 @@ if TYPE_CHECKING:
     from crawlee.proxy_configuration import ProxyInfo
 
 
-@docs_group("Classes")
+@docs_group('Classes')
 class PlaywrightBrowserController(BaseBrowserController):
     """Controller for managing Playwright browser instances and their pages.
 

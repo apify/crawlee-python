@@ -12,6 +12,7 @@ from pydantic import AnyHttpUrl, TypeAdapter
 from typing_extensions import Protocol
 
 from crawlee._utils.crypto import crypto_random_object_id
+from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Sequence
@@ -22,7 +23,7 @@ __all__ = ['ProxyInfo', 'ProxyConfiguration']
 
 
 @dataclass
-@docs_group("Data structures")
+@docs_group('Data structures')
 class ProxyInfo:
     """Provides information about a proxy connection that is used for requests."""
 
@@ -52,7 +53,7 @@ class ProxyInfo:
     """The tier of the proxy."""
 
 
-@docs_group("Classes")
+@docs_group('Classes')
 class ProxyConfiguration:
     """Configures connection to a proxy server with the provided options.
 

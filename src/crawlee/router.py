@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Awaitable, Callable, Generic, TypeVar
 
 from crawlee._types import BasicCrawlingContext
+from crawlee._utils.docs import docs_group
 
 __all__ = ['Router']
 
@@ -10,7 +11,7 @@ TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext)
 RequestHandler = Callable[[TCrawlingContext], Awaitable[None]]
 
 
-@docs_group("Classes")
+@docs_group('Classes')
 class Router(Generic[TCrawlingContext]):
     """Dispatches requests to registered handlers based on their labels."""
 

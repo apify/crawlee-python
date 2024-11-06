@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from more_itertools import pairwise
 
 from crawlee._autoscaling.types import LoadRatioInfo, Snapshot, SystemInfo
+from crawlee._utils.docs import docs_group
 from crawlee._utils.math import compute_weighted_avg
 
 if TYPE_CHECKING:
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-@docs_group("Classes")
+@docs_group('Classes')
 class SystemStatus:
     """Provides a simple interface for evaluating system resource usage from snapshots collected by `Snapshotter`.
 

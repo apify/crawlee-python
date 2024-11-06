@@ -12,11 +12,12 @@ from rich.console import Console
 from rich.table import Table
 from typing_extensions import override
 
+from crawlee._utils.docs import docs_group
 from crawlee._utils.models import timedelta_ms
 
 
 @dataclass(frozen=True)
-@docs_group("Data structures")
+@docs_group('Data structures')
 class FinalStatistics:
     """Statistics about a crawler run."""
 
@@ -55,7 +56,7 @@ class FinalStatistics:
         )
 
 
-@docs_group("Data structures")
+@docs_group('Data structures')
 class StatisticsState(BaseModel):
     """Statistic data about a crawler run."""
 
@@ -84,7 +85,7 @@ class StatisticsState(BaseModel):
     stats_persisted_at: Annotated[datetime | None, Field(alias='statsPersistedAt')] = None
 
 
-@docs_group("Data structures")
+@docs_group('Data structures')
 class StatisticsPersistedState(BaseModel):
     """Additional statistic data to be stored in the persisted state."""
 

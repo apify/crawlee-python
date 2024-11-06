@@ -11,6 +11,7 @@ from typing_extensions import Unpack
 from crawlee import EnqueueStrategy
 from crawlee._request import BaseRequestData
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
+from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
@@ -22,7 +23,7 @@ if TYPE_CHECKING:
     from crawlee._types import AddRequestsKwargs, BasicCrawlingContext
 
 
-@docs_group("Classes")
+@docs_group('Classes')
 class ParselCrawler(BasicCrawler[ParselCrawlingContext]):
     """A web crawler for performing HTTP requests and parsing HTML/XML content.
 

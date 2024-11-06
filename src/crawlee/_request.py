@@ -21,6 +21,7 @@ from typing_extensions import Self
 
 from crawlee._types import EnqueueStrategy, HttpHeaders, HttpMethod, HttpPayload, JsonSerializable
 from crawlee._utils.crypto import crypto_random_object_id
+from crawlee._utils.docs import docs_group
 from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
 from crawlee._utils.urls import extract_query_params, validate_http_url
 
@@ -226,7 +227,7 @@ class BaseRequestData(BaseModel):
         return values[0]
 
 
-@docs_group("Data structures")
+@docs_group('Data structures')
 class Request(BaseRequestData):
     """Represents a request in the Crawlee framework, containing the necessary information for crawling operations.
 

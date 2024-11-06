@@ -26,6 +26,7 @@ from crawlee._log_config import configure_logger, get_configured_log_level
 from crawlee._request import Request, RequestState
 from crawlee._types import BasicCrawlingContext, HttpHeaders, RequestHandlerRunResult, SendRequestFunction
 from crawlee._utils.byte_size import ByteSize
+from crawlee._utils.docs import docs_group
 from crawlee._utils.http import is_status_code_client_error
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
@@ -63,7 +64,7 @@ ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Union[Request, 
 FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
 
 
-@docs_group("Data structures")
+@docs_group('Data structures')
 class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     """Arguments for the `BasicCrawler` constructor.
 
@@ -136,7 +137,7 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     """A logger instance, typically provided by a subclass, for consistent logging labels."""
 
 
-@docs_group("Classes")
+@docs_group('Classes')
 class BasicCrawler(Generic[TCrawlingContext]):
     """A basic web crawler providing a framework for crawling websites.
 

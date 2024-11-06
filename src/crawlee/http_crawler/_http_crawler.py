@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, AsyncGenerator, Iterable
 
 from typing_extensions import Unpack
 
+from crawlee._utils.docs import docs_group
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
 from crawlee.http_clients import HttpxHttpClient
@@ -14,7 +15,7 @@ if TYPE_CHECKING:
     from crawlee._types import BasicCrawlingContext
 
 
-@docs_group("Classes")
+@docs_group('Classes')
 class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
     """A web crawler for performing HTTP requests.
 

@@ -3,11 +3,13 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
+from crawlee._utils.docs import docs_group
+
 if TYPE_CHECKING:
     from crawlee.base_storage_client._models import RequestQueueListPage, RequestQueueMetadata
 
 
-@docs_group("Abstract classes")
+@docs_group('Abstract classes')
 class BaseRequestQueueCollectionClient(ABC):
     """Abstract base class for request queue collection clients.
 

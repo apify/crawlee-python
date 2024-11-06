@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Generic, TypedDict, TypeVar
 from typing_extensions import override
 
 from crawlee._utils.crypto import crypto_random_object_id
+from crawlee._utils.docs import docs_group
 from crawlee._utils.lru_cache import LRUCache
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee._utils.wait import wait_for_all_tasks_for_finish
@@ -62,7 +63,7 @@ class CachedRequest(TypedDict):
     lock_expires_at: datetime | None
 
 
-@docs_group("Classes")
+@docs_group('Classes')
 class RequestQueue(BaseStorage, RequestProvider):
     """Represents a queue storage for managing HTTP requests in web crawling operations.
 

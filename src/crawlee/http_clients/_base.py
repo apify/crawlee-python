@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
+from crawlee._utils.docs import docs_group
 from crawlee._utils.http import is_status_code_error
 from crawlee.errors import HttpStatusCodeError
 
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
     from crawlee.statistics import Statistics
 
 
-@docs_group("Data structures")
+@docs_group('Data structures')
 class HttpResponse(Protocol):
     """This protocol defines the interface that any HTTP response object must implement."""
 
@@ -38,7 +39,7 @@ class HttpResponse(Protocol):
 
 
 @dataclass(frozen=True)
-@docs_group("Data structures")
+@docs_group('Data structures')
 class HttpCrawlingResult:
     """Result of a HTTP-only crawl.
 
@@ -50,7 +51,7 @@ class HttpCrawlingResult:
     """The HTTP response received from the server."""
 
 
-@docs_group("Abstract classes")
+@docs_group('Abstract classes')
 class BaseHttpClient(ABC):
     """An abstract base class for HTTP clients used in crawlers (`BasicCrawler` subclasses).
 

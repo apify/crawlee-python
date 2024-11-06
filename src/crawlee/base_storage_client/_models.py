@@ -10,6 +10,7 @@ from typing_extensions import TypeVar
 
 from crawlee._request import Request
 from crawlee._types import HttpMethod
+from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import validate_http_url
 
 KvsValueType = TypeVar('KvsValueType', default=Any)
@@ -27,7 +28,7 @@ class _BaseStorageMetadata(BaseModel):
     modified_at: Annotated[datetime, Field(alias='modifiedAt')]
 
 
-@docs_group("Data structures")
+@docs_group('Data structures')
 class DatasetMetadata(_BaseStorageMetadata):
     """Model for a dataset metadata."""
 
@@ -36,7 +37,7 @@ class DatasetMetadata(_BaseStorageMetadata):
     item_count: Annotated[int, Field(alias='itemCount')]
 
 
-@docs_group("Data structures")
+@docs_group('Data structures')
 class KeyValueStoreMetadata(_BaseStorageMetadata):
     """Model for a key-value store metadata."""
 
@@ -45,7 +46,7 @@ class KeyValueStoreMetadata(_BaseStorageMetadata):
     user_id: Annotated[str, Field(alias='userId')]
 
 
-@docs_group("Data structures")
+@docs_group('Data structures')
 class RequestQueueMetadata(_BaseStorageMetadata):
     """Model for a request queue metadata."""
 
@@ -60,7 +61,7 @@ class RequestQueueMetadata(_BaseStorageMetadata):
     resource_directory: Annotated[str, Field(alias='resourceDirectory')]
 
 
-@docs_group("Data structures")
+@docs_group('Data structures')
 class KeyValueStoreRecord(BaseModel, Generic[KvsValueType]):
     """Model for a key-value store record."""
 
@@ -72,7 +73,7 @@ class KeyValueStoreRecord(BaseModel, Generic[KvsValueType]):
     filename: Annotated[str | None, Field(alias='filename', default=None)]
 
 
-@docs_group("Data structures")
+@docs_group('Data structures')
 class KeyValueStoreRecordMetadata(BaseModel):
     """Model for a key-value store record metadata."""
 
@@ -82,7 +83,7 @@ class KeyValueStoreRecordMetadata(BaseModel):
     content_type: Annotated[str, Field(alias='contentType')]
 
 
-@docs_group("Data structures")
+@docs_group('Data structures')
 class KeyValueStoreKeyInfo(BaseModel):
     """Model for a key-value store key info."""
 
@@ -92,7 +93,7 @@ class KeyValueStoreKeyInfo(BaseModel):
     size: Annotated[int, Field(alias='size')]
 
 
-@docs_group("Data structures")
+@docs_group('Data structures')
 class KeyValueStoreListKeysPage(BaseModel):
     """Model for listing keys in the key-value store."""
 
@@ -106,7 +107,7 @@ class KeyValueStoreListKeysPage(BaseModel):
     next_exclusive_start_key: Annotated[str | None, Field(alias='nextExclusiveStartKey', default=None)]
 
 
-@docs_group("Data structures")
+@docs_group('Data structures')
 class RequestQueueHeadState(BaseModel):
     """Model for the request queue head state."""
 
@@ -119,7 +120,7 @@ class RequestQueueHeadState(BaseModel):
     had_multiple_clients: Annotated[bool, Field(alias='hadMultipleClients')]
 
 
-@docs_group("Data structures")
+@docs_group('Data structures')
 class RequestQueueHead(BaseModel):
     """Model for the request queue head."""
 
@@ -131,7 +132,7 @@ class RequestQueueHead(BaseModel):
     items: Annotated[list[Request], Field(alias='items', default_factory=list)]
 
 
-@docs_group("Data structures")
+@docs_group('Data structures')
 class RequestQueueHeadWithLocks(RequestQueueHead):
     """Model for request queue head with locks."""
 
@@ -159,7 +160,7 @@ class _BaseListPage(BaseModel):
     """Indicates if the returned list is in descending order."""
 
 
-@docs_group("Data structures")
+@docs_group('Data structures')
 class DatasetListPage(_BaseListPage):
     """Model for a single page of dataset items returned from a collection list method."""
 
@@ -167,7 +168,7 @@ class DatasetListPage(_BaseListPage):
     """The list of dataset items returned on this page."""
 
 
-@docs_group("Data structures")
+@docs_group('Data structures')
 class KeyValueStoreListPage(_BaseListPage):
     """Model for a single page of key-value store items returned from a collection list method."""
 
@@ -175,7 +176,7 @@ class KeyValueStoreListPage(_BaseListPage):
     """The list of key-value store items returned on this page."""
 
 
-@docs_group("Data structures")
+@docs_group('Data structures')
 class RequestQueueListPage(_BaseListPage):
     """Model for a single page of request queue items returned from a collection list method."""
 
@@ -183,7 +184,7 @@ class RequestQueueListPage(_BaseListPage):
     """The list of request queue items returned on this page."""
 
 
-@docs_group("Data structures")
+@docs_group('Data structures')
 class DatasetItemsListPage(_BaseListPage):
     """Model for a single page of dataset items returned from a collection list method."""
 
@@ -191,7 +192,7 @@ class DatasetItemsListPage(_BaseListPage):
     """The list of dataset items returned on this page."""
 
 
-@docs_group("Data structures")
+@docs_group('Data structures')
 class ProlongRequestLockResponse(BaseModel):
     """Response to prolong request lock calls."""
 
@@ -200,7 +201,7 @@ class ProlongRequestLockResponse(BaseModel):
     lock_expires_at: Annotated[datetime, Field(alias='lockExpiresAt')]
 
 
-@docs_group("Data structures")
+@docs_group('Data structures')
 class ProcessedRequest(BaseModel):
     """Represents a processed request."""
 
@@ -212,7 +213,7 @@ class ProcessedRequest(BaseModel):
     was_already_handled: Annotated[bool, Field(alias='wasAlreadyHandled')]
 
 
-@docs_group("Data structures")
+@docs_group('Data structures')
 class UnprocessedRequest(BaseModel):
     """Represents an unprocessed request."""
 
@@ -223,7 +224,7 @@ class UnprocessedRequest(BaseModel):
     method: Annotated[HttpMethod | None, Field()] = None
 
 
-@docs_group("Data structures")
+@docs_group('Data structures')
 class BatchRequestsOperationResponse(BaseModel):
     """Response to batch request deletion calls."""
 
