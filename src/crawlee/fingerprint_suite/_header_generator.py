@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from crawlee.browsers._types import BrowserType
 
 
+@docs_group("Classes")
 class HeaderGenerator:
     """Generates realistic looking or browser-like HTTP headers."""
 

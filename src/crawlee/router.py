@@ -10,6 +10,7 @@ TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext)
 RequestHandler = Callable[[TCrawlingContext], Awaitable[None]]
 
 
+@docs_group("Classes")
 class Router(Generic[TCrawlingContext]):
     """Dispatches requests to registered handlers based on their labels."""
 

@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
+@docs_group("Classes")
 class Snapshotter:
     """Monitors and logs system resource usage at predefined intervals for performance optimization.
 

@@ -150,6 +150,7 @@ class ExportDataCsvKwargs(TypedDict):
     """When True, raises an exception on bad CSV input. Defaults to False."""
 
 
+@docs_group("Classes")
 class Dataset(BaseStorage):
     """Represents an append-only structured storage, ideal for tabular data similar to database tables.
 

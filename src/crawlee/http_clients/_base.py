@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from crawlee.statistics import Statistics
 
 
+@docs_group("Data structures")
 class HttpResponse(Protocol):
     """This protocol defines the interface that any HTTP response object must implement."""
 
@@ -37,6 +38,7 @@ class HttpResponse(Protocol):
 
 
 @dataclass(frozen=True)
+@docs_group("Data structures")
 class HttpCrawlingResult:
     """Result of a HTTP-only crawl.
 
@@ -48,6 +50,7 @@ class HttpCrawlingResult:
     """The HTTP response received from the server."""
 
 
+@docs_group("Abstract classes")
 class BaseHttpClient(ABC):
     """An abstract base class for HTTP clients used in crawlers (`BasicCrawler` subclasses).
 

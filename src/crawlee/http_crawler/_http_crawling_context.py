@@ -7,5 +7,6 @@ from crawlee.http_clients import HttpCrawlingResult
 
 
 @dataclass(frozen=True)
+@docs_group("Data structures")
 class HttpCrawlingContext(BasicCrawlingContext, HttpCrawlingResult):
     """The crawling context used by the `HttpCrawler`."""

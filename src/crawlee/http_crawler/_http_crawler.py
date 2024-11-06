@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from crawlee._types import BasicCrawlingContext
 
 
+@docs_group("Classes")
 class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
     """A web crawler for performing HTTP requests.
 

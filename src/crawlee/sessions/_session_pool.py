@@ -21,6 +21,7 @@ logger = getLogger(__name__)
 CreateSessionFunctionType = Callable[[], Session]
 
 
+@docs_group("Classes")
 class SessionPool:
     """Session pool is a pool of sessions that are rotated based on the usage count or age."""
 

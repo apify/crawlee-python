@@ -12,6 +12,7 @@ from crawlee.sessions._models import SessionModel
 logger = getLogger(__name__)
 
 
+@docs_group("Data structures")
 class Session:
     """Session object represents a single user session.
 

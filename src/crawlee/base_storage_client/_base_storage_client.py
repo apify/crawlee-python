@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from ._base_request_queue_collection_client import BaseRequestQueueCollectionClient
 
 
+@docs_group("Abstract classes")
 class BaseStorageClient(ABC):
     """Defines an abstract base for storage clients.
 

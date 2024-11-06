@@ -62,6 +62,7 @@ class CachedRequest(TypedDict):
     lock_expires_at: datetime | None
 
 
+@docs_group("Classes")
 class RequestQueue(BaseStorage, RequestProvider):
     """Represents a queue storage for managing HTTP requests in web crawling operations.
 

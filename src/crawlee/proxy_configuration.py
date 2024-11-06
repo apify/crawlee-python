@@ -22,6 +22,7 @@ __all__ = ['ProxyInfo', 'ProxyConfiguration']
 
 
 @dataclass
+@docs_group("Data structures")
 class ProxyInfo:
     """Provides information about a proxy connection that is used for requests."""
 
@@ -51,6 +52,7 @@ class ProxyInfo:
     """The tier of the proxy."""
 
 
+@docs_group("Classes")
 class ProxyConfiguration:
     """Configures connection to a proxy server with the provided options.
 

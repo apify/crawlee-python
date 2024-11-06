@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
+@docs_group("Classes")
 class PlaywrightBrowserPlugin(BaseBrowserPlugin):
     """A plugin for managing Playwright automation library.
 

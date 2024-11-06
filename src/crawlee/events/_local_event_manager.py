@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
+@docs_group("Classes")
 class LocalEventManager(EventManager):
     """Local event manager for emitting system info events."""
 

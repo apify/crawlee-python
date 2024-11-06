@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from crawlee.base_storage_client._models import DatasetItemsListPage, DatasetMetadata
 
 
+@docs_group("Abstract classes")
 class BaseDatasetClient(ABC):
     """Abstract base class for dataset resource clients.
 

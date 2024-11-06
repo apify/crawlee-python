@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from crawlee._request import Request
 
 
+@docs_group("Classes")
 class RequestList(RequestProvider):
     """Represents a (potentially very large) list of URLs to crawl.
 

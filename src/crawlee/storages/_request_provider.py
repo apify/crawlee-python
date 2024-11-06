@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from crawlee.base_storage_client._models import ProcessedRequest
 
 
+@docs_group("Abstract classes")
 class RequestProvider(ABC):
     """Abstract base class defining the interface and common behaviour for request providers.
 

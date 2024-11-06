@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from crawlee.proxy_configuration import ProxyInfo
 
 
+@docs_group("Classes")
 class PlaywrightBrowserController(BaseBrowserController):
     """Controller for managing Playwright browser instances and their pages.
 

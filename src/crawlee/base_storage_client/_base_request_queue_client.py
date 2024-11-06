@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     )
 
 
+@docs_group("Abstract classes")
 class BaseRequestQueueClient(ABC):
     """Abstract base class for request queue resource clients.
 

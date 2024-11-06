@@ -63,6 +63,7 @@ ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Union[Request, 
 FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
 
 
+@docs_group("Data structures")
 class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     """Arguments for the `BasicCrawler` constructor.
 
@@ -135,6 +136,7 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     """A logger instance, typically provided by a subclass, for consistent logging labels."""
 
 
+@docs_group("Classes")
 class BasicCrawler(Generic[TCrawlingContext]):
     """A basic web crawler providing a framework for crawling websites.
 

@@ -70,6 +70,7 @@ class _CurlImpersonateResponse:
         return self._response.content
 
 
+@docs_group("Classes")
 class CurlImpersonateHttpClient(BaseHttpClient):
     """HTTP client based on the `curl-cffi` library.
 

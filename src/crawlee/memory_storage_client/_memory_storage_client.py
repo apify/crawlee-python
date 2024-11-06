@@ -27,6 +27,7 @@ TResourceClient = TypeVar('TResourceClient', DatasetClient, KeyValueStoreClient,
 logger = getLogger(__name__)
 
 
+@docs_group("Classes")
 class MemoryStorageClient(BaseStorageClient):
     """Represents an in-memory storage client for managing datasets, key-value stores, and request queues.
 

@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     )
 
 
+@docs_group("Abstract classes")
 class BaseKeyValueStoreClient(ABC):
     """Abstract base class for key-value store resource clients.
 

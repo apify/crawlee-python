@@ -26,6 +26,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
+@docs_group("Classes")
 class BrowserPool:
     """Manages a pool of browsers and their pages, handling lifecycle events and resource allocation.
 

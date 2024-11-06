@@ -7,6 +7,7 @@ if TYPE_CHECKING:
     from crawlee.base_storage_client._models import RequestQueueListPage, RequestQueueMetadata
 
 
+@docs_group("Abstract classes")
 class BaseRequestQueueCollectionClient(ABC):
     """Abstract base class for request queue collection clients.
 

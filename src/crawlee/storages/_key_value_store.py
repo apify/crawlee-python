@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 T = TypeVar('T')
 
 
+@docs_group("Classes")
 class KeyValueStore(BaseStorage):
     """Represents a key-value based storage for reading and writing data records or files.
 

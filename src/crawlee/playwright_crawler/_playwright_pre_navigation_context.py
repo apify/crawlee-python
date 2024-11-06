@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True)
+@docs_group("Data structures")
 class PlaywrightPreNavigationContext(BasicCrawlingContext):
     """Context used by PlaywrightCrawler.
 

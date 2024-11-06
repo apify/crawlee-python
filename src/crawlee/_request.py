@@ -226,6 +226,7 @@ class BaseRequestData(BaseModel):
         return values[0]
 
 
+@docs_group("Data structures")
 class Request(BaseRequestData):
     """Represents a request in the Crawlee framework, containing the necessary information for crawling operations.
 

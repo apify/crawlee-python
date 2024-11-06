@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
+@docs_group("Classes")
 class SystemStatus:
     """Provides a simple interface for evaluating system resource usage from snapshots collected by `Snapshotter`.
 

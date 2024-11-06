@@ -14,6 +14,7 @@ from crawlee._utils.models import timedelta_ms
 __all__ = ['Configuration']
 
 
+@docs_group("Data structures")
 class Configuration(BaseSettings):
     """Configuration of the Crawler.
 

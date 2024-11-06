@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True)
+@docs_group("Data structures")
 class BeautifulSoupCrawlingContext(HttpCrawlingResult, BasicCrawlingContext):
     """The crawling context used by the `BeautifulSoupCrawler`.
 

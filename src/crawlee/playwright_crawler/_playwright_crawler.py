@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from crawlee.browsers._types import BrowserType
 
 
+@docs_group("Classes")
 class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
     """A web crawler that leverages the `Playwright` browser automation library.
 

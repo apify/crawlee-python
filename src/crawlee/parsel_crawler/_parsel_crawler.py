@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from crawlee._types import AddRequestsKwargs, BasicCrawlingContext
 
 
+@docs_group("Classes")
 class ParselCrawler(BasicCrawler[ParselCrawlingContext]):
     """A web crawler for performing HTTP requests and parsing HTML/XML content.
 
