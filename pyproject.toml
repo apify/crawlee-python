@@ -147,12 +147,6 @@ indent-style = "space"
 "**/__init__.py" = [
     "F401", # Unused imports
 ]
-"**/{scripts}/*" = [
-    "D",       # Everything from the pydocstyle
-    "INP001",  # File {filename} is part of an implicit namespace package, add an __init__.py
-    "PLR2004", # Magic value used in comparison, consider replacing {value} with a constant variable
-    "T20",     # flake8-print
-]
 "**/{tests}/*" = [
     "D",       # Everything from the pydocstyle
     "INP001",  # File {filename} is part of an implicit namespace package, add an __init__.py
@@ -194,7 +188,7 @@ timeout = 1200
 [tool.mypy]
 python_version = "3.9"
 plugins = ["pydantic.mypy"]
-files = ["scripts", "src", "tests"]
+files = ["src", "tests"]
 check_untyped_defs = true
 disallow_incomplete_defs = true
 disallow_untyped_calls = true
