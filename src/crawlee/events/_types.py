@@ -7,7 +7,7 @@ from typing import Annotated, Any, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from crawlee._utils.system import CpuInfo, MemoryInfo, MemoryUsageInfo
+from crawlee._utils.system import CpuInfo, MemoryUsageInfo
 
 
 class Event(str, Enum):
@@ -46,7 +46,7 @@ class EventSystemInfoData(BaseModel):
 
     cpu_info: Annotated[CpuInfo, Field(alias='cpuInfo')]
     memory_info: Annotated[
-        MemoryUsageInfo | MemoryInfo,  # MemoryInfo is left here for BC
+        MemoryUsageInfo,
         Field(alias='memoryInfo'),
     ]
 
