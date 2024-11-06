@@ -45,7 +45,10 @@ class EventSystemInfoData(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     cpu_info: Annotated[CpuInfo, Field(alias='cpuInfo')]
-    memory_info: Annotated[MemoryUsageInfo | MemoryInfo, Field(alias='memoryInfo')]
+    memory_info: Annotated[
+        MemoryUsageInfo | MemoryInfo,  # MemoryInfo is left here for BC
+        Field(alias='memoryInfo'),
+    ]
 
 
 class EventMigratingData(BaseModel):
