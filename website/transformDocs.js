@@ -77,6 +77,10 @@ const groupSort = (g1, g2) => {
 };
 
 function getGroupName(object) {
+    if (object.decorations?.some(d => d.name === 'docs_group')) {
+        return object.decorations.find(d => d.name === 'docs_group')?.args.slice(2,-2);
+    }
+
     const groupPredicates = {
         'Errors': (x) => x.name.toLowerCase().endsWith('error'),
         'Main Classes': (x) => [
@@ -310,7 +314,7 @@ function convertObject(obj, parent, module) {
                     }],
                 } : undefined,
                 type: typedocType,
-                decorations: member.decorations?.map(x => x.name),
+                decorations: member.decorations?.map(({ name, args }) => ({ name, args })),
                 children: [],
                 groups: [],
                 sources: [{
