@@ -1,7 +1,7 @@
 repos:
   - repo: local
     hooks:
-      - id: lint
+      - id: lint-check
         name: Lint check
         entry: make lint
         language: system
