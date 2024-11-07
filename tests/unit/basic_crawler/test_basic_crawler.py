@@ -16,7 +16,7 @@ import pytest
 
 from crawlee import ConcurrencySettings, EnqueueStrategy, Glob
 from crawlee._request import BaseRequestData, Request
-from crawlee._types import AddRequestsKwargs, BasicCrawlingContext, HttpHeaders
+from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpHeaders
 from crawlee.basic_crawler import BasicCrawler
 from crawlee.configuration import Configuration
 from crawlee.errors import SessionError, UserDefinedErrorHandlerError
@@ -326,7 +326,7 @@ class AddRequestsTestInput:
     start_url: str
     requests: Sequence[str | BaseRequestData]
     expected_urls: Sequence[str]
-    kwargs: AddRequestsKwargs
+    kwargs: EnqueueLinksKwargs
 
 
 STRATEGY_TEST_URLS = (
@@ -363,50 +363,50 @@ INCLUDE_TEST_URLS = (
         AddRequestsTestInput(
             start_url=STRATEGY_TEST_URLS[0],
             requests=STRATEGY_TEST_URLS,
-            kwargs=AddRequestsKwargs(),
+            kwargs=EnqueueLinksKwargs(),
             expected_urls=STRATEGY_TEST_URLS,
         ),
         AddRequestsTestInput(
             start_url=STRATEGY_TEST_URLS[0],
             requests=STRATEGY_TEST_URLS,
-            kwargs=AddRequestsKwargs(strategy=EnqueueStrategy.ALL),
+            kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.ALL),
             expected_urls=STRATEGY_TEST_URLS,
         ),
         AddRequestsTestInput(
             start_url=STRATEGY_TEST_URLS[0],
             requests=STRATEGY_TEST_URLS,
-            kwargs=AddRequestsKwargs(strategy=EnqueueStrategy.SAME_DOMAIN),
+            kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.SAME_DOMAIN),
             expected_urls=STRATEGY_TEST_URLS[:3],
         ),
         AddRequestsTestInput(
             start_url=STRATEGY_TEST_URLS[0],
             requests=STRATEGY_TEST_URLS,
-            kwargs=AddRequestsKwargs(strategy=EnqueueStrategy.SAME_HOSTNAME),
+            kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.SAME_HOSTNAME),
             expected_urls=STRATEGY_TEST_URLS[:2],
         ),
         AddRequestsTestInput(
             start_url=STRATEGY_TEST_URLS[0],
             requests=STRATEGY_TEST_URLS,
-            kwargs=AddRequestsKwargs(strategy=EnqueueStrategy.SAME_ORIGIN),
+            kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.SAME_ORIGIN),
             expected_urls=STRATEGY_TEST_URLS[:1],
         ),
         # Include/exclude
         AddRequestsTestInput(
             start_url=INCLUDE_TEST_URLS[0],
             requests=INCLUDE_TEST_URLS,
-            kwargs=AddRequestsKwargs(include=[Glob('https://someplace.com/**/cats')]),
+            kwargs=EnqueueLinksKwargs(include=[Glob('https://someplace.com/**/cats')]),
             expected_urls=[INCLUDE_TEST_URLS[1], INCLUDE_TEST_URLS[4]],
         ),
         AddRequestsTestInput(
             start_url=INCLUDE_TEST_URLS[0],
             requests=INCLUDE_TEST_URLS,
-            kwargs=AddRequestsKwargs(exclude=[Glob('https://someplace.com/**/cats')]),
+            kwargs=EnqueueLinksKwargs(exclude=[Glob('https://someplace.com/**/cats')]),
             expected_urls=[INCLUDE_TEST_URLS[0], INCLUDE_TEST_URLS[2], INCLUDE_TEST_URLS[3]],
         ),
         AddRequestsTestInput(
             start_url=INCLUDE_TEST_URLS[0],
             requests=INCLUDE_TEST_URLS,
-            kwargs=AddRequestsKwargs(
+            kwargs=EnqueueLinksKwargs(
                 include=[Glob('https://someplace.com/**/cats')], exclude=[Glob('https://**/archive/**')]
             ),
             expected_urls=[INCLUDE_TEST_URLS[1]],

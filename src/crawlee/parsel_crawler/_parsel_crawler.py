@@ -19,7 +19,7 @@ from crawlee.http_crawler import HttpCrawlingContext
 from crawlee.parsel_crawler._parsel_crawling_context import ParselCrawlingContext
 
 if TYPE_CHECKING:
-    from crawlee._types import AddRequestsKwargs, BasicCrawlingContext
+    from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs
 
 
 class ParselCrawler(BasicCrawler[ParselCrawlingContext]):
@@ -176,7 +176,7 @@ class ParselCrawler(BasicCrawler[ParselCrawlingContext]):
             selector: str = 'a',
             label: str | None = None,
             user_data: dict[str, Any] | None = None,
-            **kwargs: Unpack[AddRequestsKwargs],
+            **kwargs: Unpack[EnqueueLinksKwargs],
         ) -> None:
             kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
 

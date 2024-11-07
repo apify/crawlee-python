@@ -19,7 +19,7 @@ from crawlee.http_clients import HttpxHttpClient
 from crawlee.http_crawler import HttpCrawlingContext
 
 if TYPE_CHECKING:
-    from crawlee._types import AddRequestsKwargs, BasicCrawlingContext
+    from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs
 
 
 class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
@@ -177,7 +177,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
             selector: str = 'a',
             label: str | None = None,
             user_data: dict[str, Any] | None = None,
-            **kwargs: Unpack[AddRequestsKwargs],
+            **kwargs: Unpack[EnqueueLinksKwargs],
         ) -> None:
             kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
 
