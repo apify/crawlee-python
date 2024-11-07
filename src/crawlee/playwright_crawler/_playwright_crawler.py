@@ -20,7 +20,7 @@ from crawlee.playwright_crawler._utils import infinite_scroll
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
-    from crawlee._types import AddRequestsKwargs, BasicCrawlingContext
+    from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs
     from crawlee.browsers._types import BrowserType
 
 
@@ -160,7 +160,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 selector: str = 'a',
                 label: str | None = None,
                 user_data: dict | None = None,
-                **kwargs: Unpack[AddRequestsKwargs],
+                **kwargs: Unpack[EnqueueLinksKwargs],
             ) -> None:
                 """The `PlaywrightCrawler` implementation of the `EnqueueLinksFunction` function."""
                 kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
