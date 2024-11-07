@@ -181,7 +181,7 @@ class BaseRequestData(BaseModel):
         url: str,
         *,
         method: HttpMethod = 'GET',
-        headers: HttpHeaders | None = None,
+        headers: HttpHeaders | dict[str, str] | None = None,
         payload: HttpPayload | None = None,
         label: str | None = None,
         unique_key: str | None = None,
@@ -191,7 +191,8 @@ class BaseRequestData(BaseModel):
         **kwargs: Any,
     ) -> Self:
         """Create a new `BaseRequestData` instance from a URL. See `Request.from_url` for more details."""
-        headers = headers or HttpHeaders()
+        if isinstance(headers, dict) or headers is None:
+            headers = HttpHeaders(headers or {})
 
         unique_key = unique_key or compute_unique_key(
             url,
@@ -272,7 +273,7 @@ class Request(BaseRequestData):
         url: str,
         *,
         method: HttpMethod = 'GET',
-        headers: HttpHeaders | None = None,
+        headers: HttpHeaders | dict[str, str] | None = None,
         payload: HttpPayload | None = None,
         label: str | None = None,
         unique_key: str | None = None,
@@ -311,7 +312,8 @@ class Request(BaseRequestData):
         if unique_key is not None and always_enqueue:
             raise ValueError('`always_enqueue` cannot be used with a custom `unique_key`')
 
-        headers = headers or HttpHeaders()
+        if isinstance(headers, dict) or headers is None:
+            headers = HttpHeaders(headers or {})
 
         unique_key = unique_key or compute_unique_key(
             url,

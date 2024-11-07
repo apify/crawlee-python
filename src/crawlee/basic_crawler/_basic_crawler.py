@@ -805,7 +805,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             url: str,
             *,
             method: HttpMethod = 'GET',
-            headers: HttpHeaders | None = None,
+            headers: HttpHeaders | dict[str, str] | None = None,
         ) -> HttpResponse:
             return await self._http_client.send_request(
                 url=url,

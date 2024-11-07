@@ -174,11 +174,14 @@ class HttpxHttpClient(BaseHttpClient):
         url: str,
         *,
         method: HttpMethod = 'GET',
-        headers: HttpHeaders | None = None,
+        headers: HttpHeaders | dict[str, str] | None = None,
         payload: HttpPayload | None = None,
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> HttpResponse:
+        if isinstance(headers, dict) or headers is None:
+            headers = HttpHeaders(headers or {})
+
         client = self._get_client(proxy_info.url if proxy_info else None)
         headers = self._combine_headers(headers)
 

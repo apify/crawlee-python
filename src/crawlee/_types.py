@@ -292,7 +292,7 @@ class SendRequestFunction(Protocol):
         url: str,
         *,
         method: HttpMethod = 'GET',
-        headers: HttpHeaders | None = None,
+        headers: HttpHeaders | dict[str, str] | None = None,
     ) -> Coroutine[None, None, HttpResponse]: ...
 
 
