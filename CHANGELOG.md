@@ -9,6 +9,10 @@ All notable changes to this project will be documented in this file.
 
 - Add `max_crawl_depth` option to `BasicCrawler` ([#637](https://github.com/apify/crawlee-python/pull/637)) ([77deaa9](https://github.com/apify/crawlee-python/commit/77deaa964e2c1e74af1c5117a13d8d8257f0e27e)) by [@Prathamesh010](https://github.com/Prathamesh010), closes [#460](https://github.com/apify/crawlee-python/issues/460)
 
+### 🐛 Bug Fixes
+
+- Fix total_size usage in memory size monitoring ([#661](https://github.com/apify/crawlee-python/pull/661)) ([c2a3239](https://github.com/apify/crawlee-python/commit/c2a32397eecd5cc7f412c2af7269b004a8b2eaf2)) by [@janbuchar](https://github.com/janbuchar)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.4.0](https://github.com/apify/crawlee-python/releases/tag/v0.4.0) (2024-11-01)
