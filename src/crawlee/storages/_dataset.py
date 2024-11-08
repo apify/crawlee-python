@@ -281,8 +281,6 @@ class Dataset(BaseStorage):
         Returns:
             List page containing filtered and paginated dataset items.
         """
-        # TODO: Improve error handling here
-        # https://github.com/apify/apify-sdk-python/issues/140
         return await self._resource_client.list_items(**kwargs)
 
     async def write_to_csv(self, destination: TextIO, **kwargs: Unpack[ExportDataCsvKwargs]) -> None:
