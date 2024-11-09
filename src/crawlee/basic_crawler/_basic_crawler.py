@@ -257,6 +257,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             is_task_ready_function=self.__is_task_ready_function,
             run_task_function=self.__run_task_function,
             concurrency_settings=concurrency_settings,
+            logger=_logger,
         )
 
         self._use_session_pool = use_session_pool
