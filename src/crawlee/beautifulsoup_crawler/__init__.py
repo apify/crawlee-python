@@ -1,5 +1,5 @@
 try:
-    from ._beautifulsoup_crawler import BeautifulSoupCrawler
+    from ._beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupParser
     from ._beautifulsoup_crawling_context import BeautifulSoupCrawlingContext
 except ImportError as exc:
     raise ImportError(
