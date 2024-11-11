@@ -87,7 +87,7 @@ class BaseDatasetClient(ABC):
         """
 
     @abstractmethod
-    async def iterate_items(
+    def iterate_items(
         self,
         *,
         offset: int = 0,
