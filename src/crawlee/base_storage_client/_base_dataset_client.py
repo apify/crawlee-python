@@ -125,7 +125,7 @@ class BaseDatasetClient(ABC):
         # This syntax is to make mypy properly work with abstract AsyncIterator.
         # https://mypy.readthedocs.io/en/stable/more_types.html#asynchronous-iterators
         raise NotImplementedError
-        if False:
+        if False: # type: ignore[unreachable]
             yield 0
 
     @abstractmethod
