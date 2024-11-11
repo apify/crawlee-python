@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.4.1 - **not yet released**
+## [0.4.1](https://github.com/apify/crawlee-python/releases/tag/v0.4.1) (2024-11-11)
 
 ### 🚀 Features
 
@@ -15,9 +14,9 @@ All notable changes to this project will be documented in this file.
 - Fix total_size usage in memory size monitoring ([#661](https://github.com/apify/crawlee-python/pull/661)) ([c2a3239](https://github.com/apify/crawlee-python/commit/c2a32397eecd5cc7f412c2af7269b004a8b2eaf2)) by [@janbuchar](https://github.com/janbuchar)
 - Add HttpHeaders to module exports ([#664](https://github.com/apify/crawlee-python/pull/664)) ([f0c5ca7](https://github.com/apify/crawlee-python/commit/f0c5ca717d9f9e304d375da2c23552c26ca870da)) by [@vdusek](https://github.com/vdusek), closes [#663](https://github.com/apify/crawlee-python/issues/663)
 - Fix unhandled ValueError in request handler result processing ([#666](https://github.com/apify/crawlee-python/pull/666)) ([0a99d7f](https://github.com/apify/crawlee-python/commit/0a99d7f693245eb9a065016fb6f2d268f6956805)) by [@janbuchar](https://github.com/janbuchar)
+- Fix BaseDatasetClient.iter_items type hints ([#680](https://github.com/apify/crawlee-python/pull/680)) ([a968b1b](https://github.com/apify/crawlee-python/commit/a968b1be6fceb56676b0198a044c8fceac7c92a6)) by [@Pijukatel](https://github.com/Pijukatel)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.4.0](https://github.com/apify/crawlee-python/releases/tag/v0.4.0) (2024-11-01)
 
 ### 🚀 Features
