@@ -7,4 +7,4 @@ except ImportError as exc:
         "For example, if you use pip, run `pip install 'crawlee[beautifulsoup]'`.",
     ) from exc
 
-__all__ = ['BeautifulSoupCrawler', 'BeautifulSoupCrawlingContext']
+__all__ = ['BeautifulSoupCrawler', 'BeautifulSoupCrawlingContext', 'BeautifulSoupParser']
