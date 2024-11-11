@@ -650,6 +650,7 @@ async def test_crawler_push_data_over_limit() -> None:
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
+        # Push a roughly 15MB payload - this should be enough to break the 9MB limit
         await context.push_data({'hello': 'world' * 3 * 1024 * 1024})
 
     stats = await crawler.run(['http://example.tld/1'])
