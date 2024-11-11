@@ -35,6 +35,7 @@ async def test_calls_consumer_without_middleware() -> None:
         session=Session(),
         proxy_info=AsyncMock(),
         push_data=AsyncMock(),
+        use_state=AsyncMock(),
         get_key_value_store=AsyncMock(),
         log=logging.getLogger(),
     )
@@ -61,6 +62,7 @@ async def test_calls_consumers_and_middlewares() -> None:
             session=context.session,
             proxy_info=AsyncMock(),
             push_data=AsyncMock(),
+            use_state=AsyncMock(),
             get_key_value_store=AsyncMock(),
             log=logging.getLogger(),
         )
@@ -77,6 +79,7 @@ async def test_calls_consumers_and_middlewares() -> None:
             session=context.session,
             proxy_info=AsyncMock(),
             push_data=AsyncMock(),
+            use_state=AsyncMock(),
             get_key_value_store=AsyncMock(),
             log=logging.getLogger(),
         )
@@ -91,6 +94,7 @@ async def test_calls_consumers_and_middlewares() -> None:
         session=Session(),
         proxy_info=AsyncMock(),
         push_data=AsyncMock(),
+        use_state=AsyncMock(),
         get_key_value_store=AsyncMock(),
         log=logging.getLogger(),
     )
@@ -116,6 +120,7 @@ async def test_wraps_consumer_errors() -> None:
         session=Session(),
         proxy_info=AsyncMock(),
         push_data=AsyncMock(),
+        use_state=AsyncMock(),
         get_key_value_store=AsyncMock(),
         log=logging.getLogger(),
     )
@@ -144,6 +149,7 @@ async def test_handles_exceptions_in_middleware_initialization() -> None:
         session=Session(),
         proxy_info=AsyncMock(),
         push_data=AsyncMock(),
+        use_state=AsyncMock(),
         get_key_value_store=AsyncMock(),
         log=logging.getLogger(),
     )
@@ -175,6 +181,7 @@ async def test_handles_exceptions_in_middleware_finalization() -> None:
         session=Session(),
         proxy_info=AsyncMock(),
         push_data=AsyncMock(),
+        use_state=AsyncMock(),
         get_key_value_store=AsyncMock(),
         log=logging.getLogger(),
     )

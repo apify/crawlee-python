@@ -513,6 +513,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
             wait_for_all_requests_to_be_added_timeout=wait_for_all_requests_to_be_added_timeout,
         )
 
+    async def _use_state(self, key: str, default_value: dict | None = None) -> dict:
+        store = await self.get_key_value_store()
+        return await store.get_auto_saved_value(key, default_value)
+
     async def get_data(
         self,
         dataset_id: str | None = None,
@@ -927,6 +931,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             add_requests=result.add_requests,
             push_data=result.push_data,
             get_key_value_store=result.get_key_value_store,
+            use_state=self._use_state,
             log=self._logger,
         )
 

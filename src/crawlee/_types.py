@@ -296,6 +296,16 @@ class SendRequestFunction(Protocol):
     ) -> Coroutine[None, None, HttpResponse]: ...
 
 
+class UseStateFunction(Protocol):
+    """Type of a function for performing Use State."""
+
+    def __call__(
+        self,
+        key: str,
+        default_value: dict[str, Any] | None = None,
+    ) -> Coroutine[None, None, dict]: ...
+
+
 T = TypeVar('T')
 
 
@@ -320,6 +330,8 @@ class KeyValueStoreInterface(Protocol):
         content_type: str | None = None,
     ) -> None: ...
 
+    async def get_auto_saved_value(self, key: str, default_value: dict | None = None) -> dict: ...
+
 
 class GetKeyValueStoreFromRequestHandlerFunction(Protocol):
     """Type of a function for accessing a key-value store from within a request handler."""
@@ -342,6 +354,7 @@ class BasicCrawlingContext:
     send_request: SendRequestFunction
     add_requests: AddRequestsFunction
     push_data: PushDataFunction
+    use_state: UseStateFunction
     get_key_value_store: GetKeyValueStoreFromRequestHandlerFunction
     log: logging.Logger
 
@@ -379,6 +392,9 @@ class KeyValueStoreChangeRecords:
             return cast(T, self.updates[key].content)
 
         return await self._actual_key_value_store.get_value(key, default_value)
+
+    async def get_auto_saved_value(self, key: str, default_value: dict | None = None) -> dict:
+        return await self._actual_key_value_store.get_auto_saved_value(key, default_value)
 
 
 class GetKeyValueStoreFunction(Protocol):

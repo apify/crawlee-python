@@ -8,8 +8,8 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
-from unittest.mock import AsyncMock, Mock
+from typing import TYPE_CHECKING, Any, AsyncGenerator
+from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
 import pytest
@@ -20,6 +20,7 @@ from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpHeaders
 from crawlee.basic_crawler import BasicCrawler
 from crawlee.configuration import Configuration
 from crawlee.errors import SessionError, UserDefinedErrorHandlerError
+from crawlee.events import EventManager
 from crawlee.statistics import FinalStatistics
 from crawlee.storages import Dataset, KeyValueStore, RequestList, RequestQueue
 
@@ -27,6 +28,13 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     import respx
+
+
+@pytest.fixture
+async def mock_event_manager() -> AsyncGenerator[EventManager, None]:
+    async with EventManager(persist_state_interval=timedelta(milliseconds=50)) as event_manager:
+        with patch('crawlee.service_container.get_event_manager', return_value=event_manager):
+            yield event_manager
 
 
 async def test_processes_requests() -> None:
@@ -669,6 +677,20 @@ async def test_context_update_kv_store() -> None:
 
     store = await crawler.get_key_value_store()
     assert (await store.get_value('foo')) == 'bar'
+
+
+async def test_context_use_state(mock_event_manager: EventManager) -> None:
+    crawler = BasicCrawler()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        await context.use_state('state', {'hello': 'world'})
+        await asyncio.sleep(0.1)
+
+    await crawler.run(['https://hello.world'])
+
+    store = await crawler.get_key_value_store()
+    assert (await store.get_value('state')) == {'hello': 'world'}
 
 
 async def test_max_requests_per_crawl(httpbin: str) -> None:

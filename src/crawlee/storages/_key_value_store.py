@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, AsyncIterator, TypeVar, overload
+from typing import TYPE_CHECKING, Any, AsyncIterator, TypeVar, cast, overload
 
 from typing_extensions import override
 
+from crawlee import service_container
 from crawlee.base_storage_client._models import KeyValueStoreKeyInfo, KeyValueStoreMetadata
+from crawlee.events._types import Event, EventPersistStateData
 from crawlee.storages._base_storage import BaseStorage
 
 if TYPE_CHECKING:
@@ -12,6 +14,7 @@ if TYPE_CHECKING:
     from crawlee.configuration import Configuration
 
 T = TypeVar('T')
+DictT = TypeVar('DictT', bound=dict[str, Any])
 
 
 class KeyValueStore(BaseStorage):
@@ -61,6 +64,10 @@ class KeyValueStore(BaseStorage):
 
         # Get resource clients from storage client
         self._resource_client = client.key_value_store(self._id)
+
+        # Cache for persistent (auto-saved) values
+        self._cache: dict[str, dict[str, Any]] = {}
+        self._persist_state_event_started = False
 
     @override
     @property
@@ -171,3 +178,39 @@ class KeyValueStore(BaseStorage):
             The public URL for the given key.
         """
         return await self._resource_client.get_public_url(key)
+
+    async def get_auto_saved_value(self, key: str, default_value: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Gets a value from store that will be automatically saved on changes.
+
+        Args:
+            key: Key of the record, to store the value.
+            default_value: value to be used if the record does not exist yet. Should be a dictionary
+
+        Returns:
+            Returns the value of the key
+        """
+        default_value = {} if default_value is None else default_value
+
+        if key in self._cache:
+            return self._cache[key]
+
+        value = await self.get_value(key, default_value)
+
+        self._cache[key] = value
+
+        self._ensure_persist_event()
+
+        return cast(dict[str, Any], value)
+
+    def _ensure_persist_event(self) -> None:
+        """Setup persist state event handling if not already done."""
+        if self._persist_state_event_started:
+            return
+
+        async def _persist_handler(_event_data: EventPersistStateData) -> None:
+            for key, value in self._cache.items():
+                await self.set_value(key, value)
+
+        event_manager = service_container.get_event_manager()
+        event_manager.on(event=Event.PERSIST_STATE, listener=_persist_handler)
+        self._persist_state_event_started = True
