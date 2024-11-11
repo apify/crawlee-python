@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Add `max_crawl_depth` option to `BasicCrawler` ([#637](https://github.com/apify/crawlee-python/pull/637)) ([77deaa9](https://github.com/apify/crawlee-python/commit/77deaa964e2c1e74af1c5117a13d8d8257f0e27e)) by [@Prathamesh010](https://github.com/Prathamesh010), closes [#460](https://github.com/apify/crawlee-python/issues/460)
+- Add BeautifulSoupParser type alias ([#674](https://github.com/apify/crawlee-python/pull/674)) ([b2cf88f](https://github.com/apify/crawlee-python/commit/b2cf88ffea8d75808c9210850a03fcc70b0b9e3d)) by [@Pijukatel](https://github.com/Pijukatel)
 
 ### 🐛 Bug Fixes
 
