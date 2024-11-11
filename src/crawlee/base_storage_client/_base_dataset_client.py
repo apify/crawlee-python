@@ -122,6 +122,11 @@ class BaseDatasetClient(ABC):
             An asynchronous iterator of dictionary objects, each representing a dataset item after applying
             the specified filters and transformations.
         """
+        # This syntax is to make mypy properly work with abstract AsyncIterator.
+        # https://mypy.readthedocs.io/en/stable/more_types.html#asynchronous-iterators
+        raise NotImplementedError
+        if False:  # type: ignore[unreachable]
+            yield 0
 
     @abstractmethod
     async def get_items_as_bytes(

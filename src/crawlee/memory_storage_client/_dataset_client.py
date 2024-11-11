@@ -203,7 +203,7 @@ class DatasetClient(BaseDatasetClient):
             )
 
     @override
-    async def iterate_items(  # type: ignore
+    async def iterate_items(
         self,
         *,
         offset: int = 0,

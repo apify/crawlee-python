@@ -402,7 +402,7 @@ class Dataset(BaseStorage):
         Yields:
             Each item from the dataset as a dictionary.
         """
-        async for item in self._resource_client.iterate_items(  # type: ignore
+        async for item in self._resource_client.iterate_items(
             offset=offset,
             limit=limit,
             clean=clean,
