@@ -21,6 +21,8 @@ from crawlee.http_crawler import HttpCrawlingContext
 if TYPE_CHECKING:
     from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs
 
+BeautifulSoupParser = Literal['html.parser', 'lxml', 'xml', 'html5lib']
+
 
 class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
     """A web crawler for performing HTTP requests and parsing HTML/XML content.
@@ -61,7 +63,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
     def __init__(
         self,
         *,
-        parser: Literal['html.parser', 'lxml', 'xml', 'html5lib'] = 'lxml',
+        parser: BeautifulSoupParser = 'lxml',
         additional_http_error_status_codes: Iterable[int] = (),
         ignore_http_error_status_codes: Iterable[int] = (),
         **kwargs: Unpack[BasicCrawlerOptions[BeautifulSoupCrawlingContext]],
