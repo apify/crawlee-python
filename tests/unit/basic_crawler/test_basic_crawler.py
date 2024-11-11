@@ -645,6 +645,18 @@ async def test_crawler_push_and_export_data_and_json_dump_parameter(httpbin: str
     assert exported_json_str == expected_json_str
 
 
+async def test_crawler_push_data_over_limit() -> None:
+    crawler = BasicCrawler()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        # Push a roughly 15MB payload - this should be enough to break the 9MB limit
+        await context.push_data({'hello': 'world' * 3 * 1024 * 1024})
+
+    stats = await crawler.run(['http://example.tld/1'])
+    assert stats.requests_failed == 1
+
+
 async def test_context_update_kv_store() -> None:
     crawler = BasicCrawler()
 
