@@ -59,9 +59,11 @@ const TYPEDOC_KINDS = {
 }
 
 const GROUP_ORDER = [
-    'Main Classes',
-    'Helper Classes',
+    'Classes',
+    'Abstract classes',
+    'Data structures',
     'Errors',
+    'Functions',
     'Constructors',
     'Methods',
     'Properties',
@@ -77,15 +79,14 @@ const groupSort = (g1, g2) => {
 };
 
 function getGroupName(object) {
+    if (object.decorations?.some(d => d.name === 'docs_group')) {
+        return {
+            groupName: object.decorations.find(d => d.name === 'docs_group')?.args.slice(2,-2),
+            source: 'decorator'
+        }
+    }
+
     const groupPredicates = {
-        'Errors': (x) => x.name.toLowerCase().endsWith('error'),
-        'Main Classes': (x) => [
-            'BasicCrawler', 'HttpCrawler', 'BeautifulSoupCrawler', 'ParselCrawler', 'PlaywrightCrawler', 'Dataset',
-            'KeyValueStore', 'RequestQueue', 'MemoryStorageClient', 'HttpxHttpClient', 'CurlImpersonateHttpClient',
-            'Configuration', 'EventManager', 'LocalEventManager', 'Request', 'Session', 'SessionPool', 'BrowserPool',
-            'PlaywrightBrowserController', 'PlaywrightBrowserPlugin', 'Statistics',
-        ].includes(x.name),
-        'Helper Classes': (x) => x.kindString === 'Class',
         'Methods': (x) => x.kindString === 'Method',
         'Constructors': (x) => x.kindString === 'Constructor',
         'Properties': (x) => x.kindString === 'Property',
@@ -93,11 +94,11 @@ function getGroupName(object) {
         'Enumeration Members': (x) => x.kindString === 'Enumeration Member',
     };
 
-    const [group] = Object.entries(groupPredicates).find(
+    const groupName = Object.entries(groupPredicates).find(
         ([_, predicate]) => predicate(object)
-    );
+    )?.[0];
 
-    return group;
+    return { groupName, source: 'predicate' };
 }
 
 // Strips the Optional[] type from the type string, and replaces generic types with just the main type
@@ -188,7 +189,11 @@ function injectInheritedChildren(ancestor, descendant) {
         if (!ownChild) {
             const childId = oid++;
 
-            const groupName = getGroupName(inheritedChild);
+            const { groupName } = getGroupName(inheritedChild);
+            if (!groupName) {
+                throw new Error(`Couldn't resolve the group name for ${inheritedChild.name} (inherited child of ${ancestor.name})`);
+            }
+
             const group = descendant.groups.find((g) => g.title === groupName);
 
             if (group) {
@@ -310,7 +315,7 @@ function convertObject(obj, parent, module) {
                     }],
                 } : undefined,
                 type: typedocType,
-                decorations: member.decorations?.map(x => x.name),
+                decorations: member.decorations?.map(({ name, args }) => ({ name, args })),
                 children: [],
                 groups: [],
                 sources: [{
@@ -411,16 +416,21 @@ function convertObject(obj, parent, module) {
                 popContext();
             }
 
-            const groupName = getGroupName(typedocMember);
+            const { groupName, source: groupSource } = getGroupName(typedocMember);
 
-            const group = parent.groups.find((g) => g.title === groupName);
-            if (group) {
-                group.children.push(typedocMember.id);
-            } else {
-                parent.groups.push({
-                    title: groupName,
-                    children: [typedocMember.id],
-                });
+            if (groupName) {
+                // Use the decorator classes everytime, but don't render the class-level groups for the root project
+                if (groupSource === 'decorator' || parent.kindString !== 'Project') {
+                    const group = parent.groups.find((g) => g.title === groupName);
+                    if (group) {
+                        group.children.push(typedocMember.id);
+                    } else {
+                        parent.groups.push({
+                            title: groupName,
+                            children: [typedocMember.id],
+                        });
+                    }
+                }
             }
 
             parent.children.push(typedocMember);

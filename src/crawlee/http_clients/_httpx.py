@@ -8,6 +8,7 @@ from typing_extensions import override
 
 from crawlee._types import HttpHeaders
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
+from crawlee._utils.docs import docs_group
 from crawlee.errors import ProxyError
 from crawlee.fingerprint_suite import HeaderGenerator
 from crawlee.http_clients import BaseHttpClient, HttpCrawlingResult, HttpResponse
@@ -70,6 +71,7 @@ class _HttpxTransport(httpx.AsyncHTTPTransport):
         return response
 
 
+@docs_group('Classes')
 class HttpxHttpClient(BaseHttpClient):
     """HTTP client based on the `HTTPX` library.
 

@@ -7,11 +7,13 @@ from logging import getLogger
 from typing import ClassVar, Literal, overload
 
 from crawlee._utils.crypto import crypto_random_object_id
+from crawlee._utils.docs import docs_group
 from crawlee.sessions._models import SessionModel
 
 logger = getLogger(__name__)
 
 
+@docs_group('Data structures')
 class Session:
     """Session object represents a single user session.
 

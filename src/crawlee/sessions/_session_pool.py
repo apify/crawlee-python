@@ -6,6 +6,7 @@ import random
 from logging import getLogger
 from typing import TYPE_CHECKING, Callable, Literal, overload
 
+from crawlee._utils.docs import docs_group
 from crawlee.events._types import Event, EventPersistStateData
 from crawlee.sessions import Session
 from crawlee.sessions._models import SessionPoolModel
@@ -21,6 +22,7 @@ logger = getLogger(__name__)
 CreateSessionFunctionType = Callable[[], Session]
 
 
+@docs_group('Classes')
 class SessionPool:
     """Session pool is a pool of sessions that are rotated based on the usage count or age."""
 

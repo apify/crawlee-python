@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction
+from crawlee._utils.docs import docs_group
 from crawlee.http_crawler import HttpCrawlingResult
 
 if TYPE_CHECKING:
@@ -11,6 +12,7 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True)
+@docs_group('Data structures')
 class ParselCrawlingContext(HttpCrawlingResult, BasicCrawlingContext):
     """The crawling context used by the `ParselCrawler`.
 

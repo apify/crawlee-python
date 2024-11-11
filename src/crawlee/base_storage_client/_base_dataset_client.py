@@ -3,6 +3,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, AsyncContextManager, AsyncIterator
 
+from crawlee._utils.docs import docs_group
+
 if TYPE_CHECKING:
     from httpx import Response
 
@@ -10,6 +12,7 @@ if TYPE_CHECKING:
     from crawlee.base_storage_client._models import DatasetItemsListPage, DatasetMetadata
 
 
+@docs_group('Abstract classes')
 class BaseDatasetClient(ABC):
     """Abstract base class for dataset resource clients.
 

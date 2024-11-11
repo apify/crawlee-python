@@ -5,6 +5,7 @@ from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from crawlee._request import Request
+from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -12,6 +13,7 @@ if TYPE_CHECKING:
     from crawlee.base_storage_client._models import ProcessedRequest
 
 
+@docs_group('Abstract classes')
 class RequestProvider(ABC):
     """Abstract base class defining the interface and common behaviour for request providers.
 

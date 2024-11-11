@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, TypeVar
 
 from typing_extensions import override
 
+from crawlee._utils.docs import docs_group
 from crawlee.base_storage_client import BaseStorageClient
 from crawlee.configuration import Configuration
 from crawlee.memory_storage_client._dataset_client import DatasetClient
@@ -27,6 +28,7 @@ TResourceClient = TypeVar('TResourceClient', DatasetClient, KeyValueStoreClient,
 logger = getLogger(__name__)
 
 
+@docs_group('Classes')
 class MemoryStorageClient(BaseStorageClient):
     """Represents an in-memory storage client for managing datasets, key-value stores, and request queues.
 

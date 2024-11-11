@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, AsyncIterator, TypeVar, overload
 
 from typing_extensions import override
 
+from crawlee._utils.docs import docs_group
 from crawlee.base_storage_client._models import KeyValueStoreKeyInfo, KeyValueStoreMetadata
 from crawlee.storages._base_storage import BaseStorage
 
@@ -14,6 +15,7 @@ if TYPE_CHECKING:
 T = TypeVar('T')
 
 
+@docs_group('Classes')
 class KeyValueStore(BaseStorage):
     """Represents a key-value based storage for reading and writing data records or files.
 

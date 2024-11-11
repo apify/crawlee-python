@@ -5,6 +5,7 @@ from typing import Any, AsyncGenerator, Awaitable, Callable, Generator, Generic,
 from typing_extensions import TypeVar
 
 from crawlee._types import BasicCrawlingContext
+from crawlee._utils.docs import docs_group
 from crawlee.errors import (
     ContextPipelineFinalizationError,
     ContextPipelineInitializationError,
@@ -17,6 +18,7 @@ TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, defau
 TMiddlewareCrawlingContext = TypeVar('TMiddlewareCrawlingContext', bound=BasicCrawlingContext)
 
 
+@docs_group('Classes')
 class ContextPipeline(Generic[TCrawlingContext]):
     """Encapsulates the logic of gradually enhancing the crawling context with additional information and utilities.
 

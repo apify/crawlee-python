@@ -9,6 +9,7 @@ from typing_extensions import Unpack
 from crawlee import EnqueueStrategy
 from crawlee._request import BaseRequestData
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
+from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.browsers import BrowserPool
@@ -24,6 +25,7 @@ if TYPE_CHECKING:
     from crawlee.browsers._types import BrowserType
 
 
+@docs_group('Classes')
 class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
     """A web crawler that leverages the `Playwright` browser automation library.
 
