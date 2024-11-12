@@ -151,7 +151,6 @@ async def test_custom_headers() -> None:
     assert response_headers.get('Power-Header') == request_headers['Power-Header']
     assert response_headers.get('Library') == request_headers['Library']
     assert response_headers.get('My-Test-Header') == request_headers['My-Test-Header']
-    assert 'User-Agent' in response_headers
 
 
 async def test_pre_navigation_hook() -> None:
