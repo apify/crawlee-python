@@ -1,4 +1,4 @@
-import json
+import urllib.parse
 
 from crawlee import Request
 
@@ -6,7 +6,8 @@ from crawlee import Request
 request = Request.from_url(
     url='https://httpbin.org/post',
     method='POST',
-    payload=json.dumps(
+    headers={'content-type': 'application/x-www-form-urlencoded'},
+    payload=urllib.parse.urlencode(
         {
             'custname': 'John Doe',
             'custtel': '1234567890',

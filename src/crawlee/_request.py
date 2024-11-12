@@ -16,6 +16,8 @@ from pydantic import (
     PlainSerializer,
     PlainValidator,
     TypeAdapter,
+    field_serializer,
+    field_validator,
 )
 from typing_extensions import Self
 
@@ -175,6 +177,20 @@ class BaseRequestData(BaseModel):
 
     handled_at: Annotated[datetime | None, Field(alias='handledAt')] = None
     """Timestamp when the request was handled."""
+
+    @field_validator('payload', mode='before')
+    @classmethod
+    def _payload_validation(cls, v: str | bytes | None) -> bytes | None:
+        if isinstance(v, str):
+            v = v.encode()
+        return v
+
+    @field_serializer('payload')
+    @classmethod
+    def _payload_serializer(cls, v: bytes | None) -> str | None:
+        if isinstance(v, bytes):
+            return v.decode()
+        return None
 
     @classmethod
     def from_url(
