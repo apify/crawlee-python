@@ -135,20 +135,23 @@ async def test_firefox_headless_headers() -> None:
 
 async def test_custom_headers() -> None:
     crawler = PlaywrightCrawler()
-    headers = dict[str, str]()
-    custom_headers = {'Power-Header': 'ring', 'Library': 'storm', 'My-Test-Header': 'fuzz'}
+    response_headers = dict[str, str]()
+    request_headers = {'Power-Header': 'ring', 'Library': 'storm', 'My-Test-Header': 'fuzz'}
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
         response = await context.response.text()
-        response_headers = dict(json.loads(response)).get('headers', {})
+        context_response_headers = dict(json.loads(response)).get('headers', {})
 
-        for key, val in response_headers.items():
-            headers[key] = val
+        for key, val in context_response_headers.items():
+            response_headers[key] = val
 
-    await crawler.run([Request.from_url('https://httpbin.org/get', headers=custom_headers)])
-    for key, value in custom_headers.items():
-        assert headers[key] == value
+    await crawler.run([Request.from_url('https://httpbin.org/get', headers=request_headers)])
+
+    assert response_headers.get('Power-Header') == request_headers['Power-Header']
+    assert response_headers.get('Library') == request_headers['Library']
+    assert response_headers.get('My-Test-Header') == request_headers['My-Test-Header']
+    assert 'User-Agent' in response_headers
 
 
 async def test_pre_navigation_hook() -> None:
