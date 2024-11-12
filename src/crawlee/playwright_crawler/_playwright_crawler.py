@@ -149,6 +149,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
         """
         async with context.page:
             # Navigate to the URL and get response.
+            if context.request.headers:
+                await context.page.set_extra_http_headers(context.request.headers.model_dump())
             response = await context.page.goto(context.request.url)
 
             if response is None:

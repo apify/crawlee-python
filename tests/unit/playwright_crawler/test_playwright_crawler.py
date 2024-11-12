@@ -8,7 +8,7 @@ import json
 from typing import TYPE_CHECKING
 from unittest import mock
 
-from crawlee import Glob
+from crawlee import Glob, Request
 from crawlee.fingerprint_suite._consts import (
     PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA,
     PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_MOBILE,
@@ -131,6 +131,24 @@ async def test_firefox_headless_headers() -> None:
     assert 'headless' not in headers['User-Agent'].lower()
 
     assert headers['User-Agent'] == PW_FIREFOX_HEADLESS_DEFAULT_USER_AGENT
+
+
+async def test_custom_headers() -> None:
+    crawler = PlaywrightCrawler()
+    headers = dict[str, str]()
+    custom_headers = {'Power-Header': 'ring', 'Library': 'storm', 'My-Test-Header': 'fuzz'}
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        response = await context.response.text()
+        response_headers = dict(json.loads(response)).get('headers', {})
+
+        for key, val in response_headers.items():
+            headers[key] = val
+
+    await crawler.run([Request.from_url('https://httpbin.org/get', headers=custom_headers)])
+    for key, value in custom_headers.items():
+        assert headers[key] == value
 
 
 async def test_pre_navigation_hook() -> None:
