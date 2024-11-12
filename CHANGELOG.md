@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.4.2 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Respect custom HTTP headers in `PlaywrightCrawler` ([#685](https://github.com/apify/crawlee-python/pull/685)) ([a84125f](https://github.com/apify/crawlee-python/commit/a84125f031347426de44b8f015c87882c8f96f72)) by [@Mantisus](https://github.com/Mantisus)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.4.1](https://github.com/apify/crawlee-python/releases/tag/v0.4.1) (2024-11-11)
 
 ### 🚀 Features
