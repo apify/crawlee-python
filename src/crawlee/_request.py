@@ -8,17 +8,7 @@ from decimal import Decimal
 from enum import IntEnum
 from typing import Annotated, Any, cast
 
-from pydantic import (
-    BaseModel,
-    BeforeValidator,
-    ConfigDict,
-    Field,
-    PlainSerializer,
-    PlainValidator,
-    TypeAdapter,
-    field_serializer,
-    field_validator,
-)
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, PlainSerializer, PlainValidator, TypeAdapter
 from typing_extensions import Self
 
 from crawlee._types import EnqueueStrategy, HttpHeaders, HttpMethod, HttpPayload, JsonSerializable
@@ -145,7 +135,11 @@ class BaseRequestData(BaseModel):
     headers: Annotated[HttpHeaders, Field(default_factory=HttpHeaders)] = HttpHeaders()
     """HTTP request headers."""
 
-    payload: HttpPayload | None = None
+    payload: Annotated[
+        HttpPayload | None,
+        BeforeValidator(lambda v: v.encode() if isinstance(v, str) else v),
+        PlainSerializer(lambda v: v.decode() if isinstance(v, bytes) else None),
+    ] = None
     """HTTP request payload."""
 
     user_data: Annotated[
@@ -177,20 +171,6 @@ class BaseRequestData(BaseModel):
 
     handled_at: Annotated[datetime | None, Field(alias='handledAt')] = None
     """Timestamp when the request was handled."""
-
-    @field_validator('payload', mode='before')
-    @classmethod
-    def _payload_validation(cls, v: str | bytes | None) -> bytes | None:
-        if isinstance(v, str):
-            v = v.encode()
-        return v
-
-    @field_serializer('payload')
-    @classmethod
-    def _payload_serializer(cls, v: bytes | None) -> str | None:
-        if isinstance(v, bytes):
-            return v.decode()
-        return None
 
     @classmethod
     def from_url(
