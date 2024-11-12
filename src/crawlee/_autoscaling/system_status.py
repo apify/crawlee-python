@@ -162,6 +162,7 @@ class SystemStatus:
             Client load ratio information.
         """
         sample = self._snapshotter.get_client_sample(sample_duration)
+        # TODO: DATA IS NOT GUARATEED TO BE SORTED! Either guarantee order or have to sort on demand
         return self._is_sample_overloaded(sample, self._client_overload_threshold)
 
     def _is_sample_overloaded(self, sample: list[Snapshot], threshold: float) -> LoadRatioInfo:
@@ -183,6 +184,7 @@ class SystemStatus:
 
         overloaded_time = 0.0
         non_overloaded_time = 0.0
+
         for previous, current in pairwise(sample):
             time = (current.created_at - previous.created_at).total_seconds()
             if current.is_overloaded:
@@ -190,9 +192,15 @@ class SystemStatus:
             else:
                 non_overloaded_time += time
 
-        try:
+        if (overloaded_time + non_overloaded_time) == 0:
+            overloaded_ratio = 0
+        else:
             overloaded_ratio = overloaded_time / (overloaded_time + non_overloaded_time)
-        except ValueError as exc:
-            raise ValueError('Failed to compute weighted average for the sample.') from exc
+
+        if overloaded_ratio > 0:
+            try:
+                logger.info(f"Current mem load: {sample[-1].current_size / sample[-1].max_memory_size}, overloaded_ratio: {overloaded_ratio}")
+            except:
+                pass
 
         return LoadRatioInfo(limit_ratio=threshold, actual_ratio=round(overloaded_ratio, 3))
