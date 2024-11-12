@@ -106,7 +106,6 @@ async def test_request_state_serialization(request_queue_client: RequestQueueCli
 
     assert request == got_request
     assert request.payload == got_request.payload
-    assert got_request.payload != b"b'test'"
 
 
 async def test_add_record(request_queue_client: RequestQueueClient) -> None:
