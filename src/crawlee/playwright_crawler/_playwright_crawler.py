@@ -148,9 +148,9 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 infinite_scroll).
         """
         async with context.page:
-            # Navigate to the URL and get response.
             if context.request.headers:
                 await context.page.set_extra_http_headers(context.request.headers.model_dump())
+            # Navigate to the URL and get response.
             response = await context.page.goto(context.request.url)
 
             if response is None:
