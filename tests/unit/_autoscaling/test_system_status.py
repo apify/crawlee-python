@@ -92,19 +92,19 @@ def test_get_system_info(snapshotter: Snapshotter, now: datetime) -> None:
             current_size=ByteSize.from_gb(4),
             max_memory_size=ByteSize.from_gb(12),
             max_used_memory_ratio=0.8,
-            created_at=now - timedelta(minutes=3),
+            created_at=now - timedelta(seconds=90),
         ),
         MemorySnapshot(
             current_size=ByteSize.from_gb(7),
             max_memory_size=ByteSize.from_gb(8),
             max_used_memory_ratio=0.8,
-            created_at=now - timedelta(minutes=2),
+            created_at=now - timedelta(seconds=60),
         ),
         MemorySnapshot(
             current_size=ByteSize.from_gb(28),
             max_memory_size=ByteSize.from_gb(30),
             max_used_memory_ratio=0.8,
-            created_at=now - timedelta(minutes=1),
+            created_at=now - timedelta(seconds=30),
         ),
         MemorySnapshot(
             current_size=ByteSize.from_gb(48),
@@ -150,7 +150,7 @@ def test_get_system_info(snapshotter: Snapshotter, now: datetime) -> None:
     current_system_info = system_status.get_current_system_info()
     assert current_system_info == SystemInfo(
         cpu_info=LoadRatioInfo(limit_ratio=system_status._cpu_overload_threshold, actual_ratio=1.0),
-        memory_info=LoadRatioInfo(limit_ratio=system_status._memory_overload_threshold, actual_ratio=1.0),
+        memory_info=LoadRatioInfo(limit_ratio=system_status._memory_overload_threshold, actual_ratio=0.5),
         event_loop_info=LoadRatioInfo(limit_ratio=system_status._event_loop_overload_threshold, actual_ratio=0),
         client_info=LoadRatioInfo(limit_ratio=system_status._client_overload_threshold, actual_ratio=0),
         created_at=current_system_info.created_at,

@@ -10,7 +10,6 @@ from more_itertools import pairwise
 
 from crawlee._autoscaling.types import LoadRatioInfo, Snapshot, SystemInfo
 from crawlee._utils.docs import docs_group
-from crawlee._utils.math import compute_weighted_avg
 
 if TYPE_CHECKING:
     from crawlee._autoscaling import Snapshotter
@@ -182,17 +181,18 @@ class SystemStatus:
         if len(sample) == 1:
             return LoadRatioInfo(limit_ratio=threshold, actual_ratio=float(sample[0].is_overloaded))
 
-        weights, values = [], []
-
+        overloaded_time = 0.0
+        non_overloaded_time = 0.0
         for previous, current in pairwise(sample):
-            weight = (current.created_at - previous.created_at).total_seconds() or 0.001  # Avoid zero
-            value = float(current.is_overloaded)
-            weights.append(weight)
-            values.append(value)
+            time = (current.created_at - previous.created_at).total_seconds()
+            if current.is_overloaded:
+                overloaded_time += time
+            else:
+                non_overloaded_time += time
 
         try:
-            weighted_avg = compute_weighted_avg(values, weights)
+            overloaded_ratio = overloaded_time / (overloaded_time + non_overloaded_time)
         except ValueError as exc:
             raise ValueError('Failed to compute weighted average for the sample.') from exc
 
-        return LoadRatioInfo(limit_ratio=threshold, actual_ratio=round(weighted_avg, 3))
+        return LoadRatioInfo(limit_ratio=threshold, actual_ratio=round(overloaded_ratio, 3))
