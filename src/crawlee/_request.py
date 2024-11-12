@@ -8,15 +8,7 @@ from decimal import Decimal
 from enum import IntEnum
 from typing import Annotated, Any, cast
 
-from pydantic import (
-    BaseModel,
-    BeforeValidator,
-    ConfigDict,
-    Field,
-    PlainSerializer,
-    PlainValidator,
-    TypeAdapter,
-)
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, PlainSerializer, PlainValidator, TypeAdapter
 from typing_extensions import Self
 
 from crawlee._types import EnqueueStrategy, HttpHeaders, HttpMethod, HttpPayload, JsonSerializable
@@ -143,7 +135,11 @@ class BaseRequestData(BaseModel):
     headers: Annotated[HttpHeaders, Field(default_factory=HttpHeaders)] = HttpHeaders()
     """HTTP request headers."""
 
-    payload: HttpPayload | None = None
+    payload: Annotated[
+        HttpPayload | None,
+        BeforeValidator(lambda v: v.encode() if isinstance(v, str) else v),
+        PlainSerializer(lambda v: v.decode() if isinstance(v, bytes) else None),
+    ] = None
     """HTTP request payload."""
 
     user_data: Annotated[
