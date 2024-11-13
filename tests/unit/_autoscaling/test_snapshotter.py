@@ -12,7 +12,7 @@ from crawlee._autoscaling.types import CpuSnapshot, EventLoopSnapshot, Snapshot
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.system import CpuInfo, MemoryInfo
 from crawlee.events import EventManager, LocalEventManager
-from crawlee.events._types import EventSystemInfoData
+from crawlee.events._types import Event, EventSystemInfoData
 
 
 @pytest.fixture
@@ -207,3 +207,35 @@ def test_memory_load_evaluation_silent_on_acceptable_usage(
     )
 
     assert mock_logger_warn.call_count == 0
+
+
+async def test_snapshots_time_ordered() -> None:
+    # All internal snapshot list should be ordered by creation time in ascending order.
+    # Scenario where older emitted event arrives after newer event.
+    # Snapshotter should not trust the event order and check events' times.
+    time_new = datetime.now(tz=timezone.utc)
+    time_old = datetime.now(tz=timezone.utc) - timedelta(milliseconds=50)
+
+    def create_event_data(creation_time: datetime) -> EventSystemInfoData:
+        return EventSystemInfoData(
+            cpu_info=CpuInfo(used_ratio=0.5, created_at=creation_time),
+            memory_info=MemoryInfo(
+                current_size=ByteSize(bytes=1), created_at=creation_time, total_size=ByteSize(bytes=2)
+            ),
+        )
+
+    async with (
+        LocalEventManager() as event_manager,
+        Snapshotter(event_manager, available_memory_ratio=0.25) as snapshotter,
+    ):
+        event_manager.emit(event=Event.SYSTEM_INFO, event_data=create_event_data(time_new))
+        await event_manager.wait_for_all_listeners_to_complete()
+        event_manager.emit(event=Event.SYSTEM_INFO, event_data=create_event_data(time_old))
+        await event_manager.wait_for_all_listeners_to_complete()
+
+        memory_samples = snapshotter.get_memory_sample()
+        cpu_samples = snapshotter.get_cpu_sample()
+        assert memory_samples[0].created_at == time_old
+        assert cpu_samples[0].created_at == time_old
+        assert memory_samples[1].created_at == time_new
+        assert cpu_samples[1].created_at == time_new

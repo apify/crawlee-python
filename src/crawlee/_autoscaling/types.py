@@ -150,3 +150,4 @@ class ClientSnapshot:
 
 
 Snapshot = Union[MemorySnapshot, CpuSnapshot, EventLoopSnapshot, ClientSnapshot]
+ListOfSnapshots = Union[list[MemorySnapshot], list[CpuSnapshot], list[EventLoopSnapshot], list[ClientSnapshot]]

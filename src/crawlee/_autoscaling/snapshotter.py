@@ -2,13 +2,22 @@
 
 from __future__ import annotations
 
+from bisect import insort
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
+from operator import attrgetter
 from typing import TYPE_CHECKING, cast
 
 import psutil
 
-from crawlee._autoscaling.types import ClientSnapshot, CpuSnapshot, EventLoopSnapshot, MemorySnapshot, Snapshot
+from crawlee._autoscaling.types import (
+    ClientSnapshot,
+    CpuSnapshot,
+    EventLoopSnapshot,
+    ListOfSnapshots,
+    MemorySnapshot,
+    Snapshot,
+)
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
@@ -194,7 +203,7 @@ class Snapshotter:
             return []
 
         latest_time = snapshots[-1].created_at
-        return [snapshot for snapshot in reversed(snapshots) if latest_time - snapshot.created_at <= duration]
+        return [snapshot for snapshot in snapshots if latest_time - snapshot.created_at <= duration]
 
     def _snapshot_cpu(self, event_data: EventSystemInfoData) -> None:
         """Captures a snapshot of the current CPU usage.
@@ -213,7 +222,7 @@ class Snapshotter:
 
         snapshots = cast(list[Snapshot], self._cpu_snapshots)
         self._prune_snapshots(snapshots, event_data.cpu_info.created_at)
-        self._cpu_snapshots.append(snapshot)
+        self._time_sorted_insert_snapshot(self._cpu_snapshots, snapshot)
 
     def _snapshot_memory(self, event_data: EventSystemInfoData) -> None:
         """Captures a snapshot of the current memory usage.
@@ -233,8 +242,7 @@ class Snapshotter:
 
         snapshots = cast(list[Snapshot], self._memory_snapshots)
         self._prune_snapshots(snapshots, snapshot.created_at)
-        self._memory_snapshots.append(snapshot)
-
+        self._time_sorted_insert_snapshot(self._memory_snapshots, snapshot)
         self._evaluate_memory_load(event_data.memory_info.current_size, event_data.memory_info.created_at)
 
     def _snapshot_event_loop(self) -> None:
@@ -254,7 +262,7 @@ class Snapshotter:
 
         snapshots = cast(list[Snapshot], self._event_loop_snapshots)
         self._prune_snapshots(snapshots, snapshot.created_at)
-        self._event_loop_snapshots.append(snapshot)
+        self._time_sorted_insert_snapshot(self._event_loop_snapshots, snapshot)
 
     def _snapshot_client(self) -> None:
         """Captures a snapshot of the current API state by checking for rate limit errors (HTTP 429).
@@ -271,7 +279,7 @@ class Snapshotter:
 
         snapshots = cast(list[Snapshot], self._client_snapshots)
         self._prune_snapshots(snapshots, snapshot.created_at)
-        self._client_snapshots.append(snapshot)
+        self._time_sorted_insert_snapshot(self._client_snapshots, snapshot)
 
     def _prune_snapshots(self, snapshots: list[Snapshot], now: datetime) -> None:
         """Removes snapshots that are older than the `self._snapshot_history`.
@@ -322,3 +330,11 @@ class Snapshotter:
                 'Consider increasing available memory.'
             )
             self._timestamp_of_last_memory_warning = snapshot_timestamp
+
+    @staticmethod
+    def _time_sorted_insert_snapshot(sorted_list: ListOfSnapshots, snapshot: Snapshot) -> None:
+        """Sorted insert of snapshot to ordered_list of snapshots based on created_at.
+
+        Incoming snapshot order can't be relied on and explicit sorting is necessary.
+        """
+        insort(sorted_list, snapshot, key=attrgetter('created_at'))  # type: ignore # Mypy struggles with this function.
