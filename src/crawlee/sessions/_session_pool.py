@@ -16,8 +16,6 @@ from crawlee.storages import KeyValueStore
 if TYPE_CHECKING:
     from types import TracebackType
 
-    from crawlee.events import EventManager
-
 logger = getLogger(__name__)
 
 CreateSessionFunctionType = Callable[[], Session]
@@ -33,7 +31,6 @@ class SessionPool:
         max_pool_size: int = 1000,
         create_session_settings: dict | None = None,
         create_session_function: CreateSessionFunctionType | None = None,
-        event_manager: EventManager | None = None,
         persistence_enabled: bool = False,
         persist_state_kvs_name: str = 'default',
         persist_state_key: str = 'CRAWLEE_SESSION_POOL_STATE',
@@ -47,7 +44,6 @@ class SessionPool:
                 be used. Do not set it if you are providing a `create_session_function`.
             create_session_function: A callable to create new session instances. If None, a default session settings
                 will be used. Do not set it if you are providing `create_session_settings`.
-            event_manager: The event manager to handle events like persist state.
             persistence_enabled: Flag to enable or disable state persistence of the pool. If it is enabled, make sure
                 to provide an event manager to handle the events.
             persist_state_kvs_name: The name of the `KeyValueStore` used for state persistence.
@@ -56,7 +52,7 @@ class SessionPool:
         self._max_pool_size = max_pool_size
         self._session_settings = create_session_settings or {}
         self._create_session_function = create_session_function
-        self._event_manager = event_manager
+        self._event_manager = service_container.get_event_manager()
         self._persistence_enabled = persistence_enabled
         self._persist_state_kvs_name = persist_state_kvs_name
         self._persist_state_key = persist_state_key

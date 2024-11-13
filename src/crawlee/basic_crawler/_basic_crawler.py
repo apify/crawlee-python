@@ -51,7 +51,6 @@ if TYPE_CHECKING:
 
     from crawlee._types import ConcurrencySettings, HttpMethod, JsonSerializable
     from crawlee.base_storage_client._models import DatasetItemsListPage
-    from crawlee.events._event_manager import EventManager
     from crawlee.http_clients import BaseHttpClient, HttpResponse
     from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
     from crawlee.sessions import Session
@@ -112,9 +111,6 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
 
     statistics: NotRequired[Statistics[StatisticsState]]
     """A custom `Statistics` instance, allowing the use of non-default configuration."""
-
-    event_manager: NotRequired[EventManager]
-    """A custom `EventManager` instance, allowing the use of non-default configuration."""
 
     configure_logging: NotRequired[bool]
     """If True, the crawler will set up logging infrastructure automatically."""
@@ -178,7 +174,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
         retry_on_blocked: bool = True,
         proxy_configuration: ProxyConfiguration | None = None,
         statistics: Statistics | None = None,
-        event_manager: EventManager | None = None,
         configure_logging: bool = True,
         max_crawl_depth: int | None = None,
         abort_on_error: bool = False,
@@ -206,7 +201,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
             retry_on_blocked: If True, the crawler attempts to bypass bot protections automatically.
             proxy_configuration: HTTP proxy configuration used when making requests.
             statistics: A custom `Statistics` instance, allowing the use of non-default configuration.
-            event_manager: A custom `EventManager` instance, allowing the use of non-default configuration.
             configure_logging: If True, the crawler will set up logging infrastructure automatically.
             max_crawl_depth: Maximum crawl depth. If set, the crawler will stop crawling after reaching this depth.
             abort_on_error: If True, the crawler stops immediately when any request handler error occurs.
@@ -247,9 +241,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         self._tld_extractor = TLDExtract(cache_dir=tempfile.TemporaryDirectory().name)
 
-        self._event_manager = event_manager or service_container.get_event_manager()
+        self._event_manager = service_container.get_event_manager()
         self._snapshotter = Snapshotter(
-            self._event_manager,
             max_memory_size=ByteSize.from_mb(config.memory_mbytes) if config.memory_mbytes else None,
             available_memory_ratio=config.available_memory_ratio,
         )

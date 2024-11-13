@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Literal, TextIO, TypedDict, cast
 
 from typing_extensions import NotRequired, Required, Unpack, override
 
+from crawlee import service_container
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.docs import docs_group
 from crawlee._utils.file import json_dumps
@@ -19,7 +20,6 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
 
     from crawlee._types import JsonSerializable, PushDataKwargs
-    from crawlee.base_storage_client import BaseStorageClient
     from crawlee.base_storage_client._models import DatasetItemsListPage
 
 
@@ -192,18 +192,14 @@ class Dataset(BaseStorage):
     _EFFECTIVE_LIMIT_SIZE = _MAX_PAYLOAD_SIZE - (_MAX_PAYLOAD_SIZE * _SAFETY_BUFFER_PERCENT)
     """Calculated payload limit considering safety buffer."""
 
-    def __init__(
-        self,
-        id: str,
-        name: str | None,
-        client: BaseStorageClient,
-    ) -> None:
+    def __init__(self, id: str, name: str | None) -> None:
         self._id = id
         self._name = name
 
         # Get resource clients from storage client
-        self._resource_client = client.dataset(self._id)
-        self._resource_collection_client = client.datasets()
+        storage_client = service_container.get_storage_client()
+        self._resource_client = storage_client.dataset(self._id)
+        self._resource_collection_client = storage_client.datasets()
 
     @property
     @override
@@ -217,21 +213,10 @@ class Dataset(BaseStorage):
 
     @override
     @classmethod
-    async def open(
-        cls,
-        *,
-        id: str | None = None,
-        name: str | None = None,
-        storage_client: BaseStorageClient | None = None,
-    ) -> Dataset:
+    async def open(cls, *, id: str | None = None, name: str | None = None) -> Dataset:
         from crawlee.storages._creation_management import open_storage
 
-        return await open_storage(
-            storage_class=cls,
-            id=id,
-            name=name,
-            storage_client=storage_client,
-        )
+        return await open_storage(storage_class=cls, id=id, name=name)
 
     @override
     async def drop(self) -> None:

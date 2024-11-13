@@ -5,7 +5,9 @@ from typing import TYPE_CHECKING, Annotated, Literal
 
 from pydantic import AliasChoices, BeforeValidator, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing_extensions import Self
 
+from crawlee import service_container
 from crawlee._utils.docs import docs_group
 from crawlee._utils.models import timedelta_ms
 
@@ -230,3 +232,16 @@ class Configuration(BaseSettings):
         ),
     ] = False
     """This setting is currently unused. For more details, see https://github.com/apify/crawlee-python/issues/670."""
+
+    @classmethod
+    def get_global_configuration(cls) -> Self:
+        """Retrieve the global instance of the configuration.
+
+        Mostly for the backward compatibility.
+        """
+        config = service_container.get_configuration()
+
+        if not isinstance(config, cls):
+            raise TypeError(f'Requested configuration of type {cls}, but got {config.__class__} instead.')
+
+        return config
