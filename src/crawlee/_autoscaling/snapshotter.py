@@ -194,7 +194,7 @@ class Snapshotter:
             return []
 
         latest_time = snapshots[-1].created_at
-        return [snapshot for snapshot in snapshots if latest_time - snapshot.created_at <= duration]
+        return [snapshot for snapshot in reversed(snapshots) if latest_time - snapshot.created_at <= duration]
 
     def _snapshot_cpu(self, event_data: EventSystemInfoData) -> None:
         """Captures a snapshot of the current CPU usage.

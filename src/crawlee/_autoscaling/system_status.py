@@ -8,8 +8,10 @@ from typing import TYPE_CHECKING
 
 from more_itertools import pairwise
 
+import crawlee
 from crawlee._autoscaling.types import LoadRatioInfo, Snapshot, SystemInfo
 from crawlee._utils.docs import docs_group
+from crawlee._utils.math import compute_weighted_avg
 
 if TYPE_CHECKING:
     from crawlee._autoscaling import Snapshotter
@@ -162,7 +164,6 @@ class SystemStatus:
             Client load ratio information.
         """
         sample = self._snapshotter.get_client_sample(sample_duration)
-        # TODO: DATA IS NOT GUARATEED TO BE SORTED! Either guarantee order or have to sort on demand
         return self._is_sample_overloaded(sample, self._client_overload_threshold)
 
     def _is_sample_overloaded(self, sample: list[Snapshot], threshold: float) -> LoadRatioInfo:
@@ -182,25 +183,25 @@ class SystemStatus:
         if len(sample) == 1:
             return LoadRatioInfo(limit_ratio=threshold, actual_ratio=float(sample[0].is_overloaded))
 
-        overloaded_time = 0.0
-        non_overloaded_time = 0.0
+        weights, values = [], []
 
         for previous, current in pairwise(sample):
-            time = (current.created_at - previous.created_at).total_seconds()
-            if current.is_overloaded:
-                overloaded_time += time
-            else:
-                non_overloaded_time += time
+            weight = (current.created_at - previous.created_at).total_seconds() or 0.001  # Avoid zero
+            value = float(current.is_overloaded)
+            weights.append(weight)
+            values.append(value)
 
-        if (overloaded_time + non_overloaded_time) == 0:
-            overloaded_ratio = 0
-        else:
-            overloaded_ratio = overloaded_time / (overloaded_time + non_overloaded_time)
+        try:
+            weighted_avg = compute_weighted_avg(values, weights)
+        except ValueError as exc:
+            raise ValueError('Failed to compute weighted average for the sample.') from exc
 
-        if overloaded_ratio > 0:
+        if weighted_avg > 0:
             try:
-                logger.info(f"Current mem load: {sample[-1].current_size / sample[-1].max_memory_size}, overloaded_ratio: {overloaded_ratio}")
+                if type(sample[-1])== crawlee._autoscaling.types.MemorySnapshot:
+                    logger.info(f"Current load: {sample[-1].current_size / sample[-1].max_memory_size}, overloaded_ratio: {weighted_avg}, sample size={len(sample)}")
             except:
                 pass
 
-        return LoadRatioInfo(limit_ratio=threshold, actual_ratio=round(overloaded_ratio, 3))
+
+        return LoadRatioInfo(limit_ratio=threshold, actual_ratio=round(weighted_avg, 3))
