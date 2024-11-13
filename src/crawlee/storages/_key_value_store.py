@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, AsyncIterator, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Any, AsyncIterator, ClassVar, TypeVar, cast, overload
 
 from typing_extensions import override
 
@@ -51,6 +51,10 @@ class KeyValueStore(BaseStorage):
     ```
     """
 
+    # Cache for persistent (auto-saved) values
+    _cache: ClassVar[dict[str, dict[str, Any]]] = {}
+    _persist_state_event_started = False
+
     def __init__(
         self,
         id: str,
@@ -64,10 +68,6 @@ class KeyValueStore(BaseStorage):
 
         # Get resource clients from storage client
         self._resource_client = client.key_value_store(self._id)
-
-        # Cache for persistent (auto-saved) values
-        self._cache: dict[str, dict[str, Any]] = {}
-        self._persist_state_event_started = False
 
     @override
     @property
@@ -191,8 +191,8 @@ class KeyValueStore(BaseStorage):
         """
         default_value = {} if default_value is None else default_value
 
-        if key in self._cache:
-            return self._cache[key]
+        if key in KeyValueStore._cache:
+            return KeyValueStore._cache[key]
 
         value = await self.get_value(key, default_value)
 
@@ -204,13 +204,13 @@ class KeyValueStore(BaseStorage):
 
     def _ensure_persist_event(self) -> None:
         """Setup persist state event handling if not already done."""
-        if self._persist_state_event_started:
+        if KeyValueStore._persist_state_event_started:
             return
 
         async def _persist_handler(_event_data: EventPersistStateData) -> None:
-            for key, value in self._cache.items():
+            for key, value in KeyValueStore._cache.items():
                 await self.set_value(key, value)
 
         event_manager = service_container.get_event_manager()
         event_manager.on(event=Event.PERSIST_STATE, listener=_persist_handler)
-        self._persist_state_event_started = True
+        KeyValueStore._persist_state_event_started = True

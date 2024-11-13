@@ -37,6 +37,15 @@ async def mock_event_manager() -> AsyncGenerator[EventManager, None]:
             yield event_manager
 
 
+@pytest.fixture
+async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
+    kvs = await KeyValueStore.open()
+    yield kvs
+    await kvs.drop()
+    KeyValueStore._cache = {}
+    KeyValueStore._persist_state_event_started = False
+
+
 async def test_processes_requests() -> None:
     crawler = BasicCrawler(request_provider=RequestList(['http://a.com/', 'http://b.com/', 'http://c.com/']))
     calls = list[str]()
@@ -679,7 +688,7 @@ async def test_context_update_kv_store() -> None:
     assert (await store.get_value('foo')) == 'bar'
 
 
-async def test_context_use_state(mock_event_manager: EventManager) -> None:
+async def test_context_use_state(key_value_store: KeyValueStore, mock_event_manager: EventManager) -> None:
     crawler = BasicCrawler()
 
     @crawler.router.default_handler
@@ -690,7 +699,53 @@ async def test_context_use_state(mock_event_manager: EventManager) -> None:
     await crawler.run(['https://hello.world'])
 
     store = await crawler.get_key_value_store()
+
     assert (await store.get_value('state')) == {'hello': 'world'}
+
+
+async def test_context_handlers_use_state(key_value_store: KeyValueStore, mock_event_manager: EventManager) -> None:
+    state_in_handler_one: dict[str, str] = {}
+    state_in_handler_two: dict[str, str] = {}
+    state_in_handler_three: dict[str, str] = {}
+
+    crawler = BasicCrawler()
+
+    @crawler.router.handler('one')
+    async def handler_one(context: BasicCrawlingContext) -> None:
+        state = await context.use_state('state', {'hello': 'world'})
+        state_in_handler_one.update(state)
+        state['hello'] = 'new_world'
+        await context.add_requests([Request.from_url('https://crawlee.dev/docs/quick-start', label='two')])
+
+    @crawler.router.handler('two')
+    async def handler_two(context: BasicCrawlingContext) -> None:
+        state = await context.use_state('state', {'hello': 'world'})
+        state_in_handler_two.update(state)
+        state['hello'] = 'last_world'
+
+        await asyncio.sleep(0.1)
+
+    @crawler.router.handler('three')
+    async def handler_three(context: BasicCrawlingContext) -> None:
+        state = await context.use_state('state', {'hello': 'world'})
+        state_in_handler_three.update(state)
+
+    await crawler.run([Request.from_url('https://crawlee.dev/', label='one')])
+    await crawler.run([Request.from_url('https://crawlee.dev/docs/examples', label='three')])
+
+    # The state in handler_one must match the default state
+    assert state_in_handler_one == {'hello': 'world'}
+
+    # The state in handler_two must match the state updated in handler_one
+    assert state_in_handler_two == {'hello': 'new_world'}
+
+    # The state in handler_three must match the final state updated in previous run
+    assert state_in_handler_three == {'hello': 'last_world'}
+
+    store = await crawler.get_key_value_store()
+
+    # The state in the KVS must match with the last set state
+    assert (await store.get_value('state')) == {'hello': 'last_world'}
 
 
 async def test_max_requests_per_crawl(httpbin: str) -> None:

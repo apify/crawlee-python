@@ -17,6 +17,8 @@ async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
     kvs = await KeyValueStore.open()
     yield kvs
     await kvs.drop()
+    KeyValueStore._cache = {}
+    KeyValueStore._persist_state_event_started = False
 
 
 @pytest.fixture
@@ -154,7 +156,6 @@ async def test_get_auto_saved_value_cache_value(key_value_store: KeyValueStore) 
 async def test_get_auto_saved_value_auto_save(key_value_store: KeyValueStore, mock_event_manager: EventManager) -> None:  # noqa: ARG001
     default_value = {'hello': 'world'}
     key_name = 'state'
-
     value = await key_value_store.get_auto_saved_value(key_name, default_value)
     await asyncio.sleep(0.1)
     value_one = await key_value_store.get_value(key_name)
