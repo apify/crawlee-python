@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Generic, TypedDict, TypeVar
 
 from typing_extensions import override
 
+from crawlee import service_container
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.docs import docs_group
 from crawlee._utils.lru_cache import LRUCache
@@ -24,7 +25,6 @@ if TYPE_CHECKING:
 
     from crawlee._request import Request
     from crawlee.base_storage_client import BaseStorageClient
-    from crawlee.configuration import Configuration
     from crawlee.events import EventManager
 
 logger = getLogger(__name__)
@@ -109,13 +109,13 @@ class RequestQueue(BaseStorage, RequestProvider):
         self,
         id: str,
         name: str | None,
-        configuration: Configuration,
         client: BaseStorageClient,
         event_manager: EventManager,
     ) -> None:
+        config = service_container.get_configuration()
+
         self._id = id
         self._name = name
-        self._configuration = configuration
 
         # Get resource clients from storage client
         self._resource_client = client.request_queue(self._id)
@@ -131,7 +131,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         # Other internal attributes
         self._tasks = list[asyncio.Task]()
         self._client_key = crypto_random_object_id()
-        self._internal_timeout = configuration.internal_timeout or timedelta(minutes=5)
+        self._internal_timeout = config.internal_timeout or timedelta(minutes=5)
         self._assumed_total_count = 0
         self._assumed_handled_count = 0
         self._queue_head_dict: OrderedDict[str, str] = OrderedDict()
@@ -158,7 +158,6 @@ class RequestQueue(BaseStorage, RequestProvider):
         *,
         id: str | None = None,
         name: str | None = None,
-        configuration: Configuration | None = None,
         storage_client: BaseStorageClient | None = None,
     ) -> RequestQueue:
         from crawlee.storages._creation_management import open_storage
@@ -167,7 +166,6 @@ class RequestQueue(BaseStorage, RequestProvider):
             storage_class=cls,
             id=id,
             name=name,
-            configuration=configuration,
             storage_client=storage_client,
         )
 

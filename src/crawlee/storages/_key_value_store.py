@@ -12,7 +12,6 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
     from crawlee.base_storage_client import BaseStorageClient
-    from crawlee.configuration import Configuration
 
 T = TypeVar('T')
 
@@ -56,12 +55,10 @@ class KeyValueStore(BaseStorage):
         self,
         id: str,
         name: str | None,
-        configuration: Configuration,
         client: BaseStorageClient,
     ) -> None:
         self._id = id
         self._name = name
-        self._configuration = configuration
 
         # Get resource clients from storage client
         self._resource_client = client.key_value_store(self._id)
@@ -87,7 +84,6 @@ class KeyValueStore(BaseStorage):
         *,
         id: str | None = None,
         name: str | None = None,
-        configuration: Configuration | None = None,
         storage_client: BaseStorageClient | None = None,
     ) -> KeyValueStore:
         from crawlee.storages._creation_management import open_storage
@@ -96,7 +92,6 @@ class KeyValueStore(BaseStorage):
             storage_class=cls,
             id=id,
             name=name,
-            configuration=configuration,
             storage_client=storage_client,
         )
 

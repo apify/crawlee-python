@@ -4,13 +4,13 @@ import asyncio
 from typing import TYPE_CHECKING, TypeVar
 
 from crawlee import service_container
-from crawlee.configuration import Configuration
 from crawlee.memory_storage_client import MemoryStorageClient
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 if TYPE_CHECKING:
     from crawlee.base_storage_client import BaseStorageClient
     from crawlee.base_storage_client._types import ResourceClient, ResourceCollectionClient
+    from crawlee.configuration import Configuration
 
 TResource = TypeVar('TResource', Dataset, KeyValueStore, RequestQueue)
 
@@ -123,12 +123,11 @@ async def open_storage(
     *,
     storage_class: type[TResource],
     storage_client: BaseStorageClient | None = None,
-    configuration: Configuration | None = None,
     id: str | None = None,
     name: str | None = None,
 ) -> TResource:
     """Open either a new storage or restore an existing one and return it."""
-    configuration = configuration or Configuration.get_global_configuration()
+    config = service_container.get_configuration()
     storage_client = storage_client or service_container.get_storage_client()
 
     # Try to restore the storage from cache by name
@@ -137,7 +136,7 @@ async def open_storage(
         if cached_storage:
             return cached_storage
 
-    default_id = _get_default_storage_id(configuration, storage_class)
+    default_id = _get_default_storage_id(config, storage_class)
 
     if not id and not name:
         id = default_id
@@ -152,7 +151,7 @@ async def open_storage(
             return cached_storage
 
     # Purge on start if configured
-    if configuration.purge_on_start:
+    if config.purge_on_start:
         await storage_client.purge_on_start()
 
     # Lock and create new storage
@@ -175,7 +174,6 @@ async def open_storage(
             storage = storage_class(
                 id=storage_info.id,
                 name=storage_info.name,
-                configuration=configuration,
                 client=storage_client,
                 event_manager=service_container.get_event_manager(),
             )
@@ -183,7 +181,6 @@ async def open_storage(
             storage = storage_class(
                 id=storage_info.id,
                 name=storage_info.name,
-                configuration=configuration,
                 client=storage_client,
             )
 

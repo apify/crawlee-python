@@ -1,12 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
-
-from typing_extensions import NotRequired, TypedDict
 
 from crawlee._utils.docs import docs_group
 from crawlee.configuration import Configuration
-from crawlee.errors import ServiceConflictError
 from crawlee.events import LocalEventManager
 from crawlee.memory_storage_client import MemoryStorageClient
 
@@ -29,39 +27,41 @@ __all__ = [
 StorageClientType = Literal['cloud', 'local']
 
 
-class _Services(TypedDict):
-    local_storage_client: NotRequired[BaseStorageClient]
-    cloud_storage_client: NotRequired[BaseStorageClient]
-    configuration: NotRequired[Configuration]
-    event_manager: NotRequired[EventManager]
+@dataclass
+class _Services:
+    """An internal container for singleton service instances."""
+
+    local_storage_client: BaseStorageClient = field(default_factory=MemoryStorageClient)
+    cloud_storage_client: BaseStorageClient = field(default_factory=MemoryStorageClient)
+    configuration: Configuration = field(default_factory=Configuration)
+    event_manager: EventManager = field(default_factory=LocalEventManager)
 
 
 _services = _Services()
-_default_storage_client_type: StorageClientType = 'local'
+
+_DEFAULT_STORAGE_CLIENT_TYPE: StorageClientType = 'local'
 
 
 @docs_group('Functions')
-def get_storage_client(*, client_type: StorageClientType | None = None) -> BaseStorageClient:
+def get_storage_client(client_type: StorageClientType = _DEFAULT_STORAGE_CLIENT_TYPE) -> BaseStorageClient:
     """Get the storage client instance for the current environment.
 
     Args:
         client_type: Allows retrieving a specific storage client type, regardless of where we are running.
 
+    Raises:
+        ValueError: If the client type is unknown.
+
     Returns:
         The current storage client instance.
     """
-    if client_type is None:
-        client_type = _default_storage_client_type
+    if client_type == 'local':
+        return _services.local_storage_client
 
     if client_type == 'cloud':
-        if 'cloud_storage_client' not in _services:
-            raise RuntimeError('Cloud client was not provided.')
-        return _services['cloud_storage_client']
+        return _services.cloud_storage_client
 
-    if 'local_storage_client' not in _services:
-        _services['local_storage_client'] = MemoryStorageClient()
-
-    return _services['local_storage_client']
+    raise ValueError(f'Unknown storage client type: {client_type}')
 
 
 @docs_group('Functions')
@@ -71,10 +71,7 @@ def set_local_storage_client(local_client: BaseStorageClient) -> None:
     Args:
         local_client: The local storage client instance.
     """
-    if (existing_service := _services.get('local_storage_client')) and existing_service is not local_client:
-        raise ServiceConflictError('local_storage_client', local_client, existing_service)
-
-    _services['local_storage_client'] = local_client
+    _services.local_storage_client = local_client
 
 
 @docs_group('Functions')
@@ -84,56 +81,28 @@ def set_cloud_storage_client(cloud_client: BaseStorageClient) -> None:
     Args:
         cloud_client: The cloud storage client instance.
     """
-    if (existing_service := _services.get('cloud_storage_client')) and existing_service is not cloud_client:
-        raise ServiceConflictError('cloud_storage_client', cloud_client, existing_service)
-
-    _services['cloud_storage_client'] = cloud_client
-
-
-@docs_group('Functions')
-def set_default_storage_client_type(client_type: StorageClientType) -> None:
-    """Set the default storage client type."""
-    global _default_storage_client_type  # noqa: PLW0603
-    _default_storage_client_type = client_type
+    _services.cloud_storage_client = cloud_client
 
 
 @docs_group('Functions')
 def get_configuration() -> Configuration:
     """Get the configuration object."""
-    if 'configuration' not in _services:
-        _services['configuration'] = Configuration()
-
-    return _services['configuration']
-
-
-@docs_group('Functions')
-def get_configuration_if_set() -> Configuration | None:
-    """Get the configuration object, or None if it hasn't been set yet."""
-    return _services.get('configuration')
+    return _services.configuration
 
 
 @docs_group('Functions')
 def set_configuration(configuration: Configuration) -> None:
     """Set the configuration object."""
-    if (existing_service := _services.get('configuration')) and existing_service is not configuration:
-        raise ServiceConflictError('configuration', configuration, existing_service)
-
-    _services['configuration'] = configuration
+    _services.configuration = configuration
 
 
 @docs_group('Functions')
 def get_event_manager() -> EventManager:
     """Get the event manager."""
-    if 'event_manager' not in _services:
-        _services['event_manager'] = LocalEventManager()
-
-    return _services['event_manager']
+    return _services.event_manager
 
 
 @docs_group('Functions')
 def set_event_manager(event_manager: EventManager) -> None:
     """Set the event manager."""
-    if (existing_service := _services.get('event_manager')) and existing_service is not event_manager:
-        raise ServiceConflictError('event_manager', event_manager, existing_service)
-
-    _services['event_manager'] = event_manager
+    _services.event_manager = event_manager

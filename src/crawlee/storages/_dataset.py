@@ -21,7 +21,6 @@ if TYPE_CHECKING:
     from crawlee._types import JsonSerializable, PushDataKwargs
     from crawlee.base_storage_client import BaseStorageClient
     from crawlee.base_storage_client._models import DatasetItemsListPage
-    from crawlee.configuration import Configuration
 
 
 logger = logging.getLogger(__name__)
@@ -197,12 +196,10 @@ class Dataset(BaseStorage):
         self,
         id: str,
         name: str | None,
-        configuration: Configuration,
         client: BaseStorageClient,
     ) -> None:
         self._id = id
         self._name = name
-        self._configuration = configuration
 
         # Get resource clients from storage client
         self._resource_client = client.dataset(self._id)
@@ -225,7 +222,6 @@ class Dataset(BaseStorage):
         *,
         id: str | None = None,
         name: str | None = None,
-        configuration: Configuration | None = None,
         storage_client: BaseStorageClient | None = None,
     ) -> Dataset:
         from crawlee.storages._creation_management import open_storage
@@ -234,7 +230,6 @@ class Dataset(BaseStorage):
             storage_class=cls,
             id=id,
             name=name,
-            configuration=configuration,
             storage_client=storage_client,
         )
 
