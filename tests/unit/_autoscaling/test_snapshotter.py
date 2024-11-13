@@ -47,7 +47,6 @@ def test_snapshot_memory(snapshotter: Snapshotter, event_system_data_info: Event
     snapshotter._snapshot_memory(event_system_data_info)
     assert len(snapshotter._memory_snapshots) == 1
     assert snapshotter._memory_snapshots[0].current_size == event_system_data_info.memory_info.current_size
-    assert snapshotter._memory_snapshots[0].total_size == event_system_data_info.memory_info.total_size
 
 
 def test_snapshot_event_loop(snapshotter: Snapshotter) -> None:

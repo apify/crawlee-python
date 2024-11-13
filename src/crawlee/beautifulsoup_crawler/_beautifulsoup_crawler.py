@@ -11,6 +11,7 @@ from typing_extensions import Unpack
 from crawlee import EnqueueStrategy
 from crawlee._request import BaseRequestData
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
+from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.beautifulsoup_crawler._beautifulsoup_crawling_context import BeautifulSoupCrawlingContext
@@ -19,9 +20,12 @@ from crawlee.http_clients import HttpxHttpClient
 from crawlee.http_crawler import HttpCrawlingContext
 
 if TYPE_CHECKING:
-    from crawlee._types import AddRequestsKwargs, BasicCrawlingContext
+    from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs
+
+BeautifulSoupParser = Literal['html.parser', 'lxml', 'xml', 'html5lib']
 
 
+@docs_group('Classes')
 class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
     """A web crawler for performing HTTP requests and parsing HTML/XML content.
 
@@ -61,7 +65,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
     def __init__(
         self,
         *,
-        parser: Literal['html.parser', 'lxml', 'xml', 'html5lib'] = 'lxml',
+        parser: BeautifulSoupParser = 'lxml',
         additional_http_error_status_codes: Iterable[int] = (),
         ignore_http_error_status_codes: Iterable[int] = (),
         **kwargs: Unpack[BasicCrawlerOptions[BeautifulSoupCrawlingContext]],
@@ -177,7 +181,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
             selector: str = 'a',
             label: str | None = None,
             user_data: dict[str, Any] | None = None,
-            **kwargs: Unpack[AddRequestsKwargs],
+            **kwargs: Unpack[EnqueueLinksKwargs],
         ) -> None:
             kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
 

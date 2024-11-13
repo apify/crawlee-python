@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Optional
 
+from crawlee._utils.docs import docs_group
+
 try:
     from curl_cffi.requests import AsyncSession
     from curl_cffi.requests.exceptions import ProxyError as CurlProxyError
@@ -70,6 +72,7 @@ class _CurlImpersonateResponse:
         return self._response.content
 
 
+@docs_group('Classes')
 class CurlImpersonateHttpClient(BaseHttpClient):
     """HTTP client based on the `curl-cffi` library.
 
@@ -160,11 +163,14 @@ class CurlImpersonateHttpClient(BaseHttpClient):
         url: str,
         *,
         method: HttpMethod = 'GET',
-        headers: HttpHeaders | None = None,
+        headers: HttpHeaders | dict[str, str] | None = None,
         payload: HttpPayload | None = None,
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> HttpResponse:
+        if isinstance(headers, dict) or headers is None:
+            headers = HttpHeaders(headers or {})
+
         proxy_url = proxy_info.url if proxy_info else None
         client = self._get_client(proxy_url)
 

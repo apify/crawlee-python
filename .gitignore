@@ -1,32 +1,43 @@
+# Cache
 __pycache__
 .mypy_cache
 .pytest_cache
 .ruff_cache
 
+# Virtual envs
 .venv
 .direnv
 .envrc
 .python-version
 
+# Poetry
 poetry.toml
-poetry.lock
 
+# Mise
+mise.toml
+.mise.toml
+
+# Egg and build artifacts
 *.egg-info/
 *.egg
 dist/
 build/
+
+# Coverage reports
 .coverage*
 htmlcov
 
+# IDE, editors
 .vscode
 .idea
 .DS_Store
-
-docs/changelog.md
-
 .nvim.lua
 Session.vim
 
+# Docs
+docs/changelog.md
+
+# Website build artifacts, node dependencies
 website/build
 website/node_modules
 website/.yarn
@@ -37,7 +48,5 @@ website/docspec-dump.jsonl
 website/module_shortcuts.json
 website/typedoc-types*
 
-storage
-pullRequestIssues.json
-
-.mise.toml
+# Default directory for memory storage
+storage/

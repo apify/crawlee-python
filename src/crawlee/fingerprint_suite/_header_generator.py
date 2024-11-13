@@ -4,6 +4,7 @@ import random
 from typing import TYPE_CHECKING
 
 from crawlee._types import HttpHeaders
+from crawlee._utils.docs import docs_group
 from crawlee.fingerprint_suite._consts import (
     COMMON_ACCEPT,
     COMMON_ACCEPT_LANGUAGE,
@@ -20,6 +21,7 @@ if TYPE_CHECKING:
     from crawlee.browsers._types import BrowserType
 
 
+@docs_group('Classes')
 class HeaderGenerator:
     """Generates realistic looking or browser-like HTTP headers."""
 

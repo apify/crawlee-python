@@ -89,28 +89,24 @@ def test_get_system_info(snapshotter: Snapshotter, now: datetime) -> None:
     # Add memory snapshots
     system_status._snapshotter._memory_snapshots = [
         MemorySnapshot(
-            total_size=ByteSize.from_gb(16),
             current_size=ByteSize.from_gb(4),
             max_memory_size=ByteSize.from_gb(12),
             max_used_memory_ratio=0.8,
             created_at=now - timedelta(minutes=3),
         ),
         MemorySnapshot(
-            total_size=ByteSize.from_gb(8),
             current_size=ByteSize.from_gb(7),
             max_memory_size=ByteSize.from_gb(8),
             max_used_memory_ratio=0.8,
             created_at=now - timedelta(minutes=2),
         ),
         MemorySnapshot(
-            total_size=ByteSize.from_gb(32),
             current_size=ByteSize.from_gb(28),
             max_memory_size=ByteSize.from_gb(30),
             max_used_memory_ratio=0.8,
             created_at=now - timedelta(minutes=1),
         ),
         MemorySnapshot(
-            total_size=ByteSize.from_gb(64),
             current_size=ByteSize.from_gb(48),
             max_memory_size=ByteSize.from_gb(60),
             max_used_memory_ratio=0.8,

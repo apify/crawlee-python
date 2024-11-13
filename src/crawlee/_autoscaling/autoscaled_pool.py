@@ -10,6 +10,7 @@ from logging import getLogger
 from typing import TYPE_CHECKING, Awaitable, Callable
 
 from crawlee._types import ConcurrencySettings
+from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
 
 if TYPE_CHECKING:
@@ -32,6 +33,7 @@ class _AutoscaledPoolRun:
         self.result: asyncio.Future = asyncio.Future()
 
 
+@docs_group('Classes')
 class AutoscaledPool:
     """Manages a pool of asynchronous resource-intensive tasks that are executed in parallel.
 

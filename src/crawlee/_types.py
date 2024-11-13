@@ -19,6 +19,8 @@ from typing import (
 from pydantic import ConfigDict, Field, PlainValidator, RootModel
 from typing_extensions import NotRequired, TypeAlias, TypedDict, Unpack
 
+from crawlee._utils.docs import docs_group
+
 if TYPE_CHECKING:
     import logging
     import re
@@ -97,15 +99,28 @@ class HttpHeaders(RootModel, Mapping[str, str]):
         return len(self.root)
 
 
+@docs_group('Data structures')
 class EnqueueStrategy(str, Enum):
     """Strategy for deciding which links should be followed and which ones should be ignored."""
 
     ALL = 'all'
+    """Enqueues all links found, regardless of the domain they point to. This strategy is useful when you
+    want to follow every link, including those that navigate to external websites."""
+
     SAME_DOMAIN = 'same-domain'
+    """Enqueues all links found that share the same domain name, including any possible subdomains.
+    This strategy ensures that all links within the same top-level and base domain are included."""
+
     SAME_HOSTNAME = 'same-hostname'
+    """Enqueues all links found for the exact same hostname. This is the default strategy, and it restricts
+    the crawl to links that have the same hostname as the current page, excluding subdomains."""
+
     SAME_ORIGIN = 'same-origin'
+    """Enqueues all links found that share the same origin. The same origin refers to URLs that share
+    the same protocol, domain, and port, ensuring a strict scope for the crawl."""
 
 
+@docs_group('Data structures')
 class ConcurrencySettings:
     """Concurrency settings for AutoscaledPool."""
 
@@ -153,33 +168,43 @@ class StorageTypes(str, Enum):
     REQUEST_QUEUE = 'Request queue'
 
 
-class AddRequestsKwargs(TypedDict):
-    """Keyword arguments for crawler's `add_requests` method."""
+class EnqueueLinksKwargs(TypedDict):
+    """Keyword arguments for the `enqueue_links` methods."""
 
     limit: NotRequired[int]
+    """Maximum number of requests to be enqueued."""
+
     base_url: NotRequired[str]
+    """Base URL to be used for relative URLs."""
+
     strategy: NotRequired[EnqueueStrategy]
+    """Enqueueing strategy, see the `EnqueueStrategy` enum for possible values and their meanings."""
+
     include: NotRequired[list[re.Pattern | Glob]]
+    """List of regular expressions or globs that URLs must match to be enqueued."""
+
     exclude: NotRequired[list[re.Pattern | Glob]]
+    """List of regular expressions or globs that URLs must not match to be enqueued."""
 
 
-class AddRequestsFunctionCall(AddRequestsKwargs):
-    """Record of a call to `add_requests`."""
+class AddRequestsKwargs(EnqueueLinksKwargs):
+    """Keyword arguments for the `add_requests` methods."""
 
     requests: Sequence[str | BaseRequestData | Request]
+    """Requests to be added to the request provider."""
 
 
 class AddRequestsFunction(Protocol):
     """Type of a function for adding URLs to the request queue with optional filtering.
 
-    This helper method simplifies the process of adding requests to the request provider. It opens the specified
-    request provider and adds the requests to it.
+    This helper method simplifies the process of adding requests to the request provider.
+    It opens the specified request provider and adds the requests to it.
     """
 
     def __call__(
         self,
         requests: Sequence[str | BaseRequestData | Request],
-        **kwargs: Unpack[AddRequestsKwargs],
+        **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> Coroutine[None, None, None]: ...
 
 
@@ -243,12 +268,6 @@ class EnqueueLinksFunction(Protocol):
     """A function type for enqueueing new URLs to crawl, based on elements selected by a CSS selector.
 
     This function is used to extract and enqueue new URLs from the current page for further crawling.
-
-    Args:
-        selector: CSS selector used to find the elements containing the links.
-        label: Label for the newly created `Request` objects, used for request routing.
-        user_data: User data to be provided to the newly created `Request` objects.
-        **kwargs: Additional arguments for the `add_requests` method.
     """
 
     def __call__(
@@ -257,8 +276,16 @@ class EnqueueLinksFunction(Protocol):
         selector: str = 'a',
         label: str | None = None,
         user_data: dict[str, Any] | None = None,
-        **kwargs: Unpack[AddRequestsKwargs],
-    ) -> Coroutine[None, None, None]: ...
+        **kwargs: Unpack[EnqueueLinksKwargs],
+    ) -> Coroutine[None, None, None]:
+        """A call dunder method.
+
+        Args:
+            selector: CSS selector used to find the elements containing the links.
+            label: Label for the newly created `Request` objects, used for request routing.
+            user_data: User data to be provided to the newly created `Request` objects.
+            **kwargs: Additional arguments for the `add_requests` method.
+        """
 
 
 class SendRequestFunction(Protocol):
@@ -269,7 +296,7 @@ class SendRequestFunction(Protocol):
         url: str,
         *,
         method: HttpMethod = 'GET',
-        headers: HttpHeaders | None = None,
+        headers: HttpHeaders | dict[str, str] | None = None,
     ) -> Coroutine[None, None, HttpResponse]: ...
 
 
@@ -310,6 +337,7 @@ class GetKeyValueStoreFromRequestHandlerFunction(Protocol):
 
 
 @dataclass(frozen=True)
+@docs_group('Data structures')
 class BasicCrawlingContext:
     """Basic crawling context intended to be extended by crawlers."""
 
@@ -374,22 +402,17 @@ class RequestHandlerRunResult:
 
     def __init__(self, *, key_value_store_getter: GetKeyValueStoreFunction) -> None:
         self._key_value_store_getter = key_value_store_getter
-        self.add_requests_calls = list[AddRequestsFunctionCall]()
+        self.add_requests_calls = list[AddRequestsKwargs]()
         self.push_data_calls = list[PushDataFunctionCall]()
         self.key_value_store_changes = dict[tuple[Optional[str], Optional[str]], KeyValueStoreChangeRecords]()
 
     async def add_requests(
         self,
         requests: Sequence[str | BaseRequestData],
-        **kwargs: Unpack[AddRequestsKwargs],
+        **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> None:
         """Track a call to the `add_requests` context helper."""
-        self.add_requests_calls.append(
-            AddRequestsFunctionCall(
-                requests=requests,
-                **kwargs,
-            )
-        )
+        self.add_requests_calls.append(AddRequestsKwargs(requests=requests, **kwargs))
 
     async def push_data(
         self,
@@ -399,6 +422,10 @@ class RequestHandlerRunResult:
         **kwargs: Unpack[PushDataKwargs],
     ) -> None:
         """Track a call to the `push_data` context helper."""
+        from crawlee.storages._dataset import Dataset
+
+        await Dataset.check_and_serialize(data)
+
         self.push_data_calls.append(
             PushDataFunctionCall(
                 data=data,

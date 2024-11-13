@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, AsyncIterator, Literal, TextIO, TypedDict, cas
 from typing_extensions import NotRequired, Required, Unpack, override
 
 from crawlee._utils.byte_size import ByteSize
+from crawlee._utils.docs import docs_group
 from crawlee._utils.file import json_dumps
 from crawlee.base_storage_client._models import DatasetMetadata
 from crawlee.storages._base_storage import BaseStorage
@@ -150,6 +151,7 @@ class ExportDataCsvKwargs(TypedDict):
     """When True, raises an exception on bad CSV input. Defaults to False."""
 
 
+@docs_group('Classes')
 class Dataset(BaseStorage):
     """Represents an append-only structured storage, ideal for tabular data similar to database tables.
 
@@ -257,11 +259,11 @@ class Dataset(BaseStorage):
         """
         # Handle singular items
         if not isinstance(data, list):
-            items = await self._check_and_serialize(data)
+            items = await self.check_and_serialize(data)
             return await self._resource_client.push_items(items, **kwargs)
 
         # Handle lists
-        payloads_generator = (await self._check_and_serialize(item, index) for index, item in enumerate(data))
+        payloads_generator = (await self.check_and_serialize(item, index) for index, item in enumerate(data))
 
         # Invoke client in series to preserve the order of data
         async for items in self._chunk_by_size(payloads_generator):
@@ -281,8 +283,6 @@ class Dataset(BaseStorage):
         Returns:
             List page containing filtered and paginated dataset items.
         """
-        # TODO: Improve error handling here
-        # https://github.com/apify/apify-sdk-python/issues/140
         return await self._resource_client.list_items(**kwargs)
 
     async def write_to_csv(self, destination: TextIO, **kwargs: Unpack[ExportDataCsvKwargs]) -> None:
@@ -404,7 +404,7 @@ class Dataset(BaseStorage):
         Yields:
             Each item from the dataset as a dictionary.
         """
-        async for item in self._resource_client.iterate_items(  # type: ignore
+        async for item in self._resource_client.iterate_items(
             offset=offset,
             limit=limit,
             clean=clean,
@@ -417,7 +417,8 @@ class Dataset(BaseStorage):
         ):
             yield item
 
-    async def _check_and_serialize(self, item: JsonSerializable, index: int | None = None) -> str:
+    @classmethod
+    async def check_and_serialize(cls, item: JsonSerializable, index: int | None = None) -> str:
         """Serializes a given item to JSON, checks its serializability and size against a limit.
 
         Args:
@@ -438,8 +439,8 @@ class Dataset(BaseStorage):
             raise ValueError(f'Data item{s}is not serializable to JSON.') from exc
 
         payload_size = ByteSize(len(payload.encode('utf-8')))
-        if payload_size > self._EFFECTIVE_LIMIT_SIZE:
-            raise ValueError(f'Data item{s}is too large (size: {payload_size}, limit: {self._EFFECTIVE_LIMIT_SIZE})')
+        if payload_size > cls._EFFECTIVE_LIMIT_SIZE:
+            raise ValueError(f'Data item{s}is too large (size: {payload_size}, limit: {cls._EFFECTIVE_LIMIT_SIZE})')
 
         return payload
 

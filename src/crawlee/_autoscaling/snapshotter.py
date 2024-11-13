@@ -10,6 +10,7 @@ import psutil
 
 from crawlee._autoscaling.types import ClientSnapshot, CpuSnapshot, EventLoopSnapshot, MemorySnapshot, Snapshot
 from crawlee._utils.byte_size import ByteSize
+from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee.events._types import Event, EventSystemInfoData
 
@@ -21,6 +22,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
+@docs_group('Classes')
 class Snapshotter:
     """Monitors and logs system resource usage at predefined intervals for performance optimization.
 
@@ -223,7 +225,6 @@ class Snapshotter:
             event_data: System info data from which memory usage is read.
         """
         snapshot = MemorySnapshot(
-            total_size=event_data.memory_info.total_size,
             current_size=event_data.memory_info.current_size,
             max_memory_size=self._max_memory_size,
             max_used_memory_ratio=self._max_used_memory_ratio,

@@ -3,6 +3,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, AsyncContextManager
 
+from crawlee._utils.docs import docs_group
+
 if TYPE_CHECKING:
     from httpx import Response
 
@@ -13,6 +15,7 @@ if TYPE_CHECKING:
     )
 
 
+@docs_group('Abstract classes')
 class BaseKeyValueStoreClient(ABC):
     """Abstract base class for key-value store resource clients.
 
