@@ -122,13 +122,12 @@ def _get_default_storage_id(configuration: Configuration, storage_class: type[TR
 async def open_storage(
     *,
     storage_class: type[TResource],
-    storage_client: BaseStorageClient | None = None,
     id: str | None = None,
     name: str | None = None,
 ) -> TResource:
     """Open either a new storage or restore an existing one and return it."""
     config = service_container.get_configuration()
-    storage_client = storage_client or service_container.get_storage_client()
+    storage_client = service_container.get_storage_client()
 
     # Try to restore the storage from cache by name
     if name:
@@ -175,7 +174,6 @@ async def open_storage(
                 id=storage_info.id,
                 name=storage_info.name,
                 client=storage_client,
-                event_manager=service_container.get_event_manager(),
             )
         else:
             storage = storage_class(

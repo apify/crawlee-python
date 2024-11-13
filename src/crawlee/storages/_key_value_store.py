@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, TypeVar, overload
 
 from typing_extensions import override
 
+from crawlee import service_container
 from crawlee._utils.docs import docs_group
 from crawlee.base_storage_client._models import KeyValueStoreKeyInfo, KeyValueStoreMetadata
 from crawlee.storages._base_storage import BaseStorage
@@ -51,17 +52,13 @@ class KeyValueStore(BaseStorage):
     ```
     """
 
-    def __init__(
-        self,
-        id: str,
-        name: str | None,
-        client: BaseStorageClient,
-    ) -> None:
+    def __init__(self, id: str, name: str | None) -> None:
         self._id = id
         self._name = name
 
         # Get resource clients from storage client
-        self._resource_client = client.key_value_store(self._id)
+        storage_client = service_container.get_storage_client()
+        self._resource_client = storage_client.key_value_store(self._id)
 
     @property
     @override
@@ -79,21 +76,10 @@ class KeyValueStore(BaseStorage):
 
     @override
     @classmethod
-    async def open(
-        cls,
-        *,
-        id: str | None = None,
-        name: str | None = None,
-        storage_client: BaseStorageClient | None = None,
-    ) -> KeyValueStore:
+    async def open(cls, *, id: str | None = None, name: str | None = None) -> KeyValueStore:
         from crawlee.storages._creation_management import open_storage
 
-        return await open_storage(
-            storage_class=cls,
-            id=id,
-            name=name,
-            storage_client=storage_client,
-        )
+        return await open_storage(storage_class=cls, id=id, name=name)
 
     @override
     async def drop(self) -> None:

@@ -20,8 +20,6 @@ from crawlee.storages import KeyValueStore
 if TYPE_CHECKING:
     from types import TracebackType
 
-    from crawlee.events import EventManager
-
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
 
 logger = getLogger(__name__)
@@ -67,7 +65,6 @@ class Statistics(Generic[TStatisticsState]):
     def __init__(
         self,
         *,
-        event_manager: EventManager | None = None,
         persistence_enabled: bool = False,
         persist_state_kvs_name: str = 'default',
         persist_state_key: str | None = None,
@@ -87,9 +84,7 @@ class Statistics(Generic[TStatisticsState]):
 
         self.error_tracker = ErrorTracker()
         self.error_tracker_retry = ErrorTracker()
-
-        self._events = event_manager or crawlee.service_container.get_event_manager()
-
+        self._event_manager = service_container.get_event_manager()
         self._requests_in_progress = dict[str, RequestProcessingRecord]()
 
         if persist_state_key is None:
@@ -151,7 +146,7 @@ class Statistics(Generic[TStatisticsState]):
             raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
         self.state.crawler_finished_at = datetime.now(timezone.utc)
-        self._events.off(event=Event.PERSIST_STATE, listener=self._persist_state)
+        self._event_manager.off(event=Event.PERSIST_STATE, listener=self._persist_state)
         await self._periodic_logger.stop()
         await self._persist_state(event_data=EventPersistStateData(is_migrating=False))
         self._active = False
