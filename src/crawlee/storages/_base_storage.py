@@ -1,10 +1,6 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from crawlee.configuration import Configuration
 
 
 class BaseStorage(ABC):
@@ -22,19 +18,12 @@ class BaseStorage(ABC):
 
     @classmethod
     @abstractmethod
-    async def open(
-        cls,
-        *,
-        id: str | None = None,
-        name: str | None = None,
-        configuration: Configuration | None = None,
-    ) -> BaseStorage:
+    async def open(cls, *, id: str | None = None, name: str | None = None) -> BaseStorage:
         """Open a storage, either restore existing or create a new one.
 
         Args:
             id: The storage ID.
             name: The storage name.
-            configuration: The configuration to use.
         """
 
     @abstractmethod

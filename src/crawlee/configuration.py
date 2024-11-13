@@ -230,20 +230,3 @@ class Configuration(BaseSettings):
         ),
     ] = False
     """This setting is currently unused. For more details, see https://github.com/apify/crawlee-python/issues/670."""
-
-    @classmethod
-    def get_global_configuration(cls) -> Self:
-        """Retrieve the global instance of the configuration."""
-        from crawlee import service_container
-
-        if service_container.get_configuration_if_set() is None:
-            service_container.set_configuration(cls())
-
-        global_instance = service_container.get_configuration()
-
-        if not isinstance(global_instance, cls):
-            raise TypeError(
-                f'Requested global configuration object of type {cls}, but {global_instance.__class__} was found'
-            )
-
-        return global_instance

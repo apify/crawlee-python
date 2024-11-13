@@ -10,6 +10,7 @@ from decimal import Decimal
 from logging import getLogger
 from typing import TYPE_CHECKING
 
+from crawlee import service_container
 from crawlee._consts import METADATA_FILENAME
 from crawlee._utils.data_processing import maybe_parse_body
 from crawlee._utils.file import json_dumps
@@ -405,17 +406,17 @@ def _determine_storage_path(
     from crawlee.memory_storage_client._request_queue_client import RequestQueueClient
     from crawlee.storages._creation_management import _get_default_storage_id
 
-    configuration = memory_storage_client._configuration  # noqa: SLF001
+    config = service_container.get_configuration()
 
     if issubclass(resource_client_class, DatasetClient):
         storages_dir = memory_storage_client.datasets_directory
-        default_id = _get_default_storage_id(configuration, Dataset)
+        default_id = _get_default_storage_id(config, Dataset)
     elif issubclass(resource_client_class, KeyValueStoreClient):
         storages_dir = memory_storage_client.key_value_stores_directory
-        default_id = _get_default_storage_id(configuration, KeyValueStore)
+        default_id = _get_default_storage_id(config, KeyValueStore)
     elif issubclass(resource_client_class, RequestQueueClient):
         storages_dir = memory_storage_client.request_queues_directory
-        default_id = _get_default_storage_id(configuration, RequestQueue)
+        default_id = _get_default_storage_id(config, RequestQueue)
     else:
         raise TypeError('Invalid resource client class.')
 

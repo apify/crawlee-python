@@ -51,7 +51,6 @@ if TYPE_CHECKING:
 
     from crawlee._types import ConcurrencySettings, HttpMethod, JsonSerializable
     from crawlee.base_storage_client._models import DatasetItemsListPage
-    from crawlee.configuration import Configuration
     from crawlee.events._event_manager import EventManager
     from crawlee.http_clients import BaseHttpClient, HttpResponse
     from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
@@ -95,9 +94,6 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     max_session_rotations: NotRequired[int]
     """Maximum number of session rotations per request. The crawler rotates the session if a proxy error occurs
     or if the website blocks the request."""
-
-    configuration: NotRequired[Configuration]
-    """Crawler configuration."""
 
     request_handler_timeout: NotRequired[timedelta]
     """Maximum duration allowed for a single request handler to run."""
@@ -176,7 +172,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
         max_request_retries: int = 3,
         max_requests_per_crawl: int | None = None,
         max_session_rotations: int = 10,
-        configuration: Configuration | None = None,
         request_handler_timeout: timedelta = timedelta(minutes=1),
         session_pool: SessionPool | None = None,
         use_session_pool: bool = True,
@@ -205,7 +200,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 this value.
             max_session_rotations: Maximum number of session rotations per request. The crawler rotates the session
                 if a proxy error occurs or if the website blocks the request.
-            configuration: Crawler configuration.
             request_handler_timeout: Maximum duration allowed for a single request handler to run.
             use_session_pool: Enable the use of a session pool for managing sessions during crawling.
             session_pool: A custom `SessionPool` instance, allowing the use of non-default configuration.
@@ -241,12 +235,13 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._max_session_rotations = max_session_rotations
 
         self._request_provider = request_provider
-        self._configuration = configuration or service_container.get_configuration()
+
+        config = service_container.get_configuration()
 
         self._request_handler_timeout = request_handler_timeout
         self._internal_timeout = (
-            self._configuration.internal_timeout
-            if self._configuration.internal_timeout is not None
+            config.internal_timeout
+            if config.internal_timeout is not None
             else max(2 * request_handler_timeout, timedelta(minutes=5))
         )
 
@@ -255,10 +250,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._event_manager = event_manager or service_container.get_event_manager()
         self._snapshotter = Snapshotter(
             self._event_manager,
-            max_memory_size=ByteSize.from_mb(self._configuration.memory_mbytes)
-            if self._configuration.memory_mbytes
-            else None,
-            available_memory_ratio=self._configuration.available_memory_ratio,
+            max_memory_size=ByteSize.from_mb(config.memory_mbytes) if config.memory_mbytes else None,
+            available_memory_ratio=config.available_memory_ratio,
         )
         self._autoscaled_pool = AutoscaledPool(
             system_status=SystemStatus(self._snapshotter),
@@ -275,13 +268,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         if configure_logging:
             root_logger = logging.getLogger()
-            configure_logger(root_logger, self._configuration, remove_old_handlers=True)
+            configure_logger(root_logger, remove_old_handlers=True)
 
             # Silence HTTPX logger
             httpx_logger = logging.getLogger('httpx')
-            httpx_logger.setLevel(
-                logging.DEBUG if get_configured_log_level(self._configuration) <= logging.DEBUG else logging.WARNING
-            )
+            httpx_logger.setLevel(logging.DEBUG if get_configured_log_level() <= logging.DEBUG else logging.WARNING)
 
         if not _logger:
             _logger = logging.getLogger(__name__)
@@ -369,7 +360,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
     ) -> RequestProvider:
         """Return the configured request provider. If none is configured, open and return the default request queue."""
         if not self._request_provider:
-            self._request_provider = await RequestQueue.open(id=id, name=name, configuration=self._configuration)
+            self._request_provider = await RequestQueue.open(id=id, name=name)
 
         return self._request_provider
 
@@ -380,7 +371,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         name: str | None = None,
     ) -> Dataset:
         """Return the dataset with the given ID or name. If none is provided, return the default dataset."""
-        return await Dataset.open(id=id, name=name, configuration=self._configuration)
+        return await Dataset.open(id=id, name=name)
 
     async def get_key_value_store(
         self,
@@ -389,7 +380,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         name: str | None = None,
     ) -> KeyValueStore:
         """Return the key-value store with the given ID or name. If none is provided, return the default KVS."""
-        return await KeyValueStore.open(id=id, name=name, configuration=self._configuration)
+        return await KeyValueStore.open(id=id, name=name)
 
     def error_handler(
         self, handler: ErrorHandler[TCrawlingContext | BasicCrawlingContext]
@@ -434,7 +425,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             request_provider = await self.get_request_provider()
             if purge_request_queue and isinstance(request_provider, RequestQueue):
                 await request_provider.drop()
-                self._request_provider = await RequestQueue.open(configuration=self._configuration)
+                self._request_provider = await RequestQueue.open()
 
         if requests is not None:
             await self.add_requests(requests)
