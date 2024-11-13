@@ -21,6 +21,17 @@ if TYPE_CHECKING:
     from crawlee.http_crawler._http_crawling_context import HttpCrawlingContext
 
 
+PAYLOAD = {
+    'custname': 'John Doe',
+    'custtel': '1234567890',
+    'custemail': 'johndoe@example.com',
+    'size': 'large',
+    'topping': '["bacon", "cheese", "mushroom"]',
+    'delivery': '13:00',
+    'comments': 'Please ring the doorbell upon arrival.',
+}
+
+
 @pytest.fixture
 async def mock_request_handler() -> Callable[[HttpCrawlingContext], Awaitable[None]] | AsyncMock:
     return AsyncMock()
@@ -218,17 +229,6 @@ async def test_sending_payload(http_client_class: type[BaseHttpClient]) -> None:
     http_client = http_client_class()
     crawler = HttpCrawler(http_client=http_client)
 
-    # Payload, e.g. data from a form submission.
-    payload = {
-        'custname': 'John Doe',
-        'custtel': '1234567890',
-        'custemail': 'johndoe@example.com',
-        'size': 'large',
-        'topping': '["bacon", "cheese", "mushroom"]',
-        'delivery': '13:00',
-        'comments': 'Please ring the doorbell upon arrival.',
-    }
-
     responses = []
 
     @crawler.router.default_handler
@@ -237,12 +237,12 @@ async def test_sending_payload(http_client_class: type[BaseHttpClient]) -> None:
         # The httpbin.org/post endpoint returns the provided payload in the response.
         responses.append(response)
 
-    encode_payload = urlencode(payload).encode()
+    encoded_payload = urlencode(PAYLOAD).encode()
 
     request = Request.from_url(
         url='https://httpbin.org/post',
         method='POST',
-        payload=encode_payload,
+        payload=encoded_payload,
     )
 
     await crawler.run([request])
@@ -250,12 +250,12 @@ async def test_sending_payload(http_client_class: type[BaseHttpClient]) -> None:
     # The request handler should be called once.
     assert len(responses) == 1, 'The request handler should be called once.'
 
-    assert responses[0]['data'].encode() == encode_payload, 'The byte strings must match'
+    assert responses[0]['data'].encode() == encoded_payload, 'The byte strings must match'
 
     # The reconstructed payload data should match the original payload. We have to flatten the values, because
     # parse_qs returns a list of values for each key.
     response_data = {k: v[0] if len(v) == 1 else v for k, v in parse_qs(responses[0]['data']).items()}
-    assert response_data == payload, 'The reconstructed payload data should match the original payload.'
+    assert response_data == PAYLOAD, 'The reconstructed payload data should match the original payload.'
 
     # Check that payload is defined only as `data`.
     assert responses[0]['json'] is None
@@ -271,17 +271,6 @@ async def test_sending_form_payload(http_client_class: type[BaseHttpClient]) -> 
     http_client = http_client_class()
     crawler = HttpCrawler(http_client=http_client)
 
-    # Payload, e.g. data from a form submission.
-    payload = {
-        'custname': 'John Doe',
-        'custtel': '1234567890',
-        'custemail': 'johndoe@example.com',
-        'size': 'large',
-        'topping': '["bacon", "cheese", "mushroom"]',
-        'delivery': '13:00',
-        'comments': 'Please ring the doorbell upon arrival.',
-    }
-
     responses = []
 
     @crawler.router.default_handler
@@ -294,12 +283,12 @@ async def test_sending_form_payload(http_client_class: type[BaseHttpClient]) -> 
         url='https://httpbin.org/post',
         method='POST',
         headers={'content-type': 'application/x-www-form-urlencoded'},
-        payload=urlencode(payload).encode(),
+        payload=urlencode(PAYLOAD).encode(),
     )
 
     await crawler.run([request])
 
-    assert responses[0]['form'] == payload, 'The form data must match the original payload'
+    assert responses[0]['form'] == PAYLOAD, 'The form data must match the original payload'
 
     # Check that payload is defined only as `form`.
     assert responses[0]['json'] is None
@@ -315,17 +304,6 @@ async def test_sending_json_payload(http_client_class: type[BaseHttpClient]) -> 
     http_client = http_client_class()
     crawler = HttpCrawler(http_client=http_client)
 
-    # Payload, e.g. data from a form submission.
-    payload = {
-        'custname': 'John Doe',
-        'custtel': '1234567890',
-        'custemail': 'johndoe@example.com',
-        'size': 'large',
-        'topping': '["bacon", "cheese", "mushroom"]',
-        'delivery': '13:00',
-        'comments': 'Please ring the doorbell upon arrival.',
-    }
-
     responses = []
 
     @crawler.router.default_handler
@@ -334,7 +312,7 @@ async def test_sending_json_payload(http_client_class: type[BaseHttpClient]) -> 
         # The httpbin.org/post endpoint returns the provided payload in the response.
         responses.append(response)
 
-    json_payload = json.dumps(payload).encode()
+    json_payload = json.dumps(PAYLOAD).encode()
 
     request = Request.from_url(
         url='https://httpbin.org/post',
@@ -347,7 +325,7 @@ async def test_sending_json_payload(http_client_class: type[BaseHttpClient]) -> 
 
     assert responses[0]['data'].encode() == json_payload, 'The byte strings must match'
 
-    assert responses[0]['json'] == payload, 'The contents of `json` must match the original payload'
+    assert responses[0]['json'] == PAYLOAD, 'The contents of `json` must match the original payload'
 
     # Check that payload is not defined as form
     assert responses[0]['form'] == {}
