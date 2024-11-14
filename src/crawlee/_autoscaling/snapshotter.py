@@ -104,10 +104,10 @@ class Snapshotter:
             cast(float, available_memory_ratio)
         )
 
-        self._cpu_snapshots: SortedList[CpuSnapshot] = self._get_sorted_list_by_created_at([])
-        self._event_loop_snapshots: SortedList[EventLoopSnapshot] = self._get_sorted_list_by_created_at([])
-        self._memory_snapshots: SortedList[MemorySnapshot] = self._get_sorted_list_by_created_at([])
-        self._client_snapshots: SortedList[ClientSnapshot] = self._get_sorted_list_by_created_at([])
+        self._cpu_snapshots = self._get_sorted_list_by_created_at(list[CpuSnapshot]())
+        self._event_loop_snapshots = self._get_sorted_list_by_created_at(list[EventLoopSnapshot]())
+        self._memory_snapshots = self._get_sorted_list_by_created_at(list[MemorySnapshot]())
+        self._client_snapshots = self._get_sorted_list_by_created_at(list[ClientSnapshot]())
 
         self._snapshot_event_loop_task = RecurringTask(self._snapshot_event_loop, self._event_loop_snapshot_interval)
         self._snapshot_client_task = RecurringTask(self._snapshot_client, self._client_snapshot_interval)
