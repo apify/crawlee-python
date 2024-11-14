@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
 from operator import attrgetter
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, TypeVar, cast
 
 import psutil
 from sortedcontainers import SortedList
@@ -28,6 +28,8 @@ if TYPE_CHECKING:
     from crawlee.events import EventManager
 
 logger = getLogger(__name__)
+
+T = TypeVar('T')
 
 
 @docs_group('Classes')
@@ -102,15 +104,19 @@ class Snapshotter:
             cast(float, available_memory_ratio)
         )
 
-        self._cpu_snapshots: SortedList[CpuSnapshot] = SortedList([], key=attrgetter('created_at'))
-        self._event_loop_snapshots: SortedList[EventLoopSnapshot] = SortedList([], key=attrgetter('created_at'))
-        self._memory_snapshots: SortedList[MemorySnapshot] = SortedList([], key=attrgetter('created_at'))
-        self._client_snapshots: SortedList[ClientSnapshot] = SortedList([], key=attrgetter('created_at'))
+        self._cpu_snapshots: SortedList[CpuSnapshot] = self._get_sorted_list_by_created_at([])
+        self._event_loop_snapshots: SortedList[EventLoopSnapshot] = self._get_sorted_list_by_created_at([])
+        self._memory_snapshots: SortedList[MemorySnapshot] = self._get_sorted_list_by_created_at([])
+        self._client_snapshots: SortedList[ClientSnapshot] = self._get_sorted_list_by_created_at([])
 
         self._snapshot_event_loop_task = RecurringTask(self._snapshot_event_loop, self._event_loop_snapshot_interval)
         self._snapshot_client_task = RecurringTask(self._snapshot_client, self._client_snapshot_interval)
 
         self._timestamp_of_last_memory_warning: datetime = datetime.now(timezone.utc) - timedelta(hours=1)
+
+    @staticmethod
+    def _get_sorted_list_by_created_at(input_list: list[T]) -> SortedList[T]:
+        return SortedList(input_list, key=attrgetter('created_at'))
 
     @staticmethod
     def _get_default_max_memory_size(available_memory_ratio: float) -> ByteSize:

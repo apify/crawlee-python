@@ -192,7 +192,7 @@ class SystemStatus:
                 non_overloaded_time += time
 
         if (overloaded_time + non_overloaded_time) == 0:
-            overloaded_ratio = 0
+            overloaded_ratio = 0.0
         else:
             overloaded_ratio = overloaded_time / (overloaded_time + non_overloaded_time)
 

@@ -50,9 +50,11 @@ def test_snapshot_memory(snapshotter: Snapshotter, event_system_data_info: Event
 
 
 def test_snapshot_event_loop(snapshotter: Snapshotter) -> None:
-    snapshotter._event_loop_snapshots = [
-        EventLoopSnapshot(delay=timedelta(milliseconds=100), max_delay=timedelta(milliseconds=500)),
-    ]
+    snapshotter._event_loop_snapshots = Snapshotter._get_sorted_list_by_created_at(
+        [
+            EventLoopSnapshot(delay=timedelta(milliseconds=100), max_delay=timedelta(milliseconds=500)),
+        ]
+    )
 
     snapshotter._snapshot_event_loop()
     assert len(snapshotter._event_loop_snapshots) == 2
@@ -65,14 +67,16 @@ def test_snapshot_client(snapshotter: Snapshotter) -> None:
 
 def test_get_cpu_sample(snapshotter: Snapshotter) -> None:
     now = datetime.now(timezone.utc)
-    cpu_snapshots = [
-        CpuSnapshot(
-            used_ratio=0.5,
-            max_used_ratio=0.95,
-            created_at=now - timedelta(hours=delta),
-        )
-        for delta in range(5, 0, -1)
-    ]
+    cpu_snapshots = Snapshotter._get_sorted_list_by_created_at(
+        [
+            CpuSnapshot(
+                used_ratio=0.5,
+                max_used_ratio=0.95,
+                created_at=now - timedelta(hours=delta),
+            )
+            for delta in range(5, 0, -1)
+        ]
+    )
 
     snapshotter._cpu_snapshots = cpu_snapshots
 
@@ -114,12 +118,14 @@ def test_snapshot_pruning_removes_outdated_records(snapshotter: Snapshotter) -> 
     five_hours_ago = now - timedelta(hours=5)
 
     # Create mock snapshots with varying creation times
-    snapshots = [
-        CpuSnapshot(used_ratio=0.5, max_used_ratio=0.95, created_at=five_hours_ago),
-        CpuSnapshot(used_ratio=0.6, max_used_ratio=0.95, created_at=three_hours_ago),
-        CpuSnapshot(used_ratio=0.7, max_used_ratio=0.95, created_at=two_hours_ago),
-        CpuSnapshot(used_ratio=0.8, max_used_ratio=0.95, created_at=now),
-    ]
+    snapshots = Snapshotter._get_sorted_list_by_created_at(
+        [
+            CpuSnapshot(used_ratio=0.5, max_used_ratio=0.95, created_at=five_hours_ago),
+            CpuSnapshot(used_ratio=0.6, max_used_ratio=0.95, created_at=three_hours_ago),
+            CpuSnapshot(used_ratio=0.7, max_used_ratio=0.95, created_at=two_hours_ago),
+            CpuSnapshot(used_ratio=0.8, max_used_ratio=0.95, created_at=now),
+        ]
+    )
 
     # Assign these snapshots to one of the lists (e.g., CPU snapshots)
     snapshotter._cpu_snapshots = snapshots
@@ -136,7 +142,7 @@ def test_snapshot_pruning_removes_outdated_records(snapshotter: Snapshotter) -> 
 
 def test_pruning_empty_snapshot_list_remains_empty(snapshotter: Snapshotter) -> None:
     now = datetime.now(timezone.utc)
-    snapshotter._cpu_snapshots = []
+    snapshotter._cpu_snapshots = Snapshotter._get_sorted_list_by_created_at([])
     snapshots_casted = cast(list[Snapshot], snapshotter._cpu_snapshots)
     snapshotter._prune_snapshots(snapshots_casted, now)
     assert snapshotter._cpu_snapshots == []
@@ -150,10 +156,12 @@ def test_snapshot_pruning_keeps_recent_records_unaffected(snapshotter: Snapshott
     one_hour_ago = now - timedelta(hours=1)
 
     # Create mock snapshots with varying creation times
-    snapshots = [
-        CpuSnapshot(used_ratio=0.7, max_used_ratio=0.95, created_at=one_hour_ago),
-        CpuSnapshot(used_ratio=0.8, max_used_ratio=0.95, created_at=now),
-    ]
+    snapshots = Snapshotter._get_sorted_list_by_created_at(
+        [
+            CpuSnapshot(used_ratio=0.7, max_used_ratio=0.95, created_at=one_hour_ago),
+            CpuSnapshot(used_ratio=0.8, max_used_ratio=0.95, created_at=now),
+        ]
+    )
 
     # Assign these snapshots to one of the lists (e.g., CPU snapshots)
     snapshotter._cpu_snapshots = snapshots
