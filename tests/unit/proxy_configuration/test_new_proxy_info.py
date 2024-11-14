@@ -8,7 +8,7 @@ from httpx import InvalidURL
 from crawlee.proxy_configuration import ProxyConfiguration
 
 if TYPE_CHECKING:
-    from crawlee.models import Request
+    from crawlee import Request
 
 
 async def test_returns_proxy_info() -> None:
@@ -29,8 +29,10 @@ async def test_throws_on_invalid_new_url_function() -> None:
         new_url_function=lambda session_id=None, request=None: 'http://proxy.com:1111*invalid_url'  # noqa: ARG005
     )
 
-    with pytest.raises(InvalidURL):
+    with pytest.raises(ValueError) as exc:  # noqa: PT011
         await config.new_proxy_info(None, None, None)
+
+    assert isinstance(exc.value.__cause__, InvalidURL)
 
 
 async def test_returns_proxy_info_with_new_url_function() -> None:
@@ -118,3 +120,26 @@ async def test_rotates_proxies_with_sessions() -> None:
     info = await config.new_proxy_info(sessions[5], None, None)
     assert info is not None
     assert info.url == proxy_urls[2]
+
+
+@pytest.mark.parametrize(
+    ('url', 'expected_port'),
+    [
+        # Default ports based on the URL scheme
+        ('http://proxy.com', 80),
+        ('https://proxy.com', 443),
+        # Explicit ports specified in the URL
+        ('http://proxy.com:80', 80),
+        ('http://proxy.com:1234', 1234),
+    ],
+)
+async def test_sets_port(url: str, expected_port: int) -> None:
+    """Test that the port property is set correctly.
+
+    The port is inferred from the URL scheme if it is not specified in the URL.
+    """
+    config = ProxyConfiguration(proxy_urls=[url])
+
+    info = await config.new_proxy_info(None, None, None)
+    assert info is not None
+    assert info.port == expected_port

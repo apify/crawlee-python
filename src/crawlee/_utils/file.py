@@ -5,13 +5,11 @@ import contextlib
 import io
 import json
 import mimetypes
+import os
 import re
+import shutil
 from enum import Enum
 from typing import Any
-
-import aioshutil
-from aiofiles import ospath
-from aiofiles.os import remove, rename
 
 
 class ContentType(Enum):
@@ -38,7 +36,7 @@ async def force_remove(filename: str) -> None:
         filename: The path to the file to be removed.
     """
     with contextlib.suppress(FileNotFoundError):
-        await remove(filename)
+        await asyncio.to_thread(os.remove, filename)
 
 
 async def force_rename(src_dir: str, dst_dir: str) -> None:
@@ -49,11 +47,11 @@ async def force_rename(src_dir: str, dst_dir: str) -> None:
         dst_dir: The destination directory path.
     """
     # Make sure source directory exists
-    if await ospath.exists(src_dir):
+    if await asyncio.to_thread(os.path.exists, src_dir):
         # Remove destination directory if it exists
-        if await ospath.exists(dst_dir):
-            await aioshutil.rmtree(dst_dir, ignore_errors=True)
-        await rename(src_dir, dst_dir)
+        if await asyncio.to_thread(os.path.exists, dst_dir):
+            await asyncio.to_thread(shutil.rmtree, dst_dir, ignore_errors=True)
+        await asyncio.to_thread(os.rename, src_dir, dst_dir)
 
 
 def determine_file_extension(content_type: str) -> str | None:

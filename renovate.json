@@ -1,6 +1,26 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended"
-  ]
+    "extends": ["config:base", ":semanticCommitTypeAll(chore)"],
+    "pinVersions": false,
+    "separateMajorMinor": false,
+    "dependencyDashboard": false,
+    "semanticCommits": "enabled",
+    "lockFileMaintenance": {
+        "enabled": true,
+        "schedule": ["before 1am on monday"],
+        "automerge": true,
+        "automergeType": "branch"
+    },
+    "packageRules": [
+        {
+            "matchPaths": ["pyproject.toml"],
+            "matchDepTypes": ["devDependencies"],
+            "matchUpdateTypes": ["major", "minor"],
+            "groupName": "major/minor dev dependencies",
+            "groupSlug": "dev-dependencies",
+            "automerge": true,
+            "automergeType": "branch"
+        }
+    ],
+    "schedule": ["before 1am on monday"],
+    "ignoreDeps": ["crawlee", "docusaurus-plugin-typedoc-api"]
 }

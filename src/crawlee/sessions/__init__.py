@@ -1,2 +1,4 @@
-from .session import Session
-from .session_pool import SessionPool
+from ._session import Session
+from ._session_pool import SessionPool
+
+__all__ = ['Session', 'SessionPool']

@@ -8,29 +8,29 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from crawlee.events.event_manager import EventManager
-from crawlee.events.types import Event, EventSystemInfoData
+from crawlee.events import EventManager
+from crawlee.events._types import Event, EventSystemInfoData
 
 
-@pytest.fixture()
+@pytest.fixture
 async def event_manager() -> AsyncGenerator[EventManager, None]:
     async with EventManager() as event_manager:
         yield event_manager
 
 
-@pytest.fixture()
+@pytest.fixture
 def event_system_info_data() -> EventSystemInfoData:
     return MagicMock(spec=EventSystemInfoData)
 
 
-@pytest.fixture()
+@pytest.fixture
 def async_listener() -> AsyncMock:
     al = AsyncMock()
     al.__name__ = 'async_listener'  # To avoid issues with the function name
     return al
 
 
-@pytest.fixture()
+@pytest.fixture
 def sync_listener() -> MagicMock:
     sl = MagicMock()
     sl.__name__ = 'sync_listener'  # To avoid issues with the function name

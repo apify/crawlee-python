@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 from typing import AsyncGenerator
+from urllib.parse import urlparse
 
 import pytest
 
-from crawlee.storages.key_value_store import KeyValueStore
+from crawlee.storages import KeyValueStore
 
 
-@pytest.fixture()
+@pytest.fixture
 async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
     kvs = await KeyValueStore.open()
     yield kvs
@@ -24,12 +26,12 @@ async def test_open() -> None:
     named_key_value_store = await KeyValueStore.open(name=key_value_store_name)
     assert default_key_value_store is not named_key_value_store
 
-    with pytest.raises(RuntimeError, match='Key-value store with id "nonexistent-id" does not exist!'):
+    with pytest.raises(RuntimeError, match='KeyValueStore with id "nonexistent-id" does not exist!'):
         await KeyValueStore.open(id='nonexistent-id')
 
     # Test that when you try to open a key-value store by ID and you use a name of an existing key-value store,
     # it doesn't work
-    with pytest.raises(RuntimeError, match='Key-value store with id "dummy-name" does not exist!'):
+    with pytest.raises(RuntimeError, match='KeyValueStore with id "dummy-name" does not exist!'):
         await KeyValueStore.open(id='dummy-name')
 
 
@@ -100,3 +102,20 @@ async def test_static_get_set_value(key_value_store: KeyValueStore) -> None:
     await key_value_store.set_value('test-static', 'static')
     value = await key_value_store.get_value('test-static')
     assert value == 'static'
+
+
+async def test_get_public_url_raises_for_non_existing_key(key_value_store: KeyValueStore) -> None:
+    with pytest.raises(ValueError, match='was not found'):
+        await key_value_store.get_public_url('i-do-not-exist')
+
+
+async def test_get_public_url(key_value_store: KeyValueStore) -> None:
+    await key_value_store.set_value('test-static', 'static')
+    public_url = await key_value_store.get_public_url('test-static')
+
+    url = urlparse(public_url)
+    path = url.netloc if url.netloc else url.path
+
+    with open(path) as f:  # noqa: ASYNC230
+        content = await asyncio.to_thread(f.read)
+        assert content == 'static'

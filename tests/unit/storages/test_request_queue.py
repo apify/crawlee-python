@@ -2,15 +2,20 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
-from typing import AsyncGenerator
+from typing import TYPE_CHECKING
 
 import pytest
+from pydantic import ValidationError
 
-from crawlee.models import Request
-from crawlee.storages.request_queue import RequestQueue
+from crawlee import Request
+from crawlee._request import RequestState
+from crawlee.storages import RequestQueue
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Sequence
 
 
-@pytest.fixture()
+@pytest.fixture
 async def request_queue() -> AsyncGenerator[RequestQueue, None]:
     rq = await RequestQueue.open()
     yield rq
@@ -27,12 +32,12 @@ async def test_open() -> None:
     named_request_queue = await RequestQueue.open(name=request_queue_name)
     assert default_request_queue is not named_request_queue
 
-    with pytest.raises(RuntimeError, match='Request queue with id "nonexistent-id" does not exist!'):
+    with pytest.raises(RuntimeError, match='RequestQueue with id "nonexistent-id" does not exist!'):
         await RequestQueue.open(id='nonexistent-id')
 
     # Test that when you try to open a request queue by ID and you use a name of an existing request queue,
     # it doesn't work
-    with pytest.raises(RuntimeError, match='Request queue with id "dummy-name" does not exist!'):
+    with pytest.raises(RuntimeError, match='RequestQueue with id "dummy-name" does not exist!'):
         await RequestQueue.open(id='dummy-name')
 
 
@@ -77,8 +82,8 @@ async def test_drop() -> None:
 
 async def test_get_request(request_queue: RequestQueue) -> None:
     request = Request.from_url('https://example.com')
-    add_request_info = await request_queue.add_request(request)
-    assert request.id == add_request_info.request_id
+    processed_request = await request_queue.add_request(request)
+    assert request.id == processed_request.id
     request_2 = await request_queue.get_request(request.id)
     assert request_2 is not None
     assert request == request_2
@@ -99,11 +104,11 @@ async def test_add_fetch_handle_request(request_queue: RequestQueue) -> None:
 
     # Mark it as handled
     next_request.handled_at = datetime.now(timezone.utc)
-    queue_operation_info = await request_queue.mark_request_as_handled(next_request)
+    processed_request = await request_queue.mark_request_as_handled(next_request)
 
-    assert queue_operation_info is not None
-    assert queue_operation_info.request_id == request.id
-    assert queue_operation_info.request_unique_key == request.unique_key
+    assert processed_request is not None
+    assert processed_request.id == request.id
+    assert processed_request.unique_key == request.unique_key
     assert await request_queue.is_finished() is True
 
 
@@ -125,3 +130,119 @@ async def test_reclaim_request(request_queue: RequestQueue) -> None:
     assert next_again is not None
     assert next_again.id == request.id
     assert next_again.unique_key == request.unique_key
+
+
+@pytest.mark.parametrize(
+    'requests',
+    [
+        [Request.from_url('https://apify.com')],
+        ['https://crawlee.dev'],
+        [Request.from_url(f'https://example.com/{i}') for i in range(10)],
+        [f'https://example.com/{i}' for i in range(15)],
+    ],
+    ids=['single-request', 'single-url', 'multiple-requests', 'multiple-urls'],
+)
+async def test_add_batched_requests(
+    request_queue: RequestQueue,
+    requests: Sequence[str | Request],
+) -> None:
+    request_count = len(requests)
+
+    # Add the requests to the RQ in batches
+    await request_queue.add_requests_batched(requests, wait_for_all_requests_to_be_added=True)
+
+    # Ensure the batch was processed correctly
+    assert await request_queue.get_total_count() == request_count
+
+    # Fetch and validate each request in the queue
+    for original_request in requests:
+        next_request = await request_queue.fetch_next_request()
+        assert next_request is not None
+
+        expected_url = original_request if isinstance(original_request, str) else original_request.url
+        assert next_request.url == expected_url
+
+    # Confirm the queue is empty after processing all requests
+    assert await request_queue.is_empty() is True
+
+
+async def test_invalid_user_data_serialization() -> None:
+    with pytest.raises(ValidationError):
+        Request.from_url(
+            'https://crawlee.dev',
+            user_data={
+                'foo': datetime(year=2020, month=7, day=4, tzinfo=timezone.utc),
+                'bar': {datetime(year=2020, month=4, day=7, tzinfo=timezone.utc)},
+            },
+        )
+
+
+async def test_user_data_serialization(request_queue: RequestQueue) -> None:
+    request = Request.from_url(
+        'https://crawlee.dev',
+        user_data={
+            'hello': 'world',
+            'foo': 42,
+        },
+    )
+
+    await request_queue.add_request(request)
+
+    dequeued_request = await request_queue.fetch_next_request()
+    assert dequeued_request is not None
+
+    assert dequeued_request.user_data['hello'] == 'world'
+    assert dequeued_request.user_data['foo'] == 42
+
+
+async def test_complex_user_data_serialization(request_queue: RequestQueue) -> None:
+    request = Request.from_url('https://crawlee.dev')
+    request.user_data['hello'] = 'world'
+    request.user_data['foo'] = 42
+    request.crawlee_data.max_retries = 1
+    request.crawlee_data.state = RequestState.ERROR_HANDLER
+
+    await request_queue.add_request(request)
+
+    dequeued_request = await request_queue.fetch_next_request()
+    assert dequeued_request is not None
+
+    data = dequeued_request.model_dump(by_alias=True)
+    assert data['userData']['hello'] == 'world'
+    assert data['userData']['foo'] == 42
+    assert data['userData']['__crawlee'] == {
+        'maxRetries': 1,
+        'state': RequestState.ERROR_HANDLER,
+    }
+
+
+async def test_deduplication_of_requests_with_custom_unique_key() -> None:
+    with pytest.raises(ValueError, match='`always_enqueue` cannot be used with a custom `unique_key`'):
+        Request.from_url('https://apify.com', unique_key='apify', always_enqueue=True)
+
+
+async def test_deduplication_of_requests_with_invalid_custom_unique_key() -> None:
+    request_1 = Request.from_url('https://apify.com', always_enqueue=True)
+    request_2 = Request.from_url('https://apify.com', always_enqueue=True)
+
+    rq = await RequestQueue.open(name='my-rq')
+    await rq.add_request(request_1)
+    await rq.add_request(request_2)
+
+    assert await rq.get_total_count() == 2
+
+    assert await rq.fetch_next_request() == request_1
+    assert await rq.fetch_next_request() == request_2
+
+
+async def test_deduplication_of_requests_with_valid_custom_unique_key() -> None:
+    request_1 = Request.from_url('https://apify.com')
+    request_2 = Request.from_url('https://apify.com')
+
+    rq = await RequestQueue.open(name='my-rq')
+    await rq.add_request(request_1)
+    await rq.add_request(request_2)
+
+    assert await rq.get_total_count() == 1
+
+    assert await rq.fetch_next_request() == request_1

@@ -1,31 +1,64 @@
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, AsyncGenerator, Awaitable, Callable
 from unittest.mock import AsyncMock, Mock
+from urllib.parse import parse_qs, urlencode
 
 import pytest
 import respx
 from httpx import Response
 
-from crawlee.http_crawler.http_crawler import HttpCrawler
-from crawlee.sessions.session_pool import SessionPool
+from crawlee._request import Request
+from crawlee.http_clients._httpx import HttpxHttpClient
+from crawlee.http_clients.curl_impersonate import CurlImpersonateHttpClient
+from crawlee.http_crawler import HttpCrawler
+from crawlee.sessions import SessionPool
 from crawlee.storages import RequestList
 
 if TYPE_CHECKING:
-    from crawlee.http_crawler.types import HttpCrawlingContext
+    from crawlee.http_clients._base import BaseHttpClient
+    from crawlee.http_crawler._http_crawling_context import HttpCrawlingContext
 
 
-@pytest.fixture()
+# Payload, e.g. data for a form submission.
+PAYLOAD = {
+    'custname': 'John Doe',
+    'custtel': '1234567890',
+    'custemail': 'johndoe@example.com',
+    'size': 'large',
+    'topping': '["bacon", "cheese", "mushroom"]',
+    'delivery': '13:00',
+    'comments': 'Please ring the doorbell upon arrival.',
+}
+
+
+@pytest.fixture
 async def mock_request_handler() -> Callable[[HttpCrawlingContext], Awaitable[None]] | AsyncMock:
     return AsyncMock()
 
 
-@pytest.fixture()
+@pytest.fixture
 async def crawler(mock_request_handler: Callable[[HttpCrawlingContext], Awaitable[None]]) -> HttpCrawler:
-    return HttpCrawler(request_handler=mock_request_handler, request_provider=RequestList())
+    return HttpCrawler(
+        request_handler=mock_request_handler,
+        request_provider=RequestList(),
+    )
 
 
-@pytest.fixture()
+@pytest.fixture
+async def crawler_without_retries(
+    mock_request_handler: Callable[[HttpCrawlingContext], Awaitable[None]],
+) -> HttpCrawler:
+    return HttpCrawler(
+        request_handler=mock_request_handler,
+        request_provider=RequestList(),
+        retry_on_blocked=False,
+        max_request_retries=0,
+    )
+
+
+@pytest.fixture
 async def server() -> AsyncGenerator[respx.MockRouter, None]:
     with respx.mock(base_url='https://test.io', assert_all_called=False) as mock:
         mock.get('/html', name='html_endpoint').return_value = Response(
@@ -40,6 +73,15 @@ async def server() -> AsyncGenerator[respx.MockRouter, None]:
 
         mock.get('/redirect', name='redirect_endpoint').return_value = Response(
             301, headers={'Location': 'https://test.io/html'}
+        )
+
+        mock.get('/bad_request', name='bad_request_endpoint').return_value = Response(
+            400,
+            text="""<html>
+                <head>
+                    <title>Bad request</title>
+                </head>
+            </html>""",
         )
 
         mock.get('/404', name='404_endpoint').return_value = Response(
@@ -63,7 +105,11 @@ async def server() -> AsyncGenerator[respx.MockRouter, None]:
         yield mock
 
 
-async def test_fetches_html(crawler: HttpCrawler, mock_request_handler: AsyncMock, server: respx.MockRouter) -> None:
+async def test_fetches_html(
+    crawler: HttpCrawler,
+    mock_request_handler: AsyncMock,
+    server: respx.MockRouter,
+) -> None:
     await crawler.add_requests(['https://test.io/html'])
     await crawler.run()
 
@@ -87,13 +133,17 @@ async def test_handles_redirects(
 
 
 async def test_handles_client_errors(
-    crawler: HttpCrawler, mock_request_handler: AsyncMock, server: respx.MockRouter
+    crawler_without_retries: HttpCrawler,
+    mock_request_handler: AsyncMock,
+    server: respx.MockRouter,
 ) -> None:
+    crawler = crawler_without_retries
+
     await crawler.add_requests(['https://test.io/404'])
     await crawler.run()
 
-    mock_request_handler.assert_called_once()
-    assert mock_request_handler.call_args[0][0].request.loaded_url == 'https://test.io/404'
+    # Request handler should not be called for error status codes.
+    mock_request_handler.assert_not_called()
     assert server['404_endpoint'].called
 
 
@@ -141,11 +191,161 @@ async def test_stores_cookies(httpbin: str) -> None:
     assert session.cookies == {'a': '1', 'b': '2', 'c': '3'}
 
 
+async def test_do_not_retry_on_client_errors(crawler: HttpCrawler, server: respx.MockRouter) -> None:
+    await crawler.add_requests(['https://test.io/bad_request'])
+    stats = await crawler.run()
+
+    # by default, client errors are not retried
+    assert stats.requests_failed == 1
+    assert stats.retry_histogram == [1]
+    assert stats.requests_total == 1
+
+    assert len(server['bad_request_endpoint'].calls) == 1
+
+
 async def test_http_status_statistics(crawler: HttpCrawler, server: respx.MockRouter) -> None:
-    await crawler.add_requests([f'https://test.io/500?id={i}' for i in range(100)])
-    await crawler.add_requests([f'https://test.io/404?id={i}' for i in range(100)])
-    await crawler.add_requests([f'https://test.io/html?id={i}' for i in range(100)])
+    await crawler.add_requests([f'https://test.io/500?id={i}' for i in range(10)])
+    await crawler.add_requests([f'https://test.io/404?id={i}' for i in range(10)])
+    await crawler.add_requests([f'https://test.io/html?id={i}' for i in range(10)])
 
     await crawler.run()
-    assert crawler.statistics.state.requests_with_status_code == {'200': 100, '500': 300, '404': 100}
-    assert len(server['html_endpoint'].calls) == 100
+
+    assert crawler.statistics.state.requests_with_status_code == {
+        '200': 10,
+        '404': 10,  # client errors are not retried by default
+        '500': 30,  # server errors are retried by default
+    }
+
+    assert len(server['html_endpoint'].calls) == 10
+    assert len(server['404_endpoint'].calls) == 10
+    assert len(server['500_endpoint'].calls) == 30
+
+
+@pytest.mark.parametrize(
+    'http_client_class',
+    [CurlImpersonateHttpClient, HttpxHttpClient],
+    ids=['curl', 'httpx'],
+)
+async def test_sending_payload_as_raw_data(http_client_class: type[BaseHttpClient]) -> None:
+    http_client = http_client_class()
+    crawler = HttpCrawler(http_client=http_client)
+    responses = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: HttpCrawlingContext) -> None:
+        response = json.loads(context.http_response.read())
+        # The httpbin.org/post endpoint returns the provided payload in the response.
+        responses.append(response)
+
+    encoded_payload = urlencode(PAYLOAD).encode()
+    request = Request.from_url(
+        url='https://httpbin.org/post',
+        method='POST',
+        payload=encoded_payload,
+    )
+
+    await crawler.run([request])
+
+    assert len(responses) == 1, 'Request handler should be called exactly once.'
+    assert responses[0]['data'].encode() == encoded_payload, 'Response payload data does not match the sent payload.'
+
+    # The reconstructed payload data should match the original payload. We have to flatten the values, because
+    # parse_qs returns a list of values for each key.
+    response_data = {k: v[0] if len(v) == 1 else v for k, v in parse_qs(responses[0]['data']).items()}
+    assert response_data == PAYLOAD, 'The reconstructed payload data does not match the sent payload.'
+
+    assert responses[0]['json'] is None, 'Response JSON data should be empty when only raw data is sent.'
+    assert responses[0]['form'] == {}, 'Response form data should be empty when only raw data is sent.'
+
+
+@pytest.mark.parametrize(
+    'http_client_class',
+    [CurlImpersonateHttpClient, HttpxHttpClient],
+    ids=['curl', 'httpx'],
+)
+async def test_sending_payload_as_form_data(http_client_class: type[BaseHttpClient]) -> None:
+    http_client = http_client_class()
+    crawler = HttpCrawler(http_client=http_client)
+    responses = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: HttpCrawlingContext) -> None:
+        response = json.loads(context.http_response.read())
+        # The httpbin.org/post endpoint returns the provided payload in the response.
+        responses.append(response)
+
+    request = Request.from_url(
+        url='https://httpbin.org/post',
+        method='POST',
+        headers={'content-type': 'application/x-www-form-urlencoded'},
+        payload=urlencode(PAYLOAD).encode(),
+    )
+
+    await crawler.run([request])
+
+    assert len(responses) == 1, 'Request handler should be called exactly once.'
+    assert responses[0]['form'] == PAYLOAD, 'Form data in response does not match the sent payload.'
+
+    assert responses[0]['json'] is None, 'Response JSON data should be empty when only form data is sent.'
+    assert responses[0]['data'] == '', 'Response raw data should be empty when only form data is sent.'
+
+
+@pytest.mark.parametrize(
+    'http_client_class',
+    [CurlImpersonateHttpClient, HttpxHttpClient],
+    ids=['curl', 'httpx'],
+)
+async def test_sending_payload_as_json(http_client_class: type[BaseHttpClient]) -> None:
+    http_client = http_client_class()
+    crawler = HttpCrawler(http_client=http_client)
+    responses = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: HttpCrawlingContext) -> None:
+        response = json.loads(context.http_response.read())
+        # The httpbin.org/post endpoint returns the provided payload in the response.
+        responses.append(response)
+
+    json_payload = json.dumps(PAYLOAD).encode()
+    request = Request.from_url(
+        url='https://httpbin.org/post',
+        method='POST',
+        payload=json_payload,
+        headers={'content-type': 'application/json'},
+    )
+
+    await crawler.run([request])
+
+    assert len(responses) == 1, 'Request handler should be called exactly once.'
+    assert responses[0]['data'].encode() == json_payload, 'Response raw JSON data does not match the sent payload.'
+    assert responses[0]['json'] == PAYLOAD, 'Response JSON data does not match the sent payload.'
+
+    assert responses[0]['form'] == {}, 'Response form data should be empty when only JSON data is sent.'
+
+
+@pytest.mark.parametrize(
+    'http_client_class',
+    [CurlImpersonateHttpClient, HttpxHttpClient],
+    ids=['curl', 'httpx'],
+)
+async def test_sending_url_query_params(http_client_class: type[BaseHttpClient]) -> None:
+    http_client = http_client_class()
+    crawler = HttpCrawler(http_client=http_client)
+    responses = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: HttpCrawlingContext) -> None:
+        response = json.loads(context.http_response.read())
+        # The httpbin.org/get endpoint returns the provided query parameters in the response.
+        responses.append(response)
+
+    base_url = 'https://httpbin.org/get'
+    query_params = {'param1': 'value1', 'param2': 'value2'}
+    request = Request.from_url(url=f'{base_url}?{urlencode(query_params)}')
+
+    await crawler.run([request])
+
+    assert len(responses) == 1, 'Request handler should be called exactly once.'
+
+    response_args = responses[0]['args']
+    assert response_args == query_params, 'Reconstructed query params must match the original query params.'

@@ -4,11 +4,10 @@ from typing import AsyncGenerator
 
 import pytest
 
-from crawlee.storages.dataset import Dataset
-from crawlee.storages.key_value_store import KeyValueStore
+from crawlee.storages import Dataset, KeyValueStore
 
 
-@pytest.fixture()
+@pytest.fixture
 async def dataset() -> AsyncGenerator[Dataset, None]:
     dataset = await Dataset.open()
     yield dataset
@@ -72,11 +71,11 @@ async def test_export(dataset: Dataset) -> None:
     expected_json = [{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}, {'id': 2, 'test': 'test'}]
     desired_item_count = 3
     await dataset.push_data([{'id': i, 'test': 'test'} for i in range(desired_item_count)])
-    await dataset.export_to_csv('dataset-csv')
-    await dataset.export_to_json('dataset-json')
+    await dataset.export_to(key='dataset-csv', content_type='csv')
+    await dataset.export_to(key='dataset-json', content_type='json')
     kvs = await KeyValueStore.open()
-    dataset_csv = await kvs.get_value('dataset-csv')
-    dataset_json = await kvs.get_value('dataset-json')
+    dataset_csv = await kvs.get_value(key='dataset-csv')
+    dataset_json = await kvs.get_value(key='dataset-json')
     assert dataset_csv == expected_csv
     assert dataset_json == expected_json
 

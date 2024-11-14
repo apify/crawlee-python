@@ -8,11 +8,15 @@ from typing import OrderedDict as OrderedDictType
 T = TypeVar('T')
 
 
-class LRUCache(MutableMapping, Generic[T]):
+class LRUCache(MutableMapping[str, T], Generic[T]):
     """Attempt to reimplement LRUCache from `@apify/datastructures` using `OrderedDict`."""
 
     def __init__(self, max_length: int) -> None:
-        """Create a LRUCache with a specific max_length."""
+        """A default constructor.
+
+        Args:
+            max_length: The maximum number of items to store in the cache.
+        """
         self._cache: OrderedDictType[str, T] = OrderedDict()
         self._max_length = max_length
 
