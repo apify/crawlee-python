@@ -138,9 +138,13 @@ class BaseRequestData(BaseModel):
     payload: Annotated[
         HttpPayload | None,
         BeforeValidator(lambda v: v.encode() if isinstance(v, str) else v),
-        PlainSerializer(lambda v: v.decode() if isinstance(v, bytes) else None),
+        PlainSerializer(lambda v: v.decode() if isinstance(v, bytes) else v),
     ] = None
-    """HTTP request payload."""
+    """HTTP request payload.
+
+    TODO: Re-check the need for `Validator` and `Serializer` once the issue is resolved.
+    https://github.com/apify/crawlee-python/issues/94
+    """
 
     user_data: Annotated[
         dict[str, JsonSerializable],  # Internally, the model contains `UserData`, this is just for convenience
