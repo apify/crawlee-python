@@ -381,14 +381,28 @@ class RequestQueue(BaseStorage, RequestProvider):
 
             return False
 
-        current_head = await self._resource_client.list_head(limit=2)
+        await self._ensure_head_is_non_empty()
 
-        if current_head.items:
+        if self._queue_head_dict:
             logger.debug(
-                'Queue head still returned requests that need to be processed (or that are locked by other clients)',
+                'Queue head still returned requests that need to be processed (or that are locked by other clients)'
             )
 
-        return not current_head.items
+            return False
+
+        metadata = await self._resource_client.get()
+        if metadata is not None and not metadata.had_multiple_clients and not self._queue_head_dict:
+            logger.debug('Queue head is empty and there are no other clients - we are finished')
+
+            return True
+
+        current_head = await self._resource_client.list_head(limit=2)
+
+        if not current_head.items:
+            await asyncio.sleep(5)  # TODO not sure how long we should sleep
+            current_head = await self._resource_client.list_head(limit=2)
+
+        return len(current_head.items) == 0
 
     async def get_info(self) -> RequestQueueMetadata | None:
         """Get an object containing general information about the request queue."""
