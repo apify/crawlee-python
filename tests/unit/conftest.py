@@ -69,7 +69,7 @@ def memory_storage_client(tmp_path: Path) -> MemoryStorageClient:
 
 @pytest.fixture
 def httpbin() -> str:
-    return os.environ.get('HTTPBIN_URL', 'https://httpbin.org')
+    return os.environ.get('HTTPBIN_URL', 'https://httpbingo.org')
 
 
 @pytest.fixture
