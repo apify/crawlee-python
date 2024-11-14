@@ -183,7 +183,7 @@ class BaseRequestData(BaseModel):
         *,
         method: HttpMethod = 'GET',
         headers: HttpHeaders | dict[str, str] | None = None,
-        payload: HttpPayload | None = None,
+        payload: HttpPayload | str | None = None,
         label: str | None = None,
         unique_key: str | None = None,
         id: str | None = None,
@@ -194,6 +194,9 @@ class BaseRequestData(BaseModel):
         """Create a new `BaseRequestData` instance from a URL. See `Request.from_url` for more details."""
         if isinstance(headers, dict) or headers is None:
             headers = HttpHeaders(headers or {})
+
+        if isinstance(payload, str):
+            payload = payload.encode()
 
         unique_key = unique_key or compute_unique_key(
             url,
@@ -276,7 +279,7 @@ class Request(BaseRequestData):
         *,
         method: HttpMethod = 'GET',
         headers: HttpHeaders | dict[str, str] | None = None,
-        payload: HttpPayload | None = None,
+        payload: HttpPayload | str | None = None,
         label: str | None = None,
         unique_key: str | None = None,
         id: str | None = None,
@@ -316,6 +319,9 @@ class Request(BaseRequestData):
 
         if isinstance(headers, dict) or headers is None:
             headers = HttpHeaders(headers or {})
+
+        if isinstance(payload, str):
+            payload = payload.encode()
 
         unique_key = unique_key or compute_unique_key(
             url,
