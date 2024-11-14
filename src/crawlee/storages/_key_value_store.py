@@ -54,6 +54,7 @@ class KeyValueStore(BaseStorage):
     # Cache for persistent (auto-saved) values
     _cache: ClassVar[dict[str, dict[str, Any]]] = {}
     _persist_state_event_started = False
+    _presist_state_listener = None
 
     def __init__(
         self,
@@ -191,8 +192,8 @@ class KeyValueStore(BaseStorage):
         """
         default_value = {} if default_value is None else default_value
 
-        if key in KeyValueStore._cache:
-            return KeyValueStore._cache[key]
+        if key in self._cache:
+            return self._cache[key]
 
         value = await self.get_value(key, default_value)
 
@@ -204,13 +205,25 @@ class KeyValueStore(BaseStorage):
 
     def _ensure_persist_event(self) -> None:
         """Setup persist state event handling if not already done."""
-        if KeyValueStore._persist_state_event_started:
+        if self._persist_state_event_started:
             return
 
         async def _persist_handler(_event_data: EventPersistStateData) -> None:
-            for key, value in KeyValueStore._cache.items():
+            for key, value in self._cache.items():
                 await self.set_value(key, value)
 
         event_manager = service_container.get_event_manager()
         event_manager.on(event=Event.PERSIST_STATE, listener=_persist_handler)
-        KeyValueStore._persist_state_event_started = True
+        self._persist_state_event_started = True
+        self._presist_state_listener = _persist_handler
+
+    def clear_cache(self) -> None:
+        """Clear cache with persistent values."""
+        self._cache.clear()
+
+    def drop_persist_state_event(self) -> None:
+        """Off event_manager listener and dropp event status."""
+        if self._persist_state_event_started:
+            event_manager = service_container.get_event_manager()
+            event_manager.off(event=Event.PERSIST_STATE, listener=self._presist_state_listener)
+        self._persist_state_event_started = False

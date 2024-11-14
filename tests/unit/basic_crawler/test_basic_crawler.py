@@ -42,8 +42,8 @@ async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
     kvs = await KeyValueStore.open()
     yield kvs
     await kvs.drop()
-    KeyValueStore._cache = {}
-    KeyValueStore._persist_state_event_started = False
+    kvs.clear_cache()
+    kvs.drop_persist_state_event()
 
 
 async def test_processes_requests() -> None:
