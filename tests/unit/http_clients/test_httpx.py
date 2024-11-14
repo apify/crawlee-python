@@ -86,10 +86,10 @@ async def test_send_request_with_proxy_disabled(
         await http_client.send_request(url, proxy_info=disabled_proxy)
 
 
-async def test_common_headers_and_user_agent() -> None:
+async def test_common_headers_and_user_agent(httpbin: str) -> None:
     client = HttpxHttpClient()
 
-    response = await client.send_request('https://httpbin.org/get')
+    response = await client.send_request(f'{httpbin}/get')
     response_dict = json.loads(response.read().decode())
     response_headers = response_dict.get('headers', {})
 

@@ -226,7 +226,7 @@ async def test_http_status_statistics(crawler: HttpCrawler, server: respx.MockRo
     [CurlImpersonateHttpClient, HttpxHttpClient],
     ids=['curl', 'httpx'],
 )
-async def test_sending_payload_as_raw_data(http_client_class: type[BaseHttpClient]) -> None:
+async def test_sending_payload_as_raw_data(http_client_class: type[BaseHttpClient], httpbin: str) -> None:
     http_client = http_client_class()
     crawler = HttpCrawler(http_client=http_client)
     responses = []
@@ -239,7 +239,7 @@ async def test_sending_payload_as_raw_data(http_client_class: type[BaseHttpClien
 
     encoded_payload = urlencode(PAYLOAD).encode()
     request = Request.from_url(
-        url='https://httpbin.org/post',
+        url=f'{httpbin}/post',
         method='POST',
         payload=encoded_payload,
     )
@@ -263,7 +263,7 @@ async def test_sending_payload_as_raw_data(http_client_class: type[BaseHttpClien
     [CurlImpersonateHttpClient, HttpxHttpClient],
     ids=['curl', 'httpx'],
 )
-async def test_sending_payload_as_form_data(http_client_class: type[BaseHttpClient]) -> None:
+async def test_sending_payload_as_form_data(http_client_class: type[BaseHttpClient], httpbin: str) -> None:
     http_client = http_client_class()
     crawler = HttpCrawler(http_client=http_client)
     responses = []
@@ -275,7 +275,7 @@ async def test_sending_payload_as_form_data(http_client_class: type[BaseHttpClie
         responses.append(response)
 
     request = Request.from_url(
-        url='https://httpbin.org/post',
+        url=f'{httpbin}/post',
         method='POST',
         headers={'content-type': 'application/x-www-form-urlencoded'},
         payload=urlencode(PAYLOAD).encode(),
@@ -295,7 +295,7 @@ async def test_sending_payload_as_form_data(http_client_class: type[BaseHttpClie
     [CurlImpersonateHttpClient, HttpxHttpClient],
     ids=['curl', 'httpx'],
 )
-async def test_sending_payload_as_json(http_client_class: type[BaseHttpClient]) -> None:
+async def test_sending_payload_as_json(http_client_class: type[BaseHttpClient], httpbin: str) -> None:
     http_client = http_client_class()
     crawler = HttpCrawler(http_client=http_client)
     responses = []
@@ -308,7 +308,7 @@ async def test_sending_payload_as_json(http_client_class: type[BaseHttpClient]) 
 
     json_payload = json.dumps(PAYLOAD).encode()
     request = Request.from_url(
-        url='https://httpbin.org/post',
+        url=f'{httpbin}/post',
         method='POST',
         payload=json_payload,
         headers={'content-type': 'application/json'},
@@ -328,7 +328,7 @@ async def test_sending_payload_as_json(http_client_class: type[BaseHttpClient]) 
     [CurlImpersonateHttpClient, HttpxHttpClient],
     ids=['curl', 'httpx'],
 )
-async def test_sending_url_query_params(http_client_class: type[BaseHttpClient]) -> None:
+async def test_sending_url_query_params(http_client_class: type[BaseHttpClient], httpbin: str) -> None:
     http_client = http_client_class()
     crawler = HttpCrawler(http_client=http_client)
     responses = []
@@ -339,7 +339,7 @@ async def test_sending_url_query_params(http_client_class: type[BaseHttpClient])
         # The httpbin.org/get endpoint returns the provided query parameters in the response.
         responses.append(response)
 
-    base_url = 'https://httpbin.org/get'
+    base_url = f'{httpbin}/get'
     query_params = {'param1': 'value1', 'param2': 'value2'}
     request = Request.from_url(url=f'{base_url}?{urlencode(query_params)}')
 
