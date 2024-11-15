@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, Mock
 
 import httpx
 import pytest
+from httpx import URL
 
 from crawlee import ConcurrencySettings, EnqueueStrategy, Glob
 from crawlee._request import BaseRequestData, Request
@@ -526,7 +527,7 @@ async def test_crawler_get_storages() -> None:
     assert isinstance(kvs, KeyValueStore)
 
 
-async def test_crawler_run_requests(httpbin: str) -> None:
+async def test_crawler_run_requests(httpbin: URL) -> None:
     crawler = BasicCrawler()
     seen_urls = list[str]()
 
@@ -534,14 +535,19 @@ async def test_crawler_run_requests(httpbin: str) -> None:
     async def handler(context: BasicCrawlingContext) -> None:
         seen_urls.append(context.request.url)
 
-    stats = await crawler.run([f'{httpbin}/1', f'{httpbin}/2', f'{httpbin}/3'])
+    start_urls = [
+        str(httpbin.copy_with(path='/1')),
+        str(httpbin.copy_with(path='/2')),
+        str(httpbin.copy_with(path='/3')),
+    ]
+    stats = await crawler.run(start_urls)
 
-    assert seen_urls == [f'{httpbin}/1', f'{httpbin}/2', f'{httpbin}/3']
+    assert seen_urls == start_urls
     assert stats.requests_total == 3
     assert stats.requests_finished == 3
 
 
-async def test_context_push_and_get_data(httpbin: str) -> None:
+async def test_context_push_and_get_data(httpbin: URL) -> None:
     crawler = BasicCrawler()
     dataset = await Dataset.open()
 
@@ -555,7 +561,7 @@ async def test_context_push_and_get_data(httpbin: str) -> None:
     await dataset.push_data('{"c": 3}')
     assert (await crawler.get_data()).items == [{'a': 1}, {'c': 3}]
 
-    stats = await crawler.run([f'{httpbin}/1'])
+    stats = await crawler.run([str(httpbin.copy_with(path='/1'))])
 
     assert (await crawler.get_data()).items == [{'a': 1}, {'c': 3}, {'b': 2}]
     assert stats.requests_total == 1
@@ -596,7 +602,7 @@ async def test_crawler_push_and_export_data(tmp_path: Path) -> None:
     assert (tmp_path / 'dataset.csv').read_bytes() == b'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
 
 
-async def test_context_push_and_export_data(httpbin: str, tmp_path: Path) -> None:
+async def test_context_push_and_export_data(httpbin: URL, tmp_path: Path) -> None:
     crawler = BasicCrawler()
 
     @crawler.router.default_handler
@@ -604,7 +610,7 @@ async def test_context_push_and_export_data(httpbin: str, tmp_path: Path) -> Non
         await context.push_data([{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}])
         await context.push_data({'id': 2, 'test': 'test'})
 
-    await crawler.run([f'{httpbin}/1'])
+    await crawler.run([str(httpbin.copy_with(path='/1'))])
 
     await crawler.export_data_json(path=tmp_path / 'dataset.json')
     await crawler.export_data_csv(path=tmp_path / 'dataset.csv')
@@ -618,7 +624,7 @@ async def test_context_push_and_export_data(httpbin: str, tmp_path: Path) -> Non
     assert (tmp_path / 'dataset.csv').read_bytes() == b'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
 
 
-async def test_crawler_push_and_export_data_and_json_dump_parameter(httpbin: str, tmp_path: Path) -> None:
+async def test_crawler_push_and_export_data_and_json_dump_parameter(httpbin: URL, tmp_path: Path) -> None:
     crawler = BasicCrawler()
 
     @crawler.router.default_handler
@@ -626,7 +632,7 @@ async def test_crawler_push_and_export_data_and_json_dump_parameter(httpbin: str
         await context.push_data([{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}])
         await context.push_data({'id': 2, 'test': 'test'})
 
-    await crawler.run([f'{httpbin}/1'])
+    await crawler.run([str(httpbin.copy_with(path='/1'))])
 
     await crawler.export_data_json(path=tmp_path / 'dataset.json', indent=3)
 
@@ -671,8 +677,14 @@ async def test_context_update_kv_store() -> None:
     assert (await store.get_value('foo')) == 'bar'
 
 
-async def test_max_requests_per_crawl(httpbin: str) -> None:
-    start_urls = [f'{httpbin}/1', f'{httpbin}/2', f'{httpbin}/3', f'{httpbin}/4', f'{httpbin}/5']
+async def test_max_requests_per_crawl(httpbin: URL) -> None:
+    start_urls = [
+        str(httpbin.copy_with(path='/1')),
+        str(httpbin.copy_with(path='/2')),
+        str(httpbin.copy_with(path='/3')),
+        str(httpbin.copy_with(path='/4')),
+        str(httpbin.copy_with(path='/5')),
+    ]
     processed_urls = []
 
     # Set max_concurrency to 1 to ensure testing max_requests_per_crawl accurately
@@ -693,7 +705,7 @@ async def test_max_requests_per_crawl(httpbin: str) -> None:
     assert stats.requests_finished == 3
 
 
-async def test_max_crawl_depth(httpbin: str) -> None:
+async def test_max_crawl_depth(httpbin: URL) -> None:
     processed_urls = []
 
     start_request = Request.from_url('https://someplace.com/', label='start')

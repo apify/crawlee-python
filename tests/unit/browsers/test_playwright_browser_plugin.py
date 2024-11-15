@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from typing import AsyncGenerator
+from typing import TYPE_CHECKING, AsyncGenerator
 
 import pytest
 
 from crawlee.browsers import PlaywrightBrowserPlugin
+
+if TYPE_CHECKING:
+    from httpx import URL
 
 
 @pytest.fixture
@@ -28,7 +31,7 @@ async def test_initial_state() -> None:
     assert plugin.max_open_pages_per_browser == 10
 
 
-async def test_new_browser(plugin: PlaywrightBrowserPlugin, httpbin: str) -> None:
+async def test_new_browser(plugin: PlaywrightBrowserPlugin, httpbin: URL) -> None:
     browser_controller = await plugin.new_browser()
 
     assert browser_controller.is_browser_connected

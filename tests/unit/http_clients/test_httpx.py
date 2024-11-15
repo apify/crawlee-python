@@ -13,6 +13,8 @@ from crawlee.http_clients import HttpxHttpClient
 from crawlee.statistics import Statistics
 
 if TYPE_CHECKING:
+    from httpx import URL
+
     from crawlee.proxy_configuration import ProxyInfo
 
 
@@ -21,15 +23,15 @@ def http_client() -> HttpxHttpClient:
     return HttpxHttpClient()
 
 
-async def test_http_1(httpbin: str) -> None:
+async def test_http_1(httpbin: URL) -> None:
     http_client = HttpxHttpClient(http1=True, http2=False)
-    response = await http_client.send_request(httpbin)
+    response = await http_client.send_request(str(httpbin))
     assert response.http_version == 'HTTP/1.1'
 
 
-async def test_http_2(httpbin: str) -> None:
+async def test_http_2(httpbin: URL) -> None:
     http_client = HttpxHttpClient(http2=True)
-    response = await http_client.send_request(httpbin)
+    response = await http_client.send_request(str(httpbin))
     assert response.http_version == 'HTTP/2'
 
 
@@ -37,9 +39,9 @@ async def test_http_2(httpbin: str) -> None:
 async def test_proxy(
     http_client: HttpxHttpClient,
     proxy: ProxyInfo,
-    httpbin: str,
+    httpbin: URL,
 ) -> None:
-    url = f'{httpbin}/status/222'
+    url = str(httpbin.copy_with(path='/status/222'))
     request = Request.from_url(url)
 
     async with Statistics() as statistics:
@@ -52,9 +54,9 @@ async def test_proxy(
 async def test_proxy_disabled(
     http_client: HttpxHttpClient,
     disabled_proxy: ProxyInfo,
-    httpbin: str,
+    httpbin: URL,
 ) -> None:
-    url = f'{httpbin}/status/222'
+    url = str(httpbin.copy_with(path='/status/222'))
     request = Request.from_url(url)
 
     with pytest.raises(ProxyError):
@@ -66,9 +68,9 @@ async def test_proxy_disabled(
 async def test_send_request_with_proxy(
     http_client: HttpxHttpClient,
     proxy: ProxyInfo,
-    httpbin: str,
+    httpbin: URL,
 ) -> None:
-    url = f'{httpbin}/status/222'
+    url = str(httpbin.copy_with(path='/status/222'))
 
     response = await http_client.send_request(url, proxy_info=proxy)
     assert response.status_code == 222  # 222 - authentication successful
@@ -78,18 +80,18 @@ async def test_send_request_with_proxy(
 async def test_send_request_with_proxy_disabled(
     http_client: HttpxHttpClient,
     disabled_proxy: ProxyInfo,
-    httpbin: str,
+    httpbin: URL,
 ) -> None:
-    url = f'{httpbin}/status/222'
+    url = str(httpbin.copy_with(path='/status/222'))
 
     with pytest.raises(ProxyError):
         await http_client.send_request(url, proxy_info=disabled_proxy)
 
 
-async def test_common_headers_and_user_agent(httpbin: str) -> None:
+async def test_common_headers_and_user_agent(httpbin: URL) -> None:
     client = HttpxHttpClient()
 
-    response = await client.send_request(f'{httpbin}/get')
+    response = await client.send_request(str(httpbin.copy_with(path='/get')))
     response_dict = json.loads(response.read().decode())
     response_headers = response_dict.get('headers', {})
 
