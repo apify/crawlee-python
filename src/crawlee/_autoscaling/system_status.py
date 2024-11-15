@@ -186,14 +186,16 @@ class SystemStatus:
 
         for previous, current in pairwise(sample):
             time = (current.created_at - previous.created_at).total_seconds()
+            if time < 0:
+                raise ValueError('Negative time. Code assumptions are not valid. Expected time sorted samples.')
             if current.is_overloaded:
                 overloaded_time += time
             else:
                 non_overloaded_time += time
 
-        if (overloaded_time + non_overloaded_time) == 0:
+        if (total_time := overloaded_time + non_overloaded_time) == 0:
             overloaded_ratio = 0.0
         else:
-            overloaded_ratio = overloaded_time / (overloaded_time + non_overloaded_time)
+            overloaded_ratio = overloaded_time / total_time
 
         return LoadRatioInfo(limit_ratio=threshold, actual_ratio=round(overloaded_ratio, 3))
