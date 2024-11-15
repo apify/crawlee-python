@@ -9,6 +9,8 @@ All notable changes to this project will be documented in this file.
 
 - Respect custom HTTP headers in `PlaywrightCrawler` ([#685](https://github.com/apify/crawlee-python/pull/685)) ([a84125f](https://github.com/apify/crawlee-python/commit/a84125f031347426de44b8f015c87882c8f96f72)) by [@Mantisus](https://github.com/Mantisus)
 - Fix serialization payload in Request. Fix Docs for Post Request ([#683](https://github.com/apify/crawlee-python/pull/683)) ([e8b4d2d](https://github.com/apify/crawlee-python/commit/e8b4d2d4989fd9967403b828c914cb7ae2ef9b8b)) by [@Mantisus](https://github.com/Mantisus), closes [#668](https://github.com/apify/crawlee-python/issues/668)
+- Accept string payload in the Request constructor ([#697](https://github.com/apify/crawlee-python/pull/697)) ([19f5add](https://github.com/apify/crawlee-python/commit/19f5addc0223d68389eea47864830c709335ab6e)) by [@vdusek](https://github.com/vdusek)
+- Fix snapshots handling ([#692](https://github.com/apify/crawlee-python/pull/692)) ([4016c0d](https://github.com/apify/crawlee-python/commit/4016c0d8121a8950ab1df22188eac838a011c39f)) by [@Pijukatel](https://github.com/Pijukatel)
 
 
 <!-- git-cliff-unreleased-end -->
