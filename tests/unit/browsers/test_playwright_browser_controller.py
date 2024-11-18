@@ -46,7 +46,7 @@ async def test_initial_state(browser: Browser) -> None:
 
 async def test_open_and_close_page(controller: PlaywrightBrowserController, httpbin: URL) -> None:
     page = await controller.new_page()
-    await page.goto(f'{httpbin}')
+    await page.goto(str(httpbin))
 
     assert page in controller.pages
     assert controller.pages_count == 1

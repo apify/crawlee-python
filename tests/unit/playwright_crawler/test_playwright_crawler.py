@@ -165,6 +165,6 @@ async def test_pre_navigation_hook(httpbin: URL) -> None:
     async def request_handler(_context: PlaywrightCrawlingContext) -> None:
         pass
 
-    await crawler.run(['https://example.com', f'{httpbin}'])
+    await crawler.run(['https://example.com', str(httpbin)])
 
     assert mock_hook.call_count == 2
