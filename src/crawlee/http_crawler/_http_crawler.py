@@ -127,6 +127,8 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
         if self._retry_on_blocked:
             status_code = context.http_response.status_code
 
+            # TODO: refactor to avoid private member access
+            # https://github.com/apify/crawlee-python/issues/708
             if (
                 context.session
                 and status_code not in self._http_client._ignore_http_error_status_codes  # noqa: SLF001
