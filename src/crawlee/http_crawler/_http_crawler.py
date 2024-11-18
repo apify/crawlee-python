@@ -127,7 +127,11 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
         if self._retry_on_blocked:
             status_code = context.http_response.status_code
 
-            if context.session and context.session.is_blocked_status_code(status_code=status_code):
+            if (
+                context.session
+                and status_code not in self._http_client._ignore_http_error_status_codes  # noqa: SLF001
+                and context.session.is_blocked_status_code(status_code=status_code)
+            ):
                 raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
 
         yield context

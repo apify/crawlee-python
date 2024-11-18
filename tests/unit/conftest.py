@@ -7,6 +7,7 @@ import os
 from typing import TYPE_CHECKING, Callable, cast
 
 import pytest
+from httpx import URL
 from proxy import Proxy
 
 from crawlee import service_container
@@ -68,8 +69,8 @@ def memory_storage_client(tmp_path: Path) -> MemoryStorageClient:
 
 
 @pytest.fixture
-def httpbin() -> str:
-    return os.environ.get('HTTPBIN_URL', 'https://httpbin.org')
+def httpbin() -> URL:
+    return URL(os.environ.get('HTTPBIN_URL', 'https://httpbin.org'))
 
 
 @pytest.fixture
