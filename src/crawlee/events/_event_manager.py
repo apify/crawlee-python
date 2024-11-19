@@ -10,7 +10,6 @@ from logging import getLogger
 from typing import TYPE_CHECKING, TypedDict
 
 from pyee.asyncio import AsyncIOEventEmitter
-from typing_extensions import NotRequired
 
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
@@ -19,6 +18,8 @@ from crawlee.events._types import Event, EventPersistStateData
 
 if TYPE_CHECKING:
     from types import TracebackType
+
+    from typing_extensions import NotRequired
 
     from crawlee.events._types import EventData, Listener, WrappedListener
 

@@ -4,7 +4,6 @@ import logging
 from typing import TYPE_CHECKING, Awaitable, Callable
 
 from pydantic import ValidationError
-from typing_extensions import Unpack
 
 from crawlee import EnqueueStrategy
 from crawlee._request import BaseRequestData
@@ -20,6 +19,8 @@ from crawlee.playwright_crawler._utils import infinite_scroll
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+
+    from typing_extensions import Unpack
 
     from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs
     from crawlee.browsers._types import BrowserType
