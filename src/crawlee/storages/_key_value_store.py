@@ -54,7 +54,6 @@ class KeyValueStore(BaseStorage):
     # Cache for persistent (auto-saved) values
     _cache: ClassVar[dict[str, dict[str, Any]]] = {}
     _persist_state_event_started = False
-    _presist_state_listener = None
 
     def __init__(
         self,
@@ -203,27 +202,32 @@ class KeyValueStore(BaseStorage):
 
         return cast(dict[str, Any], value)
 
+    async def _persist_save(self, _event_data: EventPersistStateData | None = None) -> None:
+        """Save cache with persistent values. Can be used in Event Manager."""
+        for key, value in self._cache.items():
+            await self.set_value(key, value)
+
     def _ensure_persist_event(self) -> None:
         """Setup persist state event handling if not already done."""
         if self._persist_state_event_started:
             return
 
-        async def _persist_handler(_event_data: EventPersistStateData) -> None:
-            for key, value in self._cache.items():
-                await self.set_value(key, value)
-
         event_manager = service_container.get_event_manager()
-        event_manager.on(event=Event.PERSIST_STATE, listener=_persist_handler)
+        event_manager.on(event=Event.PERSIST_STATE, listener=self._persist_save)
         self._persist_state_event_started = True
-        self._presist_state_listener = _persist_handler
 
     def clear_cache(self) -> None:
         """Clear cache with persistent values."""
         self._cache.clear()
 
     def drop_persist_state_event(self) -> None:
-        """Off event_manager listener and dropp event status."""
+        """Off event_manager listener and drop event status."""
         if self._persist_state_event_started:
             event_manager = service_container.get_event_manager()
-            event_manager.off(event=Event.PERSIST_STATE, listener=self._presist_state_listener)
+            event_manager.off(event=Event.PERSIST_STATE, listener=self._persist_save)
         self._persist_state_event_started = False
+
+    async def force_save_persist_state(self) -> None:
+        """Force persistent values to be saved without waiting for an event in Event Manager."""
+        if self._persist_state_event_started:
+            await self._persist_save()

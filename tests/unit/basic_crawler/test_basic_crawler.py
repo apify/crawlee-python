@@ -694,7 +694,6 @@ async def test_context_use_state(key_value_store: KeyValueStore, mock_event_mana
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
         await context.use_state('state', {'hello': 'world'})
-        await asyncio.sleep(0.1)
 
     await crawler.run(['https://hello.world'])
 
@@ -722,8 +721,6 @@ async def test_context_handlers_use_state(key_value_store: KeyValueStore, mock_e
         state = await context.use_state('state', {'hello': 'world'})
         state_in_handler_two.update(state)
         state['hello'] = 'last_world'
-
-        await asyncio.sleep(0.1)
 
     @crawler.router.handler('three')
     async def handler_three(context: BasicCrawlingContext) -> None:
