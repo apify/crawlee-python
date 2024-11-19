@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, AsyncGenerator, Iterable
 
 from parsel import Selector
 from pydantic import ValidationError
-from typing_extensions import Unpack
 
 from crawlee import EnqueueStrategy
 from crawlee._request import BaseRequestData
@@ -20,6 +19,8 @@ from crawlee.http_crawler import HttpCrawlingContext
 from crawlee.parsel_crawler._parsel_crawling_context import ParselCrawlingContext
 
 if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
     from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs
 
 

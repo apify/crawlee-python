@@ -1,21 +1,21 @@
-# ruff: noqa: TCH001, TCH002, TCH003 (because of Pydantic)
-
 from __future__ import annotations
 
 from collections.abc import Iterator, MutableMapping
 from datetime import datetime
 from decimal import Decimal
 from enum import IntEnum
-from typing import Annotated, Any, cast
+from typing import TYPE_CHECKING, Annotated, Any, cast
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, PlainSerializer, PlainValidator, TypeAdapter
-from typing_extensions import Self
 
 from crawlee._types import EnqueueStrategy, HttpHeaders, HttpMethod, HttpPayload, JsonSerializable
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.docs import docs_group
 from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
 from crawlee._utils.urls import extract_query_params, validate_http_url
+
+if TYPE_CHECKING:
+    from typing_extensions import Self
 
 
 class RequestState(IntEnum):

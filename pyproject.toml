@@ -168,6 +168,9 @@ indent-style = "space"
 docstring-quotes = "double"
 inline-quotes = "single"
 
+[tool.ruff.lint.flake8-type-checking]
+runtime-evaluated-base-classes = ["pydantic.BaseModel", "pydantic_settings.BaseSettings"]
+
 [tool.ruff.lint.flake8-builtins]
 builtins-ignorelist = ["id"]
 

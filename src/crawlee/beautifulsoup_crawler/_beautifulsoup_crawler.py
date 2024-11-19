@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, AsyncGenerator, Iterable, Literal
 
 from bs4 import BeautifulSoup, Tag
 from pydantic import ValidationError
-from typing_extensions import Unpack
 
 from crawlee import EnqueueStrategy
 from crawlee._request import BaseRequestData
@@ -20,6 +19,8 @@ from crawlee.http_clients import HttpxHttpClient
 from crawlee.http_crawler import HttpCrawlingContext
 
 if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
     from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs
 
 BeautifulSoupParser = Literal['html.parser', 'lxml', 'xml', 'html5lib']

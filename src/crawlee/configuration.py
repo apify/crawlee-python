@@ -1,16 +1,16 @@
-# ruff: noqa: TCH003 TCH002 TCH001
-
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Annotated, Literal
+from typing import TYPE_CHECKING, Annotated, Literal
 
 from pydantic import AliasChoices, BeforeValidator, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing_extensions import Self
 
 from crawlee._utils.docs import docs_group
 from crawlee._utils.models import timedelta_ms
+
+if TYPE_CHECKING:
+    from typing_extensions import Self
 
 __all__ = ['Configuration']
 
