@@ -20,6 +20,8 @@ from crawlee.storages import KeyValueStore
 if TYPE_CHECKING:
     from types import TracebackType
 
+    from crawlee.events import EventManager
+
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
 
 logger = getLogger(__name__)
@@ -65,6 +67,7 @@ class Statistics(Generic[TStatisticsState]):
     def __init__(
         self,
         *,
+        event_manager: EventManager | None = None,
         persistence_enabled: bool = False,
         persist_state_kvs_name: str = 'default',
         persist_state_key: str | None = None,
@@ -84,7 +87,9 @@ class Statistics(Generic[TStatisticsState]):
 
         self.error_tracker = ErrorTracker()
         self.error_tracker_retry = ErrorTracker()
-        self._event_manager = service_container.get_event_manager()
+
+        self._event_manager = event_manager or service_container.get_event_manager()
+
         self._requests_in_progress = dict[str, RequestProcessingRecord]()
 
         if persist_state_key is None:
