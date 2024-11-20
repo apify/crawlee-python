@@ -88,9 +88,6 @@ class CpuSnapshot:
 class MemorySnapshot:
     """A snapshot of memory usage."""
 
-    total_size: ByteSize
-    """Total memory available in the system."""
-
     current_size: ByteSize
     """Memory usage of the current Python process and its children."""
 

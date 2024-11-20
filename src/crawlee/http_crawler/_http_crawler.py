@@ -3,17 +3,19 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, AsyncGenerator, Iterable
 
-from typing_extensions import Unpack
-
+from crawlee._utils.docs import docs_group
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
 from crawlee.http_clients import HttpxHttpClient
 from crawlee.http_crawler._http_crawling_context import HttpCrawlingContext
 
 if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
     from crawlee._types import BasicCrawlingContext
 
 
+@docs_group('Classes')
 class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
     """A web crawler for performing HTTP requests.
 
@@ -125,7 +127,13 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
         if self._retry_on_blocked:
             status_code = context.http_response.status_code
 
-            if context.session and context.session.is_blocked_status_code(status_code=status_code):
+            # TODO: refactor to avoid private member access
+            # https://github.com/apify/crawlee-python/issues/708
+            if (
+                context.session
+                and status_code not in self._http_client._ignore_http_error_status_codes  # noqa: SLF001
+                and context.session.is_blocked_status_code(status_code=status_code)
+            ):
                 raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
 
         yield context

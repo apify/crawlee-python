@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Generic, cast
 from typing_extensions import Self, TypeVar
 
 import crawlee.service_container
+from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee.events._types import Event, EventPersistStateData
 from crawlee.statistics import FinalStatistics, StatisticsPersistedState, StatisticsState
@@ -53,6 +54,7 @@ class RequestProcessingRecord:
         return max(0, self._runs - 1)
 
 
+@docs_group('Classes')
 class Statistics(Generic[TStatisticsState]):
     """An interface to collecting and logging runtime statistics for requests.
 

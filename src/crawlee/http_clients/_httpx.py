@@ -8,6 +8,7 @@ from typing_extensions import override
 
 from crawlee._types import HttpHeaders
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
+from crawlee._utils.docs import docs_group
 from crawlee.errors import ProxyError
 from crawlee.fingerprint_suite import HeaderGenerator
 from crawlee.http_clients import BaseHttpClient, HttpCrawlingResult, HttpResponse
@@ -16,7 +17,7 @@ from crawlee.sessions import Session
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from crawlee._types import HttpMethod, HttpPayload, HttpQueryParams
+    from crawlee._types import HttpMethod, HttpPayload
     from crawlee.base_storage_client._models import Request
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.statistics import Statistics
@@ -70,6 +71,7 @@ class _HttpxTransport(httpx.AsyncHTTPTransport):
         return response
 
 
+@docs_group('Classes')
 class HttpxHttpClient(BaseHttpClient):
     """HTTP client based on the `HTTPX` library.
 
@@ -141,7 +143,6 @@ class HttpxHttpClient(BaseHttpClient):
             url=request.url,
             method=request.method,
             headers=headers,
-            params=request.query_params,
             content=request.payload,
             cookies=session.cookies if session else None,
             extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
@@ -175,12 +176,14 @@ class HttpxHttpClient(BaseHttpClient):
         url: str,
         *,
         method: HttpMethod = 'GET',
-        headers: HttpHeaders | None = None,
-        query_params: HttpQueryParams | None = None,
+        headers: HttpHeaders | dict[str, str] | None = None,
         payload: HttpPayload | None = None,
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> HttpResponse:
+        if isinstance(headers, dict) or headers is None:
+            headers = HttpHeaders(headers or {})
+
         client = self._get_client(proxy_info.url if proxy_info else None)
         headers = self._combine_headers(headers)
 
@@ -188,7 +191,6 @@ class HttpxHttpClient(BaseHttpClient):
             url=url,
             method=method,
             headers=dict(headers) if headers else None,
-            params=query_params,
             content=payload,
             extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
         )

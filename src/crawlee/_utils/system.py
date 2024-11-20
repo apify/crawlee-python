@@ -1,5 +1,3 @@
-# ruff: noqa: TCH001, TCH002, TCH003 (because of Pydantic)
-
 from __future__ import annotations
 
 import os
@@ -31,15 +29,10 @@ class CpuInfo(BaseModel):
     """The time at which the measurement was taken."""
 
 
-class MemoryInfo(BaseModel):
+class MemoryUsageInfo(BaseModel):
     """Information about the memory usage."""
 
     model_config = ConfigDict(populate_by_name=True)
-
-    total_size: Annotated[
-        ByteSize, PlainValidator(ByteSize.validate), PlainSerializer(lambda size: size.bytes), Field(alias='totalSize')
-    ]
-    """Total memory available in the system."""
 
     current_size: Annotated[
         ByteSize,
@@ -54,6 +47,17 @@ class MemoryInfo(BaseModel):
         default_factory=lambda: datetime.now(timezone.utc),
     )
     """The time at which the measurement was taken."""
+
+
+class MemoryInfo(MemoryUsageInfo):
+    """Information about system memory."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    total_size: Annotated[
+        ByteSize, PlainValidator(ByteSize.validate), PlainSerializer(lambda size: size.bytes), Field(alias='totalSize')
+    ]
+    """Total memory available in the system."""
 
 
 def get_cpu_info() -> CpuInfo:

@@ -5,27 +5,23 @@ description: How to store the requests your crawler will go through
 ---
 
 import ApiLink from '@site/src/components/ApiLink';
-
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import CodeBlock from '@theme/CodeBlock';
 
-import RqBasicExample from '!!raw-loader!./code/request_storage_rq_basic.py';
-import RqWithCrawlerExample from '!!raw-loader!./code/request_storage_rq_with_crawler.py';
-import RqWithCrawlerExplicitExample from '!!raw-loader!./code/request_storage_rq_with_crawler_explicit.py';
-
-import RlBasicExample from '!!raw-loader!./code/request_storage_rl_basic.py';
-import RlWithCrawlerExample from '!!raw-loader!./code/request_storage_rl_with_crawler.py';
-
-import RsHelperAddRequestsExample from '!!raw-loader!./code/request_storage_helper_add_requests.py';
-import RsHelperEnqueueLinksExample from '!!raw-loader!./code/request_storage_helper_enqueue_links.py';
-
-import RsDoNotPurgeExample from '!!raw-loader!./code/request_storage_do_not_purge.py';
-import RsPurgeExplicitlyExample from '!!raw-loader!./code/request_storage_purge_explicitly.py';
+import RqBasicExample from '!!raw-loader!./code/request_storage/rq_basic_example.py';
+import RqWithCrawlerExample from '!!raw-loader!./code/request_storage/rq_with_crawler_example.py';
+import RqWithCrawlerExplicitExample from '!!raw-loader!./code/request_storage/rq_with_crawler_explicit_example.py';
+import RlBasicExample from '!!raw-loader!./code/request_storage/rl_basic_example.py';
+import RlWithCrawlerExample from '!!raw-loader!./code/request_storage/rl_with_crawler_example.py';
+import RsHelperAddRequestsExample from '!!raw-loader!./code/request_storage/helper_add_requests_example.py';
+import RsHelperEnqueueLinksExample from '!!raw-loader!./code/request_storage/helper_enqueue_links_example.py';
+import RsDoNotPurgeExample from '!!raw-loader!./code/request_storage/do_not_purge_example.py';
+import RsPurgeExplicitlyExample from '!!raw-loader!./code/request_storage/purge_explicitly_example.py';
 
 This guide explains the different types of request storage available in Crawlee, how to store the requests that your crawler will process, and which storage type to choose based on your needs.
 
-## Request providers overview
+## Introduction
 
 All request storage types in Crawlee implement the same interface - <ApiLink to="class/RequestProvider">`RequestProvider`</ApiLink>. This unified interface allows them to be used in a consistent manner, regardless of the storage backend. The request providers are managed by storage clients - subclasses of <ApiLink to="class/BaseStorageClient">`BaseStorageClient`</ApiLink>. For instance, <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink> stores data in memory while it can also offload them to the local directory. Data are stored in the following directory structure:
 

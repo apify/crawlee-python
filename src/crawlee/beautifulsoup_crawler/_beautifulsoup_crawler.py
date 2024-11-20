@@ -6,11 +6,11 @@ from typing import TYPE_CHECKING, Any, AsyncGenerator, Iterable, Literal
 
 from bs4 import BeautifulSoup, Tag
 from pydantic import ValidationError
-from typing_extensions import Unpack
 
 from crawlee import EnqueueStrategy
 from crawlee._request import BaseRequestData
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
+from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.beautifulsoup_crawler._beautifulsoup_crawling_context import BeautifulSoupCrawlingContext
@@ -19,9 +19,14 @@ from crawlee.http_clients import HttpxHttpClient
 from crawlee.http_crawler import HttpCrawlingContext
 
 if TYPE_CHECKING:
-    from crawlee._types import AddRequestsKwargs, BasicCrawlingContext
+    from typing_extensions import Unpack
+
+    from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs
+
+BeautifulSoupParser = Literal['html.parser', 'lxml', 'xml', 'html5lib']
 
 
+@docs_group('Classes')
 class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
     """A web crawler for performing HTTP requests and parsing HTML/XML content.
 
@@ -61,7 +66,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
     def __init__(
         self,
         *,
-        parser: Literal['html.parser', 'lxml', 'xml', 'html5lib'] = 'lxml',
+        parser: BeautifulSoupParser = 'lxml',
         additional_http_error_status_codes: Iterable[int] = (),
         ignore_http_error_status_codes: Iterable[int] = (),
         **kwargs: Unpack[BasicCrawlerOptions[BeautifulSoupCrawlingContext]],
@@ -143,7 +148,13 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
         if self._retry_on_blocked:
             status_code = context.http_response.status_code
 
-            if context.session and context.session.is_blocked_status_code(status_code=status_code):
+            # TODO: refactor to avoid private member access
+            # https://github.com/apify/crawlee-python/issues/708
+            if (
+                context.session
+                and status_code not in self._http_client._ignore_http_error_status_codes  # noqa: SLF001
+                and context.session.is_blocked_status_code(status_code=status_code)
+            ):
                 raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
 
             matched_selectors = [
@@ -177,7 +188,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
             selector: str = 'a',
             label: str | None = None,
             user_data: dict[str, Any] | None = None,
-            **kwargs: Unpack[AddRequestsKwargs],
+            **kwargs: Unpack[EnqueueLinksKwargs],
         ) -> None:
             kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
 

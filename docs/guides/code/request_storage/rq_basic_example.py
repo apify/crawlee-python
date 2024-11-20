@@ -16,7 +16,7 @@ async def main() -> None:
 
     # Fetch and process requests from the queue.
     while request := await request_queue.fetch_next_request():
-        # Do something with it..
+        # Do something with it...
 
         # And mark it as handled.
         await request_queue.mark_request_as_handled(request)

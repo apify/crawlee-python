@@ -93,13 +93,12 @@ async def test_list_head(request_queue_client: RequestQueueClient) -> None:
 
 
 async def test_request_state_serialization(request_queue_client: RequestQueueClient) -> None:
-    request = Request.from_url('https://crawlee.dev')
+    request = Request.from_url('https://crawlee.dev', payload=b'test')
     request.state = RequestState.UNPROCESSED
 
     await request_queue_client.add_request(request)
 
     result = await request_queue_client.list_head()
-
     assert len(result.items) == 1
     assert result.items[0] == request
 

@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "crawlee"
-version = "0.4.0"
+version = "0.4.2"
 description = "Crawlee for Python"
 authors = ["Apify Technologies s.r.o. <support@apify.com>"]
 license = "Apache-2.0"
@@ -85,7 +85,8 @@ pytest-timeout = "~2.3.0"
 pytest-xdist = "~3.6.0"
 respx = "~0.21.0"
 ruff = "~0.7.0"
-setuptools = "~75.0.0"                    # setuptools are used by pytest, but not explicitly required
+setuptools = "~75.3.0"                    # setuptools are used by pytest, but not explicitly required
+sortedcontainers-stubs = "^2.4.2"
 types-beautifulsoup4 = "~4.12.0.20240229"
 types-colorama = "~0.4.15.20240106"
 types-psutil = "~5.9.5.20240205"
@@ -147,12 +148,6 @@ indent-style = "space"
 "**/__init__.py" = [
     "F401", # Unused imports
 ]
-"**/{scripts}/*" = [
-    "D",       # Everything from the pydocstyle
-    "INP001",  # File {filename} is part of an implicit namespace package, add an __init__.py
-    "PLR2004", # Magic value used in comparison, consider replacing {value} with a constant variable
-    "T20",     # flake8-print
-]
 "**/{tests}/*" = [
     "D",       # Everything from the pydocstyle
     "INP001",  # File {filename} is part of an implicit namespace package, add an __init__.py
@@ -172,6 +167,9 @@ indent-style = "space"
 [tool.ruff.lint.flake8-quotes]
 docstring-quotes = "double"
 inline-quotes = "single"
+
+[tool.ruff.lint.flake8-type-checking]
+runtime-evaluated-base-classes = ["pydantic.BaseModel", "pydantic_settings.BaseSettings"]
 
 [tool.ruff.lint.flake8-builtins]
 builtins-ignorelist = ["id"]
@@ -194,7 +192,7 @@ timeout = 1200
 [tool.mypy]
 python_version = "3.9"
 plugins = ["pydantic.mypy"]
-files = ["scripts", "src", "tests"]
+files = ["src", "tests"]
 check_untyped_defs = true
 disallow_incomplete_defs = true
 disallow_untyped_calls = true

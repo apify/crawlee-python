@@ -13,10 +13,11 @@ from unittest.mock import AsyncMock, Mock
 
 import httpx
 import pytest
+from httpx import URL
 
 from crawlee import ConcurrencySettings, EnqueueStrategy, Glob
 from crawlee._request import BaseRequestData, Request
-from crawlee._types import AddRequestsKwargs, BasicCrawlingContext, HttpHeaders
+from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpHeaders
 from crawlee.basic_crawler import BasicCrawler
 from crawlee.configuration import Configuration
 from crawlee.errors import SessionError, UserDefinedErrorHandlerError
@@ -326,7 +327,7 @@ class AddRequestsTestInput:
     start_url: str
     requests: Sequence[str | BaseRequestData]
     expected_urls: Sequence[str]
-    kwargs: AddRequestsKwargs
+    kwargs: EnqueueLinksKwargs
 
 
 STRATEGY_TEST_URLS = (
@@ -363,50 +364,50 @@ INCLUDE_TEST_URLS = (
         AddRequestsTestInput(
             start_url=STRATEGY_TEST_URLS[0],
             requests=STRATEGY_TEST_URLS,
-            kwargs=AddRequestsKwargs(),
+            kwargs=EnqueueLinksKwargs(),
             expected_urls=STRATEGY_TEST_URLS,
         ),
         AddRequestsTestInput(
             start_url=STRATEGY_TEST_URLS[0],
             requests=STRATEGY_TEST_URLS,
-            kwargs=AddRequestsKwargs(strategy=EnqueueStrategy.ALL),
+            kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.ALL),
             expected_urls=STRATEGY_TEST_URLS,
         ),
         AddRequestsTestInput(
             start_url=STRATEGY_TEST_URLS[0],
             requests=STRATEGY_TEST_URLS,
-            kwargs=AddRequestsKwargs(strategy=EnqueueStrategy.SAME_DOMAIN),
+            kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.SAME_DOMAIN),
             expected_urls=STRATEGY_TEST_URLS[:3],
         ),
         AddRequestsTestInput(
             start_url=STRATEGY_TEST_URLS[0],
             requests=STRATEGY_TEST_URLS,
-            kwargs=AddRequestsKwargs(strategy=EnqueueStrategy.SAME_HOSTNAME),
+            kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.SAME_HOSTNAME),
             expected_urls=STRATEGY_TEST_URLS[:2],
         ),
         AddRequestsTestInput(
             start_url=STRATEGY_TEST_URLS[0],
             requests=STRATEGY_TEST_URLS,
-            kwargs=AddRequestsKwargs(strategy=EnqueueStrategy.SAME_ORIGIN),
+            kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.SAME_ORIGIN),
             expected_urls=STRATEGY_TEST_URLS[:1],
         ),
         # Include/exclude
         AddRequestsTestInput(
             start_url=INCLUDE_TEST_URLS[0],
             requests=INCLUDE_TEST_URLS,
-            kwargs=AddRequestsKwargs(include=[Glob('https://someplace.com/**/cats')]),
+            kwargs=EnqueueLinksKwargs(include=[Glob('https://someplace.com/**/cats')]),
             expected_urls=[INCLUDE_TEST_URLS[1], INCLUDE_TEST_URLS[4]],
         ),
         AddRequestsTestInput(
             start_url=INCLUDE_TEST_URLS[0],
             requests=INCLUDE_TEST_URLS,
-            kwargs=AddRequestsKwargs(exclude=[Glob('https://someplace.com/**/cats')]),
+            kwargs=EnqueueLinksKwargs(exclude=[Glob('https://someplace.com/**/cats')]),
             expected_urls=[INCLUDE_TEST_URLS[0], INCLUDE_TEST_URLS[2], INCLUDE_TEST_URLS[3]],
         ),
         AddRequestsTestInput(
             start_url=INCLUDE_TEST_URLS[0],
             requests=INCLUDE_TEST_URLS,
-            kwargs=AddRequestsKwargs(
+            kwargs=EnqueueLinksKwargs(
                 include=[Glob('https://someplace.com/**/cats')], exclude=[Glob('https://**/archive/**')]
             ),
             expected_urls=[INCLUDE_TEST_URLS[1]],
@@ -526,7 +527,7 @@ async def test_crawler_get_storages() -> None:
     assert isinstance(kvs, KeyValueStore)
 
 
-async def test_crawler_run_requests(httpbin: str) -> None:
+async def test_crawler_run_requests(httpbin: URL) -> None:
     crawler = BasicCrawler()
     seen_urls = list[str]()
 
@@ -534,14 +535,19 @@ async def test_crawler_run_requests(httpbin: str) -> None:
     async def handler(context: BasicCrawlingContext) -> None:
         seen_urls.append(context.request.url)
 
-    stats = await crawler.run([f'{httpbin}/1', f'{httpbin}/2', f'{httpbin}/3'])
+    start_urls = [
+        str(httpbin.copy_with(path='/1')),
+        str(httpbin.copy_with(path='/2')),
+        str(httpbin.copy_with(path='/3')),
+    ]
+    stats = await crawler.run(start_urls)
 
-    assert seen_urls == [f'{httpbin}/1', f'{httpbin}/2', f'{httpbin}/3']
+    assert seen_urls == start_urls
     assert stats.requests_total == 3
     assert stats.requests_finished == 3
 
 
-async def test_context_push_and_get_data(httpbin: str) -> None:
+async def test_context_push_and_get_data(httpbin: URL) -> None:
     crawler = BasicCrawler()
     dataset = await Dataset.open()
 
@@ -555,7 +561,7 @@ async def test_context_push_and_get_data(httpbin: str) -> None:
     await dataset.push_data('{"c": 3}')
     assert (await crawler.get_data()).items == [{'a': 1}, {'c': 3}]
 
-    stats = await crawler.run([f'{httpbin}/1'])
+    stats = await crawler.run([str(httpbin.copy_with(path='/1'))])
 
     assert (await crawler.get_data()).items == [{'a': 1}, {'c': 3}, {'b': 2}]
     assert stats.requests_total == 1
@@ -585,8 +591,8 @@ async def test_crawler_push_and_export_data(tmp_path: Path) -> None:
     await dataset.push_data([{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}])
     await dataset.push_data({'id': 2, 'test': 'test'})
 
-    await crawler.export_data(tmp_path / 'dataset.json')
-    await crawler.export_data(tmp_path / 'dataset.csv')
+    await crawler.export_data_json(path=tmp_path / 'dataset.json')
+    await crawler.export_data_csv(path=tmp_path / 'dataset.csv')
 
     assert json.load((tmp_path / 'dataset.json').open()) == [
         {'id': 0, 'test': 'test'},
@@ -596,7 +602,7 @@ async def test_crawler_push_and_export_data(tmp_path: Path) -> None:
     assert (tmp_path / 'dataset.csv').read_bytes() == b'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
 
 
-async def test_context_push_and_export_data(httpbin: str, tmp_path: Path) -> None:
+async def test_context_push_and_export_data(httpbin: URL, tmp_path: Path) -> None:
     crawler = BasicCrawler()
 
     @crawler.router.default_handler
@@ -604,10 +610,10 @@ async def test_context_push_and_export_data(httpbin: str, tmp_path: Path) -> Non
         await context.push_data([{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}])
         await context.push_data({'id': 2, 'test': 'test'})
 
-    await crawler.run([f'{httpbin}/1'])
+    await crawler.run([str(httpbin.copy_with(path='/1'))])
 
-    await crawler.export_data(tmp_path / 'dataset.json')
-    await crawler.export_data(tmp_path / 'dataset.csv')
+    await crawler.export_data_json(path=tmp_path / 'dataset.json')
+    await crawler.export_data_csv(path=tmp_path / 'dataset.csv')
 
     assert json.load((tmp_path / 'dataset.json').open()) == [
         {'id': 0, 'test': 'test'},
@@ -616,6 +622,45 @@ async def test_context_push_and_export_data(httpbin: str, tmp_path: Path) -> Non
     ]
 
     assert (tmp_path / 'dataset.csv').read_bytes() == b'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
+
+
+async def test_crawler_push_and_export_data_and_json_dump_parameter(httpbin: URL, tmp_path: Path) -> None:
+    crawler = BasicCrawler()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        await context.push_data([{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}])
+        await context.push_data({'id': 2, 'test': 'test'})
+
+    await crawler.run([str(httpbin.copy_with(path='/1'))])
+
+    await crawler.export_data_json(path=tmp_path / 'dataset.json', indent=3)
+
+    with (tmp_path / 'dataset.json').open() as json_file:
+        exported_json_str = json_file.read()
+
+    # Expected data in JSON format with 3 spaces indent
+    expected_data = [
+        {'id': 0, 'test': 'test'},
+        {'id': 1, 'test': 'test'},
+        {'id': 2, 'test': 'test'},
+    ]
+    expected_json_str = json.dumps(expected_data, indent=3)
+
+    # Assert that the exported JSON string matches the expected JSON string
+    assert exported_json_str == expected_json_str
+
+
+async def test_crawler_push_data_over_limit() -> None:
+    crawler = BasicCrawler()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        # Push a roughly 15MB payload - this should be enough to break the 9MB limit
+        await context.push_data({'hello': 'world' * 3 * 1024 * 1024})
+
+    stats = await crawler.run(['http://example.tld/1'])
+    assert stats.requests_failed == 1
 
 
 async def test_context_update_kv_store() -> None:
@@ -632,8 +677,14 @@ async def test_context_update_kv_store() -> None:
     assert (await store.get_value('foo')) == 'bar'
 
 
-async def test_max_requests_per_crawl(httpbin: str) -> None:
-    start_urls = [f'{httpbin}/1', f'{httpbin}/2', f'{httpbin}/3', f'{httpbin}/4', f'{httpbin}/5']
+async def test_max_requests_per_crawl(httpbin: URL) -> None:
+    start_urls = [
+        str(httpbin.copy_with(path='/1')),
+        str(httpbin.copy_with(path='/2')),
+        str(httpbin.copy_with(path='/3')),
+        str(httpbin.copy_with(path='/4')),
+        str(httpbin.copy_with(path='/5')),
+    ]
     processed_urls = []
 
     # Set max_concurrency to 1 to ensure testing max_requests_per_crawl accurately
@@ -652,6 +703,35 @@ async def test_max_requests_per_crawl(httpbin: str) -> None:
     assert len(processed_urls) == 3
     assert stats.requests_total == 3
     assert stats.requests_finished == 3
+
+
+async def test_max_crawl_depth(httpbin: URL) -> None:
+    processed_urls = []
+
+    start_request = Request.from_url('https://someplace.com/', label='start')
+    start_request.crawl_depth = 2
+
+    # Set max_concurrency to 1 to ensure testing max_requests_per_crawl accurately
+    crawler = BasicCrawler(
+        concurrency_settings=ConcurrencySettings(max_concurrency=1),
+        max_crawl_depth=2,
+        request_provider=RequestList([start_request]),
+    )
+
+    @crawler.router.handler('start')
+    async def start_handler(context: BasicCrawlingContext) -> None:
+        processed_urls.append(context.request.url)
+        await context.add_requests(['https://someplace.com/too-deep'])
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        processed_urls.append(context.request.url)
+
+    stats = await crawler.run()
+
+    assert len(processed_urls) == 1
+    assert stats.requests_total == 1
+    assert stats.requests_finished == 1
 
 
 def test_crawler_log() -> None:

@@ -1,4 +1,4 @@
-.PHONY: clean install-dev build publish-to-pypi lint type-check unit-tests unit-tests-cov integration-tests format check-code build-api-reference run-doc
+.PHONY: clean install-dev build publish-to-pypi lint type-check unit-tests unit-tests-cov integration-tests format check-code build-api-reference run-docs
 
 DIRS_WITH_CODE = src tests docs
 
@@ -49,7 +49,7 @@ build-api-reference:
 	cd website && poetry run ./build_api_reference.sh
 
 build-docs:
-	cd website && corepack enable && yarn && yarn build
+	cd website && corepack enable && yarn && poetry run yarn build
 
-run-doc: build-api-reference
-	cd website && corepack enable && yarn && yarn start
+run-docs: build-api-reference
+	cd website && corepack enable && yarn && poetry run yarn start

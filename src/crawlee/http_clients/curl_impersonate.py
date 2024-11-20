@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Optional
 
+from crawlee._utils.docs import docs_group
+
 try:
     from curl_cffi.requests import AsyncSession
     from curl_cffi.requests.exceptions import ProxyError as CurlProxyError
@@ -26,7 +28,7 @@ if TYPE_CHECKING:
 
     from curl_cffi.requests import Response
 
-    from crawlee._types import HttpMethod, HttpQueryParams
+    from crawlee._types import HttpMethod
     from crawlee.base_storage_client._models import Request
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions import Session
@@ -70,6 +72,7 @@ class _CurlImpersonateResponse:
         return self._response.content
 
 
+@docs_group('Classes')
 class CurlImpersonateHttpClient(BaseHttpClient):
     """HTTP client based on the `curl-cffi` library.
 
@@ -130,7 +133,6 @@ class CurlImpersonateHttpClient(BaseHttpClient):
                 url=request.url,
                 method=request.method.upper(),  # type: ignore # curl-cffi requires uppercase method
                 headers=request.headers,
-                params=request.query_params,
                 data=request.payload,
                 cookies=session.cookies if session else None,
                 allow_redirects=True,
@@ -161,12 +163,14 @@ class CurlImpersonateHttpClient(BaseHttpClient):
         url: str,
         *,
         method: HttpMethod = 'GET',
-        headers: HttpHeaders | None = None,
-        query_params: HttpQueryParams | None = None,
+        headers: HttpHeaders | dict[str, str] | None = None,
         payload: HttpPayload | None = None,
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> HttpResponse:
+        if isinstance(headers, dict) or headers is None:
+            headers = HttpHeaders(headers or {})
+
         proxy_url = proxy_info.url if proxy_info else None
         client = self._get_client(proxy_url)
 
@@ -175,7 +179,6 @@ class CurlImpersonateHttpClient(BaseHttpClient):
                 url=url,
                 method=method.upper(),  # type: ignore # curl-cffi requires uppercase method
                 headers=dict(headers) if headers else None,
-                params=query_params,
                 data=payload,
                 cookies=session.cookies if session else None,
                 allow_redirects=True,

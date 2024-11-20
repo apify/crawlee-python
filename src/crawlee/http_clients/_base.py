@@ -4,19 +4,21 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
+from crawlee._utils.docs import docs_group
 from crawlee._utils.http import is_status_code_error
 from crawlee.errors import HttpStatusCodeError
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from crawlee._types import HttpHeaders, HttpMethod, HttpPayload, HttpQueryParams
+    from crawlee._types import HttpHeaders, HttpMethod, HttpPayload
     from crawlee.base_storage_client._models import Request
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions import Session
     from crawlee.statistics import Statistics
 
 
+@docs_group('Data structures')
 class HttpResponse(Protocol):
     """This protocol defines the interface that any HTTP response object must implement."""
 
@@ -37,6 +39,7 @@ class HttpResponse(Protocol):
 
 
 @dataclass(frozen=True)
+@docs_group('Data structures')
 class HttpCrawlingResult:
     """Result of a HTTP-only crawl.
 
@@ -48,6 +51,7 @@ class HttpCrawlingResult:
     """The HTTP response received from the server."""
 
 
+@docs_group('Abstract classes')
 class BaseHttpClient(ABC):
     """An abstract base class for HTTP clients used in crawlers (`BasicCrawler` subclasses).
 
@@ -111,8 +115,7 @@ class BaseHttpClient(ABC):
         url: str,
         *,
         method: HttpMethod = 'GET',
-        headers: HttpHeaders | None = None,
-        query_params: HttpQueryParams | None = None,
+        headers: HttpHeaders | dict[str, str] | None = None,
         payload: HttpPayload | None = None,
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
@@ -125,7 +128,6 @@ class BaseHttpClient(ABC):
             url: The URL to send the request to.
             method: The HTTP method to use.
             headers: The headers to include in the request.
-            query_params: The query parameters to include in the request.
             payload: The data to be sent as the request body.
             session: The session associated with the request.
             proxy_info: The information about the proxy to be used.

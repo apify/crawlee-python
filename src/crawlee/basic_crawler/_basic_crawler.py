@@ -12,7 +12,7 @@ from contextlib import AsyncExitStack, suppress
 from datetime import timedelta
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, AsyncContextManager, Callable, Generic, Literal, Union, cast
+from typing import TYPE_CHECKING, Any, AsyncContextManager, Callable, Generic, Union, cast
 from urllib.parse import ParseResult, urlparse
 
 from tldextract import TLDExtract
@@ -26,6 +26,7 @@ from crawlee._log_config import configure_logger, get_configured_log_level
 from crawlee._request import Request, RequestState
 from crawlee._types import BasicCrawlingContext, HttpHeaders, RequestHandlerRunResult, SendRequestFunction
 from crawlee._utils.byte_size import ByteSize
+from crawlee._utils.docs import docs_group
 from crawlee._utils.http import is_status_code_client_error
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
@@ -55,7 +56,7 @@ if TYPE_CHECKING:
     from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
     from crawlee.sessions import Session
     from crawlee.statistics import FinalStatistics, StatisticsState
-    from crawlee.storages._dataset import GetDataKwargs, PushDataKwargs
+    from crawlee.storages._dataset import ExportDataCsvKwargs, ExportDataJsonKwargs, GetDataKwargs, PushDataKwargs
     from crawlee.storages._request_provider import RequestProvider
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
@@ -63,6 +64,7 @@ ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Union[Request, 
 FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
 
 
+@docs_group('Data structures')
 class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     """Arguments for the `BasicCrawler` constructor.
 
@@ -120,6 +122,10 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     configure_logging: NotRequired[bool]
     """If True, the crawler will set up logging infrastructure automatically."""
 
+    max_crawl_depth: NotRequired[int | None]
+    """Limits crawl depth from 0 (initial requests) up to the specified `max_crawl_depth`.
+    Requests at the maximum depth are processed, but no further links are enqueued."""
+
     _context_pipeline: NotRequired[ContextPipeline[TCrawlingContext]]
     """Enables extending the request lifecycle and modifying the crawling context. Intended for use by
     subclasses rather than direct instantiation of `BasicCrawler`."""
@@ -131,6 +137,7 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     """A logger instance, typically provided by a subclass, for consistent logging labels."""
 
 
+@docs_group('Classes')
 class BasicCrawler(Generic[TCrawlingContext]):
     """A basic web crawler providing a framework for crawling websites.
 
@@ -174,6 +181,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         statistics: Statistics | None = None,
         event_manager: EventManager | None = None,
         configure_logging: bool = True,
+        max_crawl_depth: int | None = None,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         _additional_context_managers: Sequence[AsyncContextManager] | None = None,
         _logger: logging.Logger | None = None,
@@ -201,6 +209,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             statistics: A custom `Statistics` instance, allowing the use of non-default configuration.
             event_manager: A custom `EventManager` instance, allowing the use of non-default configuration.
             configure_logging: If True, the crawler will set up logging infrastructure automatically.
+            max_crawl_depth: Maximum crawl depth. If set, the crawler will stop crawling after reaching this depth.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
             _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
@@ -283,6 +292,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         self._running = False
         self._has_finished_before = False
+        self._max_crawl_depth = max_crawl_depth
 
     @property
     def log(self) -> logging.Logger:
@@ -531,13 +541,43 @@ class BasicCrawler(Generic[TCrawlingContext]):
     async def export_data(
         self,
         path: str | Path,
-        content_type: Literal['json', 'csv'] | None = None,
         dataset_id: str | None = None,
         dataset_name: str | None = None,
     ) -> None:
         """Export data from a dataset.
 
         This helper method simplifies the process of exporting data from a dataset. It opens the specified
+        dataset and then exports the data based on the provided parameters. If you need to pass options
+        specific to the output format, use the `export_data_csv` or `export_data_json` method instead.
+
+        Args:
+            path: The destination path.
+            dataset_id: The ID of the dataset.
+            dataset_name: The name of the dataset.
+        """
+        dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
+
+        path = path if isinstance(path, Path) else Path(path)
+        destination = path.open('w', newline='')
+
+        if path.suffix == '.csv':
+            await dataset.write_to_csv(destination)
+        elif path.suffix == '.json':
+            await dataset.write_to_json(destination)
+        else:
+            raise ValueError(f'Unsupported file extension: {path.suffix}')
+
+    async def export_data_csv(
+        self,
+        path: str | Path,
+        *,
+        dataset_id: str | None = None,
+        dataset_name: str | None = None,
+        **kwargs: Unpack[ExportDataCsvKwargs],
+    ) -> None:
+        """Export data from a dataset to a CSV file.
+
+        This helper method simplifies the process of exporting data from a dataset in csv format. It opens the specified
         dataset and then exports the data based on the provided parameters.
 
         Args:
@@ -545,12 +585,36 @@ class BasicCrawler(Generic[TCrawlingContext]):
             content_type: The output format.
             dataset_id: The ID of the dataset.
             dataset_name: The name of the dataset.
+            kwargs: Extra configurations for dumping/writing in csv format.
         """
         dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
         path = path if isinstance(path, Path) else Path(path)
 
-        final_content_type = content_type or ('csv' if path.suffix == '.csv' else 'json')
-        return await dataset.write_to(final_content_type, path.open('w', newline=''))
+        return await dataset.write_to_csv(path.open('w', newline=''), **kwargs)
+
+    async def export_data_json(
+        self,
+        path: str | Path,
+        *,
+        dataset_id: str | None = None,
+        dataset_name: str | None = None,
+        **kwargs: Unpack[ExportDataJsonKwargs],
+    ) -> None:
+        """Export data from a dataset to a JSON file.
+
+        This helper method simplifies the process of exporting data from a dataset in json format. It opens the
+        specified dataset and then exports the data based on the provided parameters.
+
+        Args:
+            path: The destination path
+            dataset_id: The ID of the dataset.
+            dataset_name: The name of the dataset.
+            kwargs: Extra configurations for dumping/writing in json format.
+        """
+        dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
+        path = path if isinstance(path, Path) else Path(path)
+
+        return await dataset.write_to_json(path.open('w', newline=''), **kwargs)
 
     async def _push_data(
         self,
@@ -744,7 +808,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             url: str,
             *,
             method: HttpMethod = 'GET',
-            headers: HttpHeaders | None = None,
+            headers: HttpHeaders | dict[str, str] | None = None,
         ) -> HttpResponse:
             return await self._http_client.send_request(
                 url=url,
@@ -787,14 +851,21 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 else:
                     dst_request = Request.from_base_request_data(request)
 
-                if self._check_enqueue_strategy(
-                    add_requests_call.get('strategy', EnqueueStrategy.ALL),
-                    target_url=urlparse(dst_request.url),
-                    origin_url=urlparse(origin),
-                ) and self._check_url_patterns(
-                    dst_request.url,
-                    add_requests_call.get('include', None),
-                    add_requests_call.get('exclude', None),
+                # Update the crawl depth of the request.
+                dst_request.crawl_depth = context.request.crawl_depth + 1
+
+                if (
+                    (self._max_crawl_depth is None or dst_request.crawl_depth <= self._max_crawl_depth)
+                    and self._check_enqueue_strategy(
+                        add_requests_call.get('strategy', EnqueueStrategy.ALL),
+                        target_url=urlparse(dst_request.url),
+                        origin_url=urlparse(origin),
+                    )
+                    and self._check_url_patterns(
+                        dst_request.url,
+                        add_requests_call.get('include', None),
+                        add_requests_call.get('exclude', None),
+                    )
                 ):
                     requests.append(dst_request)
 

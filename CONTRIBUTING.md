@@ -121,7 +121,7 @@ yarn start
 Or using `make`:
 
 ```sh
-make run-doc
+make run-docs
 ```
 
 ## Release process

@@ -12,7 +12,7 @@ from crawlee._autoscaling.types import CpuSnapshot, EventLoopSnapshot, Snapshot
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.system import CpuInfo, MemoryInfo
 from crawlee.events import EventManager, LocalEventManager
-from crawlee.events._types import EventSystemInfoData
+from crawlee.events._types import Event, EventSystemInfoData
 
 
 @pytest.fixture
@@ -47,13 +47,14 @@ def test_snapshot_memory(snapshotter: Snapshotter, event_system_data_info: Event
     snapshotter._snapshot_memory(event_system_data_info)
     assert len(snapshotter._memory_snapshots) == 1
     assert snapshotter._memory_snapshots[0].current_size == event_system_data_info.memory_info.current_size
-    assert snapshotter._memory_snapshots[0].total_size == event_system_data_info.memory_info.total_size
 
 
 def test_snapshot_event_loop(snapshotter: Snapshotter) -> None:
-    snapshotter._event_loop_snapshots = [
-        EventLoopSnapshot(delay=timedelta(milliseconds=100), max_delay=timedelta(milliseconds=500)),
-    ]
+    snapshotter._event_loop_snapshots = Snapshotter._get_sorted_list_by_created_at(
+        [
+            EventLoopSnapshot(delay=timedelta(milliseconds=100), max_delay=timedelta(milliseconds=500)),
+        ]
+    )
 
     snapshotter._snapshot_event_loop()
     assert len(snapshotter._event_loop_snapshots) == 2
@@ -66,14 +67,16 @@ def test_snapshot_client(snapshotter: Snapshotter) -> None:
 
 def test_get_cpu_sample(snapshotter: Snapshotter) -> None:
     now = datetime.now(timezone.utc)
-    cpu_snapshots = [
-        CpuSnapshot(
-            used_ratio=0.5,
-            max_used_ratio=0.95,
-            created_at=now - timedelta(hours=delta),
-        )
-        for delta in range(5, 0, -1)
-    ]
+    cpu_snapshots = Snapshotter._get_sorted_list_by_created_at(
+        [
+            CpuSnapshot(
+                used_ratio=0.5,
+                max_used_ratio=0.95,
+                created_at=now - timedelta(hours=delta),
+            )
+            for delta in range(5, 0, -1)
+        ]
+    )
 
     snapshotter._cpu_snapshots = cpu_snapshots
 
@@ -115,12 +118,14 @@ def test_snapshot_pruning_removes_outdated_records(snapshotter: Snapshotter) -> 
     five_hours_ago = now - timedelta(hours=5)
 
     # Create mock snapshots with varying creation times
-    snapshots = [
-        CpuSnapshot(used_ratio=0.5, max_used_ratio=0.95, created_at=five_hours_ago),
-        CpuSnapshot(used_ratio=0.6, max_used_ratio=0.95, created_at=three_hours_ago),
-        CpuSnapshot(used_ratio=0.7, max_used_ratio=0.95, created_at=two_hours_ago),
-        CpuSnapshot(used_ratio=0.8, max_used_ratio=0.95, created_at=now),
-    ]
+    snapshots = Snapshotter._get_sorted_list_by_created_at(
+        [
+            CpuSnapshot(used_ratio=0.5, max_used_ratio=0.95, created_at=five_hours_ago),
+            CpuSnapshot(used_ratio=0.6, max_used_ratio=0.95, created_at=three_hours_ago),
+            CpuSnapshot(used_ratio=0.7, max_used_ratio=0.95, created_at=two_hours_ago),
+            CpuSnapshot(used_ratio=0.8, max_used_ratio=0.95, created_at=now),
+        ]
+    )
 
     # Assign these snapshots to one of the lists (e.g., CPU snapshots)
     snapshotter._cpu_snapshots = snapshots
@@ -137,7 +142,7 @@ def test_snapshot_pruning_removes_outdated_records(snapshotter: Snapshotter) -> 
 
 def test_pruning_empty_snapshot_list_remains_empty(snapshotter: Snapshotter) -> None:
     now = datetime.now(timezone.utc)
-    snapshotter._cpu_snapshots = []
+    snapshotter._cpu_snapshots = Snapshotter._get_sorted_list_by_created_at(list[CpuSnapshot]())
     snapshots_casted = cast(list[Snapshot], snapshotter._cpu_snapshots)
     snapshotter._prune_snapshots(snapshots_casted, now)
     assert snapshotter._cpu_snapshots == []
@@ -151,10 +156,12 @@ def test_snapshot_pruning_keeps_recent_records_unaffected(snapshotter: Snapshott
     one_hour_ago = now - timedelta(hours=1)
 
     # Create mock snapshots with varying creation times
-    snapshots = [
-        CpuSnapshot(used_ratio=0.7, max_used_ratio=0.95, created_at=one_hour_ago),
-        CpuSnapshot(used_ratio=0.8, max_used_ratio=0.95, created_at=now),
-    ]
+    snapshots = Snapshotter._get_sorted_list_by_created_at(
+        [
+            CpuSnapshot(used_ratio=0.7, max_used_ratio=0.95, created_at=one_hour_ago),
+            CpuSnapshot(used_ratio=0.8, max_used_ratio=0.95, created_at=now),
+        ]
+    )
 
     # Assign these snapshots to one of the lists (e.g., CPU snapshots)
     snapshotter._cpu_snapshots = snapshots
@@ -208,3 +215,35 @@ def test_memory_load_evaluation_silent_on_acceptable_usage(
     )
 
     assert mock_logger_warn.call_count == 0
+
+
+async def test_snapshots_time_ordered() -> None:
+    # All internal snapshot list should be ordered by creation time in ascending order.
+    # Scenario where older emitted event arrives after newer event.
+    # Snapshotter should not trust the event order and check events' times.
+    time_new = datetime.now(tz=timezone.utc)
+    time_old = datetime.now(tz=timezone.utc) - timedelta(milliseconds=50)
+
+    def create_event_data(creation_time: datetime) -> EventSystemInfoData:
+        return EventSystemInfoData(
+            cpu_info=CpuInfo(used_ratio=0.5, created_at=creation_time),
+            memory_info=MemoryInfo(
+                current_size=ByteSize(bytes=1), created_at=creation_time, total_size=ByteSize(bytes=2)
+            ),
+        )
+
+    async with (
+        LocalEventManager() as event_manager,
+        Snapshotter(event_manager, available_memory_ratio=0.25) as snapshotter,
+    ):
+        event_manager.emit(event=Event.SYSTEM_INFO, event_data=create_event_data(time_new))
+        await event_manager.wait_for_all_listeners_to_complete()
+        event_manager.emit(event=Event.SYSTEM_INFO, event_data=create_event_data(time_old))
+        await event_manager.wait_for_all_listeners_to_complete()
+
+        memory_samples = snapshotter.get_memory_sample()
+        cpu_samples = snapshotter.get_cpu_sample()
+        assert memory_samples[0].created_at == time_old
+        assert cpu_samples[0].created_at == time_old
+        assert memory_samples[1].created_at == time_new
+        assert cpu_samples[1].created_at == time_new

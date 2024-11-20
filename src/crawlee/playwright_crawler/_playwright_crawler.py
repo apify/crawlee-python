@@ -4,11 +4,11 @@ import logging
 from typing import TYPE_CHECKING, Awaitable, Callable
 
 from pydantic import ValidationError
-from typing_extensions import Unpack
 
 from crawlee import EnqueueStrategy
 from crawlee._request import BaseRequestData
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
+from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.browsers import BrowserPool
@@ -20,10 +20,13 @@ from crawlee.playwright_crawler._utils import infinite_scroll
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
-    from crawlee._types import AddRequestsKwargs, BasicCrawlingContext
+    from typing_extensions import Unpack
+
+    from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs
     from crawlee.browsers._types import BrowserType
 
 
+@docs_group('Classes')
 class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
     """A web crawler that leverages the `Playwright` browser automation library.
 
@@ -146,6 +149,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 infinite_scroll).
         """
         async with context.page:
+            if context.request.headers:
+                await context.page.set_extra_http_headers(context.request.headers.model_dump())
             # Navigate to the URL and get response.
             response = await context.page.goto(context.request.url)
 
@@ -160,7 +165,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 selector: str = 'a',
                 label: str | None = None,
                 user_data: dict | None = None,
-                **kwargs: Unpack[AddRequestsKwargs],
+                **kwargs: Unpack[EnqueueLinksKwargs],
             ) -> None:
                 """The `PlaywrightCrawler` implementation of the `EnqueueLinksFunction` function."""
                 kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)

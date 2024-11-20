@@ -1,27 +1,21 @@
-# ruff: noqa: TCH001, TCH002, TCH003 (because of Pydantic)
-
 from __future__ import annotations
 
 from collections.abc import Iterator, MutableMapping
 from datetime import datetime
 from decimal import Decimal
 from enum import IntEnum
-from typing import Annotated, Any, cast
+from typing import TYPE_CHECKING, Annotated, Any, cast
 
-from pydantic import (
-    BaseModel,
-    BeforeValidator,
-    ConfigDict,
-    Field,
-    PlainSerializer,
-    PlainValidator,
-    TypeAdapter,
-)
-from typing_extensions import Self
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, PlainSerializer, PlainValidator, TypeAdapter
 
-from crawlee._types import EnqueueStrategy, HttpHeaders, HttpMethod, HttpPayload, HttpQueryParams, JsonSerializable
+from crawlee._types import EnqueueStrategy, HttpHeaders, HttpMethod, HttpPayload, JsonSerializable
+from crawlee._utils.crypto import crypto_random_object_id
+from crawlee._utils.docs import docs_group
 from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
 from crawlee._utils.urls import extract_query_params, validate_http_url
+
+if TYPE_CHECKING:
+    from typing_extensions import Self
 
 
 class RequestState(IntEnum):
@@ -60,6 +54,9 @@ class CrawleeRequestData(BaseModel):
 
     forefront: Annotated[bool, Field()] = False
     """Indicate whether the request should be enqueued at the front of the queue."""
+
+    crawl_depth: Annotated[int, Field(alias='crawlDepth')] = 0
+    """The depth of the request in the crawl tree."""
 
 
 class UserData(BaseModel, MutableMapping[str, JsonSerializable]):
@@ -138,11 +135,16 @@ class BaseRequestData(BaseModel):
     headers: Annotated[HttpHeaders, Field(default_factory=HttpHeaders)] = HttpHeaders()
     """HTTP request headers."""
 
-    query_params: Annotated[HttpQueryParams, Field(alias='queryParams', default_factory=dict)] = {}
-    """URL query parameters."""
+    payload: Annotated[
+        HttpPayload | None,
+        BeforeValidator(lambda v: v.encode() if isinstance(v, str) else v),
+        PlainSerializer(lambda v: v.decode() if isinstance(v, bytes) else v),
+    ] = None
+    """HTTP request payload.
 
-    payload: HttpPayload | None = None
-    """HTTP request payload."""
+    TODO: Re-check the need for `Validator` and `Serializer` once the issue is resolved.
+    https://github.com/apify/crawlee-python/issues/94
+    """
 
     user_data: Annotated[
         dict[str, JsonSerializable],  # Internally, the model contains `UserData`, this is just for convenience
@@ -180,9 +182,8 @@ class BaseRequestData(BaseModel):
         url: str,
         *,
         method: HttpMethod = 'GET',
-        headers: HttpHeaders | None = None,
-        query_params: HttpQueryParams | None = None,
-        payload: HttpPayload | None = None,
+        headers: HttpHeaders | dict[str, str] | None = None,
+        payload: HttpPayload | str | None = None,
         label: str | None = None,
         unique_key: str | None = None,
         id: str | None = None,
@@ -191,8 +192,11 @@ class BaseRequestData(BaseModel):
         **kwargs: Any,
     ) -> Self:
         """Create a new `BaseRequestData` instance from a URL. See `Request.from_url` for more details."""
-        headers = headers or HttpHeaders()
-        query_params = query_params or {}
+        if isinstance(headers, dict) or headers is None:
+            headers = HttpHeaders(headers or {})
+
+        if isinstance(payload, str):
+            payload = payload.encode()
 
         unique_key = unique_key or compute_unique_key(
             url,
@@ -211,7 +215,6 @@ class BaseRequestData(BaseModel):
             id=id,
             method=method,
             headers=headers,
-            query_params=query_params,
             payload=payload,
             **kwargs,
         )
@@ -228,6 +231,7 @@ class BaseRequestData(BaseModel):
         return values[0]
 
 
+@docs_group('Data structures')
 class Request(BaseRequestData):
     """Represents a request in the Crawlee framework, containing the necessary information for crawling operations.
 
@@ -274,14 +278,14 @@ class Request(BaseRequestData):
         url: str,
         *,
         method: HttpMethod = 'GET',
-        headers: HttpHeaders | None = None,
-        query_params: HttpQueryParams | None = None,
-        payload: HttpPayload | None = None,
+        headers: HttpHeaders | dict[str, str] | None = None,
+        payload: HttpPayload | str | None = None,
         label: str | None = None,
         unique_key: str | None = None,
         id: str | None = None,
         keep_url_fragment: bool = False,
         use_extended_unique_key: bool = False,
+        always_enqueue: bool = False,
         **kwargs: Any,
     ) -> Self:
         """Create a new `Request` instance from a URL.
@@ -295,7 +299,6 @@ class Request(BaseRequestData):
             url: The URL of the request.
             method: The HTTP method of the request.
             headers: The HTTP headers of the request.
-            query_params: The query parameters of the URL.
             payload: The data to be sent as the request body. Typically used with 'POST' or 'PUT' requests.
             label: A custom label to differentiate between request types. This is stored in `user_data`, and it is
                 used for request routing (different requests go to different handlers).
@@ -307,10 +310,18 @@ class Request(BaseRequestData):
                 the `unique_key` computation. This is only relevant when `unique_key` is not provided.
             use_extended_unique_key: Determines whether to include the HTTP method and payload in the `unique_key`
                 computation. This is only relevant when `unique_key` is not provided.
+            always_enqueue: If set to `True`, the request will be enqueued even if it is already present in the queue.
+                Using this is not allowed when a custom `unique_key` is also provided and will result in a `ValueError`.
             **kwargs: Additional request properties.
         """
-        headers = headers or HttpHeaders()
-        query_params = query_params or {}
+        if unique_key is not None and always_enqueue:
+            raise ValueError('`always_enqueue` cannot be used with a custom `unique_key`')
+
+        if isinstance(headers, dict) or headers is None:
+            headers = HttpHeaders(headers or {})
+
+        if isinstance(payload, str):
+            payload = payload.encode()
 
         unique_key = unique_key or compute_unique_key(
             url,
@@ -321,6 +332,9 @@ class Request(BaseRequestData):
             use_extended_unique_key=use_extended_unique_key,
         )
 
+        if always_enqueue:
+            unique_key = f'{unique_key}_{crypto_random_object_id()}'
+
         id = id or unique_key_to_request_id(unique_key)
 
         request = cls(
@@ -329,7 +343,6 @@ class Request(BaseRequestData):
             id=id,
             method=method,
             headers=headers,
-            query_params=query_params,
             payload=payload,
             **kwargs,
         )
@@ -359,6 +372,15 @@ class Request(BaseRequestData):
             user_data.crawlee_data = CrawleeRequestData()
 
         return user_data.crawlee_data
+
+    @property
+    def crawl_depth(self) -> int:
+        """The depth of the request in the crawl tree."""
+        return self.crawlee_data.crawl_depth
+
+    @crawl_depth.setter
+    def crawl_depth(self, new_value: int) -> None:
+        self.crawlee_data.crawl_depth = new_value
 
     @property
     def state(self) -> RequestState | None:
@@ -430,7 +452,6 @@ class Request(BaseRequestData):
                 and self.unique_key == other.unique_key
                 and self.method == other.method
                 and self.headers == other.headers
-                and self.query_params == other.query_params
                 and self.payload == other.payload
                 and self.user_data == other.user_data
                 and self.retry_count == other.retry_count
