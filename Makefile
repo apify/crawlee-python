@@ -49,7 +49,7 @@ build-api-reference:
 	cd website && poetry run ./build_api_reference.sh
 
 build-docs:
-	cd website && corepack enable && yarn && yarn build
+	cd website && corepack enable && yarn && poetry run yarn build
 
 run-docs: build-api-reference
-	cd website && corepack enable && yarn && yarn start
+	cd website && corepack enable && yarn && poetry run yarn start
