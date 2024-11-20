@@ -18,19 +18,19 @@ on:
 
 jobs:
   lint_check:
-    name: Check - Lint
+    name: Lint check
     uses: apify/workflows/.github/workflows/python_lint_check.yaml@main
 
   type_check:
-    name: Check - Types
+    name: Type check
     uses: apify/workflows/.github/workflows/python_type_check.yaml@main
 
   unit_tests:
-    name: Check - Unit tests
+    name: Unit tests
     uses: apify/workflows/.github/workflows/python_unit_tests.yaml@main
     secrets:
       httpbin_url: https://janbuchar--httpbin.apify.actor?token=${{ secrets.APIFY_HTTPBIN_TOKEN }}
 
   docs_check:
-    name: Try to run docs build
+    name: Docs check
     uses: apify/workflows/.github/workflows/python_docs_check.yaml@main
