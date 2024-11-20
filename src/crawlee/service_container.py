@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from crawlee._utils.docs import docs_group
-from crawlee.configuration import Configuration
-from crawlee.events import LocalEventManager
-from crawlee.memory_storage_client import MemoryStorageClient
 
 if TYPE_CHECKING:
     from crawlee.base_storage_client._base_storage_client import BaseStorageClient
+    from crawlee.configuration import Configuration
     from crawlee.events._event_manager import EventManager
 
 __all__ = [
@@ -24,85 +22,92 @@ __all__ = [
     'set_local_storage_client',
 ]
 
-StorageClientType = Literal['cloud', 'local']
-
 
 @dataclass
-class _Services:
-    """An internal container for singleton service instances."""
+class _ServiceLocator:
+    """Service locator for managing the services used by Crawlee.
 
-    local_storage_client: BaseStorageClient = field(default_factory=MemoryStorageClient)
-    cloud_storage_client: BaseStorageClient = field(default_factory=MemoryStorageClient)
-    configuration: Configuration = field(default_factory=Configuration)
-    event_manager: EventManager = field(default_factory=LocalEventManager)
-
-
-_services = _Services()
-
-_DEFAULT_STORAGE_CLIENT_TYPE: StorageClientType = 'local'
-
-
-@docs_group('Functions')
-def get_storage_client(client_type: StorageClientType = _DEFAULT_STORAGE_CLIENT_TYPE) -> BaseStorageClient:
-    """Get the storage client instance for the current environment.
-
-    Args:
-        client_type: Allows retrieving a specific storage client type, regardless of where we are running.
-
-    Raises:
-        ValueError: If the client type is unknown.
-
-    Returns:
-        The current storage client instance.
+    All services are initialized to its default value lazily.
     """
-    if client_type == 'local':
-        return _services.local_storage_client
 
-    if client_type == 'cloud':
-        return _services.cloud_storage_client
+    _configuration: Configuration | None = field(default=None, init=False)
+    _event_manager: EventManager | None = field(default=None, init=False)
+    _storage_client: BaseStorageClient | None = field(default=None, init=False)
 
-    raise ValueError(f'Unknown storage client type: {client_type}')
+    @property
+    def configuration(self) -> Configuration:
+        if self._configuration is None:
+            from crawlee.configuration import Configuration
+
+            self._configuration = Configuration()
+
+        return self._configuration
+
+    @configuration.setter
+    def configuration(self, value: Configuration) -> None:
+        self._configuration = value
+
+    @property
+    def storage_client(self) -> BaseStorageClient:
+        if self._storage_client is None:
+            from crawlee.memory_storage_client import MemoryStorageClient
+
+            self._storage_client = MemoryStorageClient()
+
+        return self._storage_client
+
+    @storage_client.setter
+    def storage_client(self, value: BaseStorageClient) -> None:
+        self._storage_client = value
+
+    @property
+    def event_manager(self) -> EventManager:
+        if self._event_manager is None:
+            from crawlee.events import LocalEventManager
+
+            self._event_manager = LocalEventManager()
+
+        return self._event_manager
+
+    @event_manager.setter
+    def event_manager(self, value: EventManager) -> None:
+        self._event_manager = value
 
 
-@docs_group('Functions')
-def set_local_storage_client(local_client: BaseStorageClient) -> None:
-    """Set the local storage client instance.
-
-    Args:
-        local_client: The local storage client instance.
-    """
-    _services.local_storage_client = local_client
-
-
-@docs_group('Functions')
-def set_cloud_storage_client(cloud_client: BaseStorageClient) -> None:
-    """Set the cloud storage client instance.
-
-    Args:
-        cloud_client: The cloud storage client instance.
-    """
-    _services.cloud_storage_client = cloud_client
+_service_locator = _ServiceLocator()
 
 
 @docs_group('Functions')
 def get_configuration() -> Configuration:
-    """Get the configuration object."""
-    return _services.configuration
+    """Get the configuration."""
+    return _service_locator.configuration
 
 
 @docs_group('Functions')
 def set_configuration(configuration: Configuration) -> None:
-    """Set the configuration object."""
-    _services.configuration = configuration
+    """Set the configuration."""
+    _service_locator.configuration = configuration
 
 
 @docs_group('Functions')
 def get_event_manager() -> EventManager:
     """Get the event manager."""
-    return _services.event_manager
+    return _service_locator.event_manager
 
 
 @docs_group('Functions')
 def set_event_manager(event_manager: EventManager) -> None:
     """Set the event manager."""
-    _services.event_manager = event_manager
+    _service_locator.event_manager = event_manager
+
+
+@docs_group('Functions')
+def get_storage_client() -> BaseStorageClient:
+    """Get the storage client."""
+    return _service_locator.storage_client
+
+
+@docs_group('Functions')
+def set_storage_client(storage_client: BaseStorageClient) -> None:
+    """Set the storage client."""
+    _service_locator.storage_client = storage_client

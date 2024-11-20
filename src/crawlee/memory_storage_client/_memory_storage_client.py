@@ -22,6 +22,7 @@ from crawlee.memory_storage_client._request_queue_collection_client import Reque
 
 if TYPE_CHECKING:
     from crawlee.base_storage_client._types import ResourceClient
+    from crawlee.configuration import Configuration
 
 TResourceClient = TypeVar('TResourceClient', DatasetClient, KeyValueStoreClient, RequestQueueClient)
 
@@ -45,8 +46,19 @@ class MemoryStorageClient(BaseStorageClient):
     _TEMPORARY_DIR_NAME = '__CRAWLEE_TEMPORARY'
     """Name of the directory used to temporarily store files during purges."""
 
+    _DATASETS_DIR_NAME = 'datasets'
+    """Name of the directory containing datasets."""
+
+    _KEY_VALUE_STORES_DIR_NAME = 'key_value_stores'
+    """Name of the directory containing key-value stores."""
+
+    _REQUEST_QUEUES_DIR_NAME = 'request_queues'
+    """Name of the directory containing request queues."""
+
     def __init__(
         self,
+        configuration: Configuration | None = None,
+        *,
         write_metadata: bool | None = None,
         persist_storage: bool | None = None,
         storage_dir: str | None = None,
@@ -56,7 +68,11 @@ class MemoryStorageClient(BaseStorageClient):
     ) -> None:
         """A default constructor.
 
+        All parameters are optional and can be set either directly or via the configuration object. The defaults
+        are taken from the configuration object.
+
         Args:
+            configuration: The configuration object.
             write_metadata: Whether to write metadata to the storage.
             persist_storage: Whether to persist the storage.
             storage_dir: Path to the storage directory.
@@ -64,7 +80,7 @@ class MemoryStorageClient(BaseStorageClient):
             default_key_value_store_id: The default key-value store ID.
             default_dataset_id: The default dataset ID.
         """
-        config = service_container.get_configuration()
+        config = configuration or service_container.get_configuration()
 
         # Set the internal attributes.
         self._write_metadata = write_metadata or config.write_metadata
@@ -99,56 +115,41 @@ class MemoryStorageClient(BaseStorageClient):
     @property
     def datasets_directory(self) -> str:
         """Path to the directory containing datasets."""
-        return os.path.join(self.storage_dir, 'datasets')
+        return os.path.join(self.storage_dir, self._DATASETS_DIR_NAME)
 
     @property
     def key_value_stores_directory(self) -> str:
         """Path to the directory containing key-value stores."""
-        return os.path.join(self.storage_dir, 'key_value_stores')
+        return os.path.join(self.storage_dir, self._KEY_VALUE_STORES_DIR_NAME)
 
     @property
     def request_queues_directory(self) -> str:
         """Path to the directory containing request queues."""
-        return os.path.join(self.storage_dir, 'request_queues')
+        return os.path.join(self.storage_dir, self._REQUEST_QUEUES_DIR_NAME)
 
     @override
     def dataset(self, id: str) -> DatasetClient:
-        return DatasetClient(
-            memory_storage_client=self,
-            id=id,
-        )
+        return DatasetClient(memory_storage_client=self, id=id)
 
     @override
     def datasets(self) -> DatasetCollectionClient:
-        return DatasetCollectionClient(
-            memory_storage_client=self,
-        )
+        return DatasetCollectionClient(memory_storage_client=self)
 
     @override
     def key_value_store(self, id: str) -> KeyValueStoreClient:
-        return KeyValueStoreClient(
-            memory_storage_client=self,
-            id=id,
-        )
+        return KeyValueStoreClient(memory_storage_client=self, id=id)
 
     @override
     def key_value_stores(self) -> KeyValueStoreCollectionClient:
-        return KeyValueStoreCollectionClient(
-            memory_storage_client=self,
-        )
+        return KeyValueStoreCollectionClient(memory_storage_client=self)
 
     @override
     def request_queue(self, id: str) -> RequestQueueClient:
-        return RequestQueueClient(
-            memory_storage_client=self,
-            id=id,
-        )
+        return RequestQueueClient(memory_storage_client=self, id=id)
 
     @override
     def request_queues(self) -> RequestQueueCollectionClient:
-        return RequestQueueCollectionClient(
-            memory_storage_client=self,
-        )
+        return RequestQueueCollectionClient(memory_storage_client=self)
 
     @override
     async def purge_on_start(self) -> None:
@@ -167,7 +168,10 @@ class MemoryStorageClient(BaseStorageClient):
             self._purged_on_start = True
 
     def get_cached_resource_client(
-        self, resource_client_class: type[TResourceClient], id: str | None, name: str | None
+        self,
+        resource_client_class: type[TResourceClient],
+        id: str | None,
+        name: str | None,
     ) -> TResourceClient | None:
         """Try to return a resource client from the internal cache."""
         if issubclass(resource_client_class, DatasetClient):
@@ -311,3 +315,29 @@ class MemoryStorageClient(BaseStorageClient):
 
             await asyncio.to_thread(shutil.rmtree, temporary_folder, ignore_errors=True)
         return None
+
+    def _get_default_storage_id(self, storage_client_class: type[TResourceClient]) -> str:
+        """Get the default storage ID based on the storage class."""
+        if issubclass(storage_client_class, DatasetClient):
+            return self._default_dataset_id
+
+        if issubclass(storage_client_class, KeyValueStoreClient):
+            return self._default_key_value_store_id
+
+        if issubclass(storage_client_class, RequestQueueClient):
+            return self._default_request_queue_id
+
+        raise ValueError(f'Invalid storage class: {storage_client_class.__name__}')
+
+    def _get_storage_dir(self, storage_client_class: type[TResourceClient]) -> str:
+        """Get the storage directory based on the storage class."""
+        if issubclass(storage_client_class, DatasetClient):
+            return self.datasets_directory
+
+        if issubclass(storage_client_class, KeyValueStoreClient):
+            return self.key_value_stores_directory
+
+        if issubclass(storage_client_class, RequestQueueClient):
+            return self.request_queues_directory
+
+        raise ValueError(f'Invalid storage class: {storage_client_class.__name__}')

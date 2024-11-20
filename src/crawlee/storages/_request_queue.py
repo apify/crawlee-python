@@ -25,6 +25,7 @@ if TYPE_CHECKING:
 
     from crawlee._request import Request
 
+
 logger = getLogger(__name__)
 
 T = TypeVar('T')
@@ -104,12 +105,12 @@ class RequestQueue(BaseStorage, RequestProvider):
     """Expected delay for storage to achieve consistency, guiding the timing of subsequent read operations."""
 
     def __init__(self, id: str, name: str | None) -> None:
-        self._id = id
-        self._name = name
-
         config = service_container.get_configuration()
         event_manager = service_container.get_event_manager()
         storage_client = service_container.get_storage_client()
+
+        self._id = id
+        self._name = name
 
         # Get resource clients from storage client
         self._resource_client = storage_client.request_queue(self._id)

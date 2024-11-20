@@ -18,7 +18,7 @@ from crawlee.events._types import Event, EventSystemInfoData
 @pytest.fixture
 def snapshotter() -> Snapshotter:
     mocked_event_manager = AsyncMock(spec=EventManager)
-    return Snapshotter(mocked_event_manager, available_memory_ratio=0.25)
+    return Snapshotter(event_manager=mocked_event_manager, available_memory_ratio=0.25)
 
 
 @pytest.fixture
@@ -33,7 +33,10 @@ def event_system_data_info() -> EventSystemInfoData:
 
 
 async def test_start_stop_lifecycle() -> None:
-    async with LocalEventManager() as event_manager, Snapshotter(event_manager, available_memory_ratio=0.25):
+    async with LocalEventManager() as event_manager, Snapshotter(
+        event_manager=event_manager,
+        available_memory_ratio=0.25,
+    ):
         pass
 
 
@@ -194,7 +197,8 @@ def test_snapshot_pruning_keeps_recent_records_unaffected(snapshotter: Snapshott
 
 
 def test_memory_load_evaluation_logs_warning_on_high_usage(caplog: pytest.LogCaptureFixture) -> None:
-    snapshotter = Snapshotter(AsyncMock(spec=EventManager), max_memory_size=ByteSize.from_gb(8))
+    event_manager = AsyncMock(spec=EventManager)
+    snapshotter = Snapshotter(event_manager=event_manager, max_memory_size=ByteSize.from_gb(8))
 
     high_memory_usage = ByteSize.from_gb(8) * 0.95  # 95% of 8 GB
 
@@ -251,7 +255,7 @@ async def test_snapshots_time_ordered() -> None:
 
     async with (
         LocalEventManager() as event_manager,
-        Snapshotter(event_manager, available_memory_ratio=0.25) as snapshotter,
+        Snapshotter(event_manager=event_manager, available_memory_ratio=0.25) as snapshotter,
     ):
         event_manager.emit(event=Event.SYSTEM_INFO, event_data=create_event_data(time_new))
         await event_manager.wait_for_all_listeners_to_complete()

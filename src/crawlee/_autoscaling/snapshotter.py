@@ -21,6 +21,8 @@ from crawlee.events._types import Event, EventSystemInfoData
 if TYPE_CHECKING:
     from types import TracebackType
 
+    from crawlee.events import EventManager
+
 logger = getLogger(__name__)
 
 T = TypeVar('T')
@@ -39,6 +41,7 @@ class Snapshotter:
     def __init__(
         self,
         *,
+        event_manager: EventManager | None = None,
         event_loop_snapshot_interval: timedelta = timedelta(milliseconds=500),
         client_snapshot_interval: timedelta = timedelta(milliseconds=1000),
         max_used_cpu_ratio: float = 0.95,
@@ -55,6 +58,8 @@ class Snapshotter:
         """A default constructor.
 
         Args:
+            event_manager: The event manager used to emit system info events. From data provided by this event
+              the CPU and memory usage are read.
             event_loop_snapshot_interval: The interval at which the event loop is sampled.
             client_snapshot_interval: The interval at which the client is sampled.
             max_used_cpu_ratio: Sets the ratio, defining the maximum CPU usage. When the CPU usage is higher than
@@ -80,8 +85,7 @@ class Snapshotter:
         if available_memory_ratio is None and max_memory_size is None:
             raise ValueError('At least one of `available_memory_ratio` or `max_memory_size` must be specified')
 
-        self._event_manager = service_container.get_event_manager()
-
+        self._event_manager = event_manager or service_container.get_event_manager()
         self._event_loop_snapshot_interval = event_loop_snapshot_interval
         self._client_snapshot_interval = client_snapshot_interval
         self._max_event_loop_delay = max_event_loop_delay

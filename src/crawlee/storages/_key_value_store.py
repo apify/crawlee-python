@@ -53,11 +53,12 @@ class KeyValueStore(BaseStorage):
     """
 
     def __init__(self, id: str, name: str | None) -> None:
+        storage_client = service_container.get_storage_client()
+
         self._id = id
         self._name = name
 
         # Get resource clients from storage client
-        storage_client = service_container.get_storage_client()
         self._resource_client = storage_client.key_value_store(self._id)
 
     @property

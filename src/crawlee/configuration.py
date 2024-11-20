@@ -5,9 +5,7 @@ from typing import TYPE_CHECKING, Annotated, Literal
 
 from pydantic import AliasChoices, BeforeValidator, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing_extensions import Self
 
-from crawlee import service_container
 from crawlee._utils.docs import docs_group
 from crawlee._utils.models import timedelta_ms
 
@@ -237,11 +235,13 @@ class Configuration(BaseSettings):
     def get_global_configuration(cls) -> Self:
         """Retrieve the global instance of the configuration.
 
-        Mostly for the backward compatibility.
+        TODO: Can we remove this?
         """
-        config = service_container.get_configuration()
+        from crawlee.service_container import get_configuration
 
-        if not isinstance(config, cls):
-            raise TypeError(f'Requested configuration of type {cls}, but got {config.__class__} instead.')
+        cfg = get_configuration()
 
-        return config
+        if not isinstance(cfg, cls):
+            raise TypeError(f'Requested global configuration object of type {cls}, but {cfg.__class__} was found')
+
+        return cfg

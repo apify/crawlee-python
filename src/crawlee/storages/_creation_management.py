@@ -169,18 +169,7 @@ async def open_storage(
             resource_collection_client = _get_resource_collection_client(storage_class, storage_client)
             storage_info = await resource_collection_client.get_or_create(name=name)
 
-        if issubclass(storage_class, RequestQueue):
-            storage = storage_class(
-                id=storage_info.id,
-                name=storage_info.name,
-                client=storage_client,
-            )
-        else:
-            storage = storage_class(
-                id=storage_info.id,
-                name=storage_info.name,
-                client=storage_client,
-            )
+        storage = storage_class(id=storage_info.id, name=storage_info.name)
 
         # Cache the storage by ID and name
         _add_to_cache_by_id(storage.id, storage)
