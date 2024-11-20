@@ -51,6 +51,12 @@ jobs:
     secrets:
       APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
 
+  build_and_deploy_docs:
+    needs: [update_changelog]
+    uses: ./.github/workflows/build_and_deploy_docs.yaml
+    with:
+      ref: ${{ needs.update_changelog.outputs.changelog_commitish }}
+
   publish_to_pypi:
     name: Publish to PyPI
     needs: [release_metadata, update_changelog]
