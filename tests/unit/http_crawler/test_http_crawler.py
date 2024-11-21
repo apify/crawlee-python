@@ -7,7 +7,7 @@ from urllib.parse import parse_qs, urlencode
 
 import pytest
 import respx
-from httpx import URL, Response
+from httpx import Response
 
 from crawlee._request import Request
 from crawlee.http_clients._httpx import HttpxHttpClient
@@ -17,6 +17,8 @@ from crawlee.sessions import SessionPool
 from crawlee.storages import RequestList
 
 if TYPE_CHECKING:
+    from yarl import URL
+
     from crawlee.http_clients._base import BaseHttpClient
     from crawlee.http_crawler._http_crawling_context import HttpCrawlingContext
 
@@ -165,9 +167,9 @@ async def test_stores_cookies(httpbin: URL) -> None:
     crawler = HttpCrawler(
         request_provider=RequestList(
             [
-                str(httpbin.copy_with(path='/cookies/set').copy_set_param('a', '1')),
-                str(httpbin.copy_with(path='/cookies/set').copy_set_param('b', '2')),
-                str(httpbin.copy_with(path='/cookies/set').copy_set_param('c', '3')),
+                str(httpbin.with_path('/cookies/set', keep_query=True, keep_fragment=True).extend_query(a=1)),
+                str(httpbin.with_path('/cookies/set', keep_query=True, keep_fragment=True).extend_query(b=2)),
+                str(httpbin.with_path('/cookies/set', keep_query=True, keep_fragment=True).extend_query(c=3)),
             ]
         ),
         # /cookies/set might redirect us to a page that we can't access - no problem, we only care about cookies
@@ -241,7 +243,7 @@ async def test_sending_payload_as_raw_data(http_client_class: type[BaseHttpClien
 
     encoded_payload = urlencode(PAYLOAD).encode()
     request = Request.from_url(
-        url=str(httpbin.copy_with(path='/post')),
+        url=str(httpbin.with_path('/post', keep_query=True, keep_fragment=True)),
         method='POST',
         payload=encoded_payload,
     )
@@ -277,7 +279,7 @@ async def test_sending_payload_as_form_data(http_client_class: type[BaseHttpClie
         responses.append(response)
 
     request = Request.from_url(
-        url=str(httpbin.copy_with(path='/post')),
+        url=str(httpbin.with_path('/post', keep_query=True, keep_fragment=True)),
         method='POST',
         headers={'content-type': 'application/x-www-form-urlencoded'},
         payload=urlencode(PAYLOAD).encode(),
@@ -310,7 +312,7 @@ async def test_sending_payload_as_json(http_client_class: type[BaseHttpClient], 
 
     json_payload = json.dumps(PAYLOAD).encode()
     request = Request.from_url(
-        url=str(httpbin.copy_with(path='/post')),
+        url=str(httpbin.with_path('/post', keep_query=True, keep_fragment=True)),
         method='POST',
         payload=json_payload,
         headers={'content-type': 'application/json'},
@@ -341,9 +343,9 @@ async def test_sending_url_query_params(http_client_class: type[BaseHttpClient],
         # The httpbin.org/get endpoint returns the provided query parameters in the response.
         responses.append(response)
 
-    base_url = httpbin.copy_with(path='/get')
+    base_url = httpbin.with_path('/get', keep_query=True, keep_fragment=True)
     query_params = {'param1': 'value1', 'param2': 'value2'}
-    request = Request.from_url(url=str(base_url.copy_merge_params(query_params)))
+    request = Request.from_url(url=str(base_url.extend_query(query_params)))
 
     await crawler.run([request])
 

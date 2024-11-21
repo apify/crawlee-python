@@ -7,7 +7,7 @@ import pytest
 from crawlee.browsers import PlaywrightBrowserPlugin
 
 if TYPE_CHECKING:
-    from httpx import URL
+    from yarl import URL
 
 
 @pytest.fixture
@@ -37,7 +37,7 @@ async def test_new_browser(plugin: PlaywrightBrowserPlugin, httpbin: URL) -> Non
     assert browser_controller.is_browser_connected
 
     page = await browser_controller.new_page()
-    await page.goto(f'{httpbin}')
+    await page.goto(str(httpbin))
 
     await page.close()
     await browser_controller.close()

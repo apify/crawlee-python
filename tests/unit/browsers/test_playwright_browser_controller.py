@@ -10,7 +10,7 @@ from playwright.async_api import Browser, Playwright, async_playwright
 from crawlee.browsers import PlaywrightBrowserController
 
 if TYPE_CHECKING:
-    from httpx import URL
+    from yarl import URL
 
 
 @pytest.fixture

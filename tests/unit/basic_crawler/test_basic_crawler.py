@@ -13,7 +13,6 @@ from unittest.mock import AsyncMock, Mock
 
 import httpx
 import pytest
-from httpx import URL
 
 from crawlee import ConcurrencySettings, EnqueueStrategy, Glob
 from crawlee._request import BaseRequestData, Request
@@ -28,6 +27,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     import respx
+    from yarl import URL
 
 
 async def test_processes_requests() -> None:
@@ -536,9 +536,9 @@ async def test_crawler_run_requests(httpbin: URL) -> None:
         seen_urls.append(context.request.url)
 
     start_urls = [
-        str(httpbin.copy_with(path='/1')),
-        str(httpbin.copy_with(path='/2')),
-        str(httpbin.copy_with(path='/3')),
+        str(httpbin.with_path('/1', keep_query=True, keep_fragment=True)),
+        str(httpbin.with_path('/2', keep_query=True, keep_fragment=True)),
+        str(httpbin.with_path('/3', keep_query=True, keep_fragment=True)),
     ]
     stats = await crawler.run(start_urls)
 
@@ -561,7 +561,7 @@ async def test_context_push_and_get_data(httpbin: URL) -> None:
     await dataset.push_data('{"c": 3}')
     assert (await crawler.get_data()).items == [{'a': 1}, {'c': 3}]
 
-    stats = await crawler.run([str(httpbin.copy_with(path='/1'))])
+    stats = await crawler.run([str(httpbin.with_path('/1', keep_query=True, keep_fragment=True))])
 
     assert (await crawler.get_data()).items == [{'a': 1}, {'c': 3}, {'b': 2}]
     assert stats.requests_total == 1
@@ -610,7 +610,7 @@ async def test_context_push_and_export_data(httpbin: URL, tmp_path: Path) -> Non
         await context.push_data([{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}])
         await context.push_data({'id': 2, 'test': 'test'})
 
-    await crawler.run([str(httpbin.copy_with(path='/1'))])
+    await crawler.run([str(httpbin.with_path('/1', keep_query=True, keep_fragment=True))])
 
     await crawler.export_data_json(path=tmp_path / 'dataset.json')
     await crawler.export_data_csv(path=tmp_path / 'dataset.csv')
@@ -632,7 +632,7 @@ async def test_crawler_push_and_export_data_and_json_dump_parameter(httpbin: URL
         await context.push_data([{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}])
         await context.push_data({'id': 2, 'test': 'test'})
 
-    await crawler.run([str(httpbin.copy_with(path='/1'))])
+    await crawler.run([str(httpbin.with_path('/1', keep_query=True, keep_fragment=True))])
 
     await crawler.export_data_json(path=tmp_path / 'dataset.json', indent=3)
 
@@ -679,11 +679,11 @@ async def test_context_update_kv_store() -> None:
 
 async def test_max_requests_per_crawl(httpbin: URL) -> None:
     start_urls = [
-        str(httpbin.copy_with(path='/1')),
-        str(httpbin.copy_with(path='/2')),
-        str(httpbin.copy_with(path='/3')),
-        str(httpbin.copy_with(path='/4')),
-        str(httpbin.copy_with(path='/5')),
+        str(httpbin.with_path('/1', keep_query=True, keep_fragment=True)),
+        str(httpbin.with_path('/2', keep_query=True, keep_fragment=True)),
+        str(httpbin.with_path('/3', keep_query=True, keep_fragment=True)),
+        str(httpbin.with_path('/4', keep_query=True, keep_fragment=True)),
+        str(httpbin.with_path('/5', keep_query=True, keep_fragment=True)),
     ]
     processed_urls = []
 

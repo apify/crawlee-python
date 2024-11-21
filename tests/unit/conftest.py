@@ -7,8 +7,8 @@ import os
 from typing import TYPE_CHECKING, Callable, cast
 
 import pytest
-from httpx import URL
 from proxy import Proxy
+from yarl import URL
 
 from crawlee import service_container
 from crawlee.configuration import Configuration

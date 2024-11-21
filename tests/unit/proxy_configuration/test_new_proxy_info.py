@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
-from httpx import InvalidURL
 
 from crawlee.proxy_configuration import ProxyConfiguration
 
@@ -32,7 +31,7 @@ async def test_throws_on_invalid_new_url_function() -> None:
     with pytest.raises(ValueError) as exc:  # noqa: PT011
         await config.new_proxy_info(None, None, None)
 
-    assert isinstance(exc.value.__cause__, InvalidURL)
+    assert isinstance(exc.value.__cause__, ValueError)
 
 
 async def test_returns_proxy_info_with_new_url_function() -> None:
