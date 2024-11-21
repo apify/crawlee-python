@@ -6,11 +6,11 @@ from typing import TYPE_CHECKING, Any, AsyncGenerator, Iterable
 
 from parsel import Selector
 from pydantic import ValidationError
-from typing_extensions import Unpack
 
 from crawlee import EnqueueStrategy
 from crawlee._request import BaseRequestData
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
+from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
@@ -19,9 +19,12 @@ from crawlee.http_crawler import HttpCrawlingContext
 from crawlee.parsel_crawler._parsel_crawling_context import ParselCrawlingContext
 
 if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
     from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs
 
 
+@docs_group('Classes')
 class ParselCrawler(BasicCrawler[ParselCrawlingContext]):
     """A web crawler for performing HTTP requests and parsing HTML/XML content.
 
@@ -139,7 +142,13 @@ class ParselCrawler(BasicCrawler[ParselCrawlingContext]):
         if self._retry_on_blocked:
             status_code = context.http_response.status_code
 
-            if context.session and context.session.is_blocked_status_code(status_code=status_code):
+            # TODO: refactor to avoid private member access
+            # https://github.com/apify/crawlee-python/issues/708
+            if (
+                context.session
+                and status_code not in self._http_client._ignore_http_error_status_codes  # noqa: SLF001
+                and context.session.is_blocked_status_code(status_code=status_code)
+            ):
                 raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
 
             parsel = context.selector

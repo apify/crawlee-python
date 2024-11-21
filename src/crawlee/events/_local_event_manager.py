@@ -7,8 +7,7 @@ from datetime import timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING
 
-from typing_extensions import Unpack
-
+from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.system import get_cpu_info, get_memory_info
 from crawlee.events._event_manager import EventManager, EventManagerOptions
@@ -17,9 +16,12 @@ from crawlee.events._types import Event, EventSystemInfoData
 if TYPE_CHECKING:
     from types import TracebackType
 
+    from typing_extensions import Unpack
+
 logger = getLogger(__name__)
 
 
+@docs_group('Classes')
 class LocalEventManager(EventManager):
     """Local event manager for emitting system info events."""
 

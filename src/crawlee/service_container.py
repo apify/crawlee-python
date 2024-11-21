@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Literal
 
 from typing_extensions import NotRequired, TypedDict
 
+from crawlee._utils.docs import docs_group
 from crawlee.configuration import Configuration
 from crawlee.errors import ServiceConflictError
 from crawlee.events import LocalEventManager
@@ -39,6 +40,7 @@ _services = _Services()
 _default_storage_client_type: StorageClientType = 'local'
 
 
+@docs_group('Functions')
 def get_storage_client(*, client_type: StorageClientType | None = None) -> BaseStorageClient:
     """Get the storage client instance for the current environment.
 
@@ -62,6 +64,7 @@ def get_storage_client(*, client_type: StorageClientType | None = None) -> BaseS
     return _services['local_storage_client']
 
 
+@docs_group('Functions')
 def set_local_storage_client(local_client: BaseStorageClient) -> None:
     """Set the local storage client instance.
 
@@ -74,6 +77,7 @@ def set_local_storage_client(local_client: BaseStorageClient) -> None:
     _services['local_storage_client'] = local_client
 
 
+@docs_group('Functions')
 def set_cloud_storage_client(cloud_client: BaseStorageClient) -> None:
     """Set the cloud storage client instance.
 
@@ -86,12 +90,14 @@ def set_cloud_storage_client(cloud_client: BaseStorageClient) -> None:
     _services['cloud_storage_client'] = cloud_client
 
 
+@docs_group('Functions')
 def set_default_storage_client_type(client_type: StorageClientType) -> None:
     """Set the default storage client type."""
     global _default_storage_client_type  # noqa: PLW0603
     _default_storage_client_type = client_type
 
 
+@docs_group('Functions')
 def get_configuration() -> Configuration:
     """Get the configuration object."""
     if 'configuration' not in _services:
@@ -100,11 +106,13 @@ def get_configuration() -> Configuration:
     return _services['configuration']
 
 
+@docs_group('Functions')
 def get_configuration_if_set() -> Configuration | None:
     """Get the configuration object, or None if it hasn't been set yet."""
     return _services.get('configuration')
 
 
+@docs_group('Functions')
 def set_configuration(configuration: Configuration) -> None:
     """Set the configuration object."""
     if (existing_service := _services.get('configuration')) and existing_service is not configuration:
@@ -113,6 +121,7 @@ def set_configuration(configuration: Configuration) -> None:
     _services['configuration'] = configuration
 
 
+@docs_group('Functions')
 def get_event_manager() -> EventManager:
     """Get the event manager."""
     if 'event_manager' not in _services:
@@ -121,6 +130,7 @@ def get_event_manager() -> EventManager:
     return _services['event_manager']
 
 
+@docs_group('Functions')
 def set_event_manager(event_manager: EventManager) -> None:
     """Set the event manager."""
     if (existing_service := _services.get('event_manager')) and existing_service is not event_manager:

@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 from weakref import WeakValueDictionary
 
 from crawlee._utils.crypto import crypto_random_object_id
+from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee.browsers._base_browser_controller import BaseBrowserController
 from crawlee.browsers._playwright_browser_plugin import PlaywrightBrowserPlugin
@@ -26,6 +27,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
+@docs_group('Classes')
 class BrowserPool:
     """Manages a pool of browsers and their pages, handling lifecycle events and resource allocation.
 

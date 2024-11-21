@@ -4,12 +4,21 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, cast
+from operator import attrgetter
+from typing import TYPE_CHECKING, TypeVar, cast
 
 import psutil
+from sortedcontainers import SortedList
 
-from crawlee._autoscaling.types import ClientSnapshot, CpuSnapshot, EventLoopSnapshot, MemorySnapshot, Snapshot
+from crawlee._autoscaling.types import (
+    ClientSnapshot,
+    CpuSnapshot,
+    EventLoopSnapshot,
+    MemorySnapshot,
+    Snapshot,
+)
 from crawlee._utils.byte_size import ByteSize
+from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee.events._types import Event, EventSystemInfoData
 
@@ -20,7 +29,10 @@ if TYPE_CHECKING:
 
 logger = getLogger(__name__)
 
+T = TypeVar('T')
 
+
+@docs_group('Classes')
 class Snapshotter:
     """Monitors and logs system resource usage at predefined intervals for performance optimization.
 
@@ -92,15 +104,19 @@ class Snapshotter:
             cast(float, available_memory_ratio)
         )
 
-        self._cpu_snapshots: list[CpuSnapshot] = []
-        self._event_loop_snapshots: list[EventLoopSnapshot] = []
-        self._memory_snapshots: list[MemorySnapshot] = []
-        self._client_snapshots: list[ClientSnapshot] = []
+        self._cpu_snapshots = self._get_sorted_list_by_created_at(list[CpuSnapshot]())
+        self._event_loop_snapshots = self._get_sorted_list_by_created_at(list[EventLoopSnapshot]())
+        self._memory_snapshots = self._get_sorted_list_by_created_at(list[MemorySnapshot]())
+        self._client_snapshots = self._get_sorted_list_by_created_at(list[ClientSnapshot]())
 
         self._snapshot_event_loop_task = RecurringTask(self._snapshot_event_loop, self._event_loop_snapshot_interval)
         self._snapshot_client_task = RecurringTask(self._snapshot_client, self._client_snapshot_interval)
 
         self._timestamp_of_last_memory_warning: datetime = datetime.now(timezone.utc) - timedelta(hours=1)
+
+    @staticmethod
+    def _get_sorted_list_by_created_at(input_list: list[T]) -> SortedList[T]:
+        return SortedList(input_list, key=attrgetter('created_at'))
 
     @staticmethod
     def _get_default_max_memory_size(available_memory_ratio: float) -> ByteSize:
@@ -192,7 +208,7 @@ class Snapshotter:
             return []
 
         latest_time = snapshots[-1].created_at
-        return [snapshot for snapshot in reversed(snapshots) if latest_time - snapshot.created_at <= duration]
+        return [snapshot for snapshot in snapshots if latest_time - snapshot.created_at <= duration]
 
     def _snapshot_cpu(self, event_data: EventSystemInfoData) -> None:
         """Captures a snapshot of the current CPU usage.
@@ -211,7 +227,7 @@ class Snapshotter:
 
         snapshots = cast(list[Snapshot], self._cpu_snapshots)
         self._prune_snapshots(snapshots, event_data.cpu_info.created_at)
-        self._cpu_snapshots.append(snapshot)
+        self._cpu_snapshots.add(snapshot)
 
     def _snapshot_memory(self, event_data: EventSystemInfoData) -> None:
         """Captures a snapshot of the current memory usage.
@@ -231,8 +247,7 @@ class Snapshotter:
 
         snapshots = cast(list[Snapshot], self._memory_snapshots)
         self._prune_snapshots(snapshots, snapshot.created_at)
-        self._memory_snapshots.append(snapshot)
-
+        self._memory_snapshots.add(snapshot)
         self._evaluate_memory_load(event_data.memory_info.current_size, event_data.memory_info.created_at)
 
     def _snapshot_event_loop(self) -> None:
@@ -252,7 +267,7 @@ class Snapshotter:
 
         snapshots = cast(list[Snapshot], self._event_loop_snapshots)
         self._prune_snapshots(snapshots, snapshot.created_at)
-        self._event_loop_snapshots.append(snapshot)
+        self._event_loop_snapshots.add(snapshot)
 
     def _snapshot_client(self) -> None:
         """Captures a snapshot of the current API state by checking for rate limit errors (HTTP 429).
@@ -269,7 +284,7 @@ class Snapshotter:
 
         snapshots = cast(list[Snapshot], self._client_snapshots)
         self._prune_snapshots(snapshots, snapshot.created_at)
-        self._client_snapshots.append(snapshot)
+        self._client_snapshots.add(snapshot)
 
     def _prune_snapshots(self, snapshots: list[Snapshot], now: datetime) -> None:
         """Removes snapshots that are older than the `self._snapshot_history`.

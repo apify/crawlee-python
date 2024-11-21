@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, AsyncIterator, ClassVar, TypeVar, cast, o
 from typing_extensions import override
 
 from crawlee import service_container
+from crawlee._utils.docs import docs_group
 from crawlee.base_storage_client._models import KeyValueStoreKeyInfo, KeyValueStoreMetadata
 from crawlee.events._types import Event, EventPersistStateData
 from crawlee.storages._base_storage import BaseStorage
@@ -17,6 +18,7 @@ T = TypeVar('T')
 DictT = TypeVar('DictT', bound=dict[str, Any])
 
 
+@docs_group('Classes')
 class KeyValueStore(BaseStorage):
     """Represents a key-value based storage for reading and writing data records or files.
 

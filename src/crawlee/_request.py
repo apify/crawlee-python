@@ -1,28 +1,21 @@
-# ruff: noqa: TCH001, TCH002, TCH003 (because of Pydantic)
-
 from __future__ import annotations
 
 from collections.abc import Iterator, MutableMapping
 from datetime import datetime
 from decimal import Decimal
 from enum import IntEnum
-from typing import Annotated, Any, cast
+from typing import TYPE_CHECKING, Annotated, Any, cast
 
-from pydantic import (
-    BaseModel,
-    BeforeValidator,
-    ConfigDict,
-    Field,
-    PlainSerializer,
-    PlainValidator,
-    TypeAdapter,
-)
-from typing_extensions import Self
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, PlainSerializer, PlainValidator, TypeAdapter
 
 from crawlee._types import EnqueueStrategy, HttpHeaders, HttpMethod, HttpPayload, JsonSerializable
 from crawlee._utils.crypto import crypto_random_object_id
+from crawlee._utils.docs import docs_group
 from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
 from crawlee._utils.urls import extract_query_params, validate_http_url
+
+if TYPE_CHECKING:
+    from typing_extensions import Self
 
 
 class RequestState(IntEnum):
@@ -142,8 +135,16 @@ class BaseRequestData(BaseModel):
     headers: Annotated[HttpHeaders, Field(default_factory=HttpHeaders)] = HttpHeaders()
     """HTTP request headers."""
 
-    payload: HttpPayload | None = None
-    """HTTP request payload."""
+    payload: Annotated[
+        HttpPayload | None,
+        BeforeValidator(lambda v: v.encode() if isinstance(v, str) else v),
+        PlainSerializer(lambda v: v.decode() if isinstance(v, bytes) else v),
+    ] = None
+    """HTTP request payload.
+
+    TODO: Re-check the need for `Validator` and `Serializer` once the issue is resolved.
+    https://github.com/apify/crawlee-python/issues/94
+    """
 
     user_data: Annotated[
         dict[str, JsonSerializable],  # Internally, the model contains `UserData`, this is just for convenience
@@ -182,7 +183,7 @@ class BaseRequestData(BaseModel):
         *,
         method: HttpMethod = 'GET',
         headers: HttpHeaders | dict[str, str] | None = None,
-        payload: HttpPayload | None = None,
+        payload: HttpPayload | str | None = None,
         label: str | None = None,
         unique_key: str | None = None,
         id: str | None = None,
@@ -193,6 +194,9 @@ class BaseRequestData(BaseModel):
         """Create a new `BaseRequestData` instance from a URL. See `Request.from_url` for more details."""
         if isinstance(headers, dict) or headers is None:
             headers = HttpHeaders(headers or {})
+
+        if isinstance(payload, str):
+            payload = payload.encode()
 
         unique_key = unique_key or compute_unique_key(
             url,
@@ -227,6 +231,7 @@ class BaseRequestData(BaseModel):
         return values[0]
 
 
+@docs_group('Data structures')
 class Request(BaseRequestData):
     """Represents a request in the Crawlee framework, containing the necessary information for crawling operations.
 
@@ -274,7 +279,7 @@ class Request(BaseRequestData):
         *,
         method: HttpMethod = 'GET',
         headers: HttpHeaders | dict[str, str] | None = None,
-        payload: HttpPayload | None = None,
+        payload: HttpPayload | str | None = None,
         label: str | None = None,
         unique_key: str | None = None,
         id: str | None = None,
@@ -314,6 +319,9 @@ class Request(BaseRequestData):
 
         if isinstance(headers, dict) or headers is None:
             headers = HttpHeaders(headers or {})
+
+        if isinstance(payload, str):
+            payload = payload.encode()
 
         unique_key = unique_key or compute_unique_key(
             url,

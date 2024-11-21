@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from playwright.async_api import Playwright, async_playwright
 from typing_extensions import override
 
+from crawlee._utils.docs import docs_group
 from crawlee.browsers._base_browser_plugin import BaseBrowserPlugin
 from crawlee.browsers._playwright_browser_controller import PlaywrightBrowserController
 
@@ -20,6 +21,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
+@docs_group('Classes')
 class PlaywrightBrowserPlugin(BaseBrowserPlugin):
     """A plugin for managing Playwright automation library.
 

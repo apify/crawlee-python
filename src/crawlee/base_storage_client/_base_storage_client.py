@@ -5,6 +5,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
+from crawlee._utils.docs import docs_group
+
 if TYPE_CHECKING:
     from ._base_dataset_client import BaseDatasetClient
     from ._base_dataset_collection_client import BaseDatasetCollectionClient
@@ -14,6 +16,7 @@ if TYPE_CHECKING:
     from ._base_request_queue_collection_client import BaseRequestQueueCollectionClient
 
 
+@docs_group('Abstract classes')
 class BaseStorageClient(ABC):
     """Defines an abstract base for storage clients.
 

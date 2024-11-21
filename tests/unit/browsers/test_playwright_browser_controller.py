@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta, timezone
-from typing import AsyncGenerator
+from typing import TYPE_CHECKING, AsyncGenerator
 
 import pytest
 from playwright.async_api import Browser, Playwright, async_playwright
 
 from crawlee.browsers import PlaywrightBrowserController
+
+if TYPE_CHECKING:
+    from httpx import URL
 
 
 @pytest.fixture
@@ -41,9 +44,9 @@ async def test_initial_state(browser: Browser) -> None:
     assert controller.has_free_capacity
 
 
-async def test_open_and_close_page(controller: PlaywrightBrowserController, httpbin: str) -> None:
+async def test_open_and_close_page(controller: PlaywrightBrowserController, httpbin: URL) -> None:
     page = await controller.new_page()
-    await page.goto(f'{httpbin}')
+    await page.goto(str(httpbin))
 
     assert page in controller.pages
     assert controller.pages_count == 1

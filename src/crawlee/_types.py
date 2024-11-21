@@ -19,6 +19,8 @@ from typing import (
 from pydantic import ConfigDict, Field, PlainValidator, RootModel
 from typing_extensions import NotRequired, TypeAlias, TypedDict, Unpack
 
+from crawlee._utils.docs import docs_group
+
 if TYPE_CHECKING:
     import logging
     import re
@@ -97,6 +99,7 @@ class HttpHeaders(RootModel, Mapping[str, str]):
         return len(self.root)
 
 
+@docs_group('Data structures')
 class EnqueueStrategy(str, Enum):
     """Strategy for deciding which links should be followed and which ones should be ignored."""
 
@@ -117,6 +120,7 @@ class EnqueueStrategy(str, Enum):
     the same protocol, domain, and port, ensuring a strict scope for the crawl."""
 
 
+@docs_group('Data structures')
 class ConcurrencySettings:
     """Concurrency settings for AutoscaledPool."""
 
@@ -345,6 +349,7 @@ class GetKeyValueStoreFromRequestHandlerFunction(Protocol):
 
 
 @dataclass(frozen=True)
+@docs_group('Data structures')
 class BasicCrawlingContext:
     """Basic crawling context intended to be extended by crawlers."""
 
