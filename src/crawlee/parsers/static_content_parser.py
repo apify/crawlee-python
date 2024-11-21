@@ -19,12 +19,6 @@ from crawlee.http_clients import HttpCrawlingResult, HttpResponse, HttpxHttpClie
 from crawlee.http_crawler import HttpCrawlingContext
 
 TParseResult = TypeVar('TParseResult')
-TCrawlingResult = TypeVar('TParseResult')
-@dataclass
-class BeautifulSoupResult:
-    soup: BeautifulSoup
-
-TypeNoParserResult = None
 
 @dataclass(frozen=True)
 @docs_group('Data structures')
@@ -50,12 +44,12 @@ class StaticContentParser(Generic[TParseResult], ABC):
     def find_links(self, result: TParseResult, selector: str) -> Iterable[str]: ...
 
 
-class BeautifulSoupContentParser(StaticContentParser[BeautifulSoupResult]):
+class BeautifulSoupContentParser(StaticContentParser[BeautifulSoup]):
     def __init__(self, parser: str = 'lxml'):
         self.parser = parser
 
     @override
-    def parse(self, response: HttpCrawlingResult)->BeautifulSoupResult:
+    def parse(self, response: HttpCrawlingResult)->BeautifulSoup:
         return BeautifulSoup(response.read(), self._parser)
 
     @override
@@ -71,9 +65,9 @@ class BeautifulSoupContentParser(StaticContentParser[BeautifulSoupResult]):
         #return matched_selectors  # ??? Really needed ???
 
     @override
-    def find_links(self, result: BeautifulSoupResult, selector: str) -> Iterable[str]:
+    def find_links(self, soup: BeautifulSoup, selector: str) -> Iterable[str]:
         urls: str = []
-        for link in result.soup.select(selector):
+        for link in soup.select(selector):
             if (url := link.attrs.get('href')) is not None:
                 urls.append(url.strip())
         return urls
@@ -169,7 +163,7 @@ class HttpCrawler(Generic[TParseResult], BasicCrawler[HttpCrawlingContext]):
 
 
 
-class BeautifulSoupCrawler(HttpCrawler[BeautifulSoupResult]):
+class BeautifulSoupCrawler(HttpCrawler[BeautifulSoup]):
     ...
 
 
