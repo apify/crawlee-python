@@ -2,15 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.4.3 - **not yet released**
+## [0.4.3](https://github.com/apify/crawlee-python/releases/tag/v0.4.3) (2024-11-21)
 
 ### 🐛 Bug Fixes
 
 - Pydantic 2.10.0 issues ([#716](https://github.com/apify/crawlee-python/pull/716)) ([8d8b3fc](https://github.com/apify/crawlee-python/commit/8d8b3fcff8be10edf5351f5324c7ba112c1d2ba0)) by [@Pijukatel](https://github.com/Pijukatel)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.4.2](https://github.com/apify/crawlee-python/releases/tag/v0.4.2) (2024-11-20)
 
 ### 🐛 Bug Fixes
