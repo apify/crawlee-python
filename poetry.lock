@@ -3358,4 +3358,4 @@ playwright = ["playwright"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "fbc42ae0c3057bc0f00104fc3e9dc9eb67dbb0031fd314dd6320d5351dcbe8cd"
+content-hash = "aa74b4f1dbd00bbfaeb09216c22faba5005e322e1980ee6536ef941da755b9e3"
