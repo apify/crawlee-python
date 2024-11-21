@@ -44,8 +44,7 @@
 }
 
 .heroBanner h1:nth-child(1) {
-    background: linear-gradient(225deg, #9dceff 0%, #4584b6 30%, #4584b6 100%),
-        #4584b6;
+    background: linear-gradient(225deg, #9dceff 0%, #4584b6 60%, #4584b6 100%), #4584b6;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;

@@ -9,13 +9,16 @@ from typing import TYPE_CHECKING, AsyncIterator, Literal, TextIO, TypedDict, cas
 from typing_extensions import NotRequired, Required, Unpack, override
 
 from crawlee._utils.byte_size import ByteSize
+from crawlee._utils.docs import docs_group
 from crawlee._utils.file import json_dumps
 from crawlee.base_storage_client._models import DatasetMetadata
 from crawlee.storages._base_storage import BaseStorage
 from crawlee.storages._key_value_store import KeyValueStore
 
 if TYPE_CHECKING:
-    from crawlee._types import JsonSerializable
+    from collections.abc import Callable
+
+    from crawlee._types import JsonSerializable, PushDataKwargs
     from crawlee.base_storage_client import BaseStorageClient
     from crawlee.base_storage_client._models import DatasetItemsListPage
     from crawlee.configuration import Configuration
@@ -25,55 +28,130 @@ logger = logging.getLogger(__name__)
 
 
 class GetDataKwargs(TypedDict):
-    """Keyword arguments for dataset's `get_data` method.
-
-    Args:
-        offset: Skips the specified number of items at the start.
-        limit: The maximum number of items to retrieve. Unlimited if None.
-        clean: Returns only non-empty items and excludes hidden fields. Shortcut for skip_hidden and skip_empty.
-        desc: Set True to sort results in descending order.
-        fields: Fields to include in each item. Sorts fields as specified if provided.
-        omit: Fields to exclude from each item.
-        unwind: Unwinds items by a specified array field, turning each element into a separate item.
-        skip_empty: Excludes empty items from the results if True.
-        skip_hidden: Excludes fields starting with '#' if True.
-        flatten: Fields to be flattened in returned items.
-        view: Specifies the dataset view to be used.
-    """
+    """Keyword arguments for dataset's `get_data` method."""
 
     offset: NotRequired[int]
+    """Skips the specified number of items at the start."""
+
     limit: NotRequired[int]
+    """The maximum number of items to retrieve. Unlimited if None."""
+
     clean: NotRequired[bool]
+    """Returns only non-empty items and excludes hidden fields. Shortcut for skip_hidden and skip_empty."""
+
     desc: NotRequired[bool]
+    """Set to True to sort results in descending order."""
+
     fields: NotRequired[list[str]]
+    """Fields to include in each item. Sorts fields as specified if provided."""
+
     omit: NotRequired[list[str]]
+    """Fields to exclude from each item."""
+
     unwind: NotRequired[str]
+    """Unwinds items by a specified array field, turning each element into a separate item."""
+
     skip_empty: NotRequired[bool]
+    """Excludes empty items from the results if True."""
+
     skip_hidden: NotRequired[bool]
+    """Excludes fields starting with '#' if True."""
+
     flatten: NotRequired[list[str]]
+    """Fields to be flattened in returned items."""
+
     view: NotRequired[str]
-
-
-class PushDataKwargs(TypedDict):
-    """Keyword arguments for dataset's `push_data` method."""
+    """Specifies the dataset view to be used."""
 
 
 class ExportToKwargs(TypedDict):
-    """Keyword arguments for dataset's `export_to` method.
-
-    Args:
-        key: The key under which to save the data.
-        content_type: The format in which to export the data. Either 'json' or 'csv'.
-        to_key_value_store_id: ID of the key-value store to save the exported file.
-        to_key_value_store_name: Name of the key-value store to save the exported file.
-    """
+    """Keyword arguments for dataset's `export_to` method."""
 
     key: Required[str]
+    """The key under which to save the data."""
+
     content_type: NotRequired[Literal['json', 'csv']]
+    """The format in which to export the data. Either 'json' or 'csv'."""
+
     to_key_value_store_id: NotRequired[str]
+    """ID of the key-value store to save the exported file."""
+
     to_key_value_store_name: NotRequired[str]
+    """Name of the key-value store to save the exported file."""
 
 
+class ExportDataJsonKwargs(TypedDict):
+    """Keyword arguments for dataset's `export_data_json` method."""
+
+    skipkeys: NotRequired[bool]
+    """If True (default: False), dict keys that are not of a basic type (str, int, float, bool, None) will be skipped
+    instead of raising a `TypeError`."""
+
+    ensure_ascii: NotRequired[bool]
+    """Determines if non-ASCII characters should be escaped in the output JSON string."""
+
+    check_circular: NotRequired[bool]
+    """If False (default: True), skips the circular reference check for container types. A circular reference will
+    result in a `RecursionError` or worse if unchecked."""
+
+    allow_nan: NotRequired[bool]
+    """If False (default: True), raises a ValueError for out-of-range float values (nan, inf, -inf) to strictly comply
+    with the JSON specification. If True, uses their JavaScript equivalents (NaN, Infinity, -Infinity)."""
+
+    cls: NotRequired[type[json.JSONEncoder]]
+    """Allows specifying a custom JSON encoder."""
+
+    indent: NotRequired[int]
+    """Specifies the number of spaces for indentation in the pretty-printed JSON output."""
+
+    separators: NotRequired[tuple[str, str]]
+    """A tuple of (item_separator, key_separator). The default is (', ', ': ') if indent is None and (',', ': ')
+    otherwise."""
+
+    default: NotRequired[Callable]
+    """A function called for objects that can't be serialized otherwise. It should return a JSON-encodable version
+    of the object or raise a `TypeError`."""
+
+    sort_keys: NotRequired[bool]
+    """Specifies whether the output JSON object should have keys sorted alphabetically."""
+
+
+class ExportDataCsvKwargs(TypedDict):
+    """Keyword arguments for dataset's `export_data_csv` method."""
+
+    dialect: NotRequired[str]
+    """Specifies a dialect to be used in CSV parsing and writing."""
+
+    delimiter: NotRequired[str]
+    """A one-character string used to separate fields. Defaults to ','."""
+
+    doublequote: NotRequired[bool]
+    """Controls how instances of `quotechar` inside a field should be quoted. When True, the character is doubled;
+    when False, the `escapechar` is used as a prefix. Defaults to True."""
+
+    escapechar: NotRequired[str]
+    """A one-character string used to escape the delimiter if `quoting` is set to `QUOTE_NONE` and the `quotechar`
+    if `doublequote` is False. Defaults to None, disabling escaping."""
+
+    lineterminator: NotRequired[str]
+    """The string used to terminate lines produced by the writer. Defaults to '\\r\\n'."""
+
+    quotechar: NotRequired[str]
+    """A one-character string used to quote fields containing special characters, like the delimiter or quotechar,
+    or fields containing new-line characters. Defaults to '\"'."""
+
+    quoting: NotRequired[int]
+    """Controls when quotes should be generated by the writer and recognized by the reader. Can take any of
+    the `QUOTE_*` constants, with a default of `QUOTE_MINIMAL`."""
+
+    skipinitialspace: NotRequired[bool]
+    """When True, spaces immediately following the delimiter are ignored. Defaults to False."""
+
+    strict: NotRequired[bool]
+    """When True, raises an exception on bad CSV input. Defaults to False."""
+
+
+@docs_group('Classes')
 class Dataset(BaseStorage):
     """Represents an append-only structured storage, ideal for tabular data similar to database tables.
 
@@ -97,8 +175,11 @@ class Dataset(BaseStorage):
     not exist will raise an error; however, if accessed by `name`, the dataset will be created if it doesn't already
     exist.
 
-    Usage:
+    ### Usage
+
     ```python
+    from crawlee.storages import Dataset
+
     dataset = await Dataset.open(name='my_dataset')
     ```
     """
@@ -178,11 +259,11 @@ class Dataset(BaseStorage):
         """
         # Handle singular items
         if not isinstance(data, list):
-            items = await self._check_and_serialize(data)
+            items = await self.check_and_serialize(data)
             return await self._resource_client.push_items(items, **kwargs)
 
         # Handle lists
-        payloads_generator = (await self._check_and_serialize(item, index) for index, item in enumerate(data))
+        payloads_generator = (await self.check_and_serialize(item, index) for index, item in enumerate(data))
 
         # Invoke client in series to preserve the order of data
         async for items in self._chunk_by_size(payloads_generator):
@@ -202,16 +283,14 @@ class Dataset(BaseStorage):
         Returns:
             List page containing filtered and paginated dataset items.
         """
-        # TODO: Improve error handling here
-        # https://github.com/apify/apify-sdk-python/issues/140
         return await self._resource_client.list_items(**kwargs)
 
-    async def write_to(self, content_type: Literal['json', 'csv'], destination: TextIO) -> None:
+    async def write_to_csv(self, destination: TextIO, **kwargs: Unpack[ExportDataCsvKwargs]) -> None:
         """Exports the entire dataset into an arbitrary stream.
 
         Args:
-            content_type: Specifies the output format
-            destination: The stream into which the dataset contents should be written
+            destination: The stream into which the dataset contents should be written.
+            kwargs: Additional keyword arguments for `csv.writer`.
         """
         items: list[dict] = []
         limit = 1000
@@ -224,16 +303,34 @@ class Dataset(BaseStorage):
                 break
             offset += list_items.count
 
-        if content_type == 'csv':
-            if items:
-                writer = csv.writer(destination, quoting=csv.QUOTE_MINIMAL)
-                writer.writerows([items[0].keys(), *[item.values() for item in items]])
-            else:
-                logger.warning('Attempting to export an empty dataset - no file will be created')
-        elif content_type == 'json':
-            json.dump(items, destination)
+        if items:
+            writer = csv.writer(destination, **kwargs)
+            writer.writerows([items[0].keys(), *[item.values() for item in items]])
         else:
-            raise ValueError(f'Unsupported content type: {content_type}')
+            logger.warning('Attempting to export an empty dataset - no file will be created')
+
+    async def write_to_json(self, destination: TextIO, **kwargs: Unpack[ExportDataJsonKwargs]) -> None:
+        """Exports the entire dataset into an arbitrary stream.
+
+        Args:
+            destination: The stream into which the dataset contents should be written.
+            kwargs: Additional keyword arguments for `json.dump`.
+        """
+        items: list[dict] = []
+        limit = 1000
+        offset = 0
+
+        while True:
+            list_items = await self._resource_client.list_items(limit=limit, offset=offset)
+            items.extend(list_items.items)
+            if list_items.total <= offset + list_items.count:
+                break
+            offset += list_items.count
+
+        if items:
+            json.dump(items, destination, **kwargs)
+        else:
+            logger.warning('Attempting to export an empty dataset - no file will be created')
 
     async def export_to(self, **kwargs: Unpack[ExportToKwargs]) -> None:
         """Exports the entire dataset into a specified file stored under a key in a key-value store.
@@ -248,13 +345,18 @@ class Dataset(BaseStorage):
         """
         key = cast(str, kwargs.get('key'))
         content_type = kwargs.get('content_type', 'json')
-        to_key_value_store_id = kwargs.get('to_key_value_store_id', None)
-        to_key_value_store_name = kwargs.get('to_key_value_store_name', None)
+        to_key_value_store_id = kwargs.get('to_key_value_store_id')
+        to_key_value_store_name = kwargs.get('to_key_value_store_name')
 
         key_value_store = await KeyValueStore.open(id=to_key_value_store_id, name=to_key_value_store_name)
 
         output = io.StringIO()
-        await self.write_to(content_type, output)
+        if content_type == 'csv':
+            await self.write_to_csv(output)
+        elif content_type == 'json':
+            await self.write_to_json(output)
+        else:
+            raise ValueError('Unsupported content type, expecting CSV or JSON')
 
         if content_type == 'csv':
             await key_value_store.set_value(key, output.getvalue(), 'text/csv')
@@ -302,7 +404,7 @@ class Dataset(BaseStorage):
         Yields:
             Each item from the dataset as a dictionary.
         """
-        async for item in self._resource_client.iterate_items(  # type: ignore
+        async for item in self._resource_client.iterate_items(
             offset=offset,
             limit=limit,
             clean=clean,
@@ -315,7 +417,8 @@ class Dataset(BaseStorage):
         ):
             yield item
 
-    async def _check_and_serialize(self, item: JsonSerializable, index: int | None = None) -> str:
+    @classmethod
+    async def check_and_serialize(cls, item: JsonSerializable, index: int | None = None) -> str:
         """Serializes a given item to JSON, checks its serializability and size against a limit.
 
         Args:
@@ -336,8 +439,8 @@ class Dataset(BaseStorage):
             raise ValueError(f'Data item{s}is not serializable to JSON.') from exc
 
         payload_size = ByteSize(len(payload.encode('utf-8')))
-        if payload_size > self._EFFECTIVE_LIMIT_SIZE:
-            raise ValueError(f'Data item{s}is too large (size: {payload_size}, limit: {self._EFFECTIVE_LIMIT_SIZE})')
+        if payload_size > cls._EFFECTIVE_LIMIT_SIZE:
+            raise ValueError(f'Data item{s}is too large (size: {payload_size}, limit: {cls._EFFECTIVE_LIMIT_SIZE})')
 
         return payload
 

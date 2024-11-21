@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Optional
 
+from crawlee._utils.docs import docs_group
+
 try:
     from curl_cffi.requests import AsyncSession
-    from curl_cffi.requests.errors import RequestsError
-    from curl_cffi.requests.impersonate import BrowserType
+    from curl_cffi.requests.exceptions import ProxyError as CurlProxyError
+    from curl_cffi.requests.exceptions import RequestException as CurlRequestError
+    from curl_cffi.requests.impersonate import DEFAULT_CHROME as CURL_DEFAULT_CHROME
 except ImportError as exc:
     raise ImportError(
         "To import anything from this subpackage, you need to install the 'curl-impersonate' extra."
@@ -15,6 +18,7 @@ except ImportError as exc:
 from curl_cffi.const import CurlHttpVersion
 from typing_extensions import override
 
+from crawlee._types import HttpHeaders, HttpPayload
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
 from crawlee.errors import ProxyError
 from crawlee.http_clients import BaseHttpClient, HttpCrawlingResult, HttpResponse
@@ -24,7 +28,7 @@ if TYPE_CHECKING:
 
     from curl_cffi.requests import Response
 
-    from crawlee._types import HttpHeaders, HttpMethod
+    from crawlee._types import HttpMethod
     from crawlee.base_storage_client._models import Request
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions import Session
@@ -61,13 +65,14 @@ class _CurlImpersonateResponse:
         return self._response.status_code
 
     @property
-    def headers(self) -> dict[str, str]:
-        return dict(self._response.headers.items())
+    def headers(self) -> HttpHeaders:
+        return HttpHeaders(dict(self._response.headers))
 
     def read(self) -> bytes:
         return self._response.content
 
 
+@docs_group('Classes')
 class CurlImpersonateHttpClient(BaseHttpClient):
     """HTTP client based on the `curl-cffi` library.
 
@@ -75,6 +80,16 @@ class CurlImpersonateHttpClient(BaseHttpClient):
     and to manage sessions, proxies, and error handling.
 
     See the `BaseHttpClient` class for more common information about HTTP clients.
+
+    ### Usage
+
+    ```python
+    from crawlee.http_clients.curl_impersonate import CurlImpersonateHttpClient
+    from crawlee.http_crawler import HttpCrawler  # or any other HTTP client-based crawler
+
+    http_client = CurlImpersonateHttpClient()
+    crawler = HttpCrawler(http_client=http_client)
+    ```
     """
 
     def __init__(
@@ -85,7 +100,7 @@ class CurlImpersonateHttpClient(BaseHttpClient):
         ignore_http_error_status_codes: Iterable[int] = (),
         **async_session_kwargs: Any,
     ) -> None:
-        """Create a new instance.
+        """A default constructor.
 
         Args:
             persist_cookies_per_session: Whether to persist cookies per HTTP session.
@@ -116,14 +131,13 @@ class CurlImpersonateHttpClient(BaseHttpClient):
         try:
             response = await client.request(
                 url=request.url,
-                method=request.method.upper(),  # curl-cffi requires uppercase method
+                method=request.method.upper(),  # type: ignore # curl-cffi requires uppercase method
                 headers=request.headers,
-                params=request.query_params,
-                data=request.data,
+                data=request.payload,
                 cookies=session.cookies if session else None,
                 allow_redirects=True,
             )
-        except RequestsError as exc:
+        except CurlRequestError as exc:
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
             raise
@@ -149,26 +163,27 @@ class CurlImpersonateHttpClient(BaseHttpClient):
         url: str,
         *,
         method: HttpMethod = 'GET',
-        headers: HttpHeaders | None = None,
-        query_params: dict[str, Any] | None = None,
-        data: dict[str, Any] | None = None,
+        headers: HttpHeaders | dict[str, str] | None = None,
+        payload: HttpPayload | None = None,
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> HttpResponse:
+        if isinstance(headers, dict) or headers is None:
+            headers = HttpHeaders(headers or {})
+
         proxy_url = proxy_info.url if proxy_info else None
         client = self._get_client(proxy_url)
 
         try:
             response = await client.request(
                 url=url,
-                method=method.upper(),  # curl-cffi requires uppercase method
-                headers=headers,
-                params=query_params,
-                data=data,
+                method=method.upper(),  # type: ignore # curl-cffi requires uppercase method
+                headers=dict(headers) if headers else None,
+                data=payload,
                 cookies=session.cookies if session else None,
                 allow_redirects=True,
             )
-        except RequestsError as exc:
+        except CurlRequestError as exc:
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
             raise
@@ -194,7 +209,7 @@ class CurlImpersonateHttpClient(BaseHttpClient):
             # are set as default options.
             kwargs: dict[str, Any] = {
                 'proxy': proxy_url,
-                'impersonate': BrowserType.chrome,
+                'impersonate': CURL_DEFAULT_CHROME,
             }
 
             # Update the default kwargs with any additional user-provided kwargs.
@@ -206,13 +221,12 @@ class CurlImpersonateHttpClient(BaseHttpClient):
         return self._client_by_proxy_url[proxy_url]
 
     @staticmethod
-    def _is_proxy_error(error: RequestsError) -> bool:
+    def _is_proxy_error(error: CurlRequestError) -> bool:
         """Helper to check whether the given error is a proxy-related error."""
         if any(needle in str(error) for needle in ROTATE_PROXY_ERRORS):
             return True
 
-        # Once https://github.com/yifeikong/curl_cffi/issues/361 is resolved, do it better.
-        if 'CONNECT tunnel failed' in str(error):  # noqa: SIM103
+        if isinstance(error, CurlProxyError):  # noqa: SIM103
             return True
 
         return False

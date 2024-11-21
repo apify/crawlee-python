@@ -1,4 +1,5 @@
 {
+    "name": "crawlee",
     "scripts": {
         "examples": "docusaurus-examples",
         "postinstall": "npx patch-package",
@@ -23,17 +24,17 @@
         "@typescript-eslint/eslint-plugin": "8.2.0",
         "@typescript-eslint/parser": "8.2.0",
         "eslint": "8.57.0",
-        "eslint-plugin-react": "7.36.1",
+        "eslint-plugin-react": "7.37.2",
         "eslint-plugin-react-hooks": "4.6.2",
         "fs-extra": "^11.1.0",
         "patch-package": "^8.0.0",
         "path-browserify": "^1.0.1",
         "prettier": "^3.0.0",
         "rimraf": "^6.0.0",
-        "typescript": "5.5.4"
+        "typescript": "5.6.3"
     },
     "dependencies": {
-        "@apify/docusaurus-plugin-typedoc-api": "^4.2.2",
+        "@apify/docusaurus-plugin-typedoc-api": "^4.3.0",
         "@apify/utilities": "^2.8.0",
         "@docusaurus/core": "^3.5.2",
         "@docusaurus/mdx-loader": "^3.5.2",
@@ -56,5 +57,5 @@
         "stream-browserify": "^3.0.0",
         "unist-util-visit": "^5.0.0"
     },
-    "packageManager": "yarn@4.4.1"
+    "packageManager": "yarn@4.5.1"
 }

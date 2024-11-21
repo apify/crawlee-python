@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
     from types import TracebackType
 
     from crawlee.browsers._base_browser_controller import BaseBrowserController
+    from crawlee.browsers._types import BrowserType
 
 
 class BaseBrowserPlugin(ABC):
@@ -24,7 +25,7 @@ class BaseBrowserPlugin(ABC):
 
     @property
     @abstractmethod
-    def browser_type(self) -> Literal['chromium', 'firefox', 'webkit']:
+    def browser_type(self) -> BrowserType:
         """Return the browser type name."""
 
     @property

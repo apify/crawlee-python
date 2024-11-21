@@ -5,6 +5,7 @@ from typing import Generic
 from typing_extensions import TypeVar
 
 from crawlee._types import BasicCrawlingContext
+from crawlee._utils.docs import docs_group
 
 __all__ = [
     'ContextPipelineFinalizationError',
@@ -21,10 +22,12 @@ __all__ = [
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 
 
+@docs_group('Errors')
 class UserDefinedErrorHandlerError(Exception):
     """Wraps an exception thrown from an user-defined error handler."""
 
 
+@docs_group('Errors')
 class SessionError(Exception):
     """Errors of `SessionError` type will trigger a session rotation.
 
@@ -32,10 +35,12 @@ class SessionError(Exception):
     """
 
 
+@docs_group('Errors')
 class ProxyError(SessionError):
     """Raised when a proxy is being blocked or malfunctions."""
 
 
+@docs_group('Errors')
 class HttpStatusCodeError(Exception):
     """Raised when the response status code indicates an error."""
 
@@ -45,6 +50,7 @@ class HttpStatusCodeError(Exception):
         self.message = message
 
 
+@docs_group('Errors')
 class RequestHandlerError(Exception, Generic[TCrawlingContext]):
     """Wraps an exception thrown from a request handler (router) and extends it with crawling context."""
 
@@ -54,6 +60,7 @@ class RequestHandlerError(Exception, Generic[TCrawlingContext]):
         self.crawling_context = crawling_context
 
 
+@docs_group('Errors')
 class ContextPipelineInitializationError(Exception):
     """Wraps an exception thrown in the initialization step of a context pipeline middleware.
 
@@ -66,6 +73,7 @@ class ContextPipelineInitializationError(Exception):
         self.crawling_context = crawling_context
 
 
+@docs_group('Errors')
 class ContextPipelineFinalizationError(Exception):
     """Wraps an exception thrown in the finalization step of a context pipeline middleware.
 
@@ -78,10 +86,12 @@ class ContextPipelineFinalizationError(Exception):
         self.crawling_context = crawling_context
 
 
+@docs_group('Errors')
 class ContextPipelineInterruptedError(Exception):
     """May be thrown in the initialization phase of a middleware to signal that the request should not be processed."""
 
 
+@docs_group('Errors')
 class ServiceConflictError(RuntimeError):
     """Thrown when a service container is getting reconfigured."""
 

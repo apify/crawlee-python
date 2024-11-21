@@ -21,16 +21,16 @@ function Hero() {
                     <div className={clsx(styles.relative, 'row')}>
                         <div className="col">
                             <h1 className={styles.tagline}>
-                                Crawlee is a web<br /> scraping and browser<br /> automation library
+                                Build your Python<br/> web crawlers<br/> using Crawlee
                             </h1>
                             <h1 className={styles.tagline}>
-                                Crawlee is a <span>web<br /> scraping</span> and <span>browser<br /> automation</span> library
+                                Build your <span>Python<br/> web crawlers</span><br/> using <span>Crawlee</span>
                             </h1>
                         </div>
                     </div>
                     <div className="row">
                         <div className="col">
-                            <h2>It helps you build reliable crawlers. Fast.</h2>
+                            <h2>It helps you build reliable Python web crawlers. Fast.</h2>
                         </div>
                     </div>
                     <div className="row">
@@ -68,9 +68,9 @@ function Features() {
             <div className="row">
                 {/*<div className="col col--6">*/}
                 <div className="col">
-                    <h2>Reliable crawling 🏗️</h2>
+                    <h2>Build reliable Python web crawlers 🏗️</h2>
                     <p>
-                        Crawlee won't fix broken selectors for you (yet), but it helps you <b>build and maintain your crawlers faster</b>.
+                        Crawlee won't fix broken selectors for you (yet), but it helps you <b>build and maintain your Python web crawlers faster</b>.
                     </p>
                     <p>
                         When a website adds <a href="https://crawlee.dev/docs/guides/javascript-rendering">JavaScript rendering</a>, you don't have to rewrite everything, only switch to a browser crawler. When you later find a great API to speed up your crawls, flip the switch back.

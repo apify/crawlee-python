@@ -1,18 +1,36 @@
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, AsyncGenerator, Awaitable, Callable
 from unittest.mock import AsyncMock, Mock
+from urllib.parse import parse_qs, urlencode
 
 import pytest
 import respx
-from httpx import Response
+from httpx import URL, Response
 
+from crawlee._request import Request
+from crawlee.http_clients._httpx import HttpxHttpClient
+from crawlee.http_clients.curl_impersonate import CurlImpersonateHttpClient
 from crawlee.http_crawler import HttpCrawler
 from crawlee.sessions import SessionPool
 from crawlee.storages import RequestList
 
 if TYPE_CHECKING:
+    from crawlee.http_clients._base import BaseHttpClient
     from crawlee.http_crawler._http_crawling_context import HttpCrawlingContext
+
+
+# Payload, e.g. data for a form submission.
+PAYLOAD = {
+    'custname': 'John Doe',
+    'custtel': '1234567890',
+    'custemail': 'johndoe@example.com',
+    'size': 'large',
+    'topping': '["bacon", "cheese", "mushroom"]',
+    'delivery': '13:00',
+    'comments': 'Please ring the doorbell upon arrival.',
+}
 
 
 @pytest.fixture
@@ -139,7 +157,7 @@ async def test_handles_server_error(
     assert server['500_endpoint'].called
 
 
-async def test_stores_cookies(httpbin: str) -> None:
+async def test_stores_cookies(httpbin: URL) -> None:
     visit = Mock()
     track_session_usage = Mock()
 
@@ -147,11 +165,13 @@ async def test_stores_cookies(httpbin: str) -> None:
     crawler = HttpCrawler(
         request_provider=RequestList(
             [
-                f'{httpbin}/cookies/set?a=1',
-                f'{httpbin}/cookies/set?b=2',
-                f'{httpbin}/cookies/set?c=3',
+                str(httpbin.copy_with(path='/cookies/set').copy_set_param('a', '1')),
+                str(httpbin.copy_with(path='/cookies/set').copy_set_param('b', '2')),
+                str(httpbin.copy_with(path='/cookies/set').copy_set_param('c', '3')),
             ]
         ),
+        # /cookies/set might redirect us to a page that we can't access - no problem, we only care about cookies
+        ignore_http_error_status_codes=[401],
         session_pool=session_pool,
     )
 
@@ -201,3 +221,133 @@ async def test_http_status_statistics(crawler: HttpCrawler, server: respx.MockRo
     assert len(server['html_endpoint'].calls) == 10
     assert len(server['404_endpoint'].calls) == 10
     assert len(server['500_endpoint'].calls) == 30
+
+
+@pytest.mark.parametrize(
+    'http_client_class',
+    [CurlImpersonateHttpClient, HttpxHttpClient],
+    ids=['curl', 'httpx'],
+)
+async def test_sending_payload_as_raw_data(http_client_class: type[BaseHttpClient], httpbin: URL) -> None:
+    http_client = http_client_class()
+    crawler = HttpCrawler(http_client=http_client)
+    responses = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: HttpCrawlingContext) -> None:
+        response = json.loads(context.http_response.read())
+        # The httpbin.org/post endpoint returns the provided payload in the response.
+        responses.append(response)
+
+    encoded_payload = urlencode(PAYLOAD).encode()
+    request = Request.from_url(
+        url=str(httpbin.copy_with(path='/post')),
+        method='POST',
+        payload=encoded_payload,
+    )
+
+    await crawler.run([request])
+
+    assert len(responses) == 1, 'Request handler should be called exactly once.'
+    assert responses[0]['data'].encode() == encoded_payload, 'Response payload data does not match the sent payload.'
+
+    # The reconstructed payload data should match the original payload. We have to flatten the values, because
+    # parse_qs returns a list of values for each key.
+    response_data = {k: v[0] if len(v) == 1 else v for k, v in parse_qs(responses[0]['data']).items()}
+    assert response_data == PAYLOAD, 'The reconstructed payload data does not match the sent payload.'
+
+    assert responses[0]['json'] is None, 'Response JSON data should be empty when only raw data is sent.'
+    assert responses[0]['form'] == {}, 'Response form data should be empty when only raw data is sent.'
+
+
+@pytest.mark.parametrize(
+    'http_client_class',
+    [CurlImpersonateHttpClient, HttpxHttpClient],
+    ids=['curl', 'httpx'],
+)
+async def test_sending_payload_as_form_data(http_client_class: type[BaseHttpClient], httpbin: URL) -> None:
+    http_client = http_client_class()
+    crawler = HttpCrawler(http_client=http_client)
+    responses = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: HttpCrawlingContext) -> None:
+        response = json.loads(context.http_response.read())
+        # The httpbin.org/post endpoint returns the provided payload in the response.
+        responses.append(response)
+
+    request = Request.from_url(
+        url=str(httpbin.copy_with(path='/post')),
+        method='POST',
+        headers={'content-type': 'application/x-www-form-urlencoded'},
+        payload=urlencode(PAYLOAD).encode(),
+    )
+
+    await crawler.run([request])
+
+    assert len(responses) == 1, 'Request handler should be called exactly once.'
+    assert responses[0]['form'] == PAYLOAD, 'Form data in response does not match the sent payload.'
+
+    assert responses[0]['json'] is None, 'Response JSON data should be empty when only form data is sent.'
+    assert responses[0]['data'] == '', 'Response raw data should be empty when only form data is sent.'
+
+
+@pytest.mark.parametrize(
+    'http_client_class',
+    [CurlImpersonateHttpClient, HttpxHttpClient],
+    ids=['curl', 'httpx'],
+)
+async def test_sending_payload_as_json(http_client_class: type[BaseHttpClient], httpbin: URL) -> None:
+    http_client = http_client_class()
+    crawler = HttpCrawler(http_client=http_client)
+    responses = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: HttpCrawlingContext) -> None:
+        response = json.loads(context.http_response.read())
+        # The httpbin.org/post endpoint returns the provided payload in the response.
+        responses.append(response)
+
+    json_payload = json.dumps(PAYLOAD).encode()
+    request = Request.from_url(
+        url=str(httpbin.copy_with(path='/post')),
+        method='POST',
+        payload=json_payload,
+        headers={'content-type': 'application/json'},
+    )
+
+    await crawler.run([request])
+
+    assert len(responses) == 1, 'Request handler should be called exactly once.'
+    assert responses[0]['data'].encode() == json_payload, 'Response raw JSON data does not match the sent payload.'
+    assert responses[0]['json'] == PAYLOAD, 'Response JSON data does not match the sent payload.'
+
+    assert responses[0]['form'] == {}, 'Response form data should be empty when only JSON data is sent.'
+
+
+@pytest.mark.parametrize(
+    'http_client_class',
+    [CurlImpersonateHttpClient, HttpxHttpClient],
+    ids=['curl', 'httpx'],
+)
+async def test_sending_url_query_params(http_client_class: type[BaseHttpClient], httpbin: URL) -> None:
+    http_client = http_client_class()
+    crawler = HttpCrawler(http_client=http_client)
+    responses = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: HttpCrawlingContext) -> None:
+        response = json.loads(context.http_response.read())
+        # The httpbin.org/get endpoint returns the provided query parameters in the response.
+        responses.append(response)
+
+    base_url = httpbin.copy_with(path='/get')
+    query_params = {'param1': 'value1', 'param2': 'value2'}
+    request = Request.from_url(url=str(base_url.copy_merge_params(query_params)))
+
+    await crawler.run([request])
+
+    assert len(responses) == 1, 'Request handler should be called exactly once.'
+
+    response_args = responses[0]['args']
+    assert response_args == query_params, 'Reconstructed query params must match the original query params.'

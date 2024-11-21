@@ -5,8 +5,10 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 import pytest
+from pydantic import ValidationError
 
 from crawlee import Request
+from crawlee._request import RequestState
 from crawlee.storages import RequestQueue
 
 if TYPE_CHECKING:
@@ -162,3 +164,85 @@ async def test_add_batched_requests(
 
     # Confirm the queue is empty after processing all requests
     assert await request_queue.is_empty() is True
+
+
+async def test_invalid_user_data_serialization() -> None:
+    with pytest.raises(ValidationError):
+        Request.from_url(
+            'https://crawlee.dev',
+            user_data={
+                'foo': datetime(year=2020, month=7, day=4, tzinfo=timezone.utc),
+                'bar': {datetime(year=2020, month=4, day=7, tzinfo=timezone.utc)},
+            },
+        )
+
+
+async def test_user_data_serialization(request_queue: RequestQueue) -> None:
+    request = Request.from_url(
+        'https://crawlee.dev',
+        user_data={
+            'hello': 'world',
+            'foo': 42,
+        },
+    )
+
+    await request_queue.add_request(request)
+
+    dequeued_request = await request_queue.fetch_next_request()
+    assert dequeued_request is not None
+
+    assert dequeued_request.user_data['hello'] == 'world'
+    assert dequeued_request.user_data['foo'] == 42
+
+
+async def test_complex_user_data_serialization(request_queue: RequestQueue) -> None:
+    request = Request.from_url('https://crawlee.dev')
+    request.user_data['hello'] = 'world'
+    request.user_data['foo'] = 42
+    request.crawlee_data.max_retries = 1
+    request.crawlee_data.state = RequestState.ERROR_HANDLER
+
+    await request_queue.add_request(request)
+
+    dequeued_request = await request_queue.fetch_next_request()
+    assert dequeued_request is not None
+
+    data = dequeued_request.model_dump(by_alias=True)
+    assert data['userData']['hello'] == 'world'
+    assert data['userData']['foo'] == 42
+    assert data['userData']['__crawlee'] == {
+        'maxRetries': 1,
+        'state': RequestState.ERROR_HANDLER,
+    }
+
+
+async def test_deduplication_of_requests_with_custom_unique_key() -> None:
+    with pytest.raises(ValueError, match='`always_enqueue` cannot be used with a custom `unique_key`'):
+        Request.from_url('https://apify.com', unique_key='apify', always_enqueue=True)
+
+
+async def test_deduplication_of_requests_with_invalid_custom_unique_key() -> None:
+    request_1 = Request.from_url('https://apify.com', always_enqueue=True)
+    request_2 = Request.from_url('https://apify.com', always_enqueue=True)
+
+    rq = await RequestQueue.open(name='my-rq')
+    await rq.add_request(request_1)
+    await rq.add_request(request_2)
+
+    assert await rq.get_total_count() == 2
+
+    assert await rq.fetch_next_request() == request_1
+    assert await rq.fetch_next_request() == request_2
+
+
+async def test_deduplication_of_requests_with_valid_custom_unique_key() -> None:
+    request_1 = Request.from_url('https://apify.com')
+    request_2 = Request.from_url('https://apify.com')
+
+    rq = await RequestQueue.open(name='my-rq')
+    await rq.add_request(request_1)
+    await rq.add_request(request_2)
+
+    assert await rq.get_total_count() == 1
+
+    assert await rq.fetch_next_request() == request_1

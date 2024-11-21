@@ -3,6 +3,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, AsyncContextManager
 
+from crawlee._utils.docs import docs_group
+
 if TYPE_CHECKING:
     from httpx import Response
 
@@ -13,6 +15,7 @@ if TYPE_CHECKING:
     )
 
 
+@docs_group('Abstract classes')
 class BaseKeyValueStoreClient(ABC):
     """Abstract base class for key-value store resource clients.
 
@@ -69,7 +72,7 @@ class BaseKeyValueStoreClient(ABC):
         """Retrieve the given record from the key-value store.
 
         Args:
-            key: Key of the record to retrieve
+            key: Key of the record to retrieve.
 
         Returns:
             The requested record, or None, if the record does not exist
@@ -80,7 +83,7 @@ class BaseKeyValueStoreClient(ABC):
         """Retrieve the given record from the key-value store, without parsing it.
 
         Args:
-            key: Key of the record to retrieve
+            key: Key of the record to retrieve.
 
         Returns:
             The requested record, or None, if the record does not exist
@@ -91,7 +94,7 @@ class BaseKeyValueStoreClient(ABC):
         """Retrieve the given record from the key-value store, as a stream.
 
         Args:
-            key: Key of the record to retrieve
+            key: Key of the record to retrieve.
 
         Returns:
             The requested record as a context-managed streaming Response, or None, if the record does not exist
@@ -102,9 +105,9 @@ class BaseKeyValueStoreClient(ABC):
         """Set a value to the given record in the key-value store.
 
         Args:
-            key: The key of the record to save the value to
-            value: The value to save into the record
-            content_type: The content type of the saved value
+            key: The key of the record to save the value to.
+            value: The value to save into the record.
+            content_type: The content type of the saved value.
         """
 
     @abstractmethod
@@ -112,5 +115,19 @@ class BaseKeyValueStoreClient(ABC):
         """Delete the specified record from the key-value store.
 
         Args:
-            key: The key of the record which to delete
+            key: The key of the record which to delete.
+        """
+
+    @abstractmethod
+    async def get_public_url(self, key: str) -> str:
+        """Get the public URL for the given key.
+
+        Args:
+            key: Key of the record for which URL is required.
+
+        Returns:
+            The public URL for the given key.
+
+        Raises:
+            ValueError: If the key does not exist.
         """

@@ -10,45 +10,43 @@ if TYPE_CHECKING:
 
 @dataclass
 class LoadRatioInfo:
-    """Represents the load ratio of a resource.
-
-    Args:
-        limit_ratio: The maximum ratio of overloaded and non-overloaded samples. If the actual ratio exceeds this
-            value, the resource is considered as overloaded.
-
-        actual_ratio: The actual ratio of overloaded and non-overloaded samples.
-    """
+    """Represent the load ratio of a resource."""
 
     limit_ratio: float
+    """The maximum ratio of overloaded and non-overloaded samples. If the actual ratio exceeds this value,
+    the resource is considered as overloaded."""
+
     actual_ratio: float
+    """The actual ratio of overloaded and non-overloaded samples."""
 
     @property
     def is_overloaded(self) -> bool:
-        """Returns whether the resource is overloaded."""
+        """Indicate whether the resource is currently overloaded."""
         return self.actual_ratio > self.limit_ratio
 
 
 @dataclass
 class SystemInfo:
-    """Represents the current status of the system.
-
-    Args:
-        cpu_info: The CPU load ratio.
-        memory_info: The memory load ratio.
-        event_loop_info: The event loop load ratio.
-        client_info: The client load ratio.
-        created_at: The time at which the measurement was taken.
-    """
+    """Represent the current status of the system."""
 
     cpu_info: LoadRatioInfo
+    """The CPU load ratio."""
+
     memory_info: LoadRatioInfo
+    """The memory load ratio."""
+
     event_loop_info: LoadRatioInfo
+    """The event loop load ratio."""
+
     client_info: LoadRatioInfo
+    """The client load ratio."""
+
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    """The time at which the system load information was measured."""
 
     @property
     def is_system_idle(self) -> bool:
-        """Indicates whether the system is currently idle or overloaded."""
+        """Indicate whether the system is currently idle or overloaded."""
         return (
             not self.cpu_info.is_overloaded
             and not self.memory_info.is_overloaded
@@ -69,90 +67,85 @@ class SystemInfo:
 
 @dataclass
 class CpuSnapshot:
-    """A snapshot of CPU usage.
-
-    Args:
-        used_ratio: The ratio of CPU currently in use.
-        max_used_ratio: The maximum ratio of CPU that is considered acceptable.
-        created_at: The time at which the measurement was taken.
-    """
+    """A snapshot of CPU usage."""
 
     used_ratio: float
+    """The ratio of CPU currently in use."""
+
     max_used_ratio: float
+    """The maximum ratio of CPU that is considered acceptable."""
+
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    """The time at which the system load information was measured."""
 
     @property
     def is_overloaded(self) -> bool:
-        """Returns whether the CPU is considered as overloaded."""
+        """Indicate whether the CPU is considered as overloaded."""
         return self.used_ratio > self.max_used_ratio
 
 
 @dataclass
 class MemorySnapshot:
-    """A snapshot of memory usage.
+    """A snapshot of memory usage."""
 
-    Args:
-        total_size: Total memory available in the system.
-        current_size: Memory usage of the current Python process and its children.
-        max_memory_size: The maximum memory that can be used by `AutoscaledPool`.
-        max_used_memory_ratio: The maximum acceptable ratio of `current_size` to `max_memory_size`.
-        created_at: The time at which the measurement was taken.
-    """
-
-    total_size: ByteSize
     current_size: ByteSize
+    """Memory usage of the current Python process and its children."""
+
     max_memory_size: ByteSize
+    """The maximum memory that can be used by `AutoscaledPool`."""
+
     max_used_memory_ratio: float
+    """The maximum acceptable ratio of `current_size` to `max_memory_size`."""
+
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    """The time at which the system load information was measured."""
 
     @property
     def is_overloaded(self) -> bool:
-        """Returns whether the memory is considered as overloaded."""
+        """Indicate whether the memory is considered as overloaded."""
         return (self.current_size / self.max_memory_size) > self.max_used_memory_ratio
 
 
 @dataclass
 class EventLoopSnapshot:
-    """Snapshot of the state of the event loop.
-
-    Args:
-        delay: The current delay of the event loop.
-        max_delay: The maximum delay that is considered acceptable.
-        created_at: The time at which the measurement was taken.
-    """
+    """Snapshot of the state of the event loop."""
 
     delay: timedelta
+    """The current delay of the event loop."""
+
     max_delay: timedelta
+    """The maximum delay that is considered acceptable."""
+
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    """The time at which the system load information was measured."""
 
     @property
     def max_delay_exceeded(self) -> timedelta:
-        """Returns the amount of time by which the delay exceeds the maximum delay."""
+        """The amount of time by which the delay exceeds the maximum delay."""
         return max(self.delay - self.max_delay, timedelta(seconds=0))
 
     @property
     def is_overloaded(self) -> bool:
-        """Returns whether the event loop is considered as overloaded."""
+        """Indicate whether the event loop is considered as overloaded."""
         return self.delay > self.max_delay
 
 
 @dataclass
 class ClientSnapshot:
-    """Snapshot of the state of the client.
-
-    Args:
-        error_count: The number of errors (HTTP 429) that occurred.
-        max_error_count: The maximum number of errors that is considered acceptable.
-        created_at: The time at which the measurement was taken.
-    """
+    """Snapshot of the state of the client."""
 
     error_count: int
+    """The number of errors (HTTP 429) that occurred."""
+
     max_error_count: int
+    """The maximum number of errors that is considered acceptable."""
+
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    """The time at which the system load information was measured."""
 
     @property
     def is_overloaded(self) -> bool:
-        """Returns whether the client is considered as overloaded."""
+        """Indicate whether the client is considered as overloaded."""
         return self.error_count > self.max_error_count
 
 

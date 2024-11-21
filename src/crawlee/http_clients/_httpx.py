@@ -8,6 +8,7 @@ from typing_extensions import override
 
 from crawlee._types import HttpHeaders
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
+from crawlee._utils.docs import docs_group
 from crawlee.errors import ProxyError
 from crawlee.fingerprint_suite import HeaderGenerator
 from crawlee.http_clients import BaseHttpClient, HttpCrawlingResult, HttpResponse
@@ -16,7 +17,7 @@ from crawlee.sessions import Session
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from crawlee._types import HttpMethod
+    from crawlee._types import HttpMethod, HttpPayload
     from crawlee.base_storage_client._models import Request
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.statistics import Statistics
@@ -39,8 +40,8 @@ class _HttpxResponse:
         return self._response.status_code
 
     @property
-    def headers(self) -> dict[str, str]:
-        return dict(self._response.headers.items())
+    def headers(self) -> HttpHeaders:
+        return HttpHeaders(dict(self._response.headers))
 
     def read(self) -> bytes:
         return self._response.read()
@@ -70,6 +71,7 @@ class _HttpxTransport(httpx.AsyncHTTPTransport):
         return response
 
 
+@docs_group('Classes')
 class HttpxHttpClient(BaseHttpClient):
     """HTTP client based on the `HTTPX` library.
 
@@ -77,6 +79,16 @@ class HttpxHttpClient(BaseHttpClient):
     and to manage sessions, proxies, and error handling.
 
     See the `BaseHttpClient` class for more common information about HTTP clients.
+
+    ### Usage
+
+    ```python
+    from crawlee.http_clients import HttpxHttpClient
+    from crawlee.http_crawler import HttpCrawler  # or any other HTTP client-based crawler
+
+    http_client = HttpxHttpClient()
+    crawler = HttpCrawler(http_client=http_client)
+    ```
     """
 
     _DEFAULT_HEADER_GENERATOR = HeaderGenerator()
@@ -92,7 +104,7 @@ class HttpxHttpClient(BaseHttpClient):
         header_generator: HeaderGenerator | None = _DEFAULT_HEADER_GENERATOR,
         **async_client_kwargs: Any,
     ) -> None:
-        """Create a new instance.
+        """A default constructor.
 
         Args:
             persist_cookies_per_session: Whether to persist cookies per HTTP session.
@@ -125,14 +137,13 @@ class HttpxHttpClient(BaseHttpClient):
         statistics: Statistics | None = None,
     ) -> HttpCrawlingResult:
         client = self._get_client(proxy_info.url if proxy_info else None)
-        headers = self._combine_headers(HttpHeaders(request.headers))
+        headers = self._combine_headers(request.headers)
 
         http_request = client.build_request(
             url=request.url,
             method=request.method,
             headers=headers,
-            params=request.query_params,
-            data=request.data,
+            content=request.payload,
             cookies=session.cookies if session else None,
             extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
         )
@@ -165,21 +176,22 @@ class HttpxHttpClient(BaseHttpClient):
         url: str,
         *,
         method: HttpMethod = 'GET',
-        headers: HttpHeaders | None = None,
-        query_params: dict[str, Any] | None = None,
-        data: dict[str, Any] | None = None,
+        headers: HttpHeaders | dict[str, str] | None = None,
+        payload: HttpPayload | None = None,
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> HttpResponse:
+        if isinstance(headers, dict) or headers is None:
+            headers = HttpHeaders(headers or {})
+
         client = self._get_client(proxy_info.url if proxy_info else None)
         headers = self._combine_headers(headers)
 
         http_request = client.build_request(
             url=url,
             method=method,
-            headers=headers,
-            params=query_params,
-            data=data,
+            headers=dict(headers) if headers else None,
+            content=payload,
             extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
         )
 
@@ -226,12 +238,12 @@ class HttpxHttpClient(BaseHttpClient):
 
     def _combine_headers(self, explicit_headers: HttpHeaders | None) -> HttpHeaders | None:
         """Helper to get the headers for a HTTP request."""
-        common_headers = self._header_generator.get_common_headers() if self._header_generator else {}
-        headers = HttpHeaders(common_headers)
-
-        if explicit_headers:
-            headers = HttpHeaders({**headers, **explicit_headers})
-
+        common_headers = self._header_generator.get_common_headers() if self._header_generator else HttpHeaders()
+        user_agent_header = (
+            self._header_generator.get_random_user_agent_header() if self._header_generator else HttpHeaders()
+        )
+        explicit_headers = explicit_headers or HttpHeaders()
+        headers = common_headers | user_agent_header | explicit_headers
         return headers if headers else None
 
     @staticmethod

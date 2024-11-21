@@ -4,12 +4,21 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, cast
+from operator import attrgetter
+from typing import TYPE_CHECKING, TypeVar, cast
 
 import psutil
+from sortedcontainers import SortedList
 
-from crawlee._autoscaling.types import ClientSnapshot, CpuSnapshot, EventLoopSnapshot, MemorySnapshot, Snapshot
+from crawlee._autoscaling.types import (
+    ClientSnapshot,
+    CpuSnapshot,
+    EventLoopSnapshot,
+    MemorySnapshot,
+    Snapshot,
+)
 from crawlee._utils.byte_size import ByteSize
+from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee.events._types import Event, EventSystemInfoData
 
@@ -20,7 +29,10 @@ if TYPE_CHECKING:
 
 logger = getLogger(__name__)
 
+T = TypeVar('T')
 
+
+@docs_group('Classes')
 class Snapshotter:
     """Monitors and logs system resource usage at predefined intervals for performance optimization.
 
@@ -47,42 +59,30 @@ class Snapshotter:
         memory_warning_cooldown_period: timedelta = timedelta(milliseconds=10000),
         client_rate_limit_error_retry_count: int = 2,
     ) -> None:
-        """Creates a new instance.
+        """A default constructor.
 
         Args:
             event_manager: The event manager used to emit system info events. From data provided by this event
               the CPU and memory usage are read.
-
             event_loop_snapshot_interval: The interval at which the event loop is sampled.
-
             client_snapshot_interval: The interval at which the client is sampled.
-
             max_used_cpu_ratio: Sets the ratio, defining the maximum CPU usage. When the CPU usage is higher than
                 the provided ratio, the CPU is considered overloaded.
-
             max_memory_size: Sets the maximum amount of system memory to be used by the `AutoscaledPool`. If `None`
                 is provided, the max amount of memory to be used is set to one quarter of total system memory.
                 I.e. on a system with 8192 MB, the `AutoscaledPool` will only use up to 2048 MB of memory.
-
             max_used_memory_ratio: Sets the ratio, defining the maximum ratio of memory usage. When the memory usage
                 is higher than the provided ratio of `max_memory_size`, the memory is considered overloaded.
-
             max_event_loop_delay: Sets the maximum delay of the event loop. When the delay is higher than the provided
                 value, the event loop is considered overloaded.
-
             max_client_errors: Sets the maximum number of client errors (HTTP 429). When the number of client errors
                 is higher than the provided number, the client is considered overloaded.
-
             snapshot_history: Sets the time interval for which the snapshots are kept.
-
             available_memory_ratio: How big part of the system memory should be used if `max_memory_size` is not given.
-
             reserve_memory_ratio: Fraction of memory kept in reserve. Used to calculate critical memory overload
                 threshold.
-
             memory_warning_cooldown_period: Minimum time interval between logging successive critical memory overload
                 warnings.
-
             client_rate_limit_error_retry_count: Number of retries for a client request before considering it a failure
                 due to rate limiting.
         """
@@ -104,15 +104,19 @@ class Snapshotter:
             cast(float, available_memory_ratio)
         )
 
-        self._cpu_snapshots: list[CpuSnapshot] = []
-        self._event_loop_snapshots: list[EventLoopSnapshot] = []
-        self._memory_snapshots: list[MemorySnapshot] = []
-        self._client_snapshots: list[ClientSnapshot] = []
+        self._cpu_snapshots = self._get_sorted_list_by_created_at(list[CpuSnapshot]())
+        self._event_loop_snapshots = self._get_sorted_list_by_created_at(list[EventLoopSnapshot]())
+        self._memory_snapshots = self._get_sorted_list_by_created_at(list[MemorySnapshot]())
+        self._client_snapshots = self._get_sorted_list_by_created_at(list[ClientSnapshot]())
 
         self._snapshot_event_loop_task = RecurringTask(self._snapshot_event_loop, self._event_loop_snapshot_interval)
         self._snapshot_client_task = RecurringTask(self._snapshot_client, self._client_snapshot_interval)
 
         self._timestamp_of_last_memory_warning: datetime = datetime.now(timezone.utc) - timedelta(hours=1)
+
+    @staticmethod
+    def _get_sorted_list_by_created_at(input_list: list[T]) -> SortedList[T]:
+        return SortedList(input_list, key=attrgetter('created_at'))
 
     @staticmethod
     def _get_default_max_memory_size(available_memory_ratio: float) -> ByteSize:
@@ -204,7 +208,7 @@ class Snapshotter:
             return []
 
         latest_time = snapshots[-1].created_at
-        return [snapshot for snapshot in reversed(snapshots) if latest_time - snapshot.created_at <= duration]
+        return [snapshot for snapshot in snapshots if latest_time - snapshot.created_at <= duration]
 
     def _snapshot_cpu(self, event_data: EventSystemInfoData) -> None:
         """Captures a snapshot of the current CPU usage.
@@ -223,7 +227,7 @@ class Snapshotter:
 
         snapshots = cast(list[Snapshot], self._cpu_snapshots)
         self._prune_snapshots(snapshots, event_data.cpu_info.created_at)
-        self._cpu_snapshots.append(snapshot)
+        self._cpu_snapshots.add(snapshot)
 
     def _snapshot_memory(self, event_data: EventSystemInfoData) -> None:
         """Captures a snapshot of the current memory usage.
@@ -235,7 +239,6 @@ class Snapshotter:
             event_data: System info data from which memory usage is read.
         """
         snapshot = MemorySnapshot(
-            total_size=event_data.memory_info.total_size,
             current_size=event_data.memory_info.current_size,
             max_memory_size=self._max_memory_size,
             max_used_memory_ratio=self._max_used_memory_ratio,
@@ -244,8 +247,7 @@ class Snapshotter:
 
         snapshots = cast(list[Snapshot], self._memory_snapshots)
         self._prune_snapshots(snapshots, snapshot.created_at)
-        self._memory_snapshots.append(snapshot)
-
+        self._memory_snapshots.add(snapshot)
         self._evaluate_memory_load(event_data.memory_info.current_size, event_data.memory_info.created_at)
 
     def _snapshot_event_loop(self) -> None:
@@ -265,7 +267,7 @@ class Snapshotter:
 
         snapshots = cast(list[Snapshot], self._event_loop_snapshots)
         self._prune_snapshots(snapshots, snapshot.created_at)
-        self._event_loop_snapshots.append(snapshot)
+        self._event_loop_snapshots.add(snapshot)
 
     def _snapshot_client(self) -> None:
         """Captures a snapshot of the current API state by checking for rate limit errors (HTTP 429).
@@ -282,7 +284,7 @@ class Snapshotter:
 
         snapshots = cast(list[Snapshot], self._client_snapshots)
         self._prune_snapshots(snapshots, snapshot.created_at)
-        self._client_snapshots.append(snapshot)
+        self._client_snapshots.add(snapshot)
 
     def _prune_snapshots(self, snapshots: list[Snapshot], now: datetime) -> None:
         """Removes snapshots that are older than the `self._snapshot_history`.

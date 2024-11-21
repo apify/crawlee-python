@@ -6,6 +6,7 @@ import random
 from logging import getLogger
 from typing import TYPE_CHECKING, Callable, Literal, overload
 
+from crawlee._utils.docs import docs_group
 from crawlee.events._types import Event, EventPersistStateData
 from crawlee.sessions import Session
 from crawlee.sessions._models import SessionPoolModel
@@ -21,6 +22,7 @@ logger = getLogger(__name__)
 CreateSessionFunctionType = Callable[[], Session]
 
 
+@docs_group('Classes')
 class SessionPool:
     """Session pool is a pool of sessions that are rotated based on the usage count or age."""
 
@@ -35,25 +37,19 @@ class SessionPool:
         persist_state_kvs_name: str = 'default',
         persist_state_key: str = 'CRAWLEE_SESSION_POOL_STATE',
     ) -> None:
-        """Create a new instance.
+        """A default constructor.
 
         Args:
             max_pool_size: Maximum number of sessions to maintain in the pool. You can add more sessions to the pool
                 by using the `add_session` method.
-
             create_session_settings: Settings for creating new session instances. If None, default settings will
                 be used. Do not set it if you are providing a `create_session_function`.
-
             create_session_function: A callable to create new session instances. If None, a default session settings
                 will be used. Do not set it if you are providing `create_session_settings`.
-
             event_manager: The event manager to handle events like persist state.
-
             persistence_enabled: Flag to enable or disable state persistence of the pool. If it is enabled, make sure
                 to provide an event manager to handle the events.
-
             persist_state_kvs_name: The name of the `KeyValueStore` used for state persistence.
-
             persist_state_key: The key under which the session pool's state is stored in the `KeyValueStore`.
         """
         self._max_pool_size = max_pool_size

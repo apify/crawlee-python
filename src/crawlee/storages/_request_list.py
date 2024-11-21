@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
+from crawlee._utils.docs import docs_group
 from crawlee.base_storage_client._models import ProcessedRequest
 from crawlee.storages._request_provider import RequestProvider
 
@@ -15,6 +16,7 @@ if TYPE_CHECKING:
     from crawlee._request import Request
 
 
+@docs_group('Classes')
 class RequestList(RequestProvider):
     """Represents a (potentially very large) list of URLs to crawl.
 
@@ -29,7 +31,7 @@ class RequestList(RequestProvider):
         requests: Sequence[str | Request] | None = None,
         name: str | None = None,
     ) -> None:
-        """Initialize the RequestList.
+        """A default constructor.
 
         Args:
             requests: The request objects (or their string representations) to be added to the provider.

@@ -1,4 +1,5 @@
 import asyncio
+from urllib.parse import urlencode
 
 from crawlee import Request
 from crawlee.http_crawler import HttpCrawler, HttpCrawlingContext
@@ -18,15 +19,18 @@ async def main() -> None:
     request = Request.from_url(
         url='https://httpbin.org/post',
         method='POST',
-        data={
-            'custname': 'John Doe',
-            'custtel': '1234567890',
-            'custemail': 'johndoe@example.com',
-            'size': 'large',
-            'topping': ['bacon', 'cheese', 'mushroom'],
-            'delivery': '13:00',
-            'comments': 'Please ring the doorbell upon arrival.',
-        },
+        headers={'content-type': 'application/x-www-form-urlencoded'},
+        payload=urlencode(
+            {
+                'custname': 'John Doe',
+                'custtel': '1234567890',
+                'custemail': 'johndoe@example.com',
+                'size': 'large',
+                'topping': ['bacon', 'cheese', 'mushroom'],
+                'delivery': '13:00',
+                'comments': 'Please ring the doorbell upon arrival.',
+            }
+        ).encode(),
     )
 
     # Run the crawler with the initial list of requests.

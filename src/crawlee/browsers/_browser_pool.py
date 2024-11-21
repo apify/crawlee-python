@@ -7,14 +7,15 @@ import itertools
 from collections import defaultdict
 from datetime import timedelta
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 from weakref import WeakValueDictionary
 
 from crawlee._utils.crypto import crypto_random_object_id
+from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee.browsers._base_browser_controller import BaseBrowserController
 from crawlee.browsers._playwright_browser_plugin import PlaywrightBrowserPlugin
-from crawlee.browsers._types import CrawleePage
+from crawlee.browsers._types import BrowserType, CrawleePage
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -26,6 +27,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
+@docs_group('Classes')
 class BrowserPool:
     """Manages a pool of browsers and their pages, handling lifecycle events and resource allocation.
 
@@ -49,7 +51,7 @@ class BrowserPool:
         identify_inactive_browsers_interval: timedelta = timedelta(seconds=20),
         close_inactive_browsers_interval: timedelta = timedelta(seconds=30),
     ) -> None:
-        """Create a new instance.
+        """A default constructor.
 
         Args:
             plugins: Browser plugins serve as wrappers around various browser automation libraries,
@@ -94,7 +96,7 @@ class BrowserPool:
         cls,
         *,
         headless: bool | None = None,
-        browser_type: Literal['chromium', 'firefox', 'webkit'] | None = None,
+        browser_type: BrowserType | None = None,
         **kwargs: Any,
     ) -> BrowserPool:
         """Create a new instance with a single `BaseBrowserPlugin` configured with the provided options.

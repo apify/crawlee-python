@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, AsyncIterator, TypeVar, overload
 
 from typing_extensions import override
 
+from crawlee._utils.docs import docs_group
 from crawlee.base_storage_client._models import KeyValueStoreKeyInfo, KeyValueStoreMetadata
 from crawlee.storages._base_storage import BaseStorage
 
@@ -14,6 +15,7 @@ if TYPE_CHECKING:
 T = TypeVar('T')
 
 
+@docs_group('Classes')
 class KeyValueStore(BaseStorage):
     """Represents a key-value based storage for reading and writing data records or files.
 
@@ -39,8 +41,11 @@ class KeyValueStore(BaseStorage):
     that does not exist will raise an error; however, if accessed by `name`, the store will be created if it does not
     already exist.
 
-    Usage:
+    ### Usage
+
     ```python
+    from crawlee.storages import KeyValueStore
+
     kvs = await KeyValueStore.open(name='my_kvs')
     ```
     """
@@ -157,3 +162,14 @@ class KeyValueStore(BaseStorage):
             return await self._resource_client.delete_record(key)
 
         return await self._resource_client.set_record(key, value, content_type)
+
+    async def get_public_url(self, key: str) -> str:
+        """Get the public URL for the given key.
+
+        Args:
+            key: Key of the record for which URL is required.
+
+        Returns:
+            The public URL for the given key.
+        """
+        return await self._resource_client.get_public_url(key)

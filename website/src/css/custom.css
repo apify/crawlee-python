@@ -541,3 +541,20 @@ div[class^=announcementBar_] button {
     box-shadow: var(--ifm-alert-shadow);
     padding: var(--ifm-alert-padding-vertical) var(--ifm-alert-padding-horizontal);
 }
+
+.tsd-parameters li {
+    margin-bottom: 16px;
+}
+
+.tsd-parameters-title {
+    font-size: 16px;
+    margin-bottom: 16px !important;
+}
+
+.tsd-returns-title {
+    font-size: 16px;
+}
+
+.tsd-api-options {
+    display: none;
+}

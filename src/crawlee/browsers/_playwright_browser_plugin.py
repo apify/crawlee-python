@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 from playwright.async_api import Playwright, async_playwright
 from typing_extensions import override
 
+from crawlee._utils.docs import docs_group
 from crawlee.browsers._base_browser_plugin import BaseBrowserPlugin
 from crawlee.browsers._playwright_browser_controller import PlaywrightBrowserController
 
@@ -15,9 +16,12 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
     from types import TracebackType
 
+    from crawlee.browsers._types import BrowserType
+
 logger = getLogger(__name__)
 
 
+@docs_group('Classes')
 class PlaywrightBrowserPlugin(BaseBrowserPlugin):
     """A plugin for managing Playwright automation library.
 
@@ -29,12 +33,12 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
     def __init__(
         self,
         *,
-        browser_type: Literal['chromium', 'firefox', 'webkit'] = 'chromium',
+        browser_type: BrowserType = 'chromium',
         browser_options: Mapping[str, Any] | None = None,
         page_options: Mapping[str, Any] | None = None,
         max_open_pages_per_browser: int = 20,
     ) -> None:
-        """Create a new instance.
+        """A default constructor.
 
         Args:
             browser_type: The type of the browser to launch.
@@ -53,7 +57,7 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
 
     @property
     @override
-    def browser_type(self) -> Literal['chromium', 'firefox', 'webkit']:
+    def browser_type(self) -> BrowserType:
         return self._browser_type
 
     @property

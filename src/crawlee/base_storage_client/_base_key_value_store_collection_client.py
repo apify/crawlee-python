@@ -3,10 +3,13 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
+from crawlee._utils.docs import docs_group
+
 if TYPE_CHECKING:
     from crawlee.base_storage_client._models import KeyValueStoreListPage, KeyValueStoreMetadata
 
 
+@docs_group('Abstract classes')
 class BaseKeyValueStoreCollectionClient(ABC):
     """Abstract base class for key-value store collection clients.
 
@@ -26,10 +29,8 @@ class BaseKeyValueStoreCollectionClient(ABC):
         Args:
             id: Optional ID of the key-value store to retrieve or create. If provided, the method will attempt
                 to find a key-value store with the ID.
-
             name: Optional name of the key-value store resource to retrieve or create. If provided, the method will
                 attempt to find a key-value store with this name.
-
             schema: Optional schema for the key-value store resource to be created.
 
         Returns:

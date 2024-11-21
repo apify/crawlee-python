@@ -4,19 +4,29 @@
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
 from unittest import mock
 
-from crawlee import Glob
+from crawlee import Glob, Request
+from crawlee.fingerprint_suite._consts import (
+    PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA,
+    PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_MOBILE,
+    PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_PLATFORM,
+    PW_CHROMIUM_HEADLESS_DEFAULT_USER_AGENT,
+    PW_FIREFOX_HEADLESS_DEFAULT_USER_AGENT,
+)
 from crawlee.playwright_crawler import PlaywrightCrawler
 from crawlee.storages import RequestList
 
 if TYPE_CHECKING:
+    from httpx import URL
+
     from crawlee.playwright_crawler import PlaywrightCrawlingContext
 
 
-async def test_basic_request(httpbin: str) -> None:
-    requests = [f'{httpbin}/']
+async def test_basic_request(httpbin: URL) -> None:
+    requests = [str(httpbin.copy_with(path='/'))]
     crawler = PlaywrightCrawler()
     result: dict = {}
 
@@ -30,7 +40,7 @@ async def test_basic_request(httpbin: str) -> None:
 
     await crawler.run(requests)
 
-    assert result.get('request_url') == result.get('page_url') == f'{httpbin}/'
+    assert result.get('request_url') == result.get('page_url') == requests[0]
     assert 'httpbin' in result.get('page_title', '')
     assert '<html' in result.get('page_content', '')  # there is some HTML content
 
@@ -71,3 +81,90 @@ async def test_nonexistent_url_invokes_error_handler() -> None:
     await crawler.run()
     assert error_handler.call_count == 3
     assert failed_handler.call_count == 1
+
+
+async def test_chromium_headless_headers(httpbin: URL) -> None:
+    crawler = PlaywrightCrawler(headless=True, browser_type='chromium')
+    headers = dict[str, str]()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        response = await context.response.text()
+        response_headers = dict(json.loads(response)).get('headers', {})
+
+        for key, val in response_headers.items():
+            headers[key] = val
+
+    await crawler.run([str(httpbin.copy_with(path='/get'))])
+
+    assert 'User-Agent' in headers
+    assert 'Sec-Ch-Ua' in headers
+    assert 'Sec-Ch-Ua-Mobile' in headers
+    assert 'Sec-Ch-Ua-Platform' in headers
+
+    assert 'headless' not in headers['Sec-Ch-Ua'].lower()
+    assert 'headless' not in headers['User-Agent'].lower()
+
+    assert headers['Sec-Ch-Ua'] == PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA
+    assert headers['Sec-Ch-Ua-Mobile'] == PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_MOBILE
+    assert headers['Sec-Ch-Ua-Platform'] == PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_PLATFORM
+    assert headers['User-Agent'] == PW_CHROMIUM_HEADLESS_DEFAULT_USER_AGENT
+
+
+async def test_firefox_headless_headers(httpbin: URL) -> None:
+    crawler = PlaywrightCrawler(headless=True, browser_type='firefox')
+    headers = dict[str, str]()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        response = await context.response.text()
+        response_headers = dict(json.loads(response)).get('headers', {})
+
+        for key, val in response_headers.items():
+            headers[key] = val
+
+    await crawler.run([str(httpbin.copy_with(path='/get'))])
+
+    assert 'User-Agent' in headers
+    assert 'Sec-Ch-Ua' not in headers
+    assert 'Sec-Ch-Ua-Mobile' not in headers
+    assert 'Sec-Ch-Ua-Platform' not in headers
+
+    assert 'headless' not in headers['User-Agent'].lower()
+
+    assert headers['User-Agent'] == PW_FIREFOX_HEADLESS_DEFAULT_USER_AGENT
+
+
+async def test_custom_headers(httpbin: URL) -> None:
+    crawler = PlaywrightCrawler()
+    response_headers = dict[str, str]()
+    request_headers = {'Power-Header': 'ring', 'Library': 'storm', 'My-Test-Header': 'fuzz'}
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        response = await context.response.text()
+        context_response_headers = dict(json.loads(response)).get('headers', {})
+
+        for key, val in context_response_headers.items():
+            response_headers[key] = val
+
+    await crawler.run([Request.from_url(str(httpbin.copy_with(path='/get')), headers=request_headers)])
+
+    assert response_headers.get('Power-Header') == request_headers['Power-Header']
+    assert response_headers.get('Library') == request_headers['Library']
+    assert response_headers.get('My-Test-Header') == request_headers['My-Test-Header']
+
+
+async def test_pre_navigation_hook(httpbin: URL) -> None:
+    crawler = PlaywrightCrawler()
+    mock_hook = mock.AsyncMock(return_value=None)
+
+    crawler.pre_navigation_hook(mock_hook)
+
+    @crawler.router.default_handler
+    async def request_handler(_context: PlaywrightCrawlingContext) -> None:
+        pass
+
+    await crawler.run(['https://example.com', str(httpbin)])
+
+    assert mock_hook.call_count == 2

@@ -268,7 +268,7 @@ class RequestQueueClient(BaseRequestQueueClient):
                 persist_storage=self._memory_storage_client.persist_storage,
             )
 
-            # We return wasAlreadyHandled is false even though the request may have been added as handled,
+            # We return was_already_handled=False even though the request may have been added as handled,
             # because that's how API behaves.
             return ProcessedRequest(
                 id=request_model.id,
@@ -477,7 +477,7 @@ class RequestQueueClient(BaseRequestQueueClient):
 
         # Write the request to the file
         file_path = os.path.join(entity_directory, f'{request.id}.json')
-        f = await asyncio.to_thread(open, file_path, mode='w')
+        f = await asyncio.to_thread(open, file_path, mode='w', encoding='utf-8')
         try:
             s = await json_dumps(request.model_dump())
             await asyncio.to_thread(f.write, s)
@@ -504,9 +504,12 @@ class RequestQueueClient(BaseRequestQueueClient):
     def _json_to_request(self, request_json: str | None) -> Request | None:
         if request_json is None:
             return None
+
         request_dict = filter_out_none_values_recursively(json.loads(request_json))
+
         if request_dict is None:
             return None
+
         return Request.model_validate(request_dict)
 
     async def _create_internal_request(self, request: Request, forefront: bool | None) -> Request:
@@ -514,18 +517,21 @@ class RequestQueueClient(BaseRequestQueueClient):
         id = unique_key_to_request_id(request.unique_key)
 
         if request.id is not None and request.id != id:
-            raise ValueError('Request ID does not match its unique_key.')
+            logger.warning(
+                f'The request ID does not match the ID from the unique_key (request.id={request.id}, id={id}).'
+            )
 
-        json_request = await json_dumps({**(request.model_dump()), 'id': id})
+        request_kwargs = {
+            **(request.model_dump()),
+            'id': id,
+            'order_no': order_no,
+        }
+
+        del request_kwargs['json_']
+
         return Request(
-            url=request.url,
-            unique_key=request.unique_key,
-            id=id,
-            method=request.method,
-            retry_count=request.retry_count,
-            order_no=order_no,
-            json_=json_request,
-            user_data={},
+            **request_kwargs,
+            json_=await json_dumps(request_kwargs),
         )
 
     def _calculate_order_no(self, request: Request, forefront: bool | None) -> Decimal | None:
@@ -536,7 +542,7 @@ class RequestQueueClient(BaseRequestQueueClient):
         timestamp = Decimal(datetime.now(timezone.utc).timestamp()) * 1000
         timestamp = round(timestamp, 6)
 
-        # Make sure that this timestamp was not used yet, so that we have unique orderNos
+        # Make sure that this timestamp was not used yet, so that we have unique order_nos
         if timestamp <= self._last_used_timestamp:
             timestamp = self._last_used_timestamp + Decimal(0.000001)
 

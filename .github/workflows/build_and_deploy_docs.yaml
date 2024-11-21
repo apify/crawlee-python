@@ -1,4 +1,4 @@
-name: docs
+name: Build and deploy docs
 
 on:
   push:
@@ -6,8 +6,12 @@ on:
       - master
   workflow_dispatch:
 
+env:
+  NODE_VERSION: 20
+  PYTHON_VERSION: 3.12
+
 jobs:
-  build:
+  build_and_deploy_docs:
     environment:
       name: github-pages
     permissions:
@@ -17,41 +21,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
 
-      - name: Use Node.js 20
+      - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-
-      - name: Enable corepack
-        run: |
-          corepack enable
-          corepack prepare yarn@stable --activate
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: 3.12
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
-          pipx install poetry
+          pipx install --python ${{ env.PYTHON_VERSION }} poetry
           make install-dev
 
       - name: Build generated API reference
         run: make build-api-reference
 
-      - name: Build & deploy docs
-        run: |
-          # go to website dir
-          cd website
-          # install website deps
-          yarn
-          # build the docs
-          yarn build
-        env:
-          APIFY_SIGNING_TOKEN: ${{ secrets.APIFY_SIGNING_TOKEN }}
+      - name: Build Docusaurus docs
+        run: make build-docs
 
       - name: Set up GitHub Pages
         uses: actions/configure-pages@v5
@@ -63,3 +57,8 @@ jobs:
 
       - name: Deploy artifact to GitHub Pages
         uses: actions/deploy-pages@v4
+
+      - name: Invalidate CloudFront cache
+        run: gh workflow run invalidate.yaml --repo apify/apify-docs-private
+        env:
+          GITHUB_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}

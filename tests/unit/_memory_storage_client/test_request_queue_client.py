@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from crawlee import Request
+from crawlee._request import RequestState
 
 if TYPE_CHECKING:
     from crawlee.memory_storage_client import MemoryStorageClient
@@ -89,6 +90,21 @@ async def test_list_head(request_queue_client: RequestQueueClient) -> None:
 
     for item in list_head.items:
         assert item.id is not None
+
+
+async def test_request_state_serialization(request_queue_client: RequestQueueClient) -> None:
+    request = Request.from_url('https://crawlee.dev', payload=b'test')
+    request.state = RequestState.UNPROCESSED
+
+    await request_queue_client.add_request(request)
+
+    result = await request_queue_client.list_head()
+    assert len(result.items) == 1
+    assert result.items[0] == request
+
+    got_request = await request_queue_client.get_request(request.id)
+
+    assert request == got_request
 
 
 async def test_add_record(request_queue_client: RequestQueueClient) -> None:

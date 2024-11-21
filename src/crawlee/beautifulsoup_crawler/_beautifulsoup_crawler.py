@@ -6,11 +6,11 @@ from typing import TYPE_CHECKING, Any, AsyncGenerator, Iterable, Literal
 
 from bs4 import BeautifulSoup, Tag
 from pydantic import ValidationError
-from typing_extensions import Unpack
 
 from crawlee import EnqueueStrategy
 from crawlee._request import BaseRequestData
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
+from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.beautifulsoup_crawler._beautifulsoup_crawling_context import BeautifulSoupCrawlingContext
@@ -19,31 +19,67 @@ from crawlee.http_clients import HttpxHttpClient
 from crawlee.http_crawler import HttpCrawlingContext
 
 if TYPE_CHECKING:
-    from crawlee._types import AddRequestsKwargs, BasicCrawlingContext
+    from typing_extensions import Unpack
+
+    from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs
+
+BeautifulSoupParser = Literal['html.parser', 'lxml', 'xml', 'html5lib']
 
 
+@docs_group('Classes')
 class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
-    """A crawler that fetches the request URL using `httpx` and parses the result with `BeautifulSoup`."""
+    """A web crawler for performing HTTP requests and parsing HTML/XML content.
+
+    The `BeautifulSoupCrawler` builds on top of the `BasicCrawler`, which means it inherits all of its features.
+    On top of that it implements the HTTP communication using the HTTP clients and HTML/XML parsing using the
+    `BeautifulSoup` library. The class allows integration with any HTTP client that implements the `BaseHttpClient`
+    interface. The HTTP client is provided to the crawler as an input parameter to the constructor.
+
+    The HTTP client-based crawlers are ideal for websites that do not require JavaScript execution. However,
+    if you need to execute client-side JavaScript, consider using browser-based crawler like the `PlaywrightCrawler`.
+
+    ### Usage
+
+    ```python
+    from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
+
+    crawler = BeautifulSoupCrawler()
+
+    # Define the default request handler, which will be called for every request.
+    @crawler.router.default_handler
+    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
+        context.log.info(f'Processing {context.request.url} ...')
+
+        # Extract data from the page.
+        data = {
+            'url': context.request.url,
+            'title': context.soup.title.string if context.soup.title else None,
+        }
+
+        # Push the extracted data to the default dataset.
+        await context.push_data(data)
+
+    await crawler.run(['https://crawlee.dev/'])
+    ```
+    """
 
     def __init__(
         self,
         *,
-        parser: Literal['html.parser', 'lxml', 'xml', 'html5lib'] = 'lxml',
+        parser: BeautifulSoupParser = 'lxml',
         additional_http_error_status_codes: Iterable[int] = (),
         ignore_http_error_status_codes: Iterable[int] = (),
         **kwargs: Unpack[BasicCrawlerOptions[BeautifulSoupCrawlingContext]],
     ) -> None:
-        """Initialize the BeautifulSoupCrawler.
+        """A default constructor.
 
         Args:
-            parser: The type of parser that should be used by BeautifulSoup
-
-            additional_http_error_status_codes: HTTP status codes that should be considered errors (and trigger a retry)
-
-            ignore_http_error_status_codes: HTTP status codes that are normally considered errors but we want to treat
-                them as successful
-
-            kwargs: Arguments to be forwarded to the underlying BasicCrawler
+            parser: The type of parser that should be used by `BeautifulSoup`.
+            additional_http_error_status_codes: Additional HTTP status codes to treat as errors, triggering
+                automatic retries when encountered.
+            ignore_http_error_status_codes: HTTP status codes typically considered errors but to be treated
+                as successful responses.
+            kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
         """
         self._parser = parser
 
@@ -67,6 +103,14 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
         super().__init__(**kwargs)
 
     async def _make_http_request(self, context: BasicCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
+        """Executes an HTTP request using a configured HTTP client.
+
+        Args:
+            context: The crawling context from the `BasicCrawler`.
+
+        Yields:
+            The enhanced crawling context with the HTTP response.
+        """
         result = await self._http_client.crawl(
             request=context.request,
             session=context.session,
@@ -81,21 +125,40 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
             add_requests=context.add_requests,
             send_request=context.send_request,
             push_data=context.push_data,
+            get_key_value_store=context.get_key_value_store,
             log=context.log,
             http_response=result.http_response,
         )
 
     async def _handle_blocked_request(
-        self, crawling_context: BeautifulSoupCrawlingContext
+        self,
+        context: BeautifulSoupCrawlingContext,
     ) -> AsyncGenerator[BeautifulSoupCrawlingContext, None]:
-        if self._retry_on_blocked:
-            status_code = crawling_context.http_response.status_code
+        """Try to detect if the request is blocked based on the HTTP status code or the response content.
 
-            if crawling_context.session and crawling_context.session.is_blocked_status_code(status_code=status_code):
+        Args:
+            context: The current crawling context.
+
+        Raises:
+            SessionError: If the request is considered blocked.
+
+        Yields:
+            The original crawling context if no errors are detected.
+        """
+        if self._retry_on_blocked:
+            status_code = context.http_response.status_code
+
+            # TODO: refactor to avoid private member access
+            # https://github.com/apify/crawlee-python/issues/708
+            if (
+                context.session
+                and status_code not in self._http_client._ignore_http_error_status_codes  # noqa: SLF001
+                and context.session.is_blocked_status_code(status_code=status_code)
+            ):
                 raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
 
             matched_selectors = [
-                selector for selector in RETRY_CSS_SELECTORS if crawling_context.soup.select_one(selector) is not None
+                selector for selector in RETRY_CSS_SELECTORS if context.soup.select_one(selector) is not None
             ]
 
             if matched_selectors:
@@ -104,12 +167,20 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
                     f"HTTP response matched the following selectors: {'; '.join(matched_selectors)}"
                 )
 
-        yield crawling_context
+        yield context
 
     async def _parse_http_response(
         self,
         context: HttpCrawlingContext,
     ) -> AsyncGenerator[BeautifulSoupCrawlingContext, None]:
+        """Parse the HTTP response using the `BeautifulSoup` library and implements the `enqueue_links` function.
+
+        Args:
+            context: The current crawling context.
+
+        Yields:
+            The enhanced crawling context with the `BeautifulSoup` selector and the `enqueue_links` function.
+        """
         soup = await asyncio.to_thread(lambda: BeautifulSoup(context.http_response.read(), self._parser))
 
         async def enqueue_links(
@@ -117,7 +188,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
             selector: str = 'a',
             label: str | None = None,
             user_data: dict[str, Any] | None = None,
-            **kwargs: Unpack[AddRequestsKwargs],
+            **kwargs: Unpack[EnqueueLinksKwargs],
         ) -> None:
             kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
 
@@ -159,6 +230,7 @@ class BeautifulSoupCrawler(BasicCrawler[BeautifulSoupCrawlingContext]):
             add_requests=context.add_requests,
             send_request=context.send_request,
             push_data=context.push_data,
+            get_key_value_store=context.get_key_value_store,
             log=context.log,
             http_response=context.http_response,
             soup=soup,

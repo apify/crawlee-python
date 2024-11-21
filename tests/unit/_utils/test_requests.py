@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from crawlee._types import HttpHeaders
 from crawlee._utils.requests import compute_unique_key, normalize_url, unique_key_to_request_id
 
 
@@ -35,7 +36,7 @@ def test_unique_key_to_request_id_consistency() -> None:
         'url_unsafe_characters',
     ],
 )
-def test_unique_key_to_request_id_known_values(unique_key: str, expected_request_id: str) -> None:
+def test_unique_key_to_request_id_matches_known_values(unique_key: str, expected_request_id: str) -> None:
     request_id = unique_key_to_request_id(unique_key)
     assert request_id == expected_request_id, f'Unique key "{unique_key}" should produce the expected request ID.'
 
@@ -72,47 +73,95 @@ def test_normalize_url(url: str, expected_output: str, *, keep_url_fragment: boo
     assert output == expected_output
 
 
-@pytest.mark.parametrize(
-    ('url', 'method', 'payload', 'keep_url_fragment', 'use_extended_unique_key', 'expected_output'),
-    [
-        ('http://example.com', 'GET', None, False, False, 'http://example.com'),
-        ('http://example.com', 'POST', None, False, False, 'http://example.com'),
-        ('http://example.com', 'GET', 'data', False, False, 'http://example.com'),
-        ('http://example.com', 'GET', 'data', False, True, 'GET(3a6eb079):http://example.com'),
-        ('http://example.com', 'POST', 'data', False, True, 'POST(3a6eb079):http://example.com'),
-        ('http://example.com#fragment', 'GET', None, True, False, 'http://example.com#fragment'),
-        ('http://example.com#fragment', 'GET', None, False, False, 'http://example.com'),
-        ('http://example.com', 'DELETE', 'test', False, True, 'DELETE(9f86d081):http://example.com'),
-        ('https://example.com?utm_content=test', 'GET', None, False, False, 'https://example.com'),
-        ('https://example.com?utm_content=test', 'GET', None, True, False, 'https://example.com'),
-    ],
-    ids=[
-        'simple_get',
-        'simple_post',
-        'get_with_payload',
-        'get_with_payload_extended',
-        'post_with_payload_extended',
-        'get_with_fragment',
-        'get_remove_fragment',
-        'delete_with_payload_extended',
-        'get_remove_utm',
-        'get_keep_utm_fragment',
-    ],
-)
-def test_compute_unique_key(
-    url: str,
-    method: str,
-    payload: str | None,
-    *,
-    keep_url_fragment: bool,
-    use_extended_unique_key: bool,
-    expected_output: str,
-) -> None:
-    output = compute_unique_key(
+def test_compute_unique_key_basic() -> None:
+    url = 'https://crawlee.dev'
+    uk_get = compute_unique_key(url, method='GET')
+    uk_post = compute_unique_key(url, method='POST')
+    assert url == uk_get == uk_post
+
+
+def test_compute_unique_key_handles_fragments() -> None:
+    url = 'https://crawlee.dev#fragment'
+    uk_with_fragment = compute_unique_key(url, keep_url_fragment=True)
+    assert uk_with_fragment == url
+
+    uk_without_fragment = compute_unique_key(url, 'GET', keep_url_fragment=False)
+    assert uk_without_fragment == 'https://crawlee.dev'
+
+
+def test_compute_unique_key_handles_payload() -> None:
+    url = 'https://crawlee.dev'
+    payload = b'{"key": "value"}'
+
+    # Payload without extended unique key
+    uk = compute_unique_key(url, method='POST', payload=payload, use_extended_unique_key=False)
+    assert uk == url
+
+    # Extended unique key and payload is None
+    uk = compute_unique_key(url, method='POST', payload=None, use_extended_unique_key=True)
+    assert uk == 'POST|e3b0c442|e3b0c442|https://crawlee.dev'
+
+    # Extended unique key and payload is bytes
+    uk = compute_unique_key(url, method='POST', payload=payload, use_extended_unique_key=True)
+    assert uk == 'POST|e3b0c442|9724c1e2|https://crawlee.dev'
+
+
+def test_compute_unique_key_handles_headers() -> None:
+    url = 'https://crawlee.dev'
+    headers = HttpHeaders({'Accept': '*/*', 'Content-Type': 'application/json'})
+    uk = compute_unique_key(url, headers=headers, use_extended_unique_key=False)
+    assert uk == url
+
+    extended_uk_expected = 'GET|4e1a2cf6|e3b0c442|https://crawlee.dev'
+
+    uk = compute_unique_key(url, headers=headers, use_extended_unique_key=True)
+    assert uk == extended_uk_expected
+
+    # Accept-Encoding header should not be included.
+    headers = HttpHeaders({'Accept': '*/*', 'Accept-Encoding': 'gzip, deflate', 'Content-Type': 'application/json'})
+    uk = compute_unique_key(url, headers=headers, use_extended_unique_key=True)
+    assert uk == extended_uk_expected
+
+
+def test_compute_unique_key_complex() -> None:
+    url = 'https://crawlee.dev'
+    headers = HttpHeaders({'Accept': '*/*', 'Content-Type': 'application/json'})
+    payload = b'{"key": "value"}'
+
+    uk = compute_unique_key(
         url,
-        method,
-        payload,
-        keep_url_fragment=keep_url_fragment,
-        use_extended_unique_key=use_extended_unique_key,
+        method='POST',
+        headers=headers,
+        payload=payload,
+        use_extended_unique_key=False,
     )
+    assert uk == url
+
+    extended_uk = compute_unique_key(
+        url,
+        method='POST',
+        headers=headers,
+        payload=payload,
+        use_extended_unique_key=True,
+    )
+    assert extended_uk == 'POST|4e1a2cf6|9724c1e2|https://crawlee.dev'
+
+
+def test_compute_unique_key_post_with_none_payload() -> None:
+    url = 'https://crawlee.dev'
+    expected_output = 'POST|e3b0c442|e3b0c442|https://crawlee.dev'
+    output = compute_unique_key(url, 'POST', payload=None, use_extended_unique_key=True)
     assert output == expected_output
+
+
+def test_compute_unique_key_with_whitespace_in_headers() -> None:
+    url = 'https://crawlee.dev'
+    headers = HttpHeaders({'Content-Type': 'application/json'})
+    headers_with_whitespaces = HttpHeaders({'Content-Type': ' application/json '})
+
+    expected_output = 'GET|60d83e70|e3b0c442|https://crawlee.dev'
+    uk_1 = compute_unique_key(url, headers=headers, use_extended_unique_key=True)
+    assert uk_1 == expected_output
+
+    uk_2 = compute_unique_key(url, headers=headers_with_whitespaces, use_extended_unique_key=True)
+    assert uk_2 == expected_output

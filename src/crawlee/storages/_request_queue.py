@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Generic, TypedDict, TypeVar
 from typing_extensions import override
 
 from crawlee._utils.crypto import crypto_random_object_id
+from crawlee._utils.docs import docs_group
 from crawlee._utils.lru_cache import LRUCache
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee._utils.wait import wait_for_all_tasks_for_finish
@@ -62,6 +63,7 @@ class CachedRequest(TypedDict):
     lock_expires_at: datetime | None
 
 
+@docs_group('Classes')
 class RequestQueue(BaseStorage, RequestProvider):
     """Represents a queue storage for managing HTTP requests in web crawling operations.
 
@@ -85,8 +87,11 @@ class RequestQueue(BaseStorage, RequestProvider):
     persist indefinitely, while unnamed queues expire after 7 days unless specified otherwise. The queue supports
     mutable operations, allowing URLs to be added and removed as needed.
 
-    Usage:
+    ### Usage
+
     ```python
+    from crawlee.storages import RequestQueue
+
     rq = await RequestQueue.open(name='my_rq')
     ```
     """
@@ -398,7 +403,7 @@ class RequestQueue(BaseStorage, RequestProvider):
 
         Args:
             request: The request to return to the queue.
-            forefront: Whether to add the request to the head or the end of the queue
+            forefront: Whether to add the request to the head or the end of the queue.
 
         Returns:
             Information about the queue operation. `None` if the given request was not in progress.

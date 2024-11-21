@@ -3,6 +3,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
+from crawlee._utils.docs import docs_group
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -17,6 +19,7 @@ if TYPE_CHECKING:
     )
 
 
+@docs_group('Abstract classes')
 class BaseRequestQueueClient(ABC):
     """Abstract base class for request queue resource clients.
 
@@ -56,7 +59,7 @@ class BaseRequestQueueClient(ABC):
         """Retrieve a given number of requests from the beginning of the queue.
 
         Args:
-            limit: How many requests to retrieve
+            limit: How many requests to retrieve.
 
         Returns:
             The desired number of requests from the beginning of the queue.
@@ -87,8 +90,8 @@ class BaseRequestQueueClient(ABC):
         """Add a request to the queue.
 
         Args:
-            request: The request to add to the queue
-            forefront: Whether to add the request to the head or the end of the queue
+            request: The request to add to the queue.
+            forefront: Whether to add the request to the head or the end of the queue.
 
         Returns:
             Request queue operation information.
@@ -104,8 +107,8 @@ class BaseRequestQueueClient(ABC):
         """Add a batch of requests to the queue.
 
         Args:
-            requests: The requests to add to the queue
-            forefront: Whether to add the requests to the head or the end of the queue
+            requests: The requests to add to the queue.
+            forefront: Whether to add the requests to the head or the end of the queue.
 
         Returns:
             Request queue batch operation information.
@@ -116,7 +119,7 @@ class BaseRequestQueueClient(ABC):
         """Retrieve a request from the queue.
 
         Args:
-            request_id: ID of the request to retrieve
+            request_id: ID of the request to retrieve.
 
         Returns:
             The retrieved request, or None, if it did not exist.
@@ -132,8 +135,8 @@ class BaseRequestQueueClient(ABC):
         """Update a request in the queue.
 
         Args:
-            request: The updated request
-            forefront: Whether to put the updated request in the beginning or the end of the queue
+            request: The updated request.
+            forefront: Whether to put the updated request in the beginning or the end of the queue.
 
         Returns:
             The updated request
@@ -173,7 +176,7 @@ class BaseRequestQueueClient(ABC):
         """Delete the lock on a specific request in the queue.
 
         Args:
-            request_id: ID of the request to delete the lock
+            request_id: ID of the request to delete the lock.
             forefront: Whether to put the request in the beginning or the end of the queue after the lock is deleted.
         """
 

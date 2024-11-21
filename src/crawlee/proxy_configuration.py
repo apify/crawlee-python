@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from httpx import URL
@@ -12,6 +12,7 @@ from pydantic import AnyHttpUrl, TypeAdapter
 from typing_extensions import Protocol
 
 from crawlee._utils.crypto import crypto_random_object_id
+from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Sequence
@@ -22,6 +23,7 @@ __all__ = ['ProxyInfo', 'ProxyConfiguration']
 
 
 @dataclass
+@docs_group('Data structures')
 class ProxyInfo:
     """Provides information about a proxy connection that is used for requests."""
 
@@ -48,8 +50,10 @@ class ProxyInfo:
     Using the same session ID guarantees getting the same proxy URL."""
 
     proxy_tier: int | None = None
+    """The tier of the proxy."""
 
 
+@docs_group('Classes')
 class ProxyConfiguration:
     """Configures connection to a proxy server with the provided options.
 
@@ -69,7 +73,7 @@ class ProxyConfiguration:
         new_url_function: _NewUrlFunction | None = None,
         tiered_proxy_urls: list[list[str]] | None = None,
     ) -> None:
-        """Initialize a proxy configuration object.
+        """A default constructor.
 
         Exactly one of `proxy_urls`, `tiered_proxy_urls` or `new_url_function` must be specified.
 
@@ -120,11 +124,17 @@ class ProxyConfiguration:
         if url is None:
             return None
 
+        # httpx.URL port field is None for default ports
+        default_ports = {'http': 80, 'https': 443}
+        port = url.port or default_ports.get(url.scheme)
+        if port is None:
+            raise ValueError(f'Port is None for URL: {url}')
+
         info = ProxyInfo(
             url=str(url),
             scheme=url.scheme,
             hostname=url.host,
-            port=cast(int, url.port),
+            port=port,
             username=url.username,
             password=url.password,
         )
