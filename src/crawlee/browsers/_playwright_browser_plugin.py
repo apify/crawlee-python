@@ -42,8 +42,8 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
 
         Args:
             browser_type: The type of the browser to launch.
-            browser_options: Options to configure the browser instance.
-            page_options: Options to configure a new page instance.
+            browser_options: Keyword arguments to pass to the browser launch method.
+            page_options: Keyword arguments to pass to the new page method.
             max_open_pages_per_browser: The maximum number of pages that can be opened in a single browser instance.
                 Once reached, a new browser instance will be launched to handle the excess.
         """
