@@ -6,6 +6,16 @@ on:
   # step required for PRs from forks. This prevents their potential exposure.
   pull_request:
 
+  # Pushing to the master branch triggers code checks
+  push:
+    branches:
+      - master
+    tags-ignore:
+      - "**" # Ignore all tags to prevent duplicate checks when tags are pushed.
+
+  # It should also be possible to trigger checks manually
+  workflow_dispatch:
+
 jobs:
   lint_check:
     name: Lint check
@@ -19,7 +29,7 @@ jobs:
     name: Unit tests
     uses: apify/workflows/.github/workflows/python_unit_tests.yaml@main
     secrets:
-      httpbin_url: https://janbuchar--httpbin.apify.actor?token=${{ secrets.APIFY_HTTPBIN_TOKEN }}
+      httpbin_url: ${{ secrets.APIFY_HTTPBIN_TOKEN && format('https://janbuchar--httpbin.apify.actor?token={0}', secrets.APIFY_HTTPBIN_TOKEN) || 'https://httpbin.org'}}
 
   docs_check:
     name: Docs check
