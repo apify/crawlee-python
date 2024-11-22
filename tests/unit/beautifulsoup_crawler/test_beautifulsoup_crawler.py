@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, AsyncGenerator
+from typing import AsyncGenerator
 from unittest import mock
 
 import pytest
 import respx
 from bs4 import BeautifulSoup
 from httpx import Response
-from typing_extensions import reveal_type
 
 from crawlee import ConcurrencySettings
 from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler

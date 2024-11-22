@@ -20,9 +20,11 @@ from crawlee.errors import SessionError
 from crawlee.http_clients import HttpResponse, HttpxHttpClient
 from crawlee.http_crawler import HttpCrawlingContext
 
-TParseResult = TypeVar('TParseResult', default=bytes)
-
+TParseResult = TypeVar('TParseResult')
+TCrawlingContext = TypeVar("TCrawlingContext", bound=BasicCrawlingContext)
 logger = logging.getLogger(__name__)
+
+
 
 
 @dataclass(frozen=True)
@@ -137,7 +139,7 @@ class BeautifulSoupContentParser(StaticContentParser[BeautifulSoup]):
         return urls
 
 
-class _HttpCrawler(Generic[TParseResult], BasicCrawler[HttpCrawlingContext]):
+class _HttpCrawler(Generic[TParseResult, TCrawlingContext], BasicCrawler[TCrawlingContext]):
     """A web crawler for performing HTTP requests.
 
     The `_HttpCrawler` builds on top of the `BasicCrawler`, which means it inherits all of its features. On top
@@ -179,12 +181,12 @@ class _HttpCrawler(Generic[TParseResult], BasicCrawler[HttpCrawlingContext]):
         parser: StaticContentParser[TParseResult],
         additional_http_error_status_codes: Iterable[int] = (),
         ignore_http_error_status_codes: Iterable[int] = (),
-        **kwargs: Unpack[BasicCrawlerOptions[HttpCrawlingContext]],
+        **kwargs: Unpack[BasicCrawlerOptions[TCrawlingContext]],
     ) -> None:
         self.parser = parser
 
         kwargs['_context_pipeline'] = (
-            ContextPipeline()
+            ContextPipeline[TCrawlingContext]()
             .compose(self._make_http_request)
             .compose(self._parse_http_response)
             .compose(self._handle_blocked_request)
@@ -284,7 +286,7 @@ class _HttpCrawler(Generic[TParseResult], BasicCrawler[HttpCrawlingContext]):
                 raise SessionError(blocked_info.reason)
         yield context
 
-class HttpCrawler(_HttpCrawler[bytes]):
+class HttpCrawler(_HttpCrawler[bytes, HttpCrawlingContext]):
     def __init__(
         self,
         *,

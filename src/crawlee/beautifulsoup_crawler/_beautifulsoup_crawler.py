@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Iterable, Literal
 
 from bs4 import BeautifulSoup
 
-from crawlee.parsers.static_content_parser import BeautifulSoupContentParser, _HttpCrawler
+from crawlee.parsers.static_content_parser import BeautifulSoupContentParser, _HttpCrawler, ParsedHttpCrawlingContext
 
 if TYPE_CHECKING:
     from typing_extensions import Unpack
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 BeautifulSoupParser = Literal['html.parser', 'lxml', 'xml', 'html5lib']
 
 
-class BeautifulSoupCrawler(_HttpCrawler[BeautifulSoup]):
+class BeautifulSoupCrawler(_HttpCrawler[BeautifulSoup, ParsedHttpCrawlingContext[BeautifulSoup]]):
     """A web crawler for performing HTTP requests and parsing HTML/XML content.
 
     The `BeautifulSoupCrawler` builds on top of the `BasicCrawler`, which means it inherits all of its features.
