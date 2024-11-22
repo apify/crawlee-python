@@ -224,8 +224,8 @@ __metadata:
   linkType: hard
 
 "@apify/docusaurus-plugin-typedoc-api@npm:^4.3.0":
-  version: 4.3.0
-  resolution: "@apify/docusaurus-plugin-typedoc-api@npm:4.3.0"
+  version: 4.3.1
+  resolution: "@apify/docusaurus-plugin-typedoc-api@npm:4.3.1"
   dependencies:
     "@docusaurus/plugin-content-docs": "npm:^3.5.2"
     "@docusaurus/types": "npm:^3.5.2"
@@ -242,7 +242,7 @@ __metadata:
     "@docusaurus/mdx-loader": ^3.5.2
     react: ">=18.0.0"
     typescript: ^5.0.0
-  checksum: 10c0/31a98cbe31a014f8337c0086d6685841d2e411e28007c28ec422f06f41de3707ce7200cf71fde0d7589260b529ed9d8b76715ca919b8bccf46b08a047eb34949
+  checksum: 10c0/67f1b5b6b37d12d13325d1cff762657fb9cef252cc0cd0f629d7349d717afab0e7c393098e7d8890d93af4d3e6de5358fb485c8115223e3b014f3bc98e44e56f
   languageName: node
   linkType: hard
 
@@ -14425,21 +14425,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"yaml@npm:^2.2.2":
+"yaml@npm:^2.2.2, yaml@npm:^2.5.1":
   version: 2.6.0
   resolution: "yaml@npm:2.6.0"
   bin:
     yaml: bin.mjs
   checksum: 10c0/9e74cdb91cc35512a1c41f5ce509b0e93cc1d00eff0901e4ba831ee75a71ddf0845702adcd6f4ee6c811319eb9b59653248462ab94fa021ab855543a75396ceb
-  languageName: node
-  linkType: hard
-
-"yaml@npm:^2.5.1":
-  version: 2.6.1
-  resolution: "yaml@npm:2.6.1"
-  bin:
-    yaml: bin.mjs
-  checksum: 10c0/aebf07f61c72b38c74d2b60c3a3ccf89ee4da45bcd94b2bfb7899ba07a5257625a7c9f717c65a6fc511563d48001e01deb1d9e55f0133f3e2edf86039c8c1be7
   languageName: node
   linkType: hard
 
