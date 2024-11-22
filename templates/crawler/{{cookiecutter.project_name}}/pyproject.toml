@@ -2,6 +2,9 @@
 # % if cookiecutter.enable_apify_integration
 # % do extras.append('apify')
 # % endif
+# % if cookiecutter.http_client == 'curl-impersonate'
+# % do extras.append('curl-impersonate')
+# % endif
 
 # % if cookiecutter.package_manager == 'poetry'
 [tool.poetry]

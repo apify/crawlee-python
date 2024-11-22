@@ -5,19 +5,17 @@ import json
 from pathlib import Path
 from typing import Annotated, Optional, cast
 
-import httpx
 import inquirer  # type: ignore
 import typer
 from cookiecutter.main import cookiecutter  # type: ignore
 from inquirer.render.console import ConsoleRender  # type: ignore
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-TEMPLATE_LIST_URL = 'https://api.github.com/repos/apify/crawlee-python/contents/templates'
-
 cli = typer.Typer(no_args_is_help=True)
 
 cookiecutter_json = json.load((Path().parent.parent.parent / 'templates' / 'crawler' / 'cookiecutter.json').open())
 crawler_choices = cookiecutter_json['crawler_type']
+http_client_choices = cookiecutter_json['http_client']
 package_manager_choices = cookiecutter_json['package_manager']
 default_start_url = cookiecutter_json['start_url']
 
@@ -125,6 +123,12 @@ def create(
         show_default=False,
         help='The library that will be used for crawling in your crawler. If none is given, you will be prompted.',
     ),
+    http_client: Optional[str] = typer.Option(
+        None,
+        show_default=False,
+        help='The library that will be used to make HTTP requests in your crawler. '
+        'If none is given, you will be prompted.',
+    ),
     package_manager: Optional[str] = typer.Option(
         default=None,
         show_default=False,
@@ -151,6 +155,10 @@ def create(
         if crawler_type is None:
             crawler_type = _prompt_choice('Please select the Crawler type', crawler_choices)
 
+        # Prompt for http_client if not provided.
+        if http_client is None:
+            http_client = _prompt_choice('Please select the HTTP client', http_client_choices)
+
         # Prompt for package manager if not provided.
         if package_manager is None:
             package_manager = _prompt_choice('Please select the package manager', package_manager_choices)
@@ -167,6 +175,7 @@ def create(
             [
                 project_name,
                 crawler_type,
+                http_client,
                 package_manager,
                 start_url,
                 enable_apify_integration is not None,
@@ -189,6 +198,7 @@ def create(
                         'project_name': project_name,
                         'package_manager': package_manager,
                         'crawler_type': crawler_type,
+                        'http_client': http_client,
                         'enable_apify_integration': enable_apify_integration,
                         'start_url': start_url,
                     },
@@ -203,7 +213,5 @@ def create(
             )
             typer.echo(f'See the "{project_name}/README.md" for more information.')
 
-    except httpx.HTTPStatusError as exc:
-        typer.echo(f'Failed to fetch templates: {exc}.', err=True)
     except KeyboardInterrupt:
         typer.echo('Operation cancelled by user.')

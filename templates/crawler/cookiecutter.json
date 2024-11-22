@@ -2,6 +2,7 @@
     "project_name": "crawlee-python-beautifulsoup-project",
     "__package_name": "{{ cookiecutter.project_name|lower|replace('-', '_') }}",
     "crawler_type": ["beautifulsoup", "parsel", "playwright"],
+    "http_client": ["httpx", "curl-impersonate"],
     "package_manager": ["poetry", "pip"],
     "enable_apify_integration": false,
     "start_url": "https://crawlee.dev",
