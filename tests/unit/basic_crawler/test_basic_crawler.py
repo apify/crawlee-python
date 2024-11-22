@@ -734,6 +734,40 @@ async def test_max_crawl_depth(httpbin: URL) -> None:
     assert stats.requests_finished == 1
 
 
+@pytest.mark.parametrize(
+    ('n_requests', 'n_error_request', 'e_starts', 'e_finished'),
+    [
+        (3, 0, 3, 3),
+        (3, 2, 2, 1),
+    ],
+    ids=[
+        'wihout_error',
+        'error_2nd_request',
+    ],
+)
+async def test_abort_on_error(n_requests: int, n_error_request: int | None, e_starts: int, e_finished: int) -> None:
+    starts_urls = []
+
+    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(max_concurrency=1), abort_on_error=True)
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        starts_urls.append(context.request.url)
+
+        if context.request.user_data.get('n_request') == n_error_request:
+            raise ValueError('Error request')
+
+    stats = await crawler.run(
+        [
+            Request.from_url('https://crawlee.dev', always_enqueue=True, user_data={'n_request': i + 1})
+            for i in range(n_requests)
+        ]
+    )
+
+    assert len(starts_urls) == e_starts
+    assert stats.requests_finished == e_finished
+
+
 def test_crawler_log() -> None:
     crawler = BasicCrawler()
     assert isinstance(crawler.log, logging.Logger)

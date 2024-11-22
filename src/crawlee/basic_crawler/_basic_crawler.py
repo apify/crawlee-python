@@ -126,6 +126,9 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     """Limits crawl depth from 0 (initial requests) up to the specified `max_crawl_depth`.
     Requests at the maximum depth are processed, but no further links are enqueued."""
 
+    abort_on_error: NotRequired[bool]
+    """If True, the crawler stops immediately when any request handler error occurs."""
+
     _context_pipeline: NotRequired[ContextPipeline[TCrawlingContext]]
     """Enables extending the request lifecycle and modifying the crawling context. Intended for use by
     subclasses rather than direct instantiation of `BasicCrawler`."""
@@ -182,6 +185,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         event_manager: EventManager | None = None,
         configure_logging: bool = True,
         max_crawl_depth: int | None = None,
+        abort_on_error: bool = False,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         _additional_context_managers: Sequence[AsyncContextManager] | None = None,
         _logger: logging.Logger | None = None,
@@ -210,6 +214,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             event_manager: A custom `EventManager` instance, allowing the use of non-default configuration.
             configure_logging: If True, the crawler will set up logging infrastructure automatically.
             max_crawl_depth: Maximum crawl depth. If set, the crawler will stop crawling after reaching this depth.
+            abort_on_error: If True, the crawler stops immediately when any request handler error occurs.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
             _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
@@ -293,6 +298,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._running = False
         self._has_finished_before = False
         self._max_crawl_depth = max_crawl_depth
+
+        self._failed = False
+        self._abort_on_error = abort_on_error
 
     @property
     def log(self) -> logging.Logger:
@@ -735,6 +743,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
         request_provider = await self.get_request_provider()
         request = context.request
 
+        if self._abort_on_error:
+            self._logger.exception('Aborting crawler run due to error (abort_on_error=True)', exc_info=error)
+            self._failed = True
+
         if self._should_retry_request(context, error):
             request.retry_count += 1
             self._statistics.error_tracker.add(error)
@@ -889,6 +901,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 f'All ongoing requests have now completed. Total requests processed: '
                 f'{self._statistics.state.requests_finished}. The crawler will now shut down.'
             )
+            return True
+
+        if self._abort_on_error and self._failed:
             return True
 
         return is_finished
