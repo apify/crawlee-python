@@ -83,17 +83,24 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
             browser_type: The type of browser to launch ('chromium', 'firefox', or 'webkit').
                 This option should not be used if `browser_pool` is provided.
             browser_options: Keyword arguments to pass to the browser launch method.
+                This option should not be used if `browser_pool` is provided.
             page_options: Keyword arguments to pass to the new page method.
+                This option should not be used if `browser_pool` is provided.
             headless: Whether to run the browser in headless mode.
                 This option should not be used if `browser_pool` is provided.
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
         """
         if browser_pool:
             # Raise an exception if browser_pool is provided together with headless or browser_type arguments.
-            if headless is not None or browser_type is not None or browser_options is not None:
+            if (
+                headless is not None
+                or browser_type is not None
+                or browser_options is not None
+                or page_options is not None
+            ):
                 raise ValueError(
-                    'You cannot provide `headless`, `browser_type` or `browser_options` arguments when '
-                    '`browser_pool` is provided.'
+                    'You cannot provide `headless`, `browser_type`, `browser_options` or `page_options` '
+                    'arguments when `browser_pool` is provided.'
                 )
 
         # If browser_pool is not provided, create a new instance of BrowserPool with specified arguments.
