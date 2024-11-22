@@ -7,6 +7,7 @@ from enum import IntEnum
 from typing import TYPE_CHECKING, Annotated, Any, cast
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, PlainSerializer, PlainValidator, TypeAdapter
+from yarl import URL
 
 from crawlee._types import EnqueueStrategy, HttpHeaders, HttpMethod, HttpPayload, JsonSerializable
 from crawlee._utils.crypto import crypto_random_object_id
@@ -179,7 +180,7 @@ class BaseRequestData(BaseModel):
     @classmethod
     def from_url(
         cls,
-        url: str,
+        url: str | URL,
         *,
         method: HttpMethod = 'GET',
         headers: HttpHeaders | dict[str, str] | None = None,
@@ -197,6 +198,9 @@ class BaseRequestData(BaseModel):
 
         if isinstance(payload, str):
             payload = payload.encode()
+
+        if isinstance(url, URL):
+            url = str(url)
 
         unique_key = unique_key or compute_unique_key(
             url,
@@ -274,7 +278,7 @@ class Request(BaseRequestData):
     @classmethod
     def from_url(
         cls,
-        url: str,
+        url: str | URL,
         *,
         method: HttpMethod = 'GET',
         headers: HttpHeaders | dict[str, str] | None = None,
@@ -321,6 +325,9 @@ class Request(BaseRequestData):
 
         if isinstance(payload, str):
             payload = payload.encode()
+
+        if isinstance(url, URL):
+            url = str(url)
 
         unique_key = unique_key or compute_unique_key(
             url,

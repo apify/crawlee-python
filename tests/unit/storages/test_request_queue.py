@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from pydantic import ValidationError
+from yarl import URL
 
 from crawlee import Request
 from crawlee._request import RequestState
@@ -224,24 +225,29 @@ async def test_deduplication_of_requests_with_custom_unique_key() -> None:
 async def test_deduplication_of_requests_with_invalid_custom_unique_key() -> None:
     request_1 = Request.from_url('https://apify.com', always_enqueue=True)
     request_2 = Request.from_url('https://apify.com', always_enqueue=True)
+    request_3 = Request.from_url(URL('https://apify.com'), always_enqueue=True)
 
     rq = await RequestQueue.open(name='my-rq')
     await rq.add_request(request_1)
     await rq.add_request(request_2)
+    await rq.add_request(request_3)
 
-    assert await rq.get_total_count() == 2
+    assert await rq.get_total_count() == 3
 
     assert await rq.fetch_next_request() == request_1
     assert await rq.fetch_next_request() == request_2
+    assert await rq.fetch_next_request() == request_3
 
 
 async def test_deduplication_of_requests_with_valid_custom_unique_key() -> None:
     request_1 = Request.from_url('https://apify.com')
     request_2 = Request.from_url('https://apify.com')
+    request_3 = Request.from_url(URL('https://apify.com'))
 
     rq = await RequestQueue.open(name='my-rq')
     await rq.add_request(request_1)
     await rq.add_request(request_2)
+    await rq.add_request(request_3)
 
     assert await rq.get_total_count() == 1
 
