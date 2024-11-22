@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
     """A web crawler for performing HTTP requests.
 
-    The `HttpCrawler` builds on top of the `BasicCrawler`, which means it inherits all of its features. On top
+    The `_HttpCrawler` builds on top of the `BasicCrawler`, which means it inherits all of its features. On top
     of that it implements the HTTP communication using the HTTP clients. The class allows integration with
     any HTTP client that implements the `BaseHttpClient` interface. The HTTP client is provided to the crawler
     as an input parameter to the constructor.
@@ -30,9 +30,9 @@ class HttpCrawler(BasicCrawler[HttpCrawlingContext]):
     ### Usage
 
     ```python
-    from crawlee.http_crawler import HttpCrawler, HttpCrawlingContext
+    from crawlee.http_crawler import _HttpCrawler, HttpCrawlingContext
 
-    crawler = HttpCrawler()
+    crawler = _HttpCrawler()
 
     # Define the default request handler, which will be called for every request.
     @crawler.router.default_handler

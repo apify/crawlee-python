@@ -38,7 +38,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
 
     This crawler is ideal for crawling websites that require JavaScript execution, as it uses real browsers
     to download web pages and extract data. For websites that do not require JavaScript, consider using one of the
-    HTTP client-based crawlers, such as the `HttpCrawler`, `ParselCrawler`, or `BeautifulSoupCrawler`. They use
+    HTTP client-based crawlers, such as the `_HttpCrawler`, `ParselCrawler`, or `BeautifulSoupCrawler`. They use
     raw HTTP requests, which means they are much faster.
 
     ### Usage

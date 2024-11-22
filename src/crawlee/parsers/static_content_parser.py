@@ -3,11 +3,12 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, fields
-from typing import Any, AsyncGenerator, Generic, Iterable
+from typing import Any, AsyncGenerator, Iterable
+from warnings import warn
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from pydantic import ValidationError
-from typing_extensions import TypeVar, Self, Unpack, override
+from typing_extensions import Self, Generic,TypeVar, Unpack, override, reveal_type
 
 from crawlee._request import BaseRequestData
 from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, EnqueueLinksKwargs, EnqueueStrategy
@@ -16,7 +17,7 @@ from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
-from crawlee.http_clients import HttpCrawlingResult, HttpResponse, HttpxHttpClient
+from crawlee.http_clients import HttpResponse, HttpxHttpClient
 from crawlee.http_crawler import HttpCrawlingContext
 
 TParseResult = TypeVar('TParseResult', default=bytes)
@@ -27,7 +28,7 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 @docs_group('Data structures')
 class ParsedHttpCrawlingContext(Generic[TParseResult], HttpCrawlingContext):
-    """The crawling context used by HttpCrawler.
+    """The crawling context used by _HttpCrawler.
 
     It provides access to key objects as well as utility functions for handling crawling tasks.
     """
@@ -43,8 +44,16 @@ class ParsedHttpCrawlingContext(Generic[TParseResult], HttpCrawlingContext):
         context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
         return cls(parsed_content=parsed_content, enqueue_links=enqueue_links, **context_kwargs)
 
-
-TCrawlingContext = TypeVar('TCrawlingContext', default=ParsedHttpCrawlingContext)
+    @property
+    def soup(self) -> BeautifulSoup:
+        """Property for backwards compatibility."""
+        if isinstance(self.parsed_content, BeautifulSoup):
+            warn('Usage of deprecated property soup. Use parsed_content instead.', DeprecationWarning, stacklevel=2)
+            return self.parsed_content
+        raise RuntimeError(
+            'Trying to access soup property on context that does not have BeautifulSoup in parsed_content.'
+            'Access parsed_content instead.'
+        )
 
 
 @dataclass(frozen=True)
@@ -120,17 +129,18 @@ class BeautifulSoupContentParser(StaticContentParser[BeautifulSoup]):
 
     @override
     def find_links(self, soup: BeautifulSoup, selector: str) -> Iterable[str]:
+        link: Tag
         urls: list[str] = []
         for link in soup.select(selector):
             if (url := link.attrs.get('href')) is not None:
-                urls.append(url.strip())
+                urls.append(url.strip())  # noqa: PERF401  #Mypy has problems using is not None for type inference in list comprehension.
         return urls
 
 
-class HttpCrawler(Generic[TParseResult, TCrawlingContext], BasicCrawler[HttpCrawlingContext]):
+class _HttpCrawler(Generic[TParseResult], BasicCrawler[HttpCrawlingContext]):
     """A web crawler for performing HTTP requests.
 
-    The `HttpCrawler` builds on top of the `BasicCrawler`, which means it inherits all of its features. On top
+    The `_HttpCrawler` builds on top of the `BasicCrawler`, which means it inherits all of its features. On top
     of that it implements the HTTP communication using the HTTP clients. The class allows integration with
     any HTTP client that implements the `BaseHttpClient` interface. The HTTP client is provided to the crawler
     as an input parameter to the constructor.
@@ -141,9 +151,9 @@ class HttpCrawler(Generic[TParseResult, TCrawlingContext], BasicCrawler[HttpCraw
     ### Usage
 
     ```python
-    from crawlee.http_crawler import HttpCrawler, HttpCrawlingContext
+    from crawlee.http_crawler import _HttpCrawler, HttpCrawlingContext
 
-    crawler = HttpCrawler()
+    crawler = _HttpCrawler()
 
     # Define the default request handler, which will be called for every request.
     @crawler.router.default_handler
@@ -166,14 +176,12 @@ class HttpCrawler(Generic[TParseResult, TCrawlingContext], BasicCrawler[HttpCraw
     def __init__(
         self,
         *,
-        parser: StaticContentParser[TParseResult] | None = None,
+        parser: StaticContentParser[TParseResult],
         additional_http_error_status_codes: Iterable[int] = (),
         ignore_http_error_status_codes: Iterable[int] = (),
-        _crawling_context_type: type[TCrawlingContext] = ParsedHttpCrawlingContext[bytes],
         **kwargs: Unpack[BasicCrawlerOptions[HttpCrawlingContext]],
     ) -> None:
-        self.parser = parser or NoParser()
-        self._crawling_context_type = _crawling_context_type
+        self.parser = parser
 
         kwargs['_context_pipeline'] = (
             ContextPipeline()
@@ -195,9 +203,9 @@ class HttpCrawler(Generic[TParseResult, TCrawlingContext], BasicCrawler[HttpCraw
 
     async def _parse_http_response(
         self, context: HttpCrawlingContext
-    ) -> AsyncGenerator[TCrawlingContext[TParseResult], None]:
+    ) -> AsyncGenerator[ParsedHttpCrawlingContext[TParseResult], None]:
         parsed_content = self.parser.parse(context.http_response)
-        yield self._crawling_context_type.from_http_crawling_context(
+        yield ParsedHttpCrawlingContext.from_http_crawling_context(
             context=context,
             parsed_content=parsed_content,
             enqueue_links=self._create_enqueue_links_callback(context, parsed_content),
@@ -249,7 +257,7 @@ class HttpCrawler(Generic[TParseResult, TCrawlingContext], BasicCrawler[HttpCraw
 
         yield HttpCrawlingContext.from_basic_crawling_context(context=context, http_response=result.http_response)
 
-    async def _handle_blocked_request(self, context: TCrawlingContext) -> AsyncGenerator[TCrawlingContext, None]:
+    async def _handle_blocked_request(self, context: ParsedHttpCrawlingContext[TParseResult]) -> AsyncGenerator[ParsedHttpCrawlingContext[TParseResult], None]:
         """Try to detect if the request is blocked based on the HTTP status code or the parsed response content.
 
         Args:
@@ -272,6 +280,25 @@ class HttpCrawler(Generic[TParseResult, TCrawlingContext], BasicCrawler[HttpCraw
                 and context.session.is_blocked_status_code(status_code=status_code)
             ):
                 raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
-            if blocked_info := self.parser.is_blocked(context):
+            if blocked_info := self.parser.is_blocked(context.parsed_content):
                 raise SessionError(blocked_info.reason)
         yield context
+
+class HttpCrawler(_HttpCrawler[bytes]):
+    def __init__(
+        self,
+        *,
+        additional_http_error_status_codes: Iterable[int] = (),
+        ignore_http_error_status_codes: Iterable[int] = (),
+        **kwargs: Unpack[BasicCrawlerOptions[HttpCrawlingContext]],
+    ) -> None:
+        """
+        I didn't find another way how to make default constructor specifying one of type on generics.
+        """
+        super().__init__(
+            parser=NoParser(),
+            additional_http_error_status_codes=additional_http_error_status_codes,
+            ignore_http_error_status_codes=ignore_http_error_status_codes,
+            **kwargs,
+        )
+

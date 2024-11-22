@@ -85,10 +85,10 @@ class CurlImpersonateHttpClient(BaseHttpClient):
 
     ```python
     from crawlee.http_clients.curl_impersonate import CurlImpersonateHttpClient
-    from crawlee.http_crawler import HttpCrawler  # or any other HTTP client-based crawler
+    from crawlee.http_crawler import _HttpCrawler  # or any other HTTP client-based crawler
 
     http_client = CurlImpersonateHttpClient()
-    crawler = HttpCrawler(http_client=http_client)
+    crawler = _HttpCrawler(http_client=http_client)
     ```
     """
 

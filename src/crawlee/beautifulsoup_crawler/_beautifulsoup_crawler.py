@@ -4,8 +4,7 @@ from typing import TYPE_CHECKING, Iterable, Literal
 
 from bs4 import BeautifulSoup
 
-from crawlee.beautifulsoup_crawler._beautifulsoup_crawling_context import BeautifulSoupCrawlingContext
-from crawlee.parsers.static_content_parser import BeautifulSoupContentParser, HttpCrawler
+from crawlee.parsers.static_content_parser import BeautifulSoupContentParser, _HttpCrawler
 
 if TYPE_CHECKING:
     from typing_extensions import Unpack
@@ -17,7 +16,7 @@ if TYPE_CHECKING:
 BeautifulSoupParser = Literal['html.parser', 'lxml', 'xml', 'html5lib']
 
 
-class BeautifulSoupCrawler(HttpCrawler[BeautifulSoup, BeautifulSoupCrawlingContext]):
+class BeautifulSoupCrawler(_HttpCrawler[BeautifulSoup]):
     """A web crawler for performing HTTP requests and parsing HTML/XML content.
 
     The `BeautifulSoupCrawler` builds on top of the `BasicCrawler`, which means it inherits all of its features.
@@ -31,13 +30,13 @@ class BeautifulSoupCrawler(HttpCrawler[BeautifulSoup, BeautifulSoupCrawlingConte
     ### Usage
 
     ```python
-    from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
+    from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, ParsedHttpCrawlingContext[BeautifulSoup]
 
     crawler = BeautifulSoupCrawler()
 
     # Define the default request handler, which will be called for every request.
     @crawler.router.default_handler
-    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
+    async def request_handler(context: ParsedHttpCrawlingContext[BeautifulSoup]) -> None:
         context.log.info(f'Processing {context.request.url} ...')
 
         # Extract data from the page.
@@ -75,6 +74,5 @@ class BeautifulSoupCrawler(HttpCrawler[BeautifulSoup, BeautifulSoupCrawlingConte
             parser=BeautifulSoupContentParser(parser=parser),
             additional_http_error_status_codes=additional_http_error_status_codes,
             ignore_http_error_status_codes=ignore_http_error_status_codes,
-            _crawling_context_type=BeautifulSoupCrawlingContext,
             **kwargs,
         )
