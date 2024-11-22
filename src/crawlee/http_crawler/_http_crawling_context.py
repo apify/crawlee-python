@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
-from typing import Self
+from dataclasses import dataclass, fields
+from typing_extensions import Self
 
 from crawlee._types import BasicCrawlingContext
 from crawlee._utils.docs import docs_group
-from crawlee.http_clients import HttpCrawlingResult
+from crawlee.http_clients import HttpCrawlingResult, HttpResponse
 
 
 @dataclass(frozen=True)
@@ -13,5 +13,8 @@ from crawlee.http_clients import HttpCrawlingResult
 class HttpCrawlingContext(BasicCrawlingContext, HttpCrawlingResult):
     """The crawling context used by the `HttpCrawler`."""
 
-    def fromBasicCrawlingContext(cls, context = BasicCrawlingContext, http_response=HttpCrawlingResult) -> Self:
-        return cls(parsed_content=http_response, **asdict(context))
+    @classmethod
+    def from_basic_crawling_context(cls, context: BasicCrawlingContext, http_response: HttpResponse) -> Self:
+        """Convenience constructor that creates HttpCrawlingContext from existing BasicCrawlingContext."""
+        context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
+        return cls(http_response=http_response, **context_kwargs)
