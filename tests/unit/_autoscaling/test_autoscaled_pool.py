@@ -1,4 +1,4 @@
-# ruff: noqa: FBT003 Boolean positional value in function call
+# ruff: noqa: FBT003  # Boolean positional value in function call
 
 from __future__ import annotations
 
@@ -74,7 +74,7 @@ async def test_abort_works(system_status: SystemStatus | Mock) -> None:
     )
 
     with measure_time() as elapsed:
-        run_task = asyncio.create_task(pool.run())
+        run_task = asyncio.create_task(pool.run(), name='pool run task')
         await asyncio.sleep(0.1)
         assert pool.current_concurrency == 10
         await pool.abort()

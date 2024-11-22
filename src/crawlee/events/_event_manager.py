@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, TypedDict
 
 from pyee.asyncio import AsyncIOEventEmitter
 
+from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.wait import wait_for_all_tasks_for_finish
@@ -81,13 +82,20 @@ class EventManager:
         )
 
         # Flag to indicate the context state.
-        self._initialized = False
+        self._active = False
+
+    @property
+    def active(self) -> bool:
+        """Indicates whether the context is active."""
+        return self._active
 
     async def __aenter__(self) -> EventManager:
         """Initializes the event manager upon entering the async context."""
-        if not self._initialized:
+        if self._active:
+            logger.warning(f'The {self.__class__.__name__} is already active.')
+        else:
+            self._active = True
             self._emit_persist_state_event_rec_task.start()
-            self._initialized = True
 
         return self
 
@@ -101,13 +109,15 @@ class EventManager:
 
         This will stop listening for the events, and it will wait for all the event listeners to finish.
         """
-        if self._initialized:
+        if self._active:
             await self.wait_for_all_listeners_to_complete(timeout=self._close_timeout)
             self._event_emitter.remove_all_listeners()
             self._listener_tasks.clear()
             self._listeners_to_wrappers.clear()
             await self._emit_persist_state_event_rec_task.stop()
-            self._initialized = False
+            self._active = False
+        else:
+            logger.warning(f'The {self.__class__.__name__} is not active.')
 
     def on(self, *, event: Event, listener: Listener) -> None:
         """Add an event listener to the event manager.
@@ -165,6 +175,7 @@ class EventManager:
             self._listeners_to_wrappers[event] = defaultdict(list)
             self._event_emitter.remove_all_listeners(event.value)
 
+    @ensure_context
     def emit(self, *, event: Event, event_data: EventData) -> None:
         """Emit an event.
 
@@ -172,11 +183,9 @@ class EventManager:
             event: The event which will be emitted.
             event_data: The data which will be passed to the event listeners.
         """
-        if not self._initialized:
-            raise RuntimeError('The event manager is not initialized. Use it within an async context.')
-
         self._event_emitter.emit(event.value, event_data)
 
+    @ensure_context
     async def wait_for_all_listeners_to_complete(self, *, timeout: timedelta | None = None) -> None:
         """Wait for all currently executing event listeners to complete.
 
@@ -184,8 +193,6 @@ class EventManager:
             timeout: The maximum time to wait for the event listeners to finish. If they do not complete within
                 the specified timeout, they will be canceled.
         """
-        if not self._initialized:
-            raise RuntimeError('The event manager is not initialized. Use it within an async context.')
 
         async def wait_for_listeners() -> None:
             """Gathers all listener tasks and awaits their completion, logging any exceptions encountered."""

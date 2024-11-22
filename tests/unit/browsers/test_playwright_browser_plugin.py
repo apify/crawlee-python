@@ -52,7 +52,13 @@ async def test_multiple_new_browsers(plugin: PlaywrightBrowserPlugin) -> None:
     assert browser_controller_1 is not browser_controller_2
 
 
-async def test_new_browser_without_initialization() -> None:
+async def test_methods_raise_error_when_not_active() -> None:
     plugin = PlaywrightBrowserPlugin()
-    with pytest.raises(RuntimeError):
+
+    assert plugin.active is False
+
+    with pytest.raises(RuntimeError, match='Plugin is not active'):
         await plugin.new_browser()
+
+    async with plugin:
+        assert plugin.active is True

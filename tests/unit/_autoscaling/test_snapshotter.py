@@ -65,46 +65,59 @@ def test_snapshot_client(snapshotter: Snapshotter) -> None:
     assert len(snapshotter._client_snapshots) == 1
 
 
-def test_get_cpu_sample(snapshotter: Snapshotter) -> None:
+async def test_get_cpu_sample(snapshotter: Snapshotter) -> None:
     now = datetime.now(timezone.utc)
     cpu_snapshots = Snapshotter._get_sorted_list_by_created_at(
         [
-            CpuSnapshot(
-                used_ratio=0.5,
-                max_used_ratio=0.95,
-                created_at=now - timedelta(hours=delta),
-            )
+            CpuSnapshot(used_ratio=0.5, max_used_ratio=0.95, created_at=now - timedelta(hours=delta))
             for delta in range(5, 0, -1)
         ]
     )
-
     snapshotter._cpu_snapshots = cpu_snapshots
 
-    # When no sample duration is provided it should return all snapshots
-    samples = snapshotter.get_cpu_sample()
-    assert len(samples) == len(cpu_snapshots)
+    async with snapshotter:
+        # When no sample duration is provided it should return all snapshots
+        samples = snapshotter.get_cpu_sample()
+        assert len(samples) == len(cpu_snapshots)
 
-    duration = timedelta(hours=0.5)
-    samples = snapshotter.get_cpu_sample(duration)
-    assert len(samples) == 1
+        duration = timedelta(hours=0.5)
+        samples = snapshotter.get_cpu_sample(duration)
+        assert len(samples) == 1
 
-    duration = timedelta(hours=2.5)
-    samples = snapshotter.get_cpu_sample(duration)
-    assert len(samples) == 3
+        duration = timedelta(hours=2.5)
+        samples = snapshotter.get_cpu_sample(duration)
+        assert len(samples) == 3
 
-    duration = timedelta(hours=10)
-    samples = snapshotter.get_cpu_sample(duration)
-    assert len(samples) == len(cpu_snapshots)
+        duration = timedelta(hours=10)
+        samples = snapshotter.get_cpu_sample(duration)
+        assert len(samples) == len(cpu_snapshots)
 
 
-def test_empty_snapshot_samples_return_empty_lists(snapshotter: Snapshotter) -> None:
-    # All get resource sample uses the same helper function, so testing only one of them properly (CPU) should be
-    # enough. Here just call all of them returning empty list to make sure they don't crash.
-    assert snapshotter.get_cpu_sample() == []
-    assert snapshotter.get_memory_sample() == []
-    assert snapshotter.get_event_loop_sample() == []
-    assert snapshotter.get_client_sample() == []
-    assert snapshotter._get_sample([], timedelta(hours=1)) == []
+async def test_methods_raise_error_when_not_active() -> None:
+    event_manager = AsyncMock(spec=EventManager)
+    snapshotter = Snapshotter(event_manager, available_memory_ratio=0.25)
+
+    assert snapshotter.active is False
+
+    with pytest.raises(RuntimeError, match='Snapshotter is not active.'):
+        snapshotter.get_cpu_sample()
+
+    with pytest.raises(RuntimeError, match='Snapshotter is not active.'):
+        snapshotter.get_memory_sample()
+
+    with pytest.raises(RuntimeError, match='Snapshotter is not active.'):
+        snapshotter.get_event_loop_sample()
+
+    with pytest.raises(RuntimeError, match='Snapshotter is not active.'):
+        snapshotter.get_client_sample()
+
+    async with snapshotter:
+        snapshotter.get_cpu_sample()
+        snapshotter.get_memory_sample()
+        snapshotter.get_event_loop_sample()
+        snapshotter.get_client_sample()
+
+        assert snapshotter.active is True
 
 
 def test_snapshot_pruning_removes_outdated_records(snapshotter: Snapshotter) -> None:

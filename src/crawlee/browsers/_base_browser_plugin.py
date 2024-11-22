@@ -25,6 +25,11 @@ class BaseBrowserPlugin(ABC):
 
     @property
     @abstractmethod
+    def active(self) -> bool:
+        """Indicates whether the context is active."""
+
+    @property
+    @abstractmethod
     def browser_type(self) -> BrowserType:
         """Return the browser type name."""
 

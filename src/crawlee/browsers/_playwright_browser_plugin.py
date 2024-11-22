@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from playwright.async_api import Playwright, async_playwright
 from typing_extensions import override
 
+from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 from crawlee.browsers._base_browser_plugin import BaseBrowserPlugin
 from crawlee.browsers._playwright_browser_controller import PlaywrightBrowserController
@@ -55,6 +56,14 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         self._playwright_context_manager = async_playwright()
         self._playwright: Playwright | None = None
 
+        # Flag to indicate the context state.
+        self._active = False
+
+    @property
+    @override
+    def active(self) -> bool:
+        return self._active
+
     @property
     @override
     def browser_type(self) -> BrowserType:
@@ -77,8 +86,12 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
 
     @override
     async def __aenter__(self) -> PlaywrightBrowserPlugin:
-        logger.debug('Initializing Playwright browser plugin.')
-        self._playwright = await self._playwright_context_manager.__aenter__()
+        if self._active:
+            logger.warning(f'The {self.__class__.__name__} is already active.')
+        else:
+            self._active = True
+            self._playwright = await self._playwright_context_manager.__aenter__()
+
         return self
 
     @override
@@ -88,10 +101,14 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         exc_value: BaseException | None,
         exc_traceback: TracebackType | None,
     ) -> None:
-        logger.debug('Closing Playwright browser plugin.')
-        await self._playwright_context_manager.__aexit__(exc_type, exc_value, exc_traceback)
+        if self._active:
+            await self._playwright_context_manager.__aexit__(exc_type, exc_value, exc_traceback)
+            self._active = False
+        else:
+            logger.warning(f'The {self.__class__.__name__} is not active.')
 
     @override
+    @ensure_context
     async def new_browser(self) -> PlaywrightBrowserController:
         if not self._playwright:
             raise RuntimeError('Playwright browser plugin is not initialized.')
