@@ -21,6 +21,10 @@ on:
         type: string
         default: ""
 
+concurrency: 
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release_metadata:
     name: Prepare release metadata
@@ -38,17 +42,19 @@ jobs:
           release_type: ${{ inputs.release_type }}
           custom_version: ${{ inputs.custom_version }}
 
-  lint_check:
-    name: Lint check
-    uses: apify/workflows/.github/workflows/python_lint_check.yaml@main
-
-  type_check:
-    name: Type check
-    uses: apify/workflows/.github/workflows/python_type_check.yaml@main
-
-  unit_tests:
-    name: Unit tests
-    uses: apify/workflows/.github/workflows/python_unit_tests.yaml@main
+  # If github.ref points to a [ci skip] commit, we assume that it was added by the pre_release workflow, 
+  # which doesn't push the commit if code checks don't pass.
+  # Otherwise, the checks will have been triggered by the `run_code_checks` workflow.
+  wait_for_checks:
+    name: Wait for code checks to pass
+    runs-on: ubuntu-latest
+    steps:
+      - uses: lewagon/wait-on-check-action@v1.3.4
+        with:
+          ref: ${{ github.ref }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          check-regexp: "( check| tests)$"
+          wait-interval: 5
 
   update_changelog:
     name: Update changelog
@@ -59,6 +65,12 @@ jobs:
       changelog: ${{ needs.release_metadata.outputs.changelog }}
     secrets:
       APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
+
+  build_and_deploy_docs:
+    needs: [update_changelog]
+    uses: ./.github/workflows/build_and_deploy_docs.yaml
+    with:
+      ref: ${{ needs.update_changelog.outputs.changelog_commitish }}
 
   create_github_release:
     name: Create github release
