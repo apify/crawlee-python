@@ -4,7 +4,6 @@ import inspect
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
-from urllib.parse import urlparse
 
 from more_itertools import flatten
 from pydantic import AnyHttpUrl, TypeAdapter
@@ -173,7 +172,7 @@ class ProxyConfiguration:
 
         if self._proxy_tier_tracker:
             if request is not None and proxy_tier is None:
-                hostname = urlparse(request.url).hostname
+                hostname = URL(request.url).host
                 if hostname is None:
                     raise ValueError('The request URL does not have a hostname')
 

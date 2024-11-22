@@ -44,18 +44,18 @@ def test_unique_key_to_request_id_matches_known_values(unique_key: str, expected
 @pytest.mark.parametrize(
     ('url', 'expected_output', 'keep_url_fragment'),
     [
-        ('https://example.com/?utm_source=test&utm_medium=test&key=value', 'https://example.com?key=value', False),
+        ('https://example.com/?utm_source=test&utm_medium=test&key=value', 'https://example.com/?key=value', False),
         (
             'http://example.com/?key=value&another_key=another_value',
-            'http://example.com?another_key=another_value&key=value',
+            'http://example.com/?another_key=another_value&key=value',
             False,
         ),
-        ('HTTPS://EXAMPLE.COM/?KEY=VALUE', 'https://example.com?key=value', False),
+        ('HTTPS://EXAMPLE.COM/?KEY=VALUE', 'https://example.com/?key=value', False),
         ('', '', False),
-        ('http://example.com/#fragment', 'http://example.com#fragment', True),
+        ('http://example.com/#fragment', 'http://example.com/#fragment', True),
         ('http://example.com/#fragment', 'http://example.com', False),
         ('  https://example.com/  ', 'https://example.com', False),
-        ('http://example.com/?b=2&a=1', 'http://example.com?a=1&b=2', False),
+        ('http://example.com/?b=2&a=1', 'http://example.com/?a=1&b=2', False),
     ],
     ids=[
         'remove_utm_params',
@@ -81,7 +81,7 @@ def test_compute_unique_key_basic() -> None:
 
 
 def test_compute_unique_key_handles_fragments() -> None:
-    url = 'https://crawlee.dev#fragment'
+    url = 'https://crawlee.dev/#fragment'
     uk_with_fragment = compute_unique_key(url, keep_url_fragment=True)
     assert uk_with_fragment == url
 

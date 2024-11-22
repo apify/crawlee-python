@@ -227,8 +227,7 @@ class BaseRequestData(BaseModel):
     def get_query_param_from_url(self, param: str, *, default: str | None = None) -> str | None:
         """Get the value of a specific query parameter from the URL."""
         query_params = extract_query_params(self.url)
-        values = query_params.get(param, [default])  # parse_qs returns values as list
-        return values[0]
+        return query_params.get(param, default)
 
 
 @docs_group('Data structures')

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from multidict import MultiDict
 from pydantic import ValidationError
 
 from crawlee._utils.urls import convert_to_absolute_url, extract_query_params, is_url_absolute, validate_http_url
@@ -35,7 +36,7 @@ def test_convert_to_absolute_url() -> None:
 
 def test_extract_query_parameters() -> None:
     url = 'https://example.com/path?name=John&age=30&city=New%20York'
-    expected_params = {'name': ['John'], 'age': ['30'], 'city': ['New York']}
+    expected_params = MultiDict([('name', 'John'), ('age', '30'), ('city', 'New York')])
     assert extract_query_params(url) == expected_params
 
     url_no_params = 'https://example.com/path'
