@@ -35,19 +35,25 @@ RUN echo "Python version:" \
 # % elif cookiecutter.package_manager == 'pip'
 RUN pip install -U pip setuptools
 
-# Second, copy just pyproject.toml into the Actor image,
+# Second, copy just requirements.txt into the Actor image,
 # since it should be the only file that affects the dependency install in the next step,
 # in order to speed up the build
-COPY pyproject.toml ./
+COPY requirements.txt ./
 
 # Install the dependencies
 RUN echo "Python version:" \
  && python --version \
  && echo "Installing dependencies:" \
  # Install everything using pip, set playwright version so that it matches whatever is pre-installed in the image
-    pip install . playwright==$(playwright --version | cut -d ' ' -f 2) \
+ cat requirements.txt \
+ # Replace playwright version so that it matches whatever is pre-installed in the image
+    sed "s/^playwright==.*/playwright==$(playwright --version | cut -d ' ' -f 2)/" | \
+ # Install everything using pip (ignore dependency checks - the lockfile is correct, period)
+    pip install -r /dev/stdin --no-dependencies \
  && echo "All installed Python packages:" \
  && pip freeze
+# % elif cookiecutter.package_manager == 'manual'
+# TODO install dependencies
 # % endif
 
 # Next, copy the remaining files and directories with the source code.

@@ -205,12 +205,25 @@ def create(
                 )
 
             typer.echo(f'Your project "{project_name}" was created.')
-            typer.echo(
-                f'To run it, navigate to the directory: "cd {project_name}", '
-                f'and run it using "poetry run python -m {package_name}".'
-                if package_manager == 'poetry'
-                else f'and run it using "python -m {package_name}".'
-            )
+
+            if package_manager == 'manual':
+                typer.echo(
+                    f'To run it, navigate to the directory: "cd {project_name}", '
+                    f'install the dependencies listed in "requirements.txt" '
+                    f'and run it using "python -m {package_name}".'
+                )
+            elif package_manager == 'pip':
+                typer.echo(
+                    f'To run it, navigate to the directory: "cd {project_name}", '
+                    f'activate the virtual environment in ".venv" ("source .venv/bin/activate") '
+                    f'and run your project using "python -m {package_name}".'
+                )
+            elif package_manager == 'poetry':
+                typer.echo(
+                    f'To run it, navigate to the directory: "cd {project_name}", '
+                    f'and run it using "poetry run python -m {package_name}".'
+                )
+
             typer.echo(f'See the "{project_name}/README.md" for more information.')
 
     except KeyboardInterrupt:
