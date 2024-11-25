@@ -13,7 +13,7 @@ from crawlee._types import EnqueueStrategy, HttpHeaders, HttpMethod, HttpPayload
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.docs import docs_group
 from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
-from crawlee._utils.urls import extract_query_params, validate_http_url
+from crawlee._utils.urls import validate_http_url
 
 if TYPE_CHECKING:
     from typing_extensions import Self
@@ -230,7 +230,7 @@ class BaseRequestData(BaseModel):
 
     def get_query_param_from_url(self, param: str, *, default: str | None = None) -> str | None:
         """Get the value of a specific query parameter from the URL."""
-        query_params = extract_query_params(self.url)
+        query_params = URL(self.url).query
         return query_params.get(param, default)
 
 

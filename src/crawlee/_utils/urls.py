@@ -1,12 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from pydantic import AnyHttpUrl, TypeAdapter
 from yarl import URL
-
-if TYPE_CHECKING:
-    from multidict import MultiDictProxy
 
 
 def is_url_absolute(url: str) -> bool:
@@ -20,12 +15,6 @@ def is_url_absolute(url: str) -> bool:
 def convert_to_absolute_url(base_url: str, relative_url: str) -> str:
     """Convert a relative URL to an absolute URL using a base URL."""
     return str(URL(base_url).join(URL(relative_url)))
-
-
-def extract_query_params(url: str) -> MultiDictProxy[str]:
-    """Extract query parameters from a given URL."""
-    url_parsed = URL(url)
-    return url_parsed.query
 
 
 _http_url_adapter = TypeAdapter(AnyHttpUrl)
