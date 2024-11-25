@@ -27,7 +27,7 @@ async def test_crawl_with_proxy(
     proxy: ProxyInfo,
     httpbin: URL,
 ) -> None:
-    url = str(httpbin / '/status/222')
+    url = str(httpbin / 'status/222')
     request = Request.from_url(url)
 
     async with Statistics() as statistics:
@@ -42,7 +42,7 @@ async def test_crawl_with_proxy_disabled(
     disabled_proxy: ProxyInfo,
     httpbin: URL,
 ) -> None:
-    url = str(httpbin / '/status/222')
+    url = str(httpbin / 'status/222')
     request = Request.from_url(url)
 
     with pytest.raises(ProxyError):
@@ -56,7 +56,7 @@ async def test_send_request_with_proxy(
     proxy: ProxyInfo,
     httpbin: URL,
 ) -> None:
-    url = str(httpbin / '/status/222')
+    url = str(httpbin / 'status/222')
 
     response = await http_client.send_request(url, proxy_info=proxy)
     assert response.status_code == 222  # 222 - authentication successful
@@ -68,7 +68,7 @@ async def test_send_request_with_proxy_disabled(
     disabled_proxy: ProxyInfo,
     httpbin: URL,
 ) -> None:
-    url = str(httpbin / '/status/222')
+    url = str(httpbin / 'status/222')
 
     with pytest.raises(ProxyError):
         await http_client.send_request(url, proxy_info=disabled_proxy)

@@ -245,7 +245,7 @@ async def test_sending_payload_as_raw_data(http_client_class: type[BaseHttpClien
 
     encoded_payload = urlencode(PAYLOAD).encode()
     request = Request.from_url(
-        url=str(httpbin / '/post'),
+        url=str(httpbin / 'post'),
         method='POST',
         payload=encoded_payload,
     )
@@ -281,7 +281,7 @@ async def test_sending_payload_as_form_data(http_client_class: type[BaseHttpClie
         responses.append(response)
 
     request = Request.from_url(
-        url=str(httpbin / '/post'),
+        url=str(httpbin / 'post'),
         method='POST',
         headers={'content-type': 'application/x-www-form-urlencoded'},
         payload=urlencode(PAYLOAD).encode(),
@@ -314,7 +314,7 @@ async def test_sending_payload_as_json(http_client_class: type[BaseHttpClient], 
 
     json_payload = json.dumps(PAYLOAD).encode()
     request = Request.from_url(
-        url=str(httpbin / '/post'),
+        url=str(httpbin / 'post'),
         method='POST',
         payload=json_payload,
         headers={'content-type': 'application/json'},
@@ -345,7 +345,7 @@ async def test_sending_url_query_params(http_client_class: type[BaseHttpClient],
         # The httpbin.org/get endpoint returns the provided query parameters in the response.
         responses.append(response)
 
-    base_url = httpbin / '/get'
+    base_url = httpbin / 'get'
     query_params = {'param1': 'value1', 'param2': 'value2'}
     request = Request.from_url(url=str(base_url.extend_query(query_params)))
 
