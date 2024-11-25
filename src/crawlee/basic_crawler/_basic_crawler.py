@@ -490,12 +490,14 @@ class BasicCrawler(Generic[TCrawlingContext]):
         return final_statistics
 
     async def _run_crawler(self) -> None:
+        event_manager = service_container.get_event_manager()
+
         # Collect the context managers to be entered. Context managers that are already active are excluded,
         # as they were likely entered by the caller, who will also be responsible for exiting them.
         contexts_to_enter = [
             cm
             for cm in (
-                self._event_manager,
+                event_manager,
                 self._snapshotter,
                 self._statistics,
                 self._session_pool if self._use_session_pool else None,

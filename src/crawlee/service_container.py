@@ -12,14 +12,11 @@ if TYPE_CHECKING:
 
 __all__ = [
     'get_configuration',
-    'get_configuration_if_set',
     'get_event_manager',
     'get_storage_client',
-    'set_cloud_storage_client',
     'set_configuration',
-    'set_default_storage_client_type',
     'set_event_manager',
-    'set_local_storage_client',
+    'set_storage_client',
 ]
 
 

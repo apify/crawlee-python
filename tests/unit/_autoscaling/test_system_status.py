@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 async def snapshotter() -> AsyncGenerator[Snapshotter, None]:
     async with (
         LocalEventManager() as event_manager,
-        Snapshotter(event_manager, available_memory_ratio=0.25) as snapshotter,
+        Snapshotter(event_manager=event_manager, available_memory_ratio=0.25) as snapshotter,
     ):
         yield snapshotter
 
@@ -38,7 +38,7 @@ def now() -> datetime:
 async def test_start_stop_lifecycle() -> None:
     async with (
         LocalEventManager() as event_manager,
-        Snapshotter(event_manager, available_memory_ratio=0.25) as snapshotter,
+        Snapshotter(event_manager=event_manager, available_memory_ratio=0.25) as snapshotter,
     ):
         system_status = SystemStatus(snapshotter)
         system_status.get_current_system_info()
