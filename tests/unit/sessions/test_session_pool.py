@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import AsyncGenerator
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -11,6 +11,9 @@ from crawlee.events._types import Event, EventPersistStateData
 from crawlee.sessions import Session, SessionPool
 from crawlee.sessions._models import SessionPoolModel
 from crawlee.storages import KeyValueStore
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 MAX_POOL_SIZE = 3
 KVS_NAME = 'test_session_pool'

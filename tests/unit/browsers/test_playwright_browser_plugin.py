@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, AsyncGenerator
+from typing import TYPE_CHECKING
 
 import pytest
 
 from crawlee.browsers import PlaywrightBrowserPlugin
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
     from httpx import URL
 
 

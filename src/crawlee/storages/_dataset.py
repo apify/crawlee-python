@@ -4,7 +4,7 @@ import csv
 import io
 import json
 import logging
-from typing import TYPE_CHECKING, AsyncIterator, Literal, TextIO, TypedDict, cast
+from typing import TYPE_CHECKING, Literal, TextIO, TypedDict, cast
 
 from typing_extensions import NotRequired, Required, Unpack, override
 
@@ -16,7 +16,7 @@ from crawlee.storages._base_storage import BaseStorage
 from crawlee.storages._key_value_store import KeyValueStore
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import AsyncIterator, Callable
 
     from crawlee._types import JsonSerializable, PushDataKwargs
     from crawlee.base_storage_client import BaseStorageClient
