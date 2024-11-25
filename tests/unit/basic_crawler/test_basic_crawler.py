@@ -8,7 +8,7 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, AsyncGenerator
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
@@ -26,7 +26,7 @@ from crawlee.statistics import FinalStatistics
 from crawlee.storages import Dataset, KeyValueStore, RequestList, RequestQueue
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import AsyncGenerator, Sequence
 
     import respx
 
