@@ -7,19 +7,20 @@ from crawlee.errors import SessionError, ContextPipelineInterruptedError, Contex
     ContextPipelineFinalizationError
 
 TInputContext = TypeVar("TInputContext", bound=BasicCrawlingContext, default=BasicCrawlingContext)
-TOuputContext = TypeVar("TOuputContext", bound=BasicCrawlingContext, default=BasicCrawlingContext)
+TOutputContext = TypeVar("TOutputContext", bound=BasicCrawlingContext, default=BasicCrawlingContext)
 
-class Middleware(Generic[TInputContext, TOuputContext]):
-    def __init__(self, action: Callable[[TInputContext], Awaitable[TOuputContext]], cleanup: Callable[[TOuputContext], Awaitable[None]]) -> None:
+class Middleware(Generic[TInputContext, TOutputContext]):
+    def __init__(self, action: Callable[[TInputContext], Awaitable[TOutputContext]], cleanup: Callable[[TOutputContext], Awaitable[None]]) -> None:
         self._action=action
         self._cleanup=cleanup
-        self._output_context: TOuputContext | None= None
+        self._output_context: TOutputContext | None= None
         self._input_context: TInputContext | None = None
 
-    async def action(self, input_context: TInputContext) -> Awaitable[TOuputContext]:
+    async def action(self, input_context: TInputContext) -> Awaitable[TOutputContext]:
         self._input_context = input_context
         try:
             self._output_context = await self._action(input_context)
+            return self._output_context
         except SessionError:  # Session errors get special treatment
             raise
         except ContextPipelineInterruptedError:

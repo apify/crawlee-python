@@ -6,7 +6,7 @@ from typing_extensions import TypeVar
 
 from crawlee._types import BasicCrawlingContext
 from crawlee._utils.docs import docs_group
-from crawlee.basic_crawler._middleware import TInputContext, TOuputContext, Middleware
+from crawlee.basic_crawler._middleware import TInputContext, TOutputContext, Middleware
 from crawlee.errors import (
     RequestHandlerError,
     SessionError,
@@ -16,7 +16,7 @@ TFinalContext = TypeVar('TFinalContext', bound=BasicCrawlingContext, default=Bas
 TChildrenOutputContext = TypeVar('TChildrenOutputContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 
 @docs_group('Classes')
-class ContextPipeline(Generic[TFinalContext, TInputContext, TOuputContext]):
+class ContextPipeline(Generic[TFinalContext, TInputContext, TOutputContext]):
     """Encapsulates the logic of gradually enhancing the crawling context with additional information and utilities.
 
     The enhancement is done by a chain of middlewares that are added to the pipeline after its creation.
@@ -25,14 +25,14 @@ class ContextPipeline(Generic[TFinalContext, TInputContext, TOuputContext]):
         TOutputContext is context produced by running its middleware and will be input to its child middleware.
         TFinalContext is context that must be produced by the last ContextPipeline's middleware.
         First ContextPipeline will have TInputContext=BasicCrawlingContext
-        Last ContextPipeline will have TOuputContext=TFinalContext
+        Last ContextPipeline will have TOutputContext=TFinalContext
     """
 
     def __init__(
         self,
         *,
-        middleware: Middleware[TInputContext, TOuputContext],
-        child: ContextPipeline[TFinalContext, TOuputContext, Any] | None = None, #  Each pipeline knows type of children input, but is not aware of type of children output.
+        middleware: Middleware[TInputContext, TOutputContext],
+        child: ContextPipeline[TFinalContext, TOutputContext, Any] | None = None, #  Each pipeline knows type of children input, but is not aware of type of children output.
     ) -> None:
         self._middleware = middleware
         self._child = child
@@ -68,14 +68,14 @@ class ContextPipeline(Generic[TFinalContext, TInputContext, TOuputContext]):
 
     def compose(
         self,
-        middleware: Middleware[TOuputContext, TChildrenOutputContext]
-    ) -> ContextPipeline[TFinalContext, TOuputContext, TChildrenOutputContext]:
+        middleware: Middleware[TOutputContext, TChildrenOutputContext]
+    ) -> ContextPipeline[TFinalContext, TOutputContext, TChildrenOutputContext]:
         """Add a middleware to the pipeline.
 
         Returns:
             The extended pipeline instance, providing a fluent interface
         """
-        new_pipeline_step = ContextPipeline[TFinalContext, TOuputContext, TChildrenOutputContext](
+        new_pipeline_step = ContextPipeline[TFinalContext, TOutputContext, TChildrenOutputContext](
             middleware=middleware)
         self._child = new_pipeline_step
         return new_pipeline_step
