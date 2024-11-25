@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.4.4 - **not yet released**
+
+### 🚀 Features
+
+- Expose browser_options and page_options to PlaywrightCrawler ([#730](https://github.com/apify/crawlee-python/pull/730)) ([dbe85b9](https://github.com/apify/crawlee-python/commit/dbe85b90e59def281cfc6617a0eb869a4adf2fc0)) by [@vdusek](https://github.com/vdusek), closes [#719](https://github.com/apify/crawlee-python/issues/719)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.4.3](https://github.com/apify/crawlee-python/releases/tag/v0.4.3) (2024-11-21)
 
 ### 🐛 Bug Fixes
