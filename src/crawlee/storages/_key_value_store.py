@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, AsyncIterator, ClassVar, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, cast, overload
 
 from typing_extensions import override
 
@@ -11,6 +11,8 @@ from crawlee.events._types import Event, EventPersistStateData
 from crawlee.storages._base_storage import BaseStorage
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
     from crawlee.base_storage_client import BaseStorageClient
     from crawlee.configuration import Configuration
 

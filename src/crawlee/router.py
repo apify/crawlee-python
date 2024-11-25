@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Awaitable, Callable, Generic, TypeVar
+from collections.abc import Awaitable
+from typing import Callable, Generic, TypeVar
 
 from crawlee._types import BasicCrawlingContext
 from crawlee._utils.docs import docs_group

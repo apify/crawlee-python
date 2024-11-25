@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import AsyncGenerator
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock
 
 import pytest
@@ -12,6 +12,9 @@ from crawlee._types import BasicCrawlingContext
 from crawlee.basic_crawler import ContextPipeline
 from crawlee.errors import ContextPipelineFinalizationError, ContextPipelineInitializationError, RequestHandlerError
 from crawlee.sessions._session import Session
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 
 @dataclass(frozen=True)

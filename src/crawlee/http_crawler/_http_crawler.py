@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, AsyncGenerator, Iterable
+from typing import TYPE_CHECKING
 
 from crawlee._utils.docs import docs_group
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
@@ -10,6 +10,8 @@ from crawlee.http_clients import HttpxHttpClient
 from crawlee.http_crawler._http_crawling_context import HttpCrawlingContext
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Iterable
+
     from typing_extensions import Unpack
 
     from crawlee._types import BasicCrawlingContext

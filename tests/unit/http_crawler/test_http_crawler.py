@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, AsyncGenerator, Awaitable, Callable
+from typing import TYPE_CHECKING, Callable
 from unittest.mock import AsyncMock, Mock
 from urllib.parse import parse_qs, urlencode
 
@@ -17,6 +17,8 @@ from crawlee.sessions import SessionPool
 from crawlee.storages import RequestList
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Awaitable
+
     from crawlee.http_clients._base import BaseHttpClient
     from crawlee.http_crawler._http_crawling_context import HttpCrawlingContext
 
@@ -161,36 +163,36 @@ async def test_stores_cookies(httpbin: URL) -> None:
     visit = Mock()
     track_session_usage = Mock()
 
-    session_pool = SessionPool(max_pool_size=1)
-    crawler = HttpCrawler(
-        request_provider=RequestList(
-            [
-                str(httpbin.copy_with(path='/cookies/set').copy_set_param('a', '1')),
-                str(httpbin.copy_with(path='/cookies/set').copy_set_param('b', '2')),
-                str(httpbin.copy_with(path='/cookies/set').copy_set_param('c', '3')),
-            ]
-        ),
-        # /cookies/set might redirect us to a page that we can't access - no problem, we only care about cookies
-        ignore_http_error_status_codes=[401],
-        session_pool=session_pool,
-    )
+    async with SessionPool(max_pool_size=1) as session_pool:
+        crawler = HttpCrawler(
+            request_provider=RequestList(
+                [
+                    str(httpbin.copy_with(path='/cookies/set').copy_set_param('a', '1')),
+                    str(httpbin.copy_with(path='/cookies/set').copy_set_param('b', '2')),
+                    str(httpbin.copy_with(path='/cookies/set').copy_set_param('c', '3')),
+                ]
+            ),
+            # /cookies/set might redirect us to a page that we can't access - no problem, we only care about cookies
+            ignore_http_error_status_codes=[401],
+            session_pool=session_pool,
+        )
 
-    @crawler.router.default_handler
-    async def handler(context: HttpCrawlingContext) -> None:
-        visit(context.request.url)
-        track_session_usage(context.session.id if context.session else None)
+        @crawler.router.default_handler
+        async def handler(context: HttpCrawlingContext) -> None:
+            visit(context.request.url)
+            track_session_usage(context.session.id if context.session else None)
 
-    await crawler.run()
+        await crawler.run()
 
-    visited = {call[0][0] for call in visit.call_args_list}
-    assert len(visited) == 3
+        visited = {call[0][0] for call in visit.call_args_list}
+        assert len(visited) == 3
 
-    session_ids = {call[0][0] for call in track_session_usage.call_args_list}
-    assert len(session_ids) == 1
+        session_ids = {call[0][0] for call in track_session_usage.call_args_list}
+        assert len(session_ids) == 1
 
-    session = await session_pool.get_session_by_id(session_ids.pop())
-    assert session is not None
-    assert session.cookies == {'a': '1', 'b': '2', 'c': '3'}
+        session = await session_pool.get_session_by_id(session_ids.pop())
+        assert session is not None
+        assert session.cookies == {'a': '1', 'b': '2', 'c': '3'}
 
 
 async def test_do_not_retry_on_client_errors(crawler: HttpCrawler, server: respx.MockRouter) -> None:

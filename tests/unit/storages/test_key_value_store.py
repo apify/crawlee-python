@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import timedelta
-from typing import AsyncGenerator
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 from urllib.parse import urlparse
 
@@ -10,6 +10,9 @@ import pytest
 
 from crawlee.events import EventManager
 from crawlee.storages import KeyValueStore
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 
 @pytest.fixture

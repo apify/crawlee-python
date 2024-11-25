@@ -133,8 +133,21 @@ async def test_resource_management(httpbin: URL) -> None:
     assert page.page.is_closed()
 
 
-async def test_raises_error_when_not_initialized() -> None:
+async def test_methods_raise_error_when_not_active() -> None:
     plugin = PlaywrightBrowserPlugin()
     browser_pool = BrowserPool([plugin])
-    with pytest.raises(RuntimeError, match='Browser pool is not initialized.'):
+
+    assert browser_pool.active is False
+
+    with pytest.raises(RuntimeError, match='BrowserPool is not active.'):
         await browser_pool.new_page()
+
+    with pytest.raises(RuntimeError, match='BrowserPool is not active.'):
+        await browser_pool.new_page_with_each_plugin()
+
+    with pytest.raises(RuntimeError, match='BrowserPool is already active.'):
+        async with browser_pool, browser_pool:
+            pass
+
+    async with browser_pool:
+        assert browser_pool.active is True

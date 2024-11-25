@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Any, AsyncGenerator, Iterable, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from bs4 import BeautifulSoup, Tag
 from pydantic import ValidationError
@@ -19,6 +19,8 @@ from crawlee.http_clients import HttpxHttpClient
 from crawlee.http_crawler import HttpCrawlingContext
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Iterable
+
     from typing_extensions import Unpack
 
     from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs

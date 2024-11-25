@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Generic, cast
 from typing_extensions import Self, TypeVar
 
 import crawlee.service_container
+from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee.events._types import Event, EventPersistStateData
@@ -103,8 +104,24 @@ class Statistics(Generic[TStatisticsState]):
         self._periodic_message_logger = periodic_message_logger or logger
         self._periodic_logger = RecurringTask(self._log, log_interval)
 
+        # Flag to indicate the context state.
+        self._active = False
+
+    @property
+    def active(self) -> bool:
+        """Indicates whether the context is active."""
+        return self._active
+
     async def __aenter__(self) -> Self:
-        """Subscribe to events and start collecting statistics."""
+        """Subscribe to events and start collecting statistics.
+
+        Raises:
+            RuntimeError: If the context manager is already active.
+        """
+        if self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is already active.')
+
+        self._active = True
         self._instance_start = datetime.now(timezone.utc)
 
         if self.state.crawler_started_at is None:
@@ -115,7 +132,6 @@ class Statistics(Generic[TStatisticsState]):
 
         await self._maybe_load_statistics()
         self._events.on(event=Event.PERSIST_STATE, listener=self._persist_state)
-
         self._periodic_logger.start()
 
         return self
@@ -126,23 +142,34 @@ class Statistics(Generic[TStatisticsState]):
         exc_value: BaseException | None,
         exc_traceback: TracebackType | None,
     ) -> None:
-        """Stop collecting statistics."""
+        """Stop collecting statistics.
+
+        Raises:
+            RuntimeError: If the context manager is not active.
+        """
+        if not self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is not active.')
+
         self.state.crawler_finished_at = datetime.now(timezone.utc)
         self._events.off(event=Event.PERSIST_STATE, listener=self._persist_state)
         await self._periodic_logger.stop()
         await self._persist_state(event_data=EventPersistStateData(is_migrating=False))
+        self._active = False
 
+    @ensure_context
     def register_status_code(self, code: int) -> None:
         """Increment the number of times a status code has been received."""
         self.state.requests_with_status_code.setdefault(str(code), 0)
         self.state.requests_with_status_code[str(code)] += 1
 
+    @ensure_context
     def record_request_processing_start(self, request_id_or_key: str) -> None:
         """Mark a request as started."""
         record = self._requests_in_progress.get(request_id_or_key, RequestProcessingRecord())
         record.run()
         self._requests_in_progress[request_id_or_key] = record
 
+    @ensure_context
     def record_request_processing_finish(self, request_id_or_key: str) -> None:
         """Mark a request as finished."""
         record = self._requests_in_progress.get(request_id_or_key)
@@ -162,6 +189,7 @@ class Statistics(Generic[TStatisticsState]):
 
         del self._requests_in_progress[request_id_or_key]
 
+    @ensure_context
     def record_request_processing_failure(self, request_id_or_key: str) -> None:
         """Mark a request as failed."""
         record = self._requests_in_progress.get(request_id_or_key)
