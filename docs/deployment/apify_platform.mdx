@@ -231,7 +231,7 @@ from apify import Actor
 proxy_configuration = await Actor.create_proxy_configuration(
     groups=['RESIDENTIAL'],
     country_code='US',
-);
+)
 proxy_url = await proxy_configuration.new_url()
 ```
 
