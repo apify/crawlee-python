@@ -167,7 +167,10 @@ docstring-quotes = "double"
 inline-quotes = "single"
 
 [tool.ruff.lint.flake8-type-checking]
-runtime-evaluated-base-classes = ["pydantic.BaseModel", "pydantic_settings.BaseSettings"]
+runtime-evaluated-base-classes = [
+    "pydantic.BaseModel",
+    "pydantic_settings.BaseSettings",
+]
 
 [tool.ruff.lint.flake8-builtins]
 builtins-ignorelist = ["id"]
@@ -215,7 +218,7 @@ ignore_missing_imports = true
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",
-    "assert_never()"
+    "assert_never()",
 ]
 
 [tool.basedpyright]
