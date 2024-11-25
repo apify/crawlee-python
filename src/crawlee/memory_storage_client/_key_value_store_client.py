@@ -6,7 +6,7 @@ import os
 import shutil
 from datetime import datetime, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, AsyncContextManager
+from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
@@ -28,6 +28,8 @@ from crawlee.memory_storage_client._creation_management import (
 )
 
 if TYPE_CHECKING:
+    from contextlib import AbstractAsyncContextManager
+
     from httpx import Response
 
     from crawlee.memory_storage_client import MemoryStorageClient
@@ -218,7 +220,7 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
         return await self._get_record_internal(key, as_bytes=True)
 
     @override
-    async def stream_record(self, key: str) -> AsyncContextManager[KeyValueStoreRecord[Response] | None]:
+    async def stream_record(self, key: str) -> AbstractAsyncContextManager[KeyValueStoreRecord[Response] | None]:
         raise NotImplementedError('This method is not supported in memory storage.')
 
     @override

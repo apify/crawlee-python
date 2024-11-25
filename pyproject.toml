@@ -84,7 +84,7 @@ pytest-only = "~2.1.0"
 pytest-timeout = "~2.3.0"
 pytest-xdist = "~3.6.0"
 respx = "~0.21.0"
-ruff = "~0.7.0"
+ruff = "~0.8.0"
 setuptools = "~75.6.0"                    # setuptools are used by pytest, but not explicitly required
 sortedcontainers-stubs = "^2.4.2"
 types-beautifulsoup4 = "~4.12.0.20240229"
@@ -109,8 +109,6 @@ line-length = 120
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
-    "ANN101",   # Missing type annotation for `self` in method
-    "ANN102",   # Missing type annotation for `{name}` in classmethod
     "ANN401",   # Dynamically typed expressions (typing.Any) are disallowed in {filename}
     "ASYNC109", # Async function definition with a `timeout` parameter
     "BLE001",   # Do not catch blind exception
@@ -158,10 +156,10 @@ indent-style = "space"
     "TRY301",  # Abstract `raise` to an inner function
 ]
 "**/{docs}/**" = [
-    "D",       # Everything from the pydocstyle
-    "INP001",  # File {filename} is part of an implicit namespace package, add an __init__.py
-    "F841",    # Local variable {variable} is assigned to but never used
-    "N999",    # Invalid module name
+    "D",      # Everything from the pydocstyle
+    "INP001", # File {filename} is part of an implicit namespace package, add an __init__.py
+    "F841",   # Local variable {variable} is assigned to but never used
+    "N999",   # Invalid module name
 ]
 
 [tool.ruff.lint.flake8-quotes]
@@ -169,7 +167,10 @@ docstring-quotes = "double"
 inline-quotes = "single"
 
 [tool.ruff.lint.flake8-type-checking]
-runtime-evaluated-base-classes = ["pydantic.BaseModel", "pydantic_settings.BaseSettings"]
+runtime-evaluated-base-classes = [
+    "pydantic.BaseModel",
+    "pydantic_settings.BaseSettings",
+]
 
 [tool.ruff.lint.flake8-builtins]
 builtins-ignorelist = ["id"]
@@ -217,7 +218,7 @@ ignore_missing_imports = true
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",
-    "assert_never()"
+    "assert_never()",
 ]
 
 [tool.basedpyright]

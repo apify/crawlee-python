@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Mapping
+from typing import TYPE_CHECKING, Any, Callable
 
 from pydantic import ValidationError
 
@@ -18,7 +18,7 @@ from crawlee.playwright_crawler._playwright_pre_navigation_context import Playwr
 from crawlee.playwright_crawler._utils import infinite_scroll
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
+    from collections.abc import AsyncGenerator, Awaitable, Mapping
 
     from typing_extensions import Unpack
 

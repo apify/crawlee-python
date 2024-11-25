@@ -14,9 +14,9 @@ __all__ = [
     'HttpStatusCodeError',
     'ProxyError',
     'RequestHandlerError',
+    'ServiceConflictError',
     'SessionError',
     'UserDefinedErrorHandlerError',
-    'ServiceConflictError',
 ]
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)

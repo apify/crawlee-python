@@ -12,7 +12,7 @@ from contextlib import AsyncExitStack, suppress
 from datetime import timedelta
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, AsyncContextManager, Callable, Generic, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Generic, Union, cast
 from urllib.parse import ParseResult, urlparse
 
 from tldextract import TLDExtract
@@ -47,6 +47,7 @@ from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 if TYPE_CHECKING:
     import re
+    from contextlib import AbstractAsyncContextManager
 
     from crawlee._types import ConcurrencySettings, HttpMethod, JsonSerializable
     from crawlee.base_storage_client._models import DatasetItemsListPage
@@ -130,7 +131,7 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     """Enables extending the request lifecycle and modifying the crawling context. Intended for use by
     subclasses rather than direct instantiation of `BasicCrawler`."""
 
-    _additional_context_managers: NotRequired[Sequence[AsyncContextManager]]
+    _additional_context_managers: NotRequired[Sequence[AbstractAsyncContextManager]]
     """Additional context managers used throughout the crawler lifecycle."""
 
     _logger: NotRequired[logging.Logger]
@@ -183,7 +184,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         configure_logging: bool = True,
         max_crawl_depth: int | None = None,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
-        _additional_context_managers: Sequence[AsyncContextManager] | None = None,
+        _additional_context_managers: Sequence[AbstractAsyncContextManager] | None = None,
         _logger: logging.Logger | None = None,
     ) -> None:
         """A default constructor.

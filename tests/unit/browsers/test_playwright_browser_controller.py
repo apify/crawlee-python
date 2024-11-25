@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, AsyncGenerator
+from typing import TYPE_CHECKING
 
 import pytest
 from playwright.async_api import Browser, Playwright, async_playwright
@@ -10,6 +10,8 @@ from playwright.async_api import Browser, Playwright, async_playwright
 from crawlee.browsers import PlaywrightBrowserController
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
     from httpx import URL
 
 
