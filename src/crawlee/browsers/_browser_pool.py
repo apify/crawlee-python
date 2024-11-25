@@ -97,16 +97,22 @@ class BrowserPool:
         *,
         headless: bool | None = None,
         browser_type: BrowserType | None = None,
+        browser_options: Mapping[str, Any] | None = None,
+        page_options: Mapping[str, Any] | None = None,
         **kwargs: Any,
     ) -> BrowserPool:
-        """Create a new instance with a single `BaseBrowserPlugin` configured with the provided options.
+        """Create a new instance with a single `PlaywrightBrowserPlugin` configured with the provided options.
 
         Args:
             headless: Whether to run the browser in headless mode.
             browser_type: The type of browser to launch ('chromium', 'firefox', or 'webkit').
+            browser_options: Keyword arguments to pass to the browser launch method.
+            page_options: Keyword arguments to pass to the new page method.
             kwargs: Additional arguments for default constructor.
         """
         plugin_options: dict = defaultdict(dict)
+        plugin_options['browser_options'] = browser_options or {}
+        plugin_options['page_options'] = page_options or {}
 
         if headless is not None:
             plugin_options['browser_options']['headless'] = headless
