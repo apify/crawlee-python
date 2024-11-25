@@ -225,7 +225,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         self._http_client = http_client or HttpxHttpClient()
 
-        self._context_pipeline = (_context_pipeline or ContextPipeline()).compose(self._check_url_after_redirects)
+        if _context_pipeline:
+            self._context_pipeline = _context_pipeline
+            self._context_pipeline.compose(self._check_url_after_redirects)
+        else:
+            self._context_pipeline = ContextPipeline[TCrawlingContext,TCrawlingContext,TCrawlingContext](middleware=self._check_url_after_redirects)
 
         self._error_handler: ErrorHandler[TCrawlingContext | BasicCrawlingContext] | None = None
         self._failed_request_handler: FailedRequestHandler[TCrawlingContext | BasicCrawlingContext] | None = None

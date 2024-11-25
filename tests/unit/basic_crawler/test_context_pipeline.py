@@ -82,8 +82,8 @@ async def test_calls_consumers_and_middlewares() -> None:
         )
         events.append('middleware_b_out')
 
-    pipeline = ContextPipeline[BasicCrawlingContext]().compose(middleware_a).compose(middleware_b)
-
+    pipeline = ContextPipeline[BasicCrawlingContext]()
+    pipeline.compose(middleware_a).compose(middleware_b)
     context = BasicCrawlingContext(
         request=Request.from_url(url='https://httpbin.org/'),
         send_request=AsyncMock(),
@@ -136,7 +136,8 @@ async def test_handles_exceptions_in_middleware_initialization() -> None:
         raise RuntimeError('Crash during middleware initialization')
         yield context  # type: ignore[unreachable]
 
-    pipeline = ContextPipeline().compose(step_1).compose(step_2)
+    pipeline = ContextPipeline()
+    pipeline.compose(step_1).compose(step_2)
     context = BasicCrawlingContext(
         request=Request.from_url(url='https://httpbin.org/'),
         send_request=AsyncMock(),

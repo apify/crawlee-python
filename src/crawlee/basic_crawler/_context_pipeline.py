@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Awaitable, Callable, Generic
+from contextlib import asynccontextmanager, ExitStack
+from typing import Any, Awaitable, Callable, Generic, AsyncGenerator
 
 from typing_extensions import TypeVar
 
@@ -11,8 +12,8 @@ from crawlee.errors import (
     RequestHandlerError,
     SessionError,
 )
+TFinalContext = TypeVar("TFinalContext", bound=BasicCrawlingContext, default=BasicCrawlingContext)
 
-TFinalContext = TypeVar('TFinalContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 TChildrenOutputContext = TypeVar('TChildrenOutputContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 
 @docs_group('Classes')
@@ -31,11 +32,14 @@ class ContextPipeline(Generic[TFinalContext, TInputContext, TOutputContext]):
     def __init__(
         self,
         *,
-        middleware: Middleware[TInputContext, TOutputContext],
+        middleware: Callable[[TInputContext], AsyncGenerator[TOutputContext, None]] | None = None,
         child: ContextPipeline[TFinalContext, TOutputContext, Any] | None = None, #  Each pipeline knows type of children input, but is not aware of type of children output.
     ) -> None:
-        self._middleware = middleware
-        self._child = child
+        if middleware is not None:
+            self._middleware = Middleware(middleware_factory=middleware)
+        else:
+            self._middleware = Middleware.create_empty_middleware()
+        self.child = child
 
 
     async def __call__(
@@ -47,28 +51,24 @@ class ContextPipeline(Generic[TFinalContext, TInputContext, TOutputContext]):
 
         Exceptions from the consumer function are wrapped together with the final crawling context.
         """
-        with self(input_context=crawling_context) as final_context:
-            try:
-                await final_context_consumer(final_context)
-            except SessionError:  # Session errors get special treatment
-                raise
-            except Exception as e:
-                raise RequestHandlerError(e, final_context or crawling_context) from e
+
+        await _MiddlewareContext(
+            input_context=crawling_context,
+            final_context_consumer = final_context_consumer,
+            context_pipeline =self).execute_in_final_context()
 
 
-    async def __aenter__(self, input_context: TInputContext) -> TFinalContext:
-        output_context = await self.middleware.action(input_context)
+    async def execute_in_final_context(self, crawling_context: TInputContext,
+                                       final_context_consumer: Callable[[TFinalContext], Awaitable[None]],) -> TFinalContext:
+        output_context = await self._middleware.action(crawling_context)
         if self.child:
-            async with self.child(output_context) as child_output_context:
-                return child_output_context
-        output_context
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        await self.middleware.cleanup()
+            self.child.input_context = output_context
+            return await self.child.get_final_context(output_context)
+        return output_context
 
     def compose(
         self,
-        middleware: Middleware[TOutputContext, TChildrenOutputContext]
+        middleware: Callable[[TInputContext], AsyncGenerator[TOutputContext, None]]
     ) -> ContextPipeline[TFinalContext, TOutputContext, TChildrenOutputContext]:
         """Add a middleware to the pipeline.
 
@@ -77,5 +77,35 @@ class ContextPipeline(Generic[TFinalContext, TInputContext, TOutputContext]):
         """
         new_pipeline_step = ContextPipeline[TFinalContext, TOutputContext, TChildrenOutputContext](
             middleware=middleware)
-        self._child = new_pipeline_step
+        self.child = new_pipeline_step
         return new_pipeline_step
+
+
+class _MiddlewareContext():
+    def __init__(self, input_context: TInputContext,  final_context_consumer, context_pipeline):
+        self._input_context = input_context
+        self._final_context_consumer = final_context_consumer
+        self._context_pipeline = context_pipeline
+
+    async def __aenter__(self) -> TOutputContext:
+        output_context = await self._context_pipeline._middleware.action(self._input_context)
+        return output_context
+
+
+    async def execute_in_final_context(self) -> None:
+        async with self as output_context:
+            if self._context_pipeline.child is not None:
+                await _MiddlewareContext(output_context, self._final_context_consumer,
+                                                            self._context_pipeline.child).execute_in_final_context()
+            else:
+                try:
+                    await self._final_context_consumer(output_context)
+                except SessionError:  # Session errors get special treatment
+                    raise
+                except Exception as e:
+                    raise RequestHandlerError(e, output_context or self._input_context) from e
+
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        await self._context_pipeline._middleware.cleanup()
+

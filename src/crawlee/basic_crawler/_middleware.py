@@ -1,4 +1,4 @@
-from typing import Awaitable, Callable
+from typing import Awaitable, Callable, AsyncGenerator
 
 from typing_extensions import TypeVar, Generic
 
@@ -10,17 +10,22 @@ TInputContext = TypeVar("TInputContext", bound=BasicCrawlingContext, default=Bas
 TOutputContext = TypeVar("TOutputContext", bound=BasicCrawlingContext, default=BasicCrawlingContext)
 
 class Middleware(Generic[TInputContext, TOutputContext]):
-    def __init__(self, action: Callable[[TInputContext], Awaitable[TOutputContext]], cleanup: Callable[[TOutputContext], Awaitable[None]]) -> None:
-        self._action=action
-        self._cleanup=cleanup
+    def __init__(self,
+                 middleware_factory = Callable[[TInputContext], AsyncGenerator[TOutputContext, None]],
+                 ) -> None:
+        self._middleware_factory = middleware_factory
+        self._middleware_generator: AsyncGenerator[TOutputContext, None] = middleware_factory
         self._output_context: TOutputContext | None= None
         self._input_context: TInputContext | None = None
 
     async def action(self, input_context: TInputContext) -> Awaitable[TOutputContext]:
         self._input_context = input_context
+        self._middleware_generator = self._middleware_factory(self._input_context)
         try:
-            self._output_context = await self._action(input_context)
+            self._output_context = await self._middleware_generator.__anext__()
             return self._output_context
+        except StopAsyncIteration as e:
+            raise RuntimeError('The middleware did not yield') from e
         except SessionError:  # Session errors get special treatment
             raise
         except ContextPipelineInterruptedError:
@@ -30,9 +35,19 @@ class Middleware(Generic[TInputContext, TOutputContext]):
 
     async def cleanup(self) -> Awaitable[None]:
         try:
-            await self._cleanup(self._output_context)
+            await self._middleware_generator.__anext__()
+        except StopAsyncIteration:  # noqa: PERF203
+            # Expected exception. self._middleware_generator should yield exactly once. Cleanup code does not yield.
+            pass
         except ContextPipelineInterruptedError as e:
             raise RuntimeError('Invalid state - pipeline interrupted in the finalization step') from e
         except Exception as e:
             raise ContextPipelineFinalizationError(e, self._output_context or self._input_context) from e
+        else:
+            raise RuntimeError('The middleware yielded more than once')
 
+    @classmethod
+    def create_empty_middleware(cls):
+        async def no_action_middleware(crawling_context = BasicCrawlingContext) ->AsyncGenerator[BasicCrawlingContext, None]:
+            yield crawling_context
+        return cls[BasicCrawlingContext,BasicCrawlingContext](middleware_factory=no_action_middleware)
