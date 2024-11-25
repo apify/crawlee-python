@@ -53,7 +53,7 @@ Another option is to use the [`Configuration`](https://docs.apify.com/sdk/python
 ```python
 from apify import Actor
 
-sdk = Actor(Configuration(token='your_apify_token'));
+sdk = Actor(Configuration(token='your_apify_token'))
 ```
 
 ## What is an Actor
@@ -215,7 +215,7 @@ If you are already subscribed to Apify Proxy, you can start using them immediate
 from apify import Actor
 
 proxy_configuration = await Actor.create_proxy_configuration()
-proxy_url = await proxy_configuration.new_url();
+proxy_url = await proxy_configuration.new_url()
 ```
 
 Note that unlike using your own proxies in Crawlee, you shouldn't use the constructor to create <ApiLink to="class/ProxyConfiguration">`ProxyConfiguration`</ApiLink> instances. For using the Apify Proxy you should create an instance using the [`Actor.create_proxy_configuration()`](https://docs.apify.com/sdk/python/reference/class/Actor#create_proxy_configuration) function instead.
@@ -226,13 +226,13 @@ With Apify Proxy, you can select specific proxy groups to use, or countries to c
 This allows you to get better proxy performance after some initial research.
 
 ```python
-import { Actor } from 'apify';
+from apify import Actor
 
 proxy_configuration = await Actor.create_proxy_configuration(
     groups=['RESIDENTIAL'],
     country_code='US',
-);
-proxy_url = await proxy_configuration.new_url();
+)
+proxy_url = await proxy_configuration.new_url()
 ```
 
 Now your crawlers will use only Residential proxies from the US. Note that you must first get access
