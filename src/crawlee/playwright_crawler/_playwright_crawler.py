@@ -91,13 +91,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
         """
         if browser_pool:
-            # Raise an exception if browser_pool is provided together with headless or browser_type arguments.
-            if (
-                headless is not None
-                or browser_type is not None
-                or browser_options is not None
-                or page_options is not None
-            ):
+            # Raise an exception if browser_pool is provided together with other browser-related arguments.
+            if any(param is not None for param in (headless, browser_type, browser_options, page_options)):
                 raise ValueError(
                     'You cannot provide `headless`, `browser_type`, `browser_options` or `page_options` '
                     'arguments when `browser_pool` is provided.'
