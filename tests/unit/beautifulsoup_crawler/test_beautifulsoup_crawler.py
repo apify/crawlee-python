@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, AsyncGenerator
+from typing import TYPE_CHECKING
 from unittest import mock
 
 import pytest
@@ -12,6 +12,8 @@ from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler
 from crawlee.storages import RequestList
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
     from crawlee.beautifulsoup_crawler import BeautifulSoupCrawlingContext
 
 

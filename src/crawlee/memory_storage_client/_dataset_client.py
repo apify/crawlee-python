@@ -6,7 +6,7 @@ import os
 import shutil
 from datetime import datetime, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, AsyncContextManager, AsyncIterator
+from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
@@ -19,6 +19,9 @@ from crawlee.base_storage_client._models import DatasetItemsListPage, DatasetMet
 from crawlee.memory_storage_client._creation_management import find_or_create_client_by_id_or_name_inner
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+    from contextlib import AbstractAsyncContextManager
+
     from httpx import Response
 
     from crawlee._types import JsonSerializable
@@ -281,7 +284,7 @@ class DatasetClient(BaseDatasetClient):
         skip_hidden: bool = False,
         xml_root: str | None = None,
         xml_row: str | None = None,
-    ) -> AsyncContextManager[Response | None]:
+    ) -> AbstractAsyncContextManager[Response | None]:
         raise NotImplementedError('This method is not supported in memory storage.')
 
     @override

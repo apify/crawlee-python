@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, AsyncGenerator, Awaitable, Callable, Generator, Generic, cast
+from collections.abc import AsyncGenerator, Awaitable, Generator
+from typing import Any, Callable, Generic, cast
 
 from typing_extensions import TypeVar
 

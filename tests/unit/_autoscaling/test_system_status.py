@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import AsyncGenerator
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -17,12 +17,16 @@ from crawlee._autoscaling.types import (
 from crawlee._utils.byte_size import ByteSize
 from crawlee.events import LocalEventManager
 
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
 
 @pytest.fixture
 async def snapshotter() -> AsyncGenerator[Snapshotter, None]:
-    async with LocalEventManager() as event_manager, Snapshotter(
-        event_manager, available_memory_ratio=0.25
-    ) as snapshotter:
+    async with (
+        LocalEventManager() as event_manager,
+        Snapshotter(event_manager, available_memory_ratio=0.25) as snapshotter,
+    ):
         yield snapshotter
 
 
@@ -32,9 +36,10 @@ def now() -> datetime:
 
 
 async def test_start_stop_lifecycle() -> None:
-    async with LocalEventManager() as event_manager, Snapshotter(
-        event_manager, available_memory_ratio=0.25
-    ) as snapshotter:
+    async with (
+        LocalEventManager() as event_manager,
+        Snapshotter(event_manager, available_memory_ratio=0.25) as snapshotter,
+    ):
         system_status = SystemStatus(snapshotter)
         system_status.get_current_system_info()
         system_status.get_historical_system_info()

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, AsyncContextManager, AsyncIterator
+from typing import TYPE_CHECKING
 
 from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+    from contextlib import AbstractAsyncContextManager
+
     from httpx import Response
 
     from crawlee._types import JsonSerializable
@@ -195,7 +198,7 @@ class BaseDatasetClient(ABC):
         skip_hidden: bool = False,
         xml_root: str | None = None,
         xml_row: str | None = None,
-    ) -> AsyncContextManager[Response | None]:
+    ) -> AbstractAsyncContextManager[Response | None]:
         """Retrieves dataset items as a streaming response.
 
         Args:

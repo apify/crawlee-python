@@ -1,11 +1,11 @@
-# ruff: noqa: FBT003 Boolean positional value in function call
+# ruff: noqa: FBT003 # Boolean positional value in function call
 
 from __future__ import annotations
 
 import asyncio
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
-from typing import Awaitable, TypeVar, cast
+from typing import TYPE_CHECKING, TypeVar, cast
 from unittest.mock import Mock
 
 import pytest
@@ -14,6 +14,9 @@ from crawlee._autoscaling import AutoscaledPool, SystemStatus
 from crawlee._autoscaling.types import LoadRatioInfo, SystemInfo
 from crawlee._types import ConcurrencySettings
 from crawlee._utils.measure_time import measure_time
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable
 
 
 @pytest.fixture

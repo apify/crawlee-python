@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, AsyncGenerator, Awaitable, Callable
+from typing import TYPE_CHECKING, Callable
 from unittest.mock import AsyncMock, Mock
 from urllib.parse import parse_qs, urlencode
 
@@ -17,6 +17,8 @@ from crawlee.sessions import SessionPool
 from crawlee.storages import RequestList
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Awaitable
+
     from crawlee.http_clients._base import BaseHttpClient
     from crawlee.http_crawler._http_crawling_context import HttpCrawlingContext
 
