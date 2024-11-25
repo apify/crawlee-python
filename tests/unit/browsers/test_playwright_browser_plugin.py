@@ -60,5 +60,9 @@ async def test_methods_raise_error_when_not_active() -> None:
     with pytest.raises(RuntimeError, match='Plugin is not active'):
         await plugin.new_browser()
 
+    with pytest.raises(RuntimeError, match='Plugin is already active.'):
+        async with plugin, plugin:
+            pass
+
     async with plugin:
         assert plugin.active is True

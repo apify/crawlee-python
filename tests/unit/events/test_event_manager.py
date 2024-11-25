@@ -164,6 +164,10 @@ async def test_methods_raise_error_when_not_active(event_system_info_data: Event
     with pytest.raises(RuntimeError, match='EventManager is not active.'):
         await event_manager.wait_for_all_listeners_to_complete()
 
+    with pytest.raises(RuntimeError, match='EventManager is already active.'):
+        async with event_manager, event_manager:
+            pass
+
     async with event_manager:
         event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_system_info_data)
         await event_manager.wait_for_all_listeners_to_complete()

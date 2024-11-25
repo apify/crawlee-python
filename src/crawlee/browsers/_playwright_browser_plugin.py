@@ -87,11 +87,10 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
     @override
     async def __aenter__(self) -> PlaywrightBrowserPlugin:
         if self._active:
-            logger.warning(f'The {self.__class__.__name__} is already active.')
-        else:
-            self._active = True
-            self._playwright = await self._playwright_context_manager.__aenter__()
+            raise RuntimeError(f'The {self.__class__.__name__} is already active.')
 
+        self._active = True
+        self._playwright = await self._playwright_context_manager.__aenter__()
         return self
 
     @override
@@ -101,11 +100,11 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         exc_value: BaseException | None,
         exc_traceback: TracebackType | None,
     ) -> None:
-        if self._active:
-            await self._playwright_context_manager.__aexit__(exc_type, exc_value, exc_traceback)
-            self._active = False
-        else:
-            logger.warning(f'The {self.__class__.__name__} is not active.')
+        if not self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is not active.')
+
+        await self._playwright_context_manager.__aexit__(exc_type, exc_value, exc_traceback)
+        self._active = False
 
     @override
     @ensure_context

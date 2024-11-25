@@ -136,16 +136,19 @@ class Snapshotter:
         return self._active
 
     async def __aenter__(self) -> Snapshotter:
-        """Starts capturing snapshots at configured intervals."""
-        if self._active:
-            logger.warning(f'The {self.__class__.__name__} is already active.')
-        else:
-            self._active = True
-            self._event_manager.on(event=Event.SYSTEM_INFO, listener=self._snapshot_cpu)
-            self._event_manager.on(event=Event.SYSTEM_INFO, listener=self._snapshot_memory)
-            self._snapshot_event_loop_task.start()
-            self._snapshot_client_task.start()
+        """Starts capturing snapshots at configured intervals.
 
+        Raises:
+            RuntimeError: If the context manager is already active.
+        """
+        if self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is already active.')
+
+        self._active = True
+        self._event_manager.on(event=Event.SYSTEM_INFO, listener=self._snapshot_cpu)
+        self._event_manager.on(event=Event.SYSTEM_INFO, listener=self._snapshot_memory)
+        self._snapshot_event_loop_task.start()
+        self._snapshot_client_task.start()
         return self
 
     async def __aexit__(
@@ -158,15 +161,18 @@ class Snapshotter:
 
         This method stops capturing snapshots of system resources (CPU, memory, event loop, and client information).
         It should be called to terminate resource capturing when it is no longer needed.
+
+        Raises:
+            RuntimeError: If the context manager is not active.
         """
-        if self._active:
-            self._event_manager.off(event=Event.SYSTEM_INFO, listener=self._snapshot_cpu)
-            self._event_manager.off(event=Event.SYSTEM_INFO, listener=self._snapshot_memory)
-            await self._snapshot_event_loop_task.stop()
-            await self._snapshot_client_task.stop()
-            self._active = False
-        else:
-            logger.warning(f'The {self.__class__.__name__} is not active.')
+        if not self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is not active.')
+
+        self._event_manager.off(event=Event.SYSTEM_INFO, listener=self._snapshot_cpu)
+        self._event_manager.off(event=Event.SYSTEM_INFO, listener=self._snapshot_memory)
+        await self._snapshot_event_loop_task.stop()
+        await self._snapshot_client_task.stop()
+        self._active = False
 
     @ensure_context
     def get_memory_sample(self, duration: timedelta | None = None) -> list[Snapshot]:

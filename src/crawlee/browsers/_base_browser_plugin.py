@@ -50,7 +50,11 @@ class BaseBrowserPlugin(ABC):
 
     @abstractmethod
     async def __aenter__(self) -> BaseBrowserPlugin:
-        """Enter the context manager and initialize the browser plugin."""
+        """Enter the context manager and initialize the browser plugin.
+
+        Raises:
+            RuntimeError: If the context manager is already active.
+        """
 
     @abstractmethod
     async def __aexit__(
@@ -59,7 +63,11 @@ class BaseBrowserPlugin(ABC):
         exc_value: BaseException | None,
         exc_traceback: TracebackType | None,
     ) -> None:
-        """Exit the context manager and close the browser plugin."""
+        """Exit the context manager and close the browser plugin.
+
+        Raises:
+            RuntimeError: If the context manager is not active.
+        """
 
     @abstractmethod
     async def new_browser(self) -> BaseBrowserController:

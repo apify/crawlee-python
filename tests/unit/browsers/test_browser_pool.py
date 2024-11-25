@@ -145,5 +145,9 @@ async def test_methods_raise_error_when_not_active() -> None:
     with pytest.raises(RuntimeError, match='BrowserPool is not active.'):
         await browser_pool.new_page_with_each_plugin()
 
+    with pytest.raises(RuntimeError, match='BrowserPool is already active.'):
+        async with browser_pool, browser_pool:
+            pass
+
     async with browser_pool:
         assert browser_pool.active is True

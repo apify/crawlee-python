@@ -90,13 +90,16 @@ class EventManager:
         return self._active
 
     async def __aenter__(self) -> EventManager:
-        """Initializes the event manager upon entering the async context."""
-        if self._active:
-            logger.warning(f'The {self.__class__.__name__} is already active.')
-        else:
-            self._active = True
-            self._emit_persist_state_event_rec_task.start()
+        """Initializes the event manager upon entering the async context.
 
+        Raises:
+            RuntimeError: If the context manager is already active.
+        """
+        if self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is already active.')
+
+        self._active = True
+        self._emit_persist_state_event_rec_task.start()
         return self
 
     async def __aexit__(
@@ -108,16 +111,19 @@ class EventManager:
         """Closes the local event manager upon exiting the async context.
 
         This will stop listening for the events, and it will wait for all the event listeners to finish.
+
+        Raises:
+            RuntimeError: If the context manager is not active.
         """
-        if self._active:
-            await self.wait_for_all_listeners_to_complete(timeout=self._close_timeout)
-            self._event_emitter.remove_all_listeners()
-            self._listener_tasks.clear()
-            self._listeners_to_wrappers.clear()
-            await self._emit_persist_state_event_rec_task.stop()
-            self._active = False
-        else:
-            logger.warning(f'The {self.__class__.__name__} is not active.')
+        if not self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is not active.')
+
+        await self.wait_for_all_listeners_to_complete(timeout=self._close_timeout)
+        self._event_emitter.remove_all_listeners()
+        self._listener_tasks.clear()
+        self._listeners_to_wrappers.clear()
+        await self._emit_persist_state_event_rec_task.stop()
+        self._active = False
 
     def on(self, *, event: Event, listener: Listener) -> None:
         """Add an event listener to the event manager.

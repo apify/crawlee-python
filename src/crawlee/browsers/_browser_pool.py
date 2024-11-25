@@ -152,22 +152,26 @@ class BrowserPool:
         return self._active
 
     async def __aenter__(self) -> BrowserPool:
-        """Enter the context manager and initialize all browser plugins."""
+        """Enter the context manager and initialize all browser plugins.
+
+        Raises:
+            RuntimeError: If the context manager is already active.
+        """
         if self._active:
-            logger.warning(f'The {self.__class__.__name__} is already active.')
-        else:
-            self._active = True
-            # Start the recurring tasks for identifying and closing inactive browsers
-            self._identify_inactive_browsers_task.start()
-            self._close_inactive_browsers_task.start()
+            raise RuntimeError(f'The {self.__class__.__name__} is already active.')
 
-            timeout = self._operation_timeout.total_seconds()
+        self._active = True
+        # Start the recurring tasks for identifying and closing inactive browsers
+        self._identify_inactive_browsers_task.start()
+        self._close_inactive_browsers_task.start()
 
-            try:
-                for plugin in self._plugins:
-                    await asyncio.wait_for(plugin.__aenter__(), timeout)
-            except asyncio.TimeoutError:
-                logger.warning(f'Initializing of the browser plugin {plugin} timed out, will be skipped.')
+        timeout = self._operation_timeout.total_seconds()
+
+        try:
+            for plugin in self._plugins:
+                await asyncio.wait_for(plugin.__aenter__(), timeout)
+        except asyncio.TimeoutError:
+            logger.warning(f'Initializing of the browser plugin {plugin} timed out, will be skipped.')
 
         return self
 
@@ -177,20 +181,24 @@ class BrowserPool:
         exc_value: BaseException | None,
         exc_traceback: TracebackType | None,
     ) -> None:
-        """Exit the context manager and close all browser plugins."""
-        if self._active:
-            await self._identify_inactive_browsers_task.stop()
-            await self._close_inactive_browsers_task.stop()
+        """Exit the context manager and close all browser plugins.
 
-            for browser in self._active_browsers + self._inactive_browsers:
-                await browser.close(force=True)
+        Raises:
+            RuntimeError: If the context manager is not active.
+        """
+        if not self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
-            for plugin in self._plugins:
-                await plugin.__aexit__(exc_type, exc_value, exc_traceback)
+        await self._identify_inactive_browsers_task.stop()
+        await self._close_inactive_browsers_task.stop()
 
-            self._active = False
-        else:
-            logger.warning(f'The {self.__class__.__name__} is not active.')
+        for browser in self._active_browsers + self._inactive_browsers:
+            await browser.close(force=True)
+
+        for plugin in self._plugins:
+            await plugin.__aexit__(exc_type, exc_value, exc_traceback)
+
+        self._active = False
 
     @ensure_context
     async def new_page(

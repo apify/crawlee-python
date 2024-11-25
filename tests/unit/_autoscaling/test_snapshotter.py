@@ -111,6 +111,10 @@ async def test_methods_raise_error_when_not_active() -> None:
     with pytest.raises(RuntimeError, match='Snapshotter is not active.'):
         snapshotter.get_client_sample()
 
+    with pytest.raises(RuntimeError, match='Snapshotter is already active.'):
+        async with snapshotter, snapshotter:
+            pass
+
     async with snapshotter:
         snapshotter.get_cpu_sample()
         snapshotter.get_memory_sample()

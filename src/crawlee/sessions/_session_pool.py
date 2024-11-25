@@ -99,26 +99,31 @@ class SessionPool:
         return self._active
 
     async def __aenter__(self) -> SessionPool:
-        """Initialize the pool upon entering the context manager."""
+        """Initialize the pool upon entering the context manager.
+
+        Raises:
+            RuntimeError: If the context manager is already active.
+        """
         if self._active:
-            logger.warning(f'The {self.__class__.__name__} is already active.')
-        else:
-            self._active = True
-            if self._persistence_enabled and self._event_manager:
-                self._kvs = await KeyValueStore.open(name=self._persist_state_kvs_name)
+            raise RuntimeError(f'The {self.__class__.__name__} is already active.')
 
-                # Attempt to restore the previously persisted state.
-                was_restored = await self._try_to_restore_previous_state()
+        self._active = True
 
-                # If the pool could not be restored, initialize it with new sessions.
-                if not was_restored:
-                    await self._fill_sessions_to_max()
+        if self._persistence_enabled and self._event_manager:
+            self._kvs = await KeyValueStore.open(name=self._persist_state_kvs_name)
 
-                # Register an event listener for persisting the session pool state.
-                self._event_manager.on(event=Event.PERSIST_STATE, listener=self._persist_state)
-            # If persistence is disabled, just fill the pool with sessions.
-            else:
+            # Attempt to restore the previously persisted state.
+            was_restored = await self._try_to_restore_previous_state()
+
+            # If the pool could not be restored, initialize it with new sessions.
+            if not was_restored:
                 await self._fill_sessions_to_max()
+
+            # Register an event listener for persisting the session pool state.
+            self._event_manager.on(event=Event.PERSIST_STATE, listener=self._persist_state)
+        # If persistence is disabled, just fill the pool with sessions.
+        else:
+            await self._fill_sessions_to_max()
 
         return self
 
@@ -128,17 +133,22 @@ class SessionPool:
         exc_value: BaseException | None,
         exc_traceback: TracebackType | None,
     ) -> None:
-        """Deinitialize the pool upon exiting the context manager."""
-        if self._active:
-            if self._persistence_enabled and self._event_manager:
-                # Remove the event listener for state persistence.
-                self._event_manager.off(event=Event.PERSIST_STATE, listener=self._persist_state)
+        """Deinitialize the pool upon exiting the context manager.
 
-                # Persist the final state of the session pool.
-                await self._persist_state(event_data=EventPersistStateData(is_migrating=False))
-            self._active = False
-        else:
-            logger.warning(f'The {self.__class__.__name__} is not active.')
+        Raises:
+            RuntimeError: If the context manager is not active.
+        """
+        if not self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is not active.')
+
+        if self._persistence_enabled and self._event_manager:
+            # Remove the event listener for state persistence.
+            self._event_manager.off(event=Event.PERSIST_STATE, listener=self._persist_state)
+
+            # Persist the final state of the session pool.
+            await self._persist_state(event_data=EventPersistStateData(is_migrating=False))
+
+        self._active = False
 
     @overload
     def get_state(self, *, as_dict: Literal[True]) -> dict: ...

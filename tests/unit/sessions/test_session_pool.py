@@ -184,5 +184,9 @@ async def test_methods_raise_error_when_not_active() -> None:
 
     await session_pool.reset_store()
 
+    with pytest.raises(RuntimeError, match='SessionPool is already active.'):
+        async with session_pool, session_pool:
+            pass
+
     async with session_pool:
         assert session_pool.active is True

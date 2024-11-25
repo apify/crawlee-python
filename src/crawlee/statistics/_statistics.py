@@ -113,22 +113,26 @@ class Statistics(Generic[TStatisticsState]):
         return self._active
 
     async def __aenter__(self) -> Self:
-        """Subscribe to events and start collecting statistics."""
+        """Subscribe to events and start collecting statistics.
+
+        Raises:
+            RuntimeError: If the context manager is already active.
+        """
         if self._active:
-            logger.warning(f'The {self.__class__.__name__} is already active.')
-        else:
-            self._active = True
-            self._instance_start = datetime.now(timezone.utc)
+            raise RuntimeError(f'The {self.__class__.__name__} is already active.')
 
-            if self.state.crawler_started_at is None:
-                self.state.crawler_started_at = datetime.now(timezone.utc)
+        self._active = True
+        self._instance_start = datetime.now(timezone.utc)
 
-            if self._key_value_store is None:
-                self._key_value_store = await KeyValueStore.open(name=self._persist_state_kvs_name)
+        if self.state.crawler_started_at is None:
+            self.state.crawler_started_at = datetime.now(timezone.utc)
 
-            await self._maybe_load_statistics()
-            self._events.on(event=Event.PERSIST_STATE, listener=self._persist_state)
-            self._periodic_logger.start()
+        if self._key_value_store is None:
+            self._key_value_store = await KeyValueStore.open(name=self._persist_state_kvs_name)
+
+        await self._maybe_load_statistics()
+        self._events.on(event=Event.PERSIST_STATE, listener=self._persist_state)
+        self._periodic_logger.start()
 
         return self
 
@@ -138,15 +142,19 @@ class Statistics(Generic[TStatisticsState]):
         exc_value: BaseException | None,
         exc_traceback: TracebackType | None,
     ) -> None:
-        """Stop collecting statistics."""
-        if self._active:
-            self.state.crawler_finished_at = datetime.now(timezone.utc)
-            self._events.off(event=Event.PERSIST_STATE, listener=self._persist_state)
-            await self._periodic_logger.stop()
-            await self._persist_state(event_data=EventPersistStateData(is_migrating=False))
-            self._active = False
-        else:
-            logger.warning(f'The {self.__class__.__name__} is not active.')
+        """Stop collecting statistics.
+
+        Raises:
+            RuntimeError: If the context manager is not active.
+        """
+        if not self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is not active.')
+
+        self.state.crawler_finished_at = datetime.now(timezone.utc)
+        self._events.off(event=Event.PERSIST_STATE, listener=self._persist_state)
+        await self._periodic_logger.stop()
+        await self._persist_state(event_data=EventPersistStateData(is_migrating=False))
+        self._active = False
 
     @ensure_context
     def register_status_code(self, code: int) -> None:
