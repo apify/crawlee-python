@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Expose browser_options and page_options to PlaywrightCrawler ([#730](https://github.com/apify/crawlee-python/pull/730)) ([dbe85b9](https://github.com/apify/crawlee-python/commit/dbe85b90e59def281cfc6617a0eb869a4adf2fc0)) by [@vdusek](https://github.com/vdusek), closes [#719](https://github.com/apify/crawlee-python/issues/719)
+- Add `abort_on_error` property ([#731](https://github.com/apify/crawlee-python/pull/731)) ([6dae03a](https://github.com/apify/crawlee-python/commit/6dae03a68a2d23c68c78d8d44611d43e40eb9404)) by [@Mantisus](https://github.com/Mantisus), closes [#704](https://github.com/apify/crawlee-python/issues/704)
 
 ### 🐛 Bug Fixes
 
