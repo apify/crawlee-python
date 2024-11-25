@@ -6,6 +6,7 @@ import random
 from logging import getLogger
 from typing import TYPE_CHECKING, Callable, Literal, overload
 
+from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 from crawlee.events._types import Event, EventPersistStateData
 from crawlee.sessions import Session
@@ -70,6 +71,9 @@ class SessionPool:
         self._kvs: KeyValueStore | None = None
         self._sessions: dict[str, Session] = {}
 
+        # Flag to indicate the context state.
+        self._active = False
+
     def __repr__(self) -> str:
         """Get a string representation."""
         return f'<{self.__class__.__name__} {self.get_state(as_dict=False)}>'
@@ -89,8 +93,22 @@ class SessionPool:
         """Get the number of sessions that are no longer usable."""
         return self.session_count - self.usable_session_count
 
+    @property
+    def active(self) -> bool:
+        """Indicates whether the context is active."""
+        return self._active
+
     async def __aenter__(self) -> SessionPool:
-        """Initialize the pool upon entering the context manager."""
+        """Initialize the pool upon entering the context manager.
+
+        Raises:
+            RuntimeError: If the context manager is already active.
+        """
+        if self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is already active.')
+
+        self._active = True
+
         if self._persistence_enabled and self._event_manager:
             self._kvs = await KeyValueStore.open(name=self._persist_state_kvs_name)
 
@@ -115,7 +133,14 @@ class SessionPool:
         exc_value: BaseException | None,
         exc_traceback: TracebackType | None,
     ) -> None:
-        """Deinitialize the pool upon exiting the context manager."""
+        """Deinitialize the pool upon exiting the context manager.
+
+        Raises:
+            RuntimeError: If the context manager is not active.
+        """
+        if not self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is not active.')
+
         if self._persistence_enabled and self._event_manager:
             # Remove the event listener for state persistence.
             self._event_manager.off(event=Event.PERSIST_STATE, listener=self._persist_state)
@@ -123,12 +148,15 @@ class SessionPool:
             # Persist the final state of the session pool.
             await self._persist_state(event_data=EventPersistStateData(is_migrating=False))
 
+        self._active = False
+
     @overload
     def get_state(self, *, as_dict: Literal[True]) -> dict: ...
 
     @overload
     def get_state(self, *, as_dict: Literal[False]) -> SessionPoolModel: ...
 
+    @ensure_context
     def get_state(self, *, as_dict: bool = False) -> SessionPoolModel | dict:
         """Retrieve the current state of the pool either as a model or as a dictionary."""
         model = SessionPoolModel(
@@ -145,6 +173,7 @@ class SessionPool:
             return model.model_dump()
         return model
 
+    @ensure_context
     def add_session(self, session: Session) -> None:
         """Add a specific session to the pool.
 
@@ -156,6 +185,7 @@ class SessionPool:
             return
         self._sessions[session.id] = session
 
+    @ensure_context
     async def get_session(self) -> Session:
         """Retrieve a random session from the pool.
 
@@ -175,6 +205,7 @@ class SessionPool:
         self._remove_retired_sessions()
         return await self._create_new_session()
 
+    @ensure_context
     async def get_session_by_id(self, session_id: str) -> Session | None:
         """Retrieve a session by ID from the pool.
 

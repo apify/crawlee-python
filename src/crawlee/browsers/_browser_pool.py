@@ -10,6 +10,7 @@ from logging import getLogger
 from typing import TYPE_CHECKING, Any
 from weakref import WeakValueDictionary
 
+from crawlee._utils.context import ensure_context
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
@@ -91,6 +92,9 @@ class BrowserPool:
         self._pages = WeakValueDictionary[str, CrawleePage]()  # Track the pages in the pool
         self._plugins_cycle = itertools.cycle(self._plugins)  # Cycle through the plugins
 
+        # Flag to indicate the context state.
+        self._active = False
+
     @classmethod
     def with_default_plugin(
         cls,
@@ -148,10 +152,21 @@ class BrowserPool:
         """Returns the total number of pages opened since the browser pool was launched."""
         return self._total_pages_count
 
-    async def __aenter__(self) -> BrowserPool:
-        """Enter the context manager and initialize all browser plugins."""
-        logger.debug('Initializing browser pool.')
+    @property
+    def active(self) -> bool:
+        """Indicates whether the context is active."""
+        return self._active
 
+    async def __aenter__(self) -> BrowserPool:
+        """Enter the context manager and initialize all browser plugins.
+
+        Raises:
+            RuntimeError: If the context manager is already active.
+        """
+        if self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is already active.')
+
+        self._active = True
         # Start the recurring tasks for identifying and closing inactive browsers
         self._identify_inactive_browsers_task.start()
         self._close_inactive_browsers_task.start()
@@ -172,8 +187,13 @@ class BrowserPool:
         exc_value: BaseException | None,
         exc_traceback: TracebackType | None,
     ) -> None:
-        """Exit the context manager and close all browser plugins."""
-        logger.debug('Closing browser pool.')
+        """Exit the context manager and close all browser plugins.
+
+        Raises:
+            RuntimeError: If the context manager is not active.
+        """
+        if not self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
         await self._identify_inactive_browsers_task.stop()
         await self._close_inactive_browsers_task.stop()
@@ -184,6 +204,9 @@ class BrowserPool:
         for plugin in self._plugins:
             await plugin.__aexit__(exc_type, exc_value, exc_traceback)
 
+        self._active = False
+
+    @ensure_context
     async def new_page(
         self,
         *,
@@ -213,6 +236,7 @@ class BrowserPool:
 
         return await self._get_new_page(page_id, plugin, proxy_info)
 
+    @ensure_context
     async def new_page_with_each_plugin(self) -> Sequence[CrawleePage]:
         """Create a new page with each browser plugin in the pool.
 

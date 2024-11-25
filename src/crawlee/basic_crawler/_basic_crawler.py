@@ -255,7 +255,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             else None,
             available_memory_ratio=self._configuration.available_memory_ratio,
         )
-        self._pool = AutoscaledPool(
+        self._autoscaled_pool = AutoscaledPool(
             system_status=SystemStatus(self._snapshotter),
             is_finished_function=self.__is_finished_function,
             is_task_ready_function=self.__is_task_ready_function,
@@ -442,7 +442,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
             run_task.cancel()
 
-        run_task = asyncio.create_task(self._run_crawler())
+        run_task = asyncio.create_task(self._run_crawler(), name='run_crawler_task')
 
         with suppress(NotImplementedError):  # event loop signal handlers are not supported on Windows
             asyncio.get_running_loop().add_signal_handler(signal.SIGINT, sigint_handler)
@@ -476,18 +476,25 @@ class BasicCrawler(Generic[TCrawlingContext]):
         return final_statistics
 
     async def _run_crawler(self) -> None:
+        # Collect the context managers to be entered. Context managers that are already active are excluded,
+        # as they were likely entered by the caller, who will also be responsible for exiting them.
+        contexts_to_enter = [
+            cm
+            for cm in (
+                self._event_manager,
+                self._snapshotter,
+                self._statistics,
+                self._session_pool if self._use_session_pool else None,
+                *self._additional_context_managers,
+            )
+            if cm and getattr(cm, 'active', False) is False
+        ]
+
         async with AsyncExitStack() as exit_stack:
-            await exit_stack.enter_async_context(self._event_manager)
-            await exit_stack.enter_async_context(self._snapshotter)
-            await exit_stack.enter_async_context(self._statistics)
+            for context in contexts_to_enter:
+                await exit_stack.enter_async_context(context)
 
-            if self._use_session_pool:
-                await exit_stack.enter_async_context(self._session_pool)
-
-            for context_manager in self._additional_context_managers:
-                await exit_stack.enter_async_context(context_manager)
-
-            await self._pool.run()
+            await self._autoscaled_pool.run()
 
     async def add_requests(
         self,
