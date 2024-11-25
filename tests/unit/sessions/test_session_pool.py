@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import AsyncGenerator
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -11,6 +11,9 @@ from crawlee.events._types import Event, EventPersistStateData
 from crawlee.sessions import Session, SessionPool
 from crawlee.sessions._models import SessionPoolModel
 from crawlee.storages import KeyValueStore
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 MAX_POOL_SIZE = 3
 KVS_NAME = 'test_session_pool'
@@ -162,3 +165,31 @@ async def test_session_pool_persist_and_restore(event_manager: EventManager, kvs
         await sp.reset_store()
         previous_state = await kvs.get_value(key=PERSIST_STATE_KEY)
         assert previous_state is None
+
+
+async def test_methods_raise_error_when_not_active() -> None:
+    session = Session()
+    session_pool = SessionPool()
+
+    assert session_pool.active is False
+
+    with pytest.raises(RuntimeError, match='SessionPool is not active.'):
+        session_pool.get_state(as_dict=True)
+
+    with pytest.raises(RuntimeError, match='SessionPool is not active.'):
+        session_pool.add_session(session)
+
+    with pytest.raises(RuntimeError, match='SessionPool is not active.'):
+        await session_pool.get_session()
+
+    with pytest.raises(RuntimeError, match='SessionPool is not active.'):
+        await session_pool.get_session_by_id(session.id)
+
+    await session_pool.reset_store()
+
+    with pytest.raises(RuntimeError, match='SessionPool is already active.'):
+        async with session_pool, session_pool:
+            pass
+
+    async with session_pool:
+        assert session_pool.active is True

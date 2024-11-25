@@ -52,7 +52,7 @@ async def infinite_scroll(page: Page) -> None:
 
             await asyncio.sleep(1)
 
-    check_task = asyncio.create_task(check_finished())
+    check_task = asyncio.create_task(check_finished(), name='infinite_scroll_check_finished_task')
 
     try:
         while not finished:

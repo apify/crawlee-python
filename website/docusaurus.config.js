@@ -1,6 +1,27 @@
-/* eslint-disable global-require,import/no-extraneous-dependencies */
+/* eslint-disable global-require */
+const path = require('path');
+
 const { externalLinkProcessor } = require('./tools/utils/externalLink');
-const { groupSort } = require('./transformDocs');
+
+const GROUP_ORDER = [
+    'Classes',
+    'Abstract classes',
+    'Data structures',
+    'Errors',
+    'Functions',
+    'Constructors',
+    'Methods',
+    'Properties',
+    'Constants',
+    'Enumeration Members',
+];
+
+const groupSort = (g1, g2) => {
+    if (GROUP_ORDER.includes(g1) && GROUP_ORDER.includes(g2)) {
+        return GROUP_ORDER.indexOf(g1) - GROUP_ORDER.indexOf(g2);
+    }
+    return g1.localeCompare(g2);
+};
 
 /** @type {Partial<import('@docusaurus/types').DocusaurusConfig>} */
 module.exports = {
@@ -14,6 +35,7 @@ module.exports = {
         '/python/js/custom.js',
         '/crawlee-python/js/custom.js',
     ],
+    githubHost: 'github.com',
     headTags: [
         // Intercom messenger
         {
@@ -78,9 +100,11 @@ module.exports = {
                     excludeExternals: false,
                 },
                 sortSidebar: groupSort,
-                pathToCurrentVersionTypedocJSON: `${__dirname}/api-typedoc-generated.json`,
                 routeBasePath: 'api',
-                python: true,
+                pythonOptions: {
+                    pythonModulePath: path.join(__dirname, '../src/crawlee'),
+                    moduleShortcutsPath: path.join(__dirname, 'module_shortcuts.json'),
+                },
             },
         ],
         // [

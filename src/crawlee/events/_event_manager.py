@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, TypedDict
 
 from pyee.asyncio import AsyncIOEventEmitter
 
+from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.wait import wait_for_all_tasks_for_finish
@@ -80,8 +81,24 @@ class EventManager:
             delay=self._persist_state_interval,
         )
 
+        # Flag to indicate the context state.
+        self._active = False
+
+    @property
+    def active(self) -> bool:
+        """Indicates whether the context is active."""
+        return self._active
+
     async def __aenter__(self) -> EventManager:
-        """Initializes the event manager upon entering the async context."""
+        """Initializes the event manager upon entering the async context.
+
+        Raises:
+            RuntimeError: If the context manager is already active.
+        """
+        if self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is already active.')
+
+        self._active = True
         self._emit_persist_state_event_rec_task.start()
         return self
 
@@ -94,12 +111,19 @@ class EventManager:
         """Closes the local event manager upon exiting the async context.
 
         This will stop listening for the events, and it will wait for all the event listeners to finish.
+
+        Raises:
+            RuntimeError: If the context manager is not active.
         """
+        if not self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is not active.')
+
         await self.wait_for_all_listeners_to_complete(timeout=self._close_timeout)
         self._event_emitter.remove_all_listeners()
         self._listener_tasks.clear()
         self._listeners_to_wrappers.clear()
         await self._emit_persist_state_event_rec_task.stop()
+        self._active = False
 
     def on(self, *, event: Event, listener: Listener) -> None:
         """Add an event listener to the event manager.
@@ -157,6 +181,7 @@ class EventManager:
             self._listeners_to_wrappers[event] = defaultdict(list)
             self._event_emitter.remove_all_listeners(event.value)
 
+    @ensure_context
     def emit(self, *, event: Event, event_data: EventData) -> None:
         """Emit an event.
 
@@ -166,6 +191,7 @@ class EventManager:
         """
         self._event_emitter.emit(event.value, event_data)
 
+    @ensure_context
     async def wait_for_all_listeners_to_complete(self, *, timeout: timedelta | None = None) -> None:
         """Wait for all currently executing event listeners to complete.
 

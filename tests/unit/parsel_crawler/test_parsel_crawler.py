@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from typing import TYPE_CHECKING, AsyncGenerator
+from typing import TYPE_CHECKING
 from unittest import mock
 
 import pytest
@@ -14,6 +14,8 @@ from crawlee.parsel_crawler import ParselCrawler
 from crawlee.storages import RequestList
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
     from crawlee.parsel_crawler import ParselCrawlingContext
 
 
@@ -216,13 +218,16 @@ async def test_handle_blocked_status_code(server: respx.MockRouter) -> None:
     )
 
     # Patch internal calls and run crawler
-    with mock.patch.object(
-        crawler._statistics,
-        'record_request_processing_failure',
-        wraps=crawler._statistics.record_request_processing_failure,
-    ) as record_request_processing_failure, mock.patch.object(
-        crawler._statistics.error_tracker, 'add', wraps=crawler._statistics.error_tracker.add
-    ) as error_tracker_add:
+    with (
+        mock.patch.object(
+            crawler._statistics,
+            'record_request_processing_failure',
+            wraps=crawler._statistics.record_request_processing_failure,
+        ) as record_request_processing_failure,
+        mock.patch.object(
+            crawler._statistics.error_tracker, 'add', wraps=crawler._statistics.error_tracker.add
+        ) as error_tracker_add,
+    ):
         stats = await crawler.run()
 
     assert server['blocked_endpoint'].called

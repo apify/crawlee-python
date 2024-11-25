@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
     from crawlee.base_storage_client._models import Request
 
-__all__ = ['ProxyInfo', 'ProxyConfiguration']
+__all__ = ['ProxyConfiguration', 'ProxyInfo']
 
 
 @dataclass
