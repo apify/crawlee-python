@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Generic, cast
 
 from typing_extensions import Self, TypeVar
 
-import crawlee.service_container
+from crawlee import service_container
 from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
@@ -131,7 +131,7 @@ class Statistics(Generic[TStatisticsState]):
             self._key_value_store = await KeyValueStore.open(name=self._persist_state_kvs_name)
 
         await self._maybe_load_statistics()
-        self._events.on(event=Event.PERSIST_STATE, listener=self._persist_state)
+        self._event_manager.on(event=Event.PERSIST_STATE, listener=self._persist_state)
         self._periodic_logger.start()
 
         return self

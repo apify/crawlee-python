@@ -14,7 +14,6 @@ __all__ = [
     'HttpStatusCodeError',
     'ProxyError',
     'RequestHandlerError',
-    'ServiceConflictError',
     'SessionError',
     'UserDefinedErrorHandlerError',
 ]

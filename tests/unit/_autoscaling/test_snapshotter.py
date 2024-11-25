@@ -33,9 +33,12 @@ def event_system_data_info() -> EventSystemInfoData:
 
 
 async def test_start_stop_lifecycle() -> None:
-    async with LocalEventManager() as event_manager, Snapshotter(
-        event_manager=event_manager,
-        available_memory_ratio=0.25,
+    async with (
+        LocalEventManager() as event_manager,
+        Snapshotter(
+            event_manager=event_manager,
+            available_memory_ratio=0.25,
+        ),
     ):
         pass
 
@@ -98,7 +101,7 @@ async def test_get_cpu_sample(snapshotter: Snapshotter) -> None:
 
 async def test_methods_raise_error_when_not_active() -> None:
     event_manager = AsyncMock(spec=EventManager)
-    snapshotter = Snapshotter(event_manager, available_memory_ratio=0.25)
+    snapshotter = Snapshotter(event_manager=event_manager, available_memory_ratio=0.25)
 
     assert snapshotter.active is False
 

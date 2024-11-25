@@ -6,6 +6,7 @@ import random
 from logging import getLogger
 from typing import TYPE_CHECKING, Callable, Literal, overload
 
+from crawlee import service_container
 from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 from crawlee.events._types import Event, EventPersistStateData
