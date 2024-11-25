@@ -1,116 +1,81 @@
 from __future__ import annotations
 
-from typing import Any, AsyncGenerator, Awaitable, Callable, Generator, Generic, cast
+from typing import Any, Awaitable, Callable, Generic
 
 from typing_extensions import TypeVar
 
 from crawlee._types import BasicCrawlingContext
 from crawlee._utils.docs import docs_group
+from crawlee.basic_crawler._middleware import TInputContext, TOuputContext, Middleware
 from crawlee.errors import (
-    ContextPipelineFinalizationError,
-    ContextPipelineInitializationError,
-    ContextPipelineInterruptedError,
     RequestHandlerError,
     SessionError,
 )
 
-TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
-TMiddlewareCrawlingContext = TypeVar('TMiddlewareCrawlingContext', bound=BasicCrawlingContext)
-
+TFinalContext = TypeVar('TFinalContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
+TChildrenOutputContext = TypeVar('TChildrenOutputContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 
 @docs_group('Classes')
-class ContextPipeline(Generic[TCrawlingContext]):
+class ContextPipeline(Generic[TFinalContext, TInputContext, TOuputContext]):
     """Encapsulates the logic of gradually enhancing the crawling context with additional information and utilities.
 
-    The enhancement is done by a chain of middlewares that are added to the pipeline after it's creation.
+    The enhancement is done by a chain of middlewares that are added to the pipeline after its creation.
+    Each pipeline instance in chain works with 3 different contexts:
+        TInputContext is context entering this pipeline and is input to its middleware.
+        TOutputContext is context produced by running its middleware and will be input to its child middleware.
+        TFinalContext is context that must be produced by the last ContextPipeline's middleware.
+        First ContextPipeline will have TInputContext=BasicCrawlingContext
+        Last ContextPipeline will have TOuputContext=TFinalContext
     """
 
     def __init__(
         self,
         *,
-        _middleware: Callable[
-            [TCrawlingContext],
-            AsyncGenerator[TMiddlewareCrawlingContext, None],
-        ]
-        | None = None,
-        _parent: ContextPipeline[BasicCrawlingContext] | None = None,
+        middleware: Middleware[TInputContext, TOuputContext],
+        child: ContextPipeline[TFinalContext, TOuputContext, Any] | None = None, #  Each pipeline knows type of children input, but is not aware of type of children output.
     ) -> None:
-        self._middleware = _middleware
-        self._parent = _parent
+        self._middleware = middleware
+        self._child = child
 
-    def _middleware_chain(self) -> Generator[ContextPipeline[Any], None, None]:
-        yield self
-
-        if self._parent is not None:
-            yield from self._parent._middleware_chain()  # noqa: SLF001
 
     async def __call__(
         self,
-        crawling_context: BasicCrawlingContext,
-        final_context_consumer: Callable[[TCrawlingContext], Awaitable[None]],
+        crawling_context: TInputContext,
+        final_context_consumer: Callable[[TFinalContext], Awaitable[None]],
     ) -> None:
         """Run a crawling context through the middleware chain and pipe it into a consumer function.
 
         Exceptions from the consumer function are wrapped together with the final crawling context.
         """
-        chain = list(self._middleware_chain())
-        cleanup_stack = list[AsyncGenerator]()
-
-        try:
-            for member in reversed(chain):
-                if member._middleware:  # noqa: SLF001
-                    middleware_instance = member._middleware(crawling_context)  # noqa: SLF001
-                    try:
-                        result = await middleware_instance.__anext__()
-                    except SessionError:  # Session errors get special treatment
-                        raise
-                    except StopAsyncIteration as e:
-                        raise RuntimeError('The middleware did not yield') from e
-                    except ContextPipelineInterruptedError:
-                        raise
-                    except Exception as e:
-                        raise ContextPipelineInitializationError(e, crawling_context) from e
-
-                    crawling_context = result
-                    cleanup_stack.append(middleware_instance)
-
+        with self(input_context=crawling_context) as final_context:
             try:
-                await final_context_consumer(cast(TCrawlingContext, crawling_context))
+                await final_context_consumer(final_context)
             except SessionError:  # Session errors get special treatment
                 raise
             except Exception as e:
-                raise RequestHandlerError(e, crawling_context) from e
-        finally:
-            for middleware_instance in reversed(cleanup_stack):
-                try:
-                    result = await middleware_instance.__anext__()
-                except StopAsyncIteration:  # noqa: PERF203
-                    pass
-                except ContextPipelineInterruptedError as e:
-                    raise RuntimeError('Invalid state - pipeline interrupted in the finalization step') from e
-                except Exception as e:
-                    raise ContextPipelineFinalizationError(e, crawling_context) from e
-                else:
-                    raise RuntimeError('The middleware yielded more than once')
+                raise RequestHandlerError(e, final_context or crawling_context) from e
+
+
+    async def __aenter__(self, input_context: TInputContext) -> TFinalContext:
+        output_context = await self.middleware.action(input_context)
+        if self.child:
+            async with self.child(output_context) as child_output_context:
+                return child_output_context
+        output_context
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        await self.middleware.cleanup()
 
     def compose(
         self,
-        middleware: Callable[
-            [TCrawlingContext],
-            AsyncGenerator[TMiddlewareCrawlingContext, None],
-        ],
-    ) -> ContextPipeline[TMiddlewareCrawlingContext]:
+        middleware: Middleware[TOuputContext, TChildrenOutputContext]
+    ) -> ContextPipeline[TFinalContext, TOuputContext, TChildrenOutputContext]:
         """Add a middleware to the pipeline.
-
-        The middleware should yield exactly once, and it should yield an (optionally) extended crawling context object.
-        The part before the yield can be used for initialization and the part after it for cleanup.
 
         Returns:
             The extended pipeline instance, providing a fluent interface
         """
-        return ContextPipeline[TMiddlewareCrawlingContext](
-            _middleware=cast(
-                Callable[[BasicCrawlingContext], AsyncGenerator[TMiddlewareCrawlingContext, None]], middleware
-            ),
-            _parent=cast(ContextPipeline[BasicCrawlingContext], self),
-        )
+        new_pipeline_step = ContextPipeline[TFinalContext, TOuputContext, TChildrenOutputContext](
+            middleware=middleware)
+        self._child = new_pipeline_step
+        return new_pipeline_step
