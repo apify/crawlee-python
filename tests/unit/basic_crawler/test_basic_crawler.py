@@ -735,17 +735,19 @@ async def test_max_crawl_depth(httpbin: URL) -> None:
 
 
 @pytest.mark.parametrize(
-    ('n_requests', 'n_error_request', 'e_starts', 'e_finished'),
+    ('total_requests', 'fail_at_request', 'expected_starts', 'expected_finished'),
     [
-        (3, 0, 3, 3),
+        (3, None, 3, 3),
         (3, 2, 2, 1),
     ],
     ids=[
-        'wihout_error',
-        'error_2nd_request',
+        'all_requests_successful',
+        'abort_on_second_request',
     ],
 )
-async def test_abort_on_error(n_requests: int, n_error_request: int | None, e_starts: int, e_finished: int) -> None:
+async def test_abort_on_error(
+    total_requests: int, fail_at_request: int | None, expected_starts: int, expected_finished: int
+) -> None:
     starts_urls = []
 
     crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(max_concurrency=1), abort_on_error=True)
@@ -754,18 +756,18 @@ async def test_abort_on_error(n_requests: int, n_error_request: int | None, e_st
     async def handler(context: BasicCrawlingContext) -> None:
         starts_urls.append(context.request.url)
 
-        if context.request.user_data.get('n_request') == n_error_request:
+        if context.request.user_data.get('n_request') == fail_at_request:
             raise ValueError('Error request')
 
     stats = await crawler.run(
         [
             Request.from_url('https://crawlee.dev', always_enqueue=True, user_data={'n_request': i + 1})
-            for i in range(n_requests)
+            for i in range(total_requests)
         ]
     )
 
-    assert len(starts_urls) == e_starts
-    assert stats.requests_finished == e_finished
+    assert len(starts_urls) == expected_starts
+    assert stats.requests_finished == expected_finished
 
 
 def test_crawler_log() -> None:
