@@ -18,8 +18,8 @@
     "devDependencies": {
         "@apify/eslint-config-ts": "^0.4.0",
         "@apify/tsconfig": "^0.1.0",
-        "@docusaurus/module-type-aliases": "3.4.0",
-        "@docusaurus/types": "3.4.0",
+        "@docusaurus/module-type-aliases": "3.6.3",
+        "@docusaurus/types": "3.6.3",
         "@types/react": "^18.0.28",
         "@typescript-eslint/eslint-plugin": "8.2.0",
         "@typescript-eslint/parser": "8.2.0",
