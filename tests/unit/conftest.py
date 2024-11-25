@@ -69,7 +69,18 @@ def memory_storage_client(tmp_path: Path) -> MemoryStorageClient:
 
 
 @pytest.fixture
-def httpbin() -> URL:
+def httpbin(monkeypatch: pytest.MonkeyPatch) -> URL:
+    original_with_path = URL.with_path
+
+    def mock_with_path(self: URL, path: str, *, keep_query: bool = True, keep_fragment: bool = True) -> URL:
+        return original_with_path(self, path, keep_query=keep_query, keep_fragment=keep_fragment)
+
+    def mock_truediv(self: URL, path: str) -> URL:
+        return self.with_path(path)
+
+    monkeypatch.setattr(URL, 'with_path', mock_with_path)
+    monkeypatch.setattr(URL, '__truediv__', mock_truediv)
+
     return URL(os.environ.get('HTTPBIN_URL', 'https://httpbin.org'))
 
 

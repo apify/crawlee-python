@@ -134,8 +134,8 @@ class ProxyConfiguration:
             scheme=url.scheme,
             hostname=url.host,
             port=url.port,
-            username=url.user if url.user else '',
-            password=url.password if url.password else '',
+            username=url.user or '',
+            password=url.password or '',
         )
 
         if session_id is not None:

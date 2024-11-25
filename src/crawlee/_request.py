@@ -180,7 +180,7 @@ class BaseRequestData(BaseModel):
     @classmethod
     def from_url(
         cls,
-        url: str | URL,
+        url: str,
         *,
         method: HttpMethod = 'GET',
         headers: HttpHeaders | dict[str, str] | None = None,
@@ -198,9 +198,6 @@ class BaseRequestData(BaseModel):
 
         if isinstance(payload, str):
             payload = payload.encode()
-
-        if isinstance(url, URL):
-            url = str(url)
 
         unique_key = unique_key or compute_unique_key(
             url,
@@ -278,7 +275,7 @@ class Request(BaseRequestData):
     @classmethod
     def from_url(
         cls,
-        url: str | URL,
+        url: str,
         *,
         method: HttpMethod = 'GET',
         headers: HttpHeaders | dict[str, str] | None = None,
@@ -325,9 +322,6 @@ class Request(BaseRequestData):
 
         if isinstance(payload, str):
             payload = payload.encode()
-
-        if isinstance(url, URL):
-            url = str(url)
 
         unique_key = unique_key or compute_unique_key(
             url,
