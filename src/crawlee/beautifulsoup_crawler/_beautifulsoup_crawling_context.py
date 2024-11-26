@@ -1,5 +1,5 @@
 from bs4 import BeautifulSoup
 
-from crawlee.http_crawler import ParsedHttpCrawlingContext
+from crawlee.static_content_crawler._static_crawling_context import ParsedHttpCrawlingContext
 
 BeautifulSoupCrawlingContext = ParsedHttpCrawlingContext[BeautifulSoup]

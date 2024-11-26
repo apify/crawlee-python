@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Literal
 from bs4 import BeautifulSoup
 
 from crawlee.beautifulsoup_crawler._beautifulsoup_parser import BeautifulSoupContentParser
-from crawlee.http_crawler import HttpCrawlerGeneric
+from crawlee.static_content_crawler._static_content_crawler import StaticContentCrawler
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -13,16 +13,15 @@ if TYPE_CHECKING:
     from typing_extensions import Unpack
 
     from crawlee.basic_crawler import BasicCrawlerOptions
-    from crawlee.http_crawler import ParsedHttpCrawlingContext
-
+    from crawlee.static_content_crawler._static_crawling_context import ParsedHttpCrawlingContext
 
 BeautifulSoupParser = Literal['html.parser', 'lxml', 'xml', 'html5lib']
 
 
-class BeautifulSoupCrawler(HttpCrawlerGeneric[BeautifulSoup]):
+class BeautifulSoupCrawler(StaticContentCrawler[BeautifulSoup]):
     """A web crawler for performing HTTP requests and parsing HTML/XML content.
 
-    The `BeautifulSoupCrawler` builds on top of the `HttpCrawlerGeneric`, which means it inherits all of its features.
+    The `BeautifulSoupCrawler` builds on top of the `StaticContentCrawler`, which means it inherits all of its features.
     It specifies its own parser BeautifulSoupParser which is used to parse HttpResponse.
 
     The HTTP client-based crawlers are ideal for websites that do not require JavaScript execution. However,
@@ -31,13 +30,13 @@ class BeautifulSoupCrawler(HttpCrawlerGeneric[BeautifulSoup]):
     ### Usage
 
     ```python
-    from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, ParsedHttpCrawlingContext[BeautifulSoup]
+    from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 
     crawler = BeautifulSoupCrawler()
 
     # Define the default request handler, which will be called for every request.
     @crawler.router.default_handler
-    async def request_handler(context: ParsedHttpCrawlingContext[BeautifulSoup]) -> None:
+    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url} ...')
 
         # Extract data from the page.

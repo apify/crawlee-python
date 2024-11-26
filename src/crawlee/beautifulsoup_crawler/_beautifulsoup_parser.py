@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup, Tag
 from typing_extensions import override
 
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
-from crawlee.http_crawler import BlockedInfo, StaticContentParser
+from crawlee.static_content_crawler._static_content_parser import BlockedInfo, StaticContentParser
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

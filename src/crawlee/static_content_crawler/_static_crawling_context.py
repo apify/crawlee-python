@@ -19,7 +19,7 @@ TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext)
 @dataclass(frozen=True)
 @docs_group('Data structures')
 class HttpCrawlingContext(BasicCrawlingContext, HttpCrawlingResult):
-    """The crawling context used by the `HttpCrawlerGeneric`."""
+    """The crawling context used by the `StaticContentCrawler`."""
 
     @classmethod
     def from_basic_crawling_context(cls, context: BasicCrawlingContext, http_response: HttpResponse) -> Self:
@@ -31,7 +31,7 @@ class HttpCrawlingContext(BasicCrawlingContext, HttpCrawlingResult):
 @dataclass(frozen=True)
 @docs_group('Data structures')
 class ParsedHttpCrawlingContext(Generic[TParseResult], HttpCrawlingContext):
-    """The crawling context used by HttpCrawlerGeneric.
+    """The crawling context used by StaticContentCrawler.
 
     It provides access to key objects as well as utility functions for handling crawling tasks.
     """

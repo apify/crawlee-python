@@ -1,13 +1,8 @@
-from ._http_crawler import HttpCrawler, HttpCrawlerGeneric
-from ._http_crawling_context import HttpCrawlingContext, HttpCrawlingResult, ParsedHttpCrawlingContext
-from ._http_parser import BlockedInfo, StaticContentParser
+from crawlee.http_clients import HttpCrawlingResult
+
+from ._http_crawler import HttpCrawler
 
 __all__ = [
-    'BlockedInfo',
     'HttpCrawler',
-    'HttpCrawlerGeneric',
-    'HttpCrawlingContext',
     'HttpCrawlingResult',
-    'ParsedHttpCrawlingContext',
-    'StaticContentParser',
 ]

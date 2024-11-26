@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING
 from parsel import Selector
 
 from crawlee._utils.docs import docs_group
-from crawlee.http_crawler import HttpCrawlerGeneric
 from crawlee.parsel_crawler._parsel_parser import ParselParser
+from crawlee.static_content_crawler._static_content_crawler import StaticContentCrawler
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -14,11 +14,11 @@ if TYPE_CHECKING:
     from typing_extensions import Unpack
 
     from crawlee.basic_crawler import BasicCrawlerOptions
-    from crawlee.http_crawler import ParsedHttpCrawlingContext
+    from crawlee.static_content_crawler._static_crawling_context import ParsedHttpCrawlingContext
 
 
 @docs_group('Classes')
-class ParselCrawler(HttpCrawlerGeneric[Selector]):
+class ParselCrawler(StaticContentCrawler[Selector]):
     """A web crawler for performing HTTP requests and parsing HTML/XML content.
 
     The `ParselCrawler` builds on top of the `BasicCrawler`, which means it inherits all of its features.

@@ -8,15 +8,11 @@ import respx
 from httpx import Response
 
 from crawlee import ConcurrencySettings
-from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler
+from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 from crawlee.storages import RequestList
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
-
-    from bs4 import BeautifulSoup
-
-    from crawlee.http_crawler._http_crawling_context import ParsedHttpCrawlingContext
 
 
 @pytest.fixture
@@ -85,7 +81,7 @@ async def test_basic(server: respx.MockRouter) -> None:
     handler = mock.AsyncMock()
 
     @crawler.router.default_handler
-    async def request_handler(context: ParsedHttpCrawlingContext[BeautifulSoup]) -> None:
+    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         links = context.soup.find_all('a')
         await handler(links)
 
@@ -103,7 +99,7 @@ async def test_enqueue_links(server: respx.MockRouter) -> None:
     visit = mock.Mock()
 
     @crawler.router.default_handler
-    async def request_handler(context: ParsedHttpCrawlingContext[BeautifulSoup]) -> None:
+    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         visit(context.request.url)
         await context.enqueue_links()
 
@@ -127,7 +123,7 @@ async def test_enqueue_links_selector(server: respx.MockRouter) -> None:
     visit = mock.Mock()
 
     @crawler.router.default_handler
-    async def request_handler(context: ParsedHttpCrawlingContext[BeautifulSoup]) -> None:
+    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         visit(context.request.url)
         await context.enqueue_links(selector='a.foo')
 
@@ -151,7 +147,7 @@ async def test_enqueue_links_with_max_crawl(server: respx.MockRouter) -> None:
     )
 
     @crawler.router.default_handler
-    async def request_handler(context: ParsedHttpCrawlingContext[BeautifulSoup]) -> None:
+    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         await context.enqueue_links()
         processed_urls.append(context.request.url)
 
