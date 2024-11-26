@@ -11,7 +11,7 @@ import CodeBlock from '@theme/CodeBlock';
 import RequestExample from '!!raw-loader!./code/fill_and_submit_web_form_request.py';
 import CrawlerExample from '!!raw-loader!./code/fill_and_submit_web_form_crawler.py';
 
-This example demonstrates how to fill and submit a web form using the <ApiLink to="class/_HttpCrawler">`_HttpCrawler`</ApiLink> crawler. The same approach applies to any crawler that inherits from it, such as the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> or <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink>.
+This example demonstrates how to fill and submit a web form using the <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink> crawler. The same approach applies to any crawler that inherits from it, such as the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> or <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink>.
 
 We are going to use the [httpbin.org](https://httpbin.org) website to demonstrate how it works.
 
@@ -50,7 +50,7 @@ Alternatively, you can send form data as URL parameters using the `url` argument
 
 ## Implementing the crawler
 
-Finally, let's implement the crawler and run it with the prepared request. Although we are using the <ApiLink to="class/_HttpCrawler">`_HttpCrawler`</ApiLink>, the process is the same for any crawler that inherits from it.
+Finally, let's implement the crawler and run it with the prepared request. Although we are using the <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink>, the process is the same for any crawler that inherits from it.
 
 <CodeBlock className="language-python">
     {CrawlerExample}
@@ -110,4 +110,4 @@ Finally, run your crawler. Your logs should show something like this:
 └───────────────────────────────┴──────────┘
 ```
 
-This log output confirms that the crawler successfully submitted the form and processed the response. Congratulations! You have successfully filled and submitted a web form using the <ApiLink to="class/_HttpCrawler">`_HttpCrawler`</ApiLink>.
+This log output confirms that the crawler successfully submitted the form and processed the response. Congratulations! You have successfully filled and submitted a web form using the <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink>.
