@@ -1,4 +1,5 @@
-from crawlee.parsers.static_content_parser import ParsedHttpCrawlingContext
-from parsel import Selector
+from bs4 import BeautifulSoup
 
-BeautifulSoupCrawlingContext = ParsedHttpCrawlingContext[Selector]
+from crawlee.http_crawler import ParsedHttpCrawlingContext
+
+BeautifulSoupCrawlingContext = ParsedHttpCrawlingContext[BeautifulSoup]

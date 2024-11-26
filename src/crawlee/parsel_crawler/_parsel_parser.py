@@ -1,16 +1,16 @@
 import asyncio
+from typing import Iterable
 
 from parsel import Selector
-from typing_extensions import Iterable, override
+from typing_extensions import override
 
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee.http_clients import HttpResponse
-from crawlee.parsers.static_content_parser import StaticContentParser, BlockedInfo
+from crawlee.http_crawler import BlockedInfo, StaticContentParser
 
 
-class ParselContentParser(StaticContentParser[Selector]):
+class ParselParser(StaticContentParser[Selector]):
     """Parser for parsing http response using Parsel."""
-
 
     @override
     async def parse(self, response: HttpResponse) -> Selector:
@@ -27,7 +27,10 @@ class ParselContentParser(StaticContentParser[Selector]):
             ]
 
             if matched_selectors:
-                reason =f"Assuming the session is blocked - HTTP response matched the following selectors: {'; '.join(matched_selectors)}"
+                reason = (
+                    f"Assuming the session is blocked - HTTP response matched the following selectors: "
+                    f"{'; '.join(matched_selectors)}"
+                )
 
         return BlockedInfo(reason=reason)
 
@@ -37,5 +40,5 @@ class ParselContentParser(StaticContentParser[Selector]):
         urls: list[str] = []
         for link in parsed_content.css(selector):
             if (url := link.xpath('@href').get()) is not None:
-                urls.append(url.strip())
+                urls.append(url.strip())  # noqa: PERF401  #Mypy has problems using is not None for type inference in list comprehension.
         return urls

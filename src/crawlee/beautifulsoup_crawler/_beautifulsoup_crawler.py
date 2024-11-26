@@ -4,13 +4,14 @@ from typing import TYPE_CHECKING, Iterable, Literal
 
 from bs4 import BeautifulSoup
 
-from crawlee.parsers.static_content_parser import BeautifulSoupContentParser, HttpCrawlerGeneric, ParsedHttpCrawlingContext
+from crawlee.beautifulsoup_crawler._beautifulsoup_parser import BeautifulSoupContentParser
+from crawlee.http_crawler import HttpCrawlerGeneric
 
 if TYPE_CHECKING:
     from typing_extensions import Unpack
 
     from crawlee.basic_crawler import BasicCrawlerOptions
-    from crawlee.http_crawler import HttpCrawlingContext
+    from crawlee.http_crawler import ParsedHttpCrawlingContext
 
 
 BeautifulSoupParser = Literal['html.parser', 'lxml', 'xml', 'html5lib']

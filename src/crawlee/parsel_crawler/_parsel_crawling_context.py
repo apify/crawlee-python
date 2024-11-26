@@ -1,5 +1,5 @@
-from crawlee.parsers.static_content_parser import ParsedHttpCrawlingContext
 from parsel import Selector
 
-ParselCrawlingContext = ParsedHttpCrawlingContext[Selector]
+from crawlee.http_crawler import ParsedHttpCrawlingContext
 
+ParselCrawlingContext = ParsedHttpCrawlingContext[Selector]

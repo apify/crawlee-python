@@ -1,18 +1,20 @@
 from __future__ import annotations
 
-from typing import AsyncGenerator
+from typing import TYPE_CHECKING, AsyncGenerator
 from unittest import mock
 
 import pytest
 import respx
-from bs4 import BeautifulSoup
 from httpx import Response
 
 from crawlee import ConcurrencySettings
 from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler
-from crawlee.parsers.static_content_parser import ParsedHttpCrawlingContext
 from crawlee.storages import RequestList
 
+if TYPE_CHECKING:
+    from bs4 import BeautifulSoup
+
+    from crawlee.http_crawler._http_crawling_context import ParsedHttpCrawlingContext
 
 
 @pytest.fixture

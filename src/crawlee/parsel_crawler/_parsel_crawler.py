@@ -5,15 +5,14 @@ from typing import TYPE_CHECKING, Iterable
 from parsel import Selector
 
 from crawlee._utils.docs import docs_group
-
-from crawlee.basic_crawler import BasicCrawlerOptions
-
-from crawlee.parsel_crawler._parsel_parser import ParselContentParser
-from crawlee.parsers.static_content_parser import HttpCrawlerGeneric, ParsedHttpCrawlingContext
+from crawlee.http_crawler import HttpCrawlerGeneric
+from crawlee.parsel_crawler._parsel_parser import ParselParser
 
 if TYPE_CHECKING:
     from typing_extensions import Unpack
 
+    from crawlee.basic_crawler import BasicCrawlerOptions
+    from crawlee.http_crawler import ParsedHttpCrawlingContext
 
 
 @docs_group('Classes')
@@ -21,6 +20,7 @@ class ParselCrawler(HttpCrawlerGeneric[Selector]):
     """A web crawler for performing HTTP requests and parsing HTML/XML content.
 
     The `ParselCrawler` builds on top of the `BasicCrawler`, which means it inherits all of its features.
+    It specifies its own parser ParselParser which is used to parse HttpResponse.
     On top of that it implements the HTTP communication using the HTTP clients and HTML/XML parsing using the
     `Parsel` library. The class allows integration with any HTTP client that implements the `BaseHttpClient`
     interface. The HTTP client is provided to the crawler as an input parameter to the constructor.
@@ -70,7 +70,7 @@ class ParselCrawler(HttpCrawlerGeneric[Selector]):
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
         """
         super().__init__(
-            parser=ParselContentParser(),
+            parser=ParselParser(),
             additional_http_error_status_codes=additional_http_error_status_codes,
             ignore_http_error_status_codes=ignore_http_error_status_codes,
             **kwargs,
