@@ -12,10 +12,11 @@ from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler
 from crawlee.storages import RequestList
 
 if TYPE_CHECKING:
-    from bs4 import BeautifulSoup
-    from crawlee.http_crawler._http_crawling_context import ParsedHttpCrawlingContext
     from collections.abc import AsyncGenerator
 
+    from bs4 import BeautifulSoup
+
+    from crawlee.http_crawler._http_crawling_context import ParsedHttpCrawlingContext
 
 
 @pytest.fixture

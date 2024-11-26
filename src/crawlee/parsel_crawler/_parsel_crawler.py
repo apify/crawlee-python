@@ -9,7 +9,7 @@ from crawlee.http_crawler import HttpCrawlerGeneric
 from crawlee.parsel_crawler._parsel_parser import ParselParser
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Iterable
+    from collections.abc import Iterable
 
     from typing_extensions import Unpack
 
