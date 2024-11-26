@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 @docs_group('Data structures')
 class ParsedHttpCrawlingContext(Generic[TParseResult], HttpCrawlingContext):
-    """The crawling context used by _HttpCrawler.
+    """The crawling context used by HttpCrawlerGeneric.
 
     It provides access to key objects as well as utility functions for handling crawling tasks.
     """
@@ -89,7 +89,7 @@ class StaticContentParser(Generic[TParseResult], ABC):
 
 
 class NoParser(StaticContentParser[bytes]):
-    """Dummy parser mainly for backwards compatibility.
+    """Dummy parser for backwards compatibility.
 
     To enable using HttpCrawler without need for additional specific parser.
     """
@@ -139,40 +139,20 @@ class BeautifulSoupContentParser(StaticContentParser[BeautifulSoup]):
         return urls
 
 
-class _HttpCrawler(Generic[TParseResult, TCrawlingContext], BasicCrawler[TCrawlingContext]):
+class HttpCrawlerGeneric(Generic[TParseResult], BasicCrawler[ParsedHttpCrawlingContext[TParseResult]]):
     """A web crawler for performing HTTP requests.
 
-    The `_HttpCrawler` builds on top of the `BasicCrawler`, which means it inherits all of its features. On top
+    The `HttpCrawlerGeneric` builds on top of the `BasicCrawler`, which means it inherits all of its features. On top
     of that it implements the HTTP communication using the HTTP clients. The class allows integration with
     any HTTP client that implements the `BaseHttpClient` interface. The HTTP client is provided to the crawler
     as an input parameter to the constructor.
+    HttpCrawlerGeneric is generic class and is expected to be used together with specific parser that will be used to
+    parse http response. See prepared specific version of it: BeautifulSoupCrawler or ParselCrawler for example.
+    (For backwards compatibility you can use already specific version HttpCrawler, which uses dummy
+    parser.)
 
     The HTTP client-based crawlers are ideal for websites that do not require JavaScript execution. However,
     if you need to execute client-side JavaScript, consider using a browser-based crawler like the `PlaywrightCrawler`.
-
-    ### Usage
-
-    ```python
-    from crawlee.http_crawler import _HttpCrawler, HttpCrawlingContext
-
-    crawler = _HttpCrawler()
-
-    # Define the default request handler, which will be called for every request.
-    @crawler.router.default_handler
-    async def request_handler(context: HttpCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
-
-        # Extract data from the page.
-        data = {
-            'url': context.request.url,
-            'response': context.http_response.read().decode()[:100],
-        }
-
-        # Push the extracted data to the default dataset.
-        await context.push_data(data)
-
-    await crawler.run(['https://crawlee.dev/'])
-    ```
     """
 
     def __init__(
@@ -181,12 +161,12 @@ class _HttpCrawler(Generic[TParseResult, TCrawlingContext], BasicCrawler[TCrawli
         parser: StaticContentParser[TParseResult],
         additional_http_error_status_codes: Iterable[int] = (),
         ignore_http_error_status_codes: Iterable[int] = (),
-        **kwargs: Unpack[BasicCrawlerOptions[TCrawlingContext]],
+        **kwargs: Unpack[BasicCrawlerOptions[ParsedHttpCrawlingContext[TParseResult]]],
     ) -> None:
         self.parser = parser
 
         kwargs['_context_pipeline'] = (
-            ContextPipeline[TCrawlingContext]()
+            ContextPipeline[ParsedHttpCrawlingContext[TParseResult]]()
             .compose(self._make_http_request)
             .compose(self._parse_http_response)
             .compose(self._handle_blocked_request)
@@ -286,13 +266,42 @@ class _HttpCrawler(Generic[TParseResult, TCrawlingContext], BasicCrawler[TCrawli
                 raise SessionError(blocked_info.reason)
         yield context
 
-class HttpCrawler(_HttpCrawler[bytes, HttpCrawlingContext]):
+class HttpCrawler(HttpCrawlerGeneric[bytes]):
+    """
+    Specific version of generic HttpCrawlerGeneric. It uses dummy parser NoParser. It is not intended to be used in new
+    code, it is backwards compatibility class. In new code either use HttpCrawlerGeneric or other specific children of
+    it - like BeautifulSoupCrawler or ParselCrawler.
+
+    ### Usage
+
+    ```python
+    from crawlee.http_crawler import HttpCrawlerGeneric, HttpCrawlingContext
+
+    crawler = HttpCrawler()
+
+    # Define the default request handler, which will be called for every request.
+    @crawler.router.default_handler
+    async def request_handler(context: HttpCrawlingContext) -> None:
+        context.log.info(f'Processing {context.request.url} ...')
+
+        # Extract data from the page.
+        data = {
+            'url': context.request.url,
+            'response': context.http_response.read().decode()[:100],
+        }
+
+        # Push the extracted data to the default dataset.
+        await context.push_data(data)
+
+    await crawler.run(['https://crawlee.dev/'])
+    ```
+    """
     def __init__(
         self,
         *,
         additional_http_error_status_codes: Iterable[int] = (),
         ignore_http_error_status_codes: Iterable[int] = (),
-        **kwargs: Unpack[BasicCrawlerOptions[HttpCrawlingContext]],
+        **kwargs: Unpack[BasicCrawlerOptions[ParsedHttpCrawlingContext[bytes]]],
     ) -> None:
         """
         I didn't find another way how to make default constructor specifying one of type on generics.

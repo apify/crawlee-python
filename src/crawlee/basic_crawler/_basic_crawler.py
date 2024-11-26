@@ -143,7 +143,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     The `BasicCrawler` provides a low-level functionality for crawling websites, allowing users to define their
     own page download and data extraction logic. It is designed mostly to be subclassed by crawlers with specific
-    purposes. In most cases, you will want to use a more specialized crawler, such as `_HttpCrawler`,
+    purposes. In most cases, you will want to use a more specialized crawler, such as `HttpCrawlerGeneric`,
     `BeautifulSoupCrawler`, `ParselCrawler`, or `PlaywrightCrawler`. If you are an advanced user and want full
     control over the crawling process, you can subclass the `BasicCrawler` and implement the request-handling logic
     yourself.

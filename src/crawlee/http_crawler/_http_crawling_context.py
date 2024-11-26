@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 @dataclass(frozen=True)
 @docs_group('Data structures')
 class HttpCrawlingContext(BasicCrawlingContext, HttpCrawlingResult):
-    """The crawling context used by the `_HttpCrawler`."""
+    """The crawling context used by the `HttpCrawlerGeneric`."""
 
     @classmethod
     def from_basic_crawling_context(cls, context: BasicCrawlingContext, http_response: HttpResponse) -> Self:

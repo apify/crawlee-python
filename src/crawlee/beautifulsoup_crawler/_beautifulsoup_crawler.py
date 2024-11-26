@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Iterable, Literal
 
 from bs4 import BeautifulSoup
 
-from crawlee.parsers.static_content_parser import BeautifulSoupContentParser, _HttpCrawler, ParsedHttpCrawlingContext
+from crawlee.parsers.static_content_parser import BeautifulSoupContentParser, HttpCrawlerGeneric, ParsedHttpCrawlingContext
 
 if TYPE_CHECKING:
     from typing_extensions import Unpack
@@ -16,10 +16,11 @@ if TYPE_CHECKING:
 BeautifulSoupParser = Literal['html.parser', 'lxml', 'xml', 'html5lib']
 
 
-class BeautifulSoupCrawler(_HttpCrawler[BeautifulSoup, ParsedHttpCrawlingContext[BeautifulSoup]]):
+class BeautifulSoupCrawler(HttpCrawlerGeneric[BeautifulSoup]):
     """A web crawler for performing HTTP requests and parsing HTML/XML content.
 
-    The `BeautifulSoupCrawler` builds on top of the `BasicCrawler`, which means it inherits all of its features.
+    The `BeautifulSoupCrawler` builds on top of the `HttpCrawlerGeneric`, which means it inherits all of its features.
+    It specifies its own parser BeautifulSoupParser which is used to parse HttpResponse.
     On top of that it implements the HTTP communication using the HTTP clients and HTML/XML parsing using the
     `BeautifulSoup` library. The class allows integration with any HTTP client that implements the `BaseHttpClient`
     interface. The HTTP client is provided to the crawler as an input parameter to the constructor.
@@ -58,7 +59,7 @@ class BeautifulSoupCrawler(_HttpCrawler[BeautifulSoup, ParsedHttpCrawlingContext
         parser: BeautifulSoupParser = 'lxml',
         additional_http_error_status_codes: Iterable[int] = (),
         ignore_http_error_status_codes: Iterable[int] = (),
-        **kwargs: Unpack[BasicCrawlerOptions[HttpCrawlingContext]],
+        **kwargs: Unpack[BasicCrawlerOptions[ParsedHttpCrawlingContext[BeautifulSoup]]],
     ) -> None:
         """A default constructor.
 
