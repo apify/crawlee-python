@@ -192,7 +192,15 @@ class HttpCrawler(HttpCrawlerGeneric[bytes]):
         ignore_http_error_status_codes: Iterable[int] = (),
         **kwargs: Unpack[BasicCrawlerOptions[ParsedHttpCrawlingContext[bytes]]],
     ) -> None:
-        """I didn't find another way how to make default constructor specifying one of type on generics."""
+        """A default constructor.
+
+        Args:
+            additional_http_error_status_codes: Additional HTTP status codes to treat as errors, triggering
+                automatic retries when encountered.
+            ignore_http_error_status_codes: HTTP status codes typically considered errors but to be treated
+                as successful responses.
+            kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
+        """
         super().__init__(
             parser=NoParser(),
             additional_http_error_status_codes=additional_http_error_status_codes,
