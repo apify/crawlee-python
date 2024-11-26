@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from typing import TYPE_CHECKING, Callable
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, call
 from urllib.parse import parse_qs, urlencode
 
 import pytest
@@ -10,6 +10,7 @@ import respx
 from httpx import URL, Response
 
 from crawlee._request import Request
+from crawlee._types import BasicCrawlingContext
 from crawlee.http_clients._httpx import HttpxHttpClient
 from crawlee.http_clients.curl_impersonate import CurlImpersonateHttpClient
 from crawlee.http_crawler import HttpCrawler
@@ -353,3 +354,47 @@ async def test_sending_url_query_params(http_client_class: type[BaseHttpClient],
 
     response_args = responses[0]['args']
     assert response_args == query_params, 'Reconstructed query params must match the original query params.'
+
+
+@respx.mock
+async def test_http_crawler_pre_navigation_hooks():
+    test_url_with_registered_label = "http://www.something1.com"
+    test_url_without_label = "http://www.something2.com"
+    test_url_with_unregistered_label = "http://www.something3.com"
+
+    handler_for_registered_hook = Mock()
+    default_handler = Mock()
+    registered_label = "Bla"
+    unregistered_label = "Ble"
+
+    crawler = HttpCrawler()
+
+    @crawler.router.default_handler
+    async def request_handler(context: HttpCrawlingContext) -> None:
+        pass
+
+    @crawler.pre_navigation_router.handler(registered_label)
+    async def request_handler(context: BasicCrawlingContext) -> None:
+        handler_for_registered_hook(context.request.url, context.request.label)
+
+    @crawler.pre_navigation_router.default_handler
+    async def request_handler(context: BasicCrawlingContext) -> None:
+        default_handler(context.request.url, context.request.label)
+
+    for test_url in (test_url_with_registered_label, test_url_without_label, test_url_with_unregistered_label):
+        respx.get(test_url).mock(return_value=Response(200))
+
+    requests = [
+        Request.from_url(label= registered_label, url=test_url_with_registered_label),
+        Request.from_url(url=test_url_without_label),
+        Request.from_url(label=unregistered_label, url=test_url_with_unregistered_label)
+        ]
+
+
+    await crawler.run(requests)
+
+    handler_for_registered_hook.assert_called_once_with(test_url_with_registered_label, registered_label)
+    default_handler.assert_has_calls([
+        call(test_url_without_label, None),
+        call(test_url_with_unregistered_label, unregistered_label),
+    ])
