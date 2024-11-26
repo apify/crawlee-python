@@ -4,11 +4,11 @@
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING, Callable, cast
+from typing import TYPE_CHECKING, Any, Callable, cast
 
 import pytest
-from httpx import URL
 from proxy import Proxy
+from yarl import URL
 
 from crawlee import service_container
 from crawlee.configuration import Configuration
@@ -70,7 +70,37 @@ def memory_storage_client(tmp_path: Path) -> MemoryStorageClient:
 
 @pytest.fixture
 def httpbin() -> URL:
-    return URL(os.environ.get('HTTPBIN_URL', 'https://httpbin.org'))
+    class URLWrapper:
+        def __init__(self, url: URL) -> None:
+            self.url = url
+
+        def __getattr__(self, name: str) -> Any:
+            result = getattr(self.url, name)
+            return_type = getattr(result, '__annotations__', {}).get('return', None)
+
+            if return_type == 'URL':
+
+                def wrapper(*args: Any, **kwargs: Any) -> URLWrapper:
+                    return URLWrapper(result(*args, **kwargs))
+
+                return wrapper
+
+            return result
+
+        def with_path(
+            self, path: str, *, keep_query: bool = True, keep_fragment: bool = True, encoded: bool = False
+        ) -> URLWrapper:
+            return URLWrapper(
+                URL.with_path(self.url, path, keep_query=keep_query, keep_fragment=keep_fragment, encoded=encoded)
+            )
+
+        def __truediv__(self, other: Any) -> URLWrapper:
+            return self.with_path(other)
+
+        def __str__(self) -> str:
+            return str(self.url)
+
+    return cast(URL, URLWrapper(URL(os.environ.get('HTTPBIN_URL', 'https://httpbin.org'))))
 
 
 @pytest.fixture
