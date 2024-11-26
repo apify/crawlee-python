@@ -24,12 +24,13 @@ def test_global_configuration_works() -> None:
 
 
 async def test_storage_not_persisted_when_disabled(tmp_path: Path) -> None:
-    configuration = Configuration(
+    config = Configuration(
         persist_storage=False,
         write_metadata=False,
         crawlee_storage_dir=str(tmp_path),  # type: ignore
     )
-    set_storage_client(MemoryStorageClient(configuration=configuration))
+    storage_client = MemoryStorageClient(config)
+    set_storage_client(storage_client, force=True)
 
     crawler = HttpCrawler()
 
@@ -45,12 +46,13 @@ async def test_storage_not_persisted_when_disabled(tmp_path: Path) -> None:
 
 
 async def test_storage_persisted_when_enabled(tmp_path: Path) -> None:
-    configuration = Configuration(
+    config = Configuration(
         persist_storage=True,
         write_metadata=True,
         crawlee_storage_dir=str(tmp_path),  # type: ignore
     )
-    set_storage_client(MemoryStorageClient(configuration=configuration))
+    storage_client = MemoryStorageClient(config)
+    set_storage_client(storage_client, force=True)
 
     crawler = HttpCrawler()
 
