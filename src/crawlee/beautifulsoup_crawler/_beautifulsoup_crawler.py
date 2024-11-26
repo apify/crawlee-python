@@ -24,9 +24,6 @@ class BeautifulSoupCrawler(HttpCrawlerGeneric[BeautifulSoup]):
 
     The `BeautifulSoupCrawler` builds on top of the `HttpCrawlerGeneric`, which means it inherits all of its features.
     It specifies its own parser BeautifulSoupParser which is used to parse HttpResponse.
-    On top of that it implements the HTTP communication using the HTTP clients and HTML/XML parsing using the
-    `BeautifulSoup` library. The class allows integration with any HTTP client that implements the `BaseHttpClient`
-    interface. The HTTP client is provided to the crawler as an input parameter to the constructor.
 
     The HTTP client-based crawlers are ideal for websites that do not require JavaScript execution. However,
     if you need to execute client-side JavaScript, consider using browser-based crawler like the `PlaywrightCrawler`.
