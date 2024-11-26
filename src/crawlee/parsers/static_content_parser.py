@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, fields
-from typing import Any, AsyncGenerator, Iterable
+from typing import Any, AsyncGenerator, Iterable, TYPE_CHECKING
 from warnings import warn
 
 from bs4 import BeautifulSoup, Tag
@@ -19,6 +19,7 @@ from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipe
 from crawlee.errors import SessionError
 from crawlee.http_clients import HttpResponse, HttpxHttpClient
 from crawlee.http_crawler import HttpCrawlingContext
+from parsel import Selector
 
 TParseResult = TypeVar('TParseResult')
 TCrawlingContext = TypeVar("TCrawlingContext", bound=BasicCrawlingContext)
@@ -57,6 +58,16 @@ class ParsedHttpCrawlingContext(Generic[TParseResult], HttpCrawlingContext):
             'Access parsed_content instead.'
         )
 
+    @property
+    def selector(self) -> Selector:
+        """Property for backwards compatibility."""
+        if isinstance(self.parsed_content, Selector):
+            warn('Usage of deprecated property selector. Use parsed_content instead.', DeprecationWarning, stacklevel=2)
+            return self.parsed_content
+        raise RuntimeError(
+            'Trying to access selector property on context that does not have Selector in parsed_content.'
+            'Access parsed_content instead.'
+        )
 
 @dataclass(frozen=True)
 class BlockedInfo:
@@ -73,17 +84,17 @@ class StaticContentParser(Generic[TParseResult], ABC):
     """Parser used for parsing http response and inspecting parsed result to find links or detect blocking."""
 
     @abstractmethod
-    def parse(self, http_response: HttpResponse) -> TParseResult:
+    async def parse(self, http_response: HttpResponse) -> TParseResult:
         """Parse http response."""
         ...
 
     @abstractmethod
-    def is_blocked(self, result: TParseResult) -> BlockedInfo:
+    def is_blocked(self, parsed_content: TParseResult) -> BlockedInfo:
         """Detect if blocked and return BlockedInfo with additional information."""
         ...
 
     @abstractmethod
-    def find_links(self, result: TParseResult, selector: str) -> Iterable[str]:
+    def find_links(self, parsed_content: TParseResult, selector: str) -> Iterable[str]:
         """Find all links in result using selector."""
         ...
 
@@ -95,15 +106,15 @@ class NoParser(StaticContentParser[bytes]):
     """
 
     @override
-    def parse(self, http_response: HttpResponse) -> bytes:
+    async def parse(self, http_response: HttpResponse) -> bytes:
         return http_response.read()
 
     @override
-    def is_blocked(self, result: bytes) -> BlockedInfo:  # Intentional unused argument.
+    def is_blocked(self, parsed_content: bytes) -> BlockedInfo:  # Intentional unused argument.
         return BlockedInfo(reason='')
 
     @override
-    def find_links(self, result: bytes, selector: str) -> Iterable[str]:  # Intentional unused argument.
+    def find_links(self, parsed_content: bytes, selector: str) -> Iterable[str]:  # Intentional unused argument.
         return []
 
 
@@ -114,15 +125,15 @@ class BeautifulSoupContentParser(StaticContentParser[BeautifulSoup]):
         self._parser = parser
 
     @override
-    def parse(self, response: HttpResponse) -> BeautifulSoup:
+    async def parse(self, response: HttpResponse) -> BeautifulSoup:
         return BeautifulSoup(response.read(), parser=self._parser)
 
     @override
-    def is_blocked(self, result: BeautifulSoup) -> BlockedInfo:
+    def is_blocked(self, parsed_content: BeautifulSoup) -> BlockedInfo:
         reason = ''
-        if result.soup is not None:
+        if parsed_content is not None:
             matched_selectors = [
-                selector for selector in RETRY_CSS_SELECTORS if result.soup.select_one(selector) is not None
+                selector for selector in RETRY_CSS_SELECTORS if parsed_content.select_one(selector) is not None
             ]
             if matched_selectors:
                 reason = f"Assuming the session is blocked - HTTP response matched the following selectors: {'; '.join(
@@ -130,10 +141,10 @@ class BeautifulSoupContentParser(StaticContentParser[BeautifulSoup]):
         return BlockedInfo(reason=reason)
 
     @override
-    def find_links(self, soup: BeautifulSoup, selector: str) -> Iterable[str]:
+    def find_links(self, parsed_content: BeautifulSoup, selector: str) -> Iterable[str]:
         link: Tag
         urls: list[str] = []
-        for link in soup.select(selector):
+        for link in parsed_content.select(selector):
             if (url := link.attrs.get('href')) is not None:
                 urls.append(url.strip())  # noqa: PERF401  #Mypy has problems using is not None for type inference in list comprehension.
         return urls
@@ -186,7 +197,7 @@ class HttpCrawlerGeneric(Generic[TParseResult], BasicCrawler[ParsedHttpCrawlingC
     async def _parse_http_response(
         self, context: HttpCrawlingContext
     ) -> AsyncGenerator[ParsedHttpCrawlingContext[TParseResult], None]:
-        parsed_content = self.parser.parse(context.http_response)
+        parsed_content = await self.parser.parse(context.http_response)
         yield ParsedHttpCrawlingContext.from_http_crawling_context(
             context=context,
             parsed_content=parsed_content,
