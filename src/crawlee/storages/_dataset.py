@@ -241,7 +241,7 @@ class Dataset(BaseStorage):
         # Handle singular items
         if not isinstance(data, list):
             items = await self.check_and_serialize(data)
-            return await self._resource_client.push_items(items, **kwargs)
+            return await self._resource_client.push_items(items, **kwargs)  # type: ignore[no-any-return] # Mypy is broken
 
         # Handle lists
         payloads_generator = (await self.check_and_serialize(item, index) for index, item in enumerate(data))
@@ -264,7 +264,7 @@ class Dataset(BaseStorage):
         Returns:
             List page containing filtered and paginated dataset items.
         """
-        return await self._resource_client.list_items(**kwargs)
+        return await self._resource_client.list_items(**kwargs)  # type: ignore[no-any-return] # Mypy is broken
 
     async def write_to_csv(self, destination: TextIO, **kwargs: Unpack[ExportDataCsvKwargs]) -> None:
         """Exports the entire dataset into an arbitrary stream.
