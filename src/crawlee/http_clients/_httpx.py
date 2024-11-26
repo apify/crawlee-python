@@ -84,10 +84,10 @@ class HttpxHttpClient(BaseHttpClient):
 
     ```python
     from crawlee.http_clients import HttpxHttpClient
-    from crawlee.http_crawler import HttpCrawlerGeneric  # or any other HTTP client-based crawler
+    from crawlee.http_crawler import HttpCrawler  # or any other HTTP client-based crawler
 
     http_client = HttpxHttpClient()
-    crawler = HttpCrawlerGeneric(http_client=http_client)
+    crawler = HttpCrawler(http_client=http_client)
     ```
     """
 
