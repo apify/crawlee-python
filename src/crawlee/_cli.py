@@ -13,7 +13,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 cli = typer.Typer(no_args_is_help=True)
 
-cookiecutter_json = json.load((Path(__name__).parent.parent.parent / 'templates' / 'crawler' / 'cookiecutter.json').open())
+cookiecutter_json = json.load((Path(__file__).parent.parent.parent / 'templates' / 'crawler' / 'cookiecutter.json').open())
 crawler_choices = cookiecutter_json['crawler_type']
 http_client_choices = cookiecutter_json['http_client']
 package_manager_choices = cookiecutter_json['package_manager']
