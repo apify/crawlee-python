@@ -28,7 +28,6 @@ if TYPE_CHECKING:
     from crawlee.memory_storage_client._memory_storage_client import MemoryStorageClient, TResourceClient
     from crawlee.memory_storage_client._request_queue_client import RequestQueueClient
 
-
 logger = getLogger(__name__)
 
 
