@@ -185,9 +185,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
         concurrency_settings: ConcurrencySettings | None = None,
         request_handler_timeout: timedelta = timedelta(minutes=1),
         statistics: Statistics | None = None,
-        configure_logging: bool = True,
-        max_crawl_depth: int | None = None,
         abort_on_error: bool = False,
+        configure_logging: bool = True,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         _additional_context_managers: Sequence[AbstractAsyncContextManager] | None = None,
         _logger: logging.Logger | None = None,
@@ -215,9 +214,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
             concurrency_settings: Settings to fine-tune concurrency levels.
             request_handler_timeout: Maximum duration allowed for a single request handler to run.
             statistics: A custom `Statistics` instance, allowing the use of non-default configuration.
-            configure_logging: If True, the crawler will set up logging infrastructure automatically.
-            max_crawl_depth: Maximum crawl depth. If set, the crawler will stop crawling after reaching this depth.
             abort_on_error: If True, the crawler stops immediately when any request handler error occurs.
+            configure_logging: If True, the crawler will set up logging infrastructure automatically.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
             _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
@@ -247,6 +245,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         # Error & failed request handlers
         self._error_handler: ErrorHandler[TCrawlingContext | BasicCrawlingContext] | None = None
         self._failed_request_handler: FailedRequestHandler[TCrawlingContext | BasicCrawlingContext] | None = None
+        self._abort_on_error = abort_on_error
 
         # Context pipeline
         self._context_pipeline = (_context_pipeline or ContextPipeline()).compose(self._check_url_after_redirects)
@@ -305,7 +304,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._has_finished_before = False
 
         self._failed = False
-        self._abort_on_error = abort_on_error
 
     @property
     def log(self) -> logging.Logger:

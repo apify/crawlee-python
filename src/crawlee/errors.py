@@ -14,6 +14,7 @@ __all__ = [
     'HttpStatusCodeError',
     'ProxyError',
     'RequestHandlerError',
+    'ServiceConflictError',
     'SessionError',
     'UserDefinedErrorHandlerError',
 ]
@@ -32,6 +33,17 @@ class SessionError(Exception):
 
     This error doesn't respect the `max_request_retries` option and has a separate limit of `max_session_rotations`.
     """
+
+
+@docs_group('Errors')
+class ServiceConflictError(Exception):
+    """Raised when attempting to reassign a service in service container that was already configured."""
+
+    def __init__(self, service: type, new_value: object, existing_value: object) -> None:
+        super().__init__(
+            f'Service {service.__name__} has already been set. Existing value: {existing_value}, '
+            f'attempted new value: {new_value}.'
+        )
 
 
 @docs_group('Errors')
