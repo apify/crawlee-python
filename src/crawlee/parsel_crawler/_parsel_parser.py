@@ -1,5 +1,5 @@
 import asyncio
-from typing import Iterable
+from collections.abc import Iterable
 
 from parsel import Selector
 from typing_extensions import override

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING
 
 from bs4 import BeautifulSoup, Tag
 from typing_extensions import override
@@ -9,6 +9,8 @@ from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee.http_crawler import BlockedInfo, StaticContentParser
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from crawlee.http_clients import HttpResponse
 
 
@@ -30,8 +32,10 @@ class BeautifulSoupContentParser(StaticContentParser[BeautifulSoup]):
                 selector for selector in RETRY_CSS_SELECTORS if parsed_content.select_one(selector) is not None
             ]
             if matched_selectors:
-                reason = f"Assuming the session is blocked - HTTP response matched the following selectors: {'; '.join(
-                    matched_selectors)}"
+                reason = (
+                    f"Assuming the session is blocked - HTTP response matched the following selectors:"
+                    f" {'; '.join(matched_selectors)}"
+                )
         return BlockedInfo(reason=reason)
 
     @override

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING
 
 from parsel import Selector
 

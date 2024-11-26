@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterable, Literal
+from typing import TYPE_CHECKING, Literal
 
 from bs4 import BeautifulSoup
 
