@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Generic, Iterable
+from typing import TYPE_CHECKING, Generic
+
 
 from pydantic import ValidationError
 
@@ -16,9 +17,9 @@ from ._http_crawling_context import HttpCrawlingContext, ParsedHttpCrawlingConte
 from ._http_parser import NoParser, StaticContentParser
 
 if TYPE_CHECKING:
-    from typing_extensions import Any, AsyncGenerator, Unpack
-
     from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, EnqueueLinksKwargs
+    from collections.abc import AsyncGenerator, Iterable
+    from typing_extensions import Any, Unpack
 
 logger = logging.getLogger(__name__)
 

@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 from typing import TYPE_CHECKING, Iterable, Literal
 
 from bs4 import BeautifulSoup
@@ -7,7 +6,10 @@ from bs4 import BeautifulSoup
 from crawlee.beautifulsoup_crawler._beautifulsoup_parser import BeautifulSoupContentParser
 from crawlee.http_crawler import HttpCrawlerGeneric
 
+
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Iterable
+
     from typing_extensions import Unpack
 
     from crawlee.basic_crawler import BasicCrawlerOptions

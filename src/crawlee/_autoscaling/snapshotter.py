@@ -18,6 +18,7 @@ from crawlee._autoscaling.types import (
     Snapshot,
 )
 from crawlee._utils.byte_size import ByteSize
+from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee.events._types import Event, EventSystemInfoData
@@ -114,6 +115,9 @@ class Snapshotter:
 
         self._timestamp_of_last_memory_warning: datetime = datetime.now(timezone.utc) - timedelta(hours=1)
 
+        # Flag to indicate the context state.
+        self._active = False
+
     @staticmethod
     def _get_sorted_list_by_created_at(input_list: list[T]) -> SortedList[T]:
         return SortedList(input_list, key=attrgetter('created_at'))
@@ -126,8 +130,21 @@ class Snapshotter:
         logger.info(f'Setting max_memory_size of this run to {max_memory_size}.')
         return max_memory_size
 
+    @property
+    def active(self) -> bool:
+        """Indicates whether the context is active."""
+        return self._active
+
     async def __aenter__(self) -> Snapshotter:
-        """Starts capturing snapshots at configured intervals."""
+        """Starts capturing snapshots at configured intervals.
+
+        Raises:
+            RuntimeError: If the context manager is already active.
+        """
+        if self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is already active.')
+
+        self._active = True
         self._event_manager.on(event=Event.SYSTEM_INFO, listener=self._snapshot_cpu)
         self._event_manager.on(event=Event.SYSTEM_INFO, listener=self._snapshot_memory)
         self._snapshot_event_loop_task.start()
@@ -144,12 +161,20 @@ class Snapshotter:
 
         This method stops capturing snapshots of system resources (CPU, memory, event loop, and client information).
         It should be called to terminate resource capturing when it is no longer needed.
+
+        Raises:
+            RuntimeError: If the context manager is not active.
         """
+        if not self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is not active.')
+
         self._event_manager.off(event=Event.SYSTEM_INFO, listener=self._snapshot_cpu)
         self._event_manager.off(event=Event.SYSTEM_INFO, listener=self._snapshot_memory)
         await self._snapshot_event_loop_task.stop()
         await self._snapshot_client_task.stop()
+        self._active = False
 
+    @ensure_context
     def get_memory_sample(self, duration: timedelta | None = None) -> list[Snapshot]:
         """Returns a sample of the latest memory snapshots.
 
@@ -162,6 +187,7 @@ class Snapshotter:
         snapshots = cast(list[Snapshot], self._memory_snapshots)
         return self._get_sample(snapshots, duration)
 
+    @ensure_context
     def get_event_loop_sample(self, duration: timedelta | None = None) -> list[Snapshot]:
         """Returns a sample of the latest event loop snapshots.
 
@@ -174,6 +200,7 @@ class Snapshotter:
         snapshots = cast(list[Snapshot], self._event_loop_snapshots)
         return self._get_sample(snapshots, duration)
 
+    @ensure_context
     def get_cpu_sample(self, duration: timedelta | None = None) -> list[Snapshot]:
         """Returns a sample of the latest CPU snapshots.
 
@@ -186,6 +213,7 @@ class Snapshotter:
         snapshots = cast(list[Snapshot], self._cpu_snapshots)
         return self._get_sample(snapshots, duration)
 
+    @ensure_context
     def get_client_sample(self, duration: timedelta | None = None) -> list[Snapshot]:
         """Returns a sample of the latest client snapshots.
 

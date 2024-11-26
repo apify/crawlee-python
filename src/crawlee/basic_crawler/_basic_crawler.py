@@ -12,7 +12,7 @@ from contextlib import AsyncExitStack, suppress
 from datetime import timedelta
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, AsyncContextManager, Callable, Generic, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Generic, Union, cast
 from urllib.parse import ParseResult, urlparse
 
 from tldextract import TLDExtract
@@ -47,6 +47,7 @@ from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 if TYPE_CHECKING:
     import re
+    from contextlib import AbstractAsyncContextManager
 
     from crawlee._types import ConcurrencySettings, HttpMethod, JsonSerializable
     from crawlee.base_storage_client._models import DatasetItemsListPage
@@ -126,11 +127,14 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     """Limits crawl depth from 0 (initial requests) up to the specified `max_crawl_depth`.
     Requests at the maximum depth are processed, but no further links are enqueued."""
 
+    abort_on_error: NotRequired[bool]
+    """If True, the crawler stops immediately when any request handler error occurs."""
+
     _context_pipeline: NotRequired[ContextPipeline[TCrawlingContext]]
     """Enables extending the request lifecycle and modifying the crawling context. Intended for use by
     subclasses rather than direct instantiation of `BasicCrawler`."""
 
-    _additional_context_managers: NotRequired[Sequence[AsyncContextManager]]
+    _additional_context_managers: NotRequired[Sequence[AbstractAsyncContextManager]]
     """Additional context managers used throughout the crawler lifecycle."""
 
     _logger: NotRequired[logging.Logger]
@@ -182,8 +186,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
         event_manager: EventManager | None = None,
         configure_logging: bool = True,
         max_crawl_depth: int | None = None,
+        abort_on_error: bool = False,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
-        _additional_context_managers: Sequence[AsyncContextManager] | None = None,
+        _additional_context_managers: Sequence[AbstractAsyncContextManager] | None = None,
         _logger: logging.Logger | None = None,
     ) -> None:
         """A default constructor.
@@ -210,6 +215,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             event_manager: A custom `EventManager` instance, allowing the use of non-default configuration.
             configure_logging: If True, the crawler will set up logging infrastructure automatically.
             max_crawl_depth: Maximum crawl depth. If set, the crawler will stop crawling after reaching this depth.
+            abort_on_error: If True, the crawler stops immediately when any request handler error occurs.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
             _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
@@ -254,7 +260,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             else None,
             available_memory_ratio=self._configuration.available_memory_ratio,
         )
-        self._pool = AutoscaledPool(
+        self._autoscaled_pool = AutoscaledPool(
             system_status=SystemStatus(self._snapshotter),
             is_finished_function=self.__is_finished_function,
             is_task_ready_function=self.__is_task_ready_function,
@@ -293,6 +299,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._running = False
         self._has_finished_before = False
         self._max_crawl_depth = max_crawl_depth
+
+        self._failed = False
+        self._abort_on_error = abort_on_error
 
     @property
     def log(self) -> logging.Logger:
@@ -441,7 +450,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
             run_task.cancel()
 
-        run_task = asyncio.create_task(self._run_crawler())
+        run_task = asyncio.create_task(self._run_crawler(), name='run_crawler_task')
 
         with suppress(NotImplementedError):  # event loop signal handlers are not supported on Windows
             asyncio.get_running_loop().add_signal_handler(signal.SIGINT, sigint_handler)
@@ -475,18 +484,25 @@ class BasicCrawler(Generic[TCrawlingContext]):
         return final_statistics
 
     async def _run_crawler(self) -> None:
+        # Collect the context managers to be entered. Context managers that are already active are excluded,
+        # as they were likely entered by the caller, who will also be responsible for exiting them.
+        contexts_to_enter = [
+            cm
+            for cm in (
+                self._event_manager,
+                self._snapshotter,
+                self._statistics,
+                self._session_pool if self._use_session_pool else None,
+                *self._additional_context_managers,
+            )
+            if cm and getattr(cm, 'active', False) is False
+        ]
+
         async with AsyncExitStack() as exit_stack:
-            await exit_stack.enter_async_context(self._event_manager)
-            await exit_stack.enter_async_context(self._snapshotter)
-            await exit_stack.enter_async_context(self._statistics)
+            for context in contexts_to_enter:
+                await exit_stack.enter_async_context(context)
 
-            if self._use_session_pool:
-                await exit_stack.enter_async_context(self._session_pool)
-
-            for context_manager in self._additional_context_managers:
-                await exit_stack.enter_async_context(context_manager)
-
-            await self._pool.run()
+            await self._autoscaled_pool.run()
 
     async def add_requests(
         self,
@@ -735,6 +751,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
         request_provider = await self.get_request_provider()
         request = context.request
 
+        if self._abort_on_error:
+            self._logger.exception('Aborting crawler run due to error (abort_on_error=True)', exc_info=error)
+            self._failed = True
+
         if self._should_retry_request(context, error):
             request.retry_count += 1
             self._statistics.error_tracker.add(error)
@@ -889,6 +909,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 f'All ongoing requests have now completed. Total requests processed: '
                 f'{self._statistics.state.requests_finished}. The crawler will now shut down.'
             )
+            return True
+
+        if self._abort_on_error and self._failed:
             return True
 
         return is_finished

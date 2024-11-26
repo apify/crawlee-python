@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from playwright.async_api import Playwright, async_playwright
 from typing_extensions import override
 
+from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 from crawlee.browsers._base_browser_plugin import BaseBrowserPlugin
 from crawlee.browsers._playwright_browser_controller import PlaywrightBrowserController
@@ -42,8 +43,8 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
 
         Args:
             browser_type: The type of the browser to launch.
-            browser_options: Options to configure the browser instance.
-            page_options: Options to configure a new page instance.
+            browser_options: Keyword arguments to pass to the browser launch method.
+            page_options: Keyword arguments to pass to the new page method.
             max_open_pages_per_browser: The maximum number of pages that can be opened in a single browser instance.
                 Once reached, a new browser instance will be launched to handle the excess.
         """
@@ -54,6 +55,14 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
 
         self._playwright_context_manager = async_playwright()
         self._playwright: Playwright | None = None
+
+        # Flag to indicate the context state.
+        self._active = False
+
+    @property
+    @override
+    def active(self) -> bool:
+        return self._active
 
     @property
     @override
@@ -77,7 +86,10 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
 
     @override
     async def __aenter__(self) -> PlaywrightBrowserPlugin:
-        logger.debug('Initializing Playwright browser plugin.')
+        if self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is already active.')
+
+        self._active = True
         self._playwright = await self._playwright_context_manager.__aenter__()
         return self
 
@@ -88,10 +100,14 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         exc_value: BaseException | None,
         exc_traceback: TracebackType | None,
     ) -> None:
-        logger.debug('Closing Playwright browser plugin.')
+        if not self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is not active.')
+
         await self._playwright_context_manager.__aexit__(exc_type, exc_value, exc_traceback)
+        self._active = False
 
     @override
+    @ensure_context
     async def new_browser(self) -> PlaywrightBrowserController:
         if not self._playwright:
             raise RuntimeError('Playwright browser plugin is not initialized.')

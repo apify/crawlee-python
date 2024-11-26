@@ -184,7 +184,8 @@ class Configuration(BaseSettings):
             )
         ),
     ] = 0.25
-    """This setting is currently unused. For more details, see https://github.com/apify/crawlee-python/issues/670."""
+    """The ratio of system memory to use when memory_mbytes is not specified. The `Snapshotter.available_memory_ratio`
+    is set to this value."""
 
     storage_dir: Annotated[
         str,
