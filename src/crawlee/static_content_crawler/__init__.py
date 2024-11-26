@@ -4,8 +4,8 @@ from ._static_crawling_context import HttpCrawlingContext, ParsedHttpCrawlingCon
 
 __all__ = [
     'BlockedInfo',
-    'ParsedHttpCrawlingContext',
     'HttpCrawlingContext',
+    'ParsedHttpCrawlingContext',
     'StaticContentCrawler',
     'StaticContentParser',
 ]

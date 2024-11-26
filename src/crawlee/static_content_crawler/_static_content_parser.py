@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Generic, Iterable
+from typing import TYPE_CHECKING, Generic
 
 from crawlee.static_content_crawler._static_crawling_context import TParseResult
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from crawlee.http_clients import HttpResponse
 
 
