@@ -22,7 +22,7 @@ class BeautifulSoupContentParser(StaticContentParser[BeautifulSoup]):
 
     @override
     async def parse(self, response: HttpResponse) -> BeautifulSoup:
-        return BeautifulSoup(response.read(), parser=self._parser)
+        return BeautifulSoup(response.read(), features=self._parser)
 
     @override
     def is_blocked(self, parsed_content: BeautifulSoup) -> BlockedInfo:
