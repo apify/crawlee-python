@@ -72,7 +72,7 @@ class KeyValueStore(BaseStorage):
 
     async def get_info(self) -> KeyValueStoreMetadata | None:
         """Get an object containing general information about the key value store."""
-        return await self._resource_client.get()
+        return await self._resource_client.get()  # type: ignore[no-any-return] # Mypy is broken
 
     @override
     @classmethod
@@ -142,9 +142,9 @@ class KeyValueStore(BaseStorage):
             content_type: Content type of the record.
         """
         if value is None:
-            return await self._resource_client.delete_record(key)
+            return await self._resource_client.delete_record(key)  # type: ignore[no-any-return] # Mypy is broken
 
-        return await self._resource_client.set_record(key, value, content_type)
+        return await self._resource_client.set_record(key, value, content_type)  # type: ignore[no-any-return] # Mypy is broken
 
     async def get_public_url(self, key: str) -> str:
         """Get the public URL for the given key.
@@ -155,4 +155,4 @@ class KeyValueStore(BaseStorage):
         Returns:
             The public URL for the given key.
         """
-        return await self._resource_client.get_public_url(key)
+        return await self._resource_client.get_public_url(key)  # type: ignore[no-any-return] # Mypy is broken

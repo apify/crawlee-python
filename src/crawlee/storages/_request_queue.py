@@ -204,7 +204,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         ):
             self._assumed_total_count += 1
 
-        return processed_request
+        return processed_request  # type: ignore[no-any-return] # Mypy is broken
 
     @override
     async def add_requests_batched(
@@ -260,7 +260,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         Returns:
             The retrieved request, or `None`, if it does not exist.
         """
-        return await self._resource_client.get_request(request_id)
+        return await self._resource_client.get_request(request_id)  # type: ignore[no-any-return] # Mypy is broken
 
     async def fetch_next_request(self) -> Request | None:
         """Return the next request in the queue to be processed.
@@ -373,7 +373,7 @@ class RequestQueue(BaseStorage, RequestProvider):
             self._assumed_handled_count += 1
 
         self._cache_request(unique_key_to_request_id(request.unique_key), processed_request)
-        return processed_request
+        return processed_request  # type: ignore[no-any-return] # Mypy is broken
 
     async def reclaim_request(
         self,
@@ -417,7 +417,7 @@ class RequestQueue(BaseStorage, RequestProvider):
             except Exception as err:
                 logger.debug(f'Failed to delete request lock for request {request.id}', exc_info=err)
 
-        return processed_request
+        return processed_request  # type: ignore[no-any-return] # Mypy is broken
 
     async def is_empty(self) -> bool:
         """Check whether the queue is empty.
@@ -483,7 +483,7 @@ class RequestQueue(BaseStorage, RequestProvider):
 
     async def get_info(self) -> RequestQueueMetadata | None:
         """Get an object containing general information about the request queue."""
-        return await self._resource_client.get()
+        return await self._resource_client.get()  # type: ignore[no-any-return] # Mypy is broken
 
     @override
     async def get_handled_count(self) -> int:
@@ -658,7 +658,7 @@ class RequestQueue(BaseStorage, RequestProvider):
             )
             return None
         else:
-            return res.lock_expires_at
+            return res.lock_expires_at  # type: ignore[no-any-return] # Mypy is broken
 
     async def _clear_possible_locks(self) -> None:
         self._queue_paused_for_migration = True
