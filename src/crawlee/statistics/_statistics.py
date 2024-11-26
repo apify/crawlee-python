@@ -77,6 +77,9 @@ class Statistics(Generic[TStatisticsState]):
         log_interval: timedelta = timedelta(minutes=1),
         state_model: type[TStatisticsState] = cast(Any, StatisticsState),  # noqa: B008 - in an ideal world, TStatisticsState would be inferred from this argument, but I haven't managed to do that
     ) -> None:
+        if event_manager:
+            service_container.set_event_manager(event_manager)
+
         self._id = Statistics.__next_id
         Statistics.__next_id += 1
 
@@ -87,8 +90,6 @@ class Statistics(Generic[TStatisticsState]):
 
         self.error_tracker = ErrorTracker()
         self.error_tracker_retry = ErrorTracker()
-
-        self._event_manager = event_manager or service_container.get_event_manager()
 
         self._requests_in_progress = dict[str, RequestProcessingRecord]()
 
@@ -131,7 +132,8 @@ class Statistics(Generic[TStatisticsState]):
             self._key_value_store = await KeyValueStore.open(name=self._persist_state_kvs_name)
 
         await self._maybe_load_statistics()
-        self._event_manager.on(event=Event.PERSIST_STATE, listener=self._persist_state)
+        event_manager = service_container.get_event_manager()
+        event_manager.on(event=Event.PERSIST_STATE, listener=self._persist_state)
         self._periodic_logger.start()
 
         return self
@@ -151,7 +153,8 @@ class Statistics(Generic[TStatisticsState]):
             raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
         self.state.crawler_finished_at = datetime.now(timezone.utc)
-        self._event_manager.off(event=Event.PERSIST_STATE, listener=self._persist_state)
+        event_manager = service_container.get_event_manager()
+        event_manager.off(event=Event.PERSIST_STATE, listener=self._persist_state)
         await self._periodic_logger.stop()
         await self._persist_state(event_data=EventPersistStateData(is_migrating=False))
         self._active = False
