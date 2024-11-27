@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, overload
 
 from typing_extensions import override
 
@@ -17,7 +17,6 @@ if TYPE_CHECKING:
     from crawlee.configuration import Configuration
 
 T = TypeVar('T')
-DictT = TypeVar('DictT', bound=dict[str, Any])
 
 
 @docs_group('Classes')
@@ -183,7 +182,7 @@ class KeyValueStore(BaseStorage):
         """
         return await self._resource_client.get_public_url(key)
 
-    async def get_auto_saved_value(self, key: str, default_value: dict[str, Any] | None = None) -> dict[str, Any]:
+    async def get_auto_saved_value(self, key: str, default_value: dict | None = None) -> dict:
         """Gets a value from KVS that will be automatically saved on changes.
 
         Args:
@@ -200,11 +199,16 @@ class KeyValueStore(BaseStorage):
 
         value = await self.get_value(key, default_value)
 
+        if not isinstance(value, dict):
+            raise TypeError(
+                f'Expected dictionary for persist state value at key "{key}, but got {type(value).__name__}'
+            )
+
         self._cache[key] = value
 
         self._ensure_persist_event()
 
-        return cast(dict[str, Any], value)
+        return value
 
     async def _persist_save(self, _event_data: EventPersistStateData | None = None) -> None:
         """Save cache with persistent values. Can be used in Event Manager."""
