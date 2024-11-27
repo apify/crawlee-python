@@ -8,8 +8,10 @@ from crawlee._utils.docs import docs_group
 from crawlee.parsel_crawler._parsel_parser import ParselParser
 from crawlee.static_content_crawler._static_content_crawler import StaticContentCrawler
 
+from ._parsel_crawling_context import ParselCrawlingContext
+
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import AsyncGenerator, Iterable
 
     from typing_extensions import Unpack
 
@@ -18,7 +20,7 @@ if TYPE_CHECKING:
 
 
 @docs_group('Classes')
-class ParselCrawler(StaticContentCrawler[Selector]):
+class ParselCrawler(StaticContentCrawler[ParselCrawlingContext, Selector]):
     """A web crawler for performing HTTP requests and parsing HTML/XML content.
 
     The `ParselCrawler` builds on top of the `BasicCrawler`, which means it inherits all of its features.
@@ -57,7 +59,7 @@ class ParselCrawler(StaticContentCrawler[Selector]):
         *,
         additional_http_error_status_codes: Iterable[int] = (),
         ignore_http_error_status_codes: Iterable[int] = (),
-        **kwargs: Unpack[BasicCrawlerOptions[ParsedHttpCrawlingContext[Selector]]],
+        **kwargs: Unpack[BasicCrawlerOptions[ParselCrawlingContext]],
     ) -> None:
         """A default constructor.
 
@@ -68,6 +70,11 @@ class ParselCrawler(StaticContentCrawler[Selector]):
                 as successful responses.
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
         """
+
+        async def final_step(context: ParsedHttpCrawlingContext) -> AsyncGenerator[ParselCrawlingContext, None]:
+            yield ParselCrawlingContext.from_static_crawling_context(context)
+
+        kwargs['_context_pipeline'] = self._build_context_pipeline().compose(final_step)
         super().__init__(
             parser=ParselParser(),
             additional_http_error_status_codes=additional_http_error_status_codes,

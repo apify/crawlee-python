@@ -7,8 +7,10 @@ from bs4 import BeautifulSoup
 from crawlee.beautifulsoup_crawler._beautifulsoup_parser import BeautifulSoupContentParser
 from crawlee.static_content_crawler._static_content_crawler import StaticContentCrawler
 
+from ._beautifulsoup_crawling_context import BeautifulSoupCrawlingContext
+
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import AsyncGenerator, Iterable
 
     from typing_extensions import Unpack
 
@@ -18,7 +20,7 @@ if TYPE_CHECKING:
 BeautifulSoupParser = Literal['html.parser', 'lxml', 'xml', 'html5lib']
 
 
-class BeautifulSoupCrawler(StaticContentCrawler[BeautifulSoup]):
+class BeautifulSoupCrawler(StaticContentCrawler[BeautifulSoupCrawlingContext, BeautifulSoup]):
     """A web crawler for performing HTTP requests and parsing HTML/XML content.
 
     The `BeautifulSoupCrawler` builds on top of the `StaticContentCrawler`, which means it inherits all of its features.
@@ -58,7 +60,7 @@ class BeautifulSoupCrawler(StaticContentCrawler[BeautifulSoup]):
         parser: BeautifulSoupParser = 'lxml',
         additional_http_error_status_codes: Iterable[int] = (),
         ignore_http_error_status_codes: Iterable[int] = (),
-        **kwargs: Unpack[BasicCrawlerOptions[ParsedHttpCrawlingContext[BeautifulSoup]]],
+        **kwargs: Unpack[BasicCrawlerOptions[BeautifulSoupCrawlingContext]],
     ) -> None:
         """A default constructor.
 
@@ -70,6 +72,12 @@ class BeautifulSoupCrawler(StaticContentCrawler[BeautifulSoup]):
                 as successful responses.
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
         """
+
+        async def final_step(context: ParsedHttpCrawlingContext) -> AsyncGenerator[BeautifulSoupCrawlingContext, None]:
+            yield BeautifulSoupCrawlingContext.from_static_crawling_context(context)
+
+        kwargs['_context_pipeline'] = self._build_context_pipeline().compose(final_step)
+
         super().__init__(
             parser=BeautifulSoupContentParser(parser=parser),
             additional_http_error_status_codes=additional_http_error_status_codes,

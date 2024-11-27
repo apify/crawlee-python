@@ -4,6 +4,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Generic
 
 from pydantic import ValidationError
+from typing_extensions import TypeVar
 
 from crawlee import EnqueueStrategy
 from crawlee._request import BaseRequestData
@@ -25,8 +26,10 @@ if TYPE_CHECKING:
     from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, EnqueueLinksKwargs
     from crawlee.static_content_crawler._static_content_parser import StaticContentParser
 
+TCrawlingContext = TypeVar('TCrawlingContext', bound=ParsedHttpCrawlingContext)
 
-class StaticContentCrawler(Generic[TParseResult], BasicCrawler[ParsedHttpCrawlingContext[TParseResult]]):
+
+class StaticContentCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler[TCrawlingContext]):
     """A web crawler for performing HTTP requests.
 
     The `StaticContentCrawler` builds on top of the `BasicCrawler`, which means it inherits all of its features. On top
@@ -48,16 +51,9 @@ class StaticContentCrawler(Generic[TParseResult], BasicCrawler[ParsedHttpCrawlin
         parser: StaticContentParser[TParseResult],
         additional_http_error_status_codes: Iterable[int] = (),
         ignore_http_error_status_codes: Iterable[int] = (),
-        **kwargs: Unpack[BasicCrawlerOptions[ParsedHttpCrawlingContext[TParseResult]]],
+        **kwargs: Unpack[BasicCrawlerOptions[TCrawlingContext]],
     ) -> None:
         self._parser = parser
-
-        kwargs['_context_pipeline'] = (
-            ContextPipeline[ParsedHttpCrawlingContext[TParseResult]]()
-            .compose(self._make_http_request)
-            .compose(self._parse_http_response)
-            .compose(self._handle_blocked_request)
-        )
 
         kwargs.setdefault(
             'http_client',
@@ -67,8 +63,22 @@ class StaticContentCrawler(Generic[TParseResult], BasicCrawler[ParsedHttpCrawlin
             ),
         )
 
+        if '_context_pipeline' not in kwargs:
+            raise ValueError(
+                'Please pass in a `_context_pipeline`. '
+                'You should use the StaticContentCrawler._build_context_pipeline() method to initialize it.'
+            )
+
         kwargs.setdefault('_logger', logging.getLogger(__name__))
         super().__init__(**kwargs)
+
+    def _build_context_pipeline(self) -> ContextPipeline[ParsedHttpCrawlingContext[TParseResult]]:
+        return (
+            ContextPipeline()
+            .compose(self._make_http_request)
+            .compose(self._parse_http_response)
+            .compose(self._handle_blocked_request)
+        )
 
     async def _parse_http_response(
         self, context: HttpCrawlingContext

@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-from _warnings import warn
 from dataclasses import dataclass, fields
 from typing import Generic
 
-from bs4 import BeautifulSoup
-from parsel import Selector
 from typing_extensions import Self, TypeVar
 
 from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction
@@ -13,7 +10,6 @@ from crawlee._utils.docs import docs_group
 from crawlee.http_clients import HttpCrawlingResult, HttpResponse
 
 TParseResult = TypeVar('TParseResult')
-TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext)
 
 
 @dataclass(frozen=True)
@@ -46,25 +42,3 @@ class ParsedHttpCrawlingContext(Generic[TParseResult], HttpCrawlingContext):
         """Convenience constructor that creates new context from existing HttpCrawlingContext."""
         context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
         return cls(parsed_content=parsed_content, enqueue_links=enqueue_links, **context_kwargs)
-
-    @property
-    def soup(self) -> BeautifulSoup:
-        """Property for backwards compatibility."""
-        if isinstance(self.parsed_content, BeautifulSoup):
-            warn('Usage of deprecated property soup. Use parsed_content instead.', DeprecationWarning, stacklevel=2)
-            return self.parsed_content
-        raise RuntimeError(
-            'Trying to access soup property on context that does not have BeautifulSoup in parsed_content.'
-            'Access parsed_content instead.'
-        )
-
-    @property
-    def selector(self) -> Selector:
-        """Property for backwards compatibility."""
-        if isinstance(self.parsed_content, Selector):
-            warn('Usage of deprecated property selector. Use parsed_content instead.', DeprecationWarning, stacklevel=2)
-            return self.parsed_content
-        raise RuntimeError(
-            'Trying to access selector property on context that does not have Selector in parsed_content.'
-            'Access parsed_content instead.'
-        )
