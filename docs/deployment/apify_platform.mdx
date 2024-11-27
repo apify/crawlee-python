@@ -10,8 +10,10 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import CodeBlock from '@theme/CodeBlock';
 
-import MainSource from '!!raw-loader!./code/apify_platform_main.py';
-import GetPublicUrlSource from '!!raw-loader!./code/apify_platform_get_public_url.py';
+import LogWithConfigExample from '!!raw-loader!./code/apify/log_with_config_example.py';
+import CrawlerAsActorExample from '!!raw-loader!./code/apify/crawler_as_actor_example.py';
+import ProxyExample from '!!raw-loader!./code/apify/proxy_example.py';
+import ProxyAdvancedExample from '!!raw-loader!./code/apify/proxy_advanced_example.py';
 
 Apify is a [platform](https://apify.com) built to serve large-scale and high-performance web scraping and automation needs. It provides easy access to [compute instances (Actors)](#what-is-an-actor), convenient request and result storages, [proxies](../guides/proxy-management), scheduling, webhooks and [more](https://docs.apify.com/), accessible through a [web interface](https://console.apify.com) or an [API](https://docs.apify.com/api).
 
@@ -50,11 +52,9 @@ Alternatively, you can always provide credentials to your Actor by setting the [
 
 Another option is to use the [`Configuration`](https://docs.apify.com/sdk/python/reference/class/Configuration) instance and set your api token there.
 
-```python
-from apify import Actor
-
-sdk = Actor(Configuration(token='your_apify_token'))
-```
+<CodeBlock className="language-python">
+    {LogWithConfigExample}
+</CodeBlock>
 
 ## What is an Actor
 
@@ -92,10 +92,10 @@ For running Crawlee code as an Actor on [Apify platform](https://apify.com/actor
 Adding `async with Actor` is the only important thing needed to run it on Apify platform as an Actor. It is needed to initialize your Actor (e.g. to set the correct storage implementation) and to correctly handle exitting the process.
 :::
 
-Let's look at the `BeautifulSoupCrawler` example from the [Quick Start](../quick-start) guide:
+Let's look at the `BeautifulSoupCrawler` example from the [Quick start](../quick-start) guide:
 
-<CodeBlock language="python">
-    {MainSource}
+<CodeBlock className="language-python">
+    {CrawlerAsActorExample}
 </CodeBlock>
 
 Note that you could also run your Actor (that is using Crawlee) locally with Apify CLI. You could start it via the following command in your project folder:
@@ -207,39 +207,30 @@ In addition to your own proxy servers and proxy servers acquired from
 third-party providers used together with Crawlee, you can also rely on [Apify Proxy](https://apify.com/proxy)
 for your scraping needs.
 
-### Apify Proxy
+### Apify proxy
 
 If you are already subscribed to Apify Proxy, you can start using them immediately in only a few lines of code (for local usage you first should be [logged in](#logging-into-apify-platform-from-crawlee) to your Apify account.
 
-```python
-from apify import Actor
-
-proxy_configuration = await Actor.create_proxy_configuration()
-proxy_url = await proxy_configuration.new_url()
-```
+<CodeBlock className="language-python">
+    {ProxyExample}
+</CodeBlock>
 
 Note that unlike using your own proxies in Crawlee, you shouldn't use the constructor to create <ApiLink to="class/ProxyConfiguration">`ProxyConfiguration`</ApiLink> instances. For using the Apify Proxy you should create an instance using the [`Actor.create_proxy_configuration()`](https://docs.apify.com/sdk/python/reference/class/Actor#create_proxy_configuration) function instead.
 
-### Apify Proxy Configuration
+### Advanced Apify proxy configuration
 
 With Apify Proxy, you can select specific proxy groups to use, or countries to connect from.
 This allows you to get better proxy performance after some initial research.
 
-```python
-from apify import Actor
-
-proxy_configuration = await Actor.create_proxy_configuration(
-    groups=['RESIDENTIAL'],
-    country_code='US',
-)
-proxy_url = await proxy_configuration.new_url()
-```
+<CodeBlock className="language-python">
+    {ProxyAdvancedExample}
+</CodeBlock>
 
 Now your crawlers will use only Residential proxies from the US. Note that you must first get access
 to a proxy group before you are able to use it. You can check proxy groups available to you
 in the [proxy dashboard](https://console.apify.com/proxy).
 
-### Apify Proxy vs. Own proxies
+### Apify proxy vs. own proxies
 
 The [`ProxyConfiguration`](https://docs.apify.com/sdk/python/reference/class/ProxyConfiguration) class covers both Apify Proxy and custom proxy URLs so that you can easily switch between proxy providers. However, some features of the class are available only to Apify Proxy users, mainly because Apify Proxy is what one would call a super-proxy. It's not a single proxy server, but an API endpoint that allows connection through millions of different IP addresses. So the class essentially has two modes: Apify Proxy or Own (third party) proxy.
 
