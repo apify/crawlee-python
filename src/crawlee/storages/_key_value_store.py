@@ -191,7 +191,7 @@ class KeyValueStore(BaseStorage):
             default_value: value to be used if the record does not exist yet. Should be a dictionary
 
         Returns:
-            Returns the value of the key
+            Returns the value of the key.
         """
         default_value = {} if default_value is None else default_value
 
