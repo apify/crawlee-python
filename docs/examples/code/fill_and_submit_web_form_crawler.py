@@ -2,8 +2,7 @@ import asyncio
 from urllib.parse import urlencode
 
 from crawlee import Request
-from crawlee.http_crawler import HttpCrawler
-from crawlee.static_content_crawler._static_crawling_context import HttpCrawlingContext
+from crawlee.http_crawler import HttpCrawler, HttpCrawlingContext
 
 
 async def main() -> None:

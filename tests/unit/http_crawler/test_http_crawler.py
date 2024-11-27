@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable
 
     from crawlee.http_clients._base import BaseHttpClient
-    from crawlee.static_content_crawler._static_crawling_context import HttpCrawlingContext
+    from crawlee.http_crawler import HttpCrawlingContext
 
 # Payload, e.g. data for a form submission.
 PAYLOAD = {
