@@ -78,7 +78,7 @@ await context.enqueue_links()
 The default behavior of <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> is to stay on the same hostname. This **does not include subdomains**. To include subdomains in your crawl, use the `strategy` argument. The `strategy` argument is an instance of the <ApiLink to="enum/EnqueueStrategy">`EnqueueStrategy`</ApiLink> enum.
 
 ```python
-from crawlee.enqueue_strategy import EnqueueStrategy
+from crawlee import EnqueueStrategy
 
 # See the EnqueueStrategy object for more strategy options.
 await enqueue_links(strategy=EnqueueStrategy.SAME_DOMAIN)
@@ -95,7 +95,7 @@ Skipping of duplicate URLs is critical, because visiting the same page multiple 
 While the defaults for <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> can be often exactly what you need, it also gives you fine-grained control over which URLs should be enqueued. One way we already mentioned above. It is using the <ApiLink to="enum/EnqueueStrategy">`EnqueueStrategy`</ApiLink>. You can use the `all` strategy if you want to follow every single link, regardless of its domain, or you can enqueue links that target the same domain name with the `same_domain` strategy.
 
 ```python
-from crawlee.enqueue_strategy import EnqueueStrategy
+from crawlee import EnqueueStrategy
 
 # Wanders the internet.
 await enqueue_links(strategy=EnqueueStrategy.ALL)
