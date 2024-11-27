@@ -1,21 +1,21 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Generic, Callable, Awaitable
+from typing import TYPE_CHECKING, Generic
 
 from pydantic import ValidationError
 
 from crawlee import EnqueueStrategy
 from crawlee._request import BaseRequestData
+from crawlee._types import BasicCrawlingContext
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
 from crawlee.http_clients import HttpxHttpClient
+from crawlee.router import Router
 
 from ._http_crawling_context import HttpCrawlingContext, ParsedHttpCrawlingContext, TParseResult
 from ._http_parser import NoParser, StaticContentParser
-from ..router import Router
-from crawlee._types import BasicCrawlingContext
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Iterable
@@ -52,10 +52,11 @@ class HttpCrawlerGeneric(Generic[TParseResult], BasicCrawler[ParsedHttpCrawlingC
         **kwargs: Unpack[BasicCrawlerOptions[ParsedHttpCrawlingContext[TParseResult]]],
     ) -> None:
         self.parser = parser
-        self._pre_navigation_router : Router[BasicCrawlingContext] | None = None
+        self._pre_navigation_router: Router[BasicCrawlingContext] | None = None
 
         kwargs['_context_pipeline'] = (
             ContextPipeline[ParsedHttpCrawlingContext[TParseResult]]()
+            .compose(self._execute_pre_navigation_hooks)
             .compose(self._make_http_request)
             .compose(self._parse_http_response)
             .compose(self._handle_blocked_request)
@@ -86,7 +87,6 @@ class HttpCrawlerGeneric(Generic[TParseResult], BasicCrawler[ParsedHttpCrawlingC
             raise RuntimeError('A pre navigation router is already set')
 
         self._pre_navigation_router = router
-
 
     async def _parse_http_response(
         self, context: HttpCrawlingContext
@@ -134,10 +134,14 @@ class HttpCrawlerGeneric(Generic[TParseResult], BasicCrawler[ParsedHttpCrawlingC
 
         return enqueue_links
 
-    async def _make_http_request(self, context: BasicCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
+    async def _execute_pre_navigation_hooks(
+        self, context: BasicCrawlingContext
+    ) -> AsyncGenerator[BasicCrawlingContext, None]:
         if self._pre_navigation_router:
             await self.pre_navigation_router(context)
+        yield context
 
+    async def _make_http_request(self, context: BasicCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
         result = await self._http_client.crawl(
             request=context.request,
             session=context.session,
