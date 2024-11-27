@@ -5,8 +5,7 @@ from typing import TYPE_CHECKING
 from bs4 import BeautifulSoup, Tag
 from typing_extensions import override
 
-from crawlee._utils.blocked import RETRY_CSS_SELECTORS
-from crawlee.static_content_crawler._static_content_parser import BlockedInfo, StaticContentParser
+from crawlee.static_content_crawler._static_content_parser import StaticContentParser
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -25,18 +24,8 @@ class BeautifulSoupContentParser(StaticContentParser[BeautifulSoup]):
         return BeautifulSoup(response.read(), features=self._parser)
 
     @override
-    def is_blocked(self, parsed_content: BeautifulSoup) -> BlockedInfo:
-        reason = ''
-        if parsed_content is not None:
-            matched_selectors = [
-                selector for selector in RETRY_CSS_SELECTORS if parsed_content.select_one(selector) is not None
-            ]
-            if matched_selectors:
-                reason = (
-                    f"Assuming the session is blocked - HTTP response matched the following selectors:"
-                    f" {'; '.join(matched_selectors)}"
-                )
-        return BlockedInfo(reason=reason)
+    def is_matching_selector(self, parsed_content: BeautifulSoup, selector: str) -> bool:
+        return parsed_content.select_one(selector) is not None
 
     @override
     def find_links(self, parsed_content: BeautifulSoup, selector: str) -> Iterable[str]:
