@@ -72,9 +72,10 @@ class ParselCrawler(StaticContentCrawler[ParselCrawlingContext, Selector]):
         """
 
         async def final_step(context: ParsedHttpCrawlingContext) -> AsyncGenerator[ParselCrawlingContext, None]:
-            yield ParselCrawlingContext.from_static_crawling_context(context)
+            """Enhance ParsedHttpCrawlingContext[Selector] with selector property."""
+            yield ParselCrawlingContext.from_parsed_http_crawling_context(context)
 
-        kwargs['_context_pipeline'] = self._build_context_pipeline().compose(final_step)
+        kwargs['_context_pipeline'] = self._create_static_content_crawler_pipeline().compose(final_step)
         super().__init__(
             parser=ParselParser(),
             additional_http_error_status_codes=additional_http_error_status_codes,

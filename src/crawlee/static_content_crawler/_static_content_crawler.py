@@ -37,9 +37,8 @@ class StaticContentCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler
     any HTTP client that implements the `BaseHttpClient` interface. The HTTP client is provided to the crawler
     as an input parameter to the constructor.
     StaticContentCrawler is generic class and is expected to be used together with specific parser that will be used to
-    parse http response. See prepared specific version of it: BeautifulSoupCrawler or ParselCrawler for example.
-    (For backwards compatibility you can use already specific version HttpCrawler, which uses dummy
-    parser.)
+    parse http response and type of expected TCrawlingContext which is available to the user function.
+    See prepared specific version of it: BeautifulSoupCrawler, ParselCrawler or HttpCrawler for example.
 
     The HTTP client-based crawlers are ideal for websites that do not require JavaScript execution. However,
     if you need to execute client-side JavaScript, consider using a browser-based crawler like the `PlaywrightCrawler`.
@@ -65,14 +64,15 @@ class StaticContentCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler
 
         if '_context_pipeline' not in kwargs:
             raise ValueError(
-                'Please pass in a `_context_pipeline`. '
-                'You should use the StaticContentCrawler._build_context_pipeline() method to initialize it.'
+                'Please pass in a `_context_pipeline`. You should use the '
+                'StaticContentCrawler._create_static_content_crawler_pipeline() method to initialize it.'
             )
 
         kwargs.setdefault('_logger', logging.getLogger(__name__))
         super().__init__(**kwargs)
 
-    def _build_context_pipeline(self) -> ContextPipeline[ParsedHttpCrawlingContext[TParseResult]]:
+    def _create_static_content_crawler_pipeline(self) -> ContextPipeline[ParsedHttpCrawlingContext[TParseResult]]:
+        """Create static content crawler context pipeline with expected pipeline steps."""
         return (
             ContextPipeline()
             .compose(self._make_http_request)

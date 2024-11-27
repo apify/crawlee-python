@@ -62,7 +62,7 @@ class HttpCrawler(StaticContentCrawler[ParsedHttpCrawlingContext[bytes], bytes])
                 as successful responses.
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
         """
-        kwargs['_context_pipeline'] = self._build_context_pipeline()
+        kwargs['_context_pipeline'] = self._create_static_content_crawler_pipeline()
         super().__init__(
             parser=NoParser(),
             additional_http_error_status_codes=additional_http_error_status_codes,

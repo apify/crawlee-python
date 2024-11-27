@@ -9,10 +9,10 @@ from crawlee.static_content_crawler._static_crawling_context import ParsedHttpCr
 class BeautifulSoupCrawlingContext(ParsedHttpCrawlingContext[BeautifulSoup]):
     @property
     def soup(self) -> BeautifulSoup:
-        """Property for backwards compatibility."""
+        """Convenience alias."""
         return self.parsed_content
 
     @classmethod
-    def from_static_crawling_context(cls, context: ParsedHttpCrawlingContext[BeautifulSoup]) -> Self:
-        context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
-        return cls(**context_kwargs)
+    def from_parsed_http_crawling_context(cls, context: ParsedHttpCrawlingContext[BeautifulSoup]) -> Self:
+        """Convenience constructor that creates new context from existing ParsedHttpCrawlingContext[BeautifulSoup]."""
+        return cls(**{field.name: getattr(context, field.name) for field in fields(context)})

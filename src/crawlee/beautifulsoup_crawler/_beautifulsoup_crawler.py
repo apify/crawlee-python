@@ -73,10 +73,13 @@ class BeautifulSoupCrawler(StaticContentCrawler[BeautifulSoupCrawlingContext, Be
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
         """
 
-        async def final_step(context: ParsedHttpCrawlingContext) -> AsyncGenerator[BeautifulSoupCrawlingContext, None]:
-            yield BeautifulSoupCrawlingContext.from_static_crawling_context(context)
+        async def final_step(
+            context: ParsedHttpCrawlingContext[BeautifulSoup],
+        ) -> AsyncGenerator[BeautifulSoupCrawlingContext, None]:
+            """Enhance ParsedHttpCrawlingContext[BeautifulSoup] with soup property."""
+            yield BeautifulSoupCrawlingContext.from_parsed_http_crawling_context(context)
 
-        kwargs['_context_pipeline'] = self._build_context_pipeline().compose(final_step)
+        kwargs['_context_pipeline'] = self._create_static_content_crawler_pipeline().compose(final_step)
 
         super().__init__(
             parser=BeautifulSoupContentParser(parser=parser),
