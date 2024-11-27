@@ -188,7 +188,7 @@ class KeyValueStore(BaseStorage):
 
         Args:
             key: Key of the record, to store the value.
-            default_value: value to be used if the record does not exist yet. Should be a dictionary
+            default_value: Value to be used if the record does not exist yet. Should be a dictionary.
 
         Returns:
             Returns the value of the key.
