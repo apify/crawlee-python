@@ -184,7 +184,7 @@ class KeyValueStore(BaseStorage):
         return await self._resource_client.get_public_url(key)
 
     async def get_auto_saved_value(self, key: str, default_value: dict[str, Any] | None = None) -> dict[str, Any]:
-        """Gets a value from store that will be automatically saved on changes.
+        """Gets a value from KVS that will be automatically saved on changes.
 
         Args:
             key: Key of the record, to store the value.
