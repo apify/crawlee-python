@@ -301,7 +301,7 @@ class SendRequestFunction(Protocol):
 
 
 class UseStateFunction(Protocol):
-    """Type of a function for performing Use State."""
+    """Type of a function for performing use state."""
 
     def __call__(
         self,
