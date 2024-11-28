@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from bs4 import BeautifulSoup
 
-from crawlee.beautifulsoup_crawler._beautifulsoup_parser import BeautifulSoupContentParser
+from crawlee.beautifulsoup_crawler._beautifulsoup_parser import BeautifulSoupContentParser, BeautifulSoupParser
 from crawlee.static_content_crawler._static_content_crawler import StaticContentCrawler
 
 from ._beautifulsoup_crawling_context import BeautifulSoupCrawlingContext
@@ -16,8 +16,6 @@ if TYPE_CHECKING:
 
     from crawlee.basic_crawler import BasicCrawlerOptions
     from crawlee.static_content_crawler._static_crawling_context import ParsedHttpCrawlingContext
-
-BeautifulSoupParser = Literal['html.parser', 'lxml', 'xml', 'html5lib']
 
 
 class BeautifulSoupCrawler(StaticContentCrawler[BeautifulSoupCrawlingContext, BeautifulSoup]):

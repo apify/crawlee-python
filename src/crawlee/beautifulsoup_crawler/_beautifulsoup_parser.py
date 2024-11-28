@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from bs4 import BeautifulSoup, Tag
 from typing_extensions import override
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 class BeautifulSoupContentParser(StaticContentParser[BeautifulSoup]):
     """Parser for parsing http response using BeautifulSoup."""
 
-    def __init__(self, parser: str = 'lxml') -> None:
+    def __init__(self, parser: BeautifulSoupParser = 'lxml') -> None:
         self._parser = parser
 
     @override
@@ -35,3 +35,6 @@ class BeautifulSoupContentParser(StaticContentParser[BeautifulSoup]):
             if (url := link.attrs.get('href')) is not None:
                 urls.append(url.strip())  # noqa: PERF401  #Mypy has problems using is not None for type inference in list comprehension.
         return urls
+
+
+BeautifulSoupParser = Literal['html.parser', 'lxml', 'xml', 'html5lib']
