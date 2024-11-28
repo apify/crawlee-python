@@ -6,6 +6,8 @@ from typing_extensions import Self
 from crawlee.static_content_crawler._static_crawling_context import ParsedHttpCrawlingContext
 
 
+@dataclass(frozen=True)
+@docs_group('Data structures')
 class ParselCrawlingContext(ParsedHttpCrawlingContext[Selector]):
     @property
     def selector(self) -> Selector:
