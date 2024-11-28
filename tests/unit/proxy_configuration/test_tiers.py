@@ -5,7 +5,7 @@ from crawlee.proxy_configuration import ProxyConfiguration
 
 
 async def test_rotates_proxies_uniformly_with_no_request() -> None:
-    tiered_proxy_urls = [
+    tiered_proxy_urls: list[list[str | None]] = [
         ['http://proxy:1111', 'http://proxy:2222'],
         ['http://proxy:3333', 'http://proxy:4444'],
     ]
@@ -34,7 +34,7 @@ async def test_rotates_proxies_uniformly_with_no_request() -> None:
 
 
 async def test_retrying_request_makes_tier_go_up() -> None:
-    tiered_proxy_urls = [
+    tiered_proxy_urls: list[list[str | None]] = [
         ['http://proxy:1111'],
         ['http://proxy:2222'],
         ['http://proxy:3333'],
@@ -71,7 +71,7 @@ async def test_successful_request_makes_tier_go_down() -> None:
     ProxyConfiguration assumes those are retries. Then, requesting a proxy for different requests to the same domain
     will cause the tier to drop back down."""
 
-    tiered_proxy_urls = [
+    tiered_proxy_urls: list[list[str | None]] = [
         ['http://proxy:1111'],
         ['http://proxy:2222'],
         ['http://proxy:3333'],
@@ -94,3 +94,41 @@ async def test_successful_request_makes_tier_go_down() -> None:
 
     assert info is not None
     assert info.url == tiered_proxy_urls[0][0]
+
+
+async def test_retrying_request_makes_tier_go_up_none_tier_no_proxy() -> None:
+    tiered_proxy_urls: list[list[str | None]] = [
+        [None],
+        ['http://proxy:1111'],
+    ]
+
+    config = ProxyConfiguration(tiered_proxy_urls=tiered_proxy_urls)
+
+    # Calling `new_proxy_info` with the same request most probably means it's being retried
+    request_1 = Request(url='http://some.domain/abc', unique_key='1', id='1')
+
+    info = await config.new_proxy_info(None, request_1, None)
+    assert info is None
+
+    info = await config.new_proxy_info(None, request_1, None)
+    assert info is not None
+    assert info.url == tiered_proxy_urls[1][0]
+
+
+async def test_rotates_proxies_uniformly_with_no_request_no_proxy() -> None:
+    """Not sure how real is this use case, but it is supported."""
+    tiered_proxy_urls = [
+        [None, 'http://proxy:1111'],
+    ]
+
+    config = ProxyConfiguration(tiered_proxy_urls=tiered_proxy_urls)
+
+    info = await config.new_proxy_info(None, None, None)
+    assert info is None
+
+    info = await config.new_proxy_info(None, None, None)
+    assert info is not None
+    assert info.url == tiered_proxy_urls[0][1]
+
+    info = await config.new_proxy_info(None, None, None)
+    assert info is None
