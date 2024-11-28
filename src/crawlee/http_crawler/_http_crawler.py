@@ -18,12 +18,13 @@ class HttpCrawler(StaticContentCrawler[ParsedHttpCrawlingContext[bytes], bytes])
     """Specific version of generic StaticContentCrawler.
 
     It uses a dummy parser that just returns the HTTP response body as is.
-    It is recommended to rather use `BeautifulSoupCrawler` or `ParselCrawler` or to write your own subclass of `StaticContentCrawler`.
+    It is recommended to rather use `BeautifulSoupCrawler` or `ParselCrawler` or to write your own subclass of
+    `StaticContentCrawler`.
 
     ### Usage
 
     ```python
-    from crawlee.http_crawler import StaticContentCrawler, HttpCrawlingContext
+    from crawlee.http_crawler import HttpCrawler, HttpCrawlingContext
 
     crawler = HttpCrawler()
 

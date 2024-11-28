@@ -1,8 +1,9 @@
-from dataclasses import fields
+from dataclasses import dataclass, fields
 
 from bs4 import BeautifulSoup
 from typing_extensions import Self
 
+from crawlee._utils.docs import docs_group
 from crawlee.static_content_crawler._static_crawling_context import ParsedHttpCrawlingContext
 
 
