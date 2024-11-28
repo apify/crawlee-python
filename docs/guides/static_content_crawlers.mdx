@@ -1,0 +1,21 @@
+---
+id: static-content-crawlers
+title: Static content crawlers
+description: Crawlee supports multiple static content crawlers that can be used to process http responses.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import CodeBlock from '@theme/CodeBlock';
+
+Generic class <ApiLink to="class/StaticContentCrawler">`StaticContentCrawler`</ApiLink> is parent to <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> and <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink> and it could be used as parent for your crawler with custom content parsing requirements.
+
+It already includes almost all the functionality to crawl webpages and the only missing part if the parser, that should be used to parse http responses, and context object that defines what context will be available to user handler functions.
+
+## <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>
+It uses <ApiLink to="class/BeautifulSoupContentParser">`BeautifulSoupContentParser`</ApiLink> to parse http response and this is available in <ApiLink to="class/BeautifulSoupCrawlingContext">`BeautifulSoupCrawlingContext`</ApiLink> in .soup or .parsed_content.
+
+## <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink>
+It uses <ApiLink to="class/ParselContentParser">`ParselContentParser`</ApiLink> to parse http response and this is available in <ApiLink to="class/ParselCrawlingContext">`ParselCrawlingContext`</ApiLink> in .selector or .parsed_content.
+
