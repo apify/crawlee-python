@@ -9,12 +9,9 @@ from pydantic import PlainSerializer, TypeAdapter, ValidationError, WrapValidato
 """Utility types for Pydantic models."""
 
 
-def _timedelta_to_ms(td: timedelta | None) -> float | None:
+def _timedelta_to_ms(td: timedelta) -> float:
     if td == timedelta.max:
         return float('inf')
-
-    if td is None:
-        return td
 
     return int(round(td.total_seconds() * 1000))
 
@@ -22,9 +19,7 @@ def _timedelta_to_ms(td: timedelta | None) -> float | None:
 _number_parser = TypeAdapter(float)
 
 
-def _timedelta_from_ms(
-    value: float | timedelta | Any | None, handler: Callable[[Any], timedelta | None]
-) -> timedelta | None:
+def _timedelta_from_ms(value: float | timedelta | Any | None, handler: Callable[[Any], timedelta]) -> timedelta | None:
     if value == float('inf'):
         return timedelta.max
 
