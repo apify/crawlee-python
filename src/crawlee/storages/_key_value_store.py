@@ -73,13 +73,13 @@ class KeyValueStore(BaseStorage):
         self._cache: dict[str, dict[str, JsonSerializable]] = {}
         self._persist_state_event_started = False
 
-    @override
     @property
+    @override
     def id(self) -> str:
         return self._id
 
-    @override
     @property
+    @override
     def name(self) -> str | None:
         return self._name
 

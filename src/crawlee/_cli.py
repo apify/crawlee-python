@@ -6,10 +6,10 @@ from pathlib import Path
 from typing import Annotated, Optional, cast
 
 import httpx
-import inquirer  # type: ignore
+import inquirer  # type: ignore[import-untyped]
 import typer
-from cookiecutter.main import cookiecutter  # type: ignore
-from inquirer.render.console import ConsoleRender  # type: ignore
+from cookiecutter.main import cookiecutter  # type: ignore[import-untyped]
+from inquirer.render.console import ConsoleRender  # type: ignore[import-untyped]
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 TEMPLATE_LIST_URL = 'https://api.github.com/repos/apify/crawlee-python/contents/templates'

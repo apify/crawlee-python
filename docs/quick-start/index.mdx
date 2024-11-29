@@ -6,6 +6,12 @@ title: Quick start
 import ApiLink from '@site/src/components/ApiLink';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
+import CodeBlock from '@theme/CodeBlock';
+
+import BeautifulsoupCrawlerExample from '!!raw-loader!./code/beautifulsoup_crawler_example.py';
+import ParselCrawlerExample from '!!raw-loader!./code/parsel_crawler_example.py';
+import PlaywrightCrawlerExample from '!!raw-loader!./code/playwright_crawler_example.py';
+import PlaywrightCrawlerHeadfulExample from '!!raw-loader!./code/playwright_crawler_headful_example.py';
 
 This short tutorial will help you start scraping with Crawlee in just a minute or two. For an in-depth understanding of how Crawlee works, check out the [Introduction](../introduction/index.mdx) section, which provides a comprehensive step-by-step guide to creating your first scraper.
 
@@ -58,74 +64,21 @@ For detailed installation instructions see the [Setting up](../introduction/01_s
 Run the following example to perform a recursive crawl of the Crawlee website using the selected crawler.
 
 <Tabs groupId="main">
-<TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
-
-```python
-import asyncio
-
-from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
-
-
-async def main() -> None:
-    # BeautifulSoupCrawler crawls the web using HTTP requests and parses HTML using the BeautifulSoup library.
-    crawler = BeautifulSoupCrawler(max_requests_per_crawl=50)
-
-    # Define a request handler to process each crawled page and attach it to the crawler using a decorator.
-    @crawler.router.default_handler
-    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
-        # Extract relevant data from the page context.
-        data = {
-            'url': context.request.url,
-            'title': context.soup.title.string if context.soup.title else None,
-        }
-        # Store the extracted data.
-        await context.push_data(data)
-        # Extract links from the current page and add them to the crawling queue.
-        await context.enqueue_links()
-
-    # Add first URL to the queue and start the crawl.
-    await crawler.run(['https://crawlee.dev'])
-
-
-if __name__ == '__main__':
-    asyncio.run(main())
-```
-
-</TabItem>
-<TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
-
-```python
-import asyncio
-
-from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
-
-
-async def main() -> None:
-    # PlaywrightCrawler crawls the web using a headless browser controlled by the Playwright library.
-    crawler = PlaywrightCrawler()
-
-    # Define a request handler to process each crawled page and attach it to the crawler using a decorator.
-    @crawler.router.default_handler
-    async def request_handler(context: PlaywrightCrawlingContext) -> None:
-        # Extract relevant data from the page context.
-        data = {
-            'url': context.request.url,
-            'title': await context.page.title(),
-        }
-        # Store the extracted data.
-        await context.push_data(data)
-        # Extract links from the current page and add them to the crawling queue.
-        await context.enqueue_links()
-
-    # Add first URL to the queue and start the crawl.
-    await crawler.run(['https://crawlee.dev'])
-
-
-if __name__ == '__main__':
-    asyncio.run(main())
-```
-
-</TabItem>
+    <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
+        <CodeBlock className="language-python">
+            {BeautifulsoupCrawlerExample}
+        </CodeBlock>
+    </TabItem>
+    <TabItem value="ParselCrawler" label="ParselCrawler">
+        <CodeBlock className="language-python">
+            {ParselCrawlerExample}
+        </CodeBlock>
+    </TabItem>
+    <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
+        <CodeBlock className="language-python">
+            {PlaywrightCrawlerExample}
+        </CodeBlock>
+    </TabItem>
 </Tabs>
 
 When you run the example, you will see Crawlee automating the data extraction process in your terminal.
@@ -136,19 +89,9 @@ When you run the example, you will see Crawlee automating the data extraction pr
 
 By default, browsers controlled by Playwright run in headless mode (without a visible window). However, you can configure the crawler to run in a headful mode, which is useful during development phase to observe the browser's actions. You can alsoswitch from the default Chromium browser to Firefox or WebKit.
 
-```python
-# ...
-
-async def main() -> None:
-    crawler = PlaywrightCrawler(
-        # Run with a visible browser window.
-        headless=False,
-        # Switch to the Firefox browser.
-        browser_type='firefox'
-    )
-
-    # ...
-```
+<CodeBlock className="language-python">
+    {PlaywrightCrawlerHeadfulExample}
+</CodeBlock>
 
 When you run the example code, you'll see an automated browser navigating through the Crawlee website.
 

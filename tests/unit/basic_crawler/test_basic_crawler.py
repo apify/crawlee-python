@@ -13,7 +13,6 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
 import pytest
-from httpx import URL
 
 from crawlee import ConcurrencySettings, EnqueueStrategy, Glob
 from crawlee._request import BaseRequestData, Request
@@ -29,6 +28,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Sequence
 
     import respx
+    from yarl import URL
 
     from crawlee._types import JsonSerializable
 
@@ -555,9 +555,9 @@ async def test_crawler_run_requests(httpbin: URL) -> None:
         seen_urls.append(context.request.url)
 
     start_urls = [
-        str(httpbin.copy_with(path='/1')),
-        str(httpbin.copy_with(path='/2')),
-        str(httpbin.copy_with(path='/3')),
+        str(httpbin / '1'),
+        str(httpbin / '2'),
+        str(httpbin / '3'),
     ]
     stats = await crawler.run(start_urls)
 
@@ -580,7 +580,7 @@ async def test_context_push_and_get_data(httpbin: URL) -> None:
     await dataset.push_data('{"c": 3}')
     assert (await crawler.get_data()).items == [{'a': 1}, {'c': 3}]
 
-    stats = await crawler.run([str(httpbin.copy_with(path='/1'))])
+    stats = await crawler.run([str(httpbin / '1')])
 
     assert (await crawler.get_data()).items == [{'a': 1}, {'c': 3}, {'b': 2}]
     assert stats.requests_total == 1
@@ -629,7 +629,7 @@ async def test_context_push_and_export_data(httpbin: URL, tmp_path: Path) -> Non
         await context.push_data([{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}])
         await context.push_data({'id': 2, 'test': 'test'})
 
-    await crawler.run([str(httpbin.copy_with(path='/1'))])
+    await crawler.run([str(httpbin / '1')])
 
     await crawler.export_data_json(path=tmp_path / 'dataset.json')
     await crawler.export_data_csv(path=tmp_path / 'dataset.csv')
@@ -651,7 +651,7 @@ async def test_crawler_push_and_export_data_and_json_dump_parameter(httpbin: URL
         await context.push_data([{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}])
         await context.push_data({'id': 2, 'test': 'test'})
 
-    await crawler.run([str(httpbin.copy_with(path='/1'))])
+    await crawler.run([str(httpbin / '1')])
 
     await crawler.export_data_json(path=tmp_path / 'dataset.json', indent=3)
 
@@ -755,11 +755,11 @@ async def test_context_handlers_use_state(key_value_store: KeyValueStore, mock_e
 
 async def test_max_requests_per_crawl(httpbin: URL) -> None:
     start_urls = [
-        str(httpbin.copy_with(path='/1')),
-        str(httpbin.copy_with(path='/2')),
-        str(httpbin.copy_with(path='/3')),
-        str(httpbin.copy_with(path='/4')),
-        str(httpbin.copy_with(path='/5')),
+        str(httpbin / '1'),
+        str(httpbin / '2'),
+        str(httpbin / '3'),
+        str(httpbin / '4'),
+        str(httpbin / '5'),
     ]
     processed_urls = []
 
@@ -808,6 +808,42 @@ async def test_max_crawl_depth(httpbin: URL) -> None:
     assert len(processed_urls) == 1
     assert stats.requests_total == 1
     assert stats.requests_finished == 1
+
+
+@pytest.mark.parametrize(
+    ('total_requests', 'fail_at_request', 'expected_starts', 'expected_finished'),
+    [
+        (3, None, 3, 3),
+        (3, 2, 2, 1),
+    ],
+    ids=[
+        'all_requests_successful',
+        'abort_on_second_request',
+    ],
+)
+async def test_abort_on_error(
+    total_requests: int, fail_at_request: int | None, expected_starts: int, expected_finished: int
+) -> None:
+    starts_urls = []
+
+    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(max_concurrency=1), abort_on_error=True)
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        starts_urls.append(context.request.url)
+
+        if context.request.user_data.get('n_request') == fail_at_request:
+            raise ValueError('Error request')
+
+    stats = await crawler.run(
+        [
+            Request.from_url('https://crawlee.dev', always_enqueue=True, user_data={'n_request': i + 1})
+            for i in range(total_requests)
+        ]
+    )
+
+    assert len(starts_urls) == expected_starts
+    assert stats.requests_finished == expected_finished
 
 
 def test_crawler_log() -> None:

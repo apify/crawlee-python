@@ -99,19 +99,23 @@ class BrowserPool:
     def with_default_plugin(
         cls,
         *,
-        headless: bool | None = None,
         browser_type: BrowserType | None = None,
         browser_options: Mapping[str, Any] | None = None,
         page_options: Mapping[str, Any] | None = None,
+        headless: bool | None = None,
         **kwargs: Any,
     ) -> BrowserPool:
         """Create a new instance with a single `PlaywrightBrowserPlugin` configured with the provided options.
 
         Args:
-            headless: Whether to run the browser in headless mode.
             browser_type: The type of browser to launch ('chromium', 'firefox', or 'webkit').
-            browser_options: Keyword arguments to pass to the browser launch method.
-            page_options: Keyword arguments to pass to the new page method.
+            browser_options: Keyword arguments to pass to the browser launch method. These options are provided
+                directly to Playwright's `browser_type.launch` method. For more details, refer to the Playwright
+                documentation: https://playwright.dev/python/docs/api/class-browsertype#browser-type-launch.
+            page_options: Keyword arguments to pass to the new page method. These options are provided directly to
+                Playwright's `browser_context.new_page` method. For more details, refer to the Playwright documentation:
+                https://playwright.dev/python/docs/api/class-browsercontext#browser-context-new-page.
+            headless: Whether to run the browser in headless mode.
             kwargs: Additional arguments for default constructor.
         """
         plugin_options: dict = defaultdict(dict)

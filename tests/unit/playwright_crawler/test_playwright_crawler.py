@@ -20,13 +20,13 @@ from crawlee.playwright_crawler import PlaywrightCrawler
 from crawlee.storages import RequestList
 
 if TYPE_CHECKING:
-    from httpx import URL
+    from yarl import URL
 
     from crawlee.playwright_crawler import PlaywrightCrawlingContext
 
 
 async def test_basic_request(httpbin: URL) -> None:
-    requests = [str(httpbin.copy_with(path='/'))]
+    requests = [str(httpbin.with_path('/'))]
     crawler = PlaywrightCrawler()
     result: dict = {}
 
@@ -95,7 +95,7 @@ async def test_chromium_headless_headers(httpbin: URL) -> None:
         for key, val in response_headers.items():
             headers[key] = val
 
-    await crawler.run([str(httpbin.copy_with(path='/get'))])
+    await crawler.run([str(httpbin / 'get')])
 
     assert 'User-Agent' in headers
     assert 'Sec-Ch-Ua' in headers
@@ -123,7 +123,7 @@ async def test_firefox_headless_headers(httpbin: URL) -> None:
         for key, val in response_headers.items():
             headers[key] = val
 
-    await crawler.run([str(httpbin.copy_with(path='/get'))])
+    await crawler.run([str(httpbin / 'get')])
 
     assert 'User-Agent' in headers
     assert 'Sec-Ch-Ua' not in headers
@@ -148,7 +148,7 @@ async def test_custom_headers(httpbin: URL) -> None:
         for key, val in context_response_headers.items():
             response_headers[key] = val
 
-    await crawler.run([Request.from_url(str(httpbin.copy_with(path='/get')), headers=request_headers)])
+    await crawler.run([Request.from_url(str(httpbin / 'get'), headers=request_headers)])
 
     assert response_headers.get('Power-Header') == request_headers['Power-Header']
     assert response_headers.get('Library') == request_headers['Library']

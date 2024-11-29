@@ -12,7 +12,7 @@ from crawlee.browsers import PlaywrightBrowserController
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
-    from httpx import URL
+    from yarl import URL
 
 
 @pytest.fixture

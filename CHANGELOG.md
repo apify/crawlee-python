@@ -2,19 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.4.4 - **not yet released**
+## [0.4.4](https://github.com/apify/crawlee-python/releases/tag/v0.4.4) (2024-11-29)
 
 ### 🚀 Features
 
 - Expose browser_options and page_options to PlaywrightCrawler ([#730](https://github.com/apify/crawlee-python/pull/730)) ([dbe85b9](https://github.com/apify/crawlee-python/commit/dbe85b90e59def281cfc6617a0eb869a4adf2fc0)) by [@vdusek](https://github.com/vdusek), closes [#719](https://github.com/apify/crawlee-python/issues/719)
+- Add `abort_on_error` property ([#731](https://github.com/apify/crawlee-python/pull/731)) ([6dae03a](https://github.com/apify/crawlee-python/commit/6dae03a68a2d23c68c78d8d44611d43e40eb9404)) by [@Mantisus](https://github.com/Mantisus), closes [#704](https://github.com/apify/crawlee-python/issues/704)
 
 ### 🐛 Bug Fixes
 
 - Fix init of context managers and context handling in `BasicCrawler` ([#714](https://github.com/apify/crawlee-python/pull/714)) ([486fe6d](https://github.com/apify/crawlee-python/commit/486fe6d6cd56cb560ab51a32ec0286d9e32267cb)) by [@vdusek](https://github.com/vdusek)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.4.3](https://github.com/apify/crawlee-python/releases/tag/v0.4.3) (2024-11-21)
 
 ### 🐛 Bug Fixes

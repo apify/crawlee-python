@@ -40,9 +40,6 @@ keywords = [
 "Issue Tracker" = "https://github.com/apify/crawlee-python/issues"
 "Repository" = "https://github.com/apify/crawlee-python"
 
-# We use inclusive ordered comparison clauses for external packages intentionally in order to enhance Crawlee's
-# compatibility with external packages. This decision was discussed in detail in the following PR:
-# https://github.com/apify/apify-sdk-python/pull/154.
 [tool.poetry.dependencies]
 python = "^3.9"
 apify = { version = ">=2.0.0", optional = true }
@@ -63,11 +60,11 @@ psutil = ">=6.0.0"
 pydantic = ">=2.6.0 <2.10.0"
 pydantic-settings = ">=2.2.0"
 pyee = ">=9.0.0"
-python-dateutil = ">=2.9.0"
 sortedcollections = ">=2.1.0"
 tldextract = ">=5.1.0"
 typer = ">=0.12.0"
 typing-extensions = ">=4.1.0"
+yarl = "^1.18.0"
 
 [tool.poetry.group.dev.dependencies]
 build = "~1.2.0"
@@ -121,7 +118,6 @@ ignore = [
     "G004",     # Logging statement uses f-string
     "ISC001",   # This rule may cause conflicts when used with the formatter
     "FIX",      # flake8-fixme
-    "PGH003",   # Use specific rule codes when ignoring type issues
     "PLR0911",  # Too many return statements
     "PLR0913",  # Too many arguments in function definition
     "PLR0915",  # Too many statements
@@ -204,15 +200,11 @@ warn_redundant_casts = true
 warn_return_any = true
 warn_unreachable = true
 warn_unused_ignores = true
-exclude = [
-    "docs/introduction/code/08_main.py",
-]
 
-[tool.mypy-scrapy]
-ignore_missing_imports = true
-
-[tool.mypy-sortedcollections]
-ignore_missing_imports = true
+[tool.basedpyright]
+pythonVersion = "3.9"
+typeCheckingMode = "standard"
+include = ["src", "tests", "docs"]
 
 [tool.coverage.report]
 exclude_lines = [
@@ -220,9 +212,6 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "assert_never()",
 ]
-
-[tool.basedpyright]
-typeCheckingMode = "standard"
 
 [tool.ipdb]
 context = 7
