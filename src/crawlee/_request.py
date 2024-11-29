@@ -68,7 +68,7 @@ class UserData(BaseModel, MutableMapping[str, JsonSerializable]):
     """
 
     model_config = ConfigDict(extra='allow')
-    __pydantic_extra__: dict[str, JsonSerializable] = Field(init=False)  # pyright: ignore
+    __pydantic_extra__: dict[str, JsonSerializable] = Field(init=False)
 
     crawlee_data: Annotated[CrawleeRequestData | None, Field(alias='__crawlee')] = None
     """Crawlee-specific configuration stored in the `user_data`."""
@@ -90,7 +90,7 @@ class UserData(BaseModel, MutableMapping[str, JsonSerializable]):
     def __delitem__(self, key: str) -> None:
         del self.__pydantic_extra__[key]
 
-    def __iter__(self) -> Iterator[str]:  # type: ignore
+    def __iter__(self) -> Iterator[str]:  # type: ignore[override]
         yield from self.__pydantic_extra__
 
     def __len__(self) -> int:

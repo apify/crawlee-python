@@ -66,13 +66,13 @@ class KeyValueStore(BaseStorage):
         # Get resource clients from storage client
         self._resource_client = client.key_value_store(self._id)
 
-    @override
     @property
+    @override
     def id(self) -> str:
         return self._id
 
-    @override
     @property
+    @override
     def name(self) -> str | None:
         return self._name
 

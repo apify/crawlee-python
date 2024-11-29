@@ -121,7 +121,6 @@ ignore = [
     "G004",     # Logging statement uses f-string
     "ISC001",   # This rule may cause conflicts when used with the formatter
     "FIX",      # flake8-fixme
-    "PGH003",   # Use specific rule codes when ignoring type issues
     "PLR0911",  # Too many return statements
     "PLR0913",  # Too many arguments in function definition
     "PLR0915",  # Too many statements
@@ -208,11 +207,13 @@ exclude = [
     "docs/introduction/code/08_main.py",
 ]
 
-[tool.mypy-scrapy]
-ignore_missing_imports = true
-
-[tool.mypy-sortedcollections]
-ignore_missing_imports = true
+[tool.basedpyright]
+pythonVersion = "3.9"
+typeCheckingMode = "standard"
+include = ["src", "tests", "docs"]
+ignore = [
+    "docs/introduction/code/08_main.py",
+]
 
 [tool.coverage.report]
 exclude_lines = [
@@ -220,9 +221,6 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "assert_never()",
 ]
-
-[tool.basedpyright]
-typeCheckingMode = "standard"
 
 [tool.ipdb]
 context = 7

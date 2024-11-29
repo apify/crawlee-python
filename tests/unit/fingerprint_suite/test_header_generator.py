@@ -63,7 +63,7 @@ def test_get_user_agent_header_invalid_browser_type() -> None:
     header_generator = HeaderGenerator()
 
     with pytest.raises(ValueError, match='Unsupported browser type'):
-        header_generator.get_user_agent_header(browser_type='invalid_browser')  # type: ignore
+        header_generator.get_user_agent_header(browser_type='invalid_browser')  # type: ignore[arg-type]
 
 
 def test_get_sec_ch_ua_headers_chromium() -> None:
@@ -100,4 +100,4 @@ def test_get_sec_ch_ua_headers_invalid_browser_type() -> None:
     header_generator = HeaderGenerator()
 
     with pytest.raises(ValueError, match='Unsupported browser type'):
-        header_generator.get_sec_ch_ua_headers(browser_type='invalid_browser')  # type: ignore
+        header_generator.get_sec_ch_ua_headers(browser_type='invalid_browser')  # type: ignore[arg-type]
