@@ -71,6 +71,7 @@ jobs:
     uses: ./.github/workflows/build_and_deploy_docs.yaml
     with:
       ref: ${{ needs.update_changelog.outputs.changelog_commitish }}
+    secrets: inherit
 
   create_github_release:
     name: Create github release
