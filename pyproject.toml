@@ -161,6 +161,10 @@ indent-style = "space"
     "F841",   # Local variable {variable} is assigned to but never used
     "N999",   # Invalid module name
 ]
+"src/crawlee/_utils/models.py" = [
+    "FA100",  # In order to be able to use | instead of Union for type hints in Pythons<3.10 we need to do from __future__ import annotations. This import can break pydantic in unxpecetd ways.
+]
+
 
 [tool.ruff.lint.flake8-quotes]
 docstring-quotes = "double"
