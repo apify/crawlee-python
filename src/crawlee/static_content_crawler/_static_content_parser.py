@@ -28,9 +28,8 @@ class StaticContentParser(Generic[TParseResult], ABC):
     """Parser used for parsing http response and inspecting parsed result to find links or detect blocking."""
 
     @abstractmethod
-    async def parse(self, http_response: HttpResponse) -> TParseResult:
+    async def parse(self, response: HttpResponse) -> TParseResult:
         """Parse http response."""
-        ...
 
     def is_blocked(self, parsed_content: TParseResult) -> BlockedInfo:
         """Detect if blocked and return BlockedInfo with additional information."""
@@ -51,9 +50,7 @@ class StaticContentParser(Generic[TParseResult], ABC):
     @abstractmethod
     def is_matching_selector(self, parsed_content: TParseResult, selector: str) -> bool:
         """Find if selector has match in parsed content."""
-        ...
 
     @abstractmethod
     def find_links(self, parsed_content: TParseResult, selector: str) -> Iterable[str]:
         """Find all links in result using selector."""
-        ...

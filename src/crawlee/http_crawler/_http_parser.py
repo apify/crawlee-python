@@ -23,7 +23,7 @@ class NoParser(StaticContentParser[bytes]):
         return http_response.read()
 
     @override
-    def is_blocked(self, parsed_content: bytes) -> BlockedInfo:  # Intentional unused argument.
+    def is_blocked(self, _: bytes) -> BlockedInfo:
         return BlockedInfo(reason='')
 
     @override

@@ -24,6 +24,7 @@ class ParselParser(StaticContentParser[Selector]):
         link: Selector
         urls: list[str] = []
         for link in parsed_content.css(selector):
-            if (url := link.xpath('@href').get()) is not None:
-                urls.append(url.strip())  # noqa: PERF401  #Mypy has problems using is not None for type inference in list comprehension.
+            url = link.xpath('@href').get()
+            if url:
+                urls.append(url.strip())
         return urls

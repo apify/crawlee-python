@@ -32,8 +32,9 @@ class BeautifulSoupContentParser(StaticContentParser[BeautifulSoup]):
         link: Tag
         urls: list[str] = []
         for link in parsed_content.select(selector):
-            if (url := link.attrs.get('href')) is not None:
-                urls.append(url.strip())  # noqa: PERF401  #Mypy has problems using is not None for type inference in list comprehension.
+            url = link.attrs.get('href')
+            if url:
+                urls.append(url.strip())
         return urls
 
 
