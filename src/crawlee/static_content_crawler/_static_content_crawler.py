@@ -4,10 +4,11 @@ import logging
 from typing import TYPE_CHECKING, Any, Generic
 
 from pydantic import ValidationError
-from typing_extensions import TypeVar
+from typing_extensions import NotRequired, TypeVar
 
 from crawlee import EnqueueStrategy
 from crawlee._request import BaseRequestData
+from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
@@ -29,6 +30,16 @@ if TYPE_CHECKING:
 TCrawlingContext = TypeVar('TCrawlingContext', bound=ParsedHttpCrawlingContext)
 
 
+@docs_group('Data structures')
+class StaticContentCrawlerOptions(Generic[TCrawlingContext], BasicCrawlerOptions[TCrawlingContext]):
+    additional_http_error_status_codes: NotRequired[Iterable[int]]
+    """Additional HTTP status codes to treat as errors, triggering automatic retries when encountered."""
+
+    ignore_http_error_status_codes: NotRequired[Iterable[int]]
+    """HTTP status codes typically considered errors but to be treated as successful responses."""
+
+
+@docs_group('Classes')
 class StaticContentCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler[TCrawlingContext]):
     """A web crawler for performing HTTP requests.
 

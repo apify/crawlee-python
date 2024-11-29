@@ -6,17 +6,16 @@ from parsel import Selector
 
 from crawlee._utils.docs import docs_group
 from crawlee.parsel_crawler._parsel_parser import ParselParser
-from crawlee.static_content_crawler._static_content_crawler import StaticContentCrawler
+from crawlee.static_content_crawler import StaticContentCrawler, StaticContentCrawlerOptions
 
 from ._parsel_crawling_context import ParselCrawlingContext
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Iterable
+    from collections.abc import AsyncGenerator
 
     from typing_extensions import Unpack
 
-    from crawlee.basic_crawler import BasicCrawlerOptions
-    from crawlee.static_content_crawler._static_crawling_context import ParsedHttpCrawlingContext
+    from crawlee.static_content_crawler import ParsedHttpCrawlingContext
 
 
 @docs_group('Classes')
@@ -56,29 +55,22 @@ class ParselCrawler(StaticContentCrawler[ParselCrawlingContext, Selector]):
 
     def __init__(
         self,
-        *,
-        additional_http_error_status_codes: Iterable[int] = (),
-        ignore_http_error_status_codes: Iterable[int] = (),
-        **kwargs: Unpack[BasicCrawlerOptions[ParselCrawlingContext]],
+        **kwargs: Unpack[StaticContentCrawlerOptions[ParselCrawlingContext]],
     ) -> None:
         """A default constructor.
 
         Args:
-            additional_http_error_status_codes: Additional HTTP status codes to treat as errors, triggering
-                automatic retries when encountered.
-            ignore_http_error_status_codes: HTTP status codes typically considered errors but to be treated
-                as successful responses.
-            kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
+            kwargs: Additional keyword arguments to pass to the underlying `StaticContentCrawler`.
         """
 
-        async def final_step(context: ParsedHttpCrawlingContext) -> AsyncGenerator[ParselCrawlingContext, None]:
+        async def final_step(
+            context: ParsedHttpCrawlingContext[Selector],
+        ) -> AsyncGenerator[ParselCrawlingContext, None]:
             """Enhance ParsedHttpCrawlingContext[Selector] with selector property."""
             yield ParselCrawlingContext.from_parsed_http_crawling_context(context)
 
         kwargs['_context_pipeline'] = self._create_static_content_crawler_pipeline().compose(final_step)
         super().__init__(
             parser=ParselParser(),
-            additional_http_error_status_codes=additional_http_error_status_codes,
-            ignore_http_error_status_codes=ignore_http_error_status_codes,
             **kwargs,
         )

@@ -2,18 +2,16 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from crawlee.static_content_crawler import ParsedHttpCrawlingContext, StaticContentCrawler
+from crawlee._utils.docs import docs_group
+from crawlee.static_content_crawler import ParsedHttpCrawlingContext, StaticContentCrawler, StaticContentCrawlerOptions
 
 from ._http_parser import NoParser
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
-
     from typing_extensions import Unpack
 
-    from crawlee.basic_crawler import BasicCrawlerOptions
 
-
+@docs_group('Classes')
 class HttpCrawler(StaticContentCrawler[ParsedHttpCrawlingContext[bytes], bytes]):
     """Specific version of generic StaticContentCrawler.
 
@@ -48,24 +46,15 @@ class HttpCrawler(StaticContentCrawler[ParsedHttpCrawlingContext[bytes], bytes])
 
     def __init__(
         self,
-        *,
-        additional_http_error_status_codes: Iterable[int] = (),
-        ignore_http_error_status_codes: Iterable[int] = (),
-        **kwargs: Unpack[BasicCrawlerOptions[ParsedHttpCrawlingContext[bytes]]],
+        **kwargs: Unpack[StaticContentCrawlerOptions[ParsedHttpCrawlingContext[bytes]]],
     ) -> None:
         """A default constructor.
 
         Args:
-            additional_http_error_status_codes: Additional HTTP status codes to treat as errors, triggering
-                automatic retries when encountered.
-            ignore_http_error_status_codes: HTTP status codes typically considered errors but to be treated
-                as successful responses.
-            kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
+            kwargs: Additional keyword arguments to pass to the underlying `StaticContentCrawler`.
         """
         kwargs['_context_pipeline'] = self._create_static_content_crawler_pipeline()
         super().__init__(
             parser=NoParser(),
-            additional_http_error_status_codes=additional_http_error_status_codes,
-            ignore_http_error_status_codes=ignore_http_error_status_codes,
             **kwargs,
         )

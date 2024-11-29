@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Generic
 
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
+from crawlee._utils.docs import docs_group
 from crawlee.static_content_crawler._static_crawling_context import TParseResult
 
 if TYPE_CHECKING:
@@ -13,6 +14,7 @@ if TYPE_CHECKING:
     from crawlee.http_clients import HttpResponse
 
 
+@docs_group('Classes')
 @dataclass(frozen=True)
 class BlockedInfo:
     """Information about whether the crawling is blocked. If reason is empty, then it means it is not blocked."""
@@ -24,6 +26,7 @@ class BlockedInfo:
         return bool(self.reason)
 
 
+@docs_group('Classes')
 class StaticContentParser(Generic[TParseResult], ABC):
     """Parser used for parsing http response and inspecting parsed result to find links or detect blocking."""
 

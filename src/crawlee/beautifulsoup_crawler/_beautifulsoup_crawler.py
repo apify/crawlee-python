@@ -4,20 +4,21 @@ from typing import TYPE_CHECKING
 
 from bs4 import BeautifulSoup
 
+from crawlee._utils.docs import docs_group
 from crawlee.beautifulsoup_crawler._beautifulsoup_parser import BeautifulSoupParser, BeautifulSoupParserType
-from crawlee.static_content_crawler import StaticContentCrawler
+from crawlee.static_content_crawler import StaticContentCrawler, StaticContentCrawlerOptions
 
 from ._beautifulsoup_crawling_context import BeautifulSoupCrawlingContext
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Iterable
+    from collections.abc import AsyncGenerator
 
     from typing_extensions import Unpack
 
-    from crawlee.basic_crawler import BasicCrawlerOptions
     from crawlee.static_content_crawler import ParsedHttpCrawlingContext
 
 
+@docs_group('Classes')
 class BeautifulSoupCrawler(StaticContentCrawler[BeautifulSoupCrawlingContext, BeautifulSoup]):
     """A web crawler for performing HTTP requests and parsing HTML/XML content.
 
@@ -56,19 +57,13 @@ class BeautifulSoupCrawler(StaticContentCrawler[BeautifulSoupCrawlingContext, Be
         self,
         *,
         parser: BeautifulSoupParserType = 'lxml',
-        additional_http_error_status_codes: Iterable[int] = (),
-        ignore_http_error_status_codes: Iterable[int] = (),
-        **kwargs: Unpack[BasicCrawlerOptions[BeautifulSoupCrawlingContext]],
+        **kwargs: Unpack[StaticContentCrawlerOptions[BeautifulSoupCrawlingContext]],
     ) -> None:
         """A default constructor.
 
         Args:
             parser: The type of parser that should be used by `BeautifulSoup`.
-            additional_http_error_status_codes: Additional HTTP status codes to treat as errors, triggering
-                automatic retries when encountered.
-            ignore_http_error_status_codes: HTTP status codes typically considered errors but to be treated
-                as successful responses.
-            kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
+            kwargs: Additional keyword arguments to pass to the underlying `StaticContentCrawler`.
         """
 
         async def final_step(
@@ -81,7 +76,5 @@ class BeautifulSoupCrawler(StaticContentCrawler[BeautifulSoupCrawlingContext, Be
 
         super().__init__(
             parser=BeautifulSoupParser(parser=parser),
-            additional_http_error_status_codes=additional_http_error_status_codes,
-            ignore_http_error_status_codes=ignore_http_error_status_codes,
             **kwargs,
         )
