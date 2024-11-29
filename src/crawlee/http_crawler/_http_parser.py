@@ -19,17 +19,17 @@ class NoParser(StaticContentParser[bytes]):
     """
 
     @override
-    async def parse(self, http_response: HttpResponse) -> bytes:
-        return http_response.read()
+    async def parse(self, response: HttpResponse) -> bytes:
+        return response.read()
 
     @override
     def is_blocked(self, _: bytes) -> BlockedInfo:
         return BlockedInfo(reason='')
 
     @override
-    def is_matching_selector(self, parsed_content: bytes, selector: str) -> bool:  # Intentional unused argument.
+    def is_matching_selector(self, _: bytes, selector: str) -> bool:
         return False
 
     @override
-    def find_links(self, parsed_content: bytes, selector: str) -> Iterable[str]:  # Intentional unused argument.
+    def find_links(self, _: bytes, selector: str) -> Iterable[str]:
         return []

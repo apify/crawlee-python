@@ -4,8 +4,8 @@ from typing import TYPE_CHECKING
 
 from bs4 import BeautifulSoup
 
-from crawlee.beautifulsoup_crawler._beautifulsoup_parser import BeautifulSoupContentParser, BeautifulSoupParser
-from crawlee.static_content_crawler._static_content_crawler import StaticContentCrawler
+from crawlee.beautifulsoup_crawler._beautifulsoup_parser import BeautifulSoupParser, BeautifulSoupParserType
+from crawlee.static_content_crawler import StaticContentCrawler
 
 from ._beautifulsoup_crawling_context import BeautifulSoupCrawlingContext
 
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from typing_extensions import Unpack
 
     from crawlee.basic_crawler import BasicCrawlerOptions
-    from crawlee.static_content_crawler._static_crawling_context import ParsedHttpCrawlingContext
+    from crawlee.static_content_crawler import ParsedHttpCrawlingContext
 
 
 class BeautifulSoupCrawler(StaticContentCrawler[BeautifulSoupCrawlingContext, BeautifulSoup]):
@@ -55,7 +55,7 @@ class BeautifulSoupCrawler(StaticContentCrawler[BeautifulSoupCrawlingContext, Be
     def __init__(
         self,
         *,
-        parser: BeautifulSoupParser = 'lxml',
+        parser: BeautifulSoupParserType = 'lxml',
         additional_http_error_status_codes: Iterable[int] = (),
         ignore_http_error_status_codes: Iterable[int] = (),
         **kwargs: Unpack[BasicCrawlerOptions[BeautifulSoupCrawlingContext]],
@@ -80,7 +80,7 @@ class BeautifulSoupCrawler(StaticContentCrawler[BeautifulSoupCrawlingContext, Be
         kwargs['_context_pipeline'] = self._create_static_content_crawler_pipeline().compose(final_step)
 
         super().__init__(
-            parser=BeautifulSoupContentParser(parser=parser),
+            parser=BeautifulSoupParser(parser=parser),
             additional_http_error_status_codes=additional_http_error_status_codes,
             ignore_http_error_status_codes=ignore_http_error_status_codes,
             **kwargs,

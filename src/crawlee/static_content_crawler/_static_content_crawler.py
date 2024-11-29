@@ -83,6 +83,14 @@ class StaticContentCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler
     async def _parse_http_response(
         self, context: HttpCrawlingContext
     ) -> AsyncGenerator[ParsedHttpCrawlingContext[TParseResult], None]:
+        """Parse http response and create context enhanced by the parsing result and enqueue links function.
+
+        Args:
+            context: The current crawling context, that includes http response.
+
+        Yields:
+            The original crawling context enhanced by the parsing result and enqueue links function.
+        """
         parsed_content = await self._parser.parse(context.http_response)
         yield ParsedHttpCrawlingContext.from_http_crawling_context(
             context=context,
@@ -93,6 +101,16 @@ class StaticContentCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler
     def _create_enqueue_links_function(
         self, context: HttpCrawlingContext, parsed_content: TParseResult
     ) -> EnqueueLinksFunction:
+        """Create a callback function for extracting links from parsed content and enqueuing them to the crawl.
+
+        Args:
+            context: The current crawling context.
+            parsed_content: The parsed http response.
+
+        Returns:
+            Awaitable that is used for extracting links from parsed content and enqueuing them to the crawl.
+        """
+
         async def enqueue_links(
             *,
             selector: str = 'a',
@@ -127,6 +145,14 @@ class StaticContentCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler
         return enqueue_links
 
     async def _make_http_request(self, context: BasicCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
+        """Make http request and create context enhanced by http response.
+
+        Args:
+            context: The current crawling context.
+
+        Yields:
+            The original crawling context enhanced by http response.
+        """
         result = await self._http_client.crawl(
             request=context.request,
             session=context.session,

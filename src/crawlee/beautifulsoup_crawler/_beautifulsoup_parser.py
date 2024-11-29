@@ -13,10 +13,10 @@ if TYPE_CHECKING:
     from crawlee.http_clients import HttpResponse
 
 
-class BeautifulSoupContentParser(StaticContentParser[BeautifulSoup]):
+class BeautifulSoupParser(StaticContentParser[BeautifulSoup]):
     """Parser for parsing http response using BeautifulSoup."""
 
-    def __init__(self, parser: BeautifulSoupParser = 'lxml') -> None:
+    def __init__(self, parser: BeautifulSoupParserType = 'lxml') -> None:
         self._parser = parser
 
     @override
@@ -38,4 +38,4 @@ class BeautifulSoupContentParser(StaticContentParser[BeautifulSoup]):
         return urls
 
 
-BeautifulSoupParser = Literal['html.parser', 'lxml', 'xml', 'html5lib']
+BeautifulSoupParserType = Literal['html.parser', 'lxml', 'xml', 'html5lib']

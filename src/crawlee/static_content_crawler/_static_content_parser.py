@@ -29,10 +29,28 @@ class StaticContentParser(Generic[TParseResult], ABC):
 
     @abstractmethod
     async def parse(self, response: HttpResponse) -> TParseResult:
-        """Parse http response."""
+        """Parse http response.
+
+        Args:
+            response: Http response to be parsed.
+
+        Returns:
+            Parsed http response.
+        """
 
     def is_blocked(self, parsed_content: TParseResult) -> BlockedInfo:
-        """Detect if blocked and return BlockedInfo with additional information."""
+        """Detect if blocked and return BlockedInfo with additional information.
+
+        Default implementation that expects is_matching_selector abstract method to be implemented.
+        Override this method if your parser has different way of blockage detection.
+
+        Args:
+            parsed_content: Parsed http response. Result of parse method.
+
+        Returns:
+            BlockedInfo object that contains non-empty string description of reason if blockage was detected. Empty
+            string in reason signifies no blockage detected.
+        """
         reason = ''
         if parsed_content is not None:
             matched_selectors = [
@@ -49,8 +67,24 @@ class StaticContentParser(Generic[TParseResult], ABC):
 
     @abstractmethod
     def is_matching_selector(self, parsed_content: TParseResult, selector: str) -> bool:
-        """Find if selector has match in parsed content."""
+        """Find if selector has match in parsed content.
+
+        Args:
+            parsed_content: Parsed http response. Result of parse method.
+            selector: String used to define matching pattern.
+
+        Returns:
+            True if selector has match in parsed content.
+        """
 
     @abstractmethod
     def find_links(self, parsed_content: TParseResult, selector: str) -> Iterable[str]:
-        """Find all links in result using selector."""
+        """Find all links in result using selector.
+
+        Args:
+            parsed_content: Parsed http response. Result of parse method.
+            selector: String used to define matching pattern for finding links.
+
+        Returns:
+            Iterable of strings that contain found links.
+        """
