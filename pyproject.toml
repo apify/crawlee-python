@@ -200,17 +200,11 @@ warn_redundant_casts = true
 warn_return_any = true
 warn_unreachable = true
 warn_unused_ignores = true
-exclude = [
-    "docs/introduction/code/08_main.py",
-]
 
 [tool.basedpyright]
 pythonVersion = "3.9"
 typeCheckingMode = "standard"
 include = ["src", "tests", "docs"]
-ignore = [
-    "docs/introduction/code/08_main.py",
-]
 
 [tool.coverage.report]
 exclude_lines = [
