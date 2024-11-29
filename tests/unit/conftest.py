@@ -1,4 +1,4 @@
-# TODO: type ignores and crawlee_storage_dir
+# TODO: Update crawlee_storage_dir args once the Pydantic bug is fixed
 # https://github.com/apify/crawlee-python/issues/146
 
 from __future__ import annotations
@@ -63,7 +63,7 @@ def memory_storage_client(tmp_path: Path) -> MemoryStorageClient:
     cfg = Configuration(
         write_metadata=True,
         persist_storage=True,
-        crawlee_storage_dir=str(tmp_path),  # type: ignore
+        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
     )
     return MemoryStorageClient(cfg)
 

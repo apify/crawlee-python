@@ -119,7 +119,7 @@ def find_or_create_client_by_id_or_name_inner(
         raise TypeError('Invalid resource client class.')
 
     memory_storage_client.add_resource_client_to_cache(resource_client)
-    return resource_client  # pyright: ignore
+    return resource_client
 
 
 async def get_or_create_inner(

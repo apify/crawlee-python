@@ -92,7 +92,7 @@ class HttpHeaders(RootModel, Mapping[str, str]):
         combined_headers = {**other, **self.root}
         return HttpHeaders(combined_headers)
 
-    def __iter__(self) -> Iterator[str]:  # type: ignore
+    def __iter__(self) -> Iterator[str]:  # type: ignore[override]
         yield from self.root
 
     def __len__(self) -> int:

@@ -208,13 +208,13 @@ class Dataset(BaseStorage):
         self._resource_client = client.dataset(self._id)
         self._resource_collection_client = client.datasets()
 
-    @override
     @property
+    @override
     def id(self) -> str:
         return self._id
 
-    @override
     @property
+    @override
     def name(self) -> str | None:
         return self._name
 
