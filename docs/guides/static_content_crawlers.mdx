@@ -14,10 +14,10 @@ Generic class <ApiLink to="class/StaticContentCrawler">`StaticContentCrawler`</A
 It already includes almost all the functionality to crawl webpages and the only missing part if the parser, that should be used to parse http responses, and context object that defines what context will be available to user handler functions.
 
 ## `BeautifulSoupCrawler`
-<ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> uses <ApiLink to="class/BeautifulSoupContentParser">`BeautifulSoupContentParser`</ApiLink> to parse http response and this is available in <ApiLink to="class/BeautifulSoupCrawlingContext">`BeautifulSoupCrawlingContext`</ApiLink> in .soup or .parsed_content.
+<ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> uses <ApiLink to="class/BeautifulSoupParser">`BeautifulSoupParser`</ApiLink> to parse http response and this is available in <ApiLink to="class/BeautifulSoupCrawlingContext">`BeautifulSoupCrawlingContext`</ApiLink> in .soup or .parsed_content.
 
 ## `ParselCrawler`
-<ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> uses <ApiLink to="class/ParselContentParser">`ParselContentParser`</ApiLink> to parse http response and this is available in <ApiLink to="class/ParselCrawlingContext">`ParselCrawlingContext`</ApiLink> in .selector or .parsed_content.
+<ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> uses <ApiLink to="class/ParselParser">`ParselParser`</ApiLink> to parse http response and this is available in <ApiLink to="class/ParselCrawlingContext">`ParselCrawlingContext`</ApiLink> in .selector or .parsed_content.
 
 ## `HttpCrawler`
 <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink> uses <ApiLink to="class/NoParser">`NoParser`</ApiLink> that does not parse http response at all and is to be used if no parsing is required.
