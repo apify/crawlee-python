@@ -14,14 +14,16 @@ from crawlee.storages import KeyValueStore
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
+    from crawlee._types import JsonSerializable
+
 
 @pytest.fixture
 async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
     kvs = await KeyValueStore.open()
     yield kvs
     await kvs.drop()
-    kvs.clear_cache()
-    kvs.drop_persist_state_event()
+    kvs._clear_cache()
+    kvs._drop_persist_state_event()
 
 
 @pytest.fixture
@@ -137,13 +139,13 @@ async def test_get_public_url(key_value_store: KeyValueStore) -> None:
 
 
 async def test_get_auto_saved_value_default_value(key_value_store: KeyValueStore) -> None:
-    default_value = {'hello': 'world'}
+    default_value: dict[str, JsonSerializable] = {'hello': 'world'}
     value = await key_value_store.get_auto_saved_value('state', default_value)
     assert value == default_value
 
 
 async def test_get_auto_saved_value_cache_value(key_value_store: KeyValueStore) -> None:
-    default_value = {'hello': 'world'}
+    default_value: dict[str, JsonSerializable] = {'hello': 'world'}
     key_name = 'state'
 
     value = await key_value_store.get_auto_saved_value(key_name, default_value)
@@ -157,7 +159,7 @@ async def test_get_auto_saved_value_cache_value(key_value_store: KeyValueStore) 
 
 
 async def test_get_auto_saved_value_auto_save(key_value_store: KeyValueStore, mock_event_manager: EventManager) -> None:  # noqa: ARG001
-    default_value = {'hello': 'world'}
+    default_value: dict[str, JsonSerializable] = {'hello': 'world'}
     key_name = 'state'
     value = await key_value_store.get_auto_saved_value(key_name, default_value)
     await asyncio.sleep(0.1)

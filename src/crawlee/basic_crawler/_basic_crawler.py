@@ -470,7 +470,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._running = False
         self._has_finished_before = True
 
-        await self._save_persist_state()
+        await self._save_crawler_state()
 
         final_statistics = self._statistics.calculate()
         self._logger.info(f'Final request statistics:\n{final_statistics.to_table()}')
@@ -526,13 +526,15 @@ class BasicCrawler(Generic[TCrawlingContext]):
             wait_for_all_requests_to_be_added_timeout=wait_for_all_requests_to_be_added_timeout,
         )
 
-    async def _use_state(self, key: str, default_value: dict | None = None) -> dict:
+    async def _use_state(
+        self, key: str, default_value: dict[str, JsonSerializable] | None = None
+    ) -> dict[str, JsonSerializable]:
         store = await self.get_key_value_store()
         return await store.get_auto_saved_value(key, default_value)
 
-    async def _save_persist_state(self) -> None:
+    async def _save_crawler_state(self) -> None:
         store = await self.get_key_value_store()
-        await store.force_save_persist_state()
+        await store.persist_autosaved_values()
 
     async def get_data(
         self,

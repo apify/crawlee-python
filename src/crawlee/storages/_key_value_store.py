@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, overload
+from typing import TYPE_CHECKING, Any, TypeVar, overload
 
 from typing_extensions import override
 
@@ -13,6 +13,7 @@ from crawlee.storages._base_storage import BaseStorage
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
+    from crawlee._types import JsonSerializable
     from crawlee.base_storage_client import BaseStorageClient
     from crawlee.configuration import Configuration
 
@@ -54,10 +55,6 @@ class KeyValueStore(BaseStorage):
     ```
     """
 
-    # Cache for persistent (auto-saved) values
-    _cache: ClassVar[dict[str, dict[str, Any]]] = {}
-    _persist_state_event_started = False
-
     def __init__(
         self,
         id: str,
@@ -71,6 +68,10 @@ class KeyValueStore(BaseStorage):
 
         # Get resource clients from storage client
         self._resource_client = client.key_value_store(self._id)
+
+        # Cache for persistent (auto-saved) values
+        self._cache: dict[str, dict[str, JsonSerializable]] = {}
+        self._persist_state_event_started = False
 
     @override
     @property
@@ -182,7 +183,9 @@ class KeyValueStore(BaseStorage):
         """
         return await self._resource_client.get_public_url(key)
 
-    async def get_auto_saved_value(self, key: str, default_value: dict | None = None) -> dict:
+    async def get_auto_saved_value(
+        self, key: str, default_value: dict[str, JsonSerializable] | None = None
+    ) -> dict[str, JsonSerializable]:
         """Gets a value from KVS that will be automatically saved on changes.
 
         Args:
@@ -224,18 +227,18 @@ class KeyValueStore(BaseStorage):
         event_manager.on(event=Event.PERSIST_STATE, listener=self._persist_save)
         self._persist_state_event_started = True
 
-    def clear_cache(self) -> None:
+    def _clear_cache(self) -> None:
         """Clear cache with persistent values."""
         self._cache.clear()
 
-    def drop_persist_state_event(self) -> None:
+    def _drop_persist_state_event(self) -> None:
         """Off event_manager listener and drop event status."""
         if self._persist_state_event_started:
             event_manager = service_container.get_event_manager()
             event_manager.off(event=Event.PERSIST_STATE, listener=self._persist_save)
         self._persist_state_event_started = False
 
-    async def force_save_persist_state(self) -> None:
+    async def persist_autosaved_values(self) -> None:
         """Force persistent values to be saved without waiting for an event in Event Manager."""
         if self._persist_state_event_started:
             await self._persist_save()

@@ -301,13 +301,18 @@ class SendRequestFunction(Protocol):
 
 
 class UseStateFunction(Protocol):
-    """Type of a function for performing use state."""
+    """Type of a function for performing use state.
+
+    Warning:
+    -------
+    This is an experimental feature. The behavior and interface may change in future versions.
+    """
 
     def __call__(
         self,
         key: str,
-        default_value: dict[str, Any] | None = None,
-    ) -> Coroutine[None, None, dict]: ...
+        default_value: dict[str, JsonSerializable] | None = None,
+    ) -> Coroutine[None, None, dict[str, JsonSerializable]]: ...
 
 
 T = TypeVar('T')
@@ -333,8 +338,6 @@ class KeyValueStoreInterface(Protocol):
         value: Any,
         content_type: str | None = None,
     ) -> None: ...
-
-    async def get_auto_saved_value(self, key: str, default_value: dict | None = None) -> dict: ...
 
 
 class GetKeyValueStoreFromRequestHandlerFunction(Protocol):
@@ -397,9 +400,6 @@ class KeyValueStoreChangeRecords:
             return cast(T, self.updates[key].content)
 
         return await self._actual_key_value_store.get_value(key, default_value)
-
-    async def get_auto_saved_value(self, key: str, default_value: dict | None = None) -> dict:
-        return await self._actual_key_value_store.get_auto_saved_value(key, default_value)
 
 
 class GetKeyValueStoreFunction(Protocol):

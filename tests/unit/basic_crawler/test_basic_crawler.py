@@ -30,6 +30,8 @@ if TYPE_CHECKING:
 
     import respx
 
+    from crawlee._types import JsonSerializable
+
 
 @pytest.fixture
 async def mock_event_manager() -> AsyncGenerator[EventManager, None]:
@@ -43,8 +45,8 @@ async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
     kvs = await KeyValueStore.open()
     yield kvs
     await kvs.drop()
-    kvs.clear_cache()
-    kvs.drop_persist_state_event()
+    kvs._clear_cache()
+    kvs._drop_persist_state_event()
 
 
 async def test_processes_requests() -> None:
@@ -709,9 +711,9 @@ async def test_context_use_state(key_value_store: KeyValueStore, mock_event_mana
 
 
 async def test_context_handlers_use_state(key_value_store: KeyValueStore, mock_event_manager: EventManager) -> None:
-    state_in_handler_one: dict[str, str] = {}
-    state_in_handler_two: dict[str, str] = {}
-    state_in_handler_three: dict[str, str] = {}
+    state_in_handler_one: dict[str, JsonSerializable] = {}
+    state_in_handler_two: dict[str, JsonSerializable] = {}
+    state_in_handler_three: dict[str, JsonSerializable] = {}
 
     crawler = BasicCrawler()
 
