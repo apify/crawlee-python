@@ -187,7 +187,6 @@ class BaseRequestData(BaseModel):
         payload: HttpPayload | str | None = None,
         label: str | None = None,
         unique_key: str | None = None,
-        id: str | None = None,
         keep_url_fragment: bool = False,
         use_extended_unique_key: bool = False,
         **kwargs: Any,
@@ -208,12 +207,9 @@ class BaseRequestData(BaseModel):
             use_extended_unique_key=use_extended_unique_key,
         )
 
-        id = id or unique_key_to_request_id(unique_key)
-
         request = cls(
             url=url,
             unique_key=unique_key,
-            id=id,
             method=method,
             headers=headers,
             payload=payload,
