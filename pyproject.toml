@@ -102,6 +102,7 @@ crawlee = "crawlee._cli:cli"
 
 [tool.ruff]
 line-length = 120
+extend-exclude = ["project_template"]
 
 [tool.ruff.lint]
 select = ["ALL"]
@@ -189,6 +190,7 @@ timeout = 1200
 [tool.mypy]
 python_version = "3.9"
 plugins = ["pydantic.mypy"]
+exclude = ["project_template"]
 files = ["src", "tests"]
 check_untyped_defs = true
 disallow_incomplete_defs = true
