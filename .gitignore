@@ -47,6 +47,8 @@ website/apify-shared-docspec-dump.jsonl
 website/docspec-dump.jsonl
 website/module_shortcuts.json
 website/typedoc-types*
+# npm lockfile (we use yarn)
+website/package-lock.json 
 
 # Default directory for memory storage
 storage/
