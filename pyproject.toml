@@ -102,6 +102,7 @@ crawlee = "crawlee._cli:cli"
 
 [tool.ruff]
 line-length = 120
+extend-exclude = ["project_template"]
 
 [tool.ruff.lint]
 select = ["ALL"]
