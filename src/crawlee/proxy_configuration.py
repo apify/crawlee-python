@@ -4,12 +4,11 @@ import inspect
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
-from urllib.parse import urlparse
 
-from httpx import URL
 from more_itertools import flatten
 from pydantic import AnyHttpUrl, TypeAdapter
 from typing_extensions import Protocol
+from yarl import URL
 
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.docs import docs_group
@@ -19,7 +18,7 @@ if TYPE_CHECKING:
 
     from crawlee.base_storage_client._models import Request
 
-__all__ = ['ProxyInfo', 'ProxyConfiguration']
+__all__ = ['ProxyConfiguration', 'ProxyInfo']
 
 
 @dataclass
@@ -124,19 +123,19 @@ class ProxyConfiguration:
         if url is None:
             return None
 
-        # httpx.URL port field is None for default ports
-        default_ports = {'http': 80, 'https': 443}
-        port = url.port or default_ports.get(url.scheme)
-        if port is None:
+        if url.port is None:
             raise ValueError(f'Port is None for URL: {url}')
+
+        if url.host is None:
+            raise ValueError(f'Host is None for URL: {url}')
 
         info = ProxyInfo(
             url=str(url),
             scheme=url.scheme,
             hostname=url.host,
-            port=port,
-            username=url.username,
-            password=url.password,
+            port=url.port,
+            username=url.user or '',
+            password=url.password or '',
         )
 
         if session_id is not None:
@@ -173,7 +172,7 @@ class ProxyConfiguration:
 
         if self._proxy_tier_tracker:
             if request is not None and proxy_tier is None:
-                hostname = urlparse(request.url).hostname
+                hostname = URL(request.url).host
                 if hostname is None:
                     raise ValueError('The request URL does not have a hostname')
 

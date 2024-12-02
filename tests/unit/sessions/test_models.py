@@ -91,7 +91,7 @@ def test_create_session_pool_with_direct_sessions(session_direct: SessionModel) 
         retired_session_count=0,
         sessions=[session_direct],
     )
-    session_pool.sessions = [session_direct]
+    assert session_pool.sessions == [session_direct]
 
 
 def test_create_session_pool_with_args_sessions(session_args_camel: dict, session_args_snake: dict) -> None:
@@ -106,4 +106,4 @@ def test_create_session_pool_with_args_sessions(session_args_camel: dict, sessio
         retired_session_count=0,
         sessions=[session_args_camel, session_args_snake],
     )
-    session_pool_camel.sessions = [SessionModel(**session_args_camel), SessionModel(**session_args_snake)]
+    assert session_pool_camel.sessions == [SessionModel(**session_args_camel), SessionModel(**session_args_snake)]

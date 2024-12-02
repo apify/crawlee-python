@@ -141,13 +141,13 @@ class RequestQueue(BaseStorage, RequestProvider):
         self._recently_handled: BoundedSet[str] = BoundedSet(max_length=self._RECENTLY_HANDLED_CACHE_SIZE)
         self._requests_cache: LRUCache[CachedRequest] = LRUCache(max_length=self._MAX_CACHED_REQUESTS)
 
-    @override
     @property
+    @override
     def id(self) -> str:
         return self._id
 
-    @override
     @property
+    @override
     def name(self) -> str | None:
         return self._name
 
@@ -256,7 +256,9 @@ class RequestQueue(BaseStorage, RequestProvider):
                     await asyncio.sleep(wait_time_secs)
 
         # Create and start the task to process remaining batches in the background
-        remaining_batches_task = asyncio.create_task(_process_remaining_batches())
+        remaining_batches_task = asyncio.create_task(
+            _process_remaining_batches(), name='request_queue_process_remaining_batches_task'
+        )
         self._tasks.append(remaining_batches_task)
 
         # Wait for all tasks to finish if requested
@@ -519,7 +521,7 @@ class RequestQueue(BaseStorage, RequestProvider):
             return
 
         if self._list_head_and_lock_task is None:
-            task = asyncio.create_task(self._list_head_and_lock())
+            task = asyncio.create_task(self._list_head_and_lock(), name='request_queue_list_head_and_lock_task')
 
             def callback(_: Any) -> None:
                 self._list_head_and_lock_task = None

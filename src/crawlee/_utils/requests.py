@@ -5,7 +5,8 @@ from base64 import b64encode
 from hashlib import sha256
 from logging import getLogger
 from typing import TYPE_CHECKING
-from urllib.parse import parse_qsl, urlencode, urlparse
+
+from yarl import URL
 
 from crawlee._utils.crypto import compute_short_hash
 
@@ -55,33 +56,21 @@ def normalize_url(url: str, *, keep_url_fragment: bool = False) -> str:
         A string containing the normalized URL.
     """
     # Parse the URL
-    parsed_url = urlparse(url.strip())
-    search_params = dict(parse_qsl(parsed_url.query))  # Convert query to a dict
+    parsed_url = URL(url.strip())
 
     # Remove any 'utm_' parameters
-    search_params = {k: v for k, v in search_params.items() if not k.startswith('utm_')}
+    search_params = [(k, v) for k, v in parsed_url.query.items() if not k.startswith('utm_')]
 
     # Construct the new query string
-    sorted_keys = sorted(search_params.keys())
-    sorted_query = urlencode([(k, search_params[k]) for k in sorted_keys])
+    sorted_search_params = sorted(search_params)
 
     # Construct the final URL
-    new_url = (
-        parsed_url._replace(
-            query=sorted_query,
-            scheme=parsed_url.scheme,
-            netloc=parsed_url.netloc,
-            path=parsed_url.path.rstrip('/'),
-        )
-        .geturl()
-        .lower()
+    yarl_new_url = parsed_url.with_query(sorted_search_params)
+    yarl_new_url = yarl_new_url.with_path(
+        yarl_new_url.path.removesuffix('/'), keep_query=True, keep_fragment=keep_url_fragment
     )
 
-    # Retain the URL fragment if required
-    if not keep_url_fragment:
-        new_url = new_url.split('#')[0]
-
-    return new_url
+    return str(yarl_new_url).lower()
 
 
 def compute_unique_key(

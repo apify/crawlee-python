@@ -3,13 +3,16 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import timedelta
-from typing import Any, AsyncGenerator
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from crawlee.events import EventManager
 from crawlee.events._types import Event, EventSystemInfoData
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 
 @pytest.fixture
@@ -151,3 +154,25 @@ async def test_wait_for_all_listeners_cancelled_error(
 
             # Use monkeypatch to replace asyncio.wait with mock_async_wait
             monkeypatch.setattr('asyncio.wait', mock_async_wait)
+
+
+async def test_methods_raise_error_when_not_active(event_system_info_data: EventSystemInfoData) -> None:
+    event_manager = EventManager()
+
+    assert event_manager.active is False
+
+    with pytest.raises(RuntimeError, match='EventManager is not active.'):
+        event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_system_info_data)
+
+    with pytest.raises(RuntimeError, match='EventManager is not active.'):
+        await event_manager.wait_for_all_listeners_to_complete()
+
+    with pytest.raises(RuntimeError, match='EventManager is already active.'):
+        async with event_manager, event_manager:
+            pass
+
+    async with event_manager:
+        event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_system_info_data)
+        await event_manager.wait_for_all_listeners_to_complete()
+
+        assert event_manager.active is True

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, AsyncContextManager
+from typing import TYPE_CHECKING, Any
 
 from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
+    from contextlib import AbstractAsyncContextManager
+
     from httpx import Response
 
     from crawlee.base_storage_client._models import (
@@ -90,7 +92,7 @@ class BaseKeyValueStoreClient(ABC):
         """
 
     @abstractmethod
-    async def stream_record(self, key: str) -> AsyncContextManager[KeyValueStoreRecord[Response] | None]:
+    async def stream_record(self, key: str) -> AbstractAsyncContextManager[KeyValueStoreRecord[Response] | None]:
         """Retrieve the given record from the key-value store, as a stream.
 
         Args:

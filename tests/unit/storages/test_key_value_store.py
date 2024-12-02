@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import asyncio
-from typing import AsyncGenerator
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 import pytest
 
 from crawlee.storages import KeyValueStore
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 
 @pytest.fixture

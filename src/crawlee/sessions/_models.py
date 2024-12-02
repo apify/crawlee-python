@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Annotated, Any
+from typing import Annotated
 
-from dateutil import parser
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SessionModel(BaseModel):
@@ -23,22 +22,6 @@ class SessionModel(BaseModel):
     error_score: Annotated[float, Field(alias='errorScore')]
     cookies: Annotated[dict, Field(alias='cookies')]
     blocked_status_codes: Annotated[list[int], Field(alias='blockedStatusCodes')]
-
-    @field_validator('max_age', mode='before')
-    @classmethod
-    def parse_max_age(cls, value: Any) -> timedelta:
-        """Try to parse max_age field into a timedelta object."""
-        if isinstance(value, timedelta):
-            return value
-
-        if isinstance(value, str):
-            try:
-                parsed_time = parser.parse(value)
-                return timedelta(hours=parsed_time.hour, minutes=parsed_time.minute, seconds=parsed_time.second)
-            except ValueError as exc:
-                raise ValueError(f"Invalid time format for max_age. Expected 'HH:MM:SS', got {value}") from exc
-
-        raise ValueError('Invalid data type for max_age')
 
 
 class SessionPoolModel(BaseModel):

@@ -166,7 +166,7 @@ class MemoryStorageClient(BaseStorageClient):
             if storage_client.id == id or (
                 storage_client.name and name and storage_client.name.lower() == name.lower()
             ):
-                return storage_client  # pyright: ignore
+                return storage_client
 
         return None
 

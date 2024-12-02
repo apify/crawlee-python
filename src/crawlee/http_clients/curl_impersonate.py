@@ -131,7 +131,7 @@ class CurlImpersonateHttpClient(BaseHttpClient):
         try:
             response = await client.request(
                 url=request.url,
-                method=request.method.upper(),  # type: ignore # curl-cffi requires uppercase method
+                method=request.method.upper(),  # type: ignore[arg-type] # curl-cffi requires uppercase method
                 headers=request.headers,
                 data=request.payload,
                 cookies=session.cookies if session else None,
@@ -177,7 +177,7 @@ class CurlImpersonateHttpClient(BaseHttpClient):
         try:
             response = await client.request(
                 url=url,
-                method=method.upper(),  # type: ignore # curl-cffi requires uppercase method
+                method=method.upper(),  # type: ignore[arg-type] # curl-cffi requires uppercase method
                 headers=dict(headers) if headers else None,
                 data=payload,
                 cookies=session.cookies if session else None,
