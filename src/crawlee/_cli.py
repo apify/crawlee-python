@@ -1,6 +1,7 @@
 # ruff: noqa: TRY301, FBT002, UP007
 from __future__ import annotations
 
+import importlib.resources
 import json
 from pathlib import Path
 from typing import Annotated, Optional, cast
@@ -13,9 +14,9 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 cli = typer.Typer(no_args_is_help=True)
 
-cookiecutter_json = json.load(
-    (Path(__file__).parent.parent.parent / 'templates' / 'crawler' / 'cookiecutter.json').open()
-)
+template_directory = importlib.resources.files('crawlee') / 'project_template'
+cookiecutter_json = json.load((template_directory / 'cookiecutter.json').open())
+
 crawler_choices = cookiecutter_json['crawler_type']
 http_client_choices = cookiecutter_json['http_client']
 package_manager_choices = cookiecutter_json['package_manager']
@@ -193,8 +194,7 @@ def create(
             ) as progress:
                 progress.add_task(description='Bootstrapping...', total=None)
                 cookiecutter(
-                    template='gh:apify/crawlee-python',
-                    directory='templates/crawler',
+                    template=str(template_directory),
                     no_input=True,
                     extra_context={
                         'project_name': project_name,

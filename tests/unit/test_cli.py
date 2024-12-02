@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from unittest.mock import Mock
+from unittest.mock import ANY, Mock
 
 import pytest
 import readchar
@@ -38,8 +38,7 @@ def test_create_interactive(mock_cookiecutter: Mock, monkeypatch: pytest.MonkeyP
     assert 'Your project "my_project" was created.' in result.output
 
     mock_cookiecutter.assert_called_with(
-        template='gh:apify/crawlee-python',
-        directory='templates/crawler',
+        template=ANY,
         no_input=True,
         extra_context={
             'project_name': 'my_project',
@@ -71,8 +70,7 @@ def test_create_interactive_non_default_template(mock_cookiecutter: Mock, monkey
     assert 'Your project "my_project" was created.' in result.output
 
     mock_cookiecutter.assert_called_with(
-        template='gh:apify/crawlee-python',
-        directory='templates/crawler',
+        template=ANY,
         no_input=True,
         extra_context={
             'project_name': 'my_project',
@@ -104,8 +102,7 @@ def test_create_non_interactive(mock_cookiecutter: Mock) -> None:
     )
 
     mock_cookiecutter.assert_called_with(
-        template='gh:apify/crawlee-python',
-        directory='templates/crawler',
+        template=ANY,
         no_input=True,
         extra_context={
             'project_name': 'my_project',
@@ -152,8 +149,7 @@ def test_create_existing_folder(
     assert 'existing_project already exists' in result.output
 
     mock_cookiecutter.assert_called_with(
-        template='gh:apify/crawlee-python',
-        directory='templates/crawler',
+        template=ANY,
         no_input=True,
         extra_context={
             'project_name': 'my_project',
@@ -191,8 +187,7 @@ def test_create_existing_folder_interactive(
     assert 'existing_project already exists' in result.output
 
     mock_cookiecutter.assert_called_with(
-        template='gh:apify/crawlee-python',
-        directory='templates/crawler',
+        template=ANY,
         no_input=True,
         extra_context={
             'project_name': 'my_project',
@@ -233,8 +228,7 @@ def test_create_existing_folder_interactive_multiple_attempts(
     assert 'existing_project already exists' in result.output
 
     mock_cookiecutter.assert_called_with(
-        template='gh:apify/crawlee-python',
-        directory='templates/crawler',
+        template=ANY,
         no_input=True,
         extra_context={
             'project_name': 'my_project',
