@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, TypeVar, overload
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, overload
 
 from typing_extensions import override
 
@@ -55,6 +55,10 @@ class KeyValueStore(BaseStorage):
     ```
     """
 
+    # Cache for persistent (auto-saved) values
+    _general_cache: ClassVar[dict[str, dict[str, dict[str, JsonSerializable]]]] = {}
+    _persist_state_event_started = False
+
     def __init__(
         self,
         id: str,
@@ -68,10 +72,6 @@ class KeyValueStore(BaseStorage):
 
         # Get resource clients from storage client
         self._resource_client = client.key_value_store(self._id)
-
-        # Cache for persistent (auto-saved) values
-        self._cache: dict[str, dict[str, JsonSerializable]] = {}
-        self._persist_state_event_started = False
 
     @property
     @override
@@ -212,6 +212,13 @@ class KeyValueStore(BaseStorage):
         self._ensure_persist_event()
 
         return value
+
+    @property
+    def _cache(self) -> dict[str, dict[str, JsonSerializable]]:
+        """Cache dictionary for storing auto-saved values indexed by store ID."""
+        if self._id not in self._general_cache:
+            self._general_cache[self._id] = {}
+        return self._general_cache[self._id]
 
     async def _persist_save(self, _event_data: EventPersistStateData | None = None) -> None:
         """Save cache with persistent values. Can be used in Event Manager."""
