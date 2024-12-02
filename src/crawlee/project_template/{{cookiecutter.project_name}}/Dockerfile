@@ -11,7 +11,7 @@ RUN apt install -yq git && rm -rf /var/lib/apt/lists/*
 
 # % if cookiecutter.package_manager == 'poetry'
 RUN pip install -U pip setuptools \
-    && pip install poetry \
+    && pip install 'poetry<2' \
     && poetry self add poetry-plugin-export
 
 # Second, copy just poetry.lock and pyproject.toml into the Actor image,
