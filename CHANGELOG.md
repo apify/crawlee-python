@@ -9,6 +9,10 @@ All notable changes to this project will be documented in this file.
 
 - Improve project bootstrapping ([#538](https://github.com/apify/crawlee-python/pull/538)) ([367899c](https://github.com/apify/crawlee-python/commit/367899cbad5021674f6e41c4dd7eb2266fe043aa)) by [@janbuchar](https://github.com/janbuchar), closes [#317](https://github.com/apify/crawlee-python/issues/317), [#414](https://github.com/apify/crawlee-python/issues/414), [#495](https://github.com/apify/crawlee-python/issues/495), [#511](https://github.com/apify/crawlee-python/issues/511)
 
+### 🐛 Bug Fixes
+
+- Add upper bound of HTTPX version ([#775](https://github.com/apify/crawlee-python/pull/775)) ([b59e34d](https://github.com/apify/crawlee-python/commit/b59e34d6301e26825d88608152ffb337ef602a9f)) by [@vdusek](https://github.com/vdusek)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.4.4](https://github.com/apify/crawlee-python/releases/tag/v0.4.4) (2024-11-29)
