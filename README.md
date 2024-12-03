@@ -187,10 +187,10 @@ Why Crawlee is the preferred choice for web scraping and crawling?
 
 - **Asyncio-based** – Leveraging the standard [Asyncio](https://docs.python.org/3/library/asyncio.html) library, Crawlee delivers better performance and seamless compatibility with other modern asynchronous libraries.
 - **Type hints** – Crawlee is a newer project built with modern Python, and complete type hint coverage for a better developer experience.
-- **Minimalistic and elegant interface** – Set up a functional scraper in fewer than 10 lines of code, keeping things clean and simple.
-- **Headless browser support** – Crawlee natively supports the headless browser crawling via [Playwright](https://playwright.dev/python/).
+- **Simple integration** – Crawlee crawlers are regular Python scripts, requiring no additional launcher executor. This flexibility allows you to integrate a crawler directly into
+other applications.
 - **State persistence** – Unlike Scrapy, Crawlee supports state persistence during interruptions, saving time and costs by avoiding the need to restart scraping pipelines from scratch after an issue.
-- **Separated result storage** – Crawlee provides an easy option for separated result storages ([datasets](https://crawlee.dev/python/api/class/Dataset) & [key-value stores](https://crawlee.dev/python/api/class/KeyValueStore)) for a single scraping run.
+- **Organized data storages** – Crawlee provides an easy option for separated result storages (via [datasets](https://crawlee.dev/python/api/class/Dataset) & [key-value stores](https://crawlee.dev/python/api/class/KeyValueStore)) for a single scraping run.
 
 ## Running on the Apify platform
 
