@@ -304,8 +304,7 @@ class UseStateFunction(Protocol):
     """Type of a function for performing use state.
 
     Warning:
-    -------
-    This is an experimental feature. The behavior and interface may change in future versions.
+        This is an experimental feature. The behavior and interface may change in future versions.
     """
 
     def __call__(
