@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from abc import ABC
 from typing import TYPE_CHECKING, Any, Generic
 
 from pydantic import ValidationError
@@ -40,7 +41,7 @@ class StaticContentCrawlerOptions(Generic[TCrawlingContext], BasicCrawlerOptions
 
 
 @docs_group('Classes')
-class StaticContentCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler[TCrawlingContext]):
+class StaticContentCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler[TCrawlingContext], ABC):
     """A web crawler for performing HTTP requests.
 
     The `StaticContentCrawler` builds on top of the `BasicCrawler`, which means it inherits all of its features. On top

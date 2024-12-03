@@ -23,13 +23,13 @@ class NoParser(StaticContentParser[bytes]):
         return response.read()
 
     @override
-    def is_blocked(self, _: bytes) -> BlockedInfo:
+    def is_blocked(self, parsed_content: bytes) -> BlockedInfo:  # Intentional unused argument.
         return BlockedInfo(reason='')
 
     @override
-    def is_matching_selector(self, _: bytes, selector: str) -> bool:
+    def is_matching_selector(self, parsed_content: bytes, selector: str) -> bool:  # Intentional unused argument.
         return False
 
     @override
-    def find_links(self, _: bytes, selector: str) -> Iterable[str]:
+    def find_links(self, parsed_content: bytes, selector: str) -> Iterable[str]:  # Intentional unused argument.
         return []
