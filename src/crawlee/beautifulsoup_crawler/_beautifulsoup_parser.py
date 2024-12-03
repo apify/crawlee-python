@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Literal
 from bs4 import BeautifulSoup, Tag
 from typing_extensions import override
 
-from crawlee.static_content_crawler._static_content_parser import StaticContentParser
+from crawlee.abstract_http_crawler._abstract_http_parser import AbstractHttpParser
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from crawlee.http_clients import HttpResponse
 
 
-class BeautifulSoupParser(StaticContentParser[BeautifulSoup]):
+class BeautifulSoupParser(AbstractHttpParser[BeautifulSoup]):
     """Parser for parsing http response using BeautifulSoup."""
 
     def __init__(self, parser: BeautifulSoupParserType = 'lxml') -> None:

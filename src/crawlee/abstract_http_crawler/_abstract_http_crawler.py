@@ -11,14 +11,14 @@ from crawlee import EnqueueStrategy
 from crawlee._request import BaseRequestData
 from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
-from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
-from crawlee.errors import SessionError
-from crawlee.http_clients import HttpxHttpClient
-from crawlee.static_content_crawler._static_crawling_context import (
+from crawlee.abstract_http_crawler._http_crawling_context import (
     HttpCrawlingContext,
     ParsedHttpCrawlingContext,
     TParseResult,
 )
+from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
+from crawlee.errors import SessionError
+from crawlee.http_clients import HttpxHttpClient
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Iterable
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from typing_extensions import Unpack
 
     from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, EnqueueLinksKwargs
-    from crawlee.static_content_crawler._static_content_parser import StaticContentParser
+    from crawlee.abstract_http_crawler._abstract_http_parser import AbstractHttpParser
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=ParsedHttpCrawlingContext)
 
@@ -59,7 +59,7 @@ class StaticContentCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler
     def __init__(
         self,
         *,
-        parser: StaticContentParser[TParseResult],
+        parser: AbstractHttpParser[TParseResult],
         additional_http_error_status_codes: Iterable[int] = (),
         ignore_http_error_status_codes: Iterable[int] = (),
         **kwargs: Unpack[BasicCrawlerOptions[TCrawlingContext]],

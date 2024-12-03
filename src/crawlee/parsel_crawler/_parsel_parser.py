@@ -4,11 +4,11 @@ from collections.abc import Iterable
 from parsel import Selector
 from typing_extensions import override
 
+from crawlee.abstract_http_crawler._abstract_http_parser import AbstractHttpParser
 from crawlee.http_clients import HttpResponse
-from crawlee.static_content_crawler._static_content_parser import StaticContentParser
 
 
-class ParselParser(StaticContentParser[Selector]):
+class ParselParser(AbstractHttpParser[Selector]):
     """Parser for parsing http response using Parsel."""
 
     @override

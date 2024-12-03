@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
-from crawlee.static_content_crawler._static_content_parser import BlockedInfo, StaticContentParser
+from crawlee.abstract_http_crawler._abstract_http_parser import AbstractHttpParser, BlockedInfo
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from crawlee.http_clients import HttpResponse
 
 
-class NoParser(StaticContentParser[bytes]):
+class NoParser(AbstractHttpParser[bytes]):
     """Dummy parser for backwards compatibility.
 
     To enable using HttpCrawler without need for additional specific parser.

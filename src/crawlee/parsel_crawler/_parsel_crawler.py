@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING
 from parsel import Selector
 
 from crawlee._utils.docs import docs_group
+from crawlee.abstract_http_crawler import StaticContentCrawler, StaticContentCrawlerOptions
 from crawlee.parsel_crawler._parsel_parser import ParselParser
-from crawlee.static_content_crawler import StaticContentCrawler, StaticContentCrawlerOptions
 
 from ._parsel_crawling_context import ParselCrawlingContext
 
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
     from typing_extensions import Unpack
 
-    from crawlee.static_content_crawler import ParsedHttpCrawlingContext
+    from crawlee.abstract_http_crawler import ParsedHttpCrawlingContext
 
 
 @docs_group('Classes')

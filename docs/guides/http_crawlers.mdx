@@ -9,7 +9,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import CodeBlock from '@theme/CodeBlock';
 
-Generic class <ApiLink to="class/StaticContentCrawler">`StaticContentCrawler`</ApiLink> is parent to <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> and <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink> and it could be used as parent for your crawler with custom content parsing requirements.
+Generic class <ApiLink to="class/AbstractHttpCrawler">`AbstractHttpCrawler`</ApiLink> is parent to <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> and <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink> and it could be used as parent for your crawler with custom content parsing requirements.
 
 It already includes almost all the functionality to crawl webpages and the only missing part is the parser that should be used to parse HTTP responses, and a context dataclass that defines what context helpers will be available to user handler functions.
 

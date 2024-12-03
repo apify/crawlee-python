@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING
 from bs4 import BeautifulSoup
 
 from crawlee._utils.docs import docs_group
+from crawlee.abstract_http_crawler import StaticContentCrawler, StaticContentCrawlerOptions
 from crawlee.beautifulsoup_crawler._beautifulsoup_parser import BeautifulSoupParser, BeautifulSoupParserType
-from crawlee.static_content_crawler import StaticContentCrawler, StaticContentCrawlerOptions
 
 from ._beautifulsoup_crawling_context import BeautifulSoupCrawlingContext
 
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
     from typing_extensions import Unpack
 
-    from crawlee.static_content_crawler import ParsedHttpCrawlingContext
+    from crawlee.abstract_http_crawler import ParsedHttpCrawlingContext
 
 
 @docs_group('Classes')

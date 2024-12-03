@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from crawlee._utils.docs import docs_group
-from crawlee.static_content_crawler import ParsedHttpCrawlingContext, StaticContentCrawler, StaticContentCrawlerOptions
+from crawlee.abstract_http_crawler import ParsedHttpCrawlingContext, StaticContentCrawler, StaticContentCrawlerOptions
 
 from ._http_parser import NoParser
 

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Generic
 
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.docs import docs_group
-from crawlee.static_content_crawler._static_crawling_context import TParseResult
+from crawlee.abstract_http_crawler._http_crawling_context import TParseResult
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -27,7 +27,7 @@ class BlockedInfo:
 
 
 @docs_group('Classes')
-class StaticContentParser(Generic[TParseResult], ABC):
+class AbstractHttpParser(Generic[TParseResult], ABC):
     """Parser used for parsing http response and inspecting parsed result to find links or detect blocking."""
 
     @abstractmethod

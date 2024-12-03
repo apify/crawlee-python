@@ -1,5 +1,5 @@
+from crawlee.abstract_http_crawler._http_crawling_context import HttpCrawlingContext
 from crawlee.http_clients import HttpCrawlingResult
-from crawlee.static_content_crawler._static_crawling_context import HttpCrawlingContext
 
 from ._http_crawler import HttpCrawler
 
