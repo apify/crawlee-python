@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from crawlee._utils.docs import docs_group
-from crawlee.abstract_http_crawler import ParsedHttpCrawlingContext, StaticContentCrawler, StaticContentCrawlerOptions
+from crawlee.abstract_http_crawler import AbstractHttpCrawler, HttpCrawlerOptions, ParsedHttpCrawlingContext
 
 from ._http_parser import NoParser
 
@@ -12,12 +12,12 @@ if TYPE_CHECKING:
 
 
 @docs_group('Classes')
-class HttpCrawler(StaticContentCrawler[ParsedHttpCrawlingContext[bytes], bytes]):
-    """Specific version of generic StaticContentCrawler.
+class HttpCrawler(AbstractHttpCrawler[ParsedHttpCrawlingContext[bytes], bytes]):
+    """Specific version of generic AbstractHttpCrawler.
 
     It uses a dummy parser that just returns the HTTP response body as is.
     It is recommended to rather use `BeautifulSoupCrawler` or `ParselCrawler` or to write your own subclass of
-    `StaticContentCrawler`.
+    `AbstractHttpCrawler`.
 
     ### Usage
 
@@ -46,12 +46,12 @@ class HttpCrawler(StaticContentCrawler[ParsedHttpCrawlingContext[bytes], bytes])
 
     def __init__(
         self,
-        **kwargs: Unpack[StaticContentCrawlerOptions[ParsedHttpCrawlingContext[bytes]]],
+        **kwargs: Unpack[HttpCrawlerOptions[ParsedHttpCrawlingContext[bytes]]],
     ) -> None:
         """A default constructor.
 
         Args:
-            kwargs: Additional keyword arguments to pass to the underlying `StaticContentCrawler`.
+            kwargs: Additional keyword arguments to pass to the underlying `AbstractHttpCrawler`.
         """
         kwargs['_context_pipeline'] = self._create_static_content_crawler_pipeline()
         super().__init__(

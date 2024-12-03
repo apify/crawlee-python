@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from bs4 import BeautifulSoup
 
 from crawlee._utils.docs import docs_group
-from crawlee.abstract_http_crawler import StaticContentCrawler, StaticContentCrawlerOptions
+from crawlee.abstract_http_crawler import AbstractHttpCrawler, HttpCrawlerOptions
 from crawlee.beautifulsoup_crawler._beautifulsoup_parser import BeautifulSoupParser, BeautifulSoupParserType
 
 from ._beautifulsoup_crawling_context import BeautifulSoupCrawlingContext
@@ -19,10 +19,10 @@ if TYPE_CHECKING:
 
 
 @docs_group('Classes')
-class BeautifulSoupCrawler(StaticContentCrawler[BeautifulSoupCrawlingContext, BeautifulSoup]):
+class BeautifulSoupCrawler(AbstractHttpCrawler[BeautifulSoupCrawlingContext, BeautifulSoup]):
     """A web crawler for performing HTTP requests and parsing HTML/XML content.
 
-    The `BeautifulSoupCrawler` builds on top of the `StaticContentCrawler`, which means it inherits all of its features.
+    The `BeautifulSoupCrawler` builds on top of the `AbstractHttpCrawler`, which means it inherits all of its features.
     It specifies its own parser BeautifulSoupParser which is used to parse HttpResponse.
 
     The HTTP client-based crawlers are ideal for websites that do not require JavaScript execution. However,
@@ -57,13 +57,13 @@ class BeautifulSoupCrawler(StaticContentCrawler[BeautifulSoupCrawlingContext, Be
         self,
         *,
         parser: BeautifulSoupParserType = 'lxml',
-        **kwargs: Unpack[StaticContentCrawlerOptions[BeautifulSoupCrawlingContext]],
+        **kwargs: Unpack[HttpCrawlerOptions[BeautifulSoupCrawlingContext]],
     ) -> None:
         """A default constructor.
 
         Args:
             parser: The type of parser that should be used by `BeautifulSoup`.
-            kwargs: Additional keyword arguments to pass to the underlying `StaticContentCrawler`.
+            kwargs: Additional keyword arguments to pass to the underlying `AbstractHttpCrawler`.
         """
 
         async def final_step(

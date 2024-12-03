@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from parsel import Selector
 
 from crawlee._utils.docs import docs_group
-from crawlee.abstract_http_crawler import StaticContentCrawler, StaticContentCrawlerOptions
+from crawlee.abstract_http_crawler import AbstractHttpCrawler, HttpCrawlerOptions
 from crawlee.parsel_crawler._parsel_parser import ParselParser
 
 from ._parsel_crawling_context import ParselCrawlingContext
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 
 @docs_group('Classes')
-class ParselCrawler(StaticContentCrawler[ParselCrawlingContext, Selector]):
+class ParselCrawler(AbstractHttpCrawler[ParselCrawlingContext, Selector]):
     """A web crawler for performing HTTP requests and parsing HTML/XML content.
 
     The `ParselCrawler` builds on top of the `BasicCrawler`, which means it inherits all of its features.
@@ -55,12 +55,12 @@ class ParselCrawler(StaticContentCrawler[ParselCrawlingContext, Selector]):
 
     def __init__(
         self,
-        **kwargs: Unpack[StaticContentCrawlerOptions[ParselCrawlingContext]],
+        **kwargs: Unpack[HttpCrawlerOptions[ParselCrawlingContext]],
     ) -> None:
         """A default constructor.
 
         Args:
-            kwargs: Additional keyword arguments to pass to the underlying `StaticContentCrawler`.
+            kwargs: Additional keyword arguments to pass to the underlying `AbstractHttpCrawler`.
         """
 
         async def final_step(

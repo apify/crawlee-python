@@ -32,7 +32,7 @@ TCrawlingContext = TypeVar('TCrawlingContext', bound=ParsedHttpCrawlingContext)
 
 
 @docs_group('Data structures')
-class StaticContentCrawlerOptions(Generic[TCrawlingContext], BasicCrawlerOptions[TCrawlingContext]):
+class HttpCrawlerOptions(Generic[TCrawlingContext], BasicCrawlerOptions[TCrawlingContext]):
     additional_http_error_status_codes: NotRequired[Iterable[int]]
     """Additional HTTP status codes to treat as errors, triggering automatic retries when encountered."""
 
@@ -41,14 +41,14 @@ class StaticContentCrawlerOptions(Generic[TCrawlingContext], BasicCrawlerOptions
 
 
 @docs_group('Abstract classes')
-class StaticContentCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler[TCrawlingContext], ABC):
+class AbstractHttpCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler[TCrawlingContext], ABC):
     """A web crawler for performing HTTP requests.
 
-    The `StaticContentCrawler` builds on top of the `BasicCrawler`, which means it inherits all of its features. On top
+    The `AbstractHttpCrawler` builds on top of the `BasicCrawler`, which means it inherits all of its features. On top
     of that it implements the HTTP communication using the HTTP clients. The class allows integration with
     any HTTP client that implements the `BaseHttpClient` interface. The HTTP client is provided to the crawler
     as an input parameter to the constructor.
-    StaticContentCrawler is generic class and is expected to be used together with specific parser that will be used to
+    AbstractHttpCrawler is generic class and is expected to be used together with specific parser that will be used to
     parse http response and type of expected TCrawlingContext which is available to the user function.
     See prepared specific version of it: BeautifulSoupCrawler, ParselCrawler or HttpCrawler for example.
 
@@ -77,7 +77,7 @@ class StaticContentCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler
         if '_context_pipeline' not in kwargs:
             raise ValueError(
                 'Please pass in a `_context_pipeline`. You should use the '
-                'StaticContentCrawler._create_static_content_crawler_pipeline() method to initialize it.'
+                'AbstractHttpCrawler._create_static_content_crawler_pipeline() method to initialize it.'
             )
 
         kwargs.setdefault('_logger', logging.getLogger(__name__))

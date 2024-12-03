@@ -26,7 +26,7 @@ class BlockedInfo:
         return bool(self.reason)
 
 
-@docs_group('Classes')
+@docs_group('Abstract classes')
 class AbstractHttpParser(Generic[TParseResult], ABC):
     """Parser used for parsing http response and inspecting parsed result to find links or detect blocking."""
 
