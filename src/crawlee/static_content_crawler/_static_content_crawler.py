@@ -40,7 +40,7 @@ class StaticContentCrawlerOptions(Generic[TCrawlingContext], BasicCrawlerOptions
     """HTTP status codes typically considered errors but to be treated as successful responses."""
 
 
-@docs_group('Classes')
+@docs_group('Abstract classes')
 class StaticContentCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler[TCrawlingContext], ABC):
     """A web crawler for performing HTTP requests.
 
