@@ -95,7 +95,7 @@ class AbstractHttpCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler[
     async def _parse_http_response(
         self, context: HttpCrawlingContext
     ) -> AsyncGenerator[ParsedHttpCrawlingContext[TParseResult], None]:
-        """Parse http response and create context enhanced by the parsing result and enqueue links function.
+        """Parse HTTP response and create context enhanced by the parsing result and enqueue links function.
 
         Args:
             context: The current crawling context, that includes http response.
@@ -157,13 +157,13 @@ class AbstractHttpCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler[
         return enqueue_links
 
     async def _make_http_request(self, context: BasicCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
-        """Make http request and create context enhanced by http response.
+        """Make http request and create context enhanced by HTTP response.
 
         Args:
             context: The current crawling context.
 
         Yields:
-            The original crawling context enhanced by http response.
+            The original crawling context enhanced by HTTP response.
         """
         result = await self._http_client.crawl(
             request=context.request,

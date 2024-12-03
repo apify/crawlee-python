@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 
 class BeautifulSoupParser(AbstractHttpParser[BeautifulSoup]):
-    """Parser for parsing http response using BeautifulSoup."""
+    """Parser for parsing HTTP response using `BeautifulSoup`."""
 
     def __init__(self, parser: BeautifulSoupParserType = 'lxml') -> None:
         self._parser = parser

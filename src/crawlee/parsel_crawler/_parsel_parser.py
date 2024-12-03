@@ -9,7 +9,7 @@ from crawlee.http_clients import HttpResponse
 
 
 class ParselParser(AbstractHttpParser[Selector]):
-    """Parser for parsing http response using Parsel."""
+    """Parser for parsing HTTP response using Parsel."""
 
     @override
     async def parse(self, response: HttpResponse) -> Selector:

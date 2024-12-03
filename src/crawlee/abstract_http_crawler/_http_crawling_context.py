@@ -19,7 +19,7 @@ class HttpCrawlingContext(BasicCrawlingContext, HttpCrawlingResult):
 
     @classmethod
     def from_basic_crawling_context(cls, context: BasicCrawlingContext, http_response: HttpResponse) -> Self:
-        """Convenience constructor that creates HttpCrawlingContext from existing BasicCrawlingContext."""
+        """Convenience constructor that creates `HttpCrawlingContext` from existing `BasicCrawlingContext`."""
         context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
         return cls(http_response=http_response, **context_kwargs)
 
@@ -27,7 +27,7 @@ class HttpCrawlingContext(BasicCrawlingContext, HttpCrawlingResult):
 @dataclass(frozen=True)
 @docs_group('Data structures')
 class ParsedHttpCrawlingContext(Generic[TParseResult], HttpCrawlingContext):
-    """The crawling context used by AbstractHttpCrawler.
+    """The crawling context used by `AbstractHttpCrawler`.
 
     It provides access to key objects as well as utility functions for handling crawling tasks.
     """

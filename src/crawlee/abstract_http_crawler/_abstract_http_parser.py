@@ -35,23 +35,23 @@ class AbstractHttpParser(Generic[TParseResult], ABC):
         """Parse http response.
 
         Args:
-            response: Http response to be parsed.
+            response: HTTP response to be parsed.
 
         Returns:
-            Parsed http response.
+            Parsed HTTP response.
         """
 
     def is_blocked(self, parsed_content: TParseResult) -> BlockedInfo:
         """Detect if blocked and return BlockedInfo with additional information.
 
-        Default implementation that expects is_matching_selector abstract method to be implemented.
+        Default implementation that expects `is_matching_selector` abstract method to be implemented.
         Override this method if your parser has different way of blockage detection.
 
         Args:
-            parsed_content: Parsed http response. Result of parse method.
+            parsed_content: Parsed HTTP response. Result of `parse` method.
 
         Returns:
-            BlockedInfo object that contains non-empty string description of reason if blockage was detected. Empty
+            `BlockedInfo` object that contains non-empty string description of reason if blockage was detected. Empty
             string in reason signifies no blockage detected.
         """
         reason = ''
@@ -73,7 +73,7 @@ class AbstractHttpParser(Generic[TParseResult], ABC):
         """Find if selector has match in parsed content.
 
         Args:
-            parsed_content: Parsed http response. Result of parse method.
+            parsed_content: Parsed HTTP response. Result of `parse` method.
             selector: String used to define matching pattern.
 
         Returns:
@@ -85,7 +85,7 @@ class AbstractHttpParser(Generic[TParseResult], ABC):
         """Find all links in result using selector.
 
         Args:
-            parsed_content: Parsed http response. Result of parse method.
+            parsed_content: Parsed HTTP response. Result of `parse` method.
             selector: String used to define matching pattern for finding links.
 
         Returns:

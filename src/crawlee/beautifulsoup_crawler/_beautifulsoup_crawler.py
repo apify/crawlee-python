@@ -23,7 +23,7 @@ class BeautifulSoupCrawler(AbstractHttpCrawler[BeautifulSoupCrawlingContext, Bea
     """A web crawler for performing HTTP requests and parsing HTML/XML content.
 
     The `BeautifulSoupCrawler` builds on top of the `AbstractHttpCrawler`, which means it inherits all of its features.
-    It specifies its own parser BeautifulSoupParser which is used to parse HttpResponse.
+    It specifies its own parser `BeautifulSoupParser` which is used to parse `HttpResponse`.
 
     The HTTP client-based crawlers are ideal for websites that do not require JavaScript execution. However,
     if you need to execute client-side JavaScript, consider using browser-based crawler like the `PlaywrightCrawler`.
@@ -69,7 +69,7 @@ class BeautifulSoupCrawler(AbstractHttpCrawler[BeautifulSoupCrawlingContext, Bea
         async def final_step(
             context: ParsedHttpCrawlingContext[BeautifulSoup],
         ) -> AsyncGenerator[BeautifulSoupCrawlingContext, None]:
-            """Enhance ParsedHttpCrawlingContext[BeautifulSoup] with soup property."""
+            """Enhance `ParsedHttpCrawlingContext[BeautifulSoup]` with `soup` property."""
             yield BeautifulSoupCrawlingContext.from_parsed_http_crawling_context(context)
 
         kwargs['_context_pipeline'] = self._create_static_content_crawler_pipeline().compose(final_step)

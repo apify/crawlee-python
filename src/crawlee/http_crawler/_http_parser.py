@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 class NoParser(AbstractHttpParser[bytes]):
     """Dummy parser for backwards compatibility.
 
-    To enable using HttpCrawler without need for additional specific parser.
+    To enable using `HttpCrawler` without need for additional specific parser.
     """
 
     @override

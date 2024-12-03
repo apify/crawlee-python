@@ -13,11 +13,9 @@ if TYPE_CHECKING:
 
 @docs_group('Classes')
 class HttpCrawler(AbstractHttpCrawler[ParsedHttpCrawlingContext[bytes], bytes]):
-    """Specific version of generic AbstractHttpCrawler.
+    """Specific version of generic `AbstractHttpCrawler`.
 
-    It uses a dummy parser that just returns the HTTP response body as is.
-    It is recommended to rather use `BeautifulSoupCrawler` or `ParselCrawler` or to write your own subclass of
-    `AbstractHttpCrawler`.
+    It uses a dummy parser that simply returns the HTTP response body as-is. Use this only if you know what you are doing. In most cases, using an HTML parser would be more beneficial. For such scenarios, consider using `BeautifulSoupCrawler`, `ParselCrawler`, or writing your own subclass of `AbstractHttpCrawler`.
 
     ### Usage
 

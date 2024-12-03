@@ -22,8 +22,8 @@ if TYPE_CHECKING:
 class ParselCrawler(AbstractHttpCrawler[ParselCrawlingContext, Selector]):
     """A web crawler for performing HTTP requests and parsing HTML/XML content.
 
-    The `ParselCrawler` builds on top of the `BasicCrawler`, which means it inherits all of its features.
-    It specifies its own parser ParselParser which is used to parse HttpResponse.
+    The `ParselCrawler` builds on top of the `AbstractHttpCrawler`, which means it inherits all of its features.
+    It specifies its own parser `ParselParser` which is used to parse `HttpResponse`.
 
     The HTTP client-based crawlers are ideal for websites that do not require JavaScript execution. However,
     if you need to execute client-side JavaScript, consider using browser-based crawler like the `PlaywrightCrawler`.
@@ -66,7 +66,7 @@ class ParselCrawler(AbstractHttpCrawler[ParselCrawlingContext, Selector]):
         async def final_step(
             context: ParsedHttpCrawlingContext[Selector],
         ) -> AsyncGenerator[ParselCrawlingContext, None]:
-            """Enhance ParsedHttpCrawlingContext[Selector] with selector property."""
+            """Enhance `ParsedHttpCrawlingContext[Selector]` with a `selector` property."""
             yield ParselCrawlingContext.from_parsed_http_crawling_context(context)
 
         kwargs['_context_pipeline'] = self._create_static_content_crawler_pipeline().compose(final_step)
