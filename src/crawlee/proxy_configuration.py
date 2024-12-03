@@ -68,7 +68,7 @@ class ProxyConfiguration:
     def __init__(
         self,
         *,
-        proxy_urls: list[str] | None = None,
+        proxy_urls: list[str | None] | None = None,
         new_url_function: _NewUrlFunction | None = None,
         tiered_proxy_urls: list[list[str | None]] | None = None,
     ) -> None:
@@ -95,17 +95,15 @@ class ProxyConfiguration:
                 'must be specified (and non-empty).'
             )
 
-        self._proxy_urls = (
-            [URL(url) for url in proxy_urls if self._url_validator.validate_python(url)] if proxy_urls else []
-        )
+        self._proxy_urls = [self._create_url(url) for url in proxy_urls] if proxy_urls else []
         self._proxy_tier_tracker = (
-            _ProxyTierTracker([[self._create_tiered_url(url) for url in tier] for tier in tiered_proxy_urls])
+            _ProxyTierTracker([[self._create_url(url) for url in tier] for tier in tiered_proxy_urls])
             if tiered_proxy_urls
             else None
         )
         self._new_url_function = new_url_function
 
-    def _create_tiered_url(self, url: str | None) -> URL | None:
+    def _create_url(self, url: str | None) -> URL | None:
         """Create URL from input string. None means that intentionally no proxy should be used."""
         if url is None:
             return None
