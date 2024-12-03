@@ -33,6 +33,11 @@ TCrawlingContext = TypeVar('TCrawlingContext', bound=ParsedHttpCrawlingContext)
 
 @docs_group('Data structures')
 class HttpCrawlerOptions(Generic[TCrawlingContext], BasicCrawlerOptions[TCrawlingContext]):
+    """Arguments for the `AbstractHttpCrawler` constructor.
+
+    It is intended for typing forwarded `__init__` arguments in the subclasses.
+    """
+
     additional_http_error_status_codes: NotRequired[Iterable[int]]
     """Additional HTTP status codes to treat as errors, triggering automatic retries when encountered."""
 

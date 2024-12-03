@@ -10,6 +10,11 @@ from crawlee.abstract_http_crawler._http_crawling_context import ParsedHttpCrawl
 @dataclass(frozen=True)
 @docs_group('Data structures')
 class BeautifulSoupCrawlingContext(ParsedHttpCrawlingContext[BeautifulSoup]):
+    """The crawling context used by the `BeautifulSoupCrawler`.
+
+    It provides access to key objects as well as utility functions for handling crawling tasks.
+    """
+
     @property
     def soup(self) -> BeautifulSoup:
         """Convenience alias."""

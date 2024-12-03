@@ -24,6 +24,7 @@ class ParselCrawler(AbstractHttpCrawler[ParselCrawlingContext, Selector]):
 
     The `ParselCrawler` builds on top of the `AbstractHttpCrawler`, which means it inherits all of its features.
     It specifies its own parser `ParselParser` which is used to parse `HttpResponse`.
+    ParselParser uses following library for parsing: https://pypi.org/project/parsel/
 
     The HTTP client-based crawlers are ideal for websites that do not require JavaScript execution. However,
     if you need to execute client-side JavaScript, consider using browser-based crawler like the `PlaywrightCrawler`.
