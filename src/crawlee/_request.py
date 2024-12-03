@@ -282,6 +282,7 @@ class Request(BaseRequestData):
         keep_url_fragment: bool = False,
         use_extended_unique_key: bool = False,
         always_enqueue: bool = False,
+        metadata: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Self:
         """Create a new `Request` instance from a URL.
@@ -308,6 +309,8 @@ class Request(BaseRequestData):
                 computation. This is only relevant when `unique_key` is not provided.
             always_enqueue: If set to `True`, the request will be enqueued even if it is already present in the queue.
                 Using this is not allowed when a custom `unique_key` is also provided and will result in a `ValueError`.
+            metadata: Additional metadata dict that gets stored in the `user_data.model_extra`.
+                Useful for passing info from request to context.
             **kwargs: Additional request properties.
         """
         if unique_key is not None and always_enqueue:
@@ -345,6 +348,8 @@ class Request(BaseRequestData):
 
         if label is not None:
             request.user_data['label'] = label
+        if metadata is not None:
+            request.user_data.update(metadata)
 
         return request
 
