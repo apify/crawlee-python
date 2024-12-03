@@ -103,7 +103,7 @@ class AbstractHttpCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler[
         """Parse HTTP response and create context enhanced by the parsing result and enqueue links function.
 
         Args:
-            context: The current crawling context, that includes http response.
+            context: The current crawling context, that includes HTTP response.
 
         Yields:
             The original crawling context enhanced by the parsing result and enqueue links function.
