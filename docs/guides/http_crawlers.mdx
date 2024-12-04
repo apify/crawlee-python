@@ -24,10 +24,10 @@ It already includes almost all the functionality to crawl webpages and the only 
 
 ## Creating your own HTTP crawler.
 ### Why?
-In case you want to use some custom parser for parsing HTTP responses, and the rest of the AbstractHttpCrawler functionality suit your needs.\
+In case you want to use some custom parser for parsing HTTP responses, and the rest of the <ApiLink to="class/AbstractHttpCrawler">`AbstractHttpCrawler`</ApiLink> functionality suit your needs.\
 
 ### How?
-You need to define at least 2 new classes and decide what will be the type returned by the Parser's parse method.\
+You need to define at least 2 new classes and decide what will be the type returned by the parser's `parse` method.\
 Parser will inherit from <ApiLink to="class/AbstractHttpParser">`AbstractHttpParser`</ApiLink> and it will need to implement all it's abstract methods.\
 Crawler will inherit from <ApiLink to="class/AbstractHttpCrawler">`AbstractHttpCrawler`</ApiLink> and it will need to implement all it's abstract methods.\
 Newly defined parser is then used in the `parser` argument of `AbstractHttpCrawler.__init__` method.\
