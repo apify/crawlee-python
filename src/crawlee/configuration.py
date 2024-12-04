@@ -239,9 +239,9 @@ class Configuration(BaseSettings):
         """
         from crawlee.service_container import get_configuration
 
-        cfg = get_configuration()
+        config = get_configuration()
 
-        if not isinstance(cfg, cls):
-            raise TypeError(f'Requested global configuration object of type {cls}, but {cfg.__class__} was found')
+        if not isinstance(config, cls):
+            raise TypeError(f'Requested global configuration object of type {cls}, but {config.__class__} was found')
 
-        return cfg
+        return config
