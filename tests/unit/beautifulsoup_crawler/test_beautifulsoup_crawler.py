@@ -9,7 +9,6 @@ from httpx import Response
 
 from crawlee import ConcurrencySettings
 from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler
-from crawlee.storages import RequestList
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator

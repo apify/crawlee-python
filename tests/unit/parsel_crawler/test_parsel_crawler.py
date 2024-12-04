@@ -11,7 +11,6 @@ from httpx import Response
 from crawlee import ConcurrencySettings
 from crawlee._request import BaseRequestData
 from crawlee.parsel_crawler import ParselCrawler
-from crawlee.storages import RequestList
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
