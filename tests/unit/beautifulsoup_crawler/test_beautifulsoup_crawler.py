@@ -163,6 +163,6 @@ async def test_enqueue_links_with_max_crawl(server: respx.MockRouter) -> None:
 
 async def test_handle_blocked_request(server: respx.MockRouter) -> None:
     crawler = BeautifulSoupCrawler(max_session_rotations=1)
-    stats = await crawler.run('https://test.io/fdyr')
+    stats = await crawler.run(['https://test.io/fdyr'])
     assert server['incapsula_endpoint'].called
     assert stats.requests_failed == 1
