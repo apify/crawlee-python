@@ -14,7 +14,7 @@ from crawlee.storages._request_queue import RequestQueue
 async def test_actor_memory_storage_client_key_value_store_e2e(
     monkeypatch: pytest.MonkeyPatch,
     purge_on_start: bool,  # noqa: FBT001
-    reset_globals: Callable[[], None],
+    prepare_test_env: Callable[[], None],
 ) -> None:
     """This test simulates two clean runs using memory storage.
     The second run attempts to access data created by the first one.
@@ -32,7 +32,7 @@ async def test_actor_memory_storage_client_key_value_store_e2e(
 
     # We simulate another clean run, we expect the memory storage to read from the local data directory
     # Default storages are purged based on purge_on_start parameter.
-    reset_globals()
+    prepare_test_env()
 
     # Check if we're using a different memory storage instance
     assert old_client is not service_container.get_storage_client()
@@ -54,7 +54,7 @@ async def test_actor_memory_storage_client_key_value_store_e2e(
 async def test_actor_memory_storage_client_request_queue_e2e(
     monkeypatch: pytest.MonkeyPatch,
     purge_on_start: bool,  # noqa: FBT001
-    reset_globals: Callable[[], None],
+    prepare_test_env: Callable[[], None],
 ) -> None:
     """This test simulates two clean runs using memory storage.
     The second run attempts to access data created by the first one.
@@ -82,7 +82,7 @@ async def test_actor_memory_storage_client_request_queue_e2e(
 
     # We simulate another clean run, we expect the memory storage to read from the local data directory
     # Default storages are purged based on purge_on_start parameter.
-    reset_globals()
+    prepare_test_env()
 
     # Add some more requests to the default queue
     default_queue = await RequestQueue.open()

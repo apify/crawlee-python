@@ -95,21 +95,16 @@ def get_configuration() -> Configuration:
 
 
 @docs_group('Functions')
-def set_configuration(
-    configuration: Configuration,
-    *,
-    force: bool = False,
-) -> None:
+def set_configuration(configuration: Configuration) -> None:
     """Set the configuration.
 
     Args:
         configuration: The configuration to set.
-        force: If True, the configuration will be set even if it was already set.
 
     Raises:
         ServiceConflictError: If the configuration was already set.
     """
-    if _service_locator.configuration_was_set and not force:
+    if _service_locator.configuration_was_set:
         raise ServiceConflictError(Configuration, configuration, _service_locator.configuration)
 
     _service_locator.configuration = configuration
@@ -122,21 +117,16 @@ def get_event_manager() -> EventManager:
 
 
 @docs_group('Functions')
-def set_event_manager(
-    event_manager: EventManager,
-    *,
-    force: bool = False,
-) -> None:
+def set_event_manager(event_manager: EventManager) -> None:
     """Set the event manager.
 
     Args:
         event_manager: The event manager to set.
-        force: If True, the event manager will be set even if it was already set.
 
     Raises:
         ServiceConflictError: If the event manager was already set.
     """
-    if _service_locator.event_manager_was_set and not force:
+    if _service_locator.event_manager_was_set:
         raise ServiceConflictError(EventManager, event_manager, _service_locator.event_manager)
 
     _service_locator.event_manager = event_manager
@@ -149,21 +139,16 @@ def get_storage_client() -> BaseStorageClient:
 
 
 @docs_group('Functions')
-def set_storage_client(
-    storage_client: BaseStorageClient,
-    *,
-    force: bool = False,
-) -> None:
+def set_storage_client(storage_client: BaseStorageClient) -> None:
     """Set the storage client.
 
     Args:
         storage_client: The storage client to set.
-        force: If True, the storage client will be set even if it was already set.
 
     Raises:
         ServiceConflictError: If the storage client was already set.
     """
-    if _service_locator.storage_client_was_set and not force:
+    if _service_locator.storage_client_was_set:
         raise ServiceConflictError(BaseStorageClient, storage_client, _service_locator.storage_client)
 
     _service_locator.storage_client = storage_client

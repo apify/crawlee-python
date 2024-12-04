@@ -114,7 +114,7 @@ async def test_create_session_function() -> None:
 
 async def test_session_pool_persist(event_manager: EventManager, kvs: KeyValueStore) -> None:
     """Test persistence of session pool state to KVS and validate stored data integrity."""
-    service_container.set_event_manager(event_manager, force=True)
+    service_container.set_event_manager(event_manager)
 
     async with SessionPool(
         max_pool_size=MAX_POOL_SIZE,
@@ -145,7 +145,7 @@ async def test_session_pool_persist(event_manager: EventManager, kvs: KeyValueSt
 
 async def test_session_pool_persist_and_restore(event_manager: EventManager, kvs: KeyValueStore) -> None:
     """Check session pool's ability to persist its state and then restore it accurately after reset."""
-    service_container.set_event_manager(event_manager, force=True)
+    service_container.set_event_manager(event_manager)
 
     async with SessionPool(
         max_pool_size=MAX_POOL_SIZE,

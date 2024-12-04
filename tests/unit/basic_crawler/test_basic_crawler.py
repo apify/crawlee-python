@@ -865,7 +865,7 @@ async def test_consecutive_runs_purge_request_queue() -> None:
 
 async def test_respects_no_persist_storage() -> None:
     config = Configuration(persist_storage=False)
-    service_container.set_configuration(config, force=True)
+    service_container.set_configuration(config)
     crawler = BasicCrawler()
 
     @crawler.router.default_handler
