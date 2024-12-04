@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock
 
 import httpx
 import pytest
@@ -20,7 +20,6 @@ from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpHeaders
 from crawlee.basic_crawler import BasicCrawler
 from crawlee.configuration import Configuration
 from crawlee.errors import SessionError, UserDefinedErrorHandlerError
-from crawlee.events import EventManager
 from crawlee.statistics import FinalStatistics
 from crawlee.storages import Dataset, KeyValueStore, RequestList, RequestQueue
 
@@ -34,19 +33,10 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture
-async def mock_event_manager() -> AsyncGenerator[EventManager, None]:
-    async with EventManager(persist_state_interval=timedelta(milliseconds=50)) as event_manager:
-        with patch('crawlee.service_container.get_event_manager', return_value=event_manager):
-            yield event_manager
-
-
-@pytest.fixture
 async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
     kvs = await KeyValueStore.open()
     yield kvs
     await kvs.drop()
-    kvs._clear_cache()
-    kvs._drop_persist_state_event()
 
 
 async def test_processes_requests() -> None:
@@ -696,7 +686,7 @@ async def test_context_update_kv_store() -> None:
     assert (await store.get_value('foo')) == 'bar'
 
 
-async def test_context_use_state(key_value_store: KeyValueStore, mock_event_manager: EventManager) -> None:
+async def test_context_use_state(key_value_store: KeyValueStore) -> None:
     crawler = BasicCrawler()
 
     @crawler.router.default_handler
@@ -710,7 +700,7 @@ async def test_context_use_state(key_value_store: KeyValueStore, mock_event_mana
     assert (await store.get_value('state')) == {'hello': 'world'}
 
 
-async def test_context_handlers_use_state(key_value_store: KeyValueStore, mock_event_manager: EventManager) -> None:
+async def test_context_handlers_use_state(key_value_store: KeyValueStore) -> None:
     state_in_handler_one: dict[str, JsonSerializable] = {}
     state_in_handler_two: dict[str, JsonSerializable] = {}
     state_in_handler_three: dict[str, JsonSerializable] = {}

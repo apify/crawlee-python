@@ -22,8 +22,6 @@ async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
     kvs = await KeyValueStore.open()
     yield kvs
     await kvs.drop()
-    kvs._clear_cache()
-    kvs._drop_persist_state_event()
 
 
 @pytest.fixture

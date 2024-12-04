@@ -112,6 +112,7 @@ class KeyValueStore(BaseStorage):
         from crawlee.storages._creation_management import remove_storage_from_cache
 
         await self._resource_client.delete()
+        self._clear_cache()
         remove_storage_from_cache(storage_class=self.__class__, id=self._id, name=self._name)
 
     @overload
