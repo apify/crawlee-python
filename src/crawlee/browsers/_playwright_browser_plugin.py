@@ -122,6 +122,9 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
             browser = await self._playwright.firefox.launch(**self._browser_options)
         elif self._browser_type == 'webkit':
             browser = await self._playwright.webkit.launch(**self._browser_options)
+        elif self._browser_type == 'camoufox':
+            from camoufox.async_api import AsyncCamoufox
+            browser = await AsyncCamoufox().__aenter__()
         else:
             raise ValueError(f'Invalid browser type: {self._browser_type}')
 

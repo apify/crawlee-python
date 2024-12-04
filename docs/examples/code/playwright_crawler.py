@@ -10,7 +10,7 @@ async def main() -> None:
         # Headless mode, set to False to see the browser in action.
         headless=False,
         # Browser types supported by Playwright.
-        browser_type='chromium',
+        browser_type='camoufox',
     )
 
     # Define the default request handler, which will be called for every request.
