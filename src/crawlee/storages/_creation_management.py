@@ -121,8 +121,8 @@ def _get_default_storage_id(configuration: Configuration, storage_class: type[TR
 async def open_storage(
     *,
     storage_class: type[TResource],
-    id: str | None = None,
-    name: str | None = None,
+    id: str | None,
+    name: str | None,
     configuration: Configuration,
     storage_client: BaseStorageClient,
 ) -> TResource:
