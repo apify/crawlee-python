@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import shutil
 from datetime import datetime, timezone
@@ -12,10 +11,10 @@ from typing import TYPE_CHECKING
 from sortedcollections import ValueSortedDict  # type: ignore[import-untyped]
 from typing_extensions import override
 
+from crawlee._request import InternalRequest
 from crawlee._types import StorageTypes
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import (
-    filter_out_none_values_recursively,
     raise_on_duplicate_storage,
     raise_on_non_existing_storage,
 )
@@ -200,16 +199,14 @@ class RequestQueueClient(BaseRequestQueueClient):
 
                 # Check that the request still exists and was not handled,
                 # in case something deleted it or marked it as handled concurrenctly
-                if request and request.order_no:
-                    requests.append(request)
-
-            items = [request for item in requests if (request := self._json_to_request(item.json_))]
+                if request and not request.handled_at:
+                    requests.append(Request.model_validate(request.model_dump()))
 
             return RequestQueueHead(
                 limit=limit,
                 had_multiple_clients=False,
                 queue_modified_at=existing_queue_by_id._modified_at,  # noqa: SLF001
-                items=items,
+                items=requests,
             )
 
     @override
@@ -253,7 +250,7 @@ class RequestQueueClient(BaseRequestQueueClient):
                     id=request_model.id,
                     unique_key=request_model.unique_key,
                     was_already_present=True,
-                    was_already_handled=existing_request_with_id.order_no is None,
+                    was_already_handled=existing_request_with_id.handled_at,
                 )
 
             existing_queue_by_id.requests[request_model.id] = request_model
@@ -292,8 +289,8 @@ class RequestQueueClient(BaseRequestQueueClient):
         async with existing_queue_by_id.file_operation_lock:
             await existing_queue_by_id.update_timestamps(has_been_modified=False)
 
-            request: Request = existing_queue_by_id.requests.get(request_id)
-            return self._json_to_request(request.json_ if request is not None else None)
+            internal_request: InternalRequest = existing_queue_by_id.requests.get(request_id)
+            return Request(**internal_request.model_dump()) if internal_request else None
 
     @override
     async def update_request(
@@ -328,8 +325,9 @@ class RequestQueueClient(BaseRequestQueueClient):
             existing_queue_by_id.requests[request_model.id] = request_model
 
             pending_count_adjustment = 0
-            is_request_handled_state_changing = not isinstance(existing_request.order_no, type(request_model.order_no))
-            request_was_handled_before_update = existing_request.order_no is None
+            is_request_handled_state_changing = existing_request.handled_at != request_model.handled_at
+
+            request_was_handled_before_update = existing_request.handled_at is not None
 
             # We add 1 pending request if previous state was handled
             if is_request_handled_state_changing:
@@ -368,7 +366,7 @@ class RequestQueueClient(BaseRequestQueueClient):
 
             if request:
                 del existing_queue_by_id.requests[request_id]
-                if request.order_no is None:
+                if request.handled_at:
                     existing_queue_by_id.handled_request_count -= 1
                 else:
                     existing_queue_by_id.pending_request_count -= 1
@@ -501,18 +499,7 @@ class RequestQueueClient(BaseRequestQueueClient):
         file_path = os.path.join(entity_directory, f'{request_id}.json')
         await force_remove(file_path)
 
-    def _json_to_request(self, request_json: str | None) -> Request | None:
-        if request_json is None:
-            return None
-
-        request_dict = filter_out_none_values_recursively(json.loads(request_json))
-
-        if request_dict is None:
-            return None
-
-        return Request.model_validate(request_dict)
-
-    async def _create_internal_request(self, request: Request, forefront: bool | None) -> Request:
+    async def _create_internal_request(self, request: Request, forefront: bool | None) -> InternalRequest:
         order_no = self._calculate_order_no(request, forefront)
         id = unique_key_to_request_id(request.unique_key)
 
@@ -521,18 +508,7 @@ class RequestQueueClient(BaseRequestQueueClient):
                 f'The request ID does not match the ID from the unique_key (request.id={request.id}, id={id}).'
             )
 
-        request_kwargs = {
-            **(request.model_dump()),
-            'id': id,
-            'order_no': order_no,
-        }
-
-        del request_kwargs['json_']
-
-        return Request(
-            **request_kwargs,
-            json_=await json_dumps(request_kwargs),
-        )
+        return InternalRequest.model_validate({**request.model_dump(), 'id': id, 'order_no': order_no})
 
     def _calculate_order_no(self, request: Request, forefront: bool | None) -> Decimal | None:
         if request.handled_at is not None:
