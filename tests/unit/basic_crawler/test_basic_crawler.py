@@ -21,7 +21,7 @@ from crawlee.basic_crawler import BasicCrawler
 from crawlee.configuration import Configuration
 from crawlee.errors import SessionError, UserDefinedErrorHandlerError
 from crawlee.statistics import FinalStatistics
-from crawlee.storages import Dataset, KeyValueStore, RequestQueue
+from crawlee.storages import Dataset, KeyValueStore, RequestList, RequestQueue, RequestSourceTandem
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -44,6 +44,24 @@ async def test_processes_requests() -> None:
     await crawler.run()
 
     assert calls == ['http://a.com/', 'http://b.com/', 'http://c.com/']
+
+
+async def test_processes_requests_from_request_source_tandem() -> None:
+    request_queue = await RequestQueue.open()
+    await request_queue.add_requests_batched(['http://a.com/', 'http://b.com/', 'http://c.com/'])
+
+    request_list = RequestList(['http://a.com/', 'http://d.com', 'http://e.com'])
+
+    crawler = BasicCrawler(request_provider=RequestSourceTandem(request_list, request_queue))
+    calls = set[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        calls.add(context.request.url)
+
+    await crawler.run()
+
+    assert calls == {'http://a.com/', 'http://b.com/', 'http://c.com/', 'http://d.com', 'http://e.com'}
 
 
 async def test_processes_requests_from_run_args() -> None:
