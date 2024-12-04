@@ -50,6 +50,7 @@ if TYPE_CHECKING:
     from contextlib import AbstractAsyncContextManager
 
     from crawlee._types import ConcurrencySettings, HttpMethod, JsonSerializable
+    from crawlee.base_storage_client import BaseStorageClient
     from crawlee.base_storage_client._models import DatasetItemsListPage
     from crawlee.configuration import Configuration
     from crawlee.events._event_manager import EventManager
@@ -72,17 +73,29 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     It is intended for typing forwarded `__init__` arguments in the subclasses.
     """
 
+    configuration: NotRequired[Configuration]
+    """The configuration object. Some of its properties are used as defaults for the crawler."""
+
+    event_manager: NotRequired[EventManager]
+    """The event manager for managing events for the crawler and all its components."""
+
+    storage_client: NotRequired[BaseStorageClient]
+    """The storage client for managing storages for the crawler and all its components."""
+
     request_provider: NotRequired[RequestProvider]
     """Provider for requests to be processed by the crawler."""
 
-    request_handler: NotRequired[Callable[[TCrawlingContext], Awaitable[None]]]
-    """A callable responsible for handling requests."""
+    session_pool: NotRequired[SessionPool]
+    """A custom `SessionPool` instance, allowing the use of non-default configuration."""
+
+    proxy_configuration: NotRequired[ProxyConfiguration]
+    """HTTP proxy configuration used when making requests."""
 
     http_client: NotRequired[BaseHttpClient]
-    """HTTP client used by `BasicCrawlingContext.send_request` and the HTTP-based crawling."""
+    """HTTP client used by `BasicCrawlingContext.send_request` method."""
 
-    concurrency_settings: NotRequired[ConcurrencySettings]
-    """Settings to fine-tune concurrency levels."""
+    request_handler: NotRequired[Callable[[TCrawlingContext], Awaitable[None]]]
+    """A callable responsible for handling requests."""
 
     max_request_retries: NotRequired[int]
     """Maximum number of attempts to process a single request."""
@@ -96,49 +109,45 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     """Maximum number of session rotations per request. The crawler rotates the session if a proxy error occurs
     or if the website blocks the request."""
 
-    configuration: NotRequired[Configuration]
-    """Crawler configuration."""
-
-    request_handler_timeout: NotRequired[timedelta]
-    """Maximum duration allowed for a single request handler to run."""
+    max_crawl_depth: NotRequired[int | None]
+    """Specifies the maximum crawl depth. If set, the crawler will stop processing links beyond this depth.
+    The crawl depth starts at 0 for initial requests and increases with each subsequent level of links.
+    Requests at the maximum depth will still be processed, but no new links will be enqueued from those requests.
+    If not set, crawling continues without depth restrictions.
+    """
 
     use_session_pool: NotRequired[bool]
     """Enable the use of a session pool for managing sessions during crawling."""
 
-    session_pool: NotRequired[SessionPool]
-    """A custom `SessionPool` instance, allowing the use of non-default configuration."""
-
     retry_on_blocked: NotRequired[bool]
     """If True, the crawler attempts to bypass bot protections automatically."""
 
-    proxy_configuration: NotRequired[ProxyConfiguration]
-    """HTTP proxy configuration used when making requests."""
+    concurrency_settings: NotRequired[ConcurrencySettings]
+    """Settings to fine-tune concurrency levels."""
+
+    request_handler_timeout: NotRequired[timedelta]
+    """Maximum duration allowed for a single request handler to run."""
 
     statistics: NotRequired[Statistics[StatisticsState]]
     """A custom `Statistics` instance, allowing the use of non-default configuration."""
 
-    event_manager: NotRequired[EventManager]
-    """A custom `EventManager` instance, allowing the use of non-default configuration."""
+    abort_on_error: NotRequired[bool]
+    """If True, the crawler stops immediately when any request handler error occurs."""
 
     configure_logging: NotRequired[bool]
     """If True, the crawler will set up logging infrastructure automatically."""
-
-    max_crawl_depth: NotRequired[int | None]
-    """Limits crawl depth from 0 (initial requests) up to the specified `max_crawl_depth`.
-    Requests at the maximum depth are processed, but no further links are enqueued."""
-
-    abort_on_error: NotRequired[bool]
-    """If True, the crawler stops immediately when any request handler error occurs."""
 
     _context_pipeline: NotRequired[ContextPipeline[TCrawlingContext]]
     """Enables extending the request lifecycle and modifying the crawling context. Intended for use by
     subclasses rather than direct instantiation of `BasicCrawler`."""
 
     _additional_context_managers: NotRequired[Sequence[AbstractAsyncContextManager]]
-    """Additional context managers used throughout the crawler lifecycle."""
+    """Additional context managers used throughout the crawler lifecycle. Intended for use by
+    subclasses rather than direct instantiation of `BasicCrawler`."""
 
     _logger: NotRequired[logging.Logger]
-    """A logger instance, typically provided by a subclass, for consistent logging labels."""
+    """A logger instance, typically provided by a subclass, for consistent logging labels. Intended for use by
+    subclasses rather than direct instantiation of `BasicCrawler`."""
 
 
 @docs_group('Classes')
@@ -171,6 +180,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         *,
         configuration: Configuration | None = None,
         event_manager: EventManager | None = None,
+        storage_client: BaseStorageClient | None = None,
         request_provider: RequestProvider | None = None,
         session_pool: SessionPool | None = None,
         proxy_configuration: ProxyConfiguration | None = None,
@@ -196,10 +206,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
         Args:
             configuration: The configuration object. Some of its properties are used as defaults for the crawler.
             event_manager: The event manager for managing events for the crawler and all its components.
+            storage_client: The storage client for managing storages for the crawler and all its components.
             request_provider: Provider for requests to be processed by the crawler.
             session_pool: A custom `SessionPool` instance, allowing the use of non-default configuration.
             proxy_configuration: HTTP proxy configuration used when making requests.
-            http_client: HTTP client used by `BasicCrawlingContext.send_request` and the HTTP-based crawling.
+            http_client: HTTP client used by `BasicCrawlingContext.send_request` method.
             request_handler: A callable responsible for handling requests.
             max_request_retries: Maximum number of attempts to process a single request.
             max_requests_per_crawl: Maximum number of pages to open during a crawl. The crawl stops upon reaching
@@ -208,7 +219,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 this value.
             max_session_rotations: Maximum number of session rotations per request. The crawler rotates the session
                 if a proxy error occurs or if the website blocks the request.
-            max_crawl_depth: Maximum crawl depth. If set, the crawler will stop crawling after reaching this depth.
+            max_crawl_depth: Specifies the maximum crawl depth. If set, the crawler will stop processing links beyond
+                this depth. The crawl depth starts at 0 for initial requests and increases with each subsequent level
+                of links. Requests at the maximum depth will still be processed, but no new links will be enqueued
+                from those requests. If not set, crawling continues without depth restrictions.
             use_session_pool: Enable the use of a session pool for managing sessions during crawling.
             retry_on_blocked: If True, the crawler attempts to bypass bot protections automatically.
             concurrency_settings: Settings to fine-tune concurrency levels.
@@ -219,10 +233,14 @@ class BasicCrawler(Generic[TCrawlingContext]):
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
             _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
+                Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
             _logger: A logger instance, typically provided by a subclass, for consistent logging labels.
+                Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
         """
         if configuration:
             service_container.set_configuration(configuration)
+        if storage_client:
+            service_container.set_storage_client(storage_client)
         if event_manager:
             service_container.set_event_manager(event_manager)
 
