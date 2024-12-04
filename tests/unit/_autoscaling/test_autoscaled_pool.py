@@ -212,7 +212,7 @@ async def test_autoscales(system_status: SystemStatus | Mock) -> None:
 async def test_autoscales_uses_desired_concurrency_ratio(system_status: SystemStatus | Mock) -> None:
     """Test that desired concurrency ratio can limit desired concurrency.
 
-    This test crates situation where only one task is ready and then no other task is ever ready.
+    This test creates situation where only one task is ready and then no other task is ever ready.
     This creates situation where the system could scale up desired concurrency, but it will not do so because
     desired_concurrency_ratio=1 means that first the system would have to increase current concurrency to same number as
     desired concurrency and due to no other task ever being ready, it will never happen. Thus desired concurrency will
