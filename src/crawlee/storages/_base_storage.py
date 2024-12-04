@@ -43,4 +43,4 @@ class BaseStorage(ABC):
 
     @abstractmethod
     async def drop(self) -> None:
-        """Drops the storage, removing it from the underlying storage client and clearing the cache."""
+        """Drop the storage, removing it from the underlying storage client and clearing the cache."""
