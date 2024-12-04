@@ -94,7 +94,7 @@ class RequestSourceTandem(RequestProvider):
 
     @override
     async def reclaim_request(self, request: Request, *, forefront: bool = False) -> None:
-        await self.reclaim_request(request, forefront=forefront)
+        await self._read_write_provider.reclaim_request(request, forefront=forefront)
 
     @override
     async def mark_request_as_handled(self, request: Request) -> None:
