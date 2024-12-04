@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+from datetime import timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING
 
@@ -9,6 +11,7 @@ from crawlee.storages._request_provider import RequestProvider
 
 if TYPE_CHECKING:
     from crawlee import Request
+    from crawlee.base_storage_client._models import ProcessedRequest
     from crawlee.storages._request_source import RequestSource
 
 
@@ -44,6 +47,28 @@ class RequestSourceTandem(RequestProvider):
         return (await self._read_only_source.is_finished()) and (await self._read_write_provider.is_finished())
 
     @override
+    async def add_request(self, request: str | Request, *, forefront: bool = False) -> ProcessedRequest:
+        return await self._read_write_provider.add_request(request, forefront=forefront)
+
+    @override
+    async def add_requests_batched(
+        self,
+        requests: Sequence[str | Request],
+        *,
+        batch_size: int = 1000,
+        wait_time_between_batches: timedelta = timedelta(seconds=1),
+        wait_for_all_requests_to_be_added: bool = False,
+        wait_for_all_requests_to_be_added_timeout: timedelta | None = None,
+    ) -> None:
+        return await self._read_write_provider.add_requests_batched(
+            requests,
+            batch_size=batch_size,
+            wait_time_between_batches=wait_time_between_batches,
+            wait_for_all_requests_to_be_added=wait_for_all_requests_to_be_added,
+            wait_for_all_requests_to_be_added_timeout=wait_for_all_requests_to_be_added_timeout,
+        )
+
+    @override
     async def fetch_next_request(self) -> Request | None:
         if await self._read_only_source.is_finished():
             return await self._read_write_provider.fetch_next_request()
@@ -77,3 +102,7 @@ class RequestSourceTandem(RequestProvider):
     @override
     async def get_handled_count(self) -> int:
         return await self._read_write_provider.get_handled_count()
+
+    @override
+    async def drop(self) -> None:
+        await self._read_write_provider.drop()
