@@ -84,14 +84,30 @@ class KeyValueStore(BaseStorage):
 
     async def get_info(self) -> KeyValueStoreMetadata | None:
         """Get an object containing general information about the key value store."""
-        return await self._resource_client.get()  # type: ignore[no-any-return] # Mypy is broken
+        return await self._resource_client.get()
 
     @override
     @classmethod
-    async def open(cls, *, id: str | None = None, name: str | None = None) -> KeyValueStore:
+    async def open(
+        cls,
+        *,
+        id: str | None = None,
+        name: str | None = None,
+        configuration: Configuration | None = None,
+        storage_client: BaseStorageClient | None = None,
+    ) -> KeyValueStore:
         from crawlee.storages._creation_management import open_storage
 
-        return await open_storage(storage_class=cls, id=id, name=name)
+        configuration = configuration or service_container.get_configuration()
+        storage_client = storage_client or service_container.get_storage_client()
+
+        return await open_storage(
+            storage_class=cls,
+            id=id,
+            name=name,
+            configuration=configuration,
+            storage_client=storage_client,
+        )
 
     @override
     async def drop(self) -> None:
@@ -155,9 +171,9 @@ class KeyValueStore(BaseStorage):
             content_type: Content type of the record.
         """
         if value is None:
-            return await self._resource_client.delete_record(key)  # type: ignore[no-any-return] # Mypy is broken
+            return await self._resource_client.delete_record(key)
 
-        return await self._resource_client.set_record(key, value, content_type)  # type: ignore[no-any-return] # Mypy is broken
+        return await self._resource_client.set_record(key, value, content_type)
 
     async def get_public_url(self, key: str) -> str:
         """Get the public URL for the given key.

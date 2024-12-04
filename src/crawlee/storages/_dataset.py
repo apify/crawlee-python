@@ -20,8 +20,9 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
 
     from crawlee._types import JsonSerializable, PushDataKwargs
+    from crawlee.base_storage_client import BaseStorageClient
     from crawlee.base_storage_client._models import DatasetItemsListPage
-
+    from crawlee.configuration import Configuration
 
 logger = logging.getLogger(__name__)
 
@@ -192,13 +193,11 @@ class Dataset(BaseStorage):
     _EFFECTIVE_LIMIT_SIZE = _MAX_PAYLOAD_SIZE - (_MAX_PAYLOAD_SIZE * _SAFETY_BUFFER_PERCENT)
     """Calculated payload limit considering safety buffer."""
 
-    def __init__(self, id: str, name: str | None) -> None:
-        storage_client = service_container.get_storage_client()
-
+    def __init__(self, id: str, name: str | None, storage_client: BaseStorageClient) -> None:
         self._id = id
         self._name = name
 
-        # Get resource clients from storage client
+        # Get resource clients from the storage client.
         self._resource_client = storage_client.dataset(self._id)
         self._resource_collection_client = storage_client.datasets()
 
@@ -214,10 +213,26 @@ class Dataset(BaseStorage):
 
     @override
     @classmethod
-    async def open(cls, *, id: str | None = None, name: str | None = None) -> Dataset:
+    async def open(
+        cls,
+        *,
+        id: str | None = None,
+        name: str | None = None,
+        configuration: Configuration | None = None,
+        storage_client: BaseStorageClient | None = None,
+    ) -> Dataset:
         from crawlee.storages._creation_management import open_storage
 
-        return await open_storage(storage_class=cls, id=id, name=name)
+        configuration = configuration or service_container.get_configuration()
+        storage_client = storage_client or service_container.get_storage_client()
+
+        return await open_storage(
+            storage_class=cls,
+            id=id,
+            name=name,
+            configuration=configuration,
+            storage_client=storage_client,
+        )
 
     @override
     async def drop(self) -> None:
@@ -241,7 +256,7 @@ class Dataset(BaseStorage):
         # Handle singular items
         if not isinstance(data, list):
             items = await self.check_and_serialize(data)
-            return await self._resource_client.push_items(items, **kwargs)  # type: ignore[no-any-return] # Mypy is broken
+            return await self._resource_client.push_items(items, **kwargs)
 
         # Handle lists
         payloads_generator = (await self.check_and_serialize(item, index) for index, item in enumerate(data))
@@ -264,7 +279,7 @@ class Dataset(BaseStorage):
         Returns:
             List page containing filtered and paginated dataset items.
         """
-        return await self._resource_client.list_items(**kwargs)  # type: ignore[no-any-return] # Mypy is broken
+        return await self._resource_client.list_items(**kwargs)
 
     async def write_to_csv(self, destination: TextIO, **kwargs: Unpack[ExportDataCsvKwargs]) -> None:
         """Exports the entire dataset into an arbitrary stream.
