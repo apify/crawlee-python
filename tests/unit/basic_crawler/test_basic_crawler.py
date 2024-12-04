@@ -21,7 +21,7 @@ from crawlee.basic_crawler import BasicCrawler
 from crawlee.configuration import Configuration
 from crawlee.errors import SessionError, UserDefinedErrorHandlerError
 from crawlee.statistics import FinalStatistics
-from crawlee.storages import Dataset, KeyValueStore, RequestList, RequestQueue
+from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -31,7 +31,10 @@ if TYPE_CHECKING:
 
 
 async def test_processes_requests() -> None:
-    crawler = BasicCrawler(request_provider=RequestList(['http://a.com/', 'http://b.com/', 'http://c.com/']))
+    queue = await RequestQueue.open()
+    await queue.add_requests_batched(['http://a.com/', 'http://b.com/', 'http://c.com/'])
+
+    crawler = BasicCrawler(request_provider=queue)
     calls = list[str]()
 
     @crawler.router.default_handler
@@ -44,7 +47,7 @@ async def test_processes_requests() -> None:
 
 
 async def test_processes_requests_from_run_args() -> None:
-    crawler = BasicCrawler(request_provider=RequestList())
+    crawler = BasicCrawler(request_provider=await RequestQueue.open())
     calls = list[str]()
 
     @crawler.router.default_handler
@@ -57,7 +60,7 @@ async def test_processes_requests_from_run_args() -> None:
 
 
 async def test_allows_multiple_run_calls() -> None:
-    crawler = BasicCrawler(request_provider=RequestList())
+    crawler = BasicCrawler(request_provider=await RequestQueue.open())
     calls = list[str]()
 
     @crawler.router.default_handler
@@ -78,7 +81,9 @@ async def test_allows_multiple_run_calls() -> None:
 
 
 async def test_retries_failed_requests() -> None:
-    crawler = BasicCrawler(request_provider=RequestList(['http://a.com/', 'http://b.com/', 'http://c.com/']))
+    request_queue = await RequestQueue.open()
+    await request_queue.add_requests_batched(['http://a.com/', 'http://b.com/', 'http://c.com/'])
+    crawler = BasicCrawler(request_provider=request_queue)
     calls = list[str]()
 
     @crawler.router.default_handler
@@ -100,10 +105,12 @@ async def test_retries_failed_requests() -> None:
 
 
 async def test_respects_no_retry() -> None:
+    request_queue = await RequestQueue.open()
+    await request_queue.add_requests_batched(
+        ['http://a.com/', 'http://b.com/', Request.from_url(url='http://c.com/', no_retry=True)]
+    )
     crawler = BasicCrawler(
-        request_provider=RequestList(
-            ['http://a.com/', 'http://b.com/', Request.from_url(url='http://c.com/', no_retry=True)]
-        ),
+        request_provider=request_queue,
         max_request_retries=3,
     )
     calls = list[str]()
@@ -127,14 +134,16 @@ async def test_respects_no_retry() -> None:
 
 
 async def test_respects_request_specific_max_retries() -> None:
+    request_queue = await RequestQueue.open()
+    await request_queue.add_requests_batched(
+        [
+            'http://a.com/',
+            'http://b.com/',
+            Request.from_url(url='http://c.com/', user_data={'__crawlee': {'maxRetries': 4}}),
+        ]
+    )
     crawler = BasicCrawler(
-        request_provider=RequestList(
-            [
-                'http://a.com/',
-                'http://b.com/',
-                Request.from_url(url='http://c.com/', user_data={'__crawlee': {'maxRetries': 4}}),
-            ]
-        ),
+        request_provider=request_queue,
         max_request_retries=1,
     )
     calls = list[str]()
@@ -167,8 +176,10 @@ async def test_calls_error_handler() -> None:
     # List to store the information of calls to the error handler.
     calls = list[Call]()
 
+    request_queue = await RequestQueue.open()
+    await request_queue.add_requests_batched(['http://a.com/', 'http://b.com/', 'http://c.com/'])
     crawler = BasicCrawler(
-        request_provider=RequestList(['http://a.com/', 'http://b.com/', 'http://c.com/']),
+        request_provider=request_queue,
         max_request_retries=3,
     )
 
@@ -230,8 +241,11 @@ async def test_calls_error_handler_for_sesion_errors() -> None:
 
 
 async def test_handles_error_in_error_handler() -> None:
+    request_queue = await RequestQueue.open()
+    await request_queue.add_requests_batched(['http://a.com/', 'http://b.com/', 'http://c.com/'])
+
     crawler = BasicCrawler(
-        request_provider=RequestList(['http://a.com/', 'http://b.com/', 'http://c.com/']),
+        request_provider=request_queue,
         max_request_retries=3,
     )
 
@@ -249,8 +263,11 @@ async def test_handles_error_in_error_handler() -> None:
 
 
 async def test_calls_failed_request_handler() -> None:
+    request_queue = await RequestQueue.open()
+    await request_queue.add_requests_batched(['http://a.com/', 'http://b.com/', 'http://c.com/'])
+
     crawler = BasicCrawler(
-        request_provider=RequestList(['http://a.com/', 'http://b.com/', 'http://c.com/']),
+        request_provider=request_queue,
         max_request_retries=3,
     )
     calls = list[tuple[BasicCrawlingContext, Exception]]()
@@ -272,8 +289,11 @@ async def test_calls_failed_request_handler() -> None:
 
 
 async def test_handles_error_in_failed_request_handler() -> None:
+    request_queue = await RequestQueue.open()
+    await request_queue.add_requests_batched(['http://a.com/', 'http://b.com/', 'http://c.com/'])
+
     crawler = BasicCrawler(
-        request_provider=RequestList(['http://a.com/', 'http://b.com/', 'http://c.com/']),
+        request_provider=request_queue,
         max_request_retries=3,
     )
 
@@ -298,8 +318,11 @@ async def test_send_request_works(respx_mock: respx.MockRouter) -> None:
     response_body: Any = None
     response_headers: HttpHeaders | None = None
 
+    request_queue = await RequestQueue.open()
+    await request_queue.add_requests_batched(['http://a.com/', 'http://b.com/', 'http://c.com/'])
+
     crawler = BasicCrawler(
-        request_provider=RequestList(['http://a.com/']),
+        request_provider=request_queue,
         max_request_retries=3,
     )
 
@@ -331,7 +354,7 @@ class AddRequestsTestInput:
 
 
 STRATEGY_TEST_URLS = (
-    'https://someplace.com/index.html',
+    'https://someplace.com/',
     'http://someplace.com/index.html',
     'https://blog.someplace.com/index.html',
     'https://other.place.com/index.html',
@@ -358,38 +381,38 @@ INCLUDE_TEST_URLS = (
                 'http://c.com/',
             ],
             kwargs={},
-            expected_urls=['https://a.com/', 'http://b.com/', 'http://c.com/'],
+            expected_urls=['http://b.com/', 'http://c.com/'],
         ),
         # Enqueue strategy
         AddRequestsTestInput(
             start_url=STRATEGY_TEST_URLS[0],
             requests=STRATEGY_TEST_URLS,
             kwargs=EnqueueLinksKwargs(),
-            expected_urls=STRATEGY_TEST_URLS,
+            expected_urls=STRATEGY_TEST_URLS[1:],
         ),
         AddRequestsTestInput(
             start_url=STRATEGY_TEST_URLS[0],
             requests=STRATEGY_TEST_URLS,
             kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.ALL),
-            expected_urls=STRATEGY_TEST_URLS,
+            expected_urls=STRATEGY_TEST_URLS[1:],
         ),
         AddRequestsTestInput(
             start_url=STRATEGY_TEST_URLS[0],
             requests=STRATEGY_TEST_URLS,
             kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.SAME_DOMAIN),
-            expected_urls=STRATEGY_TEST_URLS[:3],
+            expected_urls=STRATEGY_TEST_URLS[1:3],
         ),
         AddRequestsTestInput(
             start_url=STRATEGY_TEST_URLS[0],
             requests=STRATEGY_TEST_URLS,
             kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.SAME_HOSTNAME),
-            expected_urls=STRATEGY_TEST_URLS[:2],
+            expected_urls=[STRATEGY_TEST_URLS[1]],
         ),
         AddRequestsTestInput(
             start_url=STRATEGY_TEST_URLS[0],
             requests=STRATEGY_TEST_URLS,
             kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.SAME_ORIGIN),
-            expected_urls=STRATEGY_TEST_URLS[:1],
+            expected_urls=[],
         ),
         # Include/exclude
         AddRequestsTestInput(
@@ -402,7 +425,7 @@ INCLUDE_TEST_URLS = (
             start_url=INCLUDE_TEST_URLS[0],
             requests=INCLUDE_TEST_URLS,
             kwargs=EnqueueLinksKwargs(exclude=[Glob('https://someplace.com/**/cats')]),
-            expected_urls=[INCLUDE_TEST_URLS[0], INCLUDE_TEST_URLS[2], INCLUDE_TEST_URLS[3]],
+            expected_urls=[INCLUDE_TEST_URLS[2], INCLUDE_TEST_URLS[3]],
         ),
         AddRequestsTestInput(
             start_url=INCLUDE_TEST_URLS[0],
@@ -427,7 +450,10 @@ INCLUDE_TEST_URLS = (
 )
 async def test_enqueue_strategy(test_input: AddRequestsTestInput) -> None:
     visit = Mock()
-    crawler = BasicCrawler(request_provider=RequestList([Request.from_url('https://someplace.com/', label='start')]))
+
+    request_queue = await RequestQueue.open()
+    crawler = BasicCrawler(request_provider=request_queue)
+    await request_queue.add_request(Request.from_url(test_input.start_url, label='start'))
 
     @crawler.router.handler('start')
     async def start_handler(context: BasicCrawlingContext) -> None:
@@ -448,8 +474,11 @@ async def test_enqueue_strategy(test_input: AddRequestsTestInput) -> None:
 
 async def test_session_rotation() -> None:
     track_session_usage = Mock()
+
+    request_queue = await RequestQueue.open()
+    await request_queue.add_request(Request.from_url('https://someplace.com/', label='start'))
     crawler = BasicCrawler(
-        request_provider=RequestList([Request.from_url('https://someplace.com/', label='start')]),
+        request_provider=request_queue,
         max_session_rotations=7,
         max_request_retries=1,
     )
@@ -468,10 +497,12 @@ async def test_session_rotation() -> None:
 
 
 async def test_final_statistics() -> None:
+    request_queue = await RequestQueue.open()
+    await request_queue.add_requests_batched(
+        [Request.from_url(f'https://someplace.com/?id={id}', label='start') for id in range(50)]
+    )
     crawler = BasicCrawler(
-        request_provider=RequestList(
-            [Request.from_url(f'https://someplace.com/?id={id}', label='start') for id in range(50)]
-        ),
+        request_provider=request_queue,
         max_request_retries=3,
     )
 
@@ -710,12 +741,14 @@ async def test_max_crawl_depth(httpbin: URL) -> None:
 
     start_request = Request.from_url('https://someplace.com/', label='start')
     start_request.crawl_depth = 2
+    request_queue = await RequestQueue.open()
+    await request_queue.add_request(start_request)
 
     # Set max_concurrency to 1 to ensure testing max_requests_per_crawl accurately
     crawler = BasicCrawler(
         concurrency_settings=ConcurrencySettings(max_concurrency=1),
         max_crawl_depth=2,
-        request_provider=RequestList([start_request]),
+        request_provider=request_queue,
     )
 
     @crawler.router.handler('start')

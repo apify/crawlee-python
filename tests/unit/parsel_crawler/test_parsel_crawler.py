@@ -108,7 +108,7 @@ async def server() -> AsyncGenerator[respx.MockRouter, None]:
 
 
 async def test_basic(server: respx.MockRouter) -> None:
-    crawler = ParselCrawler(request_provider=RequestList(['https://test.io/']))
+    crawler = ParselCrawler()
     handler = mock.AsyncMock()
 
     @crawler.router.default_handler
@@ -116,7 +116,7 @@ async def test_basic(server: respx.MockRouter) -> None:
         links = context.selector.css('a::attr(href)').getall()
         await handler(links)
 
-    await crawler.run()
+    await crawler.run(['https://test.io/'])
 
     assert server['index_endpoint'].called
     assert handler.called
@@ -126,7 +126,7 @@ async def test_basic(server: respx.MockRouter) -> None:
 
 
 async def test_enqueue_links(server: respx.MockRouter) -> None:
-    crawler = ParselCrawler(request_provider=RequestList(['https://test.io/']))
+    crawler = ParselCrawler()
     visit = mock.Mock()
 
     @crawler.router.default_handler
@@ -135,7 +135,7 @@ async def test_enqueue_links(server: respx.MockRouter) -> None:
         visit(url)
         await context.enqueue_links()
 
-    await crawler.run()
+    await crawler.run(['https://test.io/'])
 
     assert server['index_endpoint'].called
     assert server['secondary_index_endpoint'].called
@@ -151,7 +151,7 @@ async def test_enqueue_links(server: respx.MockRouter) -> None:
 
 
 async def test_enqueue_links_selector(server: respx.MockRouter) -> None:
-    crawler = ParselCrawler(request_provider=RequestList(['https://test.io/']))
+    crawler = ParselCrawler()
     visit = mock.Mock()
 
     @crawler.router.default_handler
@@ -161,7 +161,7 @@ async def test_enqueue_links_selector(server: respx.MockRouter) -> None:
         await context.enqueue_links(selector='a.foo', label='foo')
 
     with mock.patch.object(BaseRequestData, 'from_url', wraps=BaseRequestData.from_url) as from_url:
-        await crawler.run()
+        await crawler.run(['https://test.io/'])
 
     assert server['index_endpoint'].called
     assert server['secondary_index_endpoint'].called
@@ -201,21 +201,15 @@ async def test_enqueue_links_with_max_crawl(server: respx.MockRouter) -> None:
 
 
 async def test_handle_blocked_request(server: respx.MockRouter) -> None:
-    crawler = ParselCrawler(
-        request_provider=RequestList(['https://test.io/fdyr']),
-        max_session_rotations=1,
-    )
+    crawler = ParselCrawler(max_session_rotations=1)
 
-    stats = await crawler.run()
+    stats = await crawler.run(['https://test.io/fdyr'])
     assert server['incapsula_endpoint'].called
     assert stats.requests_failed == 1
 
 
 async def test_handle_blocked_status_code(server: respx.MockRouter) -> None:
-    crawler = ParselCrawler(
-        request_provider=RequestList(['https://test.io/blocked']),
-        max_session_rotations=1,
-    )
+    crawler = ParselCrawler(max_session_rotations=1)
 
     # Patch internal calls and run crawler
     with (
@@ -228,7 +222,7 @@ async def test_handle_blocked_status_code(server: respx.MockRouter) -> None:
             crawler._statistics.error_tracker, 'add', wraps=crawler._statistics.error_tracker.add
         ) as error_tracker_add,
     ):
-        stats = await crawler.run()
+        stats = await crawler.run(['https://test.io/blocked'])
 
     assert server['blocked_endpoint'].called
     assert stats.requests_failed == 1
@@ -255,7 +249,7 @@ def test_import_error_handled() -> None:
 
 
 async def test_json(server: respx.MockRouter) -> None:
-    crawler = ParselCrawler(request_provider=RequestList(['https://test.io/json']))
+    crawler = ParselCrawler()
     handler = mock.AsyncMock()
 
     @crawler.router.default_handler
@@ -263,7 +257,7 @@ async def test_json(server: respx.MockRouter) -> None:
         result = context.selector.jmespath('hello').getall()
         await handler(result)
 
-    await crawler.run()
+    await crawler.run(['https://test.io/json'])
 
     assert server['json_endpoint'].called
     assert handler.called
@@ -272,7 +266,7 @@ async def test_json(server: respx.MockRouter) -> None:
 
 
 async def test_xml(server: respx.MockRouter) -> None:
-    crawler = ParselCrawler(request_provider=RequestList(['https://test.io/xml']))
+    crawler = ParselCrawler()
     handler = mock.AsyncMock()
 
     @crawler.router.default_handler
@@ -280,7 +274,7 @@ async def test_xml(server: respx.MockRouter) -> None:
         result = context.selector.css('hello').getall()
         await handler(result)
 
-    await crawler.run()
+    await crawler.run(['https://test.io/xml'])
 
     assert server['xml_endpoint'].called
     assert handler.called
