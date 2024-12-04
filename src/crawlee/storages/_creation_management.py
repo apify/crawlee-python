@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING, TypeVar
 
-from crawlee import service_container
 from crawlee.memory_storage_client import MemoryStorageClient
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
@@ -124,18 +123,17 @@ async def open_storage(
     storage_class: type[TResource],
     id: str | None = None,
     name: str | None = None,
+    configuration: Configuration,
+    storage_client: BaseStorageClient,
 ) -> TResource:
     """Open either a new storage or restore an existing one and return it."""
-    config = service_container.get_configuration()
-    storage_client = service_container.get_storage_client()
-
     # Try to restore the storage from cache by name
     if name:
         cached_storage = _get_from_cache_by_name(storage_class=storage_class, name=name)
         if cached_storage:
             return cached_storage
 
-    default_id = _get_default_storage_id(config, storage_class)
+    default_id = _get_default_storage_id(configuration, storage_class)
 
     if not id and not name:
         id = default_id
@@ -150,7 +148,7 @@ async def open_storage(
             return cached_storage
 
     # Purge on start if configured
-    if config.purge_on_start:
+    if configuration.purge_on_start:
         await storage_client.purge_on_start()
 
     # Lock and create new storage
@@ -169,7 +167,7 @@ async def open_storage(
             resource_collection_client = _get_resource_collection_client(storage_class, storage_client)
             storage_info = await resource_collection_client.get_or_create(name=name)
 
-        storage = storage_class(id=storage_info.id, name=storage_info.name)
+        storage = storage_class(id=storage_info.id, name=storage_info.name, storage_client=storage_client)
 
         # Cache the storage by ID and name
         _add_to_cache_by_id(storage.id, storage)

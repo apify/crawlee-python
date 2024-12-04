@@ -15,7 +15,7 @@ from crawlee._utils.docs import docs_group
 from crawlee._utils.lru_cache import LRUCache
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee._utils.wait import wait_for_all_tasks_for_finish
-from crawlee.base_storage_client._models import ProcessedRequest, RequestQueueMetadata
+from crawlee.base_storage_client import BaseStorageClient, ProcessedRequest, RequestQueueMetadata
 from crawlee.events._types import Event
 from crawlee.storages._base_storage import BaseStorage
 from crawlee.storages._request_provider import RequestProvider
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from crawlee._request import Request
-
+    from crawlee.configuration import Configuration
 
 logger = getLogger(__name__)
 
@@ -104,10 +104,9 @@ class RequestQueue(BaseStorage, RequestProvider):
     _STORAGE_CONSISTENCY_DELAY = timedelta(seconds=3)
     """Expected delay for storage to achieve consistency, guiding the timing of subsequent read operations."""
 
-    def __init__(self, id: str, name: str | None) -> None:
+    def __init__(self, id: str, name: str | None, storage_client: BaseStorageClient) -> None:
         config = service_container.get_configuration()
         event_manager = service_container.get_event_manager()
-        storage_client = service_container.get_storage_client()
 
         self._id = id
         self._name = name
@@ -148,10 +147,26 @@ class RequestQueue(BaseStorage, RequestProvider):
 
     @override
     @classmethod
-    async def open(cls, *, id: str | None = None, name: str | None = None) -> RequestQueue:
+    async def open(
+        cls,
+        *,
+        id: str | None = None,
+        name: str | None = None,
+        configuration: Configuration | None = None,
+        storage_client: BaseStorageClient | None = None,
+    ) -> RequestQueue:
         from crawlee.storages._creation_management import open_storage
 
-        return await open_storage(storage_class=cls, id=id, name=name)
+        configuration = configuration or service_container.get_configuration()
+        storage_client = storage_client or service_container.get_storage_client()
+
+        return await open_storage(
+            storage_class=cls,
+            id=id,
+            name=name,
+            configuration=configuration,
+            storage_client=storage_client,
+        )
 
     @override
     async def drop(self, *, timeout: timedelta | None = None) -> None:
@@ -204,7 +219,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         ):
             self._assumed_total_count += 1
 
-        return processed_request  # type: ignore[no-any-return] # Mypy is broken
+        return processed_request
 
     @override
     async def add_requests_batched(
@@ -260,7 +275,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         Returns:
             The retrieved request, or `None`, if it does not exist.
         """
-        return await self._resource_client.get_request(request_id)  # type: ignore[no-any-return] # Mypy is broken
+        return await self._resource_client.get_request(request_id)
 
     async def fetch_next_request(self) -> Request | None:
         """Return the next request in the queue to be processed.
@@ -373,7 +388,7 @@ class RequestQueue(BaseStorage, RequestProvider):
             self._assumed_handled_count += 1
 
         self._cache_request(unique_key_to_request_id(request.unique_key), processed_request)
-        return processed_request  # type: ignore[no-any-return] # Mypy is broken
+        return processed_request
 
     async def reclaim_request(
         self,
@@ -417,7 +432,7 @@ class RequestQueue(BaseStorage, RequestProvider):
             except Exception as err:
                 logger.debug(f'Failed to delete request lock for request {request.id}', exc_info=err)
 
-        return processed_request  # type: ignore[no-any-return] # Mypy is broken
+        return processed_request
 
     async def is_empty(self) -> bool:
         """Check whether the queue is empty.
@@ -483,7 +498,7 @@ class RequestQueue(BaseStorage, RequestProvider):
 
     async def get_info(self) -> RequestQueueMetadata | None:
         """Get an object containing general information about the request queue."""
-        return await self._resource_client.get()  # type: ignore[no-any-return] # Mypy is broken
+        return await self._resource_client.get()
 
     @override
     async def get_handled_count(self) -> int:
@@ -658,7 +673,7 @@ class RequestQueue(BaseStorage, RequestProvider):
             )
             return None
         else:
-            return res.lock_expires_at  # type: ignore[no-any-return] # Mypy is broken
+            return res.lock_expires_at
 
     async def _clear_possible_locks(self) -> None:
         self._queue_paused_for_migration = True
