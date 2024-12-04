@@ -1,29 +1,17 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Generic
 
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.docs import docs_group
 from crawlee.abstract_http_crawler._http_crawling_context import TParseResult
+from crawlee.basic_crawler import BlockedInfo
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from crawlee.http_clients import HttpResponse
-
-
-@docs_group('Classes')
-@dataclass(frozen=True)
-class BlockedInfo:
-    """Information about whether the crawling is blocked. If reason is empty, then it means it is not blocked."""
-
-    reason: str
-
-    def __bool__(self) -> bool:
-        """No reason means no blocking."""
-        return bool(self.reason)
 
 
 @docs_group('Abstract classes')

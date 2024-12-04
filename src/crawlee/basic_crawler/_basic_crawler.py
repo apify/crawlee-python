@@ -9,6 +9,7 @@ import tempfile
 from asyncio import CancelledError
 from collections.abc import AsyncGenerator, Awaitable, Sequence
 from contextlib import AsyncExitStack, suppress
+from dataclasses import dataclass
 from datetime import timedelta
 from functools import partial
 from pathlib import Path
@@ -1061,3 +1062,15 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     async def __run_request_handler(self, context: BasicCrawlingContext) -> None:
         await self._context_pipeline(context, self.router)
+
+
+@docs_group('Classes')
+@dataclass(frozen=True)
+class BlockedInfo:
+    """Information about whether the crawling is blocked. If reason is empty, then it means it is not blocked."""
+
+    reason: str
+
+    def __bool__(self) -> bool:
+        """No reason means no blocking."""
+        return bool(self.reason)
