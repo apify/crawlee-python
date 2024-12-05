@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, Mock
 import httpx
 import pytest
 
-from crawlee import ConcurrencySettings, EnqueueStrategy, Glob, service_locator
+from crawlee import ConcurrencySettings, EnqueueStrategy, Glob
 from crawlee._request import BaseRequestData, Request
 from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpHeaders
 from crawlee.basic_crawler import BasicCrawler
@@ -863,16 +863,16 @@ async def test_consecutive_runs_purge_request_queue() -> None:
     }
 
 
+@pytest.mark.only
 async def test_respects_no_persist_storage() -> None:
-    config = Configuration(persist_storage=False)
-    service_locator.set_configuration(config)
-    crawler = BasicCrawler()
+    configuration = Configuration(persist_storage=False)
+    crawler = BasicCrawler(configuration=configuration)
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
         await context.push_data({'something': 'something'})
 
-    datasets_path = Path(config.storage_dir) / 'datasets' / 'default'
+    datasets_path = Path(configuration.storage_dir) / 'datasets' / 'default'
     assert not datasets_path.exists() or list(datasets_path.iterdir()) == []
 
 
