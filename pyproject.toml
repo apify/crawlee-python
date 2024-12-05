@@ -54,7 +54,6 @@ html5lib = { version = ">=1.0", optional = true }
 # https://github.com/apify/crawlee-python/issues/774
 httpx = { version = "~=0.27.0", extras = ["brotli", "http2"] }
 inquirer = ">=3.3.0"
-lazy-object-proxy = ">=1.10.0"
 lxml = { version = ">=5.2.0", optional = true }
 more_itertools = ">=10.2.0"
 parsel = { version = ">=1.9.0", optional = true }
