@@ -136,15 +136,16 @@ async def test_firefox_headless_headers(httpbin: URL, firefox_type: BrowserType)
 
     await crawler.run([str(httpbin / 'get')])
 
-    assert 'User-Agent' in headers
-    assert 'Sec-Ch-Ua' not in headers
-    assert 'Sec-Ch-Ua-Mobile' not in headers
-    assert 'Sec-Ch-Ua-Platform' not in headers
-
-    assert 'headless' not in headers['User-Agent'].lower()
-
     if not (firefox_type == 'camoufox' and system() == 'Windows'):
+        #  Camoufox seems to currently have problem with headers on Windows
         #  Reported camoufox issue https://github.com/daijro/camoufox/issues/79
+        assert 'User-Agent' in headers
+        assert 'Sec-Ch-Ua' not in headers
+        assert 'Sec-Ch-Ua-Mobile' not in headers
+        assert 'Sec-Ch-Ua-Platform' not in headers
+
+        assert 'headless' not in headers['User-Agent'].lower()
+
         assert headers['User-Agent'] == PW_FIREFOX_HEADLESS_DEFAULT_USER_AGENT
 
 
