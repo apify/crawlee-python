@@ -13,7 +13,7 @@ All notable changes to this project will be documented in this file.
 
 - Add upper bound of HTTPX version ([#775](https://github.com/apify/crawlee-python/pull/775)) ([b59e34d](https://github.com/apify/crawlee-python/commit/b59e34d6301e26825d88608152ffb337ef602a9f)) by [@vdusek](https://github.com/vdusek)
 - Fix incorrect use of desired concurrency ratio ([#780](https://github.com/apify/crawlee-python/pull/780)) ([d1f8bfb](https://github.com/apify/crawlee-python/commit/d1f8bfb68ce2ef13b550ce415a3689858112a4c7)) by [@Pijukatel](https://github.com/Pijukatel), closes [#759](https://github.com/apify/crawlee-python/issues/759)
-- Remove pydantic constraint <2.10.0 and update timedelta validator, serializer type hints ([#757](https://github.com/apify/crawlee-python/pull/757)) ([c0050c0](https://github.com/apify/crawlee-python/commit/c0050c0ee76e5deb28f174ecf276b0e6abf68b9d)) by [@Pijukatel](https://github.com/Pijukatel)
+- Remove pydantic constraint &lt;2.10.0 and update timedelta validator, serializer type hints ([#757](https://github.com/apify/crawlee-python/pull/757)) ([c0050c0](https://github.com/apify/crawlee-python/commit/c0050c0ee76e5deb28f174ecf276b0e6abf68b9d)) by [@Pijukatel](https://github.com/Pijukatel)
 
 
 <!-- git-cliff-unreleased-end -->
