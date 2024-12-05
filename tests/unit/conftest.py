@@ -111,15 +111,6 @@ def _isolate_test_environment(
 
 
 @pytest.fixture
-def memory_storage_client(tmp_path: Path) -> MemoryStorageClient:
-    return MemoryStorageClient(
-        write_metadata=True,
-        persist_storage=True,
-        storage_dir=str(tmp_path),
-    )
-
-
-@pytest.fixture
 def httpbin() -> URL:
     class URLWrapper:
         def __init__(self, url: URL) -> None:
@@ -198,3 +189,13 @@ async def disabled_proxy(proxy_info: ProxyInfo) -> AsyncGenerator[ProxyInfo, Non
         ]
     ):
         yield proxy_info
+
+
+@pytest.fixture
+def memory_storage_client(tmp_path: Path) -> MemoryStorageClient:
+    """A fixture for testing the memory storage client and its resource clients."""
+    return MemoryStorageClient(
+        write_metadata=True,
+        persist_storage=True,
+        storage_dir=str(tmp_path),
+    )

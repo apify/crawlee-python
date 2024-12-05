@@ -863,7 +863,6 @@ async def test_consecutive_runs_purge_request_queue() -> None:
     }
 
 
-@pytest.mark.only
 async def test_respects_no_persist_storage() -> None:
     configuration = Configuration(persist_storage=False)
     crawler = BasicCrawler(configuration=configuration)
