@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+from platform import system
 from typing import TYPE_CHECKING
 from unittest import mock
 
@@ -142,7 +143,9 @@ async def test_firefox_headless_headers(httpbin: URL, firefox_type: BrowserType)
 
     assert 'headless' not in headers['User-Agent'].lower()
 
-    assert headers['User-Agent'] == PW_FIREFOX_HEADLESS_DEFAULT_USER_AGENT
+    if not (firefox_type == 'camoufox' and system() == 'Windows'):
+        #  Reported camoufox issue https://github.com/daijro/camoufox/issues/79
+        assert headers['User-Agent'] == PW_FIREFOX_HEADLESS_DEFAULT_USER_AGENT
 
 
 async def test_custom_headers(httpbin: URL) -> None:
