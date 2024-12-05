@@ -5,6 +5,7 @@ from __future__ import annotations
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
+from camoufox import AsyncNewBrowser
 from playwright.async_api import Playwright, async_playwright
 from typing_extensions import override
 
@@ -123,8 +124,13 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         elif self._browser_type == 'webkit':
             browser = await self._playwright.webkit.launch(**self._browser_options)
         elif self._browser_type == 'camoufox':
-            from camoufox.async_api import AsyncCamoufox
-            browser = await AsyncCamoufox().__aenter__()
+            try:
+                #  Intentional late import of optional library. Majority of users might be using other browsers.
+                from camoufox.async_api import AsyncNewBrowser
+            except ImportError:
+                raise ImportError("Missing camoufox. It is optional component of crawlee. To fix please install crawlee"
+                                  " with following extras: crawlee[playwright,camoufox] or crawlee[all]")
+            browser = await AsyncNewBrowser(self._playwright, **self._browser_options)
         else:
             raise ValueError(f'Invalid browser type: {self._browser_type}')
 
