@@ -237,7 +237,7 @@ class Configuration(BaseSettings):
 
         TODO: Can we remove this?
         """
-        from crawlee.service_container import get_configuration
+        from crawlee.service_locator import get_configuration
 
         config = get_configuration()
 

@@ -6,7 +6,7 @@ import random
 from logging import getLogger
 from typing import TYPE_CHECKING, Callable, Literal, overload
 
-from crawlee import service_container
+from crawlee import service_locator
 from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 from crawlee.events._types import Event, EventPersistStateData
@@ -55,7 +55,7 @@ class SessionPool:
             persist_state_key: The key under which the session pool's state is stored in the `KeyValueStore`.
         """
         if event_manager:
-            service_container.set_event_manager(event_manager)
+            service_locator.set_event_manager(event_manager)
 
         self._max_pool_size = max_pool_size
         self._session_settings = create_session_settings or {}
@@ -110,7 +110,7 @@ class SessionPool:
         self._active = True
 
         if self._persistence_enabled:
-            event_manager = service_container.get_event_manager()
+            event_manager = service_locator.get_event_manager()
             self._kvs = await KeyValueStore.open(name=self._persist_state_kvs_name)
 
             # Attempt to restore the previously persisted state.
@@ -143,7 +143,7 @@ class SessionPool:
             raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
         if self._persistence_enabled:
-            event_manager = service_container.get_event_manager()
+            event_manager = service_locator.get_event_manager()
             # Remove the event listener for state persistence.
             event_manager.off(event=Event.PERSIST_STATE, listener=self._persist_state)
 

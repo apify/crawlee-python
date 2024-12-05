@@ -18,7 +18,7 @@ from urllib.parse import ParseResult, urlparse
 from tldextract import TLDExtract
 from typing_extensions import NotRequired, TypedDict, TypeVar, Unpack, assert_never
 
-from crawlee import EnqueueStrategy, Glob, service_container
+from crawlee import EnqueueStrategy, Glob, service_locator
 from crawlee._autoscaling import AutoscaledPool
 from crawlee._autoscaling.snapshotter import Snapshotter
 from crawlee._autoscaling.system_status import SystemStatus
@@ -238,13 +238,13 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
         """
         if configuration:
-            service_container.set_configuration(configuration)
+            service_locator.set_configuration(configuration)
         if storage_client:
-            service_container.set_storage_client(storage_client)
+            service_locator.set_storage_client(storage_client)
         if event_manager:
-            service_container.set_event_manager(event_manager)
+            service_locator.set_event_manager(event_manager)
 
-        config = service_container.get_configuration()
+        config = service_locator.get_configuration()
 
         # Core components
         self._request_provider = request_provider
@@ -506,7 +506,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         return final_statistics
 
     async def _run_crawler(self) -> None:
-        event_manager = service_container.get_event_manager()
+        event_manager = service_locator.get_event_manager()
 
         # Collect the context managers to be entered. Context managers that are already active are excluded,
         # as they were likely entered by the caller, who will also be responsible for exiting them.

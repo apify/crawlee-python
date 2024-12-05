@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Literal, TextIO, TypedDict, cast
 
 from typing_extensions import NotRequired, Required, Unpack, override
 
-from crawlee import service_container
+from crawlee import service_locator
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.docs import docs_group
 from crawlee._utils.file import json_dumps
@@ -223,8 +223,8 @@ class Dataset(BaseStorage):
     ) -> Dataset:
         from crawlee.storages._creation_management import open_storage
 
-        configuration = configuration or service_container.get_configuration()
-        storage_client = storage_client or service_container.get_storage_client()
+        configuration = configuration or service_locator.get_configuration()
+        storage_client = storage_client or service_locator.get_storage_client()
 
         return await open_storage(
             storage_class=cls,
