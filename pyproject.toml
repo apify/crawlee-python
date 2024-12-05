@@ -59,7 +59,7 @@ more_itertools = ">=10.2.0"
 parsel = { version = ">=1.9.0", optional = true }
 playwright = { version = ">=1.27.0", optional = true }
 psutil = ">=6.0.0"
-pydantic = ">=2.6.0 <2.10.0"
+pydantic = ">=2.8.1, !=2.10.0, !=2.10.1, !=2.10.2"
 pydantic-settings = ">=2.2.0"
 pyee = ">=9.0.0"
 sortedcollections = ">=2.1.0"
