@@ -7,12 +7,10 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 from unittest import mock
-from unittest.mock import MagicMock
 
 import pytest
 
 from crawlee import Glob, Request
-from crawlee.browsers import PlaywrightBrowserPlugin
 from crawlee.fingerprint_suite._consts import (
     PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA,
     PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_MOBILE,
@@ -22,11 +20,11 @@ from crawlee.fingerprint_suite._consts import (
 )
 from crawlee.playwright_crawler import PlaywrightCrawler
 from crawlee.storages import RequestList
-from tests.unit.browsers.test_playwright_browser_controller import browser
 
 if TYPE_CHECKING:
     from yarl import URL
 
+    from crawlee.browsers._types import BrowserType
     from crawlee.playwright_crawler import PlaywrightCrawlingContext
 
 
@@ -116,8 +114,15 @@ async def test_chromium_headless_headers(httpbin: URL) -> None:
     assert headers['User-Agent'] == PW_CHROMIUM_HEADLESS_DEFAULT_USER_AGENT
 
 
-async def test_firefox_headless_headers(httpbin: URL) -> None:
-    crawler = PlaywrightCrawler(headless=True, browser_type='firefox')
+@pytest.mark.parametrize(
+    'firefox_type',
+    [
+        'firefox',
+        'camoufox',  #  Builds on top of firefox.
+    ],
+)
+async def test_firefox_headless_headers(httpbin: URL, firefox_type: BrowserType) -> None:
+    crawler = PlaywrightCrawler(headless=True, browser_type=firefox_type)
     headers = dict[str, str]()
 
     @crawler.router.default_handler
@@ -173,11 +178,3 @@ async def test_pre_navigation_hook(httpbin: URL) -> None:
     await crawler.run(['https://example.com', str(httpbin)])
 
     assert mock_hook.call_count == 2
-
-
-#@pytest.mark.parametrize(("browser_type_input", "browser_type_name"), [])
-async def test_playwright_browser_plugin_browser_types(httpbin: URL) -> None:
-    #with MagicMock("_playwright_browser_plugin.py")
-    async with PlaywrightBrowserPlugin(browser_type="camoufox") as browser_plugin:
-        browser_controller = await browser_plugin.new_browser()
-        assert browser_controller._browser.browser_type.name == "firefox"
