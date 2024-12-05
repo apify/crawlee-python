@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from lazy_object_proxy import Proxy as LazyObjectProxy
+
 from crawlee._utils.docs import docs_group
 from crawlee.base_storage_client._base_storage_client import BaseStorageClient
 from crawlee.configuration import Configuration
@@ -91,7 +93,8 @@ _service_locator = _ServiceLocator()
 @docs_group('Functions')
 def get_configuration() -> Configuration:
     """Get the configuration."""
-    return _service_locator.configuration
+    proxy_config: Configuration = LazyObjectProxy(lambda: _service_locator.configuration)
+    return proxy_config
 
 
 @docs_group('Functions')
@@ -113,7 +116,8 @@ def set_configuration(configuration: Configuration) -> None:
 @docs_group('Functions')
 def get_event_manager() -> EventManager:
     """Get the event manager."""
-    return _service_locator.event_manager
+    proxy_event_manager: EventManager = LazyObjectProxy(lambda: _service_locator.event_manager)
+    return proxy_event_manager
 
 
 @docs_group('Functions')
@@ -135,7 +139,8 @@ def set_event_manager(event_manager: EventManager) -> None:
 @docs_group('Functions')
 def get_storage_client() -> BaseStorageClient:
     """Get the storage client."""
-    return _service_locator.storage_client
+    proxy_storage_client: BaseStorageClient = LazyObjectProxy(lambda: _service_locator.storage_client)
+    return proxy_storage_client
 
 
 @docs_group('Functions')
