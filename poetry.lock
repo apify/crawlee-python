@@ -1452,7 +1452,7 @@ files = [
 name = "lazy-object-proxy"
 version = "1.10.0"
 description = "A fast and thorough lazy object proxy."
-optional = false
+optional = true
 python-versions = ">=3.8"
 files = [
     {file = "lazy-object-proxy-1.10.0.tar.gz", hash = "sha256:78247b6d45f43a52ef35c25b5581459e85117225408a4128a3daf8bf9648ac69"},
@@ -3621,4 +3621,4 @@ playwright = ["playwright"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "b5ce5f8c10f818b8ff42aa8f00b7f06d86fae56a6107cac225eb3ab68a7a32b4"
+content-hash = "7878adf3a275fafd7f6d14e89e8c68993daf7a2ae1261ae98de9cc6afcc0b8ff"
