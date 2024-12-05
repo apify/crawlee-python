@@ -6,14 +6,7 @@ from crawlee.configuration import Configuration
 from crawlee.errors import ServiceConflictError
 from crawlee.events._event_manager import EventManager
 
-__all__ = [
-    'get_configuration',
-    'get_event_manager',
-    'get_storage_client',
-    'set_configuration',
-    'set_event_manager',
-    'set_storage_client',
-]
+__all__ = list[str]()  # Prefer "from crawlee import service_locator"
 
 
 class _ServiceLocator:
