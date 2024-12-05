@@ -6,6 +6,7 @@ import random
 from logging import getLogger
 from typing import TYPE_CHECKING, Callable, Literal, overload
 
+from crawlee import service_locator
 from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 from crawlee.events._types import Event, EventPersistStateData
@@ -53,19 +54,18 @@ class SessionPool:
             persist_state_kvs_name: The name of the `KeyValueStore` used for state persistence.
             persist_state_key: The key under which the session pool's state is stored in the `KeyValueStore`.
         """
+        if event_manager:
+            service_locator.set_event_manager(event_manager)
+
         self._max_pool_size = max_pool_size
         self._session_settings = create_session_settings or {}
         self._create_session_function = create_session_function
-        self._event_manager = event_manager
         self._persistence_enabled = persistence_enabled
         self._persist_state_kvs_name = persist_state_kvs_name
         self._persist_state_key = persist_state_key
 
         if self._create_session_function and self._session_settings:
             raise ValueError('Both `create_session_settings` and `create_session_function` cannot be provided.')
-
-        if self._persistence_enabled and not self._event_manager:
-            raise ValueError('Persistence is enabled, but no event manager was provided.')
 
         # Internal non-configurable attributes
         self._kvs: KeyValueStore | None = None
@@ -109,7 +109,8 @@ class SessionPool:
 
         self._active = True
 
-        if self._persistence_enabled and self._event_manager:
+        if self._persistence_enabled:
+            event_manager = service_locator.get_event_manager()
             self._kvs = await KeyValueStore.open(name=self._persist_state_kvs_name)
 
             # Attempt to restore the previously persisted state.
@@ -120,7 +121,7 @@ class SessionPool:
                 await self._fill_sessions_to_max()
 
             # Register an event listener for persisting the session pool state.
-            self._event_manager.on(event=Event.PERSIST_STATE, listener=self._persist_state)
+            event_manager.on(event=Event.PERSIST_STATE, listener=self._persist_state)
         # If persistence is disabled, just fill the pool with sessions.
         else:
             await self._fill_sessions_to_max()
@@ -141,9 +142,10 @@ class SessionPool:
         if not self._active:
             raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
-        if self._persistence_enabled and self._event_manager:
+        if self._persistence_enabled:
+            event_manager = service_locator.get_event_manager()
             # Remove the event listener for state persistence.
-            self._event_manager.off(event=Event.PERSIST_STATE, listener=self._persist_state)
+            event_manager.off(event=Event.PERSIST_STATE, listener=self._persist_state)
 
             # Persist the final state of the session pool.
             await self._persist_state(event_data=EventPersistStateData(is_migrating=False))

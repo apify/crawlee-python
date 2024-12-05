@@ -66,7 +66,7 @@ sortedcollections = ">=2.1.0"
 tldextract = ">=5.1.0"
 typer = ">=0.12.0"
 typing-extensions = ">=4.1.0"
-yarl = "^1.18.0"
+yarl = ">=1.18.0"
 
 [tool.poetry.group.dev.dependencies]
 build = "~1.2.0"
@@ -204,6 +204,10 @@ warn_redundant_casts = true
 warn_return_any = true
 warn_unreachable = true
 warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = ['lazy_object_proxy']
+ignore_missing_imports = true
 
 [tool.basedpyright]
 pythonVersion = "3.9"

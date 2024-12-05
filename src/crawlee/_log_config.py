@@ -4,13 +4,12 @@ import json
 import logging
 import sys
 import textwrap
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from colorama import Fore, Style, just_fix_windows_console
 from typing_extensions import assert_never
 
-if TYPE_CHECKING:
-    from crawlee.configuration import Configuration
+from crawlee import service_locator
 
 just_fix_windows_console()
 
@@ -35,22 +34,24 @@ _LOG_LEVEL_SHORT_ALIAS = {
 _LOG_MESSAGE_INDENT = ' ' * 6
 
 
-def get_configured_log_level(configuration: Configuration) -> int:
-    verbose_logging_requested = 'verbose_log' in configuration.model_fields_set and configuration.verbose_log
+def get_configured_log_level() -> int:
+    config = service_locator.get_configuration()
 
-    if 'log_level' in configuration.model_fields_set:
-        if configuration.log_level == 'DEBUG':
+    verbose_logging_requested = 'verbose_log' in config.model_fields_set and config.verbose_log
+
+    if 'log_level' in config.model_fields_set:
+        if config.log_level == 'DEBUG':
             return logging.DEBUG
-        if configuration.log_level == 'INFO':
+        if config.log_level == 'INFO':
             return logging.INFO
-        if configuration.log_level == 'WARNING':
+        if config.log_level == 'WARNING':
             return logging.WARNING
-        if configuration.log_level == 'ERROR':
+        if config.log_level == 'ERROR':
             return logging.ERROR
-        if configuration.log_level == 'CRITICAL':
+        if config.log_level == 'CRITICAL':
             return logging.CRITICAL
 
-        assert_never(configuration.log_level)
+        assert_never(config.log_level)
 
     if sys.flags.dev_mode or verbose_logging_requested:
         return logging.DEBUG
@@ -58,12 +59,7 @@ def get_configured_log_level(configuration: Configuration) -> int:
     return logging.INFO
 
 
-def configure_logger(
-    logger: logging.Logger,
-    configuration: Configuration,
-    *,
-    remove_old_handlers: bool = False,
-) -> None:
+def configure_logger(logger: logging.Logger, *, remove_old_handlers: bool = False) -> None:
     handler = logging.StreamHandler()
     handler.setFormatter(CrawleeLogFormatter())
 
@@ -72,7 +68,7 @@ def configure_logger(
             logger.removeHandler(old_handler)
 
     logger.addHandler(handler)
-    logger.setLevel(get_configured_log_level(configuration))
+    logger.setLevel(get_configured_log_level())
 
 
 class CrawleeLogFormatter(logging.Formatter):

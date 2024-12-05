@@ -13,6 +13,9 @@ __pycache__
 # Poetry
 poetry.toml
 
+# Other Python tools
+.ropeproject
+
 # Mise
 mise.toml
 .mise.toml

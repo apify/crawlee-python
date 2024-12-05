@@ -1,17 +1,18 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any, TypeVar, overload
 
 from typing_extensions import override
 
+from crawlee import service_locator
 from crawlee._utils.docs import docs_group
-from crawlee.base_storage_client._models import KeyValueStoreKeyInfo, KeyValueStoreMetadata
+from crawlee.base_storage_client import BaseStorageClient, KeyValueStoreKeyInfo, KeyValueStoreMetadata
 from crawlee.storages._base_storage import BaseStorage
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
-    from crawlee.base_storage_client import BaseStorageClient
     from crawlee.configuration import Configuration
 
 T = TypeVar('T')
@@ -52,19 +53,12 @@ class KeyValueStore(BaseStorage):
     ```
     """
 
-    def __init__(
-        self,
-        id: str,
-        name: str | None,
-        configuration: Configuration,
-        client: BaseStorageClient,
-    ) -> None:
+    def __init__(self, id: str, name: str | None, storage_client: BaseStorageClient) -> None:
         self._id = id
         self._name = name
-        self._configuration = configuration
 
         # Get resource clients from storage client
-        self._resource_client = client.key_value_store(self._id)
+        self._resource_client = storage_client.key_value_store(self._id)
 
     @property
     @override
@@ -91,6 +85,9 @@ class KeyValueStore(BaseStorage):
         storage_client: BaseStorageClient | None = None,
     ) -> KeyValueStore:
         from crawlee.storages._creation_management import open_storage
+
+        configuration = configuration or service_locator.get_configuration()
+        storage_client = storage_client or service_locator.get_storage_client()
 
         return await open_storage(
             storage_class=cls,
