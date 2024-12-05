@@ -68,7 +68,7 @@ class UserData(BaseModel, MutableMapping[str, JsonSerializable]):
     """
 
     model_config = ConfigDict(extra='allow')
-    __pydantic_extra__: dict[str, JsonSerializable] = Field(init=False)  # pyright: ignore
+    __pydantic_extra__: dict[str, JsonSerializable] = Field(init=False)
 
     crawlee_data: Annotated[CrawleeRequestData | None, Field(alias='__crawlee')] = None
     """Crawlee-specific configuration stored in the `user_data`."""
@@ -90,7 +90,7 @@ class UserData(BaseModel, MutableMapping[str, JsonSerializable]):
     def __delitem__(self, key: str) -> None:
         del self.__pydantic_extra__[key]
 
-    def __iter__(self) -> Iterator[str]:  # type: ignore
+    def __iter__(self) -> Iterator[str]:  # type: ignore[override]
         yield from self.__pydantic_extra__
 
     def __len__(self) -> int:
@@ -187,7 +187,6 @@ class BaseRequestData(BaseModel):
         payload: HttpPayload | str | None = None,
         label: str | None = None,
         unique_key: str | None = None,
-        id: str | None = None,
         keep_url_fragment: bool = False,
         use_extended_unique_key: bool = False,
         **kwargs: Any,
@@ -208,12 +207,9 @@ class BaseRequestData(BaseModel):
             use_extended_unique_key=use_extended_unique_key,
         )
 
-        id = id or unique_key_to_request_id(unique_key)
-
         request = cls(
             url=url,
             unique_key=unique_key,
-            id=id,
             method=method,
             headers=headers,
             payload=payload,

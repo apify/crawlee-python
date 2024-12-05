@@ -3,7 +3,20 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 0.4.4 - **not yet released**
+## 0.4.5 - **not yet released**
+
+### 🚀 Features
+
+- Improve project bootstrapping ([#538](https://github.com/apify/crawlee-python/pull/538)) ([367899c](https://github.com/apify/crawlee-python/commit/367899cbad5021674f6e41c4dd7eb2266fe043aa)) by [@janbuchar](https://github.com/janbuchar), closes [#317](https://github.com/apify/crawlee-python/issues/317), [#414](https://github.com/apify/crawlee-python/issues/414), [#495](https://github.com/apify/crawlee-python/issues/495), [#511](https://github.com/apify/crawlee-python/issues/511)
+
+### 🐛 Bug Fixes
+
+- Add upper bound of HTTPX version ([#775](https://github.com/apify/crawlee-python/pull/775)) ([b59e34d](https://github.com/apify/crawlee-python/commit/b59e34d6301e26825d88608152ffb337ef602a9f)) by [@vdusek](https://github.com/vdusek)
+- Fix incorrect use of desired concurrency ratio ([#780](https://github.com/apify/crawlee-python/pull/780)) ([d1f8bfb](https://github.com/apify/crawlee-python/commit/d1f8bfb68ce2ef13b550ce415a3689858112a4c7)) by [@Pijukatel](https://github.com/Pijukatel), closes [#759](https://github.com/apify/crawlee-python/issues/759)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.4.4](https://github.com/apify/crawlee-python/releases/tag/v0.4.4) (2024-11-29)
 
 ### 🚀 Features
 
@@ -15,7 +28,6 @@ All notable changes to this project will be documented in this file.
 - Fix init of context managers and context handling in `BasicCrawler` ([#714](https://github.com/apify/crawlee-python/pull/714)) ([486fe6d](https://github.com/apify/crawlee-python/commit/486fe6d6cd56cb560ab51a32ec0286d9e32267cb)) by [@vdusek](https://github.com/vdusek)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.4.3](https://github.com/apify/crawlee-python/releases/tag/v0.4.3) (2024-11-21)
 
 ### 🐛 Bug Fixes
