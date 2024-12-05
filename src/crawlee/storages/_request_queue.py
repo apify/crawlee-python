@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Generic, TypedDict, TypeVar
 
 from typing_extensions import override
 
-from crawlee import service_container
+from crawlee import service_locator
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.docs import docs_group
 from crawlee._utils.lru_cache import LRUCache
@@ -105,8 +105,8 @@ class RequestQueue(BaseStorage, RequestProvider):
     """Expected delay for storage to achieve consistency, guiding the timing of subsequent read operations."""
 
     def __init__(self, id: str, name: str | None, storage_client: BaseStorageClient) -> None:
-        config = service_container.get_configuration()
-        event_manager = service_container.get_event_manager()
+        config = service_locator.get_configuration()
+        event_manager = service_locator.get_event_manager()
 
         self._id = id
         self._name = name
@@ -157,8 +157,8 @@ class RequestQueue(BaseStorage, RequestProvider):
     ) -> RequestQueue:
         from crawlee.storages._creation_management import open_storage
 
-        configuration = configuration or service_container.get_configuration()
-        storage_client = storage_client or service_container.get_storage_client()
+        configuration = configuration or service_locator.get_configuration()
+        storage_client = storage_client or service_locator.get_storage_client()
 
         return await open_storage(
             storage_class=cls,

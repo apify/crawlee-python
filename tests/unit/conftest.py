@@ -10,7 +10,7 @@ import pytest
 from proxy import Proxy
 from yarl import URL
 
-from crawlee import service_container
+from crawlee import service_locator
 from crawlee.configuration import Configuration
 from crawlee.events._local_event_manager import LocalEventManager
 from crawlee.memory_storage_client import MemoryStorageClient
@@ -42,14 +42,14 @@ def prepare_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callabl
         monkeypatch.setenv('CRAWLEE_STORAGE_DIR', str(tmp_path))
 
         # Initialize services in the service container with default values.
-        service_container.set_configuration(Configuration())
-        service_container.set_storage_client(MemoryStorageClient())
-        service_container.set_event_manager(LocalEventManager())
+        service_locator.set_configuration(Configuration())
+        service_locator.set_storage_client(MemoryStorageClient())
+        service_locator.set_event_manager(LocalEventManager())
 
         # Reset the global state flags in the service locator.
-        service_container._service_locator._configuration_was_set = False
-        service_container._service_locator._storage_client_was_set = False
-        service_container._service_locator._event_manager_was_set = False
+        service_locator._service_locator._configuration_was_set = False
+        service_locator._service_locator._storage_client_was_set = False
+        service_locator._service_locator._event_manager_was_set = False
 
         # Clear creation-related caches to ensure no state is carried over between tests.
         monkeypatch.setattr(_creation_management, '_cache_dataset_by_id', {})
@@ -61,9 +61,9 @@ def prepare_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callabl
 
         # Verify that the test environment was set up correctly.
         assert os.environ.get('CRAWLEE_STORAGE_DIR') == str(tmp_path)
-        assert service_container._service_locator.configuration_was_set is False
-        assert service_container._service_locator.storage_client_was_set is False
-        assert service_container._service_locator.event_manager_was_set is False
+        assert service_locator._service_locator.configuration_was_set is False
+        assert service_locator._service_locator.storage_client_was_set is False
+        assert service_locator._service_locator.event_manager_was_set is False
 
     return _prepare_test_env
 
@@ -81,9 +81,9 @@ def cleanup_test_env() -> Callable[[], None]:
 
     def _cleanup_test_env() -> None:
         # Reset the flags in the service locator to indicate no services are explicitly set.
-        service_container._service_locator._configuration_was_set = False
-        service_container._service_locator._storage_client_was_set = False
-        service_container._service_locator._event_manager_was_set = False
+        service_locator._service_locator._configuration_was_set = False
+        service_locator._service_locator._storage_client_was_set = False
+        service_locator._service_locator._event_manager_was_set = False
 
     return _cleanup_test_env
 

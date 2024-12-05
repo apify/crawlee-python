@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from crawlee import service_container
+from crawlee import service_locator
 from crawlee._autoscaling import Snapshotter
 from crawlee._autoscaling.types import CpuSnapshot, EventLoopSnapshot, Snapshot
 from crawlee._utils.byte_size import ByteSize
@@ -248,7 +248,7 @@ async def test_snapshots_time_ordered() -> None:
         )
 
     async with (
-        service_container.get_event_manager() as event_manager,
+        service_locator.get_event_manager() as event_manager,
         Snapshotter(available_memory_ratio=0.25) as snapshotter,
     ):
         event_manager.emit(event=Event.SYSTEM_INFO, event_data=create_event_data(time_new))

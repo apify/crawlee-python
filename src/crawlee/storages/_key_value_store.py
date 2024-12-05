@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, TypeVar, overload
 
 from typing_extensions import override
 
-from crawlee import service_container
+from crawlee import service_locator
 from crawlee._utils.docs import docs_group
 from crawlee.base_storage_client import BaseStorageClient, KeyValueStoreKeyInfo, KeyValueStoreMetadata
 from crawlee.storages._base_storage import BaseStorage
@@ -86,8 +86,8 @@ class KeyValueStore(BaseStorage):
     ) -> KeyValueStore:
         from crawlee.storages._creation_management import open_storage
 
-        configuration = configuration or service_container.get_configuration()
-        storage_client = storage_client or service_container.get_storage_client()
+        configuration = configuration or service_locator.get_configuration()
+        storage_client = storage_client or service_locator.get_storage_client()
 
         return await open_storage(
             storage_class=cls,

@@ -6,7 +6,7 @@ from crawlee.configuration import Configuration
 from crawlee.errors import ServiceConflictError
 from crawlee.events import LocalEventManager
 from crawlee.memory_storage_client import MemoryStorageClient
-from crawlee.service_container import (
+from crawlee.service_locator import (
     get_configuration,
     get_event_manager,
     get_storage_client,

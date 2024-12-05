@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, TypeVar, cast
 import psutil
 from sortedcontainers import SortedList
 
-from crawlee import service_container
+from crawlee import service_locator
 from crawlee._autoscaling.types import ClientSnapshot, CpuSnapshot, EventLoopSnapshot, MemorySnapshot, Snapshot
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.context import ensure_context
@@ -134,7 +134,7 @@ class Snapshotter:
             raise RuntimeError(f'The {self.__class__.__name__} is already active.')
 
         self._active = True
-        event_manager = service_container.get_event_manager()
+        event_manager = service_locator.get_event_manager()
         event_manager.on(event=Event.SYSTEM_INFO, listener=self._snapshot_cpu)
         event_manager.on(event=Event.SYSTEM_INFO, listener=self._snapshot_memory)
         self._snapshot_event_loop_task.start()
@@ -158,7 +158,7 @@ class Snapshotter:
         if not self._active:
             raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
-        event_manager = service_container.get_event_manager()
+        event_manager = service_locator.get_event_manager()
         event_manager.off(event=Event.SYSTEM_INFO, listener=self._snapshot_cpu)
         event_manager.off(event=Event.SYSTEM_INFO, listener=self._snapshot_memory)
         await self._snapshot_event_loop_task.stop()

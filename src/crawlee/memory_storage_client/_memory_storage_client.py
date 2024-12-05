@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, TypeVar
 
 from typing_extensions import override
 
-from crawlee import service_container
+from crawlee import service_locator
 from crawlee._utils.docs import docs_group
 from crawlee.base_storage_client import BaseStorageClient
 from crawlee.memory_storage_client._dataset_client import DatasetClient
@@ -80,7 +80,7 @@ class MemoryStorageClient(BaseStorageClient):
             default_key_value_store_id: The default key-value store ID.
             default_dataset_id: The default dataset ID.
         """
-        config = configuration or service_container.get_configuration()
+        config = configuration or service_locator.get_configuration()
 
         # Set the internal attributes.
         self._write_metadata = write_metadata or config.write_metadata

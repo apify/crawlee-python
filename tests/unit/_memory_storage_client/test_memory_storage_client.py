@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from crawlee import Request, service_container
+from crawlee import Request, service_locator
 from crawlee._consts import METADATA_FILENAME
 from crawlee.configuration import Configuration
 from crawlee.memory_storage_client import MemoryStorageClient
@@ -224,7 +224,7 @@ async def test_not_implemented_method(tmp_path: Path) -> None:
 async def test_default_storage_path_used(monkeypatch: pytest.MonkeyPatch) -> None:
     # We expect the default value to be used
     monkeypatch.delenv('CRAWLEE_STORAGE_DIR', raising=False)
-    service_container.set_configuration(Configuration())
+    service_locator.set_configuration(Configuration())
     ms = MemoryStorageClient()
     assert ms.storage_dir == './storage'
 
@@ -232,7 +232,7 @@ async def test_default_storage_path_used(monkeypatch: pytest.MonkeyPatch) -> Non
 async def test_storage_path_from_env_var_overrides_default(monkeypatch: pytest.MonkeyPatch) -> None:
     # We expect the env var to override the default value
     monkeypatch.setenv('CRAWLEE_STORAGE_DIR', './env_var_storage_dir')
-    service_container.set_configuration(Configuration())
+    service_locator.set_configuration(Configuration())
     ms = MemoryStorageClient()
     assert ms.storage_dir == './env_var_storage_dir'
 

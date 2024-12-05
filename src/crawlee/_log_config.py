@@ -9,7 +9,7 @@ from typing import Any
 from colorama import Fore, Style, just_fix_windows_console
 from typing_extensions import assert_never
 
-from crawlee import service_container
+from crawlee import service_locator
 
 just_fix_windows_console()
 
@@ -35,7 +35,7 @@ _LOG_MESSAGE_INDENT = ' ' * 6
 
 
 def get_configured_log_level() -> int:
-    config = service_container.get_configuration()
+    config = service_locator.get_configuration()
 
     verbose_logging_requested = 'verbose_log' in config.model_fields_set and config.verbose_log
 

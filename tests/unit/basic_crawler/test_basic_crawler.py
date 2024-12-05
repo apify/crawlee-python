@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, Mock
 import httpx
 import pytest
 
-from crawlee import ConcurrencySettings, EnqueueStrategy, Glob, service_container
+from crawlee import ConcurrencySettings, EnqueueStrategy, Glob, service_locator
 from crawlee._request import BaseRequestData, Request
 from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpHeaders
 from crawlee.basic_crawler import BasicCrawler
@@ -798,7 +798,7 @@ async def test_consecutive_runs_purge_request_queue() -> None:
 
 async def test_respects_no_persist_storage() -> None:
     config = Configuration(persist_storage=False)
-    service_container.set_configuration(config)
+    service_locator.set_configuration(config)
     crawler = BasicCrawler()
 
     @crawler.router.default_handler
