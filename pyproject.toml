@@ -60,7 +60,7 @@ more_itertools = ">=10.2.0"
 parsel = { version = ">=1.9.0", optional = true }
 playwright = { version = ">=1.27.0", optional = true }
 psutil = ">=6.0.0"
-pydantic = ">=2.6.0"
+pydantic = ">=2.6.0, !=2.10.0, !=2.10.1, !=2.10.2"
 pydantic-settings = ">=2.2.0"
 pyee = ">=9.0.0"
 sortedcollections = ">=2.1.0"
@@ -160,9 +160,6 @@ indent-style = "space"
     "INP001", # File {filename} is part of an implicit namespace package, add an __init__.py
     "F841",   # Local variable {variable} is assigned to but never used
     "N999",   # Invalid module name
-]
-"src/crawlee/_utils/models.py" = [
-    "FA100",  # In order to be able to use | instead of Union for type hints in Pythons<3.10 we need to do from __future__ import annotations. This import can break pydantic in unxpecetd ways.
 ]
 
 
