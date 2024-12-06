@@ -41,7 +41,7 @@ class HttpResponse(Protocol):
 @dataclass(frozen=True)
 @docs_group('Data structures')
 class HttpCrawlingResult:
-    """Result of a HTTP-only crawl.
+    """Result of an HTTP-only crawl.
 
     Mainly for the purpose of composing specific crawling contexts (e.g. `BeautifulSoupCrawlingContext`,
     `ParselCrawlingContext`, ...).

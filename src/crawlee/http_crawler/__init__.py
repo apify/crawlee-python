@@ -1,4 +1,10 @@
-from ._http_crawler import HttpCrawler
-from ._http_crawling_context import HttpCrawlingContext, HttpCrawlingResult
+from crawlee.abstract_http_crawler._http_crawling_context import HttpCrawlingContext
+from crawlee.http_clients import HttpCrawlingResult
 
-__all__ = ['HttpCrawler', 'HttpCrawlingContext', 'HttpCrawlingResult']
+from ._http_crawler import HttpCrawler
+
+__all__ = [
+    'HttpCrawler',
+    'HttpCrawlingContext',
+    'HttpCrawlingResult',
+]
