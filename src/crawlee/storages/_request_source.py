@@ -23,8 +23,6 @@ class RequestSource(ABC):
         - Reclaiming requests that failed during processing, allowing retries.
         - Marking requests as successfully handled after processing.
         - Managing state information such as the total and handled request counts.
-
-    Subclasses of `RequestSource` should provide specific implementations for each of the abstract methods.
     """
 
     @property
