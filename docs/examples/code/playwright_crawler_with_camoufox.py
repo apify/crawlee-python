@@ -18,9 +18,9 @@ class ExampleCamoufoxPlugin(PlaywrightBrowserPlugin):
             raise RuntimeError('Playwright browser plugin is not initialized.')
 
         return PlaywrightBrowserController(
-            browser=await AsyncNewBrowser(self._playwright, **self._browser_options),
-            max_open_pages_per_browser=self._max_open_pages_per_browser,
-            header_generator=None,  #  This turns off the crawlee header_generation. Camoufox has its own.
+            browser=await AsyncNewBrowser(self._playwright, headless=True, **self._browser_options),
+            max_open_pages_per_browser=1,  # Increase, if camoufox can handle it in your use case.
+            header_generator=None,  # This turns off the crawlee header_generation. Camoufox has its own.
         )
 
 
@@ -29,7 +29,7 @@ async def main() -> None:
         # Limit the crawl to max requests. Remove or increase it for crawling all links.
         max_requests_per_crawl=10,
         # Custom browser pool. This gives users full control over browsers used by the crawler.
-        browser_pool=BrowserPool(plugins=[ExampleCamoufoxPlugin(browser_options={'headless': True})]),
+        browser_pool=BrowserPool(plugins=[ExampleCamoufoxPlugin()]),
     )
 
     # Define the default request handler, which will be called for every request.
