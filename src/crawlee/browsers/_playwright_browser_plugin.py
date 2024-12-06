@@ -122,6 +122,16 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
             browser = await self._playwright.firefox.launch(**self._browser_options)
         elif self._browser_type == 'webkit':
             browser = await self._playwright.webkit.launch(**self._browser_options)
+        elif self._browser_type == 'camoufox':
+            try:
+                #  Intentional late import of optional library. Majority of users might be using other browsers.
+                from camoufox.async_api import AsyncNewBrowser
+            except ImportError as e:
+                raise ImportError(
+                    'Missing camoufox. It is optional component of crawlee. To fix please install crawlee'
+                    ' with following extras: crawlee[playwright,camoufox] or crawlee[all]'
+                ) from e
+            browser = await AsyncNewBrowser(self._playwright, **self._browser_options)
         else:
             raise ValueError(f'Invalid browser type: {self._browser_type}')
 

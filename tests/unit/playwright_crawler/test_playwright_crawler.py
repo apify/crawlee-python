@@ -5,8 +5,11 @@
 from __future__ import annotations
 
 import json
+from platform import system
 from typing import TYPE_CHECKING
 from unittest import mock
+
+import pytest
 
 from crawlee import Glob, Request
 from crawlee.fingerprint_suite._consts import (
@@ -22,6 +25,7 @@ from crawlee.storages import RequestList
 if TYPE_CHECKING:
     from yarl import URL
 
+    from crawlee.browsers._types import BrowserType
     from crawlee.playwright_crawler import PlaywrightCrawlingContext
 
 
@@ -111,8 +115,15 @@ async def test_chromium_headless_headers(httpbin: URL) -> None:
     assert headers['User-Agent'] == PW_CHROMIUM_HEADLESS_DEFAULT_USER_AGENT
 
 
-async def test_firefox_headless_headers(httpbin: URL) -> None:
-    crawler = PlaywrightCrawler(headless=True, browser_type='firefox')
+@pytest.mark.parametrize(
+    'firefox_type',
+    [
+        'firefox',
+        'camoufox',  #  Builds on top of firefox.
+    ],
+)
+async def test_firefox_headless_headers(httpbin: URL, firefox_type: BrowserType) -> None:
+    crawler = PlaywrightCrawler(headless=True, browser_type=firefox_type)
     headers = dict[str, str]()
 
     @crawler.router.default_handler
@@ -125,14 +136,17 @@ async def test_firefox_headless_headers(httpbin: URL) -> None:
 
     await crawler.run([str(httpbin / 'get')])
 
-    assert 'User-Agent' in headers
-    assert 'Sec-Ch-Ua' not in headers
-    assert 'Sec-Ch-Ua-Mobile' not in headers
-    assert 'Sec-Ch-Ua-Platform' not in headers
+    if not (firefox_type == 'camoufox' and system() == 'Windows'):
+        #  Camoufox seems to currently have problem with headers on Windows
+        #  Reported camoufox issue https://github.com/daijro/camoufox/issues/79
+        assert 'User-Agent' in headers
+        assert 'Sec-Ch-Ua' not in headers
+        assert 'Sec-Ch-Ua-Mobile' not in headers
+        assert 'Sec-Ch-Ua-Platform' not in headers
 
-    assert 'headless' not in headers['User-Agent'].lower()
+        assert 'headless' not in headers['User-Agent'].lower()
 
-    assert headers['User-Agent'] == PW_FIREFOX_HEADLESS_DEFAULT_USER_AGENT
+        assert headers['User-Agent'] == PW_FIREFOX_HEADLESS_DEFAULT_USER_AGENT
 
 
 async def test_custom_headers(httpbin: URL) -> None:
