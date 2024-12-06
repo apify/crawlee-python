@@ -1,6 +1,7 @@
 import asyncio
 
-from camoufox import AsyncNewBrowser  #  This external package needs to be installed. It is not included in crawlee.
+#  This external package needs to be installed. It is not included in crawlee.
+from camoufox import AsyncNewBrowser  # type: ignore[import-untyped]
 from typing_extensions import override
 
 from crawlee.browsers import BrowserPool, PlaywrightBrowserController, PlaywrightBrowserPlugin
