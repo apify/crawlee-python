@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "crawlee"
-version = "0.4.4"
+version = "0.5.0"
 description = "Crawlee for Python"
 authors = ["Apify Technologies s.r.o. <support@apify.com>"]
 license = "Apache-2.0"
@@ -50,14 +50,16 @@ curl-cffi = { version = ">=0.7.2", optional = true }
 docutils = ">=0.21.0"
 eval-type-backport = ">=0.2.0"
 html5lib = { version = ">=1.0", optional = true }
-httpx = { version = ">=0.27.0", extras = ["brotli", "http2"] }
+# TODO: relax the upper bound once the issue is resolved:
+# https://github.com/apify/crawlee-python/issues/774
+httpx = { version = "~=0.27.0", extras = ["brotli", "http2"] }
 inquirer = ">=3.3.0"
 lxml = { version = ">=5.2.0", optional = true }
 more_itertools = ">=10.2.0"
 parsel = { version = ">=1.9.0", optional = true }
 playwright = { version = ">=1.27.0", optional = true }
 psutil = ">=6.0.0"
-pydantic = ">=2.6.0 <2.10.0"
+pydantic = ">=2.8.1, !=2.10.0, !=2.10.1, !=2.10.2"
 pydantic-settings = ">=2.2.0"
 pyee = ">=9.0.0"
 sortedcollections = ">=2.1.0"
@@ -102,6 +104,7 @@ crawlee = "crawlee._cli:cli"
 
 [tool.ruff]
 line-length = 120
+extend-exclude = ["project_template"]
 
 [tool.ruff.lint]
 select = ["ALL"]
@@ -189,6 +192,7 @@ timeout = 1200
 [tool.mypy]
 python_version = "3.9"
 plugins = ["pydantic.mypy"]
+exclude = ["project_template"]
 files = ["src", "tests"]
 check_untyped_defs = true
 disallow_incomplete_defs = true
