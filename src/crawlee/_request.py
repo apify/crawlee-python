@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Iterator, MutableMapping
 from datetime import datetime
-from decimal import Decimal
 from enum import IntEnum
 from typing import TYPE_CHECKING, Annotated, Any, cast
 
@@ -422,7 +421,3 @@ class RequestWithLock(Request):
 
     lock_expires_at: Annotated[datetime, Field(alias='lockExpiresAt')]
     """The timestamp when the lock expires."""
-
-
-class InternalRequest(Request):
-    order_no: Decimal | None = None

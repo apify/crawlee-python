@@ -6,16 +6,15 @@ import mimetypes
 import os
 import pathlib
 from datetime import datetime, timezone
-from decimal import Decimal
 from logging import getLogger
 from typing import TYPE_CHECKING
 
 from crawlee._consts import METADATA_FILENAME
-from crawlee._request import InternalRequest
 from crawlee._utils.data_processing import maybe_parse_body
 from crawlee._utils.file import json_dumps
 from crawlee.base_storage_client._models import (
     DatasetMetadata,
+    InternalRequest,
     KeyValueStoreMetadata,
     KeyValueStoreRecord,
     KeyValueStoreRecordMetadata,
@@ -372,9 +371,6 @@ def create_rq_from_directory(
                 content = json.load(f)
 
             request = InternalRequest(**content)
-            order_no = request.order_no
-            if order_no:
-                request.order_no = Decimal(order_no)
 
             entries[request.id] = request
 
