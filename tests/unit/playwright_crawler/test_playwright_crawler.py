@@ -17,7 +17,6 @@ from crawlee.fingerprint_suite._consts import (
     PW_FIREFOX_HEADLESS_DEFAULT_USER_AGENT,
 )
 from crawlee.playwright_crawler import PlaywrightCrawler
-from crawlee.storages import RequestList
 
 if TYPE_CHECKING:
     from yarl import URL
@@ -64,9 +63,7 @@ async def test_enqueue_links() -> None:
 
 
 async def test_nonexistent_url_invokes_error_handler() -> None:
-    crawler = PlaywrightCrawler(
-        max_request_retries=4, request_provider=RequestList(['https://this-does-not-exist-22343434.com'])
-    )
+    crawler = PlaywrightCrawler(max_request_retries=4)
 
     error_handler = mock.AsyncMock(return_value=None)
     crawler.error_handler(error_handler)
@@ -78,7 +75,7 @@ async def test_nonexistent_url_invokes_error_handler() -> None:
     async def request_handler(_context: PlaywrightCrawlingContext) -> None:
         pass
 
-    await crawler.run()
+    await crawler.run(['https://this-does-not-exist-22343434.com'])
     assert error_handler.call_count == 3
     assert failed_handler.call_count == 1
 

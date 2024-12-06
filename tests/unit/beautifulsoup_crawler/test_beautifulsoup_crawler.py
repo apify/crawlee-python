@@ -9,7 +9,6 @@ from httpx import Response
 
 from crawlee import ConcurrencySettings
 from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler
-from crawlee.storages import RequestList
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -79,7 +78,7 @@ async def server() -> AsyncGenerator[respx.MockRouter, None]:
 
 
 async def test_basic(server: respx.MockRouter) -> None:
-    crawler = BeautifulSoupCrawler(request_provider=RequestList(['https://test.io/']))
+    crawler = BeautifulSoupCrawler()
     handler = mock.AsyncMock()
 
     @crawler.router.default_handler
@@ -87,7 +86,7 @@ async def test_basic(server: respx.MockRouter) -> None:
         links = context.soup.find_all('a')
         await handler(links)
 
-    await crawler.run()
+    await crawler.run(['https://test.io/'])
 
     assert server['index_endpoint'].called
     assert handler.called
@@ -97,7 +96,7 @@ async def test_basic(server: respx.MockRouter) -> None:
 
 
 async def test_enqueue_links(server: respx.MockRouter) -> None:
-    crawler = BeautifulSoupCrawler(request_provider=RequestList(['https://test.io/']))
+    crawler = BeautifulSoupCrawler()
     visit = mock.Mock()
 
     @crawler.router.default_handler
@@ -105,7 +104,7 @@ async def test_enqueue_links(server: respx.MockRouter) -> None:
         visit(context.request.url)
         await context.enqueue_links()
 
-    await crawler.run()
+    await crawler.run(['https://test.io/'])
 
     assert server['index_endpoint'].called
     assert server['secondary_index_endpoint'].called
@@ -121,7 +120,7 @@ async def test_enqueue_links(server: respx.MockRouter) -> None:
 
 
 async def test_enqueue_links_selector(server: respx.MockRouter) -> None:
-    crawler = BeautifulSoupCrawler(request_provider=RequestList(['https://test.io/']))
+    crawler = BeautifulSoupCrawler()
     visit = mock.Mock()
 
     @crawler.router.default_handler
@@ -129,7 +128,7 @@ async def test_enqueue_links_selector(server: respx.MockRouter) -> None:
         visit(context.request.url)
         await context.enqueue_links(selector='a.foo')
 
-    await crawler.run()
+    await crawler.run(['https://test.io/'])
 
     assert server['index_endpoint'].called
     assert server['secondary_index_endpoint'].called
@@ -163,7 +162,7 @@ async def test_enqueue_links_with_max_crawl(server: respx.MockRouter) -> None:
 
 
 async def test_handle_blocked_request(server: respx.MockRouter) -> None:
-    crawler = BeautifulSoupCrawler(request_provider=RequestList(['https://test.io/fdyr']), max_session_rotations=1)
-    stats = await crawler.run()
+    crawler = BeautifulSoupCrawler(max_session_rotations=1)
+    stats = await crawler.run(['https://test.io/fdyr'])
     assert server['incapsula_endpoint'].called
     assert stats.requests_failed == 1
