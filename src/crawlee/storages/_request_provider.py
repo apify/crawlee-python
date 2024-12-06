@@ -16,11 +16,11 @@ if TYPE_CHECKING:
 
 @docs_group('Abstract classes')
 class RequestProvider(RequestSource, ABC):
-    """Abstract base class that extends `RequestSource` with the capability to add new requests to the queue."""
+    """Abstract base class that extends `RequestSource` with the capability to enqueue new requests."""
 
     @abstractmethod
     async def drop(self) -> None:
-        """Removes the queue either from the Apify Cloud storage or from the local database."""
+        """Removes persistent state either from the Apify Cloud storage or from the local database."""
 
     @abstractmethod
     async def add_request(
@@ -52,7 +52,7 @@ class RequestProvider(RequestSource, ABC):
         """Add requests to the underlying resource client in batches.
 
         Args:
-            requests: Requests to add to the queue.
+            requests: Requests to enqueue.
             batch_size: The number of requests to add in one batch.
             wait_time_between_batches: Time to wait between adding batches.
             wait_for_all_requests_to_be_added: If True, wait for all requests to be added before returning.

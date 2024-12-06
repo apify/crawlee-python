@@ -14,9 +14,9 @@ if TYPE_CHECKING:
 
 @docs_group('Abstract classes')
 class RequestSource(ABC):
-    """Abstract base class defining the interface and common behaviour for request providers.
+    """Abstract base class defining the interface for classes that provide access to a read-only stream of requests.
 
-    Request providers are used to manage and provide access to a storage of crawling requests.
+    Request sources are used to manage and provide access to a storage of crawling requests.
 
     Key responsibilities:
         - Fetching the next request to be processed.
@@ -30,15 +30,15 @@ class RequestSource(ABC):
     @property
     @abstractmethod
     def name(self) -> str | None:
-        """ID or name of the request queue."""
+        """ID or name of the request source."""
 
     @abstractmethod
     async def get_total_count(self) -> int:
-        """Returns an offline approximation of the total number of requests in the queue (i.e. pending + handled)."""
+        """Returns an offline approximation of the total number of requests in the source (i.e. pending + handled)."""
 
     @abstractmethod
     async def is_empty(self) -> bool:
-        """Returns True if there are no more requests in the queue (there might still be unfinished requests)."""
+        """Returns True if there are no more requests in the source (there might still be unfinished requests)."""
 
     @abstractmethod
     async def is_finished(self) -> bool:
@@ -46,7 +46,7 @@ class RequestSource(ABC):
 
     @abstractmethod
     async def fetch_next_request(self) -> Request | None:
-        """Returns a next request in the queue to be processed, or `null` if there are no more pending requests."""
+        """Returns the next request to be processed, or `null` if there are no more pending requests."""
 
     @abstractmethod
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
@@ -54,7 +54,7 @@ class RequestSource(ABC):
 
     @abstractmethod
     async def reclaim_request(self, request: Request, *, forefront: bool = False) -> ProcessedRequest | None:
-        """Reclaims a failed request back to the queue, so that it can be returned for processing later again.
+        """Reclaims a failed request back to the source, so that it can be returned for processing later again.
 
         It is possible to modify the request data by supplying an updated request as a parameter.
         """
