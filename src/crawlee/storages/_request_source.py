@@ -74,7 +74,7 @@ class RequestSource(ABC):
         raise ValueError(f'Invalid request type: {type(request)}')
 
     def _transform_requests(self, requests: Sequence[str | Request]) -> list[Request]:
-        """Transforms a list of request-like objects into a list of Request objects."""
+        """Transforms a list of request-like objects into a list of `Request` objects."""
         processed_requests = dict[str, Request]()
 
         for request in requests:
