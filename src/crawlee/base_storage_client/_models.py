@@ -237,6 +237,8 @@ class BatchRequestsOperationResponse(BaseModel):
 class InternalRequest(BaseModel):
     """Represents an request in queue client."""
 
+    model_config = ConfigDict(populate_by_name=True)
+
     id: str
 
     unique_key: str
@@ -245,7 +247,7 @@ class InternalRequest(BaseModel):
 
     handled_at: datetime | None
 
-    request: Request
+    request: Annotated[Request, Field(alias='json_')]
 
     @classmethod
     def from_request(cls, request: Request, id: str, order_no: Decimal | None) -> InternalRequest:
