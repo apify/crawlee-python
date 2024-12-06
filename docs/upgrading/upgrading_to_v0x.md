@@ -5,6 +5,18 @@ title: Upgrading to v0.x
 
 This page summarizes the breaking changes between Crawlee for Python zero-based versions.
 
+## Upgrading to v0.5
+
+This section summarizes the breaking changes between v0.4.x and v0.5.0.
+
+### Service locator
+
+- The `crawlee.service_container` was completely refactored and renamed to `crawlee.service_locator`.
+
+### Statistics
+
+- The `crawlee.statistics.Statistics` class do not accept an event manager as an input argument anymore. It uses the default, global one.
+
 ## Upgrading to v0.4
 
 This section summarizes the breaking changes between v0.3.x and v0.4.0.
