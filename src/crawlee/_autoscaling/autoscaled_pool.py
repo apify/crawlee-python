@@ -195,7 +195,7 @@ class AutoscaledPool:
         """Inspect system load status and adjust desired concurrency if necessary. Do not call directly."""
         status = self._system_status.get_historical_system_info()
 
-        min_current_concurrency = math.floor(self._desired_concurrency_ratio * self.current_concurrency)
+        min_current_concurrency = math.floor(self._desired_concurrency_ratio * self.desired_concurrency)
         should_scale_up = (
             status.is_system_idle
             and self._desired_concurrency < self._max_concurrency

@@ -20,12 +20,12 @@
         "@apify/tsconfig": "^0.1.0",
         "@docusaurus/module-type-aliases": "3.6.3",
         "@docusaurus/types": "3.6.3",
-        "@types/react": "^18.0.28",
-        "@typescript-eslint/eslint-plugin": "8.15.0",
-        "@typescript-eslint/parser": "8.15.0",
+        "@types/react": "^19.0.0",
+        "@typescript-eslint/eslint-plugin": "8.17.0",
+        "@typescript-eslint/parser": "8.17.0",
         "eslint": "8.57.0",
         "eslint-plugin-react": "7.37.2",
-        "eslint-plugin-react-hooks": "5.0.0",
+        "eslint-plugin-react-hooks": "5.1.0",
         "fs-extra": "^11.1.0",
         "patch-package": "^8.0.0",
         "path-browserify": "^1.0.1",
@@ -51,11 +51,11 @@
         "process": "^0.11.10",
         "prop-types": "^15.8.1",
         "raw-loader": "^4.0.2",
-        "react": "^18.2.0",
-        "react-dom": "^18.2.0",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0",
         "react-lite-youtube-embed": "^2.3.52",
         "stream-browserify": "^3.0.0",
         "unist-util-visit": "^5.0.0"
     },
-    "packageManager": "yarn@4.5.2"
+    "packageManager": "yarn@4.5.3"
 }

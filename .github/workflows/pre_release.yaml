@@ -27,6 +27,7 @@ jobs:
         name: Prepare release metadata
         with:
           release_type: prerelease
+          existing_changelog_path: CHANGELOG.md
 
   # If github.ref points to a [ci skip] commit, this workflow won't run.
   # Otherwise, these checks will be launched from the `run_code_checks` workflow.
