@@ -3661,10 +3661,8 @@ test = ["big-O", "importlib-resources", "jaraco.functools", "jaraco.itertools", 
 type = ["pytest-mypy"]
 
 [extras]
-all = ["apify", "beautifulsoup4", "curl-cffi", "html5lib", "lxml", "parsel", "playwright"]
-apify = ["apify"]
+all = ["beautifulsoup4", "curl-cffi", "html5lib", "lxml", "parsel", "playwright"]
 beautifulsoup = ["beautifulsoup4", "html5lib", "lxml"]
-ci = ["beautifulsoup4", "curl-cffi", "html5lib", "lxml", "parsel", "playwright"]
 curl-impersonate = ["curl-cffi"]
 parsel = ["parsel"]
 playwright = ["playwright"]
@@ -3672,4 +3670,4 @@ playwright = ["playwright"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "7302860921cc0e2840f2e612378c4212775bbf3061bb47ce72793d341e386f6c"
+content-hash = "2ef3de5474613439f8aad7c8dcb3e553a0d9250e2f192e14a310684c966fa5cf"
