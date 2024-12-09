@@ -2,6 +2,8 @@ import asyncio
 
 from crawlee.http_crawler import HttpCrawler, HttpCrawlingContext
 from crawlee.storages import RequestList
+from crawlee.storages._request_queue import RequestQueue
+from crawlee.storages._request_source_tandem import RequestSourceTandem
 
 
 async def main() -> None:
@@ -12,9 +14,12 @@ async def main() -> None:
         requests=['https://apify.com/', 'https://crawlee.dev/'],
     )
 
+    # Open a request queue that should be used for links discovered on the crawled pages.
+    request_queue = await RequestQueue.open()
+
     # Create a new crawler (it can be any subclass of BasicCrawler) and pass the request
-    # list as request provider to it. It will be managed by the crawler.
-    crawler = HttpCrawler(request_provider=request_list)
+    # list along with a request queue joined into a tandem. It will be managed by the crawler.
+    crawler = HttpCrawler(request_provider=RequestSourceTandem(request_list, request_queue))
 
     # Define the default request handler, which will be called for every request.
     @crawler.router.default_handler
