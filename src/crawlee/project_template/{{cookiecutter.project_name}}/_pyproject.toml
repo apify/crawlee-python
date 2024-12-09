@@ -1,7 +1,4 @@
 # % set extras = [cookiecutter.crawler_type]
-# % if cookiecutter.enable_apify_integration
-# % do extras.append('apify')
-# % endif
 # % if cookiecutter.http_client == 'curl-impersonate'
 # % do extras.append('curl-impersonate')
 # % endif
@@ -17,6 +14,9 @@ package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.9"
+# % if cookiecutter.enable_apify_integration
+apify = "*"
+# % endif
 crawlee = {version = "*", extras = {{ extras | tojson }}}
 
 [build-system]
