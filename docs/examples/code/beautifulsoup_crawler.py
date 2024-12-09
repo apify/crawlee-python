@@ -1,6 +1,7 @@
 import asyncio
 from datetime import timedelta
 
+from crawlee._types import BasicCrawlingContext
 from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 
 
@@ -38,6 +39,12 @@ async def main() -> None:
         # Push the extracted data to the default dataset. In local configuration,
         # the data will be stored as JSON files in ./storage/datasets/default.
         await context.push_data(data)
+
+    # Register default pre navigation hook which will be called before each request.
+    # This hook is optional and does not need to be defined at all.
+    @crawler.pre_navigation_router.default_handler
+    async def default_pre_navigation_handler(context: BasicCrawlingContext) -> None:
+        pass
 
     # Run the crawler with the initial list of URLs.
     await crawler.run(['https://crawlee.dev'])
