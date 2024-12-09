@@ -92,9 +92,7 @@ types-psutil = "~5.9.5.20240205"
 types-python-dateutil = "~2.9.0.20240316"
 
 [tool.poetry.extras]
-all = ["apify", "beautifulsoup4", "curl-cffi", "lxml", "html5lib", "parsel", "playwright"]
-ci = ["beautifulsoup4", "curl-cffi", "lxml", "html5lib", "parsel", "playwright"]
-apify = ["apify"]
+all = ["beautifulsoup4", "curl-cffi", "lxml", "html5lib", "parsel", "playwright"]
 beautifulsoup = ["beautifulsoup4", "lxml", "html5lib"]
 curl-impersonate = ["curl-cffi"]
 playwright = ["playwright"]

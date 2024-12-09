@@ -9,14 +9,10 @@ clean:
 	rm -rf .mypy_cache .pytest_cache .ruff_cache build dist htmlcov .coverage
 
 install-dev:
-	poetry install --extras ci
-	poetry run pre-commit install
-	poetry run playwright install
-
-install-full:
 	poetry install --all-extras
 	poetry run pre-commit install
 	poetry run playwright install
+
 
 build:
 	poetry build --no-interaction -vv
