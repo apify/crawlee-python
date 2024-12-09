@@ -46,21 +46,21 @@ trio = ["trio (>=0.26.1)"]
 
 [[package]]
 name = "apify"
-version = "2.1.0"
+version = "2.0.2"
 description = "Apify SDK for Python"
 optional = true
 python-versions = "<4.0,>=3.9"
 files = [
-    {file = "apify-2.1.0-py3-none-any.whl", hash = "sha256:5b9f2257fe9c0946e0c15d260dddfd0d494d4242ec1351a5fa3b20759755d62b"},
-    {file = "apify-2.1.0.tar.gz", hash = "sha256:054bb2ecca8cf3f80fda37219a1d8cddd1068b2dba7d3dda4e46aabddff80983"},
+    {file = "apify-2.0.2-py3-none-any.whl", hash = "sha256:65bca55aec6df524fa9b9297c4123a263e0338007ce02dd11e650de39d75f3f2"},
+    {file = "apify-2.0.2.tar.gz", hash = "sha256:396924d73de0d898401ef73f6b33bf3ce08bedd3a0866cb1f14671efc606878c"},
 ]
 
 [package.dependencies]
 apify-client = ">=1.8.1"
 apify-shared = ">=1.1.2"
-crawlee = ">=0.4.0,<0.5.0"
+crawlee = ">=0.3.9"
 cryptography = ">=42.0.0"
-httpx = ">=0.27.0,<0.28.0"
+httpx = ">=0.27.0"
 lazy-object-proxy = ">=1.10.0"
 typing-extensions = ">=4.1.0"
 websockets = ">=10.0,<14.0.0"
@@ -1261,13 +1261,13 @@ trio = ["trio (>=0.22.0,<1.0)"]
 
 [[package]]
 name = "httpx"
-version = "0.27.2"
+version = "0.28.1"
 description = "The next generation HTTP client."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "httpx-0.27.2-py3-none-any.whl", hash = "sha256:7bb2708e112d8fdd7829cd4243970f0c223274051cb35ee80c03301ee29a3df0"},
-    {file = "httpx-0.27.2.tar.gz", hash = "sha256:f7c2be1d2f3c3c3160d441802406b206c2b76f5947b11115e6df10c6c65e66c2"},
+    {file = "httpx-0.28.1-py3-none-any.whl", hash = "sha256:d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad"},
+    {file = "httpx-0.28.1.tar.gz", hash = "sha256:75e98c5f16b0f35b567856f597f06ff2270a374470a5c2392242528e3e3e42fc"},
 ]
 
 [package.dependencies]
@@ -1278,7 +1278,6 @@ certifi = "*"
 h2 = {version = ">=3,<5", optional = true, markers = "extra == \"http2\""}
 httpcore = "==1.*"
 idna = "*"
-sniffio = "*"
 
 [package.extras]
 brotli = ["brotli", "brotlicffi"]
@@ -3671,4 +3670,4 @@ playwright = ["playwright"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "25fe92512881710e233a3df45dd1310aae9a08e1f171f3d21f173400cd91507e"
+content-hash = "9852a9f3388e287812329ba92026e75ec6375a532fbda1125b8859d95e5ffeac"
