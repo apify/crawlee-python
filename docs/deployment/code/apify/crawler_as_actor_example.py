@@ -1,4 +1,4 @@
-from apify import Actor
+from apify import Actor  # type: ignore[import-not-found]
 
 from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 

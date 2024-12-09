@@ -1,7 +1,7 @@
 import asyncio
 
 # highlight-next-line
-from apify import Actor
+from apify import Actor  # type: ignore[import-not-found]
 
 from crawlee.playwright_crawler import PlaywrightCrawler
 
