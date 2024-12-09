@@ -1,5 +1,4 @@
 # % set extras = [cookiecutter.crawler_type]
-# % endif
 # % if cookiecutter.http_client == 'curl-impersonate'
 # % do extras.append('curl-impersonate')
 # % endif
