@@ -205,6 +205,7 @@ warn_unreachable = true
 warn_unused_ignores = true
 
 [[tool.mypy.overrides]]
+# Example code that shows integration of crawlee imports apify, despite apify not being dependency of crawlee.
 module = "apify"
 ignore_missing_imports = true
 
