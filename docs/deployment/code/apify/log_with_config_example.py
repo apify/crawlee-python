@@ -1,4 +1,4 @@
-from apify import Actor, Configuration  # type: ignore[import-not-found]
+from apify import Actor, Configuration
 
 
 async def main() -> None:

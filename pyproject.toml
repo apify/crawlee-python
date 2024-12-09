@@ -204,6 +204,10 @@ warn_return_any = true
 warn_unreachable = true
 warn_unused_ignores = true
 
+[[tool.mypy.overrides]]
+module = "apify"
+ignore_missing_imports = true
+
 [tool.basedpyright]
 pythonVersion = "3.9"
 typeCheckingMode = "standard"
