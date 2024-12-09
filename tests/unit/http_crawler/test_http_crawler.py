@@ -21,8 +21,7 @@ if TYPE_CHECKING:
     from yarl import URL
 
     from crawlee.http_clients._base import BaseHttpClient
-    from crawlee.http_crawler._http_crawling_context import HttpCrawlingContext
-
+    from crawlee.http_crawler import HttpCrawlingContext
 
 # Payload, e.g. data for a form submission.
 PAYLOAD = {
