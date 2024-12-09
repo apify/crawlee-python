@@ -109,10 +109,13 @@ async def test_none_proxy_retrying_request_makes_tier_go_up() -> None:
 
     # No proxy used.
     info = await config.new_proxy_info(None, request_1, None)
-    assert info is None
+    assert info is None, 'First entry in tired_proxy_urls is None. config.new_proxy_info is expected to generate None.'
 
+    # Proxy should go up one tier for same request that was already sent before.
     info = await config.new_proxy_info(None, request_1, None)
-    assert info is not None
+    assert info is not None, (
+        'config.new_proxy_info is expected to generate non-none proxy info from non-none ' 'tiered_proxy_urls.'
+    )
     assert info.url == tiered_proxy_urls[1][0]
 
 
@@ -125,12 +128,15 @@ async def test_none_proxy_rotates_proxies_uniformly_with_no_request() -> None:
 
     # No proxy used.
     info = await config.new_proxy_info(None, None, None)
-    assert info is None
+    assert info is None, 'First entry in tired_proxy_urls is None. config.new_proxy_info is expected to generate None.'
 
+    # Proxy should be rotated on the same proxy tier for a new request.
     info = await config.new_proxy_info(None, None, None)
-    assert info is not None
+    assert info is not None, (
+        'config.new_proxy_info is expected to generate non-none proxy info from non-none ' 'tiered_proxy_urls.'
+    )
     assert info.url == tiered_proxy_urls[0][1]
 
-    # No proxy used.
+    # Proxy rotation starts from the beginning of the proxy list after last proxy in tier was used. No proxy used again.
     info = await config.new_proxy_info(None, None, None)
-    assert info is None
+    assert info is None, 'First entry in tired_proxy_urls is None. config.new_proxy_info is expected to generate None.'
