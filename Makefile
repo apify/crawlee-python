@@ -13,7 +13,6 @@ install-dev:
 	poetry run pre-commit install
 	poetry run playwright install
 
-
 build:
 	poetry build --no-interaction -vv
 
