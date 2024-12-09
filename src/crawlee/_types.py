@@ -300,6 +300,20 @@ class SendRequestFunction(Protocol):
     ) -> Coroutine[None, None, HttpResponse]: ...
 
 
+class UseStateFunction(Protocol):
+    """Type of a function for performing use state.
+
+    Warning:
+        This is an experimental feature. The behavior and interface may change in future versions.
+    """
+
+    def __call__(
+        self,
+        key: str,
+        default_value: dict[str, JsonSerializable] | None = None,
+    ) -> Coroutine[None, None, dict[str, JsonSerializable]]: ...
+
+
 T = TypeVar('T')
 
 
@@ -347,6 +361,7 @@ class BasicCrawlingContext:
     send_request: SendRequestFunction
     add_requests: AddRequestsFunction
     push_data: PushDataFunction
+    use_state: UseStateFunction
     get_key_value_store: GetKeyValueStoreFromRequestHandlerFunction
     log: logging.Logger
 

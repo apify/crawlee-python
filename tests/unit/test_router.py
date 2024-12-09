@@ -20,6 +20,7 @@ class MockContext(BasicCrawlingContext):
             add_requests=AsyncMock(),
             proxy_info=AsyncMock(),
             push_data=AsyncMock(),
+            use_state=AsyncMock(),
             get_key_value_store=AsyncMock(),
             log=logging.getLogger(),
         )
