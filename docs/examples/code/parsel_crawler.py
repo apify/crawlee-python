@@ -34,7 +34,7 @@ async def main() -> None:
     # Register pre navigation hook which will be called before each request.
     # This hook is optional and does not need to be defined at all.
     @crawler.pre_navigation_hook
-    async def default_pre_navigation_handler(context: BasicCrawlingContext) -> None:
+    async def some_hook(context: BasicCrawlingContext) -> None:
         pass
 
     # Run the crawler with the initial list of URLs.
