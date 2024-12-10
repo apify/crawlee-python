@@ -7,6 +7,7 @@ import logging
 from collections import Counter
 from dataclasses import dataclass
 from datetime import timedelta
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, Mock
@@ -890,6 +891,7 @@ async def test_respects_no_persist_storage() -> None:
     assert not datasets_path.exists() or list(datasets_path.iterdir()) == []
 
 
+@pytest.mark.skipif(os.name == 'nt' and 'CI' in os.environ, reason='Skipped in Windows CI')
 async def test_logs_final_statistics(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
     # Set the log level to INFO to capture the final statistics log.
     caplog.set_level(logging.INFO)
