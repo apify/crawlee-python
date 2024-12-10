@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from typing import TYPE_CHECKING, Callable
-from unittest.mock import AsyncMock, Mock, call
+from unittest.mock import AsyncMock, Mock
 from urllib.parse import parse_qs, urlencode
 
 import pytest
@@ -358,58 +358,8 @@ async def test_sending_url_query_params(http_client_class: type[BaseHttpClient],
 
 
 @respx.mock
-async def test_http_crawler_pre_navigation_hooks_correctly_routed() -> None:
-    """Test that pre-navigation hooks are correctly routed based on request label."""
-    test_url_with_registered_label = 'http://www.something1.com'
-    test_url_without_label = 'http://www.something2.com'
-    test_url_with_unregistered_label = 'http://www.something3.com'
-
-    handler_for_registered_hook = Mock()
-    default_handler = Mock()
-    registered_label = 'Bla'
-    unregistered_label = 'Ble'
-
-    crawler = HttpCrawler()
-
-    @crawler.router.default_handler
-    async def default_request_handler(context: HttpCrawlingContext) -> None:
-        pass
-
-    # Register tested pre navigation hook for registered_label.
-    @crawler.pre_navigation_router.handler(registered_label)
-    async def pre_navigation_handler_with_label(context: BasicCrawlingContext) -> None:
-        handler_for_registered_hook(context.request.url, context.request.label)
-
-    # Register tested pre navigation default hook.
-    @crawler.pre_navigation_router.default_handler
-    async def default_pre_navigation_handler(context: BasicCrawlingContext) -> None:
-        default_handler(context.request.url, context.request.label)
-
-    for test_url in (test_url_with_registered_label, test_url_without_label, test_url_with_unregistered_label):
-        respx.get(test_url).mock(return_value=Response(200))
-
-    requests = [
-        Request.from_url(label=registered_label, url=test_url_with_registered_label),
-        Request.from_url(url=test_url_without_label),
-        Request.from_url(label=unregistered_label, url=test_url_with_unregistered_label),
-    ]
-
-    await crawler.run(requests)
-
-    # Assert that handler_for_registered_hook is triggered for request with matching label.
-    handler_for_registered_hook.assert_called_once_with(test_url_with_registered_label, registered_label)
-    # Assert that default_handler is triggered for request with no label and request with unregistered label.
-    default_handler.assert_has_calls(
-        [
-            call(test_url_without_label, None),
-            call(test_url_with_unregistered_label, unregistered_label),
-        ]
-    )
-
-
-@respx.mock
 async def test_http_crawler_pre_navigation_hooks_executed_before_request() -> None:
-    """Test that pre-navigation hook is executed before request."""
+    """Test that pre-navigation hooks are executed in correct order."""
     execution_order = []
     test_ulr = 'http://www.something.com'
 
@@ -420,10 +370,15 @@ async def test_http_crawler_pre_navigation_hooks_executed_before_request() -> No
     async def default_request_handler(context: HttpCrawlingContext) -> None:  # noqa: ARG001 # Unused arg in test
         execution_order.append('final handler')
 
-    #  Register pre navigation hook..
-    @crawler.pre_navigation_router.default_handler
-    async def default_pre_navigation_handler(context: BasicCrawlingContext) -> None:  # noqa: ARG001 # Unused arg in test
-        execution_order.append('pre-navigation-hook')
+    #  Register pre navigation hook.
+    @crawler.pre_navigation_hook
+    async def hook1(context: BasicCrawlingContext) -> None:  # noqa: ARG001 # Unused arg in test
+        execution_order.append('pre-navigation-hook 1')
+
+    #  Register pre navigation hook.
+    @crawler.pre_navigation_hook
+    async def hook2(context: BasicCrawlingContext) -> None:  # noqa: ARG001 # Unused arg in test
+        execution_order.append('pre-navigation-hook 2')
 
     def mark_request_execution(request: Request) -> Response:  # noqa: ARG001 # Unused arg in test
         # Helper function to track execution order.
@@ -433,4 +388,4 @@ async def test_http_crawler_pre_navigation_hooks_executed_before_request() -> No
     respx.get(test_ulr).mock(side_effect=mark_request_execution)
     await crawler.run([Request.from_url(url=test_ulr)])
 
-    assert execution_order == ['pre-navigation-hook', 'request', 'final handler']
+    assert execution_order == ['pre-navigation-hook 1', 'pre-navigation-hook 2', 'request', 'final handler']

@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import logging
 from abc import ABC
-from typing import TYPE_CHECKING, Any, Generic
+from typing import TYPE_CHECKING, Any, Callable, Generic
 
 from pydantic import ValidationError
 from typing_extensions import NotRequired, TypeVar
 
 from crawlee import EnqueueStrategy
 from crawlee._request import BaseRequestData
-from crawlee._types import BasicCrawlingContext
 from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.abstract_http_crawler._http_crawling_context import (
@@ -20,14 +19,13 @@ from crawlee.abstract_http_crawler._http_crawling_context import (
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
 from crawlee.http_clients import HttpxHttpClient
-from crawlee.router import Router
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Iterable
+    from collections.abc import AsyncGenerator, Awaitable, Iterable
 
     from typing_extensions import Unpack
 
-    from crawlee._types import EnqueueLinksFunction, EnqueueLinksKwargs
+    from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, EnqueueLinksKwargs
     from crawlee.abstract_http_crawler._abstract_http_parser import AbstractHttpParser
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=ParsedHttpCrawlingContext)
@@ -72,7 +70,7 @@ class AbstractHttpCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler[
         **kwargs: Unpack[BasicCrawlerOptions[TCrawlingContext]],
     ) -> None:
         self._parser = parser
-        self._pre_navigation_router: None | Router[BasicCrawlingContext] = None
+        self._pre_navigation_hooks: list[Callable[[BasicCrawlingContext], Awaitable[None]]] = []
 
         kwargs.setdefault(
             'http_client',
@@ -101,26 +99,11 @@ class AbstractHttpCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler[
             .compose(self._handle_blocked_request)
         )
 
-    @property
-    def pre_navigation_router(self) -> Router[BasicCrawlingContext]:
-        """The router used to handle each individual crawling request."""
-        if self._pre_navigation_router is None:
-            self._pre_navigation_router = Router[BasicCrawlingContext]()
-
-        return self._pre_navigation_router
-
-    @pre_navigation_router.setter
-    def pre_navigation_router(self, router: Router[BasicCrawlingContext]) -> None:
-        if self._pre_navigation_router is not None:
-            raise RuntimeError('A pre navigation router is already set')
-
-        self._pre_navigation_router = router
-
     async def _execute_pre_navigation_hooks(
         self, context: BasicCrawlingContext
     ) -> AsyncGenerator[BasicCrawlingContext, None]:
-        if self._pre_navigation_router:
-            await self.pre_navigation_router(context)
+        for hook in self._pre_navigation_hooks:
+            await hook(context)
         yield context
 
     async def _parse_http_response(
@@ -233,3 +216,11 @@ class AbstractHttpCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler[
             if blocked_info := self._parser.is_blocked(context.parsed_content):
                 raise SessionError(blocked_info.reason)
         yield context
+
+    def pre_navigation_hook(self, hook: Callable[[BasicCrawlingContext], Awaitable[None]]) -> None:
+        """Register a hook to be called before each navigation.
+
+        Args:
+            hook: A coroutine function to be called before each navigation.
+        """
+        self._pre_navigation_hooks.append(hook)
