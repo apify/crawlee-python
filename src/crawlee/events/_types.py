@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Coroutine
 from enum import Enum
-from typing import Annotated, Any, Union
+from typing import Annotated, Any, TypeVar, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -73,3 +73,15 @@ SyncListener = Callable[..., None]
 AsyncListener = Callable[..., Coroutine[Any, Any, None]]
 Listener = Union[SyncListener, AsyncListener]
 WrappedListener = Callable[..., Coroutine[Any, Any, None]]
+
+TEvent = TypeVar('TEvent')
+EventListener = Union[
+    Callable[
+        [TEvent],
+        Union[None, Coroutine[Any, Any, None]],
+    ],
+    Callable[
+        [],
+        Union[None, Coroutine[Any, Any, None]],
+    ],
+]

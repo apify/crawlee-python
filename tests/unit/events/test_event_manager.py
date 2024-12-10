@@ -8,8 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from crawlee.events import EventManager
-from crawlee.events._types import Event, EventSystemInfoData
+from crawlee.events import Event, EventManager, EventSystemInfoData
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -83,9 +82,34 @@ async def test_emit_event_with_no_listeners(
 
     # Attempt to emit an event for which no listeners are registered, it should not fail
     event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_system_info_data)
+    await asyncio.sleep(0.1)  # Allow some time for the event to be processed
 
     # Ensure the listener for the other event was not called
     assert async_listener.call_count == 0
+
+
+async def test_emit_invokes_parameterless_listener(
+    event_manager: EventManager,
+    event_system_info_data: EventSystemInfoData,
+) -> None:
+    sync_mock = MagicMock()
+
+    def sync_listener() -> None:
+        sync_mock()
+
+    async_mock = MagicMock()
+
+    async def async_listener() -> None:
+        async_mock()
+
+    event_manager.on(event=Event.SYSTEM_INFO, listener=sync_listener)
+    event_manager.on(event=Event.SYSTEM_INFO, listener=async_listener)
+
+    event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_system_info_data)
+    await asyncio.sleep(0.1)  # Allow some time for the event to be processed
+
+    assert sync_mock.call_count == 1
+    assert async_mock.call_count == 1
 
 
 async def test_remove_nonexistent_listener_does_not_fail(
