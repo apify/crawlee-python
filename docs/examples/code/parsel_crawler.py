@@ -1,5 +1,6 @@
 import asyncio
 
+from crawlee._types import BasicCrawlingContext
 from crawlee.parsel_crawler import ParselCrawler, ParselCrawlingContext
 
 # Regex for identifying email addresses on a webpage.
@@ -29,6 +30,12 @@ async def main() -> None:
 
         # Enqueue all links found on the page.
         await context.enqueue_links()
+
+    # Register default pre navigation hook which will be called before each request.
+    # This hook is optional and does not need to be defined at all.
+    @crawler.pre_navigation_router.default_handler
+    async def default_pre_navigation_handler(context: BasicCrawlingContext) -> None:
+        pass
 
     # Run the crawler with the initial list of URLs.
     await crawler.run(['https://github.com'])
