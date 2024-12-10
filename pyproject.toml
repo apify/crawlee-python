@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "crawlee"
-version = "0.4.5"
+version = "0.5.0"
 description = "Crawlee for Python"
 authors = ["Apify Technologies s.r.o. <support@apify.com>"]
 license = "Apache-2.0"
@@ -92,8 +92,7 @@ types-psutil = "~5.9.5.20240205"
 types-python-dateutil = "~2.9.0.20240316"
 
 [tool.poetry.extras]
-all = ["apify", "beautifulsoup4", "lxml", "html5lib", "curl-cffi", "playwright"]
-apify = ["apify"]
+all = ["beautifulsoup4", "curl-cffi", "lxml", "html5lib", "parsel", "playwright"]
 beautifulsoup = ["beautifulsoup4", "lxml", "html5lib"]
 curl-impersonate = ["curl-cffi"]
 playwright = ["playwright"]
@@ -204,6 +203,11 @@ warn_redundant_casts = true
 warn_return_any = true
 warn_unreachable = true
 warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+# Example code that shows integration of crawlee imports apify, despite apify not being dependency of crawlee.
+module = "apify"
+ignore_missing_imports = true
 
 [tool.basedpyright]
 pythonVersion = "3.9"

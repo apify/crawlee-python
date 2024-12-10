@@ -3,7 +3,15 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 0.4.5 - **not yet released**
+## 0.5.0 - **not yet released**
+
+### Refactor
+
+- [**breaking**] Refactor HttpCrawler, BeautifulSoupCrawler, ParselCrawler inheritance ([#746](https://github.com/apify/crawlee-python/pull/746)) ([9d3c269](https://github.com/apify/crawlee-python/commit/9d3c2697c91ce93028ca86a91d85d465d36c1ad7)) by [@Pijukatel](https://github.com/Pijukatel), closes [#350](https://github.com/apify/crawlee-python/issues/350)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.4.5](https://github.com/apify/crawlee-python/releases/tag/v0.4.5) (2024-12-06)
 
 ### 🚀 Features
 
@@ -16,7 +24,6 @@ All notable changes to this project will be documented in this file.
 - Remove pydantic constraint &lt;2.10.0 and update timedelta validator, serializer type hints ([#757](https://github.com/apify/crawlee-python/pull/757)) ([c0050c0](https://github.com/apify/crawlee-python/commit/c0050c0ee76e5deb28f174ecf276b0e6abf68b9d)) by [@Pijukatel](https://github.com/Pijukatel)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.4.4](https://github.com/apify/crawlee-python/releases/tag/v0.4.4) (2024-11-29)
 
 ### 🚀 Features

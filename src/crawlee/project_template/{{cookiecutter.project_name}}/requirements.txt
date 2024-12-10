@@ -5,7 +5,7 @@ camoufox
 # % set extras = [cookiecutter.crawler_type]
 # % endif
 # % if cookiecutter.enable_apify_integration
-# % do extras.append('apify')
+apify
 # % endif
 # % if cookiecutter.http_client == 'curl-impersonate'
 # % do extras.append('curl-impersonate')

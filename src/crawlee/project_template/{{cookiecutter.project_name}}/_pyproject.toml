@@ -24,6 +24,9 @@ python = "^3.9"
 # % if cookiecutter.crawler_type == 'camoufox'
 camoufox = {version= ">=0.4.5", extras = ["geoip"]}
 # % endif
+# % if cookiecutter.enable_apify_integration
+apify = "*"
+# % endif
 crawlee = {version = "*", extras = {{ extras | tojson }}}
 
 [build-system]
