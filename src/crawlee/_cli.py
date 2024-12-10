@@ -1,20 +1,26 @@
 # ruff: noqa: TRY301, FBT002, UP007
 from __future__ import annotations
 
-import os
+import importlib.resources
+import json
 from pathlib import Path
 from typing import Annotated, Optional, cast
 
-import httpx
-import inquirer  # type: ignore
+import inquirer  # type: ignore[import-untyped]
 import typer
-from cookiecutter.main import cookiecutter  # type: ignore
-from inquirer.render.console import ConsoleRender  # type: ignore
+from cookiecutter.main import cookiecutter  # type: ignore[import-untyped]
+from inquirer.render.console import ConsoleRender  # type: ignore[import-untyped]
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-TEMPLATE_LIST_URL = 'https://api.github.com/repos/apify/crawlee-python/contents/templates'
-
 cli = typer.Typer(no_args_is_help=True)
+
+template_directory = importlib.resources.files('crawlee') / 'project_template'
+cookiecutter_json = json.load((template_directory / 'cookiecutter.json').open())
+
+crawler_choices = cookiecutter_json['crawler_type']
+http_client_choices = cookiecutter_json['http_client']
+package_manager_choices = cookiecutter_json['package_manager']
+default_start_url = cookiecutter_json['start_url']
 
 
 @cli.callback(invoke_without_command=True)
@@ -64,25 +70,42 @@ def _prompt_for_project_name(initial_project_name: str | None) -> str:
         return project_name
 
 
-def _prompt_for_template() -> str:
-    """Prompt the user to select a template from a list."""
-    # Fetch available templates
-    response = httpx.get(
-        TEMPLATE_LIST_URL,
-        timeout=httpx.Timeout(10),
-        headers=[('Authorization', f'Bearer {os.environ["GH_TOKEN"]}')] if 'GH_TOKEN' in os.environ else [],
+def _prompt_text(message: str, default: str) -> str:
+    return cast(
+        str,
+        ConsoleRender().render(
+            inquirer.Text(
+                name='text',
+                message=message,
+                default=default,
+                validate=lambda _, value: bool(value.strip()),
+            ),
+        ),
     )
-    response.raise_for_status()
-    template_choices = [item['name'] for item in response.json() if item['type'] == 'dir']
 
-    # Prompt for template choice
+
+def _prompt_choice(message: str, choices: list[str]) -> str:
+    """Prompt the user to pick one from a list of choices."""
     return cast(
         str,
         ConsoleRender().render(
             inquirer.List(
-                name='template',
-                message='Please select the template for your new Crawlee project',
-                choices=[(choice[0].upper() + choice[1:], choice) for choice in template_choices],
+                name='choice',
+                message=message,
+                choices=[(choice[0].upper() + choice[1:], choice) for choice in choices],
+            ),
+        ),
+    )
+
+
+def _prompt_bool(message: str, *, default: bool) -> bool:
+    return cast(
+        bool,
+        ConsoleRender().render(
+            inquirer.Confirm(
+                name='confirm',
+                message=message,
+                default=default,
             ),
         ),
     )
@@ -92,14 +115,38 @@ def _prompt_for_template() -> str:
 def create(
     project_name: Optional[str] = typer.Argument(
         default=None,
+        show_default=False,
         help='The name of the project and the directory that will be created to contain it. '
         'If none is given, you will be prompted.',
-        show_default=False,
     ),
-    template: Optional[str] = typer.Option(
-        default=None,
-        help='The template to be used to create the project. If none is given, you will be prompted.',
+    crawler_type: Optional[str] = typer.Option(
+        None,
+        '--crawler-type',
+        '--template',
         show_default=False,
+        help='The library that will be used for crawling in your crawler. If none is given, you will be prompted.',
+    ),
+    http_client: Optional[str] = typer.Option(
+        None,
+        show_default=False,
+        help='The library that will be used to make HTTP requests in your crawler. '
+        'If none is given, you will be prompted.',
+    ),
+    package_manager: Optional[str] = typer.Option(
+        default=None,
+        show_default=False,
+        help='Package manager to be used in the new project. If none is given, you will be prompted.',
+    ),
+    start_url: Optional[str] = typer.Option(
+        default=None,
+        show_default=False,
+        help='The URL where crawling should start. If none is given, you will be prompted.',
+    ),
+    enable_apify_integration: Optional[bool] = typer.Option(
+        None,
+        '--apify/--no-apify',
+        show_default=False,
+        help='Should Apify integration be set up for you? If not given, you will be prompted.',
     ),
 ) -> None:
     """Bootstrap a new Crawlee project."""
@@ -107,11 +154,38 @@ def create(
         # Prompt for project name if not provided.
         project_name = _prompt_for_project_name(project_name)
 
-        # Prompt for template choice if not provided.
-        if template is None:
-            template = _prompt_for_template()
+        # Prompt for crawler_type if not provided.
+        if crawler_type is None:
+            crawler_type = _prompt_choice('Please select the Crawler type', crawler_choices)
 
-        if project_name and template:
+        # Prompt for http_client if not provided.
+        if http_client is None:
+            http_client = _prompt_choice('Please select the HTTP client', http_client_choices)
+
+        # Prompt for package manager if not provided.
+        if package_manager is None:
+            package_manager = _prompt_choice('Please select the package manager', package_manager_choices)
+
+        # Prompt for start URL
+        if start_url is None:
+            start_url = _prompt_text('Please specify the start URL', default=default_start_url)
+
+        # Ask about Apify integration if not explicitly configured
+        if enable_apify_integration is None:
+            enable_apify_integration = _prompt_bool('Should Apify integration be set up for you?', default=False)
+
+        if all(
+            [
+                project_name,
+                crawler_type,
+                http_client,
+                package_manager,
+                start_url,
+                enable_apify_integration is not None,
+            ]
+        ):
+            package_name = project_name.replace('-', '_')
+
             # Start the bootstrap process.
             with Progress(
                 SpinnerColumn(),
@@ -120,21 +194,39 @@ def create(
             ) as progress:
                 progress.add_task(description='Bootstrapping...', total=None)
                 cookiecutter(
-                    template='gh:apify/crawlee-python',
-                    directory=f'templates/{template}',
+                    template=str(template_directory),
                     no_input=True,
-                    extra_context={'project_name': project_name},
+                    extra_context={
+                        'project_name': project_name,
+                        'package_manager': package_manager,
+                        'crawler_type': crawler_type,
+                        'http_client': http_client,
+                        'enable_apify_integration': enable_apify_integration,
+                        'start_url': start_url,
+                    },
                 )
 
             typer.echo(f'Your project "{project_name}" was created.')
-            typer.echo(
-                f'To run it, navigate to the directory: "cd {project_name}", '
-                'install dependencies with "poetry install", '
-                f'and run it using "poetry run python -m {project_name}".'
-            )
+
+            if package_manager == 'manual':
+                typer.echo(
+                    f'To run it, navigate to the directory: "cd {project_name}", '
+                    f'install the dependencies listed in "requirements.txt" '
+                    f'and run it using "python -m {package_name}".'
+                )
+            elif package_manager == 'pip':
+                typer.echo(
+                    f'To run it, navigate to the directory: "cd {project_name}", '
+                    f'activate the virtual environment in ".venv" ("source .venv/bin/activate") '
+                    f'and run your project using "python -m {package_name}".'
+                )
+            elif package_manager == 'poetry':
+                typer.echo(
+                    f'To run it, navigate to the directory: "cd {project_name}", '
+                    f'and run it using "poetry run python -m {package_name}".'
+                )
+
             typer.echo(f'See the "{project_name}/README.md" for more information.')
 
-    except httpx.HTTPStatusError as exc:
-        typer.echo(f'Failed to fetch templates: {exc}.', err=True)
     except KeyboardInterrupt:
         typer.echo('Operation cancelled by user.')

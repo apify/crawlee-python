@@ -6,7 +6,7 @@ FROM apify/actor-python:3.13
 RUN apt install -yq git && rm -rf /var/lib/apt/lists/*
 
 RUN pip install -U pip setuptools \
-    && pip install poetry \
+    && pip install 'poetry<2' \
     && poetry self add poetry-plugin-export
 
 # Second, copy just poetry.lock and pyproject.toml into the Actor image,

@@ -32,11 +32,11 @@ def _get_from_cache_by_name(
 ) -> TResource | None:
     """Try to restore storage from cache by name."""
     if issubclass(storage_class, Dataset):
-        return _cache_dataset_by_name.get(name)  # pyright: ignore
+        return _cache_dataset_by_name.get(name)
     if issubclass(storage_class, KeyValueStore):
-        return _cache_kvs_by_name.get(name)  # pyright: ignore
+        return _cache_kvs_by_name.get(name)
     if issubclass(storage_class, RequestQueue):
-        return _cache_rq_by_name.get(name)  # pyright: ignore
+        return _cache_rq_by_name.get(name)
     raise ValueError(f'Unknown storage class: {storage_class.__name__}')
 
 
@@ -46,11 +46,11 @@ def _get_from_cache_by_id(
 ) -> TResource | None:
     """Try to restore storage from cache by ID."""
     if issubclass(storage_class, Dataset):
-        return _cache_dataset_by_id.get(id)  # pyright: ignore
+        return _cache_dataset_by_id.get(id)
     if issubclass(storage_class, KeyValueStore):
-        return _cache_kvs_by_id.get(id)  # pyright: ignore
+        return _cache_kvs_by_id.get(id)
     if issubclass(storage_class, RequestQueue):
-        return _cache_rq_by_id.get(id)  # pyright: ignore
+        return _cache_rq_by_id.get(id)
     raise ValueError(f'Unknown storage: {storage_class.__name__}')
 
 
