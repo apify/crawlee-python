@@ -222,11 +222,16 @@ async def test_not_implemented_method(tmp_path: Path) -> None:
 
 
 async def test_default_storage_path_used(monkeypatch: pytest.MonkeyPatch) -> None:
-    # We expect the default value to be used
+    # Reset the configuration in service locator
+    service_locator._service_locator._configuration = None
+    service_locator._service_locator._configuration_was_set = False
+
+    # Remove the env var for setting the storage directory
     monkeypatch.delenv('CRAWLEE_STORAGE_DIR', raising=False)
-    service_locator.set_configuration(Configuration())
-    ms = MemoryStorageClient()
-    assert ms.storage_dir == './storage'
+
+    # Initialize the service locator with default configuration
+    msc = MemoryStorageClient()
+    assert msc.storage_dir == './storage'
 
 
 async def test_storage_path_from_env_var_overrides_default(monkeypatch: pytest.MonkeyPatch) -> None:
