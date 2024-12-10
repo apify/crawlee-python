@@ -5,6 +5,14 @@ title: Upgrading to v0.x
 
 This page summarizes the breaking changes between Crawlee for Python zero-based versions.
 
+## Upgrading to v0.5
+
+This section summarizes the breaking changes between v0.4.x and v0.5.0.
+
+### BeautifulSoupParser
+- Renamed `BeautifulSoupParser` to `BeautifulSoupParserType`. Probably used only in type hints. Please replace previous usages of `BeautifulSoupParser` by `BeautifulSoupParserType`.
+- `BeautifulSoupParser` is now a new class that is used in refactored class `BeautifulSoupCrawler`.
+
 ## Upgrading to v0.4
 
 This section summarizes the breaking changes between v0.3.x and v0.4.0.
