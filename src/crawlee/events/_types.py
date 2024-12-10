@@ -69,9 +69,6 @@ class EventExitData(BaseModel):
 
 
 EventData = Union[EventPersistStateData, EventSystemInfoData, EventMigratingData, EventAbortingData, EventExitData]
-SyncListener = Callable[..., None]
-AsyncListener = Callable[..., Coroutine[Any, Any, None]]
-Listener = Union[SyncListener, AsyncListener]
 WrappedListener = Callable[..., Coroutine[Any, Any, None]]
 
 TEvent = TypeVar('TEvent')
