@@ -154,9 +154,9 @@ async def test_methods_raise_error_when_not_active() -> None:
 
 
 async def test_with_plugin_contains_page_options(httpbin: URL) -> None:
-    plugin = PlaywrightBrowserPlugin(page_options={'user_agent': 'My Best Uset-Agent'})
+    plugin = PlaywrightBrowserPlugin(page_options={'user_agent': 'My Best User-Agent'})
     async with BrowserPool(plugins=[plugin]) as browser_pool:
         test_page = await browser_pool.new_page()
         await test_page.page.goto(str(httpbin / 'user-agent'))
-        assert 'My Best Uset-Agent' in await test_page.page.content()
+        assert 'My Best User-Agent' in await test_page.page.content()
         await test_page.page.close()
