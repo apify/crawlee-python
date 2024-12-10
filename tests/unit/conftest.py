@@ -18,7 +18,7 @@ from crawlee.proxy_configuration import ProxyInfo
 from crawlee.storages import _creation_management
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Generator
+    from collections.abc import AsyncGenerator
     from pathlib import Path
 
 
@@ -38,6 +38,12 @@ def prepare_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callabl
     """
 
     def _prepare_test_env() -> None:
+        # Reset the flags in the service locator to indicate that no services are explicitly set. This ensures
+        # a clean state, as services might have been set during a previous test and not reset properly.
+        service_locator._service_locator._configuration_was_set = False
+        service_locator._service_locator._storage_client_was_set = False
+        service_locator._service_locator._event_manager_was_set = False
+
         # Set the environment variable for the local storage directory to the temporary path.
         monkeypatch.setenv('CRAWLEE_STORAGE_DIR', str(tmp_path))
 
@@ -68,31 +74,8 @@ def prepare_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callabl
     return _prepare_test_env
 
 
-@pytest.fixture
-def cleanup_test_env() -> Callable[[], None]:
-    """Clean up and reset global state after a test has completed.
-
-    This fixture ensures that any modifications to the global state during a test are undone
-    after the test finishes. Restoring the environment for the subsequent tests.
-
-    Returns:
-        A callable that cleans up the test environment.
-    """
-
-    def _cleanup_test_env() -> None:
-        # Reset the flags in the service locator to indicate no services are explicitly set.
-        service_locator._service_locator._configuration_was_set = False
-        service_locator._service_locator._storage_client_was_set = False
-        service_locator._service_locator._event_manager_was_set = False
-
-    return _cleanup_test_env
-
-
 @pytest.fixture(autouse=True)
-def _isolate_test_environment(
-    prepare_test_env: Callable[[], None],
-    cleanup_test_env: Callable[[], None],
-) -> Generator[None, None, None]:
+def _isolate_test_environment(prepare_test_env: Callable[[], None]) -> None:
     """Isolate the testing environment by resetting global state before and after each test.
 
     This fixture ensures that each test starts with a clean slate and that any modifications during the test
@@ -100,14 +83,8 @@ def _isolate_test_environment(
 
     Args:
         prepare_test_env: Fixture to prepare the environment before each test.
-        cleanup_test_env: Fixture to clean up the environment after each test.
-
-    Yields:
-        None. This fixture works as a setup and teardown mechanism.
     """
     prepare_test_env()
-    yield
-    cleanup_test_env()
 
 
 @pytest.fixture
