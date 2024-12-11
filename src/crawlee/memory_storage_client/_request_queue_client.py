@@ -39,6 +39,8 @@ from crawlee.memory_storage_client._creation_management import (
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from sortedcontainers import SortedDict
+
     from crawlee.memory_storage_client import MemoryStorageClient
 
 logger = getLogger(__name__)
@@ -68,7 +70,9 @@ class RequestQueueClient(BaseRequestQueueClient):
         self.handled_request_count = handled_request_count
         self.pending_request_count = pending_request_count
 
-        self.requests = ValueSortedDict(lambda request: request.order_no or -float('inf'))
+        self.requests: SortedDict[str, InternalRequest] = ValueSortedDict(
+            lambda request: request.order_no or -float('inf')
+        )
         self.file_operation_lock = asyncio.Lock()
         self._last_used_timestamp = Decimal(0.0)
 
@@ -188,19 +192,18 @@ class RequestQueueClient(BaseRequestQueueClient):
 
             # Iterate all requests in the queue which have sorted key larger than infinity, which means
             # `order_no` is not `None`. This will iterate them in order of `order_no`.
-            for request_key in existing_queue_by_id.requests.irange_key(
-                min_key=-float('inf'),
-                inclusive=(False, True),
+            for request_key in existing_queue_by_id.requests.irange_key(  # type: ignore[attr-defined] # irange_key is a valid SortedDict method but not recognized by mypy
+                min_key=-float('inf'), inclusive=(False, True)
             ):
                 if len(requests) == limit:
                     break
 
-                request = existing_queue_by_id.requests.get(request_key)
+                internal_request = existing_queue_by_id.requests.get(request_key)
 
                 # Check that the request still exists and was not handled,
                 # in case something deleted it or marked it as handled concurrenctly
-                if request and not request.handled_at:
-                    requests.append(request.to_request())
+                if internal_request and not internal_request.handled_at:
+                    requests.append(internal_request.to_request())
 
             return RequestQueueHead(
                 limit=limit,
@@ -240,17 +243,17 @@ class RequestQueueClient(BaseRequestQueueClient):
         internal_request = await self._create_internal_request(request, forefront)
 
         async with existing_queue_by_id.file_operation_lock:
-            existing_request_with_id = existing_queue_by_id.requests.get(internal_request.id)
+            existing_internal_request_with_id = existing_queue_by_id.requests.get(internal_request.id)
 
             # We already have the request present, so we return information about it
-            if existing_request_with_id is not None:
+            if existing_internal_request_with_id is not None:
                 await existing_queue_by_id.update_timestamps(has_been_modified=False)
 
                 return ProcessedRequest(
                     id=internal_request.id,
                     unique_key=internal_request.unique_key,
                     was_already_present=True,
-                    was_already_handled=existing_request_with_id.handled_at,
+                    was_already_handled=existing_internal_request_with_id.handled_at is not None,
                 )
 
             existing_queue_by_id.requests[internal_request.id] = internal_request
@@ -289,7 +292,7 @@ class RequestQueueClient(BaseRequestQueueClient):
         async with existing_queue_by_id.file_operation_lock:
             await existing_queue_by_id.update_timestamps(has_been_modified=False)
 
-            internal_request: InternalRequest = existing_queue_by_id.requests.get(request_id)
+            internal_request = existing_queue_by_id.requests.get(request_id)
             return internal_request.to_request() if internal_request else None
 
     @override
@@ -312,11 +315,11 @@ class RequestQueueClient(BaseRequestQueueClient):
         internal_request = await self._create_internal_request(request, forefront)
 
         # First we need to check the existing request to be able to return information about its handled state.
-        existing_request = existing_queue_by_id.requests.get(internal_request.id)
+        existing_internal_request = existing_queue_by_id.requests.get(internal_request.id)
 
         # Undefined means that the request is not present in the queue.
         # We need to insert it, to behave the same as API.
-        if existing_request is None:
+        if existing_internal_request is None:
             return await self.add_request(request, forefront=forefront)
 
         async with existing_queue_by_id.file_operation_lock:
@@ -325,9 +328,9 @@ class RequestQueueClient(BaseRequestQueueClient):
             existing_queue_by_id.requests[internal_request.id] = internal_request
 
             pending_count_adjustment = 0
-            is_request_handled_state_changing = existing_request.handled_at != internal_request.handled_at
+            is_request_handled_state_changing = existing_internal_request.handled_at != internal_request.handled_at
 
-            request_was_handled_before_update = existing_request.handled_at is not None
+            request_was_handled_before_update = existing_internal_request.handled_at is not None
 
             # We add 1 pending request if previous state was handled
             if is_request_handled_state_changing:
@@ -362,11 +365,11 @@ class RequestQueueClient(BaseRequestQueueClient):
             raise_on_non_existing_storage(StorageTypes.REQUEST_QUEUE, self.id)
 
         async with existing_queue_by_id.file_operation_lock:
-            request = existing_queue_by_id.requests.get(request_id)
+            internal_request = existing_queue_by_id.requests.get(request_id)
 
-            if request:
+            if internal_request:
                 del existing_queue_by_id.requests[request_id]
-                if request.handled_at:
+                if internal_request.handled_at:
                     existing_queue_by_id.handled_request_count -= 1
                 else:
                     existing_queue_by_id.pending_request_count -= 1

@@ -233,9 +233,8 @@ class BatchRequestsOperationResponse(BaseModel):
     unprocessed_requests: Annotated[list[UnprocessedRequest], Field(alias='unprocessedRequests')]
 
 
-@docs_group('Data structures')
 class InternalRequest(BaseModel):
-    """Represents an request in queue client."""
+    """Represents an internal representation of queue request with additional metadata for ordering and storage."""
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -244,10 +243,13 @@ class InternalRequest(BaseModel):
     unique_key: str
 
     order_no: Decimal | None = None
+    """Order number for maintaining request sequence in queue.
+    Used for restoring correct request order when recovering queue from storage."""
 
     handled_at: datetime | None
 
-    request: Annotated[Request, Field(alias='json_')]
+    request: Request
+    """Original Request object"""
 
     @classmethod
     def from_request(cls, request: Request, id: str, order_no: Decimal | None) -> InternalRequest:
