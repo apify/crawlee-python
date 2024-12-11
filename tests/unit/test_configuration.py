@@ -5,10 +5,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from crawlee import service_locator
 from crawlee.configuration import Configuration
 from crawlee.http_crawler import HttpCrawler, HttpCrawlingContext
 from crawlee.memory_storage_client._memory_storage_client import MemoryStorageClient
-from crawlee.service_locator import get_configuration, set_storage_client
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -20,8 +20,8 @@ def test_global_configuration_works() -> None:
     assert (
         Configuration.get_global_configuration()
         is Configuration.get_global_configuration()
-        is get_configuration()
-        is get_configuration()
+        is service_locator.get_configuration()
+        is service_locator.get_configuration()
     )
 
 
@@ -32,7 +32,7 @@ async def test_storage_not_persisted_when_disabled(tmp_path: Path, httpbin: URL)
         crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
     )
     storage_client = MemoryStorageClient(config)
-    set_storage_client(storage_client)
+    service_locator.set_storage_client(storage_client)
 
     crawler = HttpCrawler()
 
@@ -54,7 +54,7 @@ async def test_storage_persisted_when_enabled(tmp_path: Path, httpbin: URL) -> N
         crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
     )
     storage_client = MemoryStorageClient(config)
-    set_storage_client(storage_client)
+    service_locator.set_storage_client(storage_client)
 
     crawler = HttpCrawler()
 

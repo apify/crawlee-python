@@ -41,14 +41,14 @@ def prepare_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callabl
 
         # Reset the flags in the service locator to indicate that no services are explicitly set. This ensures
         # a clean state, as services might have been set during a previous test and not reset properly.
-        service_locator._service_locator._configuration_was_set = False
-        service_locator._service_locator._storage_client_was_set = False
-        service_locator._service_locator._event_manager_was_set = False
+        service_locator._configuration_was_set = False
+        service_locator._storage_client_was_set = False
+        service_locator._event_manager_was_set = False
 
         # Reset the services in the service locator.
-        service_locator._service_locator._configuration = None
-        service_locator._service_locator._event_manager = None
-        service_locator._service_locator._storage_client = None
+        service_locator._configuration = None
+        service_locator._event_manager = None
+        service_locator._storage_client = None
 
         # Clear creation-related caches to ensure no state is carried over between tests.
         monkeypatch.setattr(_creation_management, '_cache_dataset_by_id', {})
@@ -60,9 +60,9 @@ def prepare_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callabl
 
         # Verify that the test environment was set up correctly.
         assert os.environ.get('CRAWLEE_STORAGE_DIR') == str(tmp_path)
-        assert service_locator._service_locator.configuration_was_set is False
-        assert service_locator._service_locator.storage_client_was_set is False
-        assert service_locator._service_locator.event_manager_was_set is False
+        assert service_locator._configuration_was_set is False
+        assert service_locator._storage_client_was_set is False
+        assert service_locator._event_manager_was_set is False
 
     return _prepare_test_env
 

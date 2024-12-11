@@ -223,8 +223,8 @@ async def test_not_implemented_method(tmp_path: Path) -> None:
 
 async def test_default_storage_path_used(monkeypatch: pytest.MonkeyPatch) -> None:
     # Reset the configuration in service locator
-    service_locator._service_locator._configuration = None
-    service_locator._service_locator._configuration_was_set = False
+    service_locator._configuration = None
+    service_locator._configuration_was_set = False
 
     # Remove the env var for setting the storage directory
     monkeypatch.delenv('CRAWLEE_STORAGE_DIR', raising=False)
