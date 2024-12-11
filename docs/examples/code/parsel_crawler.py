@@ -1,6 +1,6 @@
 import asyncio
 
-from crawlee._types import BasicCrawlingContext
+from crawlee.basic_crawler import BasicCrawlingContext
 from crawlee.parsel_crawler import ParselCrawler, ParselCrawlingContext
 
 # Regex for identifying email addresses on a webpage.

@@ -1,7 +1,7 @@
 import asyncio
 from datetime import timedelta
 
-from crawlee._types import BasicCrawlingContext
+from crawlee.basic_crawler import BasicCrawlingContext
 from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 
 
