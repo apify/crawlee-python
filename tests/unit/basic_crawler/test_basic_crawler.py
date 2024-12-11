@@ -4,10 +4,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 from collections import Counter
 from dataclasses import dataclass
 from datetime import timedelta
-import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, Mock
@@ -941,3 +941,28 @@ async def test_logs_final_statistics(monkeypatch: pytest.MonkeyPatch, caplog: py
         '│ crawler_runtime               │ 300.0     │',
         '└───────────────────────────────┴───────────┘',
     ]
+
+
+async def test_crawler_manual_stop(httpbin: URL) -> None:
+    start_urls = [
+        str(httpbin / '1'),
+        str(httpbin / '2'),
+        str(httpbin / '3'),
+    ]
+    processed_urls = []
+
+    # Set max_concurrency to 1 to ensure testing urls are visited one by one in order.
+    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(max_concurrency=1))
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        processed_urls.append(context.request.url)
+        if context.request.url == start_urls[1]:
+            crawler.stop()
+
+    stats = await crawler.run(start_urls)
+
+    # Verify that only 2 out of the 3 provided URLs were made
+    assert len(processed_urls) == 2
+    assert stats.requests_total == 2
+    assert stats.requests_finished == 2

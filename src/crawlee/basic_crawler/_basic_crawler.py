@@ -303,6 +303,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._failed = False
         self._abort_on_error = abort_on_error
 
+        self._unexpected_stop: bool = False
+        self._unexpected_stop_reason = ''
+
     @property
     def log(self) -> logging.Logger:
         """The logger used by the crawler."""
@@ -328,13 +331,26 @@ class BasicCrawler(Generic[TCrawlingContext]):
         """Statistics about the current (or last) crawler run."""
         return self._statistics
 
-    @property
-    def _max_requests_count_exceeded(self) -> bool:
-        """Whether the maximum number of requests to crawl has been reached."""
-        if self._max_requests_per_crawl is None:
-            return False
+    def stop(self, reason: str = 'Stop was called externally.') -> None:
+        """Set flag to stop crawler.
 
-        return self._statistics.state.requests_finished >= self._max_requests_per_crawl
+        This stops current crawler run regardless of whether all requests were finished.
+
+        Args:
+            reason: Reason for stopping that will be used in logs.
+        """
+        self._unexpected_stop_reason = reason
+        self._unexpected_stop = True
+
+    def _stop_if_max_requests_count_exceeded(self) -> None:
+        """Call `stop` when the maximum number of requests to crawl has been reached."""
+        if self._max_requests_per_crawl is None:
+            return
+
+        if self._statistics.state.requests_finished >= self._max_requests_per_crawl:
+            self.stop(
+                reason=f'The crawler has reached its limit of {self._max_requests_per_crawl} requests per crawl. '
+            )
 
     async def _get_session(self) -> Session | None:
         """If session pool is being used, try to take a session from it."""
@@ -912,16 +928,17 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 await store.set_value(key, value.content, value.content_type)
 
     async def __is_finished_function(self) -> bool:
-        request_provider = await self.get_request_provider()
-        is_finished = await request_provider.is_finished()
-
-        if self._max_requests_count_exceeded:
+        self._stop_if_max_requests_count_exceeded()
+        if self._unexpected_stop:
             self._logger.info(
-                f'The crawler has reached its limit of {self._max_requests_per_crawl} requests per crawl. '
-                f'All ongoing requests have now completed. Total requests processed: '
+                f'Crawler `stop` method was called with reason: {self._unexpected_stop_reason}'
+                f'All ongoing requests have now completed. Total requests processed:'
                 f'{self._statistics.state.requests_finished}. The crawler will now shut down.'
             )
             return True
+
+        request_provider = await self.get_request_provider()
+        is_finished = await request_provider.is_finished()
 
         if self._abort_on_error and self._failed:
             return True
@@ -929,10 +946,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
         return is_finished
 
     async def __is_task_ready_function(self) -> bool:
-        if self._max_requests_count_exceeded:
+        self._stop_if_max_requests_count_exceeded()
+        if self._unexpected_stop:
             self._logger.info(
-                f'The crawler has reached its limit of {self._max_requests_per_crawl} requests per crawl. '
-                f'The crawler will soon shut down. Ongoing requests will be allowed to complete.'
+                f'No new requests are allowed because crawler `stop` method was called with reason: '
+                f'{self._unexpected_stop_reason}. Ongoing requests will be allowed to complete. '
             )
             return False
 
