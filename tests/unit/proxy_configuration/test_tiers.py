@@ -5,7 +5,7 @@ from crawlee.proxy_configuration import ProxyConfiguration
 
 
 async def test_rotates_proxies_uniformly_with_no_request() -> None:
-    tiered_proxy_urls = [
+    tiered_proxy_urls: list[list[str | None]] = [
         ['http://proxy:1111', 'http://proxy:2222'],
         ['http://proxy:3333', 'http://proxy:4444'],
     ]
@@ -34,7 +34,7 @@ async def test_rotates_proxies_uniformly_with_no_request() -> None:
 
 
 async def test_retrying_request_makes_tier_go_up() -> None:
-    tiered_proxy_urls = [
+    tiered_proxy_urls: list[list[str | None]] = [
         ['http://proxy:1111'],
         ['http://proxy:2222'],
         ['http://proxy:3333'],
@@ -71,7 +71,7 @@ async def test_successful_request_makes_tier_go_down() -> None:
     ProxyConfiguration assumes those are retries. Then, requesting a proxy for different requests to the same domain
     will cause the tier to drop back down."""
 
-    tiered_proxy_urls = [
+    tiered_proxy_urls: list[list[str | None]] = [
         ['http://proxy:1111'],
         ['http://proxy:2222'],
         ['http://proxy:3333'],
@@ -94,3 +94,49 @@ async def test_successful_request_makes_tier_go_down() -> None:
 
     assert info is not None
     assert info.url == tiered_proxy_urls[0][0]
+
+
+async def test_none_proxy_retrying_request_makes_tier_go_up() -> None:
+    tiered_proxy_urls: list[list[str | None]] = [
+        [None],
+        ['http://proxy:1111'],
+    ]
+
+    config = ProxyConfiguration(tiered_proxy_urls=tiered_proxy_urls)
+
+    # Calling `new_proxy_info` with the same request most probably means it's being retried
+    request_1 = Request(url='http://some.domain/abc', unique_key='1', id='1')
+
+    # No proxy used.
+    info = await config.new_proxy_info(None, request_1, None)
+    assert info is None, 'First entry in tired_proxy_urls is None. config.new_proxy_info is expected to generate None.'
+
+    # Proxy should go up one tier for same request that was already sent before.
+    info = await config.new_proxy_info(None, request_1, None)
+    assert info is not None, (
+        'config.new_proxy_info is expected to generate non-none proxy info from non-none ' 'tiered_proxy_urls.'
+    )
+    assert info.url == tiered_proxy_urls[1][0]
+
+
+async def test_none_proxy_rotates_proxies_uniformly_with_no_request() -> None:
+    tiered_proxy_urls = [
+        [None, 'http://proxy:1111'],
+    ]
+
+    config = ProxyConfiguration(tiered_proxy_urls=tiered_proxy_urls)
+
+    # No proxy used.
+    info = await config.new_proxy_info(None, None, None)
+    assert info is None, 'First entry in tired_proxy_urls is None. config.new_proxy_info is expected to generate None.'
+
+    # Proxy should be rotated on the same proxy tier for a new request.
+    info = await config.new_proxy_info(None, None, None)
+    assert info is not None, (
+        'config.new_proxy_info is expected to generate non-none proxy info from non-none ' 'tiered_proxy_urls.'
+    )
+    assert info.url == tiered_proxy_urls[0][1]
+
+    # Proxy rotation starts from the beginning of the proxy list after last proxy in tier was used. No proxy used again.
+    info = await config.new_proxy_info(None, None, None)
+    assert info is None, 'First entry in tired_proxy_urls is None. config.new_proxy_info is expected to generate None.'
