@@ -524,7 +524,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         async with AsyncExitStack() as exit_stack:
             for context in contexts_to_enter:
-                await exit_stack.enter_async_context(context)
+                await exit_stack.enter_async_context(context)  # type: ignore[arg-type]
 
             await self._autoscaled_pool.run()
 
