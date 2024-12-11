@@ -932,7 +932,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         if self._unexpected_stop:
             self._logger.info(
                 f'Crawler `stop` method was called with reason: {self._unexpected_stop_reason}'
-                f'All ongoing requests have now completed. Total requests processed:'
+                f'All ongoing requests have now completed. Total requests processed: '
                 f'{self._statistics.state.requests_finished}. The crawler will now shut down.'
             )
             return True
