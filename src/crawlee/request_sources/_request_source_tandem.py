@@ -6,14 +6,14 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
-from crawlee.storages._request_provider import RequestProvider
+from crawlee.request_sources import RequestProvider
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from crawlee import Request
     from crawlee.base_storage_client._models import ProcessedRequest
-    from crawlee.storages._request_source import RequestSource
+    from crawlee.request_sources import RequestSource
 
 
 logger = getLogger(__name__)

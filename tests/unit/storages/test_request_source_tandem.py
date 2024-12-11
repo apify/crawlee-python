@@ -1,8 +1,8 @@
 from unittest.mock import create_autospec
 
 from crawlee import Request
-from crawlee.storages import RequestList, RequestQueue, RequestSourceTandem
-from crawlee.storages._request_source import RequestSource
+from crawlee.request_sources import RequestList, RequestSource, RequestSourceTandem
+from crawlee.storages import RequestQueue
 
 
 async def test_basic_usage() -> None:

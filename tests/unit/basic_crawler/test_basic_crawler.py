@@ -21,8 +21,9 @@ from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpHeaders
 from crawlee.basic_crawler import BasicCrawler
 from crawlee.configuration import Configuration
 from crawlee.errors import SessionError, UserDefinedErrorHandlerError
+from crawlee.request_sources import RequestList, RequestSourceTandem
 from crawlee.statistics import FinalStatistics
-from crawlee.storages import Dataset, KeyValueStore, RequestList, RequestQueue, RequestSourceTandem
+from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Sequence

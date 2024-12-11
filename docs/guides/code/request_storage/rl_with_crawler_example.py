@@ -1,9 +1,8 @@
 import asyncio
 
 from crawlee.http_crawler import HttpCrawler, HttpCrawlingContext
-from crawlee.storages import RequestList
-from crawlee.storages._request_queue import RequestQueue
-from crawlee.storages._request_source_tandem import RequestSourceTandem
+from crawlee.request_sources import RequestList, RequestSourceTandem
+from crawlee.storages import RequestQueue
 
 
 async def main() -> None:

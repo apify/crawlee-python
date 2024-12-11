@@ -16,8 +16,8 @@ from crawlee._utils.requests import unique_key_to_request_id
 from crawlee._utils.wait import wait_for_all_tasks_for_finish
 from crawlee.base_storage_client._models import ProcessedRequest, RequestQueueMetadata
 from crawlee.events._types import Event
+from crawlee.request_sources import RequestProvider
 from crawlee.storages._base_storage import BaseStorage
-from crawlee.storages._request_provider import RequestProvider
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
