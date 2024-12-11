@@ -11,8 +11,6 @@ from proxy import Proxy
 from yarl import URL
 
 from crawlee import service_locator
-from crawlee.configuration import Configuration
-from crawlee.events._local_event_manager import LocalEventManager
 from crawlee.memory_storage_client import MemoryStorageClient
 from crawlee.proxy_configuration import ProxyInfo
 from crawlee.storages import _creation_management
@@ -38,24 +36,19 @@ def prepare_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callabl
     """
 
     def _prepare_test_env() -> None:
+        # Set the environment variable for the local storage directory to the temporary path.
+        monkeypatch.setenv('CRAWLEE_STORAGE_DIR', str(tmp_path))
+
         # Reset the flags in the service locator to indicate that no services are explicitly set. This ensures
         # a clean state, as services might have been set during a previous test and not reset properly.
         service_locator._service_locator._configuration_was_set = False
         service_locator._service_locator._storage_client_was_set = False
         service_locator._service_locator._event_manager_was_set = False
 
-        # Set the environment variable for the local storage directory to the temporary path.
-        monkeypatch.setenv('CRAWLEE_STORAGE_DIR', str(tmp_path))
-
-        # Initialize services in the service container with default values.
-        service_locator.set_configuration(Configuration())
-        service_locator.set_storage_client(MemoryStorageClient())
-        service_locator.set_event_manager(LocalEventManager())
-
-        # Reset the global state flags in the service locator.
-        service_locator._service_locator._configuration_was_set = False
-        service_locator._service_locator._storage_client_was_set = False
-        service_locator._service_locator._event_manager_was_set = False
+        # Reset the services in the service locator.
+        service_locator._service_locator._configuration = None
+        service_locator._service_locator._event_manager = None
+        service_locator._service_locator._storage_client = None
 
         # Clear creation-related caches to ensure no state is carried over between tests.
         monkeypatch.setattr(_creation_management, '_cache_dataset_by_id', {})
