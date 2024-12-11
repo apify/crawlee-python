@@ -361,7 +361,7 @@ async def test_sending_url_query_params(http_client_class: type[BaseHttpClient],
 async def test_http_crawler_pre_navigation_hooks_executed_before_request() -> None:
     """Test that pre-navigation hooks are executed in correct order."""
     execution_order = []
-    test_ulr = 'http://www.something.com'
+    test_url = 'http://www.something.com'
 
     crawler = HttpCrawler()
 
@@ -385,7 +385,7 @@ async def test_http_crawler_pre_navigation_hooks_executed_before_request() -> No
         execution_order.append('request')
         return Response(200)
 
-    respx.get(test_ulr).mock(side_effect=mark_request_execution)
-    await crawler.run([Request.from_url(url=test_ulr)])
+    respx.get(test_url).mock(side_effect=mark_request_execution)
+    await crawler.run([Request.from_url(url=test_url)])
 
     assert execution_order == ['pre-navigation-hook 1', 'pre-navigation-hook 2', 'request', 'final handler']
