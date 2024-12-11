@@ -8,6 +8,8 @@ async def main() -> None:
     # Create a ProxyConfiguration object and pass it to the crawler.
     proxy_configuration = ProxyConfiguration(
         tiered_proxy_urls=[
+            # No proxy tier. (Not needed, but optional in case you do not want to use any proxy on lowest tier.)
+            [None],
             # lower tier, cheaper, preferred as long as they work
             ['http://cheap-datacenter-proxy-1.com/', 'http://cheap-datacenter-proxy-2.com/'],
             # higher tier, more expensive, used as a fallback
