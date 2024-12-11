@@ -6,30 +6,30 @@ from bs4 import BeautifulSoup
 from crawlee._utils.html_to_text import html_to_text
 
 _EXPECTED_TEXT = (
-"Let's start with a simple text. \n" +
-"The ships hung in the sky, much the way that bricks don't. \n" +
-"These aren't the Droids you're looking for\n" +
-"I'm sorry, Dave. I'm afraid I can't do that.\n" +
-"I'm sorry, Dave. I'm afraid I can't do that.\n" +
-'A1\tA2\tA3\t\n' +
-'B1\tB2\tB3\tB 4\t\n' +
-'This is some text with inline elements and HTML entities (>bla<) \n' +
-'Test\n' +
-'a\n' +
-'few\n' +
-'line\n' +
-'breaks\n' +
-'Spaces in an inline text should be completely ignored. \n' +
-'But,\n' +
-'    a pre-formatted\n' +
-'                block  should  be  kept\n' +
-'                                       pre-formatted.\n' +
-'The Greatest Science Fiction Quotes Of All Time \n' +
-"Don't know, I don't know such stuff. I just do eyes, ju-, ju-, just eyes... just genetic design, just eyes. You Nexus, huh? I design your eyes."
+    "Let's start with a simple text. \n"
+    "The ships hung in the sky, much the way that bricks don't. \n"
+    "These aren't the Droids you're looking for\n"
+    "I'm sorry, Dave. I'm afraid I can't do that.\n"
+    "I'm sorry, Dave. I'm afraid I can't do that.\n"
+    'A1\tA2\tA3\t\n'
+    'B1\tB2\tB3\tB 4\t\n'
+    'This is some text with inline elements and HTML entities (>bla<) \n'
+    'Test\n'
+    'a\n'
+    'few\n'
+    'line\n'
+    'breaks\n'
+    'Spaces in an inline text should be completely ignored. \n'
+    'But,\n'
+    '    a pre-formatted\n'
+    '                block  should  be  kept\n'
+    '                                       pre-formatted.\n'
+    'The Greatest Science Fiction Quotes Of All Time \n'
+    "Don't know, I don't know such stuff. I just do eyes, ju-, ju-, just eyes... just genetic design, just eyes. You "
+    'Nexus, huh? I design your eyes.'
 )
 
-_EXAMPLE_HTML = (
-"""
+_EXAMPLE_HTML = """
 <html>
 <head>
     <title>Title SHOULD NOT be converted</title>
@@ -126,11 +126,58 @@ But,
 </body>
 </html>
 """
-)
 
-@pytest.mark.parametrize('source', [_EXAMPLE_HTML, BeautifulSoup(_EXAMPLE_HTML)], ids=('String', 'BeautifulSoup'))
-def test_html_to_text(source: str | BeautifulSoup) -> None:
-    assert html_to_text(source) == _EXPECTED_TEXT
+
+@pytest.mark.parametrize(
+    ('source', 'expected_text'),
+    [
+        (_EXAMPLE_HTML, _EXPECTED_TEXT),
+        (BeautifulSoup(_EXAMPLE_HTML), _EXPECTED_TEXT),
+        ('   Plain    text     node    ', 'Plain text node'),
+        ('   \nPlain    text     node  \n  ', 'Plain text node'),
+        ('<h1>Header 1</h1> <h2>Header 2</h2>', 'Header 1\nHeader 2'),
+        ('<h1>Header 1</h1> <h2>Header 2</h2><br>', 'Header 1\nHeader 2'),
+        ('<h1>Header 1</h1> <h2>Header 2</h2><br><br>', 'Header 1\nHeader 2'),
+        ('<h1>Header 1</h1> <h2>Header 2</h2><br><br><br>', 'Header 1\nHeader 2'),
+        ('<h1>Header 1</h1><br><h2>Header 2</h2><br><br><br>', 'Header 1\n\nHeader 2'),
+        ('<h1>Header 1</h1> <br> <h2>Header 2</h2><br><br><br>', 'Header 1\n\nHeader 2'),
+        ('<h1>Header 1</h1>  \n <br>\n<h2>Header 2</h2><br><br><br>', 'Header 1\n\nHeader 2'),
+        ('<h1>Header 1</h1>  \n <br>\n<br><h2>Header 2</h2><br><br><br>', 'Header 1\n\n\nHeader 2'),
+        ('<h1>Header 1</h1>  \n <br>\n<br><br><h2>Header 2</h2><br><br><br>', 'Header 1\n\n\n\nHeader 2'),
+        ('<div><div>Div</div><p>Paragraph</p></div>', 'Div\nParagraph'),
+        ('<div>Div1</div><!-- Some comments --><div>Div2</div>', 'Div1\nDiv2'),
+        ('<div>Div1</div><style>Skip styles</style>', 'Div1'),
+        ('<script>Skip_scripts();</script><div>Div1</div>', 'Div1'),
+        ('<SCRIPT>Skip_scripts();</SCRIPT><div>Div1</div>', 'Div1'),
+        ('<svg>Skip svg</svg><div>Div1</div>', 'Div1'),
+        ('<canvas>Skip canvas</canvas><div>Div1</div>', 'Div1'),
+        ('<b>A  B  C  D  E\n\nF  G</b>', 'A B C D E F G'),
+        ('<pre>A  B  C  D  E\n\nF  G</pre>', 'A  B  C  D  E\n\nF  G'),
+        (
+            '<h1>Heading 1</h1><div><div><div><div>Deep  Div</div></div></div></div><h2>Heading       2</h2>',
+            'Heading 1\nDeep Div' '\nHeading 2',
+        ),
+        ('<a>this_word</a>_should_<b></b>be_<span>one</span>', 'this_word_should_be_one'),
+        ('<span attributes="should" be="ignored">some <span>text</span></span>', 'some text'),
+        (
+            (
+                """<table>
+    <tr>
+        <td>Cell    A1</td><td>Cell A2</td>
+        <td>    Cell A3    </td>
+    </tr>
+    <tr>
+        <td>Cell    B1</td><td>Cell B2</td>
+    </tr>
+</table>"""
+            ),
+            'Cell A1\tCell A2\tCell A3 \t\nCell B1\tCell B2',
+        ),
+        ('<span>&aacute; &eacute;</span>', 'á é'),
+    ],
+)
+def test_html_to_text(source: str | BeautifulSoup, expected_text: str) -> None:
+    assert html_to_text(source) == expected_text
 
 
 def test_html_to_text_raises_on_wrong_input_type() -> None:
