@@ -30,11 +30,6 @@ class RequestSourceTandem(RequestProvider):
         self._read_only_source = request_source
         self._read_write_provider = request_provider
 
-    @property
-    @override
-    def name(self) -> str:
-        return ''
-
     @override
     async def get_total_count(self) -> int:
         return (await self._read_only_source.get_total_count()) + (await self._read_write_provider.get_total_count())

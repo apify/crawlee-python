@@ -35,15 +35,14 @@ class RequestList(RequestSource):
             requests: The request objects (or their string representations) to be added to the provider.
             name: A name of the request list.
         """
-        self._name = name or ''
+        self._name = name
         self._handled_count = 0
 
         self._requests = deque(self._transform_requests(requests or []))
         self._in_progress = set[str]()
 
     @property
-    @override
-    def name(self) -> str:
+    def name(self) -> str | None:
         return self._name
 
     @override

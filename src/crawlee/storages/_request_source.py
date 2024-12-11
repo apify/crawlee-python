@@ -25,11 +25,6 @@ class RequestSource(ABC):
         - Managing state information such as the total and handled request counts.
     """
 
-    @property
-    @abstractmethod
-    def name(self) -> str | None:
-        """ID or name of the request source."""
-
     @abstractmethod
     async def get_total_count(self) -> int:
         """Returns an offline approximation of the total number of requests in the source (i.e. pending + handled)."""
