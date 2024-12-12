@@ -10,9 +10,9 @@ from typing import TYPE_CHECKING, TypeVar
 
 from typing_extensions import override
 
-from crawlee import service_locator
 from crawlee._utils.docs import docs_group
 from crawlee.base_storage_client import BaseStorageClient
+from crawlee.configuration import Configuration
 from crawlee.memory_storage_client._dataset_client import DatasetClient
 from crawlee.memory_storage_client._dataset_collection_client import DatasetCollectionClient
 from crawlee.memory_storage_client._key_value_store_client import KeyValueStoreClient
@@ -22,7 +22,7 @@ from crawlee.memory_storage_client._request_queue_collection_client import Reque
 
 if TYPE_CHECKING:
     from crawlee.base_storage_client._types import ResourceClient
-    from crawlee.configuration import Configuration
+
 
 TResourceClient = TypeVar('TResourceClient', DatasetClient, KeyValueStoreClient, RequestQueueClient)
 
@@ -57,22 +57,17 @@ class MemoryStorageClient(BaseStorageClient):
 
     def __init__(
         self,
-        configuration: Configuration | None = None,
         *,
-        write_metadata: bool | None = None,
-        persist_storage: bool | None = None,
-        storage_dir: str | None = None,
-        default_request_queue_id: str | None = None,
-        default_key_value_store_id: str | None = None,
-        default_dataset_id: str | None = None,
+        write_metadata: bool,
+        persist_storage: bool,
+        storage_dir: str,
+        default_request_queue_id: str,
+        default_key_value_store_id: str,
+        default_dataset_id: str,
     ) -> None:
         """A default constructor.
 
-        All parameters are optional and can be set either directly or via the configuration object. The defaults
-        are taken from the configuration object.
-
         Args:
-            configuration: The configuration object.
             write_metadata: Whether to write metadata to the storage.
             persist_storage: Whether to persist the storage.
             storage_dir: Path to the storage directory.
@@ -80,15 +75,13 @@ class MemoryStorageClient(BaseStorageClient):
             default_key_value_store_id: The default key-value store ID.
             default_dataset_id: The default dataset ID.
         """
-        config = configuration or service_locator.get_configuration()
-
         # Set the internal attributes.
-        self._write_metadata = write_metadata or config.write_metadata
-        self._persist_storage = persist_storage or config.persist_storage
-        self._storage_dir = storage_dir or config.storage_dir
-        self._default_request_queue_id = default_request_queue_id or config.default_request_queue_id
-        self._default_key_value_store_id = default_key_value_store_id or config.default_key_value_store_id
-        self._default_dataset_id = default_dataset_id or config.default_dataset_id
+        self._write_metadata = write_metadata
+        self._persist_storage = persist_storage
+        self._storage_dir = storage_dir
+        self._default_request_queue_id = default_request_queue_id
+        self._default_key_value_store_id = default_key_value_store_id
+        self._default_dataset_id = default_dataset_id
 
         self.datasets_handled: list[DatasetClient] = []
         self.key_value_stores_handled: list[KeyValueStoreClient] = []
@@ -96,6 +89,26 @@ class MemoryStorageClient(BaseStorageClient):
 
         self._purged_on_start = False  # Indicates whether a purge was already performed on this instance.
         self._purge_lock = asyncio.Lock()
+
+    @classmethod
+    def from_config(cls, config: Configuration | None = None) -> MemoryStorageClient:
+        """Create a new instance based on the provided configuration.
+
+        All the memory storage client parameters are taken from the configuration object.
+
+        Args:
+            config: The configuration object.
+        """
+        config = config or Configuration.get_global_configuration()
+
+        return cls(
+            write_metadata=config.write_metadata,
+            persist_storage=config.persist_storage,
+            storage_dir=config.storage_dir,
+            default_request_queue_id=config.default_request_queue_id,
+            default_key_value_store_id=config.default_key_value_store_id,
+            default_dataset_id=config.default_dataset_id,
+        )
 
     @property
     def write_metadata(self) -> bool:

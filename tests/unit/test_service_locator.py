@@ -40,7 +40,7 @@ def test_storage_client() -> None:
     default_storage_client = service_locator.get_storage_client()
     assert isinstance(default_storage_client, MemoryStorageClient)
 
-    custom_storage_client = MemoryStorageClient()
+    custom_storage_client = MemoryStorageClient.from_config()
     service_locator.set_storage_client(custom_storage_client)
     storage_client = service_locator.get_storage_client()
     assert storage_client == custom_storage_client

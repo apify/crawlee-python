@@ -11,6 +11,7 @@ from proxy import Proxy
 from yarl import URL
 
 from crawlee import service_locator
+from crawlee.configuration import Configuration
 from crawlee.memory_storage_client import MemoryStorageClient
 from crawlee.proxy_configuration import ProxyInfo
 from crawlee.storages import _creation_management
@@ -164,8 +165,10 @@ async def disabled_proxy(proxy_info: ProxyInfo) -> AsyncGenerator[ProxyInfo, Non
 @pytest.fixture
 def memory_storage_client(tmp_path: Path) -> MemoryStorageClient:
     """A fixture for testing the memory storage client and its resource clients."""
-    return MemoryStorageClient(
-        write_metadata=True,
+    config = Configuration(
         persist_storage=True,
-        storage_dir=str(tmp_path),
+        write_metadata=True,
+        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
     )
+
+    return MemoryStorageClient.from_config(config)
