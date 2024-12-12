@@ -17,13 +17,13 @@ from crawlee.memory_storage_client import MemoryStorageClient
 async def test_write_metadata(tmp_path: Path) -> None:
     dataset_name = 'test'
     dataset_no_metadata_name = 'test-no-metadata'
-    ms = MemoryStorageClient(
+    ms = MemoryStorageClient.from_config(
         Configuration(
             crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
             write_metadata=True,
         ),
     )
-    ms_no_metadata = MemoryStorageClient(
+    ms_no_metadata = MemoryStorageClient.from_config(
         Configuration(
             crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
             write_metadata=False,
@@ -48,7 +48,7 @@ async def test_write_metadata(tmp_path: Path) -> None:
     ],
 )
 async def test_persist_storage(persist_storage: bool, tmp_path: Path) -> None:  # noqa: FBT001
-    ms = MemoryStorageClient(
+    ms = MemoryStorageClient.from_config(
         Configuration(
             crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
             persist_storage=persist_storage,
@@ -82,18 +82,20 @@ async def test_persist_storage(persist_storage: bool, tmp_path: Path) -> None:  
 
 def test_persist_storage_set_to_false_via_string_env_var(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv('CRAWLEE_PERSIST_STORAGE', 'false')
-    ms = MemoryStorageClient(Configuration(crawlee_storage_dir=str(tmp_path)))  # type: ignore[call-arg]
+    ms = MemoryStorageClient.from_config(
+        Configuration(crawlee_storage_dir=str(tmp_path)),  # type: ignore[call-arg]
+    )
     assert ms.persist_storage is False
 
 
 def test_persist_storage_set_to_false_via_numeric_env_var(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv('CRAWLEE_PERSIST_STORAGE', '0')
-    ms = MemoryStorageClient(Configuration(crawlee_storage_dir=str(tmp_path)))  # type: ignore[call-arg]
+    ms = MemoryStorageClient.from_config(Configuration(crawlee_storage_dir=str(tmp_path)))  # type: ignore[call-arg]
     assert ms.persist_storage is False
 
 
 def test_persist_storage_true_via_constructor_arg(tmp_path: Path) -> None:
-    ms = MemoryStorageClient(
+    ms = MemoryStorageClient.from_config(
         Configuration(
             crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
             persist_storage=True,
@@ -104,20 +106,24 @@ def test_persist_storage_true_via_constructor_arg(tmp_path: Path) -> None:
 
 def test_default_write_metadata_behavior(tmp_path: Path) -> None:
     # Default behavior
-    ms = MemoryStorageClient(Configuration(crawlee_storage_dir=str(tmp_path)))  # type: ignore[call-arg]
+    ms = MemoryStorageClient.from_config(
+        Configuration(crawlee_storage_dir=str(tmp_path)),  # type: ignore[call-arg]
+    )
     assert ms.write_metadata is True
 
 
 def test_write_metadata_set_to_false_via_env_var(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     # Test if env var changes write_metadata to False
     monkeypatch.setenv('CRAWLEE_WRITE_METADATA', 'false')
-    ms = MemoryStorageClient(Configuration(crawlee_storage_dir=str(tmp_path)))  # type: ignore[call-arg]
+    ms = MemoryStorageClient.from_config(
+        Configuration(crawlee_storage_dir=str(tmp_path)),  # type: ignore[call-arg]
+    )
     assert ms.write_metadata is False
 
 
 def test_write_metadata_false_via_constructor_arg_overrides_env_var(tmp_path: Path) -> None:
     # Test if constructor arg takes precedence over env var value
-    ms = MemoryStorageClient(
+    ms = MemoryStorageClient.from_config(
         Configuration(
             write_metadata=False,
             crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
@@ -127,7 +133,7 @@ def test_write_metadata_false_via_constructor_arg_overrides_env_var(tmp_path: Pa
 
 
 async def test_purge_datasets(tmp_path: Path) -> None:
-    ms = MemoryStorageClient(
+    ms = MemoryStorageClient.from_config(
         Configuration(
             write_metadata=True,
             crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
@@ -150,7 +156,7 @@ async def test_purge_datasets(tmp_path: Path) -> None:
 
 
 async def test_purge_key_value_stores(tmp_path: Path) -> None:
-    ms = MemoryStorageClient(
+    ms = MemoryStorageClient.from_config(
         Configuration(
             write_metadata=True,
             crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
@@ -185,7 +191,7 @@ async def test_purge_key_value_stores(tmp_path: Path) -> None:
 
 
 async def test_purge_request_queues(tmp_path: Path) -> None:
-    ms = MemoryStorageClient(
+    ms = MemoryStorageClient.from_config(
         Configuration(
             write_metadata=True,
             crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
@@ -207,7 +213,7 @@ async def test_purge_request_queues(tmp_path: Path) -> None:
 
 
 async def test_not_implemented_method(tmp_path: Path) -> None:
-    ms = MemoryStorageClient(
+    ms = MemoryStorageClient.from_config(
         Configuration(
             write_metadata=True,
             crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
@@ -230,7 +236,7 @@ async def test_default_storage_path_used(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.delenv('CRAWLEE_STORAGE_DIR', raising=False)
 
     # Initialize the service locator with default configuration
-    msc = MemoryStorageClient()
+    msc = MemoryStorageClient.from_config()
     assert msc.storage_dir == './storage'
 
 
@@ -238,13 +244,13 @@ async def test_storage_path_from_env_var_overrides_default(monkeypatch: pytest.M
     # We expect the env var to override the default value
     monkeypatch.setenv('CRAWLEE_STORAGE_DIR', './env_var_storage_dir')
     service_locator.set_configuration(Configuration())
-    ms = MemoryStorageClient()
+    ms = MemoryStorageClient.from_config()
     assert ms.storage_dir == './env_var_storage_dir'
 
 
 async def test_parametrized_storage_path_overrides_env_var() -> None:
     # We expect the parametrized value to be used
-    ms = MemoryStorageClient(
+    ms = MemoryStorageClient.from_config(
         Configuration(crawlee_storage_dir='./parametrized_storage_dir'),  # type: ignore[call-arg]
     )
     assert ms.storage_dir == './parametrized_storage_dir'

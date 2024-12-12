@@ -31,7 +31,7 @@ async def test_storage_not_persisted_when_disabled(tmp_path: Path, httpbin: URL)
         write_metadata=False,
         crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
     )
-    storage_client = MemoryStorageClient(config)
+    storage_client = MemoryStorageClient.from_config(config)
     service_locator.set_storage_client(storage_client)
 
     crawler = HttpCrawler()
@@ -53,7 +53,7 @@ async def test_storage_persisted_when_enabled(tmp_path: Path, httpbin: URL) -> N
         write_metadata=True,
         crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
     )
-    storage_client = MemoryStorageClient(config)
+    storage_client = MemoryStorageClient.from_config(config)
     service_locator.set_storage_client(storage_client)
 
     crawler = HttpCrawler()
