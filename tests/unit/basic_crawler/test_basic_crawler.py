@@ -21,8 +21,9 @@ from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpHeaders
 from crawlee.basic_crawler import BasicCrawler
 from crawlee.configuration import Configuration
 from crawlee.errors import SessionError, UserDefinedErrorHandlerError
+from crawlee.request_sources import RequestList, RequestSourceTandem
 from crawlee.statistics import FinalStatistics
-from crawlee.storages import Dataset, KeyValueStore, RequestList, RequestQueue
+from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Sequence
@@ -40,8 +41,11 @@ async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
     await kvs.drop()
 
 
-async def test_processes_requests() -> None:
-    crawler = BasicCrawler(request_provider=RequestList(['http://a.com/', 'http://b.com/', 'http://c.com/']))
+async def test_processes_requests_from_explicit_queue() -> None:
+    queue = await RequestQueue.open()
+    await queue.add_requests_batched(['http://a.com/', 'http://b.com/', 'http://c.com/'])
+
+    crawler = BasicCrawler(request_provider=queue)
     calls = list[str]()
 
     @crawler.router.default_handler
@@ -53,8 +57,26 @@ async def test_processes_requests() -> None:
     assert calls == ['http://a.com/', 'http://b.com/', 'http://c.com/']
 
 
+async def test_processes_requests_from_request_source_tandem() -> None:
+    request_queue = await RequestQueue.open()
+    await request_queue.add_requests_batched(['http://a.com/', 'http://b.com/', 'http://c.com/'])
+
+    request_list = RequestList(['http://a.com/', 'http://d.com', 'http://e.com'])
+
+    crawler = BasicCrawler(request_provider=RequestSourceTandem(request_list, request_queue))
+    calls = set[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        calls.add(context.request.url)
+
+    await crawler.run()
+
+    assert calls == {'http://a.com/', 'http://b.com/', 'http://c.com/', 'http://d.com', 'http://e.com'}
+
+
 async def test_processes_requests_from_run_args() -> None:
-    crawler = BasicCrawler(request_provider=RequestList())
+    crawler = BasicCrawler()
     calls = list[str]()
 
     @crawler.router.default_handler
@@ -67,7 +89,7 @@ async def test_processes_requests_from_run_args() -> None:
 
 
 async def test_allows_multiple_run_calls() -> None:
-    crawler = BasicCrawler(request_provider=RequestList())
+    crawler = BasicCrawler()
     calls = list[str]()
 
     @crawler.router.default_handler
@@ -88,7 +110,7 @@ async def test_allows_multiple_run_calls() -> None:
 
 
 async def test_retries_failed_requests() -> None:
-    crawler = BasicCrawler(request_provider=RequestList(['http://a.com/', 'http://b.com/', 'http://c.com/']))
+    crawler = BasicCrawler()
     calls = list[str]()
 
     @crawler.router.default_handler
@@ -98,7 +120,7 @@ async def test_retries_failed_requests() -> None:
         if context.request.url == 'http://b.com/':
             raise RuntimeError('Arbitrary crash for testing purposes')
 
-    await crawler.run()
+    await crawler.run(['http://a.com/', 'http://b.com/', 'http://c.com/'])
 
     assert calls == [
         'http://a.com/',
@@ -110,12 +132,7 @@ async def test_retries_failed_requests() -> None:
 
 
 async def test_respects_no_retry() -> None:
-    crawler = BasicCrawler(
-        request_provider=RequestList(
-            ['http://a.com/', 'http://b.com/', Request.from_url(url='http://c.com/', no_retry=True)]
-        ),
-        max_request_retries=3,
-    )
+    crawler = BasicCrawler(max_request_retries=3)
     calls = list[str]()
 
     @crawler.router.default_handler
@@ -123,7 +140,7 @@ async def test_respects_no_retry() -> None:
         calls.append(context.request.url)
         raise RuntimeError('Arbitrary crash for testing purposes')
 
-    await crawler.run()
+    await crawler.run(['http://a.com/', 'http://b.com/', Request.from_url(url='http://c.com/', no_retry=True)])
 
     assert calls == [
         'http://a.com/',
@@ -137,16 +154,7 @@ async def test_respects_no_retry() -> None:
 
 
 async def test_respects_request_specific_max_retries() -> None:
-    crawler = BasicCrawler(
-        request_provider=RequestList(
-            [
-                'http://a.com/',
-                'http://b.com/',
-                Request.from_url(url='http://c.com/', user_data={'__crawlee': {'maxRetries': 4}}),
-            ]
-        ),
-        max_request_retries=1,
-    )
+    crawler = BasicCrawler(max_request_retries=1)
     calls = list[str]()
 
     @crawler.router.default_handler
@@ -154,7 +162,13 @@ async def test_respects_request_specific_max_retries() -> None:
         calls.append(context.request.url)
         raise RuntimeError('Arbitrary crash for testing purposes')
 
-    await crawler.run()
+    await crawler.run(
+        [
+            'http://a.com/',
+            'http://b.com/',
+            Request.from_url(url='http://c.com/', user_data={'__crawlee': {'maxRetries': 4}}),
+        ]
+    )
 
     assert calls == [
         'http://a.com/',
@@ -177,10 +191,7 @@ async def test_calls_error_handler() -> None:
     # List to store the information of calls to the error handler.
     calls = list[Call]()
 
-    crawler = BasicCrawler(
-        request_provider=RequestList(['http://a.com/', 'http://b.com/', 'http://c.com/']),
-        max_request_retries=3,
-    )
+    crawler = BasicCrawler(max_request_retries=3)
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
@@ -201,7 +212,7 @@ async def test_calls_error_handler() -> None:
         request['headers'] = HttpHeaders({'custom_retry_count': str(custom_retry_count + 1)})
         return Request.model_validate(request)
 
-    await crawler.run()
+    await crawler.run(['http://a.com/', 'http://b.com/', 'http://c.com/'])
 
     # Verify that the error handler was called twice
     assert len(calls) == 2
@@ -240,10 +251,7 @@ async def test_calls_error_handler_for_sesion_errors() -> None:
 
 
 async def test_handles_error_in_error_handler() -> None:
-    crawler = BasicCrawler(
-        request_provider=RequestList(['http://a.com/', 'http://b.com/', 'http://c.com/']),
-        max_request_retries=3,
-    )
+    crawler = BasicCrawler(max_request_retries=3)
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
@@ -255,14 +263,11 @@ async def test_handles_error_in_error_handler() -> None:
         raise RuntimeError('Crash in error handler')
 
     with pytest.raises(UserDefinedErrorHandlerError):
-        await crawler.run()
+        await crawler.run(['http://a.com/', 'http://b.com/', 'http://c.com/'])
 
 
 async def test_calls_failed_request_handler() -> None:
-    crawler = BasicCrawler(
-        request_provider=RequestList(['http://a.com/', 'http://b.com/', 'http://c.com/']),
-        max_request_retries=3,
-    )
+    crawler = BasicCrawler(max_request_retries=3)
     calls = list[tuple[BasicCrawlingContext, Exception]]()
 
     @crawler.router.default_handler
@@ -274,7 +279,7 @@ async def test_calls_failed_request_handler() -> None:
     async def failed_request_handler(context: BasicCrawlingContext, error: Exception) -> None:
         calls.append((context, error))
 
-    await crawler.run()
+    await crawler.run(['http://a.com/', 'http://b.com/', 'http://c.com/'])
 
     assert len(calls) == 1
     assert calls[0][0].request.url == 'http://b.com/'
@@ -282,10 +287,7 @@ async def test_calls_failed_request_handler() -> None:
 
 
 async def test_handles_error_in_failed_request_handler() -> None:
-    crawler = BasicCrawler(
-        request_provider=RequestList(['http://a.com/', 'http://b.com/', 'http://c.com/']),
-        max_request_retries=3,
-    )
+    crawler = BasicCrawler(max_request_retries=3)
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
@@ -297,7 +299,7 @@ async def test_handles_error_in_failed_request_handler() -> None:
         raise RuntimeError('Crash in failed request handler')
 
     with pytest.raises(UserDefinedErrorHandlerError):
-        await crawler.run()
+        await crawler.run(['http://a.com/', 'http://b.com/', 'http://c.com/'])
 
 
 async def test_send_request_works(respx_mock: respx.MockRouter) -> None:
@@ -309,7 +311,6 @@ async def test_send_request_works(respx_mock: respx.MockRouter) -> None:
     response_headers: HttpHeaders | None = None
 
     crawler = BasicCrawler(
-        request_provider=RequestList(['http://a.com/']),
         max_request_retries=3,
     )
 
@@ -321,7 +322,7 @@ async def test_send_request_works(respx_mock: respx.MockRouter) -> None:
         response_body = response.read()
         response_headers = response.headers
 
-    await crawler.run()
+    await crawler.run(['http://a.com/', 'http://b.com/', 'http://c.com/'])
     assert respx_mock['test_endpoint'].called
 
     assert json.loads(response_body) == {'hello': 'world'}
@@ -341,7 +342,7 @@ class AddRequestsTestInput:
 
 
 STRATEGY_TEST_URLS = (
-    'https://someplace.com/index.html',
+    'https://someplace.com/',
     'http://someplace.com/index.html',
     'https://blog.someplace.com/index.html',
     'https://other.place.com/index.html',
@@ -368,38 +369,38 @@ INCLUDE_TEST_URLS = (
                 'http://c.com/',
             ],
             kwargs={},
-            expected_urls=['https://a.com/', 'http://b.com/', 'http://c.com/'],
+            expected_urls=['http://b.com/', 'http://c.com/'],
         ),
         # Enqueue strategy
         AddRequestsTestInput(
             start_url=STRATEGY_TEST_URLS[0],
             requests=STRATEGY_TEST_URLS,
             kwargs=EnqueueLinksKwargs(),
-            expected_urls=STRATEGY_TEST_URLS,
+            expected_urls=STRATEGY_TEST_URLS[1:],
         ),
         AddRequestsTestInput(
             start_url=STRATEGY_TEST_URLS[0],
             requests=STRATEGY_TEST_URLS,
             kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.ALL),
-            expected_urls=STRATEGY_TEST_URLS,
+            expected_urls=STRATEGY_TEST_URLS[1:],
         ),
         AddRequestsTestInput(
             start_url=STRATEGY_TEST_URLS[0],
             requests=STRATEGY_TEST_URLS,
             kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.SAME_DOMAIN),
-            expected_urls=STRATEGY_TEST_URLS[:3],
+            expected_urls=STRATEGY_TEST_URLS[1:3],
         ),
         AddRequestsTestInput(
             start_url=STRATEGY_TEST_URLS[0],
             requests=STRATEGY_TEST_URLS,
             kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.SAME_HOSTNAME),
-            expected_urls=STRATEGY_TEST_URLS[:2],
+            expected_urls=[STRATEGY_TEST_URLS[1]],
         ),
         AddRequestsTestInput(
             start_url=STRATEGY_TEST_URLS[0],
             requests=STRATEGY_TEST_URLS,
             kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.SAME_ORIGIN),
-            expected_urls=STRATEGY_TEST_URLS[:1],
+            expected_urls=[],
         ),
         # Include/exclude
         AddRequestsTestInput(
@@ -412,7 +413,7 @@ INCLUDE_TEST_URLS = (
             start_url=INCLUDE_TEST_URLS[0],
             requests=INCLUDE_TEST_URLS,
             kwargs=EnqueueLinksKwargs(exclude=[Glob('https://someplace.com/**/cats')]),
-            expected_urls=[INCLUDE_TEST_URLS[0], INCLUDE_TEST_URLS[2], INCLUDE_TEST_URLS[3]],
+            expected_urls=[INCLUDE_TEST_URLS[2], INCLUDE_TEST_URLS[3]],
         ),
         AddRequestsTestInput(
             start_url=INCLUDE_TEST_URLS[0],
@@ -437,7 +438,8 @@ INCLUDE_TEST_URLS = (
 )
 async def test_enqueue_strategy(test_input: AddRequestsTestInput) -> None:
     visit = Mock()
-    crawler = BasicCrawler(request_provider=RequestList([Request.from_url('https://someplace.com/', label='start')]))
+
+    crawler = BasicCrawler()
 
     @crawler.router.handler('start')
     async def start_handler(context: BasicCrawlingContext) -> None:
@@ -450,7 +452,7 @@ async def test_enqueue_strategy(test_input: AddRequestsTestInput) -> None:
     async def handler(context: BasicCrawlingContext) -> None:
         visit(context.request.url)
 
-    await crawler.run()
+    await crawler.run([Request.from_url(test_input.start_url, label='start')])
 
     visited = {call[0][0] for call in visit.call_args_list}
     assert visited == set(test_input.expected_urls)
@@ -458,8 +460,8 @@ async def test_enqueue_strategy(test_input: AddRequestsTestInput) -> None:
 
 async def test_session_rotation() -> None:
     track_session_usage = Mock()
+
     crawler = BasicCrawler(
-        request_provider=RequestList([Request.from_url('https://someplace.com/', label='start')]),
         max_session_rotations=7,
         max_request_retries=1,
     )
@@ -469,7 +471,7 @@ async def test_session_rotation() -> None:
         track_session_usage(context.session.id if context.session else None)
         raise SessionError('Test error')
 
-    await crawler.run()
+    await crawler.run([Request.from_url('https://someplace.com/', label='start')])
     assert track_session_usage.call_count == 7
 
     session_ids = {call[0][0] for call in track_session_usage.call_args_list}
@@ -478,12 +480,7 @@ async def test_session_rotation() -> None:
 
 
 async def test_final_statistics() -> None:
-    crawler = BasicCrawler(
-        request_provider=RequestList(
-            [Request.from_url(f'https://someplace.com/?id={id}', label='start') for id in range(50)]
-        ),
-        max_request_retries=3,
-    )
+    crawler = BasicCrawler(max_request_retries=3)
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
@@ -502,7 +499,9 @@ async def test_final_statistics() -> None:
         if context.request.retry_count == 2 and id % 4 == 0:
             raise RuntimeError('Third crash')
 
-    final_statistics = await crawler.run()
+    final_statistics = await crawler.run(
+        [Request.from_url(f'https://someplace.com/?id={id}', label='start') for id in range(50)]
+    )
 
     assert final_statistics.requests_total == 50
     assert final_statistics.requests_finished == 45
@@ -775,14 +774,10 @@ async def test_max_requests_per_crawl(httpbin: URL) -> None:
 async def test_max_crawl_depth(httpbin: URL) -> None:
     processed_urls = []
 
-    start_request = Request.from_url('https://someplace.com/', label='start')
-    start_request.crawl_depth = 2
-
     # Set max_concurrency to 1 to ensure testing max_requests_per_crawl accurately
     crawler = BasicCrawler(
         concurrency_settings=ConcurrencySettings(max_concurrency=1),
         max_crawl_depth=2,
-        request_provider=RequestList([start_request]),
     )
 
     @crawler.router.handler('start')
@@ -794,7 +789,10 @@ async def test_max_crawl_depth(httpbin: URL) -> None:
     async def handler(context: BasicCrawlingContext) -> None:
         processed_urls.append(context.request.url)
 
-    stats = await crawler.run()
+    start_request = Request.from_url('https://someplace.com/', label='start')
+    start_request.crawl_depth = 2
+
+    stats = await crawler.run([start_request])
 
     assert len(processed_urls) == 1
     assert stats.requests_total == 1
