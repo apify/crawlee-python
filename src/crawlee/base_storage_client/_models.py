@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Annotated, Any, Generic
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
@@ -230,3 +231,31 @@ class BatchRequestsOperationResponse(BaseModel):
 
     processed_requests: Annotated[list[ProcessedRequest], Field(alias='processedRequests')]
     unprocessed_requests: Annotated[list[UnprocessedRequest], Field(alias='unprocessedRequests')]
+
+
+class InternalRequest(BaseModel):
+    """Represents an internal representation of queue request with additional metadata for ordering and storage."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+
+    unique_key: str
+
+    order_no: Decimal | None = None
+    """Order number for maintaining request sequence in queue.
+    Used for restoring correct request order when recovering queue from storage."""
+
+    handled_at: datetime | None
+
+    request: Request
+    """Original Request object"""
+
+    @classmethod
+    def from_request(cls, request: Request, id: str, order_no: Decimal | None) -> InternalRequest:
+        return cls(
+            unique_key=request.unique_key, id=id, handled_at=request.handled_at, order_no=order_no, request=request
+        )
+
+    def to_request(self) -> Request:
+        return self.request

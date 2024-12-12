@@ -239,3 +239,11 @@ async def test_forefront(request_queue_client: RequestQueueClient) -> None:
     queue_head = await request_queue_client.list_head()
     req_unique_keys = [req.unique_key for req in queue_head.items]
     assert req_unique_keys == ['3', '7', '4', '0', '6']
+
+
+async def test_add_duplicate_record(request_queue_client: RequestQueueClient) -> None:
+    processed_request = await request_queue_client.add_request(Request.from_url('https://apify.com'))
+    processed_request_duplicate = await request_queue_client.add_request(Request.from_url('https://apify.com'))
+
+    assert processed_request.id == processed_request_duplicate.id
+    assert processed_request_duplicate.was_already_present is True
