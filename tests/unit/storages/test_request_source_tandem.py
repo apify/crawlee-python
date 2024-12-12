@@ -19,7 +19,7 @@ class TestInput:
 
 
 @pytest.mark.parametrize(
-    argnames=['test_input'],
+    argnames='test_input',
     ids=[
         'basic_usage',
         'wait_for_read_only_source',
