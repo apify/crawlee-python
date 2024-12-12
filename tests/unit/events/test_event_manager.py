@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import timedelta
+from functools import update_wrapper
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -27,15 +28,21 @@ def event_system_info_data() -> EventSystemInfoData:
 
 @pytest.fixture
 def async_listener() -> AsyncMock:
+    async def async_listener(payload: Any) -> None:
+        pass
+
     al = AsyncMock()
-    al.__name__ = 'async_listener'  # To avoid issues with the function name
+    update_wrapper(al, async_listener)
     return al
 
 
 @pytest.fixture
 def sync_listener() -> MagicMock:
+    def sync_listener(payload: Any) -> None:
+        pass
+
     sl = MagicMock()
-    sl.__name__ = 'sync_listener'  # To avoid issues with the function name
+    update_wrapper(sl, sync_listener)
     return sl
 
 
