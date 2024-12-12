@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import timedelta
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 from urllib.parse import urlparse
 
 import pytest
 
+from crawlee.events import EventManager
 from crawlee.storages import KeyValueStore
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+
+    from crawlee._types import JsonSerializable
 
 
 @pytest.fixture
@@ -17,6 +22,13 @@ async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
     kvs = await KeyValueStore.open()
     yield kvs
     await kvs.drop()
+
+
+@pytest.fixture
+async def mock_event_manager() -> AsyncGenerator[EventManager, None]:
+    async with EventManager(persist_state_interval=timedelta(milliseconds=50)) as event_manager:
+        with patch('crawlee.service_container.get_event_manager', return_value=event_manager):
+            yield event_manager
 
 
 async def test_open() -> None:
@@ -122,3 +134,37 @@ async def test_get_public_url(key_value_store: KeyValueStore) -> None:
     with open(path) as f:  # noqa: ASYNC230
         content = await asyncio.to_thread(f.read)
         assert content == 'static'
+
+
+async def test_get_auto_saved_value_default_value(key_value_store: KeyValueStore) -> None:
+    default_value: dict[str, JsonSerializable] = {'hello': 'world'}
+    value = await key_value_store.get_auto_saved_value('state', default_value)
+    assert value == default_value
+
+
+async def test_get_auto_saved_value_cache_value(key_value_store: KeyValueStore) -> None:
+    default_value: dict[str, JsonSerializable] = {'hello': 'world'}
+    key_name = 'state'
+
+    value = await key_value_store.get_auto_saved_value(key_name, default_value)
+    value['hello'] = 'new_world'
+    value_one = await key_value_store.get_auto_saved_value(key_name)
+    assert value_one == {'hello': 'new_world'}
+
+    value_one['hello'] = ['new_world']
+    value_two = await key_value_store.get_auto_saved_value(key_name)
+    assert value_two == {'hello': ['new_world']}
+
+
+async def test_get_auto_saved_value_auto_save(key_value_store: KeyValueStore, mock_event_manager: EventManager) -> None:  # noqa: ARG001
+    default_value: dict[str, JsonSerializable] = {'hello': 'world'}
+    key_name = 'state'
+    value = await key_value_store.get_auto_saved_value(key_name, default_value)
+    await asyncio.sleep(0.1)
+    value_one = await key_value_store.get_value(key_name)
+    assert value_one == {'hello': 'world'}
+
+    value['hello'] = 'new_world'
+    await asyncio.sleep(0.1)
+    value_two = await key_value_store.get_value(key_name)
+    assert value_two == {'hello': 'new_world'}
