@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.5.0 - **not yet released**
 
+### 🚀 Features
+
+- Add possibility to use None as no proxy in tiered proxies ([#760](https://github.com/apify/crawlee-python/pull/760)) ([0fbd017](https://github.com/apify/crawlee-python/commit/0fbd01723b9fe2e3410e0f358cab2f22848b08d0)) by [@Pijukatel](https://github.com/Pijukatel), closes [#687](https://github.com/apify/crawlee-python/issues/687)
+- Add `use_state` context method ([#682](https://github.com/apify/crawlee-python/pull/682)) ([868b41e](https://github.com/apify/crawlee-python/commit/868b41ebd4c8003fa60ab07887577d0fb85b6ecc)) by [@Mantisus](https://github.com/Mantisus), closes [#191](https://github.com/apify/crawlee-python/issues/191)
+- Add pre-navigation hooks router to AbstractHttpCrawler ([#791](https://github.com/apify/crawlee-python/pull/791)) ([0f23205](https://github.com/apify/crawlee-python/commit/0f23205923065074c522b3de9d47218a204dfa78)) by [@Pijukatel](https://github.com/Pijukatel), closes [#635](https://github.com/apify/crawlee-python/issues/635)
+- Add example of how to integrate Camoufox into PlaywrightCrawler ([#789](https://github.com/apify/crawlee-python/pull/789)) ([246cfc4](https://github.com/apify/crawlee-python/commit/246cfc4ebc8bce1d15e1dddd62d652bd65869328)) by [@Pijukatel](https://github.com/Pijukatel), closes [#684](https://github.com/apify/crawlee-python/issues/684)
+
+### 🐛 Bug Fixes
+
+- Fix circular import in `KeyValueStore` ([#805](https://github.com/apify/crawlee-python/pull/805)) ([8bdf49d](https://github.com/apify/crawlee-python/commit/8bdf49d1cb2a94b66f69fd1b77063a4113517fae)) by [@Mantisus](https://github.com/Mantisus), closes [#804](https://github.com/apify/crawlee-python/issues/804)
+
 ### Refactor
 
 - [**breaking**] Refactor HttpCrawler, BeautifulSoupCrawler, ParselCrawler inheritance ([#746](https://github.com/apify/crawlee-python/pull/746)) ([9d3c269](https://github.com/apify/crawlee-python/commit/9d3c2697c91ce93028ca86a91d85d465d36c1ad7)) by [@Pijukatel](https://github.com/Pijukatel), closes [#350](https://github.com/apify/crawlee-python/issues/350)

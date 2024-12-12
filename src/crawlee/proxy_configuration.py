@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 from more_itertools import flatten
 from pydantic import AnyHttpUrl, TypeAdapter
@@ -68,9 +68,9 @@ class ProxyConfiguration:
     def __init__(
         self,
         *,
-        proxy_urls: list[str] | None = None,
+        proxy_urls: list[str | None] | None = None,
         new_url_function: _NewUrlFunction | None = None,
-        tiered_proxy_urls: list[list[str]] | None = None,
+        tiered_proxy_urls: list[list[str | None]] | None = None,
     ) -> None:
         """A default constructor.
 
@@ -85,7 +85,7 @@ class ProxyConfiguration:
                 the proxy selection mechanism.
         """
         self._next_custom_url_index = 0
-        self._used_proxy_urls = dict[str, URL]()
+        self._used_proxy_urls = dict[str, Union[URL, None]]()
         self._url_validator = TypeAdapter(AnyHttpUrl)
 
         # Validation
@@ -95,17 +95,21 @@ class ProxyConfiguration:
                 'must be specified (and non-empty).'
             )
 
-        self._proxy_urls = (
-            [URL(url) for url in proxy_urls if self._url_validator.validate_python(url)] if proxy_urls else []
-        )
+        self._proxy_urls = [self._create_url(url) for url in proxy_urls] if proxy_urls else []
         self._proxy_tier_tracker = (
-            _ProxyTierTracker(
-                [[URL(url) for url in tier if self._url_validator.validate_python(url)] for tier in tiered_proxy_urls]
-            )
+            _ProxyTierTracker([[self._create_url(url) for url in tier] for tier in tiered_proxy_urls])
             if tiered_proxy_urls
             else None
         )
         self._new_url_function = new_url_function
+
+    def _create_url(self, url: str | None) -> URL | None:
+        """Create URL from input string. None means that intentionally no proxy should be used."""
+        if url is None:
+            return None
+
+        self._url_validator.validate_python(url)
+        return URL(url)
 
     async def new_proxy_info(
         self, session_id: str | None, request: Request | None, proxy_tier: int | None
@@ -208,16 +212,16 @@ class ProxyConfiguration:
 class _ProxyTierTracker:
     """Tracks the state of currently used proxy tiers and their error frequency for individual crawled domains."""
 
-    def __init__(self, tiered_proxy_urls: list[list[URL]]) -> None:
+    def __init__(self, tiered_proxy_urls: list[list[URL | None]]) -> None:
         self._tiered_proxy_urls = tiered_proxy_urls
         self._histogram_by_domain = defaultdict[str, list[int]](lambda: [0 for _tier in tiered_proxy_urls])
         self._current_tier_by_domain = defaultdict[str, int](lambda: 0)
 
     @property
-    def all_urls(self) -> Sequence[URL]:
+    def all_urls(self) -> Sequence[URL | None]:
         return list(flatten(self._tiered_proxy_urls))
 
-    def get_tier_urls(self, tier_number: int) -> Sequence[URL]:
+    def get_tier_urls(self, tier_number: int) -> Sequence[URL | None]:
         return self._tiered_proxy_urls[tier_number]
 
     def add_error(self, domain: str, tier: int) -> None:
