@@ -24,6 +24,8 @@ def test_global_configuration_works() -> None:
         is service_locator.get_configuration()
     )
 
+
+def test_global_configuration_works_reversed() -> None:
     assert (
         service_locator.get_configuration()
         is service_locator.get_configuration()
