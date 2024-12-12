@@ -13,6 +13,9 @@ This section summarizes the breaking changes between v0.4.x and v0.5.0.
 - Renamed `BeautifulSoupParser` to `BeautifulSoupParserType`. Probably used only in type hints. Please replace previous usages of `BeautifulSoupParser` by `BeautifulSoupParserType`.
 - `BeautifulSoupParser` is now a new class that is used in refactored class `BeautifulSoupCrawler`.
 
+### Request
+- Removed properties `json_` and `order_no `. 
+
 ## Upgrading to v0.4
 
 This section summarizes the breaking changes between v0.3.x and v0.4.0.
