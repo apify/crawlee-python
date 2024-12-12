@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC
-from typing import TYPE_CHECKING, Any, Generic
+from typing import TYPE_CHECKING, Any, Callable, Generic
 
 from pydantic import ValidationError
 from typing_extensions import NotRequired, TypeVar
@@ -21,7 +21,7 @@ from crawlee.errors import SessionError
 from crawlee.http_clients import HttpxHttpClient
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Iterable
+    from collections.abc import AsyncGenerator, Awaitable, Iterable
 
     from typing_extensions import Unpack
 
@@ -70,6 +70,7 @@ class AbstractHttpCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler[
         **kwargs: Unpack[BasicCrawlerOptions[TCrawlingContext]],
     ) -> None:
         self._parser = parser
+        self._pre_navigation_hooks: list[Callable[[BasicCrawlingContext], Awaitable[None]]] = []
 
         kwargs.setdefault(
             'http_client',
@@ -92,10 +93,18 @@ class AbstractHttpCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler[
         """Create static content crawler context pipeline with expected pipeline steps."""
         return (
             ContextPipeline()
+            .compose(self._execute_pre_navigation_hooks)
             .compose(self._make_http_request)
             .compose(self._parse_http_response)
             .compose(self._handle_blocked_request)
         )
+
+    async def _execute_pre_navigation_hooks(
+        self, context: BasicCrawlingContext
+    ) -> AsyncGenerator[BasicCrawlingContext, None]:
+        for hook in self._pre_navigation_hooks:
+            await hook(context)
+        yield context
 
     async def _parse_http_response(
         self, context: HttpCrawlingContext
@@ -207,3 +216,11 @@ class AbstractHttpCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler[
             if blocked_info := self._parser.is_blocked(context.parsed_content):
                 raise SessionError(blocked_info.reason)
         yield context
+
+    def pre_navigation_hook(self, hook: Callable[[BasicCrawlingContext], Awaitable[None]]) -> None:
+        """Register a hook to be called before each navigation.
+
+        Args:
+            hook: A coroutine function to be called before each navigation.
+        """
+        self._pre_navigation_hooks.append(hook)

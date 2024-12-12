@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 
     from yarl import URL
 
+    from crawlee._types import BasicCrawlingContext
     from crawlee.http_clients._base import BaseHttpClient
     from crawlee.http_crawler import HttpCrawlingContext
 
@@ -354,3 +355,37 @@ async def test_sending_url_query_params(http_client_class: type[BaseHttpClient],
 
     response_args = responses[0]['args']
     assert response_args == query_params, 'Reconstructed query params must match the original query params.'
+
+
+@respx.mock
+async def test_http_crawler_pre_navigation_hooks_executed_before_request() -> None:
+    """Test that pre-navigation hooks are executed in correct order."""
+    execution_order = []
+    test_url = 'http://www.something.com'
+
+    crawler = HttpCrawler()
+
+    #  Register final context handler.
+    @crawler.router.default_handler
+    async def default_request_handler(context: HttpCrawlingContext) -> None:  # noqa: ARG001 # Unused arg in test
+        execution_order.append('final handler')
+
+    #  Register pre navigation hook.
+    @crawler.pre_navigation_hook
+    async def hook1(context: BasicCrawlingContext) -> None:  # noqa: ARG001 # Unused arg in test
+        execution_order.append('pre-navigation-hook 1')
+
+    #  Register pre navigation hook.
+    @crawler.pre_navigation_hook
+    async def hook2(context: BasicCrawlingContext) -> None:  # noqa: ARG001 # Unused arg in test
+        execution_order.append('pre-navigation-hook 2')
+
+    def mark_request_execution(request: Request) -> Response:  # noqa: ARG001 # Unused arg in test
+        # Helper function to track execution order.
+        execution_order.append('request')
+        return Response(200)
+
+    respx.get(test_url).mock(side_effect=mark_request_execution)
+    await crawler.run([Request.from_url(url=test_url)])
+
+    assert execution_order == ['pre-navigation-hook 1', 'pre-navigation-hook 2', 'request', 'final handler']
