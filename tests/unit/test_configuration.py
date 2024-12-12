@@ -24,6 +24,13 @@ def test_global_configuration_works() -> None:
         is service_locator.get_configuration()
     )
 
+    assert (
+        service_locator.get_configuration()
+        is service_locator.get_configuration()
+        is Configuration.get_global_configuration()
+        is Configuration.get_global_configuration()
+    )
+
 
 async def test_storage_not_persisted_when_disabled(tmp_path: Path, httpbin: URL) -> None:
     config = Configuration(
@@ -32,9 +39,8 @@ async def test_storage_not_persisted_when_disabled(tmp_path: Path, httpbin: URL)
         crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
     )
     storage_client = MemoryStorageClient.from_config(config)
-    service_locator.set_storage_client(storage_client)
 
-    crawler = HttpCrawler()
+    crawler = HttpCrawler(storage_client=storage_client)
 
     @crawler.router.default_handler
     async def default_handler(context: HttpCrawlingContext) -> None:
@@ -54,9 +60,8 @@ async def test_storage_persisted_when_enabled(tmp_path: Path, httpbin: URL) -> N
         crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
     )
     storage_client = MemoryStorageClient.from_config(config)
-    service_locator.set_storage_client(storage_client)
 
-    crawler = HttpCrawler()
+    crawler = HttpCrawler(storage_client=storage_client)
 
     @crawler.router.default_handler
     async def default_handler(context: HttpCrawlingContext) -> None:
