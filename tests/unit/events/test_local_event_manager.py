@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 from datetime import timedelta
+from functools import update_wrapper
+from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
@@ -12,8 +14,11 @@ from crawlee.events._types import Event, EventSystemInfoData
 
 @pytest.fixture
 def listener() -> AsyncMock:
+    async def async_listener(payload: Any) -> None:
+        pass
+
     al = AsyncMock()
-    al.__name__ = 'listener'  # To avoid issues with the function name
+    update_wrapper(al, async_listener)
     return al
 
 
