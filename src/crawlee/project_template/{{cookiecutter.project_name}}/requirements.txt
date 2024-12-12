@@ -1,4 +1,9 @@
+# % if cookiecutter.crawler_type == 'camoufox'
+camoufox
+# % set extras = ['playwright']
+# % else
 # % set extras = [cookiecutter.crawler_type]
+# % endif
 # % if cookiecutter.enable_apify_integration
 apify
 # % endif
