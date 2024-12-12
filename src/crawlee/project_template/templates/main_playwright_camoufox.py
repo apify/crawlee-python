@@ -10,7 +10,7 @@ from crawlee.playwright_crawler import PlaywrightCrawler
 # % endblock
 
 # % block pre_main
-class ExampleCamoufoxPlugin(PlaywrightBrowserPlugin):
+class CamoufoxPlugin(PlaywrightBrowserPlugin):
     """Example browser plugin that uses Camoufox Browser, but otherwise keeps the functionality of
     PlaywrightBrowserPlugin."""
 
@@ -31,6 +31,6 @@ class ExampleCamoufoxPlugin(PlaywrightBrowserPlugin):
 crawler = PlaywrightCrawler(
     max_requests_per_crawl=10,
     request_handler=router,
-    browser_pool=BrowserPool(plugins=[ExampleCamoufoxPlugin()])
+    browser_pool=BrowserPool(plugins=[CamoufoxPlugin()])
 )
 # % endblock

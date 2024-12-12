@@ -20,11 +20,11 @@ http_client=HttpxHttpClient(),
 # % endif
 # % endblock
 # % endfilter
-{% if self.pre_main is defined %}
+# % if self.pre_main is defined
 
 {{self.pre_main()}}
 
-{% endif %}
+# % endif
 async def main() -> None:
     """The crawler entry point."""
     # % filter truncate(0, end='')

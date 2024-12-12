@@ -17,7 +17,9 @@ To be able to run this example you will need to install camoufox, as it is exter
 You can either pre-download this file using following command `python3 -m camoufox fetch` or camoufox will download it automatically once you try to run it, and it does not find existing binary.
 For more details please refer to: https://github.com/daijro/camoufox/tree/main/pythonlib#camoufox-python-interface
 
-Rest of the example code after PlayWrightCrawler instantiation is exactly the same as example describing the use of Playwright Crawler. The only difference is that in this example Camoufox will be used as the browser.
+**Project template -** It is possible to generate project with Python code which includes Camoufox integration into crawlee through crawlee cli. Call `crawlee create` and pick `Playwright-camoufox` when asked for Crawler type.
+
+The example code after PlayWrightCrawler instantiation is similar to example describing the use of Playwright Crawler. The main difference is that in this example Camoufox will be used as the browser through BrowserPool.
 
 <CodeBlock className="language-python">
     {PlaywrightCrawlerExampleWithCamoufox}
