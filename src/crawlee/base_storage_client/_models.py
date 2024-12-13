@@ -235,7 +235,7 @@ class BatchRequestsOperationResponse(BaseModel):
 
 
 class InternalRequest(BaseModel):
-    """Represents an internal representation of queue request with additional metadata for ordering and storage."""
+    """Internal representation of a queue request with additional metadata for ordering and storage."""
 
     model_config = ConfigDict(populate_by_name=True)
 
