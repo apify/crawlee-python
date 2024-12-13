@@ -3,22 +3,21 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
 from typing import cast
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 
+from crawlee import service_locator
 from crawlee._autoscaling import Snapshotter
 from crawlee._autoscaling.types import CpuSnapshot, EventLoopSnapshot, Snapshot
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.system import CpuInfo, MemoryInfo
-from crawlee.events import EventManager, LocalEventManager
 from crawlee.events._types import Event, EventSystemInfoData
 
 
 @pytest.fixture
 def snapshotter() -> Snapshotter:
-    mocked_event_manager = AsyncMock(spec=EventManager)
-    return Snapshotter(mocked_event_manager, available_memory_ratio=0.25)
+    return Snapshotter(available_memory_ratio=0.25)
 
 
 @pytest.fixture
@@ -33,7 +32,7 @@ def event_system_data_info() -> EventSystemInfoData:
 
 
 async def test_start_stop_lifecycle() -> None:
-    async with LocalEventManager() as event_manager, Snapshotter(event_manager, available_memory_ratio=0.25):
+    async with Snapshotter(available_memory_ratio=0.25):
         pass
 
 
@@ -94,8 +93,7 @@ async def test_get_cpu_sample(snapshotter: Snapshotter) -> None:
 
 
 async def test_methods_raise_error_when_not_active() -> None:
-    event_manager = AsyncMock(spec=EventManager)
-    snapshotter = Snapshotter(event_manager, available_memory_ratio=0.25)
+    snapshotter = Snapshotter(available_memory_ratio=0.25)
 
     assert snapshotter.active is False
 
@@ -194,7 +192,7 @@ def test_snapshot_pruning_keeps_recent_records_unaffected(snapshotter: Snapshott
 
 
 def test_memory_load_evaluation_logs_warning_on_high_usage(caplog: pytest.LogCaptureFixture) -> None:
-    snapshotter = Snapshotter(AsyncMock(spec=EventManager), max_memory_size=ByteSize.from_gb(8))
+    snapshotter = Snapshotter(max_memory_size=ByteSize.from_gb(8))
 
     high_memory_usage = ByteSize.from_gb(8) * 0.95  # 95% of 8 GB
 
@@ -250,8 +248,8 @@ async def test_snapshots_time_ordered() -> None:
         )
 
     async with (
-        LocalEventManager() as event_manager,
-        Snapshotter(event_manager, available_memory_ratio=0.25) as snapshotter,
+        service_locator.get_event_manager() as event_manager,
+        Snapshotter(available_memory_ratio=0.25) as snapshotter,
     ):
         event_manager.emit(event=Event.SYSTEM_INFO, event_data=create_event_data(time_new))
         await event_manager.wait_for_all_listeners_to_complete()

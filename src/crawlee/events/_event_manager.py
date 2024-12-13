@@ -149,9 +149,9 @@ class EventManager:
             self._listener_tasks.add(listener_task)
 
             try:
-                logger.debug('LocalEventManager.on.listener_wrapper(): Awaiting listener task...')
+                logger.debug('EventManager.on.listener_wrapper(): Awaiting listener task...')
                 await listener_task
-                logger.debug('LocalEventManager.on.listener_wrapper(): Listener task completed.')
+                logger.debug('EventManager.on.listener_wrapper(): Listener task completed.')
             except Exception:
                 # We need to swallow the exception and just log it here, otherwise it could break the event emitter
                 logger.exception(
@@ -159,7 +159,7 @@ class EventManager:
                     extra={'event_name': event.value, 'listener_name': listener.__name__},
                 )
             finally:
-                logger.debug('LocalEventManager.on.listener_wrapper(): Removing listener task from the set...')
+                logger.debug('EventManager.on.listener_wrapper(): Removing listener task from the set...')
                 self._listener_tasks.remove(listener_task)
 
         self._listeners_to_wrappers[event][listener].append(listener_wrapper)

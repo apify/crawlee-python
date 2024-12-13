@@ -10,8 +10,17 @@ This page summarizes the breaking changes between Crawlee for Python zero-based 
 This section summarizes the breaking changes between v0.4.x and v0.5.0.
 
 ### BeautifulSoupParser
+
 - Renamed `BeautifulSoupParser` to `BeautifulSoupParserType`. Probably used only in type hints. Please replace previous usages of `BeautifulSoupParser` by `BeautifulSoupParserType`.
 - `BeautifulSoupParser` is now a new class that is used in refactored class `BeautifulSoupCrawler`.
+
+### Service locator
+
+- The `crawlee.service_container` was completely refactored and renamed to `crawlee.service_locator`.
+
+### Statistics
+
+- The `crawlee.statistics.Statistics` class do not accept an event manager as an input argument anymore. It uses the default, global one.
 
 ## Upgrading to v0.4
 
