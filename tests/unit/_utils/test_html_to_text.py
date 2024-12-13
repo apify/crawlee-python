@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from bs4 import BeautifulSoup
 
-from crawlee._utils.html_to_text import html_to_text
+from crawlee.beautifulsoup_crawler import html_to_text
 
 _EXPECTED_TEXT = (
     "Let's start with a simple text. \n"

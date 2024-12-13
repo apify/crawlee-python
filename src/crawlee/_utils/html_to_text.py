@@ -33,6 +33,10 @@ BLOCK_TAGS = {
     'option',
 }
 
+_EMPTY_OR_ENDS_WITH_ANY_WHITE_SPACE = re.compile(r'(^|\s)$')
+_EMPTY_OR_ENDS_WITH_NEW_LINE = re.compile(r'(^|\n)$')
+_ANY_CONSECUTIVE_WHITE_SPACES = re.compile(r'\s+')
+
 
 def html_to_text(source: str | BeautifulSoup) -> str:
     """Converts markup string or BeautifulSoup object to newline separated plain text without tags."""
@@ -56,9 +60,9 @@ def html_to_text(source: str | BeautifulSoup) -> str:
                         compr = page_element.get_text()
                     else:
                         # Compress white spaces outside of pre block
-                        compr = re.sub(r'\s+', ' ', page_element.get_text())
+                        compr = re.sub(_ANY_CONSECUTIVE_WHITE_SPACES, ' ', page_element.get_text())
                     # If text is empty or ends with a whitespace, don't add the leading whitespace or new line
-                    if (compr.startswith((' ', '\n'))) and re.search(r'(^|\s)$', text):
+                    if (compr.startswith((' ', '\n'))) and re.search(_EMPTY_OR_ENDS_WITH_ANY_WHITE_SPACE, text):
                         compr = compr[1:]
                     text += compr
                 elif page_element.name.lower() in SKIP_TAGS or isinstance(page_element, int):
@@ -72,7 +76,7 @@ def html_to_text(source: str | BeautifulSoup) -> str:
                 else:
                     # Block elements must be surrounded by newlines(unless beginning of text)
                     is_block_tag = page_element.name.lower() in BLOCK_TAGS
-                    if is_block_tag and not re.search(r'(^|\n)$', text):
+                    if is_block_tag and not re.search(_EMPTY_OR_ENDS_WITH_NEW_LINE, text):
                         text += '\n'
                     _page_element_to_text(page_element.children)
                     if is_block_tag and not text.endswith('\n'):
