@@ -27,14 +27,13 @@ from crawlee._request import Request, RequestState
 from crawlee._types import BasicCrawlingContext, HttpHeaders, RequestHandlerRunResult, SendRequestFunction
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.docs import docs_group
-from crawlee._utils.http import is_status_code_client_error
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
 from crawlee.basic_crawler._context_pipeline import ContextPipeline
 from crawlee.errors import (
     ContextPipelineInitializationError,
     ContextPipelineInterruptedError,
-    HttpStatusCodeError,
+    HttpClientStatusCodeError,
     RequestHandlerError,
     SessionError,
     UserDefinedErrorHandlerError,
@@ -670,7 +669,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             return False
 
         # Do not retry on client errors.
-        if isinstance(error, HttpStatusCodeError) and is_status_code_client_error(error.status_code):
+        if isinstance(error, HttpClientStatusCodeError):
             return False
 
         if isinstance(error, SessionError):
