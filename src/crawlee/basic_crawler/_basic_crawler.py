@@ -339,6 +339,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         Args:
             reason: Reason for stopping that will be used in logs.
         """
+        self._logger.info(f'Crawler.stop() was called with following reason: {reason}.')
         self._unexpected_stop_reason = reason
         self._unexpected_stop = True
 
@@ -930,11 +931,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
     async def __is_finished_function(self) -> bool:
         self._stop_if_max_requests_count_exceeded()
         if self._unexpected_stop:
-            self._logger.info(
-                f'Crawler `stop` method was called with reason: {self._unexpected_stop_reason}'
-                f'All ongoing requests have now completed. Total requests processed: '
-                f'{self._statistics.state.requests_finished}. The crawler will now shut down.'
-            )
+            self._logger.info('The crawler will finish any remaining ongoing requests and shut down.')
             return True
 
         request_provider = await self.get_request_provider()
@@ -949,8 +946,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._stop_if_max_requests_count_exceeded()
         if self._unexpected_stop:
             self._logger.info(
-                f'No new requests are allowed because crawler `stop` method was called with reason: '
-                f'{self._unexpected_stop_reason}. Ongoing requests will be allowed to complete. '
+                'No new requests are allowed because crawler `stop` method was called. '
+                'Ongoing requests will be allowed to complete. '
             )
             return False
 
