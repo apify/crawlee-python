@@ -135,7 +135,11 @@ class BaseRequestData(BaseModel):
     headers: Annotated[HttpHeaders, Field(default_factory=HttpHeaders)] = HttpHeaders()
     """HTTP request headers."""
 
-    payload: HttpPayload | None = None
+    payload: Annotated[
+        HttpPayload | None,
+        BeforeValidator(lambda v: v.encode() if isinstance(v, str) else v),
+        PlainSerializer(lambda v: v.decode() if isinstance(v, bytes) else v),
+    ] = None
     """HTTP request payload."""
 
     user_data: Annotated[
