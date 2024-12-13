@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Any, Generic
@@ -248,8 +249,10 @@ class InternalRequest(BaseModel):
 
     handled_at: datetime | None
 
-    request: Request
-    """Original Request object"""
+    request: Annotated[
+        Request, Field(alias='json_'), BeforeValidator(lambda v: json.loads(v) if isinstance(v, str) else v)
+    ]
+    """Original Request object. The alias 'json_' is required for backward compatibility with legacy code."""
 
     @classmethod
     def from_request(cls, request: Request, id: str, order_no: Decimal | None) -> InternalRequest:
