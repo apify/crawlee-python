@@ -863,22 +863,6 @@ async def test_consecutive_runs_purge_request_queue() -> None:
     }
 
 
-async def test_passes_configuration_to_storages() -> None:
-    configuration = Configuration(persist_storage=False, purge_on_start=True)
-
-    crawler = BasicCrawler(configuration=configuration)
-
-    dataset = await crawler.get_dataset()
-    assert dataset._configuration is configuration
-
-    key_value_store = await crawler.get_key_value_store()
-    assert key_value_store._configuration is configuration
-
-    request_provider = await crawler.get_request_provider()
-    assert isinstance(request_provider, RequestQueue)
-    assert request_provider._configuration is configuration
-
-
 async def test_respects_no_persist_storage() -> None:
     configuration = Configuration(persist_storage=False)
     crawler = BasicCrawler(configuration=configuration)

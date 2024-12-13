@@ -9,12 +9,13 @@ from typing import TYPE_CHECKING, Any, Generic, TypedDict, TypeVar
 
 from typing_extensions import override
 
+from crawlee import service_locator
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.docs import docs_group
 from crawlee._utils.lru_cache import LRUCache
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee._utils.wait import wait_for_all_tasks_for_finish
-from crawlee.base_storage_client._models import ProcessedRequest, RequestQueueMetadata
+from crawlee.base_storage_client import BaseStorageClient, ProcessedRequest, RequestQueueMetadata
 from crawlee.events._types import Event
 from crawlee.storages._base_storage import BaseStorage
 from crawlee.storages._request_provider import RequestProvider
@@ -23,9 +24,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from crawlee._request import Request
-    from crawlee.base_storage_client import BaseStorageClient
     from crawlee.configuration import Configuration
-    from crawlee.events import EventManager
 
 logger = getLogger(__name__)
 
@@ -105,21 +104,16 @@ class RequestQueue(BaseStorage, RequestProvider):
     _STORAGE_CONSISTENCY_DELAY = timedelta(seconds=3)
     """Expected delay for storage to achieve consistency, guiding the timing of subsequent read operations."""
 
-    def __init__(
-        self,
-        id: str,
-        name: str | None,
-        configuration: Configuration,
-        client: BaseStorageClient,
-        event_manager: EventManager,
-    ) -> None:
+    def __init__(self, id: str, name: str | None, storage_client: BaseStorageClient) -> None:
+        config = service_locator.get_configuration()
+        event_manager = service_locator.get_event_manager()
+
         self._id = id
         self._name = name
-        self._configuration = configuration
 
         # Get resource clients from storage client
-        self._resource_client = client.request_queue(self._id)
-        self._resource_collection_client = client.request_queues()
+        self._resource_client = storage_client.request_queue(self._id)
+        self._resource_collection_client = storage_client.request_queues()
 
         self._request_lock_time = timedelta(minutes=3)
         self._queue_paused_for_migration = False
@@ -131,7 +125,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         # Other internal attributes
         self._tasks = list[asyncio.Task]()
         self._client_key = crypto_random_object_id()
-        self._internal_timeout = configuration.internal_timeout or timedelta(minutes=5)
+        self._internal_timeout = config.internal_timeout or timedelta(minutes=5)
         self._assumed_total_count = 0
         self._assumed_handled_count = 0
         self._queue_head_dict: OrderedDict[str, str] = OrderedDict()
@@ -162,6 +156,9 @@ class RequestQueue(BaseStorage, RequestProvider):
         storage_client: BaseStorageClient | None = None,
     ) -> RequestQueue:
         from crawlee.storages._creation_management import open_storage
+
+        configuration = configuration or service_locator.get_configuration()
+        storage_client = storage_client or service_locator.get_storage_client()
 
         return await open_storage(
             storage_class=cls,

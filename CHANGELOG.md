@@ -15,6 +15,8 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Fix circular import in `KeyValueStore` ([#805](https://github.com/apify/crawlee-python/pull/805)) ([8bdf49d](https://github.com/apify/crawlee-python/commit/8bdf49d1cb2a94b66f69fd1b77063a4113517fae)) by [@Mantisus](https://github.com/Mantisus), closes [#804](https://github.com/apify/crawlee-python/issues/804)
+- [**breaking**] Refactor service usage to rely on `service_locator` ([#691](https://github.com/apify/crawlee-python/pull/691)) ([1d31c6c](https://github.com/apify/crawlee-python/commit/1d31c6c7e7a9ec7cee5b2de900568d9f77db65ba)) by [@vdusek](https://github.com/vdusek), closes [#369](https://github.com/apify/crawlee-python/issues/369), [#539](https://github.com/apify/crawlee-python/issues/539), [#699](https://github.com/apify/crawlee-python/issues/699)
+- Pass `verify` in httpx client ([#802](https://github.com/apify/crawlee-python/pull/802)) ([074d083](https://github.com/apify/crawlee-python/commit/074d0836b55e52f13726e7cd1c21602623fda4fc)) by [@Mantisus](https://github.com/Mantisus), closes [#798](https://github.com/apify/crawlee-python/issues/798)
 
 ### Refactor
 
