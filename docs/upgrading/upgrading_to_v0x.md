@@ -23,7 +23,8 @@ This section summarizes the breaking changes between v0.4.x and v0.5.0.
 - The `crawlee.statistics.Statistics` class do not accept an event manager as an input argument anymore. It uses the default, global one.
 
 ### Request
-- Removed properties `json_` and `order_no `. 
+
+- Removed properties `json_` and `order_no`.
 
 ## Upgrading to v0.4
 
