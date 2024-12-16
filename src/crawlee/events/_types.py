@@ -6,11 +6,12 @@ from typing import Annotated, Any, TypeVar, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from crawlee._utils.docs import docs_group
 from crawlee._utils.system import CpuInfo, MemoryUsageInfo
 
 
 class Event(str, Enum):
-    """Enum of all possible events that can be emitted."""
+    """Names of all possible events that can be emitted using an EventManager."""
 
     # Core events
     PERSIST_STATE = 'persistState'
@@ -30,6 +31,7 @@ class Event(str, Enum):
     PAGE_CLOSED = 'pageClosed'
 
 
+@docs_group('Event payloads')
 class EventPersistStateData(BaseModel):
     """Data for the persist state event."""
 
@@ -38,6 +40,7 @@ class EventPersistStateData(BaseModel):
     is_migrating: Annotated[bool, Field(alias='isMigrating')]
 
 
+@docs_group('Event payloads')
 class EventSystemInfoData(BaseModel):
     """Data for the system info event."""
 
@@ -50,18 +53,21 @@ class EventSystemInfoData(BaseModel):
     ]
 
 
+@docs_group('Event payloads')
 class EventMigratingData(BaseModel):
     """Data for the migrating event."""
 
     model_config = ConfigDict(populate_by_name=True)
 
 
+@docs_group('Event payloads')
 class EventAbortingData(BaseModel):
     """Data for the aborting event."""
 
     model_config = ConfigDict(populate_by_name=True)
 
 
+@docs_group('Event payloads')
 class EventExitData(BaseModel):
     """Data for the exit event."""
 
@@ -69,6 +75,8 @@ class EventExitData(BaseModel):
 
 
 EventData = Union[EventPersistStateData, EventSystemInfoData, EventMigratingData, EventAbortingData, EventExitData]
+"""A helper type for all possible event payloads"""
+
 WrappedListener = Callable[..., Coroutine[Any, Any, None]]
 
 TEvent = TypeVar('TEvent')
@@ -82,3 +90,4 @@ EventListener = Union[
         Union[None, Coroutine[Any, Any, None]],
     ],
 ]
+"""An event listener function - it can be both sync and async and may accept zero or one argument."""
