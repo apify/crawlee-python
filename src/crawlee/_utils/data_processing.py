@@ -10,32 +10,6 @@ if TYPE_CHECKING:
     from crawlee._types import StorageTypes
 
 
-def filter_out_none_values_recursively(dictionary: dict, *, remove_empty_dicts: bool = False) -> dict | None:
-    """Recursively filters out None values from a dictionary.
-
-    Args:
-        dictionary: The dictionary to filter.
-        remove_empty_dicts: Flag indicating whether to remove empty nested dictionaries.
-
-    Returns:
-        A copy of the dictionary with all None values (and potentially empty dictionaries) removed.
-    """
-    result = {}
-    for k, v in dictionary.items():
-        # If the value is a dictionary, apply recursion
-        if isinstance(v, dict):
-            nested = filter_out_none_values_recursively(v, remove_empty_dicts=remove_empty_dicts)
-            if nested or not remove_empty_dicts:
-                result[k] = nested
-        elif v is not None:
-            result[k] = v
-
-    # If removing empty dictionaries and result is empty, return None
-    if remove_empty_dicts and not result:
-        return None
-    return result
-
-
 def maybe_extract_enum_member_value(maybe_enum_member: Any) -> Any:
     """Extract the value of an enumeration member if it is an Enum, otherwise return the original value."""
     if isinstance(maybe_enum_member, Enum):
