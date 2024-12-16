@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - Add `use_state` context method ([#682](https://github.com/apify/crawlee-python/pull/682)) ([868b41e](https://github.com/apify/crawlee-python/commit/868b41ebd4c8003fa60ab07887577d0fb85b6ecc)) by [@Mantisus](https://github.com/Mantisus), closes [#191](https://github.com/apify/crawlee-python/issues/191)
 - Add pre-navigation hooks router to AbstractHttpCrawler ([#791](https://github.com/apify/crawlee-python/pull/791)) ([0f23205](https://github.com/apify/crawlee-python/commit/0f23205923065074c522b3de9d47218a204dfa78)) by [@Pijukatel](https://github.com/Pijukatel), closes [#635](https://github.com/apify/crawlee-python/issues/635)
 - Add example of how to integrate Camoufox into PlaywrightCrawler ([#789](https://github.com/apify/crawlee-python/pull/789)) ([246cfc4](https://github.com/apify/crawlee-python/commit/246cfc4ebc8bce1d15e1dddd62d652bd65869328)) by [@Pijukatel](https://github.com/Pijukatel), closes [#684](https://github.com/apify/crawlee-python/issues/684)
+- Expose event types, improve on&#x2F;emit signature, allow parameterless listeners ([#800](https://github.com/apify/crawlee-python/pull/800)) ([c102c4c](https://github.com/apify/crawlee-python/commit/c102c4c894a00b09adfd5f4911563c81cf3e98b4)) by [@janbuchar](https://github.com/janbuchar), closes [#561](https://github.com/apify/crawlee-python/issues/561)
 
 ### 🐛 Bug Fixes
 
