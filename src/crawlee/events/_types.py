@@ -11,7 +11,7 @@ from crawlee._utils.system import CpuInfo, MemoryUsageInfo
 
 
 class Event(str, Enum):
-    """Names of all possible events that can be emitted using an EventManager."""
+    """Names of all possible events that can be emitted using an `EventManager`."""
 
     # Core events
     PERSIST_STATE = 'persistState'
