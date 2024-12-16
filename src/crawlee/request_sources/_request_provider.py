@@ -5,7 +5,7 @@ from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from crawlee._utils.docs import docs_group
-from crawlee.request_sources import RequestSource
+from crawlee.request_sources._request_source import RequestSource
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
