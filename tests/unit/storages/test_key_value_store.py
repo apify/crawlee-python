@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 from urllib.parse import urlparse
@@ -27,7 +27,7 @@ async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
 @pytest.fixture
 async def mock_event_manager() -> AsyncGenerator[EventManager, None]:
     async with EventManager(persist_state_interval=timedelta(milliseconds=50)) as event_manager:
-        with patch('crawlee.service_container.get_event_manager', return_value=event_manager):
+        with patch('crawlee.service_locator.get_event_manager', return_value=event_manager):
             yield event_manager
 
 
@@ -157,14 +157,24 @@ async def test_get_auto_saved_value_cache_value(key_value_store: KeyValueStore) 
 
 
 async def test_get_auto_saved_value_auto_save(key_value_store: KeyValueStore, mock_event_manager: EventManager) -> None:  # noqa: ARG001
+    # This is not a realtime system and timing constrains can be hard to enforce.
+    # For the test to avoid flakiness it needs some time tolerance.
+    autosave_deadline_time = 1
+    autosave_check_period = 0.01
+
+    async def autosaved_within_deadline(key: str, expected_value: dict[str, str]) -> bool:
+        """Check if the `key_value_store` of `key` has expected value within `autosave_deadline_time` seconds."""
+        deadline = datetime.now(tz=timezone.utc) + timedelta(seconds=autosave_deadline_time)
+        while datetime.now(tz=timezone.utc) < deadline:
+            await asyncio.sleep(autosave_check_period)
+            if await key_value_store.get_value(key) == expected_value:
+                return True
+        return False
+
     default_value: dict[str, JsonSerializable] = {'hello': 'world'}
     key_name = 'state'
     value = await key_value_store.get_auto_saved_value(key_name, default_value)
-    await asyncio.sleep(0.1)
-    value_one = await key_value_store.get_value(key_name)
-    assert value_one == {'hello': 'world'}
+    assert await autosaved_within_deadline(key=key_name, expected_value={'hello': 'world'})
 
     value['hello'] = 'new_world'
-    await asyncio.sleep(0.1)
-    value_two = await key_value_store.get_value(key_name)
-    assert value_two == {'hello': 'new_world'}
+    assert await autosaved_within_deadline(key=key_name, expected_value={'hello': 'new_world'})

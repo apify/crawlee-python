@@ -21,9 +21,6 @@ from crawlee.base_storage_client._models import (
     Request,
     RequestQueueMetadata,
 )
-from crawlee.storages._dataset import Dataset
-from crawlee.storages._key_value_store import KeyValueStore
-from crawlee.storages._request_queue import RequestQueue
 
 if TYPE_CHECKING:
     from crawlee.memory_storage_client._dataset_client import DatasetClient
@@ -400,24 +397,8 @@ def _determine_storage_path(
     id: str | None = None,
     name: str | None = None,
 ) -> str | None:
-    from crawlee.memory_storage_client._dataset_client import DatasetClient
-    from crawlee.memory_storage_client._key_value_store_client import KeyValueStoreClient
-    from crawlee.memory_storage_client._request_queue_client import RequestQueueClient
-    from crawlee.storages._creation_management import _get_default_storage_id
-
-    configuration = memory_storage_client._configuration  # noqa: SLF001
-
-    if issubclass(resource_client_class, DatasetClient):
-        storages_dir = memory_storage_client.datasets_directory
-        default_id = _get_default_storage_id(configuration, Dataset)
-    elif issubclass(resource_client_class, KeyValueStoreClient):
-        storages_dir = memory_storage_client.key_value_stores_directory
-        default_id = _get_default_storage_id(configuration, KeyValueStore)
-    elif issubclass(resource_client_class, RequestQueueClient):
-        storages_dir = memory_storage_client.request_queues_directory
-        default_id = _get_default_storage_id(configuration, RequestQueue)
-    else:
-        raise TypeError('Invalid resource client class.')
+    storages_dir = memory_storage_client._get_storage_dir(resource_client_class)  # noqa: SLF001
+    default_id = memory_storage_client._get_default_storage_id(resource_client_class)  # noqa: SLF001
 
     # Try to find by name directly from directories
     if name:

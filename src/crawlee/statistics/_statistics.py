@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Generic, cast
 
 from typing_extensions import Self, TypeVar
 
-import crawlee.service_container
+from crawlee import service_locator
 from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
@@ -19,8 +19,6 @@ from crawlee.storages import KeyValueStore
 
 if TYPE_CHECKING:
     from types import TracebackType
-
-    from crawlee.events import EventManager
 
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
 
@@ -67,7 +65,6 @@ class Statistics(Generic[TStatisticsState]):
     def __init__(
         self,
         *,
-        event_manager: EventManager | None = None,
         persistence_enabled: bool = False,
         persist_state_kvs_name: str = 'default',
         persist_state_key: str | None = None,
@@ -87,8 +84,6 @@ class Statistics(Generic[TStatisticsState]):
 
         self.error_tracker = ErrorTracker()
         self.error_tracker_retry = ErrorTracker()
-
-        self._events = event_manager or crawlee.service_container.get_event_manager()
 
         self._requests_in_progress = dict[str, RequestProcessingRecord]()
 
@@ -131,7 +126,8 @@ class Statistics(Generic[TStatisticsState]):
             self._key_value_store = await KeyValueStore.open(name=self._persist_state_kvs_name)
 
         await self._maybe_load_statistics()
-        self._events.on(event=Event.PERSIST_STATE, listener=self._persist_state)
+        event_manager = service_locator.get_event_manager()
+        event_manager.on(event=Event.PERSIST_STATE, listener=self._persist_state)
         self._periodic_logger.start()
 
         return self
@@ -151,7 +147,8 @@ class Statistics(Generic[TStatisticsState]):
             raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
         self.state.crawler_finished_at = datetime.now(timezone.utc)
-        self._events.off(event=Event.PERSIST_STATE, listener=self._persist_state)
+        event_manager = service_locator.get_event_manager()
+        event_manager.off(event=Event.PERSIST_STATE, listener=self._persist_state)
         await self._periodic_logger.stop()
         await self._persist_state(event_data=EventPersistStateData(is_migrating=False))
         self._active = False

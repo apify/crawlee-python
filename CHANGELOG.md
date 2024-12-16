@@ -9,10 +9,14 @@ All notable changes to this project will be documented in this file.
 
 - Add possibility to use None as no proxy in tiered proxies ([#760](https://github.com/apify/crawlee-python/pull/760)) ([0fbd017](https://github.com/apify/crawlee-python/commit/0fbd01723b9fe2e3410e0f358cab2f22848b08d0)) by [@Pijukatel](https://github.com/Pijukatel), closes [#687](https://github.com/apify/crawlee-python/issues/687)
 - Add `use_state` context method ([#682](https://github.com/apify/crawlee-python/pull/682)) ([868b41e](https://github.com/apify/crawlee-python/commit/868b41ebd4c8003fa60ab07887577d0fb85b6ecc)) by [@Mantisus](https://github.com/Mantisus), closes [#191](https://github.com/apify/crawlee-python/issues/191)
+- Add pre-navigation hooks router to AbstractHttpCrawler ([#791](https://github.com/apify/crawlee-python/pull/791)) ([0f23205](https://github.com/apify/crawlee-python/commit/0f23205923065074c522b3de9d47218a204dfa78)) by [@Pijukatel](https://github.com/Pijukatel), closes [#635](https://github.com/apify/crawlee-python/issues/635)
+- Add example of how to integrate Camoufox into PlaywrightCrawler ([#789](https://github.com/apify/crawlee-python/pull/789)) ([246cfc4](https://github.com/apify/crawlee-python/commit/246cfc4ebc8bce1d15e1dddd62d652bd65869328)) by [@Pijukatel](https://github.com/Pijukatel), closes [#684](https://github.com/apify/crawlee-python/issues/684)
 
 ### 🐛 Bug Fixes
 
 - Fix circular import in `KeyValueStore` ([#805](https://github.com/apify/crawlee-python/pull/805)) ([8bdf49d](https://github.com/apify/crawlee-python/commit/8bdf49d1cb2a94b66f69fd1b77063a4113517fae)) by [@Mantisus](https://github.com/Mantisus), closes [#804](https://github.com/apify/crawlee-python/issues/804)
+- [**breaking**] Refactor service usage to rely on `service_locator` ([#691](https://github.com/apify/crawlee-python/pull/691)) ([1d31c6c](https://github.com/apify/crawlee-python/commit/1d31c6c7e7a9ec7cee5b2de900568d9f77db65ba)) by [@vdusek](https://github.com/vdusek), closes [#369](https://github.com/apify/crawlee-python/issues/369), [#539](https://github.com/apify/crawlee-python/issues/539), [#699](https://github.com/apify/crawlee-python/issues/699)
+- Pass `verify` in httpx client ([#802](https://github.com/apify/crawlee-python/pull/802)) ([074d083](https://github.com/apify/crawlee-python/commit/074d0836b55e52f13726e7cd1c21602623fda4fc)) by [@Mantisus](https://github.com/Mantisus), closes [#798](https://github.com/apify/crawlee-python/issues/798)
 
 ### Refactor
 

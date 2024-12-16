@@ -1,1 +1,1 @@
-# % include 'routes_%s.py' % cookiecutter.crawler_type
+# % include 'routes_%s.py' % cookiecutter.__crawler_type
