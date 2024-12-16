@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, cast
 
+from browserforge.fingerprints import FingerprintGenerator
 from playwright.async_api import BrowserContext, Page, ProxySettings
 from typing_extensions import override
 
@@ -12,6 +13,7 @@ from crawlee._utils.docs import docs_group
 from crawlee.browsers._base_browser_controller import BaseBrowserController
 from crawlee.browsers._types import BrowserType
 from crawlee.fingerprint_suite import HeaderGenerator
+from crawlee.fingerprint_suite._injected_page_function import javascript_stuff
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -38,6 +40,9 @@ class PlaywrightBrowserController(BaseBrowserController):
         *,
         max_open_pages_per_browser: int = 20,
         header_generator: HeaderGenerator | None = _DEFAULT_HEADER_GENERATOR,
+        fingerprint_generator: FingerprintGenerator | None = None,
+        use_fingerprints: bool = True,
+        fingerprint_generator_options: dict[str, Any] | None = None,
     ) -> None:
         """A default constructor.
 
@@ -47,14 +52,22 @@ class PlaywrightBrowserController(BaseBrowserController):
             header_generator: An optional `HeaderGenerator` instance used to generate and manage HTTP headers for
                 requests made by the browser. By default, a predefined header generator is used. Set to `None` to
                 disable automatic header modifications.
+            fingerprint_generator: An optional `FingerprintGenerator` instance used to generate fingerprints,
+            use_fingerprints: Will inject fingerprints
+            fingerprint_generator_options: Override generated fingerprints with these specific values.
         """
         self._browser = browser
         self._max_open_pages_per_browser = max_open_pages_per_browser
         self._header_generator = header_generator
 
+        fingerprint_generator_options = fingerprint_generator_options or {}
+        self._fingerprint_generator = fingerprint_generator or FingerprintGenerator(**fingerprint_generator_options)
+
         self._browser_context: BrowserContext | None = None
         self._pages = list[Page]()
         self._last_page_opened_at = datetime.now(timezone.utc)
+
+        self._use_fingerprints = use_fingerprints
 
     @property
     @override
@@ -113,7 +126,14 @@ class PlaywrightBrowserController(BaseBrowserController):
         self._pages.append(page)
         self._last_page_opened_at = datetime.now(timezone.utc)
 
+        # Inject fingerprint
+        if self._use_fingerprints:
+            await self._inject_fingerprint_to_page(page)
+
         return page
+
+    async def _inject_fingerprint_to_page(self, page: Page) -> None:
+        await page.evaluate(javascript_stuff, self._fingerprint_generator.generate().dumps())
 
     @override
     async def close(self, *, force: bool = False) -> None:

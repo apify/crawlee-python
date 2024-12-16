@@ -44,6 +44,7 @@ keywords = [
 python = "^3.9"
 apify = { version = ">=2.0.0", optional = true }
 beautifulsoup4 = { version = ">=4.12.0", optional = true }
+browserforge = { version = "*", optional = true }
 colorama = ">=0.4.0"
 cookiecutter = ">=2.6.0"
 curl-cffi = { version = ">=0.7.2", optional = true }
@@ -94,10 +95,10 @@ types-psutil = "~5.9.5.20240205"
 types-python-dateutil = "~2.9.0.20240316"
 
 [tool.poetry.extras]
-all = ["beautifulsoup4", "curl-cffi", "lxml", "html5lib", "parsel", "playwright"]
+all = ["beautifulsoup4", "curl-cffi", "lxml", "html5lib", "parsel", "playwright", "browserforge"]
 beautifulsoup = ["beautifulsoup4", "lxml", "html5lib"]
 curl-impersonate = ["curl-cffi"]
-playwright = ["playwright"]
+playwright = ["playwright", "browserforge"]
 parsel = ["parsel"]
 
 [tool.poetry.scripts]

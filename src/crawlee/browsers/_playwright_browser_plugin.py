@@ -38,6 +38,8 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         browser_options: Mapping[str, Any] | None = None,
         page_options: Mapping[str, Any] | None = None,
         max_open_pages_per_browser: int = 20,
+        use_fingerprints: bool = True,
+        fingerprint_generator_options: dict[str, Any] | None = None,
     ) -> None:
         """A default constructor.
 
@@ -51,6 +53,9 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
                 https://playwright.dev/python/docs/api/class-browsercontext#browser-context-new-page.
             max_open_pages_per_browser: The maximum number of pages that can be opened in a single browser instance.
                 Once reached, a new browser instance will be launched to handle the excess.
+            use_fingerprints: Will inject fingerprints
+            fingerprint_generator_options: Override generated fingerprints with these specific values.
+
         """
         self._browser_type = browser_type
         self._browser_options = browser_options or {}
@@ -62,6 +67,9 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
 
         # Flag to indicate the context state.
         self._active = False
+
+        self._use_fingerprints = use_fingerprints
+        self._fingerprint_generator_options = fingerprint_generator_options
 
     @property
     @override
@@ -128,4 +136,6 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         return PlaywrightBrowserController(
             browser,
             max_open_pages_per_browser=self._max_open_pages_per_browser,
+            use_fingerprints=self._use_fingerprints,
+            fingerprint_generator_options=self._fingerprint_generator_options,
         )

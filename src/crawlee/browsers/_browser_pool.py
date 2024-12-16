@@ -51,6 +51,8 @@ class BrowserPool:
         browser_inactive_threshold: timedelta = timedelta(seconds=10),
         identify_inactive_browsers_interval: timedelta = timedelta(seconds=20),
         close_inactive_browsers_interval: timedelta = timedelta(seconds=30),
+        use_fingerprints: bool = True,
+        fingerprint_generator_options: dict[str, Any] | None = None,
     ) -> None:
         """A default constructor.
 
@@ -66,6 +68,8 @@ class BrowserPool:
             close_inactive_browsers_interval: The interval at which the pool checks for inactive browsers
                 and closes them. The browser is considered as inactive if it has no active pages and has been idle
                 for the specified period.
+            use_fingerprints: Will inject fingerprints
+            fingerprint_generator_options: Override generated fingerprints with these specific values.
         """
         self._plugins = plugins or [PlaywrightBrowserPlugin()]
         self._operation_timeout = operation_timeout
@@ -95,6 +99,9 @@ class BrowserPool:
         # Flag to indicate the context state.
         self._active = False
 
+        self._use_fingerprints = use_fingerprints
+        self._fingerprint_generator_options = fingerprint_generator_options
+
     @classmethod
     def with_default_plugin(
         cls,
@@ -103,6 +110,8 @@ class BrowserPool:
         browser_options: Mapping[str, Any] | None = None,
         page_options: Mapping[str, Any] | None = None,
         headless: bool | None = None,
+        use_fingerprints: bool = True,
+        fingerprint_generator_options: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> BrowserPool:
         """Create a new instance with a single `PlaywrightBrowserPlugin` configured with the provided options.
@@ -116,6 +125,8 @@ class BrowserPool:
                 Playwright's `browser_context.new_page` method. For more details, refer to the Playwright documentation:
                 https://playwright.dev/python/docs/api/class-browsercontext#browser-context-new-page.
             headless: Whether to run the browser in headless mode.
+            use_fingerprints: Will inject fingerprints
+            fingerprint_generator_options: Override generated fingerprints with these specific values.
             kwargs: Additional arguments for default constructor.
         """
         plugin_options: dict = defaultdict(dict)
@@ -128,7 +139,11 @@ class BrowserPool:
         if browser_type:
             plugin_options['browser_type'] = browser_type
 
-        plugin = PlaywrightBrowserPlugin(**plugin_options)
+        plugin = PlaywrightBrowserPlugin(
+            **plugin_options,
+            use_fingerprints=use_fingerprints,
+            fingerprint_generator_options=fingerprint_generator_options,
+        )
         return cls(plugins=[plugin], **kwargs)
 
     @property
