@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Iterator, MutableMapping
 from datetime import datetime
-from decimal import Decimal
 from enum import IntEnum
 from typing import TYPE_CHECKING, Annotated, Any, cast
 
@@ -141,11 +140,7 @@ class BaseRequestData(BaseModel):
         BeforeValidator(lambda v: v.encode() if isinstance(v, str) else v),
         PlainSerializer(lambda v: v.decode() if isinstance(v, bytes) else v),
     ] = None
-    """HTTP request payload.
-
-    TODO: Re-check the need for `Validator` and `Serializer` once the issue is resolved.
-    https://github.com/apify/crawlee-python/issues/94
-    """
+    """HTTP request payload."""
 
     user_data: Annotated[
         dict[str, JsonSerializable],  # Internally, the model contains `UserData`, this is just for convenience
@@ -255,18 +250,6 @@ class Request(BaseRequestData):
     id: str
     """A unique identifier for the request. Note that this is not used for deduplication, and should not be confused
     with `unique_key`."""
-
-    json_: str | None = None
-    """Deprecated internal field, do not use it.
-
-    Should be removed as part of https://github.com/apify/crawlee-python/issues/94.
-    """
-
-    order_no: Decimal | None = None
-    """Deprecated internal field, do not use it.
-
-    Should be removed as part of https://github.com/apify/crawlee-python/issues/94.
-    """
 
     @classmethod
     def from_url(
@@ -435,35 +418,6 @@ class Request(BaseRequestData):
     @forefront.setter
     def forefront(self, new_value: bool) -> None:
         self.crawlee_data.forefront = new_value
-
-    def __eq__(self, other: object) -> bool:
-        """Compare all relevant fields of the `Request` class, excluding deprecated fields `json_` and `order_no`.
-
-        TODO: Remove this method once the issue is resolved.
-        https://github.com/apify/crawlee-python/issues/94
-        """
-        if isinstance(other, Request):
-            return (
-                self.url == other.url
-                and self.unique_key == other.unique_key
-                and self.method == other.method
-                and self.headers == other.headers
-                and self.payload == other.payload
-                and self.user_data == other.user_data
-                and self.retry_count == other.retry_count
-                and self.no_retry == other.no_retry
-                and self.loaded_url == other.loaded_url
-                and self.handled_at == other.handled_at
-                and self.id == other.id
-                and self.label == other.label
-                and self.state == other.state
-                and self.max_retries == other.max_retries
-                and self.session_rotation_count == other.session_rotation_count
-                and self.enqueue_strategy == other.enqueue_strategy
-                and self.last_proxy_tier == other.last_proxy_tier
-                and self.forefront == other.forefront
-            )
-        return NotImplemented
 
 
 class RequestWithLock(Request):
