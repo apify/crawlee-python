@@ -4,9 +4,10 @@ from datetime import timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING
 
-from typing_extensions import override
+from typing_extensions import Self, override
 
 from crawlee.request_sources import RequestProvider
+from crawlee.storages import RequestQueue
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -29,6 +30,11 @@ class RequestSourceTandem(RequestProvider):
     def __init__(self, request_source: RequestSource, request_provider: RequestProvider) -> None:
         self._read_only_source = request_source
         self._read_write_provider = request_provider
+
+    @classmethod
+    async def from_source(cls, request_source: RequestSource) -> Self:
+        """A shortcut for joining a `RequestSource` instance with the default `RequestQueue`."""
+        return cls(request_source=request_source, request_provider=await RequestQueue.open())
 
     @override
     async def get_total_count(self) -> int:
