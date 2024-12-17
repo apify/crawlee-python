@@ -4,7 +4,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable
 
 from crawlee._utils.docs import docs_group
-from crawlee.playwright_crawler._playwright_pre_navigation_context import PlaywrightPreNavigationContext
+from crawlee.playwright_crawler._playwright_pre_navigation_crawling_context import (
+    PlaywrightPreNavigationCrawlingContext,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable
@@ -16,7 +18,7 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 @docs_group('Data structures')
-class PlaywrightCrawlingContext(PlaywrightPreNavigationContext):
+class PlaywrightCrawlingContext(PlaywrightPreNavigationCrawlingContext):
     """The crawling context used by the `PlaywrightCrawler`.
 
     It provides access to key objects as well as utility functions for handling crawling tasks.
