@@ -26,14 +26,14 @@ if TYPE_CHECKING:
     import re
     from collections.abc import Coroutine, Sequence
 
-    from crawlee import Glob
-    from crawlee._request import BaseRequestData, Request
+    from crawlee import Glob, Request
+    from crawlee._request import BaseRequestData
     from crawlee.http_clients import HttpResponse
     from crawlee.proxy_configuration import ProxyInfo
-    from crawlee.sessions._session import Session
-    from crawlee.storage_clients.base._models import DatasetItemsListPage
+    from crawlee.sessions import Session
+    from crawlee.storage_clients.base import DatasetItemsListPage
+    from crawlee.storages import KeyValueStore
     from crawlee.storages._dataset import ExportToKwargs, GetDataKwargs
-    from crawlee.storages._key_value_store import KeyValueStore
 
     # Workaround for https://github.com/pydantic/pydantic/issues/9445
     J = TypeVar('J', bound='JsonSerializable')

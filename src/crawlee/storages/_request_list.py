@@ -7,13 +7,14 @@ from typing import TYPE_CHECKING
 from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
-from crawlee.storage_clients.base._models import ProcessedRequest
-from crawlee.storages._request_provider import RequestProvider
+from crawlee.storage_clients.base import ProcessedRequest
+
+from ._request_provider import RequestProvider
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from crawlee._request import Request
+    from crawlee import Request
 
 
 @docs_group('Classes')

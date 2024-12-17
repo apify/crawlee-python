@@ -12,17 +12,17 @@ from crawlee import service_locator
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.docs import docs_group
 from crawlee._utils.file import json_dumps
-from crawlee.storage_clients.base._models import DatasetMetadata
-from crawlee.storages._base_storage import BaseStorage
-from crawlee.storages._key_value_store import KeyValueStore
+from crawlee.storage_clients.base import DatasetMetadata
+
+from ._base_storage import BaseStorage
+from ._key_value_store import KeyValueStore
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
 
     from crawlee._types import JsonSerializable, PushDataKwargs
     from crawlee.configuration import Configuration
-    from crawlee.storage_clients.base import BaseStorageClient
-    from crawlee.storage_clients.base._models import DatasetItemsListPage
+    from crawlee.storage_clients.base import BaseStorageClient, DatasetItemsListPage
 
 logger = logging.getLogger(__name__)
 

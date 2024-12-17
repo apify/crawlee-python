@@ -19,9 +19,7 @@ from tldextract import TLDExtract
 from typing_extensions import NotRequired, TypedDict, TypeVar, Unpack, assert_never
 
 from crawlee import EnqueueStrategy, Glob, service_locator
-from crawlee._autoscaling import AutoscaledPool
-from crawlee._autoscaling.snapshotter import Snapshotter
-from crawlee._autoscaling.system_status import SystemStatus
+from crawlee._autoscaling import AutoscaledPool, Snapshotter, SystemStatus
 from crawlee._log_config import configure_logger, get_configured_log_level
 from crawlee._request import Request, RequestState
 from crawlee._types import BasicCrawlingContext, HttpHeaders, RequestHandlerRunResult, SendRequestFunction
@@ -52,13 +50,12 @@ if TYPE_CHECKING:
 
     from crawlee._types import ConcurrencySettings, HttpMethod, JsonSerializable
     from crawlee.configuration import Configuration
-    from crawlee.events._event_manager import EventManager
+    from crawlee.events import EventManager
     from crawlee.http_clients import BaseHttpClient, HttpResponse
     from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
     from crawlee.sessions import Session
     from crawlee.statistics import FinalStatistics, StatisticsState
-    from crawlee.storage_clients.base import BaseStorageClient
-    from crawlee.storage_clients.base._models import DatasetItemsListPage
+    from crawlee.storage_clients.base import BaseStorageClient, DatasetItemsListPage
     from crawlee.storages._dataset import ExportDataCsvKwargs, ExportDataJsonKwargs, GetDataKwargs, PushDataKwargs
     from crawlee.storages._request_provider import RequestProvider
 
