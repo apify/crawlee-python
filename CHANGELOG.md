@@ -19,6 +19,7 @@ All notable changes to this project will be documented in this file.
 - [**breaking**] Refactor service usage to rely on `service_locator` ([#691](https://github.com/apify/crawlee-python/pull/691)) ([1d31c6c](https://github.com/apify/crawlee-python/commit/1d31c6c7e7a9ec7cee5b2de900568d9f77db65ba)) by [@vdusek](https://github.com/vdusek), closes [#369](https://github.com/apify/crawlee-python/issues/369), [#539](https://github.com/apify/crawlee-python/issues/539), [#699](https://github.com/apify/crawlee-python/issues/699)
 - Pass `verify` in httpx client ([#802](https://github.com/apify/crawlee-python/pull/802)) ([074d083](https://github.com/apify/crawlee-python/commit/074d0836b55e52f13726e7cd1c21602623fda4fc)) by [@Mantisus](https://github.com/Mantisus), closes [#798](https://github.com/apify/crawlee-python/issues/798)
 - Fix `page_options` for `PlaywrightBrowserPlugin` ([#796](https://github.com/apify/crawlee-python/pull/796)) ([bd3bdd4](https://github.com/apify/crawlee-python/commit/bd3bdd4046c2ddea62feb77322033cad50f382dd)) by [@Mantisus](https://github.com/Mantisus), closes [#755](https://github.com/apify/crawlee-python/issues/755)
+- Fix event migrating handler in `RequestQueue` ([#825](https://github.com/apify/crawlee-python/pull/825)) ([fd6663f](https://github.com/apify/crawlee-python/commit/fd6663f903bc7eecd1000da89e06197b43dfb962)) by [@Mantisus](https://github.com/Mantisus), closes [#815](https://github.com/apify/crawlee-python/issues/815)
 
 ### Refactor
 
