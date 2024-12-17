@@ -303,7 +303,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._failed = False
         self._abort_on_error = abort_on_error
 
-        self._unexpected_stop: bool = False
+        self._unexpected_stop = False
         self._unexpected_stop_reason = ''
 
     @property
