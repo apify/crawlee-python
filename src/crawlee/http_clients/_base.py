@@ -147,16 +147,16 @@ class BaseHttpClient(ABC):
         ignore_http_error_status_codes: set[int],
     ) -> None:
         """Raise an exception if the given status code is considered as an error."""
-        exclude_error = status_code in ignore_http_error_status_codes
-        include_error = status_code in additional_http_error_status_codes
+        is_ignored_status = status_code in ignore_http_error_status_codes
+        is_explicit_error = status_code in additional_http_error_status_codes
 
-        if include_error:
+        if is_explicit_error:
             raise HttpStatusCodeError('Error status code (user-configured) returned.', status_code)
 
-        if is_status_code_client_error(status_code) and not exclude_error:
+        if is_status_code_client_error(status_code) and not is_ignored_status:
             raise HttpClientStatusCodeError('Client error status code returned', status_code)
 
-        if is_status_code_server_error(status_code) and not exclude_error:
+        if is_status_code_server_error(status_code) and not is_ignored_status:
             raise HttpStatusCodeError('Error status code returned', status_code)
 
     @property

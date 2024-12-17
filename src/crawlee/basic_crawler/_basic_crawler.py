@@ -1073,3 +1073,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     async def __run_request_handler(self, context: BasicCrawlingContext) -> None:
         await self._context_pipeline(context, self.router)
+
+    def _is_blocked_status_code(self, session: Session | None, status_code: int) -> bool:
+        return session is not None and session.is_blocked_status_code(
+            status_code=status_code,
+            additional_blocked_status_codes=self._http_client.additional_blocked_status_codes,
+            ignore_http_error_status_codes=self._http_client.ignore_http_error_status_codes,
+        )
