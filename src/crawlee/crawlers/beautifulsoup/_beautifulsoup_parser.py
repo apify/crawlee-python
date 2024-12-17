@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Literal
 from bs4 import BeautifulSoup, Tag
 from typing_extensions import override
 
-from crawlee.abstract_http_crawler._abstract_http_parser import AbstractHttpParser
+from crawlee.crawlers.abstract_http import AbstractHttpParser
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

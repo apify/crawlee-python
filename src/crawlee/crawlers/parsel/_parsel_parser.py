@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from parsel import Selector
 from typing_extensions import override
 
-from crawlee.abstract_http_crawler._abstract_http_parser import AbstractHttpParser
+from crawlee.crawlers.abstract_http import AbstractHttpParser
 from crawlee.http_clients import HttpResponse
 
 

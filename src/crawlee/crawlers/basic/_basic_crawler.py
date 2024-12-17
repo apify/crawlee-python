@@ -30,7 +30,6 @@ from crawlee._utils.docs import docs_group
 from crawlee._utils.http import is_status_code_client_error
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
-from crawlee.basic_crawler._context_pipeline import ContextPipeline
 from crawlee.errors import (
     ContextPipelineInitializationError,
     ContextPipelineInterruptedError,
@@ -44,6 +43,8 @@ from crawlee.router import Router
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
+
+from ._context_pipeline import ContextPipeline
 
 if TYPE_CHECKING:
     import re

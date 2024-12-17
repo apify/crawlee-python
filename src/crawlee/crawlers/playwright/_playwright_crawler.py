@@ -10,12 +10,13 @@ from crawlee._request import BaseRequestData
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
-from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.browsers import BrowserPool
+from crawlee.crawlers.basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
-from crawlee.playwright_crawler._playwright_crawling_context import PlaywrightCrawlingContext
-from crawlee.playwright_crawler._playwright_pre_navigation_context import PlaywrightPreNavigationContext
-from crawlee.playwright_crawler._utils import infinite_scroll
+
+from ._playwright_crawling_context import PlaywrightCrawlingContext
+from ._playwright_pre_navigation_context import PlaywrightPreNavigationContext
+from ._utils import infinite_scroll
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable, Mapping

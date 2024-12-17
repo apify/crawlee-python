@@ -1,4 +1,4 @@
-from crawlee.playwright_crawler import PlaywrightCrawler
+from crawlee.crawlers.playwright import PlaywrightCrawler
 from crawlee.proxy_configuration import ProxyConfiguration
 
 

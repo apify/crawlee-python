@@ -5,8 +5,9 @@ from typing import TYPE_CHECKING, Generic
 
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.docs import docs_group
-from crawlee.abstract_http_crawler._http_crawling_context import TParseResult
-from crawlee.basic_crawler import BlockedInfo
+from crawlee.crawlers.basic import BlockedInfo
+
+from ._http_crawling_context import TParseResult
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

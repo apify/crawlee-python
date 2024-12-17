@@ -1,6 +1,6 @@
 import asyncio
 
-from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
+from crawlee.crawlers.playwright import PlaywrightCrawler, PlaywrightCrawlingContext
 
 
 async def main() -> None:

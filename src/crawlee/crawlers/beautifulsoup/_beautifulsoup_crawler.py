@@ -5,17 +5,17 @@ from typing import TYPE_CHECKING
 from bs4 import BeautifulSoup
 
 from crawlee._utils.docs import docs_group
-from crawlee.abstract_http_crawler import AbstractHttpCrawler, HttpCrawlerOptions
-from crawlee.beautifulsoup_crawler._beautifulsoup_parser import BeautifulSoupParser, BeautifulSoupParserType
+from crawlee.crawlers.abstract_http import AbstractHttpCrawler, HttpCrawlerOptions
 
 from ._beautifulsoup_crawling_context import BeautifulSoupCrawlingContext
+from ._beautifulsoup_parser import BeautifulSoupParser, BeautifulSoupParserType
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
     from typing_extensions import Unpack
 
-    from crawlee.abstract_http_crawler import ParsedHttpCrawlingContext
+    from crawlee.crawlers.abstract_http import ParsedHttpCrawlingContext
 
 
 @docs_group('Classes')

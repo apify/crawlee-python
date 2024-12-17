@@ -5,17 +5,17 @@ from typing import TYPE_CHECKING
 from parsel import Selector
 
 from crawlee._utils.docs import docs_group
-from crawlee.abstract_http_crawler import AbstractHttpCrawler, HttpCrawlerOptions
-from crawlee.parsel_crawler._parsel_parser import ParselParser
+from crawlee.crawlers.abstract_http import AbstractHttpCrawler, HttpCrawlerOptions
 
 from ._parsel_crawling_context import ParselCrawlingContext
+from ._parsel_parser import ParselParser
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
     from typing_extensions import Unpack
 
-    from crawlee.abstract_http_crawler import ParsedHttpCrawlingContext
+    from crawlee.crawlers.abstract_http import ParsedHttpCrawlingContext
 
 
 @docs_group('Classes')

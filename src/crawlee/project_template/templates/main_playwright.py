@@ -1,7 +1,7 @@
 # % extends 'main.py'
 
 # % block import
-from crawlee.playwright_crawler import PlaywrightCrawler
+from crawlee.crawlers.playwright import PlaywrightCrawler
 # % endblock
 
 # % block instantiation

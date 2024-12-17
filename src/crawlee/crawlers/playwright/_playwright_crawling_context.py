@@ -4,7 +4,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable
 
 from crawlee._utils.docs import docs_group
-from crawlee.playwright_crawler._playwright_pre_navigation_context import PlaywrightPreNavigationContext
+
+from ._playwright_pre_navigation_context import PlaywrightPreNavigationContext
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable

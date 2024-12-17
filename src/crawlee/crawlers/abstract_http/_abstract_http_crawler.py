@@ -11,14 +11,11 @@ from crawlee import EnqueueStrategy
 from crawlee._request import BaseRequestData
 from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
-from crawlee.abstract_http_crawler._http_crawling_context import (
-    HttpCrawlingContext,
-    ParsedHttpCrawlingContext,
-    TParseResult,
-)
-from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
+from crawlee.crawlers.basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
 from crawlee.http_clients import HttpxHttpClient
+
+from ._http_crawling_context import HttpCrawlingContext, ParsedHttpCrawlingContext, TParseResult
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable, Iterable
@@ -26,7 +23,8 @@ if TYPE_CHECKING:
     from typing_extensions import Unpack
 
     from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, EnqueueLinksKwargs
-    from crawlee.abstract_http_crawler._abstract_http_parser import AbstractHttpParser
+
+    from ._abstract_http_parser import AbstractHttpParser
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=ParsedHttpCrawlingContext)
 
