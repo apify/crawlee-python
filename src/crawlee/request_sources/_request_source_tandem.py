@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 from typing_extensions import Self, override
 
 from crawlee.request_sources import RequestProvider
-from crawlee.storages import RequestQueue
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -34,6 +33,8 @@ class RequestSourceTandem(RequestProvider):
     @classmethod
     async def from_source(cls, request_source: RequestSource) -> Self:
         """A shortcut for joining a `RequestSource` instance with the default `RequestQueue`."""
+        from crawlee.storages import RequestQueue
+
         return cls(request_source=request_source, request_provider=await RequestQueue.open())
 
     @override
