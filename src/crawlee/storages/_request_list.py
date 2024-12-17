@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
-from crawlee.base_storage_client._models import ProcessedRequest
+from crawlee.storage_clients.base._models import ProcessedRequest
 from crawlee.storages._request_provider import RequestProvider
 
 if TYPE_CHECKING:

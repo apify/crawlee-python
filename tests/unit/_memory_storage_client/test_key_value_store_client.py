@@ -13,13 +13,13 @@ from crawlee._consts import METADATA_FILENAME
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import maybe_parse_body
 from crawlee._utils.file import json_dumps
-from crawlee.base_storage_client._models import KeyValueStoreMetadata, KeyValueStoreRecordMetadata
+from crawlee.storage_clients.base._models import KeyValueStoreMetadata, KeyValueStoreRecordMetadata
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from crawlee.memory_storage_client import MemoryStorageClient
-    from crawlee.memory_storage_client._key_value_store_client import KeyValueStoreClient
+    from crawlee.storage_clients.memory import MemoryStorageClient
+    from crawlee.storage_clients.memory._key_value_store_client import KeyValueStoreClient
 
 TINY_PNG = base64.b64decode(
     s='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVQYV2NgYAAAAAMAAWgmWQ0AAAAASUVORK5CYII=',

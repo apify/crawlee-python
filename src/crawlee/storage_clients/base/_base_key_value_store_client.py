@@ -10,11 +10,7 @@ if TYPE_CHECKING:
 
     from httpx import Response
 
-    from crawlee.base_storage_client._models import (
-        KeyValueStoreListKeysPage,
-        KeyValueStoreMetadata,
-        KeyValueStoreRecord,
-    )
+    from ._models import KeyValueStoreListKeysPage, KeyValueStoreMetadata, KeyValueStoreRecord
 
 
 @docs_group('Abstract classes')

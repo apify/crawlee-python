@@ -8,7 +8,7 @@ from crawlee._utils.docs import docs_group
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from crawlee.base_storage_client._models import (
+    from ._models import (
         BatchRequestsOperationResponse,
         ProcessedRequest,
         ProlongRequestLockResponse,

@@ -28,10 +28,10 @@ if TYPE_CHECKING:
 
     from crawlee import Glob
     from crawlee._request import BaseRequestData, Request
-    from crawlee.base_storage_client._models import DatasetItemsListPage
     from crawlee.http_clients import HttpResponse
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions._session import Session
+    from crawlee.storage_clients.base._models import DatasetItemsListPage
     from crawlee.storages._dataset import ExportToKwargs, GetDataKwargs
     from crawlee.storages._key_value_store import KeyValueStore
 

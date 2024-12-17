@@ -8,7 +8,7 @@ from typing import Annotated, Any, Generic
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 from typing_extensions import TypeVar
 
-from crawlee._request import Request
+from crawlee import Request
 from crawlee._types import HttpMethod
 from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import validate_http_url

@@ -15,8 +15,8 @@ from crawlee._utils.docs import docs_group
 from crawlee._utils.lru_cache import LRUCache
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee._utils.wait import wait_for_all_tasks_for_finish
-from crawlee.base_storage_client import BaseStorageClient, ProcessedRequest, RequestQueueMetadata
 from crawlee.events._types import Event
+from crawlee.storage_clients.base import BaseStorageClient, ProcessedRequest, RequestQueueMetadata
 from crawlee.storages._base_storage import BaseStorage
 from crawlee.storages._request_provider import RequestProvider
 

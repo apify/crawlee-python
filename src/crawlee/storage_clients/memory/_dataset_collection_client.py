@@ -4,24 +4,24 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
-from crawlee.base_storage_client import BaseKeyValueStoreCollectionClient
-from crawlee.base_storage_client._models import KeyValueStoreListPage, KeyValueStoreMetadata
-from crawlee.memory_storage_client._creation_management import get_or_create_inner
-from crawlee.memory_storage_client._key_value_store_client import KeyValueStoreClient
+from crawlee.storage_clients.base import BaseDatasetCollectionClient, DatasetListPage, DatasetMetadata
+
+from ._creation_management import get_or_create_inner
+from ._dataset_client import DatasetClient
 
 if TYPE_CHECKING:
-    from crawlee.memory_storage_client._memory_storage_client import MemoryStorageClient
+    from ._memory_storage_client import MemoryStorageClient
 
 
-class KeyValueStoreCollectionClient(BaseKeyValueStoreCollectionClient):
-    """Subclient for manipulating key-value stores."""
+class DatasetCollectionClient(BaseDatasetCollectionClient):
+    """Subclient for manipulating datasets."""
 
     def __init__(self, *, memory_storage_client: MemoryStorageClient) -> None:
         self._memory_storage_client = memory_storage_client
 
     @property
-    def _storage_client_cache(self) -> list[KeyValueStoreClient]:
-        return self._memory_storage_client.key_value_stores_handled
+    def _storage_client_cache(self) -> list[DatasetClient]:
+        return self._memory_storage_client.datasets_handled
 
     @override
     async def get_or_create(
@@ -30,11 +30,11 @@ class KeyValueStoreCollectionClient(BaseKeyValueStoreCollectionClient):
         name: str | None = None,
         schema: dict | None = None,
         id: str | None = None,
-    ) -> KeyValueStoreMetadata:
+    ) -> DatasetMetadata:
         resource_client = await get_or_create_inner(
             memory_storage_client=self._memory_storage_client,
             storage_client_cache=self._storage_client_cache,
-            resource_client_class=KeyValueStoreClient,
+            resource_client_class=DatasetClient,
             name=name,
             id=id,
         )
@@ -48,10 +48,10 @@ class KeyValueStoreCollectionClient(BaseKeyValueStoreCollectionClient):
         limit: int | None = None,
         offset: int | None = None,
         desc: bool = False,
-    ) -> KeyValueStoreListPage:
+    ) -> DatasetListPage:
         items = [storage.resource_info for storage in self._storage_client_cache]
 
-        return KeyValueStoreListPage(
+        return DatasetListPage(
             total=len(items),
             count=len(items),
             offset=0,

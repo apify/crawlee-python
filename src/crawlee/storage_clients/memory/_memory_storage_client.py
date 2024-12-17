@@ -11,17 +11,18 @@ from typing import TYPE_CHECKING, TypeVar
 from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
-from crawlee.base_storage_client import BaseStorageClient
 from crawlee.configuration import Configuration
-from crawlee.memory_storage_client._dataset_client import DatasetClient
-from crawlee.memory_storage_client._dataset_collection_client import DatasetCollectionClient
-from crawlee.memory_storage_client._key_value_store_client import KeyValueStoreClient
-from crawlee.memory_storage_client._key_value_store_collection_client import KeyValueStoreCollectionClient
-from crawlee.memory_storage_client._request_queue_client import RequestQueueClient
-from crawlee.memory_storage_client._request_queue_collection_client import RequestQueueCollectionClient
+from crawlee.storage_clients.base import BaseStorageClient
+
+from ._dataset_client import DatasetClient
+from ._dataset_collection_client import DatasetCollectionClient
+from ._key_value_store_client import KeyValueStoreClient
+from ._key_value_store_collection_client import KeyValueStoreCollectionClient
+from ._request_queue_client import RequestQueueClient
+from ._request_queue_collection_client import RequestQueueCollectionClient
 
 if TYPE_CHECKING:
-    from crawlee.base_storage_client._types import ResourceClient
+    from crawlee.storage_clients.base._types import ResourceClient
 
 
 TResourceClient = TypeVar('TResourceClient', DatasetClient, KeyValueStoreClient, RequestQueueClient)

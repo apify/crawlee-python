@@ -12,7 +12,8 @@ if TYPE_CHECKING:
     from httpx import Response
 
     from crawlee._types import JsonSerializable
-    from crawlee.base_storage_client._models import DatasetItemsListPage, DatasetMetadata
+
+    from ._models import DatasetItemsListPage, DatasetMetadata
 
 
 @docs_group('Abstract classes')

@@ -241,8 +241,8 @@ def test_import_error_handled() -> None:
     # Simulate ImportError for parsel
     with mock.patch.dict('sys.modules', {'parsel': None}):
         # Invalidate ParselCrawler import
-        sys.modules.pop('crawlee.parsel_crawler', None)
-        sys.modules.pop('crawlee.parsel_crawler._parsel_crawler', None)
+        sys.modules.pop('crawlee.crawlers.parsel', None)
+        sys.modules.pop('crawlee.crawlers.parsel._parsel_crawler', None)
 
         with pytest.raises(ImportError) as import_error:
             from crawlee.crawlers.parsel import ParselCrawler  # noqa: F401

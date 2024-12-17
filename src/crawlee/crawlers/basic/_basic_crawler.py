@@ -51,14 +51,14 @@ if TYPE_CHECKING:
     from contextlib import AbstractAsyncContextManager
 
     from crawlee._types import ConcurrencySettings, HttpMethod, JsonSerializable
-    from crawlee.base_storage_client import BaseStorageClient
-    from crawlee.base_storage_client._models import DatasetItemsListPage
     from crawlee.configuration import Configuration
     from crawlee.events._event_manager import EventManager
     from crawlee.http_clients import BaseHttpClient, HttpResponse
     from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
     from crawlee.sessions import Session
     from crawlee.statistics import FinalStatistics, StatisticsState
+    from crawlee.storage_clients.base import BaseStorageClient
+    from crawlee.storage_clients.base._models import DatasetItemsListPage
     from crawlee.storages._dataset import ExportDataCsvKwargs, ExportDataJsonKwargs, GetDataKwargs, PushDataKwargs
     from crawlee.storages._request_provider import RequestProvider
 

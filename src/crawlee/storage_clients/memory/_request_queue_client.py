@@ -19,29 +19,28 @@ from crawlee._utils.data_processing import (
 )
 from crawlee._utils.file import force_remove, force_rename, json_dumps
 from crawlee._utils.requests import unique_key_to_request_id
-from crawlee.base_storage_client import BaseRequestQueueClient
-from crawlee.base_storage_client._models import (
+from crawlee.storage_clients.base import (
+    BaseRequestQueueClient,
     BatchRequestsOperationResponse,
     InternalRequest,
     ProcessedRequest,
     ProlongRequestLockResponse,
-    Request,
     RequestQueueHead,
     RequestQueueHeadWithLocks,
     RequestQueueMetadata,
     UnprocessedRequest,
 )
-from crawlee.memory_storage_client._creation_management import (
-    find_or_create_client_by_id_or_name_inner,
-    persist_metadata_if_enabled,
-)
+
+from ._creation_management import find_or_create_client_by_id_or_name_inner, persist_metadata_if_enabled
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from sortedcontainers import SortedDict
 
-    from crawlee.memory_storage_client import MemoryStorageClient
+    from crawlee import Request
+
+    from ._memory_storage_client import MemoryStorageClient
 
 logger = getLogger(__name__)
 
