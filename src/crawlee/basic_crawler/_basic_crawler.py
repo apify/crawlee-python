@@ -304,7 +304,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._abort_on_error = abort_on_error
 
         self._unexpected_stop = False
-        self._unexpected_stop_reason = ''
 
     @property
     def log(self) -> logging.Logger:
@@ -340,7 +339,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
             reason: Reason for stopping that will be used in logs.
         """
         self._logger.info(f'Crawler.stop() was called with following reason: {reason}.')
-        self._unexpected_stop_reason = reason
         self._unexpected_stop = True
 
     def _stop_if_max_requests_count_exceeded(self) -> None:
