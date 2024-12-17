@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 if TYPE_CHECKING:
-    from crawlee.memory_storage_client import MemoryStorageClient
-    from crawlee.memory_storage_client._dataset_client import DatasetClient
+    from crawlee.storage_clients.memory import MemoryStorageClient
+    from crawlee.storage_clients.memory._dataset_client import DatasetClient
 
 
 @pytest.fixture

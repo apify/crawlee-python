@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from unittest import mock
 
 from crawlee import Glob, Request
+from crawlee.crawlers.playwright import PlaywrightCrawler
 from crawlee.fingerprint_suite._consts import (
     PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA,
     PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_MOBILE,
@@ -16,13 +17,12 @@ from crawlee.fingerprint_suite._consts import (
     PW_CHROMIUM_HEADLESS_DEFAULT_USER_AGENT,
     PW_FIREFOX_HEADLESS_DEFAULT_USER_AGENT,
 )
-from crawlee.playwright_crawler import PlaywrightCrawler
 from crawlee.storages import RequestList
 
 if TYPE_CHECKING:
     from yarl import URL
 
-    from crawlee.playwright_crawler import PlaywrightCrawlingContext
+    from crawlee.crawlers.playwright import PlaywrightCrawlingContext
 
 
 async def test_basic_request(httpbin: URL) -> None:

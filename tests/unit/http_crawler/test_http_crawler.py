@@ -10,9 +10,9 @@ import respx
 from httpx import Response
 
 from crawlee._request import Request
+from crawlee.crawlers.http import HttpCrawler
 from crawlee.http_clients._httpx import HttpxHttpClient
 from crawlee.http_clients.curl_impersonate import CurlImpersonateHttpClient
-from crawlee.http_crawler import HttpCrawler
 from crawlee.sessions import SessionPool
 from crawlee.storages import RequestList
 
@@ -22,8 +22,8 @@ if TYPE_CHECKING:
     from yarl import URL
 
     from crawlee._types import BasicCrawlingContext
+    from crawlee.crawlers.http import HttpCrawlingContext
     from crawlee.http_clients._base import BaseHttpClient
-    from crawlee.http_crawler import HttpCrawlingContext
 
 # Payload, e.g. data for a form submission.
 PAYLOAD = {

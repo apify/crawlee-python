@@ -18,8 +18,8 @@ import pytest
 from crawlee import ConcurrencySettings, EnqueueStrategy, Glob
 from crawlee._request import BaseRequestData, Request
 from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpHeaders
-from crawlee.basic_crawler import BasicCrawler
 from crawlee.configuration import Configuration
+from crawlee.crawlers.basic import BasicCrawler
 from crawlee.errors import SessionError, UserDefinedErrorHandlerError
 from crawlee.statistics import FinalStatistics
 from crawlee.storages import Dataset, KeyValueStore, RequestList, RequestQueue

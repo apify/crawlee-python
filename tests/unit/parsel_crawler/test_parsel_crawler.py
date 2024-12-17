@@ -10,13 +10,13 @@ from httpx import Response
 
 from crawlee import ConcurrencySettings
 from crawlee._request import BaseRequestData
-from crawlee.parsel_crawler import ParselCrawler
+from crawlee.crawlers.parsel import ParselCrawler
 from crawlee.storages import RequestList
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
-    from crawlee.parsel_crawler import ParselCrawlingContext
+    from crawlee.crawlers.parsel import ParselCrawlingContext
 
 
 @pytest.fixture
@@ -241,11 +241,11 @@ def test_import_error_handled() -> None:
     # Simulate ImportError for parsel
     with mock.patch.dict('sys.modules', {'parsel': None}):
         # Invalidate ParselCrawler import
-        sys.modules.pop('crawlee.parsel_crawler', None)
-        sys.modules.pop('crawlee.parsel_crawler._parsel_crawler', None)
+        sys.modules.pop('crawlee.crawlers.parsel', None)
+        sys.modules.pop('crawlee.crawlers.parsel._parsel_crawler', None)
 
         with pytest.raises(ImportError) as import_error:
-            from crawlee.parsel_crawler import ParselCrawler  # noqa: F401
+            from crawlee.crawlers.parsel import ParselCrawler  # noqa: F401
 
     # Check if the raised ImportError contains the expected message
     assert str(import_error.value) == (

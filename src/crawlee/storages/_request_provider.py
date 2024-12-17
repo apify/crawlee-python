@@ -10,7 +10,7 @@ from crawlee._utils.docs import docs_group
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from crawlee.base_storage_client._models import ProcessedRequest
+    from crawlee.storage_clients.base import ProcessedRequest
 
 
 @docs_group('Abstract classes')

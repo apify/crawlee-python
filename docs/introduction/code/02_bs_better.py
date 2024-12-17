@@ -1,7 +1,7 @@
 import asyncio
 
 # You don't need to import RequestQueue anymore.
-from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
+from crawlee.crawlers.beautifulsoup import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 
 
 async def main() -> None:

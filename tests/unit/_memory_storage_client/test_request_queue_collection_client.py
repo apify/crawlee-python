@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 if TYPE_CHECKING:
-    from crawlee.memory_storage_client import MemoryStorageClient
-    from crawlee.memory_storage_client._request_queue_collection_client import RequestQueueCollectionClient
+    from crawlee.storage_clients.memory import MemoryStorageClient
+    from crawlee.storage_clients.memory._request_queue_collection_client import RequestQueueCollectionClient
 
 
 @pytest.fixture

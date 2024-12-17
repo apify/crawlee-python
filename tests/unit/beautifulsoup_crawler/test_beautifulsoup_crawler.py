@@ -8,7 +8,7 @@ import respx
 from httpx import Response
 
 from crawlee import ConcurrencySettings
-from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
+from crawlee.crawlers.beautifulsoup import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 from crawlee.storages import RequestList
 
 if TYPE_CHECKING:

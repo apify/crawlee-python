@@ -1,6 +1,6 @@
 import asyncio
 
-from crawlee.playwright_crawler import PlaywrightCrawler
+from crawlee.crawlers.playwright import PlaywrightCrawler
 
 from .routes import router
 
