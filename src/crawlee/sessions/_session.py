@@ -207,8 +207,7 @@ class Session:
         Returns:
             True if the session should be retired, False otherwise.
         """
-        blocked_status_codes = self._blocked_status_codes | (additional_blocked_status_codes or set())
+        if additional_blocked_status_codes and status_code in additional_blocked_status_codes:
+            return True
 
-        blocked_status_codes = blocked_status_codes - (ignore_http_error_status_codes or set())
-
-        return status_code in blocked_status_codes
+        return status_code in (self._blocked_status_codes - (ignore_http_error_status_codes or set()))
