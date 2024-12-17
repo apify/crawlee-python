@@ -947,7 +947,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         if self._unexpected_stop:
             self._logger.info(
                 'No new requests are allowed because crawler `stop` method was called. '
-                'Ongoing requests will be allowed to complete. '
+                'Ongoing requests will be allowed to complete.'
             )
             return False
 

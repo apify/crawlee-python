@@ -991,7 +991,7 @@ async def test_crawler_multiple_stops_in_parallel(httpbin: URL) -> None:
         # Second request will have some sleep time to make sure it is still being processed after crawler.stop() was
         # called from the first request and so the crawler is already shutting down.
         await asyncio.sleep(next(sleep_time_generator))
-        crawler.stop(reason=f'Stop called on  {context.request.url}')
+        crawler.stop(reason=f'Stop called on {context.request.url}')
 
     stats = await crawler.run(start_urls)
 
