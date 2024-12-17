@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import re
 
+# Tags based on Javascript implementation of text_to_html from:
+# https://github.com/apify/crawlee/blob/master/packages/utils/src/internals/cheerio.ts#L11
+# Originally added here: https://github.com/apify/apify-ts/commit/4c0e5e3e7377536a449bb7b205132348ad3b0fe9
 SKIP_TAGS = {'script', 'style', 'canvas', 'svg', 'noscript', 'title'}
 BLOCK_TAGS = {
     'p',

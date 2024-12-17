@@ -8,6 +8,7 @@ from parsel import Selector
 
 from crawlee.beautifulsoup_crawler._utils import html_to_text as html_to_text_beautifulsoup
 from crawlee.parsel_crawler._utils import html_to_text as html_to_text_parsel
+from crawlee.utils import html_to_text as html_to_text_public
 
 _EXPECTED_TEXT = (
     "Let's start with a simple text. \n"
@@ -132,7 +133,7 @@ But,
 """
 
 
-@pytest.mark.parametrize('html_to_text', [html_to_text_parsel, html_to_text_beautifulsoup])
+@pytest.mark.parametrize('html_to_text', [html_to_text_parsel, html_to_text_beautifulsoup, html_to_text_public])
 @pytest.mark.parametrize(
     ('source', 'expected_text'),
     [
@@ -184,7 +185,7 @@ def test_html_to_text(source: str, expected_text: str, html_to_text: Callable[[s
     assert html_to_text(source) == expected_text
 
 
-@pytest.mark.parametrize('html_to_text', [html_to_text_parsel, html_to_text_beautifulsoup])
+@pytest.mark.parametrize('html_to_text', [html_to_text_parsel, html_to_text_beautifulsoup, html_to_text_public])
 def test_html_to_text_raises_on_wrong_input_type(html_to_text: Callable[[str], str]) -> None:
     with pytest.raises(TypeError):
         html_to_text(1)  # type: ignore[arg-type]  # Intentional wrong type test.
