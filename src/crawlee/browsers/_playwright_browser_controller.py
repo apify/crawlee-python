@@ -133,7 +133,8 @@ class PlaywrightBrowserController(BaseBrowserController):
         return page
 
     async def _inject_fingerprint_to_page(self, page: Page) -> None:
-        await page.evaluate(javascript_stuff, self._fingerprint_generator.generate().dumps())
+        finger_print = self._fingerprint_generator.generate().dumps()
+        ret = await page.evaluate(javascript_stuff, finger_print)
 
     @override
     async def close(self, *, force: bool = False) -> None:

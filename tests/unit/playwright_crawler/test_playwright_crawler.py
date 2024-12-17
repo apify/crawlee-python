@@ -112,7 +112,7 @@ async def test_chromium_headless_headers(httpbin: URL) -> None:
 
 
 async def test_firefox_headless_headers(httpbin: URL) -> None:
-    crawler = PlaywrightCrawler(headless=True, browser_type='firefox')
+    crawler = PlaywrightCrawler(headless=False, browser_type='firefox')
     headers = dict[str, str]()
 
     @crawler.router.default_handler
