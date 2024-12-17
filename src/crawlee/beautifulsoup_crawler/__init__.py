@@ -1,6 +1,4 @@
 try:
-    from crawlee._utils.html_to_text import html_to_text
-
     from ._beautifulsoup_crawler import BeautifulSoupCrawler
     from ._beautifulsoup_crawling_context import BeautifulSoupCrawlingContext
     from ._beautifulsoup_parser import BeautifulSoupParserType
@@ -10,4 +8,4 @@ except ImportError as exc:
         "For example, if you use pip, run `pip install 'crawlee[beautifulsoup]'`.",
     ) from exc
 
-__all__ = ['BeautifulSoupCrawler', 'BeautifulSoupCrawlingContext', 'BeautifulSoupParserType', 'html_to_text']
+__all__ = ['BeautifulSoupCrawler', 'BeautifulSoupCrawlingContext', 'BeautifulSoupParserType']

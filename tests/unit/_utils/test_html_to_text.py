@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from typing import Callable
+
 import pytest
 from bs4 import BeautifulSoup
+from parsel import Selector
 
-from crawlee.beautifulsoup_crawler import html_to_text
+from crawlee.beautifulsoup_crawler._utils import html_to_text as html_to_text_beautifulsoup
+from crawlee.parsel_crawler._utils import html_to_text as html_to_text_parsel
 
 _EXPECTED_TEXT = (
     "Let's start with a simple text. \n"
@@ -128,11 +132,11 @@ But,
 """
 
 
+@pytest.mark.parametrize('html_to_text', [html_to_text_parsel, html_to_text_beautifulsoup])
 @pytest.mark.parametrize(
     ('source', 'expected_text'),
     [
         (_EXAMPLE_HTML, _EXPECTED_TEXT),
-        (BeautifulSoup(_EXAMPLE_HTML), _EXPECTED_TEXT),
         ('   Plain    text     node    ', 'Plain text node'),
         ('   \nPlain    text     node  \n  ', 'Plain text node'),
         ('<h1>Header 1</h1> <h2>Header 2</h2>', 'Header 1\nHeader 2'),
@@ -176,10 +180,19 @@ But,
         ('<span>&aacute; &eacute;</span>', 'á é'),
     ],
 )
-def test_html_to_text(source: str | BeautifulSoup, expected_text: str) -> None:
+def test_html_to_text(source: str, expected_text: str, html_to_text: Callable[[str], str]) -> None:
     assert html_to_text(source) == expected_text
 
 
-def test_html_to_text_raises_on_wrong_input_type() -> None:
+@pytest.mark.parametrize('html_to_text', [html_to_text_parsel, html_to_text_beautifulsoup])
+def test_html_to_text_raises_on_wrong_input_type(html_to_text: Callable[[str], str]) -> None:
     with pytest.raises(TypeError):
         html_to_text(1)  # type: ignore[arg-type]  # Intentional wrong type test.
+
+
+def test_html_to_text_parsel() -> None:
+    assert html_to_text_parsel(Selector(_EXAMPLE_HTML)) == _EXPECTED_TEXT
+
+
+def test_html_to_text_beautifulsoup() -> None:
+    assert html_to_text_beautifulsoup(BeautifulSoup(_EXAMPLE_HTML)) == _EXPECTED_TEXT
