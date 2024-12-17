@@ -13,7 +13,7 @@ from crawlee._utils.docs import docs_group
 from crawlee.browsers._base_browser_controller import BaseBrowserController
 from crawlee.browsers._types import BrowserType
 from crawlee.fingerprint_suite import HeaderGenerator
-from crawlee.fingerprint_suite._injected_page_function import javascript_stuff
+from crawlee.fingerprint_suite._injected_page_function import create_init_script_with_fingerprint
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -60,7 +60,7 @@ class PlaywrightBrowserController(BaseBrowserController):
         self._max_open_pages_per_browser = max_open_pages_per_browser
         self._header_generator = header_generator
 
-        fingerprint_generator_options = fingerprint_generator_options or {}
+        fingerprint_generator_options = fingerprint_generator_options or {'slim':True}
         self._fingerprint_generator = fingerprint_generator or FingerprintGenerator(**fingerprint_generator_options)
 
         self._browser_context: BrowserContext | None = None
@@ -134,7 +134,7 @@ class PlaywrightBrowserController(BaseBrowserController):
 
     async def _inject_fingerprint_to_page(self, page: Page) -> None:
         finger_print = self._fingerprint_generator.generate().dumps()
-        ret = await page.evaluate(javascript_stuff, finger_print)
+        await page.add_init_script(create_init_script_with_fingerprint(finger_print))
 
     @override
     async def close(self, *, force: bool = False) -> None:

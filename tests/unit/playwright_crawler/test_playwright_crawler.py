@@ -168,3 +168,33 @@ async def test_pre_navigation_hook(httpbin: URL) -> None:
     await crawler.run(['https://example.com', str(httpbin)])
 
     assert mock_hook.call_count == 2
+
+
+async def test_custom_fingerprint(httpbin: URL) -> None:
+    crawler = PlaywrightCrawler(headless=False, use_fingerprints=True,fingerprint_generator_options={
+        "browser":"edge",
+        "os":"android",
+        "device":"mobile"})
+    response_headers = dict[str, str]()
+    fingerprints = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        response = await context.response.text()
+        context_response_headers = dict(json.loads(response)).get('headers', {})
+
+        for key, val in context_response_headers.items():
+            response_headers[key] = val
+        fingerprints.append(await context.page.evaluate("()=>window.navigator.userAgent"))
+
+
+    await crawler.run([Request.from_url(str(httpbin / 'get'))])
+
+    for fingerprint in fingerprints:
+        assert "EdgA" in fingerprint
+        assert "Android" in fingerprint
+        assert "Mobile" in fingerprint
+
+
+
+

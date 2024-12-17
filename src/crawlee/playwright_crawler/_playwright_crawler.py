@@ -74,6 +74,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
         browser_options: Mapping[str, Any] | None = None,
         page_options: Mapping[str, Any] | None = None,
         headless: bool | None = None,
+        use_fingerprints: bool = True,
+        fingerprint_generator_options: dict[str, Any] | None = None,
         **kwargs: Unpack[BasicCrawlerOptions[PlaywrightCrawlingContext]],
     ) -> None:
         """A default constructor.
@@ -92,6 +94,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 This option should not be used if `browser_pool` is provided.
             headless: Whether to run the browser in headless mode.
                 This option should not be used if `browser_pool` is provided.
+            use_fingerprints: Will inject fingerprints
+            fingerprint_generator_options: Override generated fingerprints with these specific values.
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
         """
         if browser_pool:
@@ -109,6 +113,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 browser_type=browser_type,
                 browser_options=browser_options,
                 page_options=page_options,
+                use_fingerprints=use_fingerprints,
+                fingerprint_generator_options=fingerprint_generator_options,
             )
 
         self._browser_pool = browser_pool
@@ -168,7 +174,6 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
         async with context.page:
             if context.request.headers:
                 await context.page.set_extra_http_headers(context.request.headers.model_dump())
-            # Navigate to the URL and get response.
             response = await context.page.goto(context.request.url)
 
             if response is None:

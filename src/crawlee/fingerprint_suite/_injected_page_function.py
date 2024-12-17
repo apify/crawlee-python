@@ -1,6 +1,7 @@
 # This is function that should set the fingerprint on page object.
-javascript_stuff = r"""
-(fp) =>{
+
+_unclosed_body = r"""
+(() =>{
     const isHeadlessChromium = /headless/i.test(navigator.userAgent) && navigator.plugins.length === 0;
     const isChrome = navigator.userAgent.includes("Chrome");
     const isFirefox = navigator.userAgent.includes("Firefox");
@@ -68,7 +69,7 @@ javascript_stuff = r"""
         },
     }
 
-function useStrictModeExceptions(prop) {
+    function useStrictModeExceptions(prop) {
         if (['caller', 'callee', 'arguments'].includes(prop)) {
             throw TypeError(`'caller', 'callee', and 'arguments' properties may not be accessed on strict mode functions or the arguments objects for calls to them`);
         }
@@ -842,9 +843,7 @@ function useStrictModeExceptions(prop) {
         overrideBattery(battery);
 
     }
-
-
-inject(JSON.parse(fp))
-return window.screen;}
 """
 
+def create_init_script_with_fingerprint(fingerprint: str):
+    return _unclosed_body + f'inject({fingerprint});' + '})()'
