@@ -27,5 +27,5 @@ class ParselCrawlingContext(ParsedHttpCrawlingContext[Selector]):
         return cls(**{field.name: getattr(context, field.name) for field in fields(context)})
 
     def html_to_text(self) -> str:
-        """Converts parsed_content to newline-separated plain text without tags."""
+        """Convert the parsed HTML content to newline-separated plain text without tags."""
         return html_to_text(self.parsed_content)
