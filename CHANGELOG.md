@@ -22,6 +22,7 @@ All notable changes to this project will be documented in this file.
 - Pass `verify` in httpx client ([#802](https://github.com/apify/crawlee-python/pull/802)) ([074d083](https://github.com/apify/crawlee-python/commit/074d0836b55e52f13726e7cd1c21602623fda4fc)) by [@Mantisus](https://github.com/Mantisus), closes [#798](https://github.com/apify/crawlee-python/issues/798)
 - Fix `page_options` for `PlaywrightBrowserPlugin` ([#796](https://github.com/apify/crawlee-python/pull/796)) ([bd3bdd4](https://github.com/apify/crawlee-python/commit/bd3bdd4046c2ddea62feb77322033cad50f382dd)) by [@Mantisus](https://github.com/Mantisus), closes [#755](https://github.com/apify/crawlee-python/issues/755)
 - Fix event migrating handler in `RequestQueue` ([#825](https://github.com/apify/crawlee-python/pull/825)) ([fd6663f](https://github.com/apify/crawlee-python/commit/fd6663f903bc7eecd1000da89e06197b43dfb962)) by [@Mantisus](https://github.com/Mantisus), closes [#815](https://github.com/apify/crawlee-python/issues/815)
+- Respect user configuration for work with status codes ([#812](https://github.com/apify/crawlee-python/pull/812)) ([8daf4bd](https://github.com/apify/crawlee-python/commit/8daf4bd49c1b09a0924f827daedebf7600ac609b)) by [@Mantisus](https://github.com/Mantisus), closes [#708](https://github.com/apify/crawlee-python/issues/708), [#756](https://github.com/apify/crawlee-python/issues/756)
 
 ### Refactor
 
