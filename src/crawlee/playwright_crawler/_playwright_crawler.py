@@ -14,9 +14,7 @@ from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipe
 from crawlee.browsers import BrowserPool
 from crawlee.errors import SessionError
 from crawlee.playwright_crawler._playwright_crawling_context import PlaywrightCrawlingContext
-from crawlee.playwright_crawler._playwright_pre_navigation_crawling_context import (
-    PlaywrightPreNavigationCrawlingContext,
-)
+from crawlee.playwright_crawler._playwright_pre_nav_crawling_context import PlaywrightPreNavCrawlingContext
 from crawlee.playwright_crawler._utils import infinite_scroll
 
 if TYPE_CHECKING:
@@ -121,21 +119,21 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
         )
         kwargs['_additional_context_managers'] = [self._browser_pool]
         kwargs.setdefault('_logger', logging.getLogger(__name__))
-        self._pre_navigation_hooks: list[Callable[[PlaywrightPreNavigationCrawlingContext], Awaitable[None]]] = []
+        self._pre_navigation_hooks: list[Callable[[PlaywrightPreNavCrawlingContext], Awaitable[None]]] = []
 
         super().__init__(**kwargs)
 
     async def _open_page(
         self,
         context: BasicCrawlingContext,
-    ) -> AsyncGenerator[PlaywrightPreNavigationCrawlingContext, None]:
+    ) -> AsyncGenerator[PlaywrightPreNavCrawlingContext, None]:
         if self._browser_pool is None:
             raise ValueError('Browser pool is not initialized.')
 
         # Create a new browser page
         crawlee_page = await self._browser_pool.new_page(proxy_info=context.proxy_info)
 
-        pre_navigation_context = PlaywrightPreNavigationCrawlingContext(
+        pre_navigation_context = PlaywrightPreNavCrawlingContext(
             request=context.request,
             session=context.session,
             add_requests=context.add_requests,
@@ -155,7 +153,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
 
     async def _navigate(
         self,
-        context: PlaywrightPreNavigationCrawlingContext,
+        context: PlaywrightPreNavCrawlingContext,
     ) -> AsyncGenerator[PlaywrightCrawlingContext, None]:
         """Executes an HTTP request utilizing the `BrowserPool` and the `Playwright` library.
 
@@ -276,7 +274,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
 
         yield context
 
-    def pre_navigation_hook(self, hook: Callable[[PlaywrightPreNavigationCrawlingContext], Awaitable[None]]) -> None:
+    def pre_navigation_hook(self, hook: Callable[[PlaywrightPreNavCrawlingContext], Awaitable[None]]) -> None:
         """Register a hook to be called before each navigation.
 
         Args:

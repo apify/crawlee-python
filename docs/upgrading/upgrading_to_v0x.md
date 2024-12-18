@@ -28,7 +28,7 @@ This section summarizes the breaking changes between v0.4.x and v0.5.0.
 
 ### PlaywrightCrawler
 
-- The `PlaywrightPreNavigationContext` was renamed to `PlaywrightPreNavigationCrawlingContext`.
+- The `PlaywrightPreNavigationContext` was renamed to `PlaywrightPreNavCrawlingContext`.
 
 ## Upgrading to v0.4
 
