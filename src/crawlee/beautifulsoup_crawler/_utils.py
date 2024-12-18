@@ -18,7 +18,14 @@ if TYPE_CHECKING:
 
 
 def html_to_text(source: str | BeautifulSoup) -> str:
-    """Converts markup string or `BeautifulSoup` to newline separated plain text without tags using BeautifulSoup."""
+    """Converts markup string or `BeautifulSoup` to newline separated plain text without tags using BeautifulSoup.
+
+    Args:
+        source: Input markup string or `BeautifulSoup` object.
+
+    Returns:
+        Newline separated plain text without tags.
+    """
     if isinstance(source, str):
         soup = BeautifulSoup(source)
     elif isinstance(source, BeautifulSoup):

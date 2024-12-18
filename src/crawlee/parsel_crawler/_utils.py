@@ -14,7 +14,14 @@ from crawlee._utils.html_to_text import (
 
 
 def html_to_text(source: str | Selector) -> str:
-    """Converts markup string or `Selector` to newline-separated plain text without tags using Parsel."""
+    """Converts markup string or `Selector` to newline-separated plain text without tags using Parsel.
+
+    Args:
+        source: Input markup string or `Selector` object.
+
+    Returns:
+        Newline separated plain text without tags.
+    """
     if isinstance(source, str):
         selector = Selector(text=source)
     elif isinstance(source, Selector):
