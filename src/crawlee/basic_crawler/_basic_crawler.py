@@ -1074,7 +1074,16 @@ class BasicCrawler(Generic[TCrawlingContext]):
     async def __run_request_handler(self, context: BasicCrawlingContext) -> None:
         await self._context_pipeline(context, self.router)
 
-    def _is_blocked_status_code(self, session: Session | None, status_code: int) -> bool:
+    def _is_session_blocked_status_code(self, session: Session | None, status_code: int) -> bool:
+        """Check if the HTTP status code indicates that the session was blocked by the target website.
+
+        Args:
+            session: The session used for the request. If None, the method always returns False.
+            status_code: The HTTP status code to check.
+
+        Returns:
+            True if the status code indicates the session was blocked, False otherwise.
+        """
         return session is not None and session.is_blocked_status_code(
             status_code=status_code,
             additional_blocked_status_codes=self._http_client.additional_blocked_status_codes,
