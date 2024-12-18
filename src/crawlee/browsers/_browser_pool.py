@@ -68,8 +68,8 @@ class BrowserPool:
             close_inactive_browsers_interval: The interval at which the pool checks for inactive browsers
                 and closes them. The browser is considered as inactive if it has no active pages and has been idle
                 for the specified period.
-            use_fingerprints: Will inject fingerprints
-            fingerprint_generator_options: Override generated fingerprints with these specific values.
+            use_fingerprints: Inject generated fingerprints to page.
+            fingerprint_generator_options: Override generated fingerprints with these specific values, if possible.
         """
         self._plugins = plugins or [PlaywrightBrowserPlugin()]
         self._operation_timeout = operation_timeout
@@ -110,7 +110,7 @@ class BrowserPool:
         browser_options: Mapping[str, Any] | None = None,
         page_options: Mapping[str, Any] | None = None,
         headless: bool | None = None,
-        use_fingerprints: bool = True,
+        use_fingerprints: bool = False,
         fingerprint_generator_options: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> BrowserPool:
@@ -125,8 +125,8 @@ class BrowserPool:
                 Playwright's `browser_context.new_page` method. For more details, refer to the Playwright documentation:
                 https://playwright.dev/python/docs/api/class-browsercontext#browser-context-new-page.
             headless: Whether to run the browser in headless mode.
-            use_fingerprints: Will inject fingerprints
-            fingerprint_generator_options: Override generated fingerprints with these specific values.
+            use_fingerprints: Inject generated fingerprints to page.
+            fingerprint_generator_options: Override generated fingerprints with these specific values, if possible.
             kwargs: Additional arguments for default constructor.
         """
         plugin_options: dict = defaultdict(dict)

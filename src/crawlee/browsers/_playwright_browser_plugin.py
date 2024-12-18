@@ -53,8 +53,8 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
                 https://playwright.dev/python/docs/api/class-browsercontext#browser-context-new-page.
             max_open_pages_per_browser: The maximum number of pages that can be opened in a single browser instance.
                 Once reached, a new browser instance will be launched to handle the excess.
-            use_fingerprints: Will inject fingerprints
-            fingerprint_generator_options: Override generated fingerprints with these specific values.
+            use_fingerprints: Inject generated fingerprints to page.
+            fingerprint_generator_options: Override generated fingerprints with these specific values, if possible.
 
         """
         self._browser_type = browser_type

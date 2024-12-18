@@ -51,8 +51,8 @@ class PlaywrightBrowserController(BaseBrowserController):
             header_generator: An optional `HeaderGenerator` instance used to generate and manage HTTP headers for
                 requests made by the browser. By default, a predefined header generator is used. Set to `None` to
                 disable automatic header modifications.
-            use_fingerprints: Will inject fingerprints
-            fingerprint_generator_options: Override generated fingerprints with these specific values.
+            use_fingerprints: Inject generated fingerprints to page.
+            fingerprint_generator_options: Override generated fingerprints with these specific values, if possible.
         """
         self._browser = browser
         self._max_open_pages_per_browser = max_open_pages_per_browser
@@ -157,7 +157,19 @@ class PlaywrightBrowserController(BaseBrowserController):
 
     async def _set_fingerprint(self) -> None:
         if self._use_fingerprints and not self._fingerprint:
-            self._fingerprint = self._fingerprint_generator.generate()
+            while fingerprint := self._fingerprint_generator.generate():
+                if self._is_good_fingerprint(fingerprint):
+                    break
+            self._fingerprint = fingerprint
+
+    @staticmethod
+    def _is_good_fingerprint(fingerprint: Fingerprint) -> bool:
+        """Check if fingerprint is ok to use.
+
+        By trial and error it was found out that some generated fingerprints are not working well.
+        All fingerprints that were not working well had 'Te': 'trailers' in headers.
+        """
+        return fingerprint.headers.get('Te', '') != 'trailers'
 
     def _get_fingerprint(self) -> Fingerprint:
         if not self._use_fingerprints:

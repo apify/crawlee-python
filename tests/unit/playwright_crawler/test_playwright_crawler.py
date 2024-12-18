@@ -86,7 +86,7 @@ async def test_nonexistent_url_invokes_error_handler() -> None:
 
 
 async def test_chromium_headless_headers(httpbin: URL) -> None:
-    crawler = PlaywrightCrawler(headless=True, browser_type='chromium', use_fingerprints=False)
+    crawler = PlaywrightCrawler(headless=True, browser_type='chromium')
     headers = dict[str, str]()
 
     @crawler.router.default_handler
@@ -114,7 +114,7 @@ async def test_chromium_headless_headers(httpbin: URL) -> None:
 
 
 async def test_firefox_headless_headers(httpbin: URL) -> None:
-    crawler = PlaywrightCrawler(headless=False, browser_type='firefox', use_fingerprints=False)
+    crawler = PlaywrightCrawler(headless=False, browser_type='firefox')
     headers = dict[str, str]()
 
     @crawler.router.default_handler
@@ -179,11 +179,15 @@ async def test_custom_fingerprint_uses_generator_options(httpbin: URL) -> None:
     max_height = 1200
     crawler = PlaywrightCrawler(
         headless=True,
-        use_fingerprints=True,
-        fingerprint_generator_options={
-            'browser': 'edge',
-            'os': 'android',
-            'screen': Screen(min_width=min_width, max_width=max_width, min_height=min_height, max_height=max_height),
+        browser_pool_options={
+            'use_fingerprints': True,
+            'fingerprint_generator_options': {
+                'browser': 'edge',
+                'os': 'android',
+                'screen': Screen(
+                    min_width=min_width, max_width=max_width, min_height=min_height, max_height=max_height
+                ),
+            },
         },
     )
 
@@ -217,7 +221,7 @@ async def test_custom_fingerprint_uses_generator_options(httpbin: URL) -> None:
 async def test_custom_fingerprint_matches_header_user_agent(httpbin: URL) -> None:
     """Test that generated fingerprint and header have matching user agent."""
 
-    crawler = PlaywrightCrawler(headless=True, use_fingerprints=True)
+    crawler = PlaywrightCrawler(headless=True, browser_pool_options={'use_fingerprints': True})
     response_headers = dict[str, str]()
     fingerprints = dict[str, str]()
 
