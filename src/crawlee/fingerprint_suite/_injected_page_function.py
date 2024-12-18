@@ -1,7 +1,7 @@
 # This is function that should set the fingerprint on page object.
 
-_unclosed_body = r"""
-(() =>{
+_js_function = r"""
+((fp) =>{
     const isHeadlessChromium = /headless/i.test(navigator.userAgent) && navigator.plugins.length === 0;
     const isChrome = navigator.userAgent.includes("Chrome");
     const isFirefox = navigator.userAgent.includes("Firefox");
@@ -843,7 +843,9 @@ _unclosed_body = r"""
         overrideBattery(battery);
 
     }
+return inject(fp);
+})
 """
 
 def create_init_script_with_fingerprint(fingerprint: str):
-    return _unclosed_body + f'inject({fingerprint});' + '})()'
+    return _js_function + f'({fingerprint})'
