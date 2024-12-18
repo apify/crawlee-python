@@ -1,5 +1,5 @@
-# This is function that should set the fingerprint on page object.
-
+# flake8: noqa
+# No formating check on injected JS code.
 _js_function = r"""
 ((fp) =>{
     const isHeadlessChromium = /headless/i.test(navigator.userAgent) && navigator.plugins.length === 0;
@@ -847,5 +847,7 @@ return inject(fp);
 })
 """
 
-def create_init_script_with_fingerprint(fingerprint: str):
+
+def create_init_script_with_fingerprint(fingerprint: str) -> str:
+    """Create string that contains Javascript function call that will set fingerprints in page."""
     return _js_function + f'({fingerprint})'

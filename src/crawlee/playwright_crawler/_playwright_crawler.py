@@ -74,6 +74,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
         browser_options: Mapping[str, Any] | None = None,
         page_options: Mapping[str, Any] | None = None,
         headless: bool | None = None,
+        *,
         use_fingerprints: bool = True,
         fingerprint_generator_options: dict[str, Any] | None = None,
         **kwargs: Unpack[BasicCrawlerOptions[PlaywrightCrawlingContext]],
