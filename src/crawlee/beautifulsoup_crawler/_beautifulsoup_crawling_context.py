@@ -5,6 +5,7 @@ from typing_extensions import Self
 
 from crawlee._utils.docs import docs_group
 from crawlee.abstract_http_crawler._http_crawling_context import ParsedHttpCrawlingContext
+from crawlee.beautifulsoup_crawler._utils import html_to_text
 
 
 @dataclass(frozen=True)
@@ -24,3 +25,7 @@ class BeautifulSoupCrawlingContext(ParsedHttpCrawlingContext[BeautifulSoup]):
     def from_parsed_http_crawling_context(cls, context: ParsedHttpCrawlingContext[BeautifulSoup]) -> Self:
         """Convenience constructor that creates new context from existing `ParsedHttpCrawlingContext[BeautifulSoup]`."""
         return cls(**{field.name: getattr(context, field.name) for field in fields(context)})
+
+    def html_to_text(self) -> str:
+        """Convert the parsed HTML content to newline-separated plain text without tags."""
+        return html_to_text(self.parsed_content)
