@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - Add example of how to integrate Camoufox into PlaywrightCrawler ([#789](https://github.com/apify/crawlee-python/pull/789)) ([246cfc4](https://github.com/apify/crawlee-python/commit/246cfc4ebc8bce1d15e1dddd62d652bd65869328)) by [@Pijukatel](https://github.com/Pijukatel), closes [#684](https://github.com/apify/crawlee-python/issues/684)
 - Expose event types, improve on&#x2F;emit signature, allow parameterless listeners ([#800](https://github.com/apify/crawlee-python/pull/800)) ([c102c4c](https://github.com/apify/crawlee-python/commit/c102c4c894a00b09adfd5f4911563c81cf3e98b4)) by [@janbuchar](https://github.com/janbuchar), closes [#561](https://github.com/apify/crawlee-python/issues/561)
 - Add stop method to BasicCrawler ([#807](https://github.com/apify/crawlee-python/pull/807)) ([6d01af4](https://github.com/apify/crawlee-python/commit/6d01af4231d02b4349a8719f5ed18d812843fde5)) by [@Pijukatel](https://github.com/Pijukatel), closes [#651](https://github.com/apify/crawlee-python/issues/651)
+- Add `html_to_text` helper function ([#792](https://github.com/apify/crawlee-python/pull/792)) ([2b9d970](https://github.com/apify/crawlee-python/commit/2b9d97009dd653870681bb3cadbb46b214ff1a73)) by [@Pijukatel](https://github.com/Pijukatel), closes [#659](https://github.com/apify/crawlee-python/issues/659)
 
 ### 🐛 Bug Fixes
 
