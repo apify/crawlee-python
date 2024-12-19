@@ -94,11 +94,11 @@ class PlaywrightBrowserController(BaseBrowserController):
     @override
     async def new_page(
         self,
-        page_options: Mapping[str, Any] | None = None,
+        browser_new_context_options: Mapping[str, Any] | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> Page:
         if not self._browser_context:
-            self._browser_context = await self._create_browser_context(page_options, proxy_info)
+            self._browser_context = await self._create_browser_context(browser_new_context_options, proxy_info)
 
         if not self.has_free_capacity:
             raise ValueError('Cannot open more pages in this browser.')
@@ -116,13 +116,11 @@ class PlaywrightBrowserController(BaseBrowserController):
 
     @override
     async def close(self, *, force: bool = False) -> None:
-        if force:
-            for page in self._pages:
-                await page.close()
-
-        if self.pages_count > 0:
+        if self.pages_count > 0 and not force:
             raise ValueError('Cannot close the browser while there are open pages.')
 
+        if self._browser_context:
+            await self._browser_context.close()
         await self._browser.close()
 
     def _on_page_close(self, page: Page) -> None:

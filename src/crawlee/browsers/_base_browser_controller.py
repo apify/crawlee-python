@@ -59,13 +59,13 @@ class BaseBrowserController(ABC):
     @abstractmethod
     async def new_page(
         self,
-        page_options: Mapping[str, Any] | None = None,
+        browser_new_context_options: Mapping[str, Any] | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> Page:
         """Create a new page with the given context options.
 
         Args:
-            page_options: Options to configure the new page.
+            browser_new_context_options: Options to configure the new context used for creating new page.
             proxy_info: The proxy configuration to use for the new page.
 
         Returns:

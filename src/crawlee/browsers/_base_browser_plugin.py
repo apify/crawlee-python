@@ -35,13 +35,13 @@ class BaseBrowserPlugin(ABC):
 
     @property
     @abstractmethod
-    def browser_options(self) -> Mapping[str, Any]:
-        """Return the options for a new browser."""
+    def browser_launch_options(self) -> Mapping[str, Any]:
+        """Return the options for the `browser.launch` method."""
 
     @property
     @abstractmethod
-    def page_options(self) -> Mapping[str, Any]:
-        """Return the options for a new page."""
+    def browser_new_context_options(self) -> Mapping[str, Any]:
+        """Return the options for the `browser.new_context` method."""
 
     @property
     @abstractmethod
