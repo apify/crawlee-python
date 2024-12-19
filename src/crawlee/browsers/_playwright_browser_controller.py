@@ -20,6 +20,10 @@ if TYPE_CHECKING:
 
     from crawlee.proxy_configuration import ProxyInfo
 
+from logging import getLogger
+
+logger = getLogger(__name__)
+
 
 @docs_group('Classes')
 class PlaywrightBrowserController(BaseBrowserController):
@@ -94,11 +98,25 @@ class PlaywrightBrowserController(BaseBrowserController):
     @override
     async def new_page(
         self,
-        page_options: Mapping[str, Any] | None = None,
+        browser_new_context_options: Mapping[str, Any] | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> Page:
+        """Create a new page with the given context options.
+
+        Args:
+            browser_new_context_options: Keyword arguments to pass to the browser new context method. These options
+                are provided directly to Playwright's `browser.new_context` method. For more details, refer to the
+                Playwright documentation: https://playwright.dev/python/docs/api/class-browser#browser-new-context.
+            proxy_info: The proxy configuration to use for the new page.
+
+        Returns:
+            Page: The newly created page.
+
+        Raises:
+            ValueError: If the browser has reached the maximum number of open pages.
+        """
         if not self._browser_context:
-            self._browser_context = await self._create_browser_context(page_options, proxy_info)
+            self._browser_context = await self._create_browser_context(browser_new_context_options, proxy_info)
 
         if not self.has_free_capacity:
             raise ValueError('Cannot open more pages in this browser.')
@@ -116,13 +134,19 @@ class PlaywrightBrowserController(BaseBrowserController):
 
     @override
     async def close(self, *, force: bool = False) -> None:
-        if force:
-            for page in self._pages:
-                await page.close()
+        """Close the browser.
 
-        if self.pages_count > 0:
+        Args:
+            force: Whether to force close all open pages before closing the browser.
+
+        Raises:
+            ValueError: If there are still open pages when trying to close the browser.
+        """
+        if self.pages_count > 0 and not force:
             raise ValueError('Cannot close the browser while there are open pages.')
 
+        if self._browser_context:
+            await self._browser_context.close()
         await self._browser.close()
 
     def _on_page_close(self, page: Page) -> None:
@@ -130,7 +154,7 @@ class PlaywrightBrowserController(BaseBrowserController):
         self._pages.remove(page)
 
     async def _create_browser_context(
-        self, page_options: Mapping[str, Any] | None = None, proxy_info: ProxyInfo | None = None
+        self, browser_new_context_options: Mapping[str, Any] | None = None, proxy_info: ProxyInfo | None = None
     ) -> BrowserContext:
         """Create a new browser context with the specified proxy settings."""
         if self._header_generator:
@@ -141,17 +165,19 @@ class PlaywrightBrowserController(BaseBrowserController):
         else:
             extra_http_headers = None
 
-        page_options = dict(page_options) if page_options else {}
-        page_options['extra_http_headers'] = page_options.get('extra_http_headers', extra_http_headers)
+        browser_new_context_options = dict(browser_new_context_options) if browser_new_context_options else {}
+        browser_new_context_options['extra_http_headers'] = browser_new_context_options.get(
+            'extra_http_headers', extra_http_headers
+        )
 
-        proxy = (
-            ProxySettings(
+        if proxy_info:
+            if browser_new_context_options['proxy']:
+                logger.warning("browser_new_context_options['proxy'] overriden by explicit `proxy_info` argument.")
+
+            browser_new_context_options['proxy'] = ProxySettings(
                 server=f'{proxy_info.scheme}://{proxy_info.hostname}:{proxy_info.port}',
                 username=proxy_info.username,
                 password=proxy_info.password,
             )
-            if proxy_info
-            else None
-        )
 
-        return await self._browser.new_context(proxy=proxy, **page_options)
+        return await self._browser.new_context(**browser_new_context_options)
