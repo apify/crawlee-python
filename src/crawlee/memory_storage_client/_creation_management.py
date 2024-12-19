@@ -6,7 +6,6 @@ import mimetypes
 import os
 import pathlib
 from datetime import datetime, timezone
-from decimal import Decimal
 from logging import getLogger
 from typing import TYPE_CHECKING
 
@@ -15,10 +14,10 @@ from crawlee._utils.data_processing import maybe_parse_body
 from crawlee._utils.file import json_dumps
 from crawlee.base_storage_client._models import (
     DatasetMetadata,
+    InternalRequest,
     KeyValueStoreMetadata,
     KeyValueStoreRecord,
     KeyValueStoreRecordMetadata,
-    Request,
     RequestQueueMetadata,
 )
 
@@ -358,7 +357,7 @@ def create_rq_from_directory(
         pending_request_count = resource_info.pending_request_count
 
     # Load request entries
-    entries: dict[str, Request] = {}
+    entries: dict[str, InternalRequest] = {}
 
     for entry in os.scandir(storage_directory):
         if entry.is_file():
@@ -368,10 +367,7 @@ def create_rq_from_directory(
             with open(os.path.join(storage_directory, entry.name), encoding='utf-8') as f:
                 content = json.load(f)
 
-            request = Request(**content)
-            order_no = request.order_no
-            if order_no:
-                request.order_no = Decimal(order_no)
+            request = InternalRequest(**content)
 
             entries[request.id] = request
 

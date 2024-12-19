@@ -76,6 +76,7 @@ async def test_actor_memory_storage_client_request_queue_e2e(
                 unique_key=str(i),
                 url=request_url,
                 handled_at=datetime.now(timezone.utc) if was_handled else None,
+                payload=b'test',
             ),
             forefront=forefront,
         )
@@ -98,6 +99,7 @@ async def test_actor_memory_storage_client_request_queue_e2e(
                 unique_key=str(i),
                 url=request_url,
                 handled_at=datetime.now(timezone.utc) if was_handled else None,
+                payload=b'test',
             ),
             forefront=forefront,
         )
@@ -125,3 +127,4 @@ async def test_actor_memory_storage_client_request_queue_e2e(
 
     assert [int(req.unique_key) for req in actual_requests] == expected_pending_request_order
     assert [req.url for req in actual_requests] == [f'http://example.com/{req.unique_key}' for req in actual_requests]
+    assert [req.payload for req in actual_requests] == [b'test' for _ in actual_requests]

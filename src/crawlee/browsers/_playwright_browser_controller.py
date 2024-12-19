@@ -107,14 +107,15 @@ class PlaywrightBrowserController(BaseBrowserController):
     ) -> Page:
         if not self._browser_context:
             await self._set_browser_context(
-                fingerprint_options=self._fingerprint_generator_options, proxy_info=proxy_info
+                page_options=page_options,
+                fingerprint_options=self._fingerprint_generator_options,
+                proxy_info=proxy_info,
             )
 
         if not self.has_free_capacity:
             raise ValueError('Cannot open more pages in this browser.')
 
-        page_options = dict(page_options) if page_options else {}
-        page = await self._get_browser_context().new_page(**page_options)
+        page = await self._get_browser_context().new_page()
 
         # Handle page close event
         page.on(event='close', f=self._on_page_close)
@@ -126,13 +127,17 @@ class PlaywrightBrowserController(BaseBrowserController):
         return page
 
     async def _set_browser_context(
-        self, proxy_info: ProxyInfo | None = None, fingerprint_options: dict | None = None
+        self,
+        page_options: Mapping[str, Any] | None = None,
+        proxy_info: ProxyInfo | None = None,
+        fingerprint_options: dict | None = None,
     ) -> None:
         """Set browser context.
 
         Create context using `browserforge`  if `_use_fingerprints` is True.
         Create context without fingerprints with headers based header generator if available.
         """
+        page_options = page_options or {}
         proxy = (
             ProxySettings(
                 server=f'{proxy_info.scheme}://{proxy_info.hostname}:{proxy_info.port}',
@@ -145,7 +150,7 @@ class PlaywrightBrowserController(BaseBrowserController):
 
         if self._use_fingerprints:
             self._browser_context = await AsyncNewContext(
-                browser=self._browser, fingerprint_options=(fingerprint_options or {}), proxy=proxy
+                browser=self._browser, fingerprint_options=(fingerprint_options or {}), proxy=proxy, **page_options
             )
             return
 
@@ -155,16 +160,13 @@ class PlaywrightBrowserController(BaseBrowserController):
             user_agent_header = self._header_generator.get_user_agent_header(browser_type=self.browser_type)
             headers = dict(common_headers | sec_ch_ua_headers | user_agent_header)
             extra_http_headers = headers
-            user_agent = headers.get('User-Agent')
         else:
             extra_http_headers = None
-            user_agent = None
 
-        self._browser_context = await self._browser.new_context(
-            user_agent=user_agent,
-            extra_http_headers=extra_http_headers,
-            proxy=proxy,
-        )
+        page_options = dict(page_options) if page_options else {}
+        page_options['extra_http_headers'] = page_options.get('extra_http_headers', extra_http_headers)
+
+        self._browser_context = await self._browser.new_context(proxy=proxy, **page_options)
 
     def _get_browser_context(self) -> BrowserContext:
         if not self._browser_context:

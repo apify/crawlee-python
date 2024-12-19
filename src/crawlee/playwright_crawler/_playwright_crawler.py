@@ -257,8 +257,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
             status_code = context.response.status
 
             # Check if the session is blocked based on the HTTP status code.
-            if context.session and context.session.is_blocked_status_code(status_code=status_code):
-                raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}.')
+            if self._is_session_blocked_status_code(context.session, status_code):
+                raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
 
             matched_selectors = [
                 selector for selector in RETRY_CSS_SELECTORS if (await context.page.query_selector(selector))

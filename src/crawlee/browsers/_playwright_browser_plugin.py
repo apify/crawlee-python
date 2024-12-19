@@ -48,9 +48,9 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
             browser_options: Keyword arguments to pass to the browser launch method. These options are provided
                 directly to Playwright's `browser_type.launch` method. For more details, refer to the Playwright
                 documentation: https://playwright.dev/python/docs/api/class-browsertype#browser-type-launch.
-            page_options: Keyword arguments to pass to the new page method. These options are provided directly to
-                Playwright's `browser_context.new_page` method. For more details, refer to the Playwright documentation:
-                https://playwright.dev/python/docs/api/class-browsercontext#browser-context-new-page.
+            page_options: Keyword arguments to pass to the page object is set at the playwright context level.
+                These options are provided directly to Playwright's `browser.new_context` method. For more details,
+                refer to the Playwright documentation: https://playwright.dev/python/docs/api/class-browser#browser-new-context.
             max_open_pages_per_browser: The maximum number of pages that can be opened in a single browser instance.
                 Once reached, a new browser instance will be launched to handle the excess.
             use_fingerprints: Inject generated fingerprints to page.
