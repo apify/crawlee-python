@@ -101,7 +101,7 @@ TODO: write this section, once https://github.com/apify/crawlee-python/issues/99
 
 In some cases, you might need to combine requests from multiple sources, most frequently from a static list of URLs and a <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, where the queue takes care of persistence and retrying failed requests.
 
-This use case is supported via the <ApiLink to="class/RequestManagerTandem">`RequestManagerTandem`</ApiLink> class. You may also use the <ApiLink to="class/RequestSource#to_tandem">`RequestSource.to_tandem`</ApiLink> method as a shortcut.
+This use case is supported via the <ApiLink to="class/RequestManagerTandem">`RequestManagerTandem`</ApiLink> class. You may also use the <ApiLink to="class/RequestLoader#to_tandem">`RequestLoader.to_tandem`</ApiLink> method as a shortcut.
 
 <CodeBlock className="language-python">
     {TandemExample}

@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
+from crawlee._utils.docs import docs_group
 from crawlee.request_loaders import RequestManager
 
 if TYPE_CHECKING:
@@ -19,6 +20,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
+@docs_group('Classes')
 class RequestManagerTandem(RequestManager):
     """Implements a tandem behaviour for a pair of `RequestLoader` and `RequestManager`.
 
