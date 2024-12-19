@@ -1,16 +1,20 @@
 import asyncio
 
 from crawlee.parsel_crawler import ParselCrawler, ParselCrawlingContext
-from crawlee.request_loaders import RequestList
+from crawlee.request_loaders import RequestList, RequestManagerTandem
+from crawlee.storages import RequestQueue
 
 
 async def main() -> None:
     # Create a static request list
     request_list = RequestList(['https://crawlee.dev', 'https://apify.com'])
 
+    # Open the default request queue
+    request_queue = await RequestQueue.open()
+
     crawler = ParselCrawler(
         # Requests from the list will be processed first, but they will be enqueued in the default request queue first
-        request_manager=await request_list.to_tandem(),
+        request_manager=RequestManagerTandem(request_list, request_queue),
     )
 
     @crawler.router.default_handler

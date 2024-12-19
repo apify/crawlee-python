@@ -1,7 +1,7 @@
 import asyncio
 
 from crawlee.http_crawler import HttpCrawler, HttpCrawlingContext
-from crawlee.request_loaders import RequestList, RequestManagerTandem
+from crawlee.request_loaders import RequestList
 
 
 async def main() -> None:
@@ -12,9 +12,11 @@ async def main() -> None:
         requests=['https://apify.com/', 'https://crawlee.dev/'],
     )
 
-    # Create a new crawler (it can be any subclass of BasicCrawler) and pass the request
-    # list along with a request queue joined into a tandem. It will be managed by the crawler.
-    crawler = HttpCrawler(request_manager=await RequestManagerTandem.from_loader(request_list))
+    # Join the request list into a tandem with the default request queue
+    request_manager = await request_list.to_tandem()
+
+    # Create a new crawler (it can be any subclass of BasicCrawler) and pass the request manager tandem
+    crawler = HttpCrawler(request_manager=request_manager)
 
     # Define the default request handler, which will be called for every request.
     @crawler.router.default_handler

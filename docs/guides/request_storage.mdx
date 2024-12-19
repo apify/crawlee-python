@@ -19,6 +19,7 @@ import RsHelperEnqueueLinksExample from '!!raw-loader!./code/request_storage/hel
 import RsDoNotPurgeExample from '!!raw-loader!./code/request_storage/do_not_purge_example.py';
 import RsPurgeExplicitlyExample from '!!raw-loader!./code/request_storage/purge_explicitly_example.py';
 import TandemExample from '!!raw-loader!./code/request_storage/tandem_example.py';
+import ExplicitTandemExample from '!!raw-loader!./code/request_storage/tandem_example_explicit.py';
 
 This guide explains the different types of request storage available in Crawlee, how to store the requests that your crawler will process, and which storage type to choose based on your needs.
 
@@ -100,11 +101,23 @@ TODO: write this section, once https://github.com/apify/crawlee-python/issues/99
 
 In some cases, you might need to combine requests from multiple sources, most frequently from a static list of URLs and a <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, where the queue takes care of persistence and retrying failed requests.
 
-This use case is supported via the <ApiLink to="class/RequestManagerTandem">`RequestManagerTandem`</ApiLink> class:
+This use case is supported via the <ApiLink to="class/RequestManagerTandem">`RequestManagerTandem`</ApiLink> class. You may also use the <ApiLink to="class/RequestSource#to_tandem">`RequestSource.to_tandem`</ApiLink> method as a shortcut.
 
 <CodeBlock className="language-python">
     {TandemExample}
 </CodeBlock>
+<Tabs groupId="request_manager_tandem">
+    <TabItem value="request_manager_tandem_helper" label="Using to_tandem helper" default>
+        <CodeBlock className="language-python">
+            {TandemExample}
+        </CodeBlock>
+    </TabItem>
+    <TabItem value="request_manager_tandem_explicit" label="Explicitly using RequestManagerTandem">
+        <CodeBlock className="language-python">
+            {ExplicitTandemExample}
+        </CodeBlock>
+    </TabItem>
+</Tabs>
 
 ## Request-related helpers
 

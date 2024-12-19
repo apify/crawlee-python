@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from crawlee.base_storage_client._models import ProcessedRequest
+    from crawlee.request_loaders import RequestManager, RequestManagerTandem
 
 
 @docs_group('Abstract classes')
@@ -47,6 +48,21 @@ class RequestLoader(ABC):
     @abstractmethod
     async def get_handled_count(self) -> int:
         """Returns the number of handled requests."""
+
+    async def to_tandem(self, request_manager: RequestManager | None = None) -> RequestManagerTandem:
+        """Combine the loader with a request manager to support adding and reclaiming requests.
+
+        Args:
+            request_manager: Request manager to combine the loader with.
+                If None is given, the default request queue is used.
+        """
+        from crawlee.request_loaders import RequestManagerTandem
+        from crawlee.storages import RequestQueue
+
+        if request_manager is None:
+            request_manager = await RequestQueue.open()
+
+        return RequestManagerTandem(self, request_manager)
 
     def _transform_request(self, request: str | Request) -> Request:
         """Transforms a request-like object into a Request object."""

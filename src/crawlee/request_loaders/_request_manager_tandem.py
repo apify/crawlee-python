@@ -4,7 +4,7 @@ from datetime import timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING
 
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from crawlee.request_loaders import RequestManager
 
@@ -29,13 +29,6 @@ class RequestManagerTandem(RequestManager):
     def __init__(self, request_loader: RequestLoader, request_manager: RequestManager) -> None:
         self._read_only_loader = request_loader
         self._read_write_manager = request_manager
-
-    @classmethod
-    async def from_loader(cls, request_loader: RequestLoader) -> Self:
-        """A shortcut for joining a `RequestLoader` instance with the default `RequestQueue`."""
-        from crawlee.storages import RequestQueue
-
-        return cls(request_loader=request_loader, request_manager=await RequestQueue.open())
 
     @override
     async def get_total_count(self) -> int:
