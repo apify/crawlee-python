@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections import deque
+import asyncio
+from collections.abc import AsyncIterable, AsyncIterator, Iterable
 from typing import TYPE_CHECKING
 
 from typing_extensions import override
@@ -9,8 +10,6 @@ from crawlee._utils.docs import docs_group
 from crawlee.request_loaders._request_loader import RequestLoader
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-
     from crawlee._request import Request
 
 
@@ -26,7 +25,7 @@ class RequestList(RequestLoader):
 
     def __init__(
         self,
-        requests: Sequence[str | Request] | None = None,
+        requests: Iterable[str | Request] | AsyncIterable[str | Request] | None = None,
         name: str | None = None,
     ) -> None:
         """A default constructor.
@@ -37,9 +36,18 @@ class RequestList(RequestLoader):
         """
         self._name = name
         self._handled_count = 0
+        self._assumed_total_count = 0
 
-        self._requests = deque(self._transform_requests(requests or []))
         self._in_progress = set[str]()
+        self._is_empty = False
+
+        if isinstance(requests, AsyncIterable):
+            self._requests = requests.__aiter__()
+        elif requests is None:
+            self._requests = self._iterate_in_threadpool([])
+            self._is_empty = True
+        else:
+            self._requests = self._iterate_in_threadpool(requests)
 
     @property
     def name(self) -> str | None:
@@ -47,33 +55,30 @@ class RequestList(RequestLoader):
 
     @override
     async def get_total_count(self) -> int:
-        return len(self._requests)
+        return self._assumed_total_count
 
     @override
     async def is_empty(self) -> bool:
-        return len(self._requests) == 0
+        return self._is_empty
 
     @override
     async def is_finished(self) -> bool:
-        return await self.is_empty() and len(self._in_progress) == 0
+        return self._is_empty and len(self._in_progress) == 0
 
     @override
     async def fetch_next_request(self) -> Request | None:
+        if self._is_empty:
+            return None
+
         try:
-            request = self._requests.popleft()
-        except IndexError:
+            request = self._transform_request(await self._requests.__anext__())
+        except StopAsyncIteration:
+            self._is_empty = True
             return None
         else:
             self._in_progress.add(request.id)
+            self._assumed_total_count += 1
             return request
-
-    async def reclaim_request(self, request: Request, *, forefront: bool = False) -> None:
-        if forefront:
-            self._requests.appendleft(request)
-        else:
-            self._requests.append(request)
-
-        self._in_progress.remove(request.id)
 
     @override
     async def mark_request_as_handled(self, request: Request) -> None:
@@ -83,3 +88,25 @@ class RequestList(RequestLoader):
     @override
     async def get_handled_count(self) -> int:
         return self._handled_count
+
+    async def _iterate_in_threadpool(self, iterable: Iterable[str | Request]) -> AsyncIterator[str | Request]:
+        """Inspired by a function of the same name from encode/starlette."""
+        iterator = iter(iterable)
+
+        class _StopIteration(Exception):  # noqa: N818
+            pass
+
+        def _next() -> str | Request:
+            # We can't raise `StopIteration` from within the threadpool iterator
+            # and catch it outside that context, so we coerce them into a different
+            # exception type.
+            try:
+                return next(iterator)
+            except StopIteration:
+                raise _StopIteration  # noqa: B904
+
+        try:
+            while True:
+                yield await asyncio.to_thread(_next)
+        except _StopIteration:
+            raise StopAsyncIteration  # noqa: B904
