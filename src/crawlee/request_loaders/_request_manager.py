@@ -5,7 +5,7 @@ from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from crawlee._utils.docs import docs_group
-from crawlee.request_sources._request_source import RequestSource
+from crawlee.request_loaders._request_loader import RequestLoader
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -15,8 +15,8 @@ if TYPE_CHECKING:
 
 
 @docs_group('Abstract classes')
-class RequestProvider(RequestSource, ABC):
-    """Abstract base class that extends `RequestSource` with the capability to enqueue new requests."""
+class RequestManager(RequestLoader, ABC):
+    """Abstract base class that extends `RequestLoader` with the capability to enqueue new requests."""
 
     @abstractmethod
     async def drop(self) -> None:
@@ -29,15 +29,15 @@ class RequestProvider(RequestSource, ABC):
         *,
         forefront: bool = False,
     ) -> ProcessedRequest:
-        """Add a single request to the provider and store it in underlying resource client.
+        """Add a single request to the manager and store it in underlying resource client.
 
         Args:
-            request: The request object (or its string representation) to be added to the provider.
+            request: The request object (or its string representation) to be added to the manager.
             forefront: Determines whether the request should be added to the beginning (if True) or the end (if False)
-                of the provider.
+                of the manager.
 
         Returns:
-            Information about the request addition to the provider.
+            Information about the request addition to the manager.
         """
 
     async def add_requests_batched(
@@ -49,7 +49,7 @@ class RequestProvider(RequestSource, ABC):
         wait_for_all_requests_to_be_added: bool = False,  # noqa: ARG002
         wait_for_all_requests_to_be_added_timeout: timedelta | None = None,  # noqa: ARG002
     ) -> None:
-        """Add requests to the underlying resource client in batches.
+        """Add requests to the manager in batches.
 
         Args:
             requests: Requests to enqueue.

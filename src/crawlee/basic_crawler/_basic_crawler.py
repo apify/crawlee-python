@@ -56,7 +56,7 @@ if TYPE_CHECKING:
     from crawlee.events._event_manager import EventManager
     from crawlee.http_clients import BaseHttpClient, HttpResponse
     from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
-    from crawlee.request_sources._request_provider import RequestProvider
+    from crawlee.request_loaders._request_manager import RequestManager
     from crawlee.sessions import Session
     from crawlee.statistics import FinalStatistics, StatisticsState
     from crawlee.storages._dataset import ExportDataCsvKwargs, ExportDataJsonKwargs, GetDataKwargs, PushDataKwargs
@@ -82,8 +82,8 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     storage_client: NotRequired[BaseStorageClient]
     """The storage client for managing storages for the crawler and all its components."""
 
-    request_provider: NotRequired[RequestProvider]
-    """Provider for requests to be processed by the crawler."""
+    request_manager: NotRequired[RequestManager]
+    """Manager of requests that should be processed by the crawler."""
 
     session_pool: NotRequired[SessionPool]
     """A custom `SessionPool` instance, allowing the use of non-default configuration."""
@@ -181,7 +181,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         configuration: Configuration | None = None,
         event_manager: EventManager | None = None,
         storage_client: BaseStorageClient | None = None,
-        request_provider: RequestProvider | None = None,
+        request_manager: RequestManager | None = None,
         session_pool: SessionPool | None = None,
         proxy_configuration: ProxyConfiguration | None = None,
         http_client: BaseHttpClient | None = None,
@@ -207,7 +207,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             configuration: The configuration object. Some of its properties are used as defaults for the crawler.
             event_manager: The event manager for managing events for the crawler and all its components.
             storage_client: The storage client for managing storages for the crawler and all its components.
-            request_provider: Provider for requests to be processed by the crawler.
+            request_manager: Manager of requests that should be processed by the crawler.
             session_pool: A custom `SessionPool` instance, allowing the use of non-default configuration.
             proxy_configuration: HTTP proxy configuration used when making requests.
             http_client: HTTP client used by `BasicCrawlingContext.send_request` method.
@@ -247,7 +247,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         config = service_locator.get_configuration()
 
         # Core components
-        self._request_provider = request_provider
+        self._request_manager = request_manager
         self._session_pool = session_pool or SessionPool()
         self._proxy_configuration = proxy_configuration
         self._http_client = http_client or HttpxHttpClient()
@@ -381,12 +381,12 @@ class BasicCrawler(Generic[TCrawlingContext]):
             proxy_tier=None,
         )
 
-    async def get_request_provider(self) -> RequestProvider:
+    async def get_request_manager(self) -> RequestManager:
         """Return the configured request provider. If none is configured, open and return the default request queue."""
-        if not self._request_provider:
-            self._request_provider = await RequestQueue.open()
+        if not self._request_manager:
+            self._request_manager = await RequestQueue.open()
 
-        return self._request_provider
+        return self._request_manager
 
     async def get_dataset(
         self,
@@ -446,10 +446,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
             if self._use_session_pool:
                 await self._session_pool.reset_store()
 
-            request_provider = await self.get_request_provider()
+            request_provider = await self.get_request_manager()
             if purge_request_queue and isinstance(request_provider, RequestQueue):
                 await request_provider.drop()
-                self._request_provider = await RequestQueue.open()
+                self._request_manager = await RequestQueue.open()
 
         if requests is not None:
             await self.add_requests(requests)
@@ -541,7 +541,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             wait_for_all_requests_to_be_added: If True, wait for all requests to be added before returning.
             wait_for_all_requests_to_be_added_timeout: Timeout for waiting for all requests to be added.
         """
-        request_provider = await self.get_request_provider()
+        request_provider = await self.get_request_manager()
 
         await request_provider.add_requests_batched(
             requests=requests,
@@ -777,7 +777,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         context: TCrawlingContext | BasicCrawlingContext,
         error: Exception,
     ) -> None:
-        request_provider = await self.get_request_provider()
+        request_provider = await self.get_request_manager()
         request = context.request
 
         if self._abort_on_error:
@@ -872,7 +872,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
     async def _commit_request_handler_result(
         self, context: BasicCrawlingContext, result: RequestHandlerRunResult
     ) -> None:
-        request_provider = await self.get_request_provider()
+        request_provider = await self.get_request_manager()
         origin = context.request.loaded_url or context.request.url
 
         for add_requests_call in result.add_requests_calls:
@@ -929,7 +929,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 await store.set_value(key, value.content, value.content_type)
 
     async def __is_finished_function(self) -> bool:
-        request_provider = await self.get_request_provider()
+        request_provider = await self.get_request_manager()
         is_finished = await request_provider.is_finished()
 
         if self._max_requests_count_exceeded:
@@ -953,11 +953,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
             )
             return False
 
-        request_provider = await self.get_request_provider()
+        request_provider = await self.get_request_manager()
         return not await request_provider.is_empty()
 
     async def __run_task_function(self) -> None:
-        request_provider = await self.get_request_provider()
+        request_provider = await self.get_request_manager()
 
         request = await wait_for(
             lambda: request_provider.fetch_next_request(),

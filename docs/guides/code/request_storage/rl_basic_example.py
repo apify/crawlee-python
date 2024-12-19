@@ -1,6 +1,6 @@
 import asyncio
 
-from crawlee.request_sources import RequestList
+from crawlee.request_loaders import RequestList
 
 
 async def main() -> None:

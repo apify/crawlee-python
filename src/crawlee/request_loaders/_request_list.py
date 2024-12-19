@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
-from crawlee.request_sources._request_source import RequestSource
+from crawlee.request_loaders._request_loader import RequestLoader
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 
 @docs_group('Classes')
-class RequestList(RequestSource):
+class RequestList(RequestLoader):
     """Represents a (potentially very large) list of URLs to crawl.
 
     Disclaimer: The `RequestList` class is in its early version and is not fully implemented. It is currently

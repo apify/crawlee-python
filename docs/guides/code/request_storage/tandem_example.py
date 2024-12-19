@@ -1,13 +1,13 @@
 import asyncio
 
 from crawlee.parsel_crawler import ParselCrawler, ParselCrawlingContext
-from crawlee.request_sources import RequestList, RequestSourceTandem
+from crawlee.request_loaders import RequestList, RequestManagerTandem
 
 
 async def main() -> None:
     crawler = ParselCrawler(
         # Requests from the list will be processed first, but they will be enqueued in the default request queue first
-        request_provider=await RequestSourceTandem.from_source(
+        request_manager=await RequestManagerTandem.from_loader(
             RequestList(['https://crawlee.dev', 'https://apify.com'])
         ),
     )

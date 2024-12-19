@@ -21,7 +21,7 @@ from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpHeaders
 from crawlee.basic_crawler import BasicCrawler
 from crawlee.configuration import Configuration
 from crawlee.errors import SessionError, UserDefinedErrorHandlerError
-from crawlee.request_sources import RequestList, RequestSourceTandem
+from crawlee.request_loaders import RequestList, RequestManagerTandem
 from crawlee.statistics import FinalStatistics
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
@@ -45,7 +45,7 @@ async def test_processes_requests_from_explicit_queue() -> None:
     queue = await RequestQueue.open()
     await queue.add_requests_batched(['http://a.com/', 'http://b.com/', 'http://c.com/'])
 
-    crawler = BasicCrawler(request_provider=queue)
+    crawler = BasicCrawler(request_manager=queue)
     calls = list[str]()
 
     @crawler.router.default_handler
@@ -63,7 +63,7 @@ async def test_processes_requests_from_request_source_tandem() -> None:
 
     request_list = RequestList(['http://a.com/', 'http://d.com', 'http://e.com'])
 
-    crawler = BasicCrawler(request_provider=RequestSourceTandem(request_list, request_queue))
+    crawler = BasicCrawler(request_manager=RequestManagerTandem(request_list, request_queue))
     calls = set[str]()
 
     @crawler.router.default_handler
@@ -526,7 +526,7 @@ async def test_final_statistics() -> None:
 async def test_crawler_get_storages() -> None:
     crawler = BasicCrawler()
 
-    rp = await crawler.get_request_provider()
+    rp = await crawler.get_request_manager()
     assert isinstance(rp, RequestQueue)
 
     dataset = await crawler.get_dataset()
