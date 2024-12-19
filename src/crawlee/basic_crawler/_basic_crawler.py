@@ -957,6 +957,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         is_finished = await request_provider.is_finished()
 
         if self._abort_on_error and self._failed:
+            self._failed = False
             return True
 
         return is_finished
