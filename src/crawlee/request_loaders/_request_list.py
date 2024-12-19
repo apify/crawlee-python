@@ -67,7 +67,6 @@ class RequestList(RequestLoader):
             self._in_progress.add(request.id)
             return request
 
-    @override
     async def reclaim_request(self, request: Request, *, forefront: bool = False) -> None:
         if forefront:
             self._requests.appendleft(request)

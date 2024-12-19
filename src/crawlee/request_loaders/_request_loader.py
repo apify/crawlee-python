@@ -46,13 +46,6 @@ class RequestLoader(ABC):
         """Marks a request as handled after a successful processing (or after giving up retrying)."""
 
     @abstractmethod
-    async def reclaim_request(self, request: Request, *, forefront: bool = False) -> ProcessedRequest | None:
-        """Reclaims a failed request back to the source, so that it can be returned for processing later again.
-
-        It is possible to modify the request data by supplying an updated request as a parameter.
-        """
-
-    @abstractmethod
     async def get_handled_count(self) -> int:
         """Returns the number of handled requests."""
 

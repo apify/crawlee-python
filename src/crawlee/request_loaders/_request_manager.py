@@ -61,3 +61,10 @@ class RequestManager(RequestLoader, ABC):
         # Default and dumb implementation.
         for request in requests:
             await self.add_request(request)
+
+    @abstractmethod
+    async def reclaim_request(self, request: Request, *, forefront: bool = False) -> ProcessedRequest | None:
+        """Reclaims a failed request back to the source, so that it can be returned for processing later again.
+
+        It is possible to modify the request data by supplying an updated request as a parameter.
+        """

@@ -85,10 +85,9 @@ class RequestManagerTandem(RequestManager):
             await self._read_write_manager.add_request(request, forefront=True)
         except Exception:
             logger.exception(
-                'Adding request from the RequestLoader to the RequestManager failed, '
-                'reclaiming request back to the list.',
+                'Adding request from the RequestLoader to the RequestManager failed, the request has been dropped',
+                extra={'url': request.url, 'unique_key': request.unique_key},
             )
-            await self._read_only_loader.reclaim_request(request)
             return None
 
         await self._read_only_loader.mark_request_as_handled(request)
