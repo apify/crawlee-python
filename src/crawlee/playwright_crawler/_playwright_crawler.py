@@ -172,7 +172,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
         async with context.page:
             if context.request.headers:
                 await context.page.set_extra_http_headers(context.request.headers.model_dump())
-            response = await context.page.goto(context.request.url, wait_until='domcontentloaded')
+            response = await context.page.goto(context.request.url)
             if response is None:
                 raise SessionError(f'Failed to load the URL: {context.request.url}')
 

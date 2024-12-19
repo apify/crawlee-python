@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, cast
 
-from browserforge.fingerprints import Fingerprint, FingerprintGenerator
+from browserforge.injectors.playwright import AsyncNewContext
 from playwright.async_api import BrowserContext, Page, ProxySettings
 from typing_extensions import override
 
@@ -13,7 +13,6 @@ from crawlee._utils.docs import docs_group
 from crawlee.browsers._base_browser_controller import BaseBrowserController
 from crawlee.browsers._types import BrowserType
 from crawlee.fingerprint_suite import HeaderGenerator
-from crawlee.fingerprint_suite._injected_page_function import create_init_script_with_fingerprint
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -58,14 +57,12 @@ class PlaywrightBrowserController(BaseBrowserController):
         self._max_open_pages_per_browser = max_open_pages_per_browser
         self._header_generator = header_generator
 
-        self._fingerprint_generator = FingerprintGenerator(**(fingerprint_generator_options or {}))
-
         self._browser_context: BrowserContext | None = None
         self._pages = list[Page]()
         self._last_page_opened_at = datetime.now(timezone.utc)
 
         self._use_fingerprints = use_fingerprints
-        self._fingerprint: Fingerprint | None = None
+        self._fingerprint_generator_options = fingerprint_generator_options
 
     @property
     @override
@@ -109,8 +106,9 @@ class PlaywrightBrowserController(BaseBrowserController):
         proxy_info: ProxyInfo | None = None,
     ) -> Page:
         if not self._browser_context:
-            await self._set_fingerprint()
-            await self._set_browser_context(fingerprint=self._fingerprint)
+            await self._set_browser_context(
+                fingerprint_options=self._fingerprint_generator_options, proxy_info=proxy_info
+            )
 
         if not self.has_free_capacity:
             raise ValueError('Cannot open more pages in this browser.')
@@ -125,61 +123,53 @@ class PlaywrightBrowserController(BaseBrowserController):
         self._pages.append(page)
         self._last_page_opened_at = datetime.now(timezone.utc)
 
-        # Inject fingerprint
-        if self._use_fingerprints:
-            await self._inject_fingerprint_to_page(page)
-
         return page
 
     async def _set_browser_context(
-        self, proxy_info: ProxyInfo | None = None, fingerprint: Fingerprint | None = None
+        self, proxy_info: ProxyInfo | None = None, fingerprint_options: dict | None = None
     ) -> None:
         """Set browser context.
 
-        Set headers based on fingerprint if available to ensure consistency between headers and fingerprint.
-        Fallback to header generator if no fingerprint is available.
+        Create context using `browserforge`  if `_use_fingerprints` is True.
+        Create context without fingerprints with headers based header generator if available.
         """
-        if fingerprint:
-            headers = fingerprint.headers
-        elif self._header_generator:
+        proxy = (
+            ProxySettings(
+                server=f'{proxy_info.scheme}://{proxy_info.hostname}:{proxy_info.port}',
+                username=proxy_info.username,
+                password=proxy_info.password,
+            )
+            if proxy_info
+            else None
+        )
+
+        if self._use_fingerprints:
+            self._browser_context = await AsyncNewContext(
+                browser=self._browser, fingerprint_options=(fingerprint_options or {}), proxy=proxy
+            )
+            return
+
+        if self._header_generator:
             common_headers = self._header_generator.get_common_headers()
             sec_ch_ua_headers = self._header_generator.get_sec_ch_ua_headers(browser_type=self.browser_type)
             user_agent_header = self._header_generator.get_user_agent_header(browser_type=self.browser_type)
             headers = dict(common_headers | sec_ch_ua_headers | user_agent_header)
+            extra_http_headers = headers
+            user_agent = headers.get('User-Agent')
         else:
-            headers = None
-        self._browser_context = await self._create_browser_context(proxy_info, headers)
+            extra_http_headers = None
+            user_agent = None
+
+        self._browser_context = await self._browser.new_context(
+            user_agent=user_agent,
+            extra_http_headers=extra_http_headers,
+            proxy=proxy,
+        )
 
     def _get_browser_context(self) -> BrowserContext:
         if not self._browser_context:
             raise RuntimeError('Browser context was not set yet.')
         return self._browser_context
-
-    async def _set_fingerprint(self) -> None:
-        if self._use_fingerprints and not self._fingerprint:
-            while fingerprint := self._fingerprint_generator.generate():
-                if self._is_good_fingerprint(fingerprint):
-                    break
-            self._fingerprint = fingerprint
-
-    @staticmethod
-    def _is_good_fingerprint(fingerprint: Fingerprint) -> bool:
-        """Check if fingerprint is ok to use.
-
-        By trial and error it was found out that some generated fingerprints are not working well.
-        All fingerprints that were not working well had 'Te': 'trailers' in headers.
-        """
-        return fingerprint.headers.get('Te', '') != 'trailers'
-
-    def _get_fingerprint(self) -> Fingerprint:
-        if not self._use_fingerprints:
-            raise RuntimeError('Fingerprint was is not allowed. use_fingerprints = False.')
-        if not self._fingerprint:
-            raise RuntimeError('Fingerprint was not set yet.')
-        return self._fingerprint
-
-    async def _inject_fingerprint_to_page(self, page: Page) -> None:
-        await page.add_init_script(create_init_script_with_fingerprint(self._get_fingerprint().dumps()))
 
     @override
     async def close(self, *, force: bool = False) -> None:
@@ -195,30 +185,3 @@ class PlaywrightBrowserController(BaseBrowserController):
     def _on_page_close(self, page: Page) -> None:
         """Handle actions after a page is closed."""
         self._pages.remove(page)
-
-    async def _create_browser_context(
-        self, proxy_info: ProxyInfo | None = None, headers: dict[str, str] | None = None
-    ) -> BrowserContext:
-        """Create a new browser context with the specified proxy settings."""
-        if headers:
-            extra_http_headers = headers
-            user_agent = headers.get('User-Agent')
-        else:
-            extra_http_headers = None
-            user_agent = None
-
-        proxy = (
-            ProxySettings(
-                server=f'{proxy_info.scheme}://{proxy_info.hostname}:{proxy_info.port}',
-                username=proxy_info.username,
-                password=proxy_info.password,
-            )
-            if proxy_info
-            else None
-        )
-
-        return await self._browser.new_context(
-            user_agent=user_agent,
-            extra_http_headers=extra_http_headers,
-            proxy=proxy,
-        )
