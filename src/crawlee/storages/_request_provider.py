@@ -35,6 +35,16 @@ class RequestProvider(ABC):
     def name(self) -> str | None:
         """ID or name of the request queue."""
 
+    @property
+    def keep_alive(self) -> bool:
+        """Flag that forces is_finished to return False regardless of other conditions."""
+        return self._keep_alive
+
+    @keep_alive.setter
+    def keep_alive(self, keep_alive:bool) -> None:
+        """Set keep_alive to flag."""
+        self._keep_alive = keep_alive
+
     @abstractmethod
     async def get_total_count(self) -> int:
         """Returns an offline approximation of the total number of requests in the queue (i.e. pending + handled)."""

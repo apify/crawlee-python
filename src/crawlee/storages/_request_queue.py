@@ -62,6 +62,8 @@ class CachedRequest(TypedDict):
     lock_expires_at: datetime | None
 
 
+id_func = id
+
 @docs_group('Classes')
 class RequestQueue(BaseStorage, RequestProvider):
     """Represents a queue storage for managing HTTP requests in web crawling operations.
@@ -123,6 +125,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         event_manager.on(event=Event.ABORTING, listener=self._clear_possible_locks)
 
         # Other internal attributes
+        self._keep_alive = False
         self._tasks = list[asyncio.Task]()
         self._client_key = crypto_random_object_id()
         self._internal_timeout = config.internal_timeout or timedelta(minutes=5)
@@ -133,6 +136,7 @@ class RequestQueue(BaseStorage, RequestProvider):
         self._in_progress: set[str] = set()
         self._last_activity = datetime.now(timezone.utc)
         self._recently_handled: BoundedSet[str] = BoundedSet(max_length=self._RECENTLY_HANDLED_CACHE_SIZE)
+        logger.debug(f"{id_func(self._recently_handled._data)=}")
         self._requests_cache: LRUCache[CachedRequest] = LRUCache(max_length=self._MAX_CACHED_REQUESTS)
 
     @property
@@ -452,6 +456,8 @@ class RequestQueue(BaseStorage, RequestProvider):
         Returns:
             bool: `True` if all requests were already handled and there are no more left. `False` otherwise.
         """
+        if self.keep_alive:
+            return False
         seconds_since_last_activity = datetime.now(timezone.utc) - self._last_activity
         if self._in_progress_count() > 0 and seconds_since_last_activity > self._internal_timeout:
             logger.warning(
@@ -550,6 +556,7 @@ class RequestQueue(BaseStorage, RequestProvider):
                         'recently_handled': request.id in self._recently_handled,
                     },
                 )
+                logger.debug(f"{self._recently_handled=}, {id_func(self._recently_handled._data)=}, {self=}")
 
                 # Remove the lock from the request for now, so that it can be picked up later
                 # This may/may not succeed, but that's fine
