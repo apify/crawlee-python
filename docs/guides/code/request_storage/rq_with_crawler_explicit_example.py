@@ -14,7 +14,7 @@ async def main() -> None:
 
     # Create a new crawler (it can be any subclass of BasicCrawler) and pass the request
     # list as request provider to it. It will be managed by the crawler.
-    crawler = HttpCrawler(request_provider=request_queue)
+    crawler = HttpCrawler(request_manager=request_queue)
 
     # Define the default request handler, which will be called for every request.
     @crawler.router.default_handler
