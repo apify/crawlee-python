@@ -69,7 +69,9 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
 
     def __init__(
         self,
+        *,
         browser_pool: BrowserPool | None = None,
+        browser_pool_options: Mapping[str, Any] | None = None,
         browser_type: BrowserType | None = None,
         browser_options: Mapping[str, Any] | None = None,
         page_options: Mapping[str, Any] | None = None,
@@ -80,6 +82,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
 
         Args:
             browser_pool: A `BrowserPool` instance to be used for launching the browsers and getting pages.
+            browser_pool_options: Arguments passed to `BrowserPool`.
             browser_type: The type of browser to launch ('chromium', 'firefox', or 'webkit').
                 This option should not be used if `browser_pool` is provided.
             browser_options: Keyword arguments to pass to the browser launch method. These options are provided
@@ -109,6 +112,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 browser_type=browser_type,
                 browser_options=browser_options,
                 page_options=page_options,
+                **(browser_pool_options or {}),
             )
 
         self._browser_pool = browser_pool
@@ -171,9 +175,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
         async with context.page:
             if context.request.headers:
                 await context.page.set_extra_http_headers(context.request.headers.model_dump())
-            # Navigate to the URL and get response.
             response = await context.page.goto(context.request.url)
-
             if response is None:
                 raise SessionError(f'Failed to load the URL: {context.request.url}')
 
