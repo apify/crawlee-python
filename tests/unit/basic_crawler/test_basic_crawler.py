@@ -361,79 +361,95 @@ INCLUDE_TEST_URLS = (
     'test_input',
     argvalues=[
         # Basic use case
-        AddRequestsTestInput(
-            start_url='https://a.com/',
-            requests=[
-                'https://a.com/',
-                BaseRequestData.from_url('http://b.com/'),
-                'http://c.com/',
-            ],
-            kwargs={},
-            expected_urls=['http://b.com/', 'http://c.com/'],
+        pytest.param(
+            AddRequestsTestInput(
+                start_url='https://a.com/',
+                requests=[
+                    'https://a.com/',
+                    BaseRequestData.from_url('http://b.com/'),
+                    'http://c.com/',
+                ],
+                kwargs={},
+                expected_urls=['http://b.com/', 'http://c.com/'],
+            ),
+            id='basic',
         ),
         # Enqueue strategy
-        AddRequestsTestInput(
-            start_url=STRATEGY_TEST_URLS[0],
-            requests=STRATEGY_TEST_URLS,
-            kwargs=EnqueueLinksKwargs(),
-            expected_urls=STRATEGY_TEST_URLS[1:],
+        pytest.param(
+            AddRequestsTestInput(
+                start_url=STRATEGY_TEST_URLS[0],
+                requests=STRATEGY_TEST_URLS,
+                kwargs=EnqueueLinksKwargs(),
+                expected_urls=STRATEGY_TEST_URLS[1:],
+            ),
+            id='enqueue_strategy_1',
         ),
-        AddRequestsTestInput(
-            start_url=STRATEGY_TEST_URLS[0],
-            requests=STRATEGY_TEST_URLS,
-            kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.ALL),
-            expected_urls=STRATEGY_TEST_URLS[1:],
+        pytest.param(
+            AddRequestsTestInput(
+                start_url=STRATEGY_TEST_URLS[0],
+                requests=STRATEGY_TEST_URLS,
+                kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.ALL),
+                expected_urls=STRATEGY_TEST_URLS[1:],
+            ),
+            id='enqueue_strategy_2',
         ),
-        AddRequestsTestInput(
-            start_url=STRATEGY_TEST_URLS[0],
-            requests=STRATEGY_TEST_URLS,
-            kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.SAME_DOMAIN),
-            expected_urls=STRATEGY_TEST_URLS[1:3],
+        pytest.param(
+            AddRequestsTestInput(
+                start_url=STRATEGY_TEST_URLS[0],
+                requests=STRATEGY_TEST_URLS,
+                kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.SAME_DOMAIN),
+                expected_urls=STRATEGY_TEST_URLS[1:3],
+            ),
+            id='enqueue_strategy_3',
         ),
-        AddRequestsTestInput(
-            start_url=STRATEGY_TEST_URLS[0],
-            requests=STRATEGY_TEST_URLS,
-            kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.SAME_HOSTNAME),
-            expected_urls=[STRATEGY_TEST_URLS[1]],
+        pytest.param(
+            AddRequestsTestInput(
+                start_url=STRATEGY_TEST_URLS[0],
+                requests=STRATEGY_TEST_URLS,
+                kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.SAME_HOSTNAME),
+                expected_urls=[STRATEGY_TEST_URLS[1]],
+            ),
+            id='enqueue_strategy_4',
         ),
-        AddRequestsTestInput(
-            start_url=STRATEGY_TEST_URLS[0],
-            requests=STRATEGY_TEST_URLS,
-            kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.SAME_ORIGIN),
-            expected_urls=[],
+        pytest.param(
+            AddRequestsTestInput(
+                start_url=STRATEGY_TEST_URLS[0],
+                requests=STRATEGY_TEST_URLS,
+                kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.SAME_ORIGIN),
+                expected_urls=[],
+            ),
+            id='enqueue_strategy_5',
         ),
         # Include/exclude
-        AddRequestsTestInput(
-            start_url=INCLUDE_TEST_URLS[0],
-            requests=INCLUDE_TEST_URLS,
-            kwargs=EnqueueLinksKwargs(include=[Glob('https://someplace.com/**/cats')]),
-            expected_urls=[INCLUDE_TEST_URLS[1], INCLUDE_TEST_URLS[4]],
-        ),
-        AddRequestsTestInput(
-            start_url=INCLUDE_TEST_URLS[0],
-            requests=INCLUDE_TEST_URLS,
-            kwargs=EnqueueLinksKwargs(exclude=[Glob('https://someplace.com/**/cats')]),
-            expected_urls=[INCLUDE_TEST_URLS[2], INCLUDE_TEST_URLS[3]],
-        ),
-        AddRequestsTestInput(
-            start_url=INCLUDE_TEST_URLS[0],
-            requests=INCLUDE_TEST_URLS,
-            kwargs=EnqueueLinksKwargs(
-                include=[Glob('https://someplace.com/**/cats')], exclude=[Glob('https://**/archive/**')]
+        pytest.param(
+            AddRequestsTestInput(
+                start_url=INCLUDE_TEST_URLS[0],
+                requests=INCLUDE_TEST_URLS,
+                kwargs=EnqueueLinksKwargs(include=[Glob('https://someplace.com/**/cats')]),
+                expected_urls=[INCLUDE_TEST_URLS[1], INCLUDE_TEST_URLS[4]],
             ),
-            expected_urls=[INCLUDE_TEST_URLS[1]],
+            id='include_exclude_1',
         ),
-    ],
-    ids=[
-        'basic',
-        'enqueue_strategy_1',
-        'enqueue_strategy_2',
-        'enqueue_strategy_3',
-        'enqueue_strategy_4',
-        'enqueue_strategy_5',
-        'include_exclude_1',
-        'include_exclude_2',
-        'include_exclude_3',
+        pytest.param(
+            AddRequestsTestInput(
+                start_url=INCLUDE_TEST_URLS[0],
+                requests=INCLUDE_TEST_URLS,
+                kwargs=EnqueueLinksKwargs(exclude=[Glob('https://someplace.com/**/cats')]),
+                expected_urls=[INCLUDE_TEST_URLS[2], INCLUDE_TEST_URLS[3]],
+            ),
+            id='include_exclude_2',
+        ),
+        pytest.param(
+            AddRequestsTestInput(
+                start_url=INCLUDE_TEST_URLS[0],
+                requests=INCLUDE_TEST_URLS,
+                kwargs=EnqueueLinksKwargs(
+                    include=[Glob('https://someplace.com/**/cats')], exclude=[Glob('https://**/archive/**')]
+                ),
+                expected_urls=[INCLUDE_TEST_URLS[1]],
+            ),
+            id='include_exclude_3',
+        ),
     ],
 )
 async def test_enqueue_strategy(test_input: AddRequestsTestInput) -> None:

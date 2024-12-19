@@ -20,31 +20,33 @@ class TestInput:
 
 @pytest.mark.parametrize(
     argnames='test_input',
-    ids=[
-        'basic_usage',
-        'wait_for_read_only_source',
-    ],
     argvalues=[
-        TestInput(
-            request_loader_items=['http://a.com', 'http://b.com'],
-            request_manager_items=[],
-            discovered_items=[Request.from_url('http://c.com')],
-            expected_result={
-                'http://a.com',
-                'http://b.com',
-                'http://c.com',
-            },
+        pytest.param(
+            TestInput(
+                request_loader_items=['http://a.com', 'http://b.com'],
+                request_manager_items=[],
+                discovered_items=[Request.from_url('http://c.com')],
+                expected_result={
+                    'http://a.com',
+                    'http://b.com',
+                    'http://c.com',
+                },
+            ),
+            id='basic_usage',
         ),
-        TestInput(
-            request_loader_items=[Request.from_url('http://a.com'), None, Request.from_url('http://c.com')],
-            request_manager_items=['http://b.com', 'http://d.com'],
-            discovered_items=[],
-            expected_result={
-                'http://a.com',
-                'http://b.com',
-                'http://c.com',
-                'http://d.com',
-            },
+        pytest.param(
+            TestInput(
+                request_loader_items=[Request.from_url('http://a.com'), None, Request.from_url('http://c.com')],
+                request_manager_items=['http://b.com', 'http://d.com'],
+                discovered_items=[],
+                expected_result={
+                    'http://a.com',
+                    'http://b.com',
+                    'http://c.com',
+                    'http://d.com',
+                },
+            ),
+            id='wait_for_read_only_source',
         ),
     ],
 )
