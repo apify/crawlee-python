@@ -65,7 +65,9 @@ class BaseBrowserController(ABC):
         """Create a new page with the given context options.
 
         Args:
-            browser_new_context_options: Options to configure the new context used for creating new page.
+            browser_new_context_options: Keyword arguments to pass to the browser new context method. These options
+                are provided directly to Playwright's `browser.new_context` method. For more details, refer to the
+                Playwright documentation: https://playwright.dev/python/docs/api/class-browser#browser-new-context.
             proxy_info: The proxy configuration to use for the new page.
 
         Returns:

@@ -46,9 +46,9 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
             browser_launch_options: Keyword arguments to pass to the browser launch method. These options are provided
                 directly to Playwright's `browser_type.launch` method. For more details, refer to the Playwright
                 documentation: https://playwright.dev/python/docs/api/class-browsertype#browser-type-launch.
-            browser_new_context_options: Keyword arguments to pass to the page object is set at the playwright context.
-                These options are provided directly to Playwright's `browser.new_context` method. For more details,
-                refer to the Playwright documentation: https://playwright.dev/python/docs/api/class-browser#browser-new-context.
+            browser_new_context_options: Keyword arguments to pass to the browser new context method. These options
+                are provided directly to Playwright's `browser.new_context` method. For more details, refer to the
+                Playwright documentation: https://playwright.dev/python/docs/api/class-browser#browser-new-context.
             max_open_pages_per_browser: The maximum number of pages that can be opened in a single browser instance.
                 Once reached, a new browser instance will be launched to handle the excess.
         """
@@ -76,11 +76,23 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
     @property
     @override
     def browser_launch_options(self) -> Mapping[str, Any]:
+        """Return the options for the `browser.launch` method.
+
+        Keyword arguments to pass to the browser launch method. These options are provided directly to Playwright's
+        `browser_type.launch` method. For more details, refer to the Playwright documentation:
+         https://playwright.dev/python/docs/api/class-browsertype#browser-type-launch.
+        """
         return self._browser_launch_options
 
     @property
     @override
     def browser_new_context_options(self) -> Mapping[str, Any]:
+        """Return the options for the `browser.new_context` method.
+
+        Keyword arguments to pass to the browser new context method. These options are provided directly to Playwright's
+        `browser.new_context` method. For more details, refer to the Playwright documentation:
+        https://playwright.dev/python/docs/api/class-browser#browser-new-context.
+        """
         return self._browser_new_context_options
 
     @property

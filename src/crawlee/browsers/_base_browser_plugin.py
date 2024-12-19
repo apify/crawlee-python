@@ -36,12 +36,22 @@ class BaseBrowserPlugin(ABC):
     @property
     @abstractmethod
     def browser_launch_options(self) -> Mapping[str, Any]:
-        """Return the options for the `browser.launch` method."""
+        """Return the options for the `browser.launch` method.
+
+        Keyword arguments to pass to the browser launch method. These options are provided directly to Playwright's
+        `browser_type.launch` method. For more details, refer to the Playwright documentation:
+         https://playwright.dev/python/docs/api/class-browsertype#browser-type-launch.
+        """
 
     @property
     @abstractmethod
     def browser_new_context_options(self) -> Mapping[str, Any]:
-        """Return the options for the `browser.new_context` method."""
+        """Return the options for the `browser.new_context` method.
+
+        Keyword arguments to pass to the browser new context method. These options are provided directly to Playwright's
+        `browser.new_context` method. For more details, refer to the Playwright documentation:
+        https://playwright.dev/python/docs/api/class-browser#browser-new-context.
+        """
 
     @property
     @abstractmethod
