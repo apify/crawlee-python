@@ -20,7 +20,6 @@ class RequestLoader(ABC):
 
     Key responsibilities:
         - Fetching the next request to be processed.
-        - Reclaiming requests that failed during processing, allowing retries.
         - Marking requests as successfully handled after processing.
         - Managing state information such as the total and handled request counts.
     """

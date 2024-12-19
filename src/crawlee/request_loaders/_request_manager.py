@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 @docs_group('Abstract classes')
 class RequestManager(RequestLoader, ABC):
-    """Abstract base class that extends `RequestLoader` with the capability to enqueue new requests."""
+    """Base class that extends `RequestLoader` with the capability to enqueue new requests and reclaim failed ones."""
 
     @abstractmethod
     async def drop(self) -> None:
