@@ -37,6 +37,10 @@ This section summarizes the breaking changes between v0.4.x and v0.5.0.
     - It implements the new `RequestLoader` interface instead of `RequestManager`
     - `RequestManagerTandem` with a `RequestQueue` should be used to enable passing a `RequestList` (or any other `RequestLoader` implementation) as a `request_manager`, `await list.to_tandem()` can be used as a shortcut
 
+### PlaywrightCrawler
+
+- The `PlaywrightPreNavigationContext` was renamed to `PlaywrightPreNavCrawlingContext`.
+
 ## Upgrading to v0.4
 
 This section summarizes the breaking changes between v0.3.x and v0.4.0.

@@ -12,10 +12,10 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 @docs_group('Data structures')
-class PlaywrightPreNavigationContext(BasicCrawlingContext):
-    """Context used by PlaywrightCrawler.
+class PlaywrightPreNavCrawlingContext(BasicCrawlingContext):
+    """The pre navigation crawling context used by the `PlaywrightCrawler`.
 
-    It Provides access to the `Page` object for the current browser page.
+    It provides access to the `Page` object, before the navigation to the URL is performed.
     """
 
     page: Page
