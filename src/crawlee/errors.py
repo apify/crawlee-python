@@ -11,6 +11,7 @@ __all__ = [
     'ContextPipelineFinalizationError',
     'ContextPipelineInitializationError',
     'ContextPipelineInterruptedError',
+    'HttpClientStatusCodeError',
     'HttpStatusCodeError',
     'ProxyError',
     'RequestHandlerError',
@@ -59,6 +60,11 @@ class HttpStatusCodeError(Exception):
         super().__init__(f'{message} (status code: {status_code}).')
         self.status_code = status_code
         self.message = message
+
+
+@docs_group('Errors')
+class HttpClientStatusCodeError(HttpStatusCodeError):
+    """Raised when the response status code indicates an client error."""
 
 
 @docs_group('Errors')

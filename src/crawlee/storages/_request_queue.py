@@ -119,8 +119,8 @@ class RequestQueue(BaseStorage, RequestManager):
         self._queue_paused_for_migration = False
 
         event_manager.on(event=Event.MIGRATING, listener=lambda _: setattr(self, '_queue_paused_for_migration', True))
-        event_manager.on(event=Event.MIGRATING, listener=lambda _: self._clear_possible_locks())
-        event_manager.on(event=Event.ABORTING, listener=lambda _: self._clear_possible_locks())
+        event_manager.on(event=Event.MIGRATING, listener=self._clear_possible_locks)
+        event_manager.on(event=Event.ABORTING, listener=self._clear_possible_locks)
 
         # Other internal attributes
         self._tasks = list[asyncio.Task]()
@@ -494,7 +494,7 @@ class RequestQueue(BaseStorage, RequestManager):
                 'Queue head still returned requests that need to be processed (or that are locked by other clients)',
             )
 
-        return not current_head.items and not self._in_progress
+        return (not current_head.items and not self._in_progress) or self._queue_paused_for_migration
 
     async def get_info(self) -> RequestQueueMetadata | None:
         """Get an object containing general information about the request queue."""

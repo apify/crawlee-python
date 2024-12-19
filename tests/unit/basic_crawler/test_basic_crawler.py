@@ -923,3 +923,61 @@ async def test_logs_final_statistics(monkeypatch: pytest.MonkeyPatch, caplog: py
         '│ crawler_runtime               │ 300.0     │',
         '└───────────────────────────────┴───────────┘',
     ]
+
+
+async def test_crawler_manual_stop(httpbin: URL) -> None:
+    """Test that no new requests are handled after crawler.stop() is called."""
+    start_urls = [
+        str(httpbin / '1'),
+        str(httpbin / '2'),
+        str(httpbin / '3'),
+    ]
+    processed_urls = []
+
+    # Set max_concurrency to 1 to ensure testing urls are visited one by one in order.
+    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(max_concurrency=1))
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        processed_urls.append(context.request.url)
+        if context.request.url == start_urls[1]:
+            crawler.stop()
+
+    stats = await crawler.run(start_urls)
+
+    # Verify that only 2 out of the 3 provided URLs were made
+    assert len(processed_urls) == 2
+    assert stats.requests_total == 2
+    assert stats.requests_finished == 2
+
+
+async def test_crawler_multiple_stops_in_parallel(httpbin: URL) -> None:
+    """Test that no new requests are handled after crawler.stop() is called, but ongoing requests can still finish."""
+    start_urls = [
+        str(httpbin / '1'),
+        str(httpbin / '2'),
+        str(httpbin / '3'),
+    ]
+    processed_urls = []
+
+    # Set max_concurrency to 2 to ensure two urls are being visited in parallel.
+    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(max_concurrency=2))
+
+    sleep_time_generator = iter([0, 0.1])
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        processed_urls.append(context.request.url)
+
+        # This sleep ensures that first request is processed quickly and triggers stop() almost immediately.
+        # Second request will have some sleep time to make sure it is still being processed after crawler.stop() was
+        # called from the first request and so the crawler is already shutting down.
+        await asyncio.sleep(next(sleep_time_generator))
+        crawler.stop(reason=f'Stop called on {context.request.url}')
+
+    stats = await crawler.run(start_urls)
+
+    # Verify that only 2 out of the 3 provided URLs were made
+    assert len(processed_urls) == 2
+    assert stats.requests_total == 2
+    assert stats.requests_finished == 2
