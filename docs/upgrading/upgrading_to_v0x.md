@@ -26,6 +26,10 @@ This section summarizes the breaking changes between v0.4.x and v0.5.0.
 
 - Removed properties `json_` and `order_no`.
 
+### PlaywrightCrawler
+
+- The `PlaywrightPreNavigationContext` was renamed to `PlaywrightPreNavCrawlingContext`.
+
 ## Upgrading to v0.4
 
 This section summarizes the breaking changes between v0.3.x and v0.4.0.
