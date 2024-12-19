@@ -24,7 +24,7 @@ This guide explains the different types of request storage available in Crawlee,
 
 ## Introduction
 
-All request storage types in Crawlee implement the same interface - <ApiLink to="class/RequestProvider">`RequestProvider`</ApiLink>. This unified interface allows them to be used in a consistent manner, regardless of the storage backend. The request providers are managed by storage clients - subclasses of <ApiLink to="class/BaseStorageClient">`BaseStorageClient`</ApiLink>. For instance, <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink> stores data in memory while it can also offload them to the local directory. Data are stored in the following directory structure:
+All request storage types in Crawlee implement the same interface - <ApiLink to="class/RequestManager">`RequestManager`</ApiLink>. This unified interface allows them to be used in a consistent manner, regardless of the storage backend. The request providers are managed by storage clients - subclasses of <ApiLink to="class/BaseStorageClient">`BaseStorageClient`</ApiLink>. For instance, <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink> stores data in memory while it can also offload them to the local directory. Data are stored in the following directory structure:
 
 ```text
 {CRAWLEE_STORAGE_DIR}/{request_provider}/{QUEUE_ID}/
@@ -100,7 +100,7 @@ TODO: write this section, once https://github.com/apify/crawlee-python/issues/99
 
 In some cases, you might need to combine requests from multiple sources, most frequently from a static list of URLs and a <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, where the queue takes care of persistence and retrying failed requests.
 
-This use case is supported via the <ApiLink to="class/RequestSourceTandem">`RequestSourceTandem`</ApiLink> class:
+This use case is supported via the <ApiLink to="class/RequestManagerTandem">`RequestManagerTandem`</ApiLink> class:
 
 <CodeBlock className="language-python">
     {TandemExample}
