@@ -49,6 +49,8 @@ class RequestList(RequestLoader):
         else:
             self._requests = self._iterate_in_threadpool(requests)
 
+        self._requests_lock: asyncio.Lock | None = None
+
     @property
     def name(self) -> str | None:
         return self._name
@@ -70,8 +72,12 @@ class RequestList(RequestLoader):
         if self._is_empty:
             return None
 
+        if self._requests_lock is None:
+            self._requests_lock = asyncio.Lock()
+
         try:
-            request = self._transform_request(await self._requests.__anext__())
+            async with self._requests_lock:
+                request = self._transform_request(await self._requests.__anext__())
         except StopAsyncIteration:
             self._is_empty = True
             return None
