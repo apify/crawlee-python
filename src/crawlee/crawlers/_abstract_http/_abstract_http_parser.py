@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Generic
 
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.docs import docs_group
-from crawlee.crawlers._basic import BlockedInfo
+from crawlee.crawlers._types import BlockedInfo
 
 from ._http_crawling_context import TParseResult
 

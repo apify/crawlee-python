@@ -11,7 +11,7 @@ try:
     from curl_cffi.requests.impersonate import DEFAULT_CHROME as CURL_DEFAULT_CHROME
 except ImportError as exc:
     raise ImportError(
-        "To import anything from this subpackage, you need to install the 'curl-impersonate' extra."
+        "To import anything from this subpackage, you need to install the 'curl-impersonate' extra. "
         "For example, if you use pip, run `pip install 'crawlee[curl-impersonate]'`.",
     ) from exc
 

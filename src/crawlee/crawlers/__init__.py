@@ -1,14 +1,42 @@
-import contextlib as _contextlib
+from crawlee._utils.try_import import install_import_hook as _install_import_hook
+from crawlee._utils.try_import import try_import as _try_import
 
 from ._abstract_http import AbstractHttpCrawler, AbstractHttpParser, HttpCrawlerOptions, ParsedHttpCrawlingContext
-from ._basic import BasicCrawler, BasicCrawlerOptions, BasicCrawlingContext, BlockedInfo, ContextPipeline
+from ._basic import BasicCrawler, BasicCrawlerOptions, BasicCrawlingContext, ContextPipeline
 from ._http import HttpCrawler, HttpCrawlingContext, HttpCrawlingResult
 
-with _contextlib.suppress(ImportError):
+_install_import_hook(__name__)
+
+# The following imports require try_import because they may not be available as they are optional dependencies.
+
+with _try_import(__name__, 'BeautifulSoupCrawler', 'BeautifulSoupCrawlingContext', 'BeautifulSoupParserType'):
     from ._beautifulsoup import BeautifulSoupCrawler, BeautifulSoupCrawlingContext, BeautifulSoupParserType
 
-with _contextlib.suppress(ImportError):
+with _try_import(__name__, 'ParselCrawler', 'ParselCrawlingContext'):
     from ._parsel import ParselCrawler, ParselCrawlingContext
 
-with _contextlib.suppress(ImportError):
+with _try_import(__name__, 'PlaywrightCrawler', 'PlaywrightCrawlingContext', 'PlaywrightPreNavCrawlingContext'):
     from ._playwright import PlaywrightCrawler, PlaywrightCrawlingContext, PlaywrightPreNavCrawlingContext
+
+
+__all__ = [
+    'AbstractHttpCrawler',
+    'AbstractHttpParser',
+    'BasicCrawler',
+    'BasicCrawlerOptions',
+    'BasicCrawlingContext',
+    'BeautifulSoupCrawler',
+    'BeautifulSoupCrawlingContext',
+    'BeautifulSoupParserType',
+    'ContextPipeline',
+    'HttpCrawler',
+    'HttpCrawlerOptions',
+    'HttpCrawlingContext',
+    'HttpCrawlingResult',
+    'ParsedHttpCrawlingContext',
+    'ParselCrawler',
+    'ParselCrawlingContext',
+    'PlaywrightCrawler',
+    'PlaywrightCrawlingContext',
+    'PlaywrightPreNavCrawlingContext',
+]

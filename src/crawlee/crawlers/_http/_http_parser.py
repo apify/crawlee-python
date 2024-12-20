@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from typing_extensions import override
 
 from crawlee.crawlers._abstract_http import AbstractHttpParser
-from crawlee.crawlers._basic import BlockedInfo
+from crawlee.crawlers._types import BlockedInfo
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
