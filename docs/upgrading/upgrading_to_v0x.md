@@ -26,6 +26,11 @@ This section summarizes the breaking changes between v0.4.x and v0.5.0.
 
 - Removed properties `json_` and `order_no`.
 
+### PlaywrightCrawler related kwargs renamed
+
+- Renamed `PlaywrightCrawler.__init__` keyword arguments: `browser_options` to `browser_launch_options`, `page_options` to `browser_new_context_options`.
+- Same keyword arguments renaming happened in `PlaywrightBrowserPlugin`, `BaseBrowserPlugin`, `PlaywrightBrowserController`, `BaseBrowserController` in all methods where previously named arguments were present.
+
 ## Upgrading to v0.4
 
 This section summarizes the breaking changes between v0.3.x and v0.4.0.
