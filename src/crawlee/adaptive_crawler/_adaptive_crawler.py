@@ -2,20 +2,32 @@ import asyncio
 from asyncio import Future
 from collections.abc import AsyncGenerator, Sequence
 from copy import deepcopy
+from dataclasses import fields
 from itertools import cycle
-from logging import getLogger
+from logging import getLogger, exception
 from typing import Any
 
-from typing_extensions import Unpack
+from bs4 import BeautifulSoup
+from typing_extensions import Unpack, Self
 
 from crawlee import Request
 from crawlee._types import BasicCrawlingContext
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
+from crawlee.beautifulsoup_crawler import BeautifulSoupCrawlingContext
+from crawlee.playwright_crawler import PlaywrightCrawlingContext
 from crawlee.statistics import FinalStatistics
 from crawlee.storages import RequestQueue
-#getLogger("crawlee._autoscaling.autoscaled_pool").setLevel("DEBUG")
-#getLogger("crawlee.storages._request_queue").setLevel("DEBUG")
+
+class AdaptiveCrawlingContext(BeautifulSoupCrawlingContext, PlaywrightCrawlingContext):
+
+    @classmethod
+    def from_playwright_crawling_context(cls, context: PlaywrightCrawlingContext, soup: BeautifulSoup) -> Self:
+        return cls(parsed_content=soup, **{field.name: getattr(context, field.name) for field in fields(context)})
+
+    @classmethod
+    def from_beautifulsoup_crawling_context(cls, context: PlaywrightCrawlingContext, soup: BeautifulSoup) -> Self:
+        return cls(response=None, infinite_scroll=None, page=None, **{field.name: getattr(context, field.name) for field in fields(context)})
 
 class AdaptiveCrawler(BasicCrawler):
     def __init__(
@@ -28,31 +40,43 @@ class AdaptiveCrawler(BasicCrawler):
         self._primary_crawler = primary_crawler
         self._secondary_crawler = secondary_crawler
         # Compose the context pipeline.
-        kwargs['_context_pipeline'] = ContextPipeline().compose(self._delegate_to_crawlers)
+        kwargs['_context_pipeline'] = ContextPipeline().compose(self._delegate_to_subcrawlers)
         self.coordinator = _Coordinator(primary_crawler, secondary_crawler)
         super().__init__(**kwargs)
 
 
-    async def _delegate_to_crawlers(self, context: BasicCrawlingContext) -> AsyncGenerator[BasicCrawlingContext, None]:
-        #if next(self.use_secondary_crawler):
+    async def _delegate_to_subcrawlers(self, context: BasicCrawlingContext) -> AsyncGenerator[AdaptiveCrawlingContext, None]:
 
-        # This has to be "atomic" with some sort of lock to prevent parallel delegations to prevent from crawler from resource blocking itself and to have consistent behavoir with JS
+        # This can be "atomic" with some sort of lock to prevent parallel delegations to prevent from crawler from resource blocking itself and to have consistent behavoir with JS
+        # Or there can be limit on each subcrawler "active delegation count". Do only if needed.
 
 
         async with self.coordinator.result_cleanup(request_id=context.request.id):
             # TODO: some logic that decides when to run which crawler. Copy from JS
-            await ((await self._primary_crawler.get_request_provider()).add_request(deepcopy(context.request))) # Each request has to be passed as copy to decouple processing, otherwise even if processed by different request queues it will be still coupled.
             await ((await self._secondary_crawler.get_request_provider()).add_request(deepcopy(context.request)))
+            await ((await self._primary_crawler.get_request_provider()).add_request(deepcopy(context.request))) # Each request has to be passed as copy to decouple processing, otherwise even if processed by different request queues it will be still coupled.
 
-            p_result = await self.coordinator.get_result(self._primary_crawler, context.request.id)
-            s_result = await self.coordinator.get_result(self._secondary_crawler, context.request.id)
+
+            # This will always happen
+            primary_crawler_result = await self.coordinator.get_result(self._primary_crawler, context.request.id)
+
+            #This just sometimes
+            secondary_crawler_result = await self.coordinator.get_result(self._secondary_crawler, context.request.id)
             # TODO: Do some work with the result, compare, analyze, save them. Enhance context
 
         # End of "atomic" lock
-        yield context
+
+        """
+        content = await s_context.page.content()
+        body = await s_context.response.body()
+        """
+        #context = AdaptiveCrawlingContext.from_playwright_crawling_context(s_context)
+        yield primary_crawler_result
 
     def _connect_crawlers(self):
-        """Point storage of subcrawlers to the storage of top crawler"""
+        """Point storage of subcrawlers to the storage of top crawler or other related connections"""
+
+        # Maybe not needed.
         pass
 
     async def _keep_crawlers_alive(self) -> None:
@@ -74,15 +98,24 @@ class AdaptiveCrawler(BasicCrawler):
     async def run( self,requests: Sequence[str | Request] | None = None,*,
         purge_request_queue: bool = True) -> FinalStatistics:
 
-        await self._keep_crawlers_alive()
-        tasks = [asyncio.create_task(self._primary_crawler.run()),asyncio.create_task(self._secondary_crawler.run())]
-        await super().run(requests=requests, purge_request_queue=purge_request_queue)
-        await self._kill_crawlers()
+        # TODO: Make something robust, maybe some context that keeps track of subcrawlers
+        try:
+            await self._keep_crawlers_alive()
+            tasks = [asyncio.create_task(self._primary_crawler.run()),asyncio.create_task(self._secondary_crawler.run())]
+
+            await super().run(requests=requests, purge_request_queue=purge_request_queue)
+
+        except Exception as e:
+            raise e
+        finally:
+            await self._kill_crawlers()
         await asyncio.gather(*tasks)
 
+        # TODO: Handle stats
 
 
-class _Coordinator():
+# TODO: Make generic based on the crawler result types
+class _Coordinator:
     """Some way to share state and results between different crawlers."""
     def __init__(self, crawler1: BasicCrawler, crawler2: BasicCrawler) -> None:
         self._id1=id(crawler1)
