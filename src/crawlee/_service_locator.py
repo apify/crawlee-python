@@ -39,7 +39,7 @@ class ServiceLocator:
             configuration: The configuration to set.
 
         Raises:
-            ServiceConflictError: If the configuration was already set.
+            ServiceConflictError: If the configuration has already been retrieved before.
         """
         if self._configuration_was_retrieved:
             raise ServiceConflictError(Configuration, configuration, self._configuration)
@@ -63,7 +63,7 @@ class ServiceLocator:
             event_manager: The event manager to set.
 
         Raises:
-            ServiceConflictError: If the event manager was already set.
+            ServiceConflictError: If the event manager has already been retrieved before.
         """
         if self._event_manager_was_retrieved:
             raise ServiceConflictError(EventManager, event_manager, self._event_manager)
@@ -87,7 +87,7 @@ class ServiceLocator:
             storage_client: The storage client to set.
 
         Raises:
-            ServiceConflictError: If the storage client was already set.
+            ServiceConflictError: If the storage client has already been retrieved before.
         """
         if self._storage_client_was_retrieved:
             raise ServiceConflictError(BaseStorageClient, storage_client, self._storage_client)
