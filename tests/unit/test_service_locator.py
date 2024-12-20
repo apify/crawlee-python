@@ -35,7 +35,7 @@ def test_configuration_conflict() -> None:
     service_locator.get_configuration()
     custom_config = Configuration(default_browser_path='custom_path')
 
-    with pytest.raises(ServiceConflictError, match='Configuration has already been set.'):
+    with pytest.raises(ServiceConflictError, match='Configuration is already in use.'):
         service_locator.set_configuration(custom_config)
 
 
@@ -66,7 +66,7 @@ def test_event_manager_conflict() -> None:
     service_locator.get_event_manager()
     custom_event_manager = LocalEventManager()
 
-    with pytest.raises(ServiceConflictError, match='EventManager has already been set.'):
+    with pytest.raises(ServiceConflictError, match='EventManager is already in use.'):
         service_locator.set_event_manager(custom_event_manager)
 
 
@@ -97,5 +97,5 @@ def test_storage_client_conflict() -> None:
     service_locator.get_storage_client()
     custom_storage_client = MemoryStorageClient.from_config()
 
-    with pytest.raises(ServiceConflictError, match='StorageClient has already been set.'):
+    with pytest.raises(ServiceConflictError, match='StorageClient is already in use.'):
         service_locator.set_storage_client(custom_storage_client)
