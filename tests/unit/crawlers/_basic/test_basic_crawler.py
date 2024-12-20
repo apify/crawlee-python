@@ -22,10 +22,10 @@ from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
 from crawlee.errors import SessionError, UserDefinedErrorHandlerError
 from crawlee.events._local_event_manager import LocalEventManager
-from crawlee.memory_storage_client import MemoryStorageClient
-from crawlee.memory_storage_client._dataset_client import DatasetClient
 from crawlee.request_loaders import RequestList, RequestManagerTandem
 from crawlee.statistics import FinalStatistics
+from crawlee.storage_clients import MemoryStorageClient
+from crawlee.storage_clients._memory import DatasetClient
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 if TYPE_CHECKING:
