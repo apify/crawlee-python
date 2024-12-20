@@ -234,15 +234,16 @@ def test_import_error_handled() -> None:
     # Simulate ImportError for parsel
     with mock.patch.dict('sys.modules', {'parsel': None}):
         # Invalidate ParselCrawler import
-        sys.modules.pop('crawlee._parsel', None)
-        sys.modules.pop('crawlee._parsel._parsel_crawler', None)
+        sys.modules.pop('crawlee.crawlers', None)
+        sys.modules.pop('crawlee.crawlers._parsel', None)
+        sys.modules.pop('crawlee.crawlers._parsel.ParselCrawler', None)
 
         with pytest.raises(ImportError) as import_error:
-            from crawlee.crawlers._parsel import ParselCrawler  # noqa: F401
+            from crawlee.crawlers import ParselCrawler  # noqa: F401
 
     # Check if the raised ImportError contains the expected message
     assert str(import_error.value) == (
-        "To import anything from this subpackage, you need to install the 'parsel' extra."
+        "To import anything from this subpackage, you need to install the 'parsel' extra. "
         "For example, if you use pip, run `pip install 'crawlee[parsel]'`."
     )
 

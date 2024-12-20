@@ -11,8 +11,7 @@ from httpx import Response
 
 from crawlee._request import Request
 from crawlee.crawlers import HttpCrawler
-from crawlee.http_clients._httpx import HttpxHttpClient
-from crawlee.http_clients.curl_impersonate import CurlImpersonateHttpClient
+from crawlee.http_clients import CurlImpersonateHttpClient, HttpxHttpClient
 from crawlee.sessions import SessionPool
 
 if TYPE_CHECKING:

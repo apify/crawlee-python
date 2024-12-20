@@ -7,7 +7,7 @@ from ._http import HttpCrawler, HttpCrawlingContext, HttpCrawlingResult
 
 _install_import_hook(__name__)
 
-# The following imports require try_import because they may not be available as they are optional dependencies.
+# The following imports use try_import to handle optional dependencies, as they may not always be available.
 
 with _try_import(__name__, 'BeautifulSoupCrawler', 'BeautifulSoupCrawlingContext', 'BeautifulSoupParserType'):
     from ._beautifulsoup import BeautifulSoupCrawler, BeautifulSoupCrawlingContext, BeautifulSoupParserType
