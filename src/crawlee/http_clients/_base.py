@@ -11,8 +11,8 @@ from crawlee.errors import HttpClientStatusCodeError, HttpStatusCodeError
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from crawlee import Request
     from crawlee._types import HttpHeaders, HttpMethod, HttpPayload
-    from crawlee.base_storage_client._models import Request
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions import Session
     from crawlee.statistics import Statistics

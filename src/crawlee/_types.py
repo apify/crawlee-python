@@ -3,18 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from enum import Enum
-from typing import (
-    TYPE_CHECKING,
-    Annotated,
-    Any,
-    Literal,
-    Optional,
-    Protocol,
-    TypeVar,
-    Union,
-    cast,
-    overload,
-)
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Optional, Protocol, TypeVar, Union, cast, overload
 
 from pydantic import ConfigDict, Field, PlainValidator, RootModel
 from typing_extensions import NotRequired, TypeAlias, TypedDict, Unpack
@@ -26,14 +15,14 @@ if TYPE_CHECKING:
     import re
     from collections.abc import Coroutine, Sequence
 
-    from crawlee import Glob
-    from crawlee._request import BaseRequestData, Request
-    from crawlee.base_storage_client._models import DatasetItemsListPage
+    from crawlee import Glob, Request
+    from crawlee._request import BaseRequestData
     from crawlee.http_clients import HttpResponse
     from crawlee.proxy_configuration import ProxyInfo
-    from crawlee.sessions._session import Session
+    from crawlee.sessions import Session
+    from crawlee.storage_clients.models import DatasetItemsListPage
+    from crawlee.storages import KeyValueStore
     from crawlee.storages._dataset import ExportToKwargs, GetDataKwargs
-    from crawlee.storages._key_value_store import KeyValueStore
 
     # Workaround for https://github.com/pydantic/pydantic/issues/9445
     J = TypeVar('J', bound='JsonSerializable')

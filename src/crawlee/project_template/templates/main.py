@@ -4,9 +4,9 @@ from apify import Actor
 # % block import required
 # % endblock
 # % if cookiecutter.http_client == 'curl-impersonate'
-from crawlee.http_clients.curl_impersonate import CurlImpersonateHttpClient
+from crawlee.http_clients import CurlImpersonateHttpClient
 # % elif cookiecutter.http_client == 'httpx'
-from crawlee.http_clients._httpx import HttpxHttpClient
+from crawlee.http_clients import HttpxHttpClient
 # % endif
 
 from .routes import router

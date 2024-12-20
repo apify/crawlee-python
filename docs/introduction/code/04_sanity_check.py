@@ -1,7 +1,7 @@
 import asyncio
 
 # Instead of BeautifulSoupCrawler let's use Playwright to be able to render JavaScript.
-from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
+from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext
 
 
 async def main() -> None:

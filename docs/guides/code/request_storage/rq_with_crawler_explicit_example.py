@@ -1,6 +1,6 @@
 import asyncio
 
-from crawlee.http_crawler import HttpCrawler, HttpCrawlingContext
+from crawlee.crawlers import HttpCrawler, HttpCrawlingContext
 from crawlee.storages import RequestQueue
 
 

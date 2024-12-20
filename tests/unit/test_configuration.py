@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 
 from crawlee import service_locator
 from crawlee.configuration import Configuration
-from crawlee.http_crawler import HttpCrawler, HttpCrawlingContext
-from crawlee.memory_storage_client._memory_storage_client import MemoryStorageClient
+from crawlee.crawlers import HttpCrawler, HttpCrawlingContext
+from crawlee.storage_clients import MemoryStorageClient
 
 if TYPE_CHECKING:
     from pathlib import Path

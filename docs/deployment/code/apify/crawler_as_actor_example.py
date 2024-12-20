@@ -1,6 +1,6 @@
 from apify import Actor
 
-from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
+from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 
 
 async def main() -> None:

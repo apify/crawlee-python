@@ -7,16 +7,17 @@ from typing_extensions import override
 
 from crawlee import service_locator
 from crawlee._utils.docs import docs_group
-from crawlee.base_storage_client import BaseStorageClient, KeyValueStoreKeyInfo, KeyValueStoreMetadata
 from crawlee.events._types import Event, EventPersistStateData
-from crawlee.storages._base_storage import BaseStorage
+from crawlee.storage_clients.models import KeyValueStoreKeyInfo, KeyValueStoreMetadata
+
+from ._base_storage import BaseStorage
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
     from crawlee._types import JsonSerializable
-    from crawlee.base_storage_client import BaseStorageClient
     from crawlee.configuration import Configuration
+    from crawlee.storage_clients import BaseStorageClient
 
 T = TypeVar('T')
 

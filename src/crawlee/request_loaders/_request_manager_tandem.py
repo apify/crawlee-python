@@ -13,8 +13,8 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from crawlee import Request
-    from crawlee.base_storage_client._models import ProcessedRequest
     from crawlee.request_loaders import RequestLoader
+    from crawlee.storage_clients.models import ProcessedRequest
 
 
 logger = getLogger(__name__)

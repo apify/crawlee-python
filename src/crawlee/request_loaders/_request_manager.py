@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from crawlee._request import Request
-    from crawlee.base_storage_client._models import ProcessedRequest
+    from crawlee.storage_clients.models import ProcessedRequest
 
 
 @docs_group('Abstract classes')
