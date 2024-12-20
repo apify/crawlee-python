@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - Expose event types, improve on&#x2F;emit signature, allow parameterless listeners ([#800](https://github.com/apify/crawlee-python/pull/800)) ([c102c4c](https://github.com/apify/crawlee-python/commit/c102c4c894a00b09adfd5f4911563c81cf3e98b4)) by [@janbuchar](https://github.com/janbuchar), closes [#561](https://github.com/apify/crawlee-python/issues/561)
 - Add stop method to BasicCrawler ([#807](https://github.com/apify/crawlee-python/pull/807)) ([6d01af4](https://github.com/apify/crawlee-python/commit/6d01af4231d02b4349a8719f5ed18d812843fde5)) by [@Pijukatel](https://github.com/Pijukatel), closes [#651](https://github.com/apify/crawlee-python/issues/651)
 - Add `html_to_text` helper function ([#792](https://github.com/apify/crawlee-python/pull/792)) ([2b9d970](https://github.com/apify/crawlee-python/commit/2b9d97009dd653870681bb3cadbb46b214ff1a73)) by [@Pijukatel](https://github.com/Pijukatel), closes [#659](https://github.com/apify/crawlee-python/issues/659)
+- [**breaking**] Implement `RequestManagerTandem`, remove `add_request` from `RequestList`, accept any iterable in `RequestList` constructor ([#777](https://github.com/apify/crawlee-python/pull/777)) ([4172652](https://github.com/apify/crawlee-python/commit/4172652079e5e91190c1cc5e2138fd41a7c84a6b)) by [@janbuchar](https://github.com/janbuchar)
 
 ### 🐛 Bug Fixes
 
@@ -28,6 +29,7 @@ All notable changes to this project will be documented in this file.
 
 - [**breaking**] Refactor HttpCrawler, BeautifulSoupCrawler, ParselCrawler inheritance ([#746](https://github.com/apify/crawlee-python/pull/746)) ([9d3c269](https://github.com/apify/crawlee-python/commit/9d3c2697c91ce93028ca86a91d85d465d36c1ad7)) by [@Pijukatel](https://github.com/Pijukatel), closes [#350](https://github.com/apify/crawlee-python/issues/350)
 - [**breaking**] Remove `json_` and `order_no` from `Request` ([#788](https://github.com/apify/crawlee-python/pull/788)) ([5381d13](https://github.com/apify/crawlee-python/commit/5381d13aa51a757fc1906f400788555df090a1af)) by [@Mantisus](https://github.com/Mantisus), closes [#94](https://github.com/apify/crawlee-python/issues/94)
+- [**breaking**] Rename PwPreNavContext to PwPreNavCrawlingContext ([#827](https://github.com/apify/crawlee-python/pull/827)) ([84b61a3](https://github.com/apify/crawlee-python/commit/84b61a3d25bee42faed4e81cd156663f251b3d3d)) by [@vdusek](https://github.com/vdusek)
 
 
 <!-- git-cliff-unreleased-end -->
