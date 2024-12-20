@@ -269,7 +269,8 @@ class BrowserPool:
                 browser_controller = await asyncio.wait_for(self._launch_new_browser(plugin), timeout)
             page = await asyncio.wait_for(
                 browser_controller.new_page(
-                    browser_new_context_options=plugin.browser_new_context_options, proxy_info=proxy_info
+                    browser_new_context_options=plugin.browser_new_context_options,
+                    proxy_info=proxy_info,
                 ),
                 timeout,
             )

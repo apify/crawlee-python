@@ -90,7 +90,6 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 are provided directly to Playwright's `browser.new_context` method. For more details, refer to the
                 Playwright documentation: https://playwright.dev/python/docs/api/class-browser#browser-new-context.
                 This option should not be used if `browser_pool` is provided.
-                This option should not be used if `browser_pool` is provided.
             headless: Whether to run the browser in headless mode.
                 This option should not be used if `browser_pool` is provided.
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
