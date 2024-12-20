@@ -33,6 +33,7 @@ All notable changes to this project will be documented in this file.
 - [**breaking**] Remove `json_` and `order_no` from `Request` ([#788](https://github.com/apify/crawlee-python/pull/788)) ([5381d13](https://github.com/apify/crawlee-python/commit/5381d13aa51a757fc1906f400788555df090a1af)) by [@Mantisus](https://github.com/Mantisus), closes [#94](https://github.com/apify/crawlee-python/issues/94)
 - [**breaking**] Rename PwPreNavContext to PwPreNavCrawlingContext ([#827](https://github.com/apify/crawlee-python/pull/827)) ([84b61a3](https://github.com/apify/crawlee-python/commit/84b61a3d25bee42faed4e81cd156663f251b3d3d)) by [@vdusek](https://github.com/vdusek)
 - [**breaking**] Rename PlaywrightCrawler kwargs: browser_options, page_options ([#831](https://github.com/apify/crawlee-python/pull/831)) ([ffc6048](https://github.com/apify/crawlee-python/commit/ffc6048e9dc5c5e862271fa50c48bb0fb6f0a18f)) by [@Pijukatel](https://github.com/Pijukatel)
+- [**breaking**] Update the crawlers &amp; storage clients structure ([#828](https://github.com/apify/crawlee-python/pull/828)) ([0ba04d1](https://github.com/apify/crawlee-python/commit/0ba04d1633881043928a408678932c46fb90e21f)) by [@vdusek](https://github.com/vdusek), closes [#764](https://github.com/apify/crawlee-python/issues/764)
 
 
 <!-- git-cliff-unreleased-end -->
