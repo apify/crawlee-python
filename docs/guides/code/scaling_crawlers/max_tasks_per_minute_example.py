@@ -1,7 +1,7 @@
 import asyncio
 
 from crawlee import ConcurrencySettings
-from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler
+from crawlee.crawlers import BeautifulSoupCrawler
 
 
 async def main() -> None:

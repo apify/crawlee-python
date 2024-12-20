@@ -6,7 +6,7 @@ from crawlee import service_locator
 from crawlee.configuration import Configuration
 from crawlee.errors import ServiceConflictError
 from crawlee.events import LocalEventManager
-from crawlee.memory_storage_client import MemoryStorageClient
+from crawlee.storage_clients import MemoryStorageClient
 
 
 def test_default_configuration() -> None:

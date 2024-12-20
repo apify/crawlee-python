@@ -12,8 +12,8 @@ from yarl import URL
 
 from crawlee import service_locator
 from crawlee.configuration import Configuration
-from crawlee.memory_storage_client import MemoryStorageClient
 from crawlee.proxy_configuration import ProxyInfo
+from crawlee.storage_clients import MemoryStorageClient
 from crawlee.storages import _creation_management
 
 if TYPE_CHECKING:

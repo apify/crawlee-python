@@ -6,7 +6,7 @@ from typing_extensions import override
 
 from crawlee._utils.context import ensure_context
 from crawlee.browsers import PlaywrightBrowserPlugin, PlaywrightBrowserController, BrowserPool
-from crawlee.playwright_crawler import PlaywrightCrawler
+from crawlee.crawlers import PlaywrightCrawler
 # % endblock
 
 # % block pre_main

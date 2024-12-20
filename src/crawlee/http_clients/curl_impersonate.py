@@ -28,8 +28,8 @@ if TYPE_CHECKING:
 
     from curl_cffi.requests import Response
 
+    from crawlee import Request
     from crawlee._types import HttpMethod
-    from crawlee.base_storage_client._models import Request
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions import Session
     from crawlee.statistics import Statistics

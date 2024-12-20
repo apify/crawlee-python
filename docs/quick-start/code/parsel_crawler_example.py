@@ -1,6 +1,6 @@
 import asyncio
 
-from crawlee.parsel_crawler import ParselCrawler, ParselCrawlingContext
+from crawlee.crawlers import ParselCrawler, ParselCrawlingContext
 
 
 async def main() -> None:

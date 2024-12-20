@@ -1,7 +1,7 @@
 # % extends 'main.py'
 
 # % block import
-from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler
+from crawlee.crawlers import BeautifulSoupCrawler
 # % endblock
 
 # % block instantiation

@@ -1,7 +1,7 @@
 # % extends 'main.py'
 
 # % block import
-from crawlee.parsel_crawler import ParselCrawler
+from crawlee.crawlers import ParselCrawler
 # % endblock
 
 # % block instantiation

@@ -1,4 +1,4 @@
-from crawlee.parsel_crawler import ParselCrawlingContext
+from crawlee.crawlers import ParselCrawlingContext
 from crawlee.router import Router
 
 router = Router[ParselCrawlingContext]()

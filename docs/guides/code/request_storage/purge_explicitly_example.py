@@ -1,6 +1,6 @@
 import asyncio
 
-from crawlee.memory_storage_client import MemoryStorageClient
+from crawlee.storage_clients import MemoryStorageClient
 
 
 async def main() -> None:

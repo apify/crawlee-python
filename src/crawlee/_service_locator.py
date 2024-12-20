@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from crawlee._utils.docs import docs_group
-from crawlee.base_storage_client._base_storage_client import BaseStorageClient
 from crawlee.configuration import Configuration
 from crawlee.errors import ServiceConflictError
-from crawlee.events._event_manager import EventManager
+from crawlee.events import EventManager
+from crawlee.storage_clients import BaseStorageClient
 
 
 @docs_group('Classes')
@@ -73,7 +73,7 @@ class ServiceLocator:
     def get_storage_client(self) -> BaseStorageClient:
         """Get the storage client."""
         if self._storage_client is None:
-            from crawlee.memory_storage_client import MemoryStorageClient
+            from crawlee.storage_clients import MemoryStorageClient
 
             self._storage_client = MemoryStorageClient.from_config()
 

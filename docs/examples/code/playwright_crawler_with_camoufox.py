@@ -5,7 +5,7 @@ from camoufox import AsyncNewBrowser
 from typing_extensions import override
 
 from crawlee.browsers import BrowserPool, PlaywrightBrowserController, PlaywrightBrowserPlugin
-from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
+from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext
 
 
 class CamoufoxPlugin(PlaywrightBrowserPlugin):

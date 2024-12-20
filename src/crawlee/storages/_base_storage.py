@@ -4,8 +4,8 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from crawlee.base_storage_client import BaseStorageClient
     from crawlee.configuration import Configuration
+    from crawlee.storage_clients._base import BaseStorageClient
 
 
 class BaseStorage(ABC):

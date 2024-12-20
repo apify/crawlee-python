@@ -1,4 +1,4 @@
-from crawlee.beautifulsoup_crawler import BeautifulSoupCrawlingContext
+from crawlee.crawlers import BeautifulSoupCrawlingContext
 from crawlee.router import Router
 
 router = Router[BeautifulSoupCrawlingContext]()

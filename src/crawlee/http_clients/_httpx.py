@@ -18,8 +18,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
     from ssl import SSLContext
 
+    from crawlee import Request
     from crawlee._types import HttpMethod, HttpPayload
-    from crawlee.base_storage_client._models import Request
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.statistics import Statistics
 
