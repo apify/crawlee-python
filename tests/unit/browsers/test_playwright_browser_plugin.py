@@ -21,15 +21,15 @@ async def plugin() -> AsyncGenerator[PlaywrightBrowserPlugin, None]:
 async def test_initial_state() -> None:
     plugin = PlaywrightBrowserPlugin(
         browser_type='chromium',
-        browser_options={'headless': False},
-        page_options={'viewport': {'width': 1920, 'height': 1080}},
+        browser_launch_options={'headless': False},
+        browser_new_context_options={'viewport': {'width': 1920, 'height': 1080}},
         max_open_pages_per_browser=10,
     )
 
     # Test initial state
     assert plugin.browser_type == 'chromium'
-    assert plugin.browser_options == {'headless': False}
-    assert plugin.page_options == {'viewport': {'width': 1920, 'height': 1080}}
+    assert plugin.browser_launch_options == {'headless': False}
+    assert plugin.browser_new_context_options == {'viewport': {'width': 1920, 'height': 1080}}
     assert plugin.max_open_pages_per_browser == 10
 
 

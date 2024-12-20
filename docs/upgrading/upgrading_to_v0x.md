@@ -40,6 +40,10 @@ This section summarizes the breaking changes between v0.4.x and v0.5.0.
 ### PlaywrightCrawler
 
 - The `PlaywrightPreNavigationContext` was renamed to `PlaywrightPreNavCrawlingContext`.
+- The input arguments in `PlaywrightCrawler.__init__` have been renamed:
+    - `browser_options` is now `browser_launch_options`,
+    - `page_options` is now `browser_new_context_options`.
+- These argument renaming changes have also been applied to `BrowserPool`, `PlaywrightBrowserPlugin`, and `PlaywrightBrowserController`.
 
 ## Upgrading to v0.4
 
