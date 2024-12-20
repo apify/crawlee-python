@@ -136,7 +136,6 @@ class RequestQueue(BaseStorage, RequestProvider):
         self._in_progress: set[str] = set()
         self._last_activity = datetime.now(timezone.utc)
         self._recently_handled: BoundedSet[str] = BoundedSet(max_length=self._RECENTLY_HANDLED_CACHE_SIZE)
-        logger.debug(f"{id_func(self._recently_handled._data)=}")
         self._requests_cache: LRUCache[CachedRequest] = LRUCache(max_length=self._MAX_CACHED_REQUESTS)
 
     @property
@@ -556,7 +555,6 @@ class RequestQueue(BaseStorage, RequestProvider):
                         'recently_handled': request.id in self._recently_handled,
                     },
                 )
-                logger.debug(f"{self._recently_handled=}, {id_func(self._recently_handled._data)=}, {self=}")
 
                 # Remove the lock from the request for now, so that it can be picked up later
                 # This may/may not succeed, but that's fine

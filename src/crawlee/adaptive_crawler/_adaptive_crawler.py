@@ -1,7 +1,10 @@
 import asyncio
+from asyncio import Future
 from collections.abc import AsyncGenerator, Sequence
+from copy import deepcopy
 from itertools import cycle
 from logging import getLogger
+from typing import Any
 
 from typing_extensions import Unpack
 
@@ -11,8 +14,8 @@ from crawlee._utils.crypto import crypto_random_object_id
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.statistics import FinalStatistics
 from crawlee.storages import RequestQueue
-getLogger("crawlee._autoscaling.autoscaled_pool").setLevel("DEBUG")
-getLogger("crawlee.storages._request_queue").setLevel("DEBUG")
+#getLogger("crawlee._autoscaling.autoscaled_pool").setLevel("DEBUG")
+#getLogger("crawlee.storages._request_queue").setLevel("DEBUG")
 
 class AdaptiveCrawler(BasicCrawler):
     def __init__(
@@ -26,16 +29,26 @@ class AdaptiveCrawler(BasicCrawler):
         self._secondary_crawler = secondary_crawler
         # Compose the context pipeline.
         kwargs['_context_pipeline'] = ContextPipeline().compose(self._delegate_to_crawlers)
-        # Some way of toggling. TODO: Copy from JS in the future
-        self.use_secondary_crawler = cycle((False, True))
+        self.coordinator = _Coordinator(primary_crawler, secondary_crawler)
         super().__init__(**kwargs)
 
 
     async def _delegate_to_crawlers(self, context: BasicCrawlingContext) -> AsyncGenerator[BasicCrawlingContext, None]:
         #if next(self.use_secondary_crawler):
-        await ((await self._primary_crawler.get_request_provider()).add_request(context.request))
-        await ((await self._secondary_crawler.get_request_provider()).add_request(context.request))
 
+        # This has to be "atomic" with some sort of lock to prevent parallel delegations to prevent from crawler from resource blocking itself and to have consistent behavoir with JS
+
+
+        async with self.coordinator.result_cleanup(request_id=context.request.id):
+            # TODO: some logic that decides when to run which crawler. Copy from JS
+            await ((await self._primary_crawler.get_request_provider()).add_request(deepcopy(context.request))) # Each request has to be passed as copy to decouple processing, otherwise even if processed by different request queues it will be still coupled.
+            await ((await self._secondary_crawler.get_request_provider()).add_request(deepcopy(context.request)))
+
+            p_result = await self.coordinator.get_result(self._primary_crawler, context.request.id)
+            s_result = await self.coordinator.get_result(self._secondary_crawler, context.request.id)
+            # TODO: Do some work with the result, compare, analyze, save them. Enhance context
+
+        # End of "atomic" lock
         yield context
 
     def _connect_crawlers(self):
@@ -66,3 +79,51 @@ class AdaptiveCrawler(BasicCrawler):
         await super().run(requests=requests, purge_request_queue=purge_request_queue)
         await self._kill_crawlers()
         await asyncio.gather(*tasks)
+
+
+
+class _Coordinator():
+    """Some way to share state and results between different crawlers."""
+    def __init__(self, crawler1: BasicCrawler, crawler2: BasicCrawler) -> None:
+        self._id1=id(crawler1)
+        self._id2=id(crawler2)
+        self._results = {self._id1: {}, self._id2: {}}
+        self.locks = {}
+
+
+    def register_expected_result(self, request_id: str):
+        self._results[self._id1][request_id] = Future()
+        self._results[self._id2][request_id] = Future()
+
+
+    async def get_result(self, crawler: BasicCrawler, request_id: str, timeout: int =1):
+        # TODO: Handle timeouts and edge cases
+        return await self._results[id(crawler)][request_id]
+
+
+    def set_result(self, crawler: BasicCrawler, request_id: str, result: Any) -> None:
+        self._results[id(crawler)][request_id].set_result(result)
+
+
+    def remove_result(self, request_id):
+        del self._results[self._id1][request_id]
+        del self._results[self._id2][request_id]
+
+    def result_cleanup(self, request_id: str):
+        return _CoordinatorResultCleanup(self, request_id)
+
+
+
+class _CoordinatorResultCleanup:
+
+    def __init__(self, coordinator: _Coordinator, request_id: str):
+        self._coordinator = coordinator
+        self._request_id = request_id
+
+    async def __aenter__(self):
+        self._coordinator.register_expected_result(self._request_id)
+        return self
+
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        return self._coordinator.remove_result(self._request_id)
