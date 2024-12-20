@@ -9,18 +9,21 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, Mock
 
 import httpx
 import pytest
 
-from crawlee import ConcurrencySettings, EnqueueStrategy, Glob
+from crawlee import ConcurrencySettings, EnqueueStrategy, Glob, service_locator
 from crawlee._request import BaseRequestData, Request
 from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpHeaders
 from crawlee.basic_crawler import BasicCrawler
 from crawlee.configuration import Configuration
 from crawlee.errors import SessionError, UserDefinedErrorHandlerError
+from crawlee.events._local_event_manager import LocalEventManager
+from crawlee.memory_storage_client import MemoryStorageClient
+from crawlee.memory_storage_client._dataset_client import DatasetClient
 from crawlee.request_loaders import RequestList, RequestManagerTandem
 from crawlee.statistics import FinalStatistics
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
@@ -997,3 +1000,49 @@ async def test_crawler_multiple_stops_in_parallel(httpbin: URL) -> None:
     assert len(processed_urls) == 2
     assert stats.requests_total == 2
     assert stats.requests_finished == 2
+
+
+async def test_sets_services() -> None:
+    custom_configuration = Configuration()
+    custom_event_manager = LocalEventManager()
+    custom_storage_client = MemoryStorageClient.from_config(custom_configuration)
+
+    crawler = BasicCrawler(
+        configuration=custom_configuration,
+        event_manager=custom_event_manager,
+        storage_client=custom_storage_client,
+    )
+
+    assert service_locator.get_configuration() is custom_configuration
+    assert service_locator.get_event_manager() is custom_event_manager
+    assert service_locator.get_storage_client() is custom_storage_client
+
+    dataset = await crawler.get_dataset(name='test')
+    assert cast(DatasetClient, dataset._resource_client)._memory_storage_client is custom_storage_client
+
+
+async def test_allows_storage_client_overwrite_before_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    custom_storage_client = MemoryStorageClient.from_config()
+
+    crawler = BasicCrawler(
+        storage_client=custom_storage_client,
+    )
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        await context.push_data({'foo': 'bar'})
+
+    other_storage_client = MemoryStorageClient.from_config()
+    service_locator.set_storage_client(other_storage_client)
+
+    with monkeypatch.context() as monkey:
+        spy = Mock(wraps=service_locator.get_storage_client)
+        monkey.setattr(service_locator, 'get_storage_client', spy)
+        await crawler.run(['https://does-not-matter.com'])
+        assert spy.call_count >= 1
+
+    dataset = await crawler.get_dataset()
+    assert cast(DatasetClient, dataset._resource_client)._memory_storage_client is other_storage_client
+
+    data = await dataset.get_data()
+    assert data.items == [{'foo': 'bar'}]
