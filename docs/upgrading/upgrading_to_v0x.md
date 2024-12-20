@@ -14,7 +14,7 @@ This section summarizes the breaking changes between v0.4.x and v0.5.0.
 - All crawler and crawling context classes have been consolidated into a single sub-package called `crawlers`.
 - The affected classes include: `AbstractHttpCrawler`, `AbstractHttpParser`, `BasicCrawler`, `BasicCrawlerOptions`, `BasicCrawlingContext`, `BeautifulSoupCrawler`, `BeautifulSoupCrawlingContext`, `BeautifulSoupParserType`, `ContextPipeline`, `HttpCrawler`, `HttpCrawlerOptions`, `HttpCrawlingContext`, `HttpCrawlingResult`, `ParsedHttpCrawlingContext`, `ParselCrawler`, `ParselCrawlingContext`, `PlaywrightCrawler`, `PlaywrightCrawlingContext`, `PlaywrightPreNavCrawlingContext`.
 
-- Example update:
+Example update:
 ```diff
 - from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 + from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
@@ -25,10 +25,20 @@ This section summarizes the breaking changes between v0.4.x and v0.5.0.
 - All storage client classes have been moved into a single sub-package called `storage_clients`.
 - The affected classes include: `MemoryStorageClient`, `BaseStorageClient`.
 
-- Example update:
+Example update:
 ```diff
-- from memory_storage_client import MemoryStorageClient
-+ from storage_clients import MemoryStorageClient
+- from crawlee.memory_storage_client import MemoryStorageClient
++ from crawlee.storage_clients import MemoryStorageClient
+```
+
+### CurlImpersonateHttpClient
+
+- The `CurlImpersonateHttpClient` changed its import location.
+
+Example update:
+```diff
+- from crawlee.http_clients.curl_impersonate import CurlImpersonateHttpClient
++ from crawlee.http_clients import CurlImpersonateHttpClient
 ```
 
 ### BeautifulSoupParser
