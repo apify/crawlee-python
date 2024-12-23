@@ -26,6 +26,7 @@ All notable changes to this project will be documented in this file.
 - Respect user configuration for work with status codes ([#812](https://github.com/apify/crawlee-python/pull/812)) ([8daf4bd](https://github.com/apify/crawlee-python/commit/8daf4bd49c1b09a0924f827daedebf7600ac609b)) by [@Mantisus](https://github.com/Mantisus), closes [#708](https://github.com/apify/crawlee-python/issues/708), [#756](https://github.com/apify/crawlee-python/issues/756)
 - `abort-on-error` for successive runs ([#834](https://github.com/apify/crawlee-python/pull/834)) ([0cea673](https://github.com/apify/crawlee-python/commit/0cea67387bf366800b447de784af580159b199ee)) by [@Mantisus](https://github.com/Mantisus)
 - Relax ServiceLocator restrictions ([#837](https://github.com/apify/crawlee-python/pull/837)) ([aa3667f](https://github.com/apify/crawlee-python/commit/aa3667f344d78945df3eca77431e1409f43f8bb5)) by [@janbuchar](https://github.com/janbuchar), closes [#806](https://github.com/apify/crawlee-python/issues/806)
+- Fix typo in exports ([#841](https://github.com/apify/crawlee-python/pull/841)) ([8fa6ac9](https://github.com/apify/crawlee-python/commit/8fa6ac994fe4f3f6430cb796a0c6a732c93c672b)) by [@janbuchar](https://github.com/janbuchar)
 
 ### Refactor
 
