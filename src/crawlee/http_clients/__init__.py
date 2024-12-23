@@ -14,7 +14,7 @@ with _try_import(__name__, 'BeautifulSoupCrawler', 'BeautifulSoupCrawlingContext
 
 __all__ = [
     'BaseHttpClient',
-    'CurlImpersonatedHttpClient',
+    'CurlImpersonateHttpClient',
     'HttpCrawlingResult',
     'HttpResponse',
     'HttpxHttpClient',
