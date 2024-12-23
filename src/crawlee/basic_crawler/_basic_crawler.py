@@ -237,6 +237,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
         """
         if configuration:
+            # This makes it impossible to have multiple crawlers with different configuration
+            # This makes configuration sort of implicit hidden singleton.
             service_locator.set_configuration(configuration)
         if storage_client:
             service_locator.set_storage_client(storage_client)
