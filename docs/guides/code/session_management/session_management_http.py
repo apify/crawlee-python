@@ -1,7 +1,7 @@
 import asyncio
 import re
 
-from crawlee.http_crawler import HttpCrawler, HttpCrawlingContext
+from crawlee.crawlers import HttpCrawler, HttpCrawlingContext
 from crawlee.proxy_configuration import ProxyConfiguration
 from crawlee.sessions import SessionPool
 
