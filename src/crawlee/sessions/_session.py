@@ -65,7 +65,7 @@ class Session:
         self._max_usage_count = max_usage_count
         self._error_score = error_score
         self._cookies = cookies or {}
-        self._blocked_status_codes = blocked_status_codes or self._DEFAULT_BLOCKED_STATUS_CODES
+        self._blocked_status_codes = set(blocked_status_codes or self._DEFAULT_BLOCKED_STATUS_CODES)
 
     @classmethod
     def from_model(cls, model: SessionModel) -> Session:
@@ -193,17 +193,21 @@ class Session:
         self,
         *,
         status_code: int,
-        additional_blocked_status_codes: list[int] | None = None,
+        additional_blocked_status_codes: set[int] | None = None,
+        ignore_http_error_status_codes: set[int] | None = None,
     ) -> bool:
         """Evaluate whether a session should be retired based on the received HTTP status code.
 
         Args:
             status_code: The HTTP status code received from a server response.
             additional_blocked_status_codes: Optional additional status codes that should trigger session retirement.
+            ignore_http_error_status_codes: Optional status codes to allow suppression of
+            codes from `blocked_status_codes`.
 
         Returns:
             True if the session should be retired, False otherwise.
         """
-        blocked_status_codes = self._blocked_status_codes + (additional_blocked_status_codes or [])
+        if additional_blocked_status_codes and status_code in additional_blocked_status_codes:
+            return True
 
-        return status_code in blocked_status_codes
+        return status_code in (self._blocked_status_codes - (ignore_http_error_status_codes or set()))

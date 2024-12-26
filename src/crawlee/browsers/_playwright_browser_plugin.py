@@ -35,26 +35,26 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         self,
         *,
         browser_type: BrowserType = 'chromium',
-        browser_options: Mapping[str, Any] | None = None,
-        page_options: Mapping[str, Any] | None = None,
+        browser_launch_options: Mapping[str, Any] | None = None,
+        browser_new_context_options: Mapping[str, Any] | None = None,
         max_open_pages_per_browser: int = 20,
     ) -> None:
         """A default constructor.
 
         Args:
             browser_type: The type of browser to launch ('chromium', 'firefox', or 'webkit').
-            browser_options: Keyword arguments to pass to the browser launch method. These options are provided
+            browser_launch_options: Keyword arguments to pass to the browser launch method. These options are provided
                 directly to Playwright's `browser_type.launch` method. For more details, refer to the Playwright
                 documentation: https://playwright.dev/python/docs/api/class-browsertype#browser-type-launch.
-            page_options: Keyword arguments to pass to the new page method. These options are provided directly to
-                Playwright's `browser_context.new_page` method. For more details, refer to the Playwright documentation:
-                https://playwright.dev/python/docs/api/class-browsercontext#browser-context-new-page.
+            browser_new_context_options: Keyword arguments to pass to the browser new context method. These options
+                are provided directly to Playwright's `browser.new_context` method. For more details, refer to the
+                Playwright documentation: https://playwright.dev/python/docs/api/class-browser#browser-new-context.
             max_open_pages_per_browser: The maximum number of pages that can be opened in a single browser instance.
                 Once reached, a new browser instance will be launched to handle the excess.
         """
         self._browser_type = browser_type
-        self._browser_options = browser_options or {}
-        self._page_options = page_options or {}
+        self._browser_launch_options = browser_launch_options or {}
+        self._browser_new_context_options = browser_new_context_options or {}
         self._max_open_pages_per_browser = max_open_pages_per_browser
 
         self._playwright_context_manager = async_playwright()
@@ -75,13 +75,25 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
 
     @property
     @override
-    def browser_options(self) -> Mapping[str, Any]:
-        return self._browser_options
+    def browser_launch_options(self) -> Mapping[str, Any]:
+        """Return the options for the `browser.launch` method.
+
+        Keyword arguments to pass to the browser launch method. These options are provided directly to Playwright's
+        `browser_type.launch` method. For more details, refer to the Playwright documentation:
+         https://playwright.dev/python/docs/api/class-browsertype#browser-type-launch.
+        """
+        return self._browser_launch_options
 
     @property
     @override
-    def page_options(self) -> Mapping[str, Any]:
-        return self._page_options
+    def browser_new_context_options(self) -> Mapping[str, Any]:
+        """Return the options for the `browser.new_context` method.
+
+        Keyword arguments to pass to the browser new context method. These options are provided directly to Playwright's
+        `browser.new_context` method. For more details, refer to the Playwright documentation:
+        https://playwright.dev/python/docs/api/class-browser#browser-new-context.
+        """
+        return self._browser_new_context_options
 
     @property
     @override
@@ -117,11 +129,11 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
             raise RuntimeError('Playwright browser plugin is not initialized.')
 
         if self._browser_type == 'chromium':
-            browser = await self._playwright.chromium.launch(**self._browser_options)
+            browser = await self._playwright.chromium.launch(**self._browser_launch_options)
         elif self._browser_type == 'firefox':
-            browser = await self._playwright.firefox.launch(**self._browser_options)
+            browser = await self._playwright.firefox.launch(**self._browser_launch_options)
         elif self._browser_type == 'webkit':
-            browser = await self._playwright.webkit.launch(**self._browser_options)
+            browser = await self._playwright.webkit.launch(**self._browser_launch_options)
         else:
             raise ValueError(f'Invalid browser type: {self._browser_type}')
 

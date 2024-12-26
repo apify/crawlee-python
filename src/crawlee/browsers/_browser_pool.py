@@ -100,8 +100,8 @@ class BrowserPool:
         cls,
         *,
         browser_type: BrowserType | None = None,
-        browser_options: Mapping[str, Any] | None = None,
-        page_options: Mapping[str, Any] | None = None,
+        browser_launch_options: Mapping[str, Any] | None = None,
+        browser_new_context_options: Mapping[str, Any] | None = None,
         headless: bool | None = None,
         **kwargs: Any,
     ) -> BrowserPool:
@@ -109,21 +109,21 @@ class BrowserPool:
 
         Args:
             browser_type: The type of browser to launch ('chromium', 'firefox', or 'webkit').
-            browser_options: Keyword arguments to pass to the browser launch method. These options are provided
+            browser_launch_options: Keyword arguments to pass to the browser launch method. These options are provided
                 directly to Playwright's `browser_type.launch` method. For more details, refer to the Playwright
                 documentation: https://playwright.dev/python/docs/api/class-browsertype#browser-type-launch.
-            page_options: Keyword arguments to pass to the new page method. These options are provided directly to
-                Playwright's `browser_context.new_page` method. For more details, refer to the Playwright documentation:
-                https://playwright.dev/python/docs/api/class-browsercontext#browser-context-new-page.
+            browser_new_context_options: Keyword arguments to pass to the browser new context method. These options
+                are provided directly to Playwright's `browser.new_context` method. For more details, refer to the
+                Playwright documentation: https://playwright.dev/python/docs/api/class-browser#browser-new-context.
             headless: Whether to run the browser in headless mode.
             kwargs: Additional arguments for default constructor.
         """
         plugin_options: dict = defaultdict(dict)
-        plugin_options['browser_options'] = browser_options or {}
-        plugin_options['page_options'] = page_options or {}
+        plugin_options['browser_launch_options'] = browser_launch_options or {}
+        plugin_options['browser_new_context_options'] = browser_new_context_options or {}
 
         if headless is not None:
-            plugin_options['browser_options']['headless'] = headless
+            plugin_options['browser_launch_options']['headless'] = headless
 
         if browser_type:
             plugin_options['browser_type'] = browser_type
@@ -262,13 +262,16 @@ class BrowserPool:
     ) -> CrawleePage:
         """Internal method to initialize a new page in a browser using the specified plugin."""
         timeout = self._operation_timeout.total_seconds()
-        browser = self._pick_browser_with_free_capacity(plugin)
+        browser_controller = self._pick_browser_with_free_capacity(plugin)
 
         try:
-            if not browser:
-                browser = await asyncio.wait_for(self._launch_new_browser(plugin), timeout)
+            if not browser_controller:
+                browser_controller = await asyncio.wait_for(self._launch_new_browser(plugin), timeout)
             page = await asyncio.wait_for(
-                browser.new_page(page_options=plugin.page_options, proxy_info=proxy_info),
+                browser_controller.new_page(
+                    browser_new_context_options=plugin.browser_new_context_options,
+                    proxy_info=proxy_info,
+                ),
                 timeout,
             )
         except asyncio.TimeoutError as exc:

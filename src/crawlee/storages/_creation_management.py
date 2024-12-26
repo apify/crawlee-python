@@ -3,14 +3,15 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING, TypeVar
 
-from crawlee import service_container
-from crawlee.configuration import Configuration
-from crawlee.memory_storage_client import MemoryStorageClient
-from crawlee.storages import Dataset, KeyValueStore, RequestQueue
+from crawlee.storage_clients import MemoryStorageClient
+
+from ._dataset import Dataset
+from ._key_value_store import KeyValueStore
+from ._request_queue import RequestQueue
 
 if TYPE_CHECKING:
-    from crawlee.base_storage_client import BaseStorageClient
-    from crawlee.base_storage_client._types import ResourceClient, ResourceCollectionClient
+    from crawlee.configuration import Configuration
+    from crawlee.storage_clients._base import BaseStorageClient, ResourceClient, ResourceCollectionClient
 
 TResource = TypeVar('TResource', Dataset, KeyValueStore, RequestQueue)
 
@@ -122,15 +123,12 @@ def _get_default_storage_id(configuration: Configuration, storage_class: type[TR
 async def open_storage(
     *,
     storage_class: type[TResource],
-    storage_client: BaseStorageClient | None = None,
-    configuration: Configuration | None = None,
-    id: str | None = None,
-    name: str | None = None,
+    id: str | None,
+    name: str | None,
+    configuration: Configuration,
+    storage_client: BaseStorageClient,
 ) -> TResource:
     """Open either a new storage or restore an existing one and return it."""
-    configuration = configuration or Configuration.get_global_configuration()
-    storage_client = storage_client or service_container.get_storage_client()
-
     # Try to restore the storage from cache by name
     if name:
         cached_storage = _get_from_cache_by_name(storage_class=storage_class, name=name)
@@ -171,21 +169,7 @@ async def open_storage(
             resource_collection_client = _get_resource_collection_client(storage_class, storage_client)
             storage_info = await resource_collection_client.get_or_create(name=name)
 
-        if issubclass(storage_class, RequestQueue):
-            storage = storage_class(
-                id=storage_info.id,
-                name=storage_info.name,
-                configuration=configuration,
-                client=storage_client,
-                event_manager=service_container.get_event_manager(),
-            )
-        else:
-            storage = storage_class(
-                id=storage_info.id,
-                name=storage_info.name,
-                configuration=configuration,
-                client=storage_client,
-            )
+        storage = storage_class(id=storage_info.id, name=storage_info.name, storage_client=storage_client)
 
         # Cache the storage by ID and name
         _add_to_cache_by_id(storage.id, storage)

@@ -16,9 +16,10 @@ from crawlee.sessions import Session
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+    from ssl import SSLContext
 
+    from crawlee import Request
     from crawlee._types import HttpMethod, HttpPayload
-    from crawlee.base_storage_client._models import Request
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.statistics import Statistics
 
@@ -101,6 +102,7 @@ class HttpxHttpClient(BaseHttpClient):
         ignore_http_error_status_codes: Iterable[int] = (),
         http1: bool = True,
         http2: bool = True,
+        verify: str | bool | SSLContext = True,
         header_generator: HeaderGenerator | None = _DEFAULT_HEADER_GENERATOR,
         **async_client_kwargs: Any,
     ) -> None:
@@ -112,6 +114,7 @@ class HttpxHttpClient(BaseHttpClient):
             ignore_http_error_status_codes: HTTP status codes to ignore as errors.
             http1: Whether to enable HTTP/1.1 support.
             http2: Whether to enable HTTP/2 support.
+            verify: SSL certificates used to verify the identity of requested hosts.
             header_generator: Header generator instance to use for generating common headers.
             async_client_kwargs: Additional keyword arguments for `httpx.AsyncClient`.
         """
@@ -122,6 +125,7 @@ class HttpxHttpClient(BaseHttpClient):
         )
         self._http1 = http1
         self._http2 = http2
+        self._verify = verify
         self._async_client_kwargs = async_client_kwargs
         self._header_generator = header_generator
 
@@ -219,13 +223,12 @@ class HttpxHttpClient(BaseHttpClient):
             # Prepare a default kwargs for the new client.
             kwargs: dict[str, Any] = {
                 'transport': _HttpxTransport(
-                    proxy=proxy_url,
-                    http1=self._http1,
-                    http2=self._http2,
+                    proxy=proxy_url, http1=self._http1, http2=self._http2, verify=self._verify
                 ),
                 'proxy': proxy_url,
                 'http1': self._http1,
                 'http2': self._http2,
+                'verify': self._verify,
             }
 
             # Update the default kwargs with any additional user-provided kwargs.

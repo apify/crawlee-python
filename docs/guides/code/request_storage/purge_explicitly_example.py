@@ -1,10 +1,10 @@
 import asyncio
 
-from crawlee.memory_storage_client import MemoryStorageClient
+from crawlee.storage_clients import MemoryStorageClient
 
 
 async def main() -> None:
-    storage_client = MemoryStorageClient()
+    storage_client = MemoryStorageClient.from_config()
     # highlight-next-line
     await storage_client.purge_on_start()
 

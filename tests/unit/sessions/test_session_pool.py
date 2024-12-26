@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from crawlee import service_locator
 from crawlee.events import EventManager
 from crawlee.events._types import Event, EventPersistStateData
 from crawlee.sessions import Session, SessionPool
@@ -113,9 +114,10 @@ async def test_create_session_function() -> None:
 
 async def test_session_pool_persist(event_manager: EventManager, kvs: KeyValueStore) -> None:
     """Test persistence of session pool state to KVS and validate stored data integrity."""
+    service_locator.set_event_manager(event_manager)
+
     async with SessionPool(
         max_pool_size=MAX_POOL_SIZE,
-        event_manager=event_manager,
         persistence_enabled=True,
         persist_state_kvs_name=KVS_NAME,
         persist_state_key=PERSIST_STATE_KEY,
@@ -143,20 +145,20 @@ async def test_session_pool_persist(event_manager: EventManager, kvs: KeyValueSt
 
 async def test_session_pool_persist_and_restore(event_manager: EventManager, kvs: KeyValueStore) -> None:
     """Check session pool's ability to persist its state and then restore it accurately after reset."""
+    service_locator.set_event_manager(event_manager)
+
     async with SessionPool(
         max_pool_size=MAX_POOL_SIZE,
-        event_manager=event_manager,
         persistence_enabled=True,
         persist_state_kvs_name=KVS_NAME,
         persist_state_key=PERSIST_STATE_KEY,
-    ) as _:
+    ):
         # Emit persist state event and wait for the persistence to complete
         event_manager.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False))
         await event_manager.wait_for_all_listeners_to_complete()
 
     async with SessionPool(
         max_pool_size=MAX_POOL_SIZE,
-        event_manager=event_manager,
         persistence_enabled=True,
         persist_state_kvs_name=KVS_NAME,
         persist_state_key=PERSIST_STATE_KEY,

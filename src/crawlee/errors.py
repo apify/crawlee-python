@@ -11,6 +11,7 @@ __all__ = [
     'ContextPipelineFinalizationError',
     'ContextPipelineInitializationError',
     'ContextPipelineInterruptedError',
+    'HttpClientStatusCodeError',
     'HttpStatusCodeError',
     'ProxyError',
     'RequestHandlerError',
@@ -36,6 +37,17 @@ class SessionError(Exception):
 
 
 @docs_group('Errors')
+class ServiceConflictError(Exception):
+    """Raised when attempting to reassign a service in service container that is already in use."""
+
+    def __init__(self, service: type, new_value: object, existing_value: object) -> None:
+        super().__init__(
+            f'Service {service.__name__} is already in use. Existing value: {existing_value}, '
+            f'attempted new value: {new_value}.'
+        )
+
+
+@docs_group('Errors')
 class ProxyError(SessionError):
     """Raised when a proxy is being blocked or malfunctions."""
 
@@ -48,6 +60,11 @@ class HttpStatusCodeError(Exception):
         super().__init__(f'{message} (status code: {status_code}).')
         self.status_code = status_code
         self.message = message
+
+
+@docs_group('Errors')
+class HttpClientStatusCodeError(HttpStatusCodeError):
+    """Raised when the response status code indicates an client error."""
 
 
 @docs_group('Errors')
@@ -89,13 +106,3 @@ class ContextPipelineFinalizationError(Exception):
 @docs_group('Errors')
 class ContextPipelineInterruptedError(Exception):
     """May be thrown in the initialization phase of a middleware to signal that the request should not be processed."""
-
-
-@docs_group('Errors')
-class ServiceConflictError(RuntimeError):
-    """Thrown when a service container is getting reconfigured."""
-
-    def __init__(self, service_name: str, new_value: object, old_value: object) -> None:
-        super().__init__(
-            f"Service '{service_name}' was already set (existing value is '{old_value}', new value is '{new_value}')."
-        )

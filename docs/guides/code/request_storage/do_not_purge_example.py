@@ -1,7 +1,7 @@
 import asyncio
 
 from crawlee.configuration import Configuration
-from crawlee.http_crawler import HttpCrawler, HttpCrawlingContext
+from crawlee.crawlers import HttpCrawler, HttpCrawlingContext
 
 
 async def main() -> None:

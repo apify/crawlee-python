@@ -50,9 +50,7 @@ curl-cffi = { version = ">=0.7.2", optional = true }
 docutils = ">=0.21.0"
 eval-type-backport = ">=0.2.0"
 html5lib = { version = ">=1.0", optional = true }
-# TODO: relax the upper bound once the issue is resolved:
-# https://github.com/apify/crawlee-python/issues/774
-httpx = { version = "~=0.27.0", extras = ["brotli", "http2"] }
+httpx = {version = ">=0.27.0", extras = ["brotli", "http2", "zstd"]}
 inquirer = ">=3.3.0"
 lxml = { version = ">=5.2.0", optional = true }
 more_itertools = ">=10.2.0"
@@ -60,13 +58,15 @@ parsel = { version = ">=1.9.0", optional = true }
 playwright = { version = ">=1.27.0", optional = true }
 psutil = ">=6.0.0"
 pydantic = ">=2.8.1, !=2.10.0, !=2.10.1, !=2.10.2"
-pydantic-settings = ">=2.2.0"
+# TODO: relax the upper bound once the issue is resolved:
+# https://github.com/apify/crawlee-python/issues/814
+pydantic-settings = ">=2.2.0 <2.7.0"
 pyee = ">=9.0.0"
 sortedcollections = ">=2.1.0"
 tldextract = ">=5.1.0"
 typer = ">=0.12.0"
 typing-extensions = ">=4.1.0"
-yarl = "^1.18.0"
+yarl = ">=1.18.0"
 
 [tool.poetry.group.dev.dependencies]
 build = "~1.2.0"
@@ -77,12 +77,12 @@ pre-commit = "~4.0.0"
 proxy-py = "~2.4.0"
 pydoc-markdown = "~4.8.0"
 pytest = "~8.3.0"
-pytest-asyncio = "~0.24.0"
+pytest-asyncio = "~0.25.0"
 pytest-cov = "~6.0.0"
 pytest-only = "~2.1.0"
 pytest-timeout = "~2.3.0"
 pytest-xdist = "~3.6.0"
-respx = "~0.21.0"
+respx = "~0.22.0"
 ruff = "~0.8.0"
 setuptools = "~75.6.0"                    # setuptools are used by pytest, but not explicitly required
 sortedcontainers-stubs = "^2.4.2"
@@ -205,8 +205,11 @@ warn_unreachable = true
 warn_unused_ignores = true
 
 [[tool.mypy.overrides]]
-# Example code that shows integration of crawlee imports apify, despite apify not being dependency of crawlee.
-module = "apify"
+# Example codes are sometimes showing integration of crawlee with external tool, which is not dependency of crawlee.
+module = [
+    "apify",    # Example code shows integration of apify and crawlee.
+    "camoufox", # Example code shows integration of camoufox and crawlee.
+]
 ignore_missing_imports = true
 
 [tool.basedpyright]

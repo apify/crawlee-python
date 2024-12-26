@@ -4,9 +4,9 @@ from apify import Actor
 # % block import required
 # % endblock
 # % if cookiecutter.http_client == 'curl-impersonate'
-from crawlee.http_clients.curl_impersonate import CurlImpersonateHttpClient
+from crawlee.http_clients import CurlImpersonateHttpClient
 # % elif cookiecutter.http_client == 'httpx'
-from crawlee.http_clients._httpx import HttpxHttpClient
+from crawlee.http_clients import HttpxHttpClient
 # % endif
 
 from .routes import router
@@ -20,7 +20,11 @@ http_client=HttpxHttpClient(),
 # % endif
 # % endblock
 # % endfilter
+# % if self.pre_main is defined
 
+{{self.pre_main()}}
+
+# % endif
 async def main() -> None:
     """The crawler entry point."""
     # % filter truncate(0, end='')
@@ -30,17 +34,16 @@ async def main() -> None:
 
     # % if cookiecutter.enable_apify_integration
     async with Actor:
-        # % filter indent(width=8, first=False)
-        {{ self.instantiation() }}
-        # % endfilter
+    # % set indent_width = 8
     # % else
-        # % filter indent(width=4, first=False)
-    {{ self.instantiation() }}
-        # % endfilter
+    # % set indent_width = 4
     # % endif
+# % filter indent(width=indent_width, first=True)
+{{self.instantiation()}}
 
-    await crawler.run(
-        [
-            '{{ cookiecutter.start_url }}',
-        ]
-    )
+await crawler.run(
+    [
+        '{{ cookiecutter.start_url }}',
+    ]
+)
+# % endfilter

@@ -233,17 +233,16 @@ class Configuration(BaseSettings):
 
     @classmethod
     def get_global_configuration(cls) -> Self:
-        """Retrieve the global instance of the configuration."""
-        from crawlee import service_container
+        """Retrieve the global instance of the configuration.
 
-        if service_container.get_configuration_if_set() is None:
-            service_container.set_configuration(cls())
+        Mostly for the backwards compatibility. It is recommended to use the `service_locator.get_configuration()`
+        instead.
+        """
+        from crawlee import service_locator
 
-        global_instance = service_container.get_configuration()
+        config = service_locator.get_configuration()
 
-        if not isinstance(global_instance, cls):
-            raise TypeError(
-                f'Requested global configuration object of type {cls}, but {global_instance.__class__} was found'
-            )
+        if not isinstance(config, cls):
+            raise TypeError(f'Requested global configuration object of type {cls}, but {config.__class__} was found')
 
-        return global_instance
+        return config

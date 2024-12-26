@@ -5,14 +5,14 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
 from crawlee._utils.docs import docs_group
-from crawlee._utils.http import is_status_code_error
-from crawlee.errors import HttpStatusCodeError
+from crawlee._utils.http import is_status_code_client_error, is_status_code_server_error
+from crawlee.errors import HttpClientStatusCodeError, HttpStatusCodeError
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from crawlee import Request
     from crawlee._types import HttpHeaders, HttpMethod, HttpPayload
-    from crawlee.base_storage_client._models import Request
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions import Session
     from crawlee.statistics import Statistics
@@ -147,11 +147,22 @@ class BaseHttpClient(ABC):
         ignore_http_error_status_codes: set[int],
     ) -> None:
         """Raise an exception if the given status code is considered as an error."""
-        exclude_error = status_code in ignore_http_error_status_codes
-        include_error = status_code in additional_http_error_status_codes
+        is_ignored_status = status_code in ignore_http_error_status_codes
+        is_explicit_error = status_code in additional_http_error_status_codes
 
-        if include_error or (is_status_code_error(status_code) and not exclude_error):
-            if include_error:
-                raise HttpStatusCodeError('Error status code (user-configured) returned.', status_code)
+        if is_explicit_error:
+            raise HttpStatusCodeError('Error status code (user-configured) returned.', status_code)
 
+        if is_status_code_client_error(status_code) and not is_ignored_status:
+            raise HttpClientStatusCodeError('Client error status code returned', status_code)
+
+        if is_status_code_server_error(status_code) and not is_ignored_status:
             raise HttpStatusCodeError('Error status code returned', status_code)
+
+    @property
+    def additional_blocked_status_codes(self) -> set[int]:
+        return self._additional_http_error_status_codes
+
+    @property
+    def ignore_http_error_status_codes(self) -> set[int]:
+        return self._ignore_http_error_status_codes

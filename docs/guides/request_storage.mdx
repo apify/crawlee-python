@@ -18,12 +18,14 @@ import RsHelperAddRequestsExample from '!!raw-loader!./code/request_storage/help
 import RsHelperEnqueueLinksExample from '!!raw-loader!./code/request_storage/helper_enqueue_links_example.py';
 import RsDoNotPurgeExample from '!!raw-loader!./code/request_storage/do_not_purge_example.py';
 import RsPurgeExplicitlyExample from '!!raw-loader!./code/request_storage/purge_explicitly_example.py';
+import TandemExample from '!!raw-loader!./code/request_storage/tandem_example.py';
+import ExplicitTandemExample from '!!raw-loader!./code/request_storage/tandem_example_explicit.py';
 
 This guide explains the different types of request storage available in Crawlee, how to store the requests that your crawler will process, and which storage type to choose based on your needs.
 
 ## Introduction
 
-All request storage types in Crawlee implement the same interface - <ApiLink to="class/RequestProvider">`RequestProvider`</ApiLink>. This unified interface allows them to be used in a consistent manner, regardless of the storage backend. The request providers are managed by storage clients - subclasses of <ApiLink to="class/BaseStorageClient">`BaseStorageClient`</ApiLink>. For instance, <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink> stores data in memory while it can also offload them to the local directory. Data are stored in the following directory structure:
+All request storage types in Crawlee implement the same interface - <ApiLink to="class/RequestManager">`RequestManager`</ApiLink>. This unified interface allows them to be used in a consistent manner, regardless of the storage backend. The request providers are managed by storage clients - subclasses of <ApiLink to="class/BaseStorageClient">`BaseStorageClient`</ApiLink>. For instance, <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink> stores data in memory while it can also offload them to the local directory. Data are stored in the following directory structure:
 
 ```text
 {CRAWLEE_STORAGE_DIR}/{request_provider}/{QUEUE_ID}/
@@ -94,6 +96,28 @@ The following code demonstrates the usage of the <ApiLink to="class/RequestList"
 TODO: write this section, once https://github.com/apify/crawlee-python/issues/99 is resolved
 
 */}
+
+## Processing requests from multiple sources
+
+In some cases, you might need to combine requests from multiple sources, most frequently from a static list of URLs (such as <ApiLink to="class/RequestList">`RequestList`</ApiLink>) and a <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, where the queue takes care of persistence and retrying failed requests.
+
+This use case is supported via the <ApiLink to="class/RequestManagerTandem">`RequestManagerTandem`</ApiLink> class. You may also use the <ApiLink to="class/RequestLoader#to_tandem">`RequestLoader.to_tandem`</ApiLink> method as a shortcut.
+
+<CodeBlock className="language-python">
+    {TandemExample}
+</CodeBlock>
+<Tabs groupId="request_manager_tandem">
+    <TabItem value="request_manager_tandem_helper" label="Using to_tandem helper" default>
+        <CodeBlock className="language-python">
+            {TandemExample}
+        </CodeBlock>
+    </TabItem>
+    <TabItem value="request_manager_tandem_explicit" label="Explicitly using RequestManagerTandem">
+        <CodeBlock className="language-python">
+            {ExplicitTandemExample}
+        </CodeBlock>
+    </TabItem>
+</Tabs>
 
 ## Request-related helpers
 
