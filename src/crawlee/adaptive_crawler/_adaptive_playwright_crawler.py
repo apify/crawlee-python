@@ -34,6 +34,17 @@ class AdaptivePlaywrightCrawlingContext(BeautifulSoupCrawlingContext):
     _page : Page | None = None
     # TODO: UseStateFunction
 
+    @property
+    def page(self):
+        return self._page
+
+    @property
+    def infinite_scroll(self):
+        return self._infinite_scroll
+
+    @property
+    def response(self):
+        return self._response
 
     @classmethod
     def from_beautifulsoup_crawling_context(cls, context: BeautifulSoupCrawlingContext,
@@ -52,17 +63,15 @@ class AdaptivePlaywrightCrawlingContext(BeautifulSoupCrawlingContext):
 
         context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
         # Remove playwright specific
-        context_kwargs.pop("response")
-        context_kwargs.pop("page")
-        context_kwargs.pop("infinite_scroll")
+        context_kwargs["_response"] = context_kwargs.pop("response")
+        context_kwargs["_page"] = context_kwargs.pop("page")
+        context_kwargs["_infinite_scroll"] = context_kwargs.pop("infinite_scroll")
         http_response = await _HttpResponse.from_playwright_response(context.response)
         # Override push_data and enqueue_links
         context_kwargs["push_data"] = push_data
         context_kwargs["add_requests"] = add_requests
         #context_kwargs[enqueue_links] = enqueue_links
         return cls(parsed_content= BeautifulSoup(http_response.read(), features="lxml"), # TODO: Pass parser type
-                   _response = context.response,
-                   _infinite_scroll = None,
                    http_response = http_response,
                    **context_kwargs)
 
@@ -84,7 +93,7 @@ class AdaptivePlaywrightCrawlingContext(BeautifulSoupCrawlingContext):
         async def add_request(requests: Sequence[str | BaseRequestData | Request],
                               **kwargs: Unpack[EnqueueLinksKwargs]) -> Coroutine[None, None, None]:
             async def _():
-                return coordinator.add_request(crawler, request_id, add_request_kwargs={"requests": requests, **kwargs})
+                return coordinator.set_add_request(crawler, request_id, add_request_kwargs={"requests": requests, **kwargs})
             return await _()
         return add_request
 
@@ -165,11 +174,14 @@ class AdaptivePlayWrightCrawler(AdaptiveCrawler):
                 crawler=beautifulsoup_crawler,
                 request_id=context.request.id)
 
+            # This needs to be done due to the fact that enqueue_links is closure that has fixed context it works on. Maybe it should be normal method on context
+            enqueue_links = beautifulsoup_crawler._create_enqueue_links_function
+
             adaptive_crawling_context = AdaptivePlaywrightCrawlingContext.from_beautifulsoup_crawling_context(
                 context=context, push_data=push_data, add_requests=add_requests
             )
 
-            await adaptive_crawler.reroute_to_top_handler(sub_crawler=playwright_crawler,
+            await adaptive_crawler.reroute_to_top_handler(sub_crawler=beautifulsoup_crawler,
                                                           context=adaptive_crawling_context,
                                                           request_id=context.request.id)
 
@@ -191,7 +203,7 @@ class AdaptivePlayWrightCrawler(AdaptiveCrawler):
             adaptive_crawling_context = await AdaptivePlaywrightCrawlingContext.from_playwright_crawling_context(
                 context=context, push_data=push_data, add_requests=add_requests)
 
-            await adaptive_crawler.reroute_to_top_handler(sub_crawler=beautifulsoup_crawler,
+            await adaptive_crawler.reroute_to_top_handler(sub_crawler=playwright_crawler,
                                                           context=adaptive_crawling_context,
                                                           request_id=context.request.id)
 

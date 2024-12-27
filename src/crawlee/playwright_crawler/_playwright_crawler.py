@@ -179,6 +179,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
 
             async def enqueue_links(
                 *,
+                context: PlaywrightCrawlingContext,
                 selector: str = 'a',
                 label: str | None = None,
                 user_data: dict | None = None,
@@ -233,7 +234,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 page=context.page,
                 infinite_scroll=lambda: infinite_scroll(context.page),
                 response=response,
-                enqueue_links=enqueue_links,
+                _enqueue_links=enqueue_links,
             )
 
     async def _handle_blocked_request(

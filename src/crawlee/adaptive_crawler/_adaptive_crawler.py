@@ -145,6 +145,7 @@ class _Coordinator:
     @dataclass(frozen=True)
     class SubCrawlerResult:
         push_data_kwargs: dict | None = None
+        add_request_kwargs: dict | None = None
         links: list | None = None
         state: any | None = None
 
@@ -152,6 +153,7 @@ class _Coordinator:
     class _AwaitableSubCrawlerResult():
         # Could be done by subclassing Future instead.
         push_data_kwargs: dict | None = None
+        add_request_kwargs: dict | None = None
         links: list | None = None
         state: any | None = None
         _future: Future = field(default_factory=Future)
@@ -160,6 +162,7 @@ class _Coordinator:
             self._future.set_result(
                 _Coordinator.SubCrawlerResult(
                     push_data_kwargs=self.push_data_kwargs,
+                    add_request_kwargs=self.add_request_kwargs,
                     links=self.links,
                     state=self.state,
                 ))
@@ -191,7 +194,9 @@ class _Coordinator:
 
     def set_push_data(self, crawler: BasicCrawler, request_id: str, push_data_kwargs: dict) -> None:
         self._results[id(crawler)][request_id].push_data_kwargs=push_data_kwargs
-        # TODO: Handle Enqueu links results as well.
+
+    def set_add_request(self, crawler: BasicCrawler, request_id: str, add_request_kwargs: dict):
+        self._results[id(crawler)][request_id].add_request_kwargs = add_request_kwargs
 
     def remove_result(self, request_id):
         if self._results[self._id1]:

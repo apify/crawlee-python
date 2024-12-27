@@ -137,8 +137,7 @@ class AbstractHttpCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler[
             Awaitable that is used for extracting links from parsed content and enqueuing them to the crawl.
         """
 
-        async def enqueue_links(
-            *,
+        async def enqueue_links(context = context,
             selector: str = 'a',
             label: str | None = None,
             user_data: dict[str, Any] | None = None,
