@@ -1,12 +1,14 @@
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.poetry]
+[project]
 name = "crawlee"
 version = "0.5.0"
 description = "Crawlee for Python"
-authors = ["Apify Technologies s.r.o. <support@apify.com>"]
+authors = [
+    {name = "Apify Technologies s.r.o.", email = "support@apify.com"},
+]
 license = "Apache-2.0"
 readme = "README.md"
 packages = [{ include = "crawlee", from = "src" }]
@@ -31,8 +33,24 @@ keywords = [
     "scraper",
     "scraping",
 ]
+requires-python = ">=3.9.0"
+dependencies = [
+    "colorama>=0.4.0",
+    "docutils>=0.21.0",
+    "eval-type-backport>=0.2.0",
+    "httpx[brotli,http2,zstd]>=0.27.0",
+    "more-itertools>=10.2.0",
+    "psutil>=6.0.0",
+    "pydantic!=2.10.0,!=2.10.1,!=2.10.2,>=2.8.1",
+    "pydantic-settings<2.7.0,>=2.2.0",
+    "pyee>=9.0.0",
+    "sortedcollections>=2.1.0",
+    "tldextract>=5.1.0",
+    "typing-extensions>=4.1.0",
+    "yarl>=1.18.0",
+]
 
-[tool.poetry.urls]
+[project.urls]
 "Homepage" = "https://crawlee.dev/python"
 "Apify Homepage" = "https://apify.com"
 "Changelog" = "https://crawlee.dev/python/docs/changelog"
@@ -40,65 +58,50 @@ keywords = [
 "Issue Tracker" = "https://github.com/apify/crawlee-python/issues"
 "Repository" = "https://github.com/apify/crawlee-python"
 
-[tool.poetry.dependencies]
-python = "^3.9"
-apify = { version = ">=2.0.0", optional = true }
-beautifulsoup4 = { version = ">=4.12.0", optional = true }
-colorama = ">=0.4.0"
-cookiecutter = ">=2.6.0"
-curl-cffi = { version = ">=0.7.2", optional = true }
-docutils = ">=0.21.0"
-eval-type-backport = ">=0.2.0"
-html5lib = { version = ">=1.0", optional = true }
-httpx = {version = ">=0.27.0", extras = ["brotli", "http2", "zstd"]}
-inquirer = ">=3.3.0"
-lxml = { version = ">=5.2.0", optional = true }
-more_itertools = ">=10.2.0"
-parsel = { version = ">=1.9.0", optional = true }
-playwright = { version = ">=1.27.0", optional = true }
-psutil = ">=6.0.0"
-pydantic = ">=2.8.1, !=2.10.0, !=2.10.1, !=2.10.2"
-# TODO: relax the upper bound once the issue is resolved:
-# https://github.com/apify/crawlee-python/issues/814
-pydantic-settings = ">=2.2.0 <2.7.0"
-pyee = ">=9.0.0"
-sortedcollections = ">=2.1.0"
-tldextract = ">=5.1.0"
-typer = ">=0.12.0"
-typing-extensions = ">=4.1.0"
-yarl = ">=1.18.0"
+[project.optional-dependencies]
+all = [
+    "beautifulsoup4>=4.12.0",
+    "curl-cffi>=0.7.2",
+    "html5lib>=1.0",
+    "lxml>=5.2.0",
+    "parsel>=1.9.0",
+    "playwright>=1.27.0",
+]
+beautifulsoup = ["beautifulsoup4>=4.12.0", "lxml>=5.2.0", "html5lib>=1.0"]
+curl-impersonate = ["curl-cffi>=0.7.2"]
+playwright = ["playwright>=1.27.0"]
+parsel = ["parsel>=1.9.0"]
+apify = ["apify>=2.0.0"]
 
-[tool.poetry.group.dev.dependencies]
-build = "~1.2.0"
-filelock = "~3.16.0"
-ipdb = "~0.13.0"
-mypy = "~1.13.0"
-pre-commit = "~4.0.0"
-proxy-py = "~2.4.0"
-pydoc-markdown = "~4.8.0"
-pytest = "~8.3.0"
-pytest-asyncio = "~0.25.0"
-pytest-cov = "~6.0.0"
-pytest-only = "~2.1.0"
-pytest-timeout = "~2.3.0"
-pytest-xdist = "~3.6.0"
-respx = "~0.22.0"
-ruff = "~0.8.0"
-setuptools = "~75.6.0"                    # setuptools are used by pytest, but not explicitly required
-sortedcontainers-stubs = "^2.4.2"
-types-beautifulsoup4 = "~4.12.0.20240229"
-types-colorama = "~0.4.15.20240106"
-types-psutil = "~5.9.5.20240205"
-types-python-dateutil = "~2.9.0.20240316"
+[dependency-groups]
+dev = [
+    "build~=1.2.0",
+    "filelock~=3.16.0",
+    "ipdb~=0.13.0",
+    "mypy~=1.13.0",
+    "pre-commit~=4.0.0",
+    "proxy-py~=2.4.0",
+    "pydoc-markdown~=4.8.0",
+    "pytest~=8.3.0",
+    "pytest-asyncio~=0.25.0",
+    "pytest-cov~=6.0.0",
+    "pytest-only~=2.1.0",
+    "pytest-timeout~=2.3.0",
+    "pytest-xdist~=3.6.0",
+    "respx~=0.22.0",
+    "ruff~=0.8.0",
+    "setuptools~=75.6.0",                # setuptools are used by pytest, but not explicitly required
+    "sortedcontainers-stubs<3.0.0,>=2.4.2",
+    "types-beautifulsoup4~=4.12.0.20240229",
+    "types-colorama~=0.4.15.20240106",
+    "types-psutil~=5.9.5.20240205",
+    "types-python-dateutil~=2.9.0.20240316",
+]
 
-[tool.poetry.extras]
-all = ["beautifulsoup4", "curl-cffi", "lxml", "html5lib", "parsel", "playwright"]
-beautifulsoup = ["beautifulsoup4", "lxml", "html5lib"]
-curl-impersonate = ["curl-cffi"]
-playwright = ["playwright"]
-parsel = ["parsel"]
+[tool.uv]
+default-groups = []
 
-[tool.poetry.scripts]
+[project.scripts]
 crawlee = "crawlee._cli:cli"
 
 [tool.ruff]
