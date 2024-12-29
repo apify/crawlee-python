@@ -1,14 +1,13 @@
 import asyncio
 
-from crawlee.adaptive_crawler._adaptive_playwright_crawler import AdaptivePlayWrightCrawler, \
+from crawlee.adaptive_crawler._adaptive_playwright_crawler import AdaptivePlaywrightCrawler, \
     AdaptivePlaywrightCrawlingContext
-from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler
 
 
 
 async def main():
 
-    adaptive_crawler = await AdaptivePlayWrightCrawler.create_with_default_settings()
+    adaptive_crawler = await AdaptivePlaywrightCrawler.create_with_default_settings(max_crawl_depth=2)
 
     @adaptive_crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
@@ -20,15 +19,6 @@ async def main():
 
 
     await adaptive_crawler.run(['https://crawlee.dev'])
-
-    """
-    await adaptive_crawler.run(['https://crawlee.dev',
-                                "https://crawlee.dev/docs/quick-start",
-                                "https://crawlee.dev/docs/examples",
-                                "https://crawlee.dev/api/core"])
-    """
-
-
 
 
 if __name__ == '__main__':

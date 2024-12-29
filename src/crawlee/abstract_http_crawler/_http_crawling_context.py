@@ -46,12 +46,6 @@ class ParsedHttpCrawlingContext(Generic[TParseResult], HttpCrawlingContext):
 
 
     @property
-    def enqueue_links(self,
-        *,
-        selector: str = 'a',
-        label: str | None = None,
-        user_data: dict[str, Any] | None = None,
-        **kwargs: Unpack[EnqueueLinksKwargs],
-    ) -> EnqueueLinksFunction:
+    def enqueue_links(self) -> EnqueueLinksFunction:
         """Bind closure _enqueue_links back to this context"""
         return partial(self._enqueue_links, context=self)
