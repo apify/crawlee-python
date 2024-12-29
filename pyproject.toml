@@ -72,6 +72,7 @@ curl-impersonate = ["curl-cffi>=0.7.2"]
 playwright = ["playwright>=1.27.0"]
 parsel = ["parsel>=1.9.0"]
 apify = ["apify>=2.0.0"]
+cli = ["cookiecutter>=2.6.0", "typer>=0.12.0", "inquirer>=3.3.0"]
 
 [dependency-groups]
 dev = [
