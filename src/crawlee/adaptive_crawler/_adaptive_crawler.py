@@ -6,11 +6,13 @@ from collections.abc import Sequence
 
 from copy import deepcopy
 from dataclasses import dataclass, field
+from random import random
 
 from typing_extensions import Unpack, TypeVar
 
 from crawlee import Request
 from crawlee._types import BasicCrawlingContext
+from crawlee.adaptive_crawler._crawl_type_predictor import CrawlTypePredictor, CrawlType
 from crawlee.adaptive_crawler._result_handlers import SubCrawlerResult, default_result_comparator, \
     default_result_checker
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
@@ -45,6 +47,9 @@ class AdaptiveCrawler[TAdaptiveCrawlingContext](BasicCrawler[BasicCrawlingContex
         self._primary_request_provider = primary_request_provider
         self._secondary_request_provider = secondary_request_provider
         self.coordinator = _Coordinator(primary_crawler, secondary_crawler)
+
+        # Dummy predictor for now.
+        self.crawl_type_predictor = CrawlTypePredictor()
 
         # Result related args:
         self.result_comparator = default_result_comparator
@@ -97,40 +102,77 @@ class AdaptiveCrawler[TAdaptiveCrawlingContext](BasicCrawler[BasicCrawlingContex
 
     async def _BasicCrawler__run_request_handler(self, context: BasicCrawlingContext) -> None:
         """Delegate to sub crawlers."""
+        async def commit_result(result=SubCrawlerResult):
+            """Perform push_data and add_requests on top crawler with arguments from sub crawler."""
+            await context.add_requests(**result.add_request_kwargs)
+            await context.push_data(**result.push_data_kwargs)
+            # TODO: USE STATE
+
+
+        should_run_primary_crawler = False
+        should_run_secondary_crawler = False
+
+        crawl_type_prediction = self.crawl_type_predictor.predict(context.request.url, context.request.label)
+        should_detect_crawl_type = random() < crawl_type_prediction.detection_probability_recommendation
+
+        if not should_detect_crawl_type:
+            self.log.debug(f"Predicted rendering type {crawl_type_prediction.crawl_type} for {context.request.url}")
+            should_run_primary_crawler = crawl_type_prediction.crawl_type == "primary"
+        else:
+            should_run_primary_crawler = True
 
         async with self.coordinator.result_cleanup(request_id=context.request.id):
-            # TODO: some logic that decides when to run which crawler. Copy from JS
-            # Each request has to be passed as copy to decouple processing, otherwise even if processed by different request queues it will be still coupled.
-            await (self._primary_request_provider.add_request(deepcopy(context.request)))
+
+            if should_run_primary_crawler:
+                # Each request has to be passed as copy to decouple processing, otherwise even if processed by different request queues it will be still coupled.
+                await (self._primary_request_provider.add_request(deepcopy(context.request)))
+                primary_crawler_result = await self.coordinator.get_result(self._primary_crawler, context.request.id,
+                                                                           timeout=self._request_handler_timeout.seconds)
+                if primary_crawler_result.ok and self.result_checker(primary_crawler_result):
+                    await commit_result(primary_crawler_result)
+                    return
+                elif not primary_crawler_result.ok:
+                    context.log.exception(msg=f"Primary crawler: {self._primary_crawler} failed for {context.request.url}", exc_info=primary_crawler_result.exception)
+                else:
+                    context.log.warning(f"Primary crawler: : {self._primary_crawler} returned a suspicious result for {context.request.url}")
+
+
             await (self._secondary_request_provider.add_request(deepcopy(context.request)))
-
-            # This will always happen?
-            primary_crawler_result = await self.coordinator.get_result(self._primary_crawler, context.request.id, timeout=self._request_handler_timeout.seconds)
-
-            #This just sometimes
             secondary_crawler_result = await self.coordinator.get_result(self._secondary_crawler, context.request.id, timeout=self._request_handler_timeout.seconds)
-            r = self.result_comparator(primary_crawler_result, secondary_crawler_result)
+
+            if not secondary_crawler_result.ok:
+                raise secondary_crawler_result.exception
+            await commit_result(secondary_crawler_result)
+
+            if should_detect_crawl_type:
+                detection_result: CrawlType
+                await (self._primary_request_provider.add_request(deepcopy(context.request)))
+                primary_crawler_result = await self.coordinator.get_result(self._primary_crawler, context.request.id,
+                                                                           timeout=self._request_handler_timeout.seconds)
+
+                if primary_crawler_result.ok and self.result_comparator(primary_crawler_result, secondary_crawler_result):
+                    detection_result = "primary"
+                else:
+                    detection_result = "secondary"
+
+                context.log.debug(f"Detected crawl type {detection_result} for {context.request.url}")
+                self.crawl_type_predictor.store_result(context.request.url, context.request.label, detection_result);
 
             # TODO: Do some work with the result, compare, analyze, save them. Enhance context
 
-        # End of "atomic" lock
-        # Decide what to save and which links to enqueue
-        await context.add_requests(**primary_crawler_result.add_request_kwargs)
-        await context.push_data(**primary_crawler_result.push_data_kwargs)
+
 
 
 class _Coordinator:
     """Class to share sub crawler results for specific request."""
-
-
 
     @dataclass
     class _AwaitableSubCrawlerResult():
         """Gradually created result of sub crawler. It is completed after finalize method is called."""
         push_data_kwargs: dict | None = None
         add_request_kwargs: dict | None = None
-        links: list | None = None
         state: any | None = None
+        exception: Exception | None = None
         _future: Future = field(default_factory=Future)
 
         def finalize(self):
@@ -138,8 +180,8 @@ class _Coordinator:
                 SubCrawlerResult(
                     push_data_kwargs=self.push_data_kwargs,
                     add_request_kwargs=self.add_request_kwargs,
-                    links=self.links,
                     state=self.state,
+                    exception=self.exception
                 ))
 
         def __await__(self):
@@ -172,6 +214,10 @@ class _Coordinator:
     def set_add_request(self, crawler: BasicCrawler, request_id: str, add_request_kwargs: dict):
         """Set 'add_request' related arguments to result of specific sub crawler for specific request_id."""
         self._results[id(crawler)][request_id].add_request_kwargs = add_request_kwargs
+
+    def set_exception(self, crawler: BasicCrawler, request_id: str, exception: Exception):
+        """Set 'ok' value. Should be false if sub crawler failed to get results."""
+        self._results[id(crawler)][request_id].exception = exception
 
     def remove_result(self, request_id):
         """Remove results of all sub crawlers for specific request_id."""

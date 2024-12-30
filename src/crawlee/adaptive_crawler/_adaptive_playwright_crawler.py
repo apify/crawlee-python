@@ -113,7 +113,7 @@ class _HttpResponse(HttpResponse):
         status_code = response.status
         # Can't find this anywhere in PlayWright, but some headers can include information about protocol. In firefox for example: 'x-firefox-spdy'
         # Might be also obtained by executing JS code in browser: performance.getEntries()[0].nextHopProtocol
-        # Response headers capitalization not respecting http Pascal case. Always lower case in PlayWright.
+        # Response headers capitalization not respecting http1.1 Pascal case. Always lower case in PlayWright.
         http_version = "TODO"
         _content = await response.body()
 
@@ -208,8 +208,9 @@ class AdaptivePlaywrightCrawler(AdaptiveCrawler[AdaptivePlaywrightCrawlingContex
         except Exception as e:
             # Finalize results only after all retries have been done.
             if (context.request.retry_count + 1) >= (context.request.max_retries or self._max_request_retries):
-                self.coordinator.finalize_result(crawler=sub_crawler,
-                                                             request_id=context.request.id)
+                self.coordinator.set_exception(crawler=sub_crawler,request_id=context.request.id, exception=e)
+                self.coordinator.finalize_result(crawler=sub_crawler,request_id=context.request.id)
+                return
             raise e
         # Finalize results if no error.
         self.coordinator.finalize_result(crawler=sub_crawler,
