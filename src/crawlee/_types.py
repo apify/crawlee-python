@@ -13,7 +13,7 @@ from typing import (
     TypeVar,
     Union,
     cast,
-    overload,
+    overload, Generic,
 )
 
 from pydantic import ConfigDict, Field, PlainValidator, RootModel
@@ -263,18 +263,6 @@ class ExportToFunction(Protocol):
         **kwargs: Unpack[ExportToKwargs],
     ) -> Coroutine[None, None, None]: ...
 
-class _ContextlessEnqueueLinksFunction(Protocol):
-    def __call__(
-        self,
-        context: BasicCrawlingContext,
-        *,
-        selector: str = 'a',
-        label: str | None = None,
-        user_data: dict[str, Any] | None = None,
-        **kwargs: Unpack[EnqueueLinksKwargs],
-    ) -> Coroutine[None, None, None]:
-        ...
-
 
 class EnqueueLinksFunction(Protocol):
     """A function type for enqueueing new URLs to crawl, based on elements selected by a CSS selector.
@@ -376,6 +364,21 @@ class BasicCrawlingContext:
     use_state: UseStateFunction
     get_key_value_store: GetKeyValueStoreFromRequestHandlerFunction
     log: logging.Logger
+
+TCrawlingContext = TypeVar('TCrawlingContext', contravariant=True)
+
+
+class _ContextlessEnqueueLinksFunction(Generic[TCrawlingContext], Protocol):
+    def __call__(
+        self,
+        *,
+        context: TCrawlingContext,
+        selector: str = 'a',
+        label: str | None = None,
+        user_data: dict[str, Any] | None = None,
+        **kwargs: Unpack[EnqueueLinksKwargs],
+    ) -> Coroutine[None, None, None]:
+        ...
 
 
 @dataclass()

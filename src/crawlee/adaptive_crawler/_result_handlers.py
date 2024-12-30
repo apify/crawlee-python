@@ -25,8 +25,8 @@ class CrawlTypePredictor:
 
 class _PushDataKwargs(PushDataKwargs):
     data: JsonSerializable
-    dataset_id: NotRequired[str]
-    dataset_name: NotRequired[str]
+    dataset_id: NotRequired[str | None]
+    dataset_name: NotRequired[str | None]
 
 class _AddRequestsKwargs(EnqueueLinksKwargs):
     requests: Sequence[str | BaseRequestData | Request]

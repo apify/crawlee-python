@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from asyncio import Future
 from copy import deepcopy
 from dataclasses import dataclass, field
 from random import random
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ContextManager, Callable
 
 from typing_extensions import Self, TypeVar, Unpack, override, Never
 
@@ -14,7 +13,7 @@ from crawlee._types import BasicCrawlingContext
 from crawlee.adaptive_crawler._crawl_type_predictor import CrawlType, CrawlTypePredictor
 from crawlee.adaptive_crawler._result_handlers import (
     SubCrawlerResult,
-    default_result_comparator,
+    default_result_comparator, _PushDataKwargs, _AddRequestsKwargs,
 )
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 
@@ -60,7 +59,7 @@ class AdaptiveCrawler(BasicCrawler[TAdaptiveCrawlingContext]):
 
         # Result related args:
         self.result_comparator = default_result_comparator
-        self.result_checker = lambda result: True #  noqa: ARG005
+        self.result_checker: Callable[[SubCrawlerResult], bool] = lambda result: True #  noqa: ARG005
 
         kwargs['_context_pipeline'] = ContextPipeline[TAdaptiveCrawlingContext]()
         super().__init__(**kwargs)
@@ -151,7 +150,7 @@ class AdaptiveCrawler(BasicCrawler[TAdaptiveCrawlingContext]):
             secondary_crawler_result = await self.coordinator.get_result(self._secondary_crawler, context.request.id,
                                                                          timeout=self._request_handler_timeout.seconds)
 
-            if not secondary_crawler_result.ok:
+            if secondary_crawler_result.exception is not None:
                 raise secondary_crawler_result.exception
             await commit_result(secondary_crawler_result)
 
@@ -181,11 +180,11 @@ class _Coordinator:
     @dataclass
     class _AwaitableSubCrawlerResult:
         """Gradually created result of sub crawler. It is completed after finalize method is called."""
-        push_data_kwargs: dict | None = None
-        add_request_kwargs: dict | None = None
+        push_data_kwargs: _PushDataKwargs | None = None
+        add_request_kwargs: _AddRequestsKwargs | None = None
         state: Any | None = None
         exception: Exception | None = None
-        _future: Future = field(default_factory=Future)
+        _future: asyncio.Future = field(default_factory=asyncio.Future)
 
         def finalize(self) -> None:
             self._future.set_result(
@@ -219,11 +218,11 @@ class _Coordinator:
         async with asyncio.timeout(timeout):
             return await self._results[id(crawler)][request_id]
 
-    def set_push_data(self, crawler: BasicCrawler, request_id: str, push_data_kwargs: dict) -> None:
+    def set_push_data(self, crawler: BasicCrawler, request_id: str, push_data_kwargs: _PushDataKwargs) -> None:
         """Set 'push_data' related arguments to result of specific sub crawler for specific request_id."""
         self._results[id(crawler)][request_id].push_data_kwargs=push_data_kwargs
 
-    def set_add_request(self, crawler: BasicCrawler, request_id: str, add_request_kwargs: dict) -> None:
+    def set_add_request(self, crawler: BasicCrawler, request_id: str, add_request_kwargs: _AddRequestsKwargs) -> None:
         """Set 'add_request' related arguments to result of specific sub crawler for specific request_id."""
         self._results[id(crawler)][request_id].add_request_kwargs = add_request_kwargs
 
@@ -238,7 +237,7 @@ class _Coordinator:
         if self._results[self._id2]:
             del self._results[self._id2][request_id]
 
-    def result_cleanup(self, request_id: str) -> None:
+    def result_cleanup(self, request_id: str) -> ContextManager[None]:
         """Context for preparing and cleaning sub crawler results for specific request_id."""
 
         @contextlib.contextmanager

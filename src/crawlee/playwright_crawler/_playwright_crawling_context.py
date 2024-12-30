@@ -26,7 +26,7 @@ class PlaywrightCrawlingContext(PlaywrightPreNavigationContext):
     response: Response
     """The Playwright `Response` object containing the response details for the current URL."""
 
-    _enqueue_links: _ContextlessEnqueueLinksFunction
+    _enqueue_links: _ContextlessEnqueueLinksFunction[PlaywrightCrawlingContext]
     """The Playwright `EnqueueLinksFunction` implementation."""
 
     infinite_scroll: Callable[[], Awaitable[None]]

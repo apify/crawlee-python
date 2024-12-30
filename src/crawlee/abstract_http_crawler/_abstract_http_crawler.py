@@ -25,7 +25,8 @@ if TYPE_CHECKING:
 
     from typing_extensions import Unpack
 
-    from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, EnqueueLinksKwargs
+    from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, EnqueueLinksKwargs, \
+    _ContextlessEnqueueLinksFunction
     from crawlee.abstract_http_crawler._abstract_http_parser import AbstractHttpParser
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=ParsedHttpCrawlingContext)
@@ -126,7 +127,7 @@ class AbstractHttpCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler[
 
     def _create_enqueue_links_function(
         self, context: HttpCrawlingContext, parsed_content: TParseResult
-    ) -> EnqueueLinksFunction:
+    ) -> _ContextlessEnqueueLinksFunction:
         """Create a callback function for extracting links from parsed content and enqueuing them to the crawl.
 
         Args:
@@ -137,7 +138,7 @@ class AbstractHttpCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler[
             Awaitable that is used for extracting links from parsed content and enqueuing them to the crawl.
         """
 
-        async def enqueue_links(context: BasicCrawlingContext = context,
+        async def enqueue_links(context: HttpCrawlingContext = context,
             selector: str = 'a',
             label: str | None = None,
             user_data: dict[str, Any] | None = None,
