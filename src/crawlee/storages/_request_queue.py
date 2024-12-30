@@ -62,7 +62,6 @@ class CachedRequest(TypedDict):
     lock_expires_at: datetime | None
 
 
-id_func = id
 
 @docs_group('Classes')
 class RequestQueue(BaseStorage, RequestProvider):

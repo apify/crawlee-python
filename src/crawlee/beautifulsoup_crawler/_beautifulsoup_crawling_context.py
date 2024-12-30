@@ -4,7 +4,6 @@ from bs4 import BeautifulSoup
 from typing_extensions import Self
 
 from crawlee._utils.docs import docs_group
-
 from crawlee.abstract_http_crawler._http_crawling_context import ParsedHttpCrawlingContext
 from crawlee.beautifulsoup_crawler._utils import html_to_text
 

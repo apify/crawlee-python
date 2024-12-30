@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import Coroutine, Callable
 from dataclasses import dataclass, fields
 from functools import partial
 from typing import Generic, Any
 
 from typing_extensions import Self, TypeVar, Unpack
 
-from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, EnqueueLinksKwargs
+from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, EnqueueLinksKwargs, \
+    _ContextlessEnqueueLinksFunction
 from crawlee._utils.docs import docs_group
 from crawlee.http_clients import HttpCrawlingResult, HttpResponse
 
@@ -34,11 +36,11 @@ class ParsedHttpCrawlingContext(Generic[TParseResult], HttpCrawlingContext):
     """
 
     parsed_content: TParseResult
-    _enqueue_links: EnqueueLinksFunction
+    _enqueue_links: _ContextlessEnqueueLinksFunction
 
     @classmethod
     def from_http_crawling_context(
-        cls, context: HttpCrawlingContext, parsed_content: TParseResult, enqueue_links: EnqueueLinksFunction
+        cls, context: HttpCrawlingContext, parsed_content: TParseResult, enqueue_links: _ContextlessEnqueueLinksFunction
     ) -> Self:
         """Convenience constructor that creates new context from existing HttpCrawlingContext."""
         context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
@@ -47,5 +49,5 @@ class ParsedHttpCrawlingContext(Generic[TParseResult], HttpCrawlingContext):
 
     @property
     def enqueue_links(self) -> EnqueueLinksFunction:
-        """Bind closure _enqueue_links back to this context"""
+        """Bind _enqueue_links to this context."""
         return partial(self._enqueue_links, context=self)

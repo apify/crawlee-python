@@ -263,6 +263,18 @@ class ExportToFunction(Protocol):
         **kwargs: Unpack[ExportToKwargs],
     ) -> Coroutine[None, None, None]: ...
 
+class _ContextlessEnqueueLinksFunction(Protocol):
+    def __call__(
+        self,
+        context: BasicCrawlingContext,
+        *,
+        selector: str = 'a',
+        label: str | None = None,
+        user_data: dict[str, Any] | None = None,
+        **kwargs: Unpack[EnqueueLinksKwargs],
+    ) -> Coroutine[None, None, None]:
+        ...
+
 
 class EnqueueLinksFunction(Protocol):
     """A function type for enqueueing new URLs to crawl, based on elements selected by a CSS selector.

@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import partial
-from typing import TYPE_CHECKING, Callable, Any
-
-from typing_extensions import Unpack
+from typing import TYPE_CHECKING, Callable
 
 from crawlee._utils.docs import docs_group
 from crawlee.playwright_crawler._playwright_pre_navigation_context import PlaywrightPreNavigationContext
@@ -14,7 +12,7 @@ if TYPE_CHECKING:
 
     from playwright.async_api import Response
 
-    from crawlee._types import EnqueueLinksFunction, EnqueueLinksKwargs
+    from crawlee._types import EnqueueLinksFunction, _ContextlessEnqueueLinksFunction
 
 
 @dataclass(frozen=True)
@@ -28,7 +26,7 @@ class PlaywrightCrawlingContext(PlaywrightPreNavigationContext):
     response: Response
     """The Playwright `Response` object containing the response details for the current URL."""
 
-    _enqueue_links: EnqueueLinksFunction
+    _enqueue_links: _ContextlessEnqueueLinksFunction
     """The Playwright `EnqueueLinksFunction` implementation."""
 
     infinite_scroll: Callable[[], Awaitable[None]]
@@ -37,5 +35,5 @@ class PlaywrightCrawlingContext(PlaywrightPreNavigationContext):
 
     @property
     def enqueue_links(self) -> EnqueueLinksFunction:
-        """Bind closure _enqueue_links back to this context"""
+        """Bind _enqueue_links to this context."""
         return partial(self._enqueue_links, context=self)
