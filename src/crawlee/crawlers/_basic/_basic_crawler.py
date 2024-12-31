@@ -1104,6 +1104,31 @@ class BasicCrawler(Generic[TCrawlingContext]):
     async def __run_request_handler(self, context: BasicCrawlingContext) -> None:
         await self._context_pipeline(context, self.router)
 
+
+    async def _crawl_one(self,*, context: BasicCrawlingContext, request_handler_timeout: timedelta,
+                         result: RequestHandlerRunResult) -> RequestHandlerRunResult:
+        """Populate result by crawling one request from input context. Use result to re-route context callbacks to it."""
+        result_specific_context = BasicCrawlingContext(
+            request=context.request,
+            session=context.session,
+            proxy_info=context.proxy_info,
+            send_request=context.send_request,
+            add_requests=result.add_requests,
+            push_data=result.push_data,
+            get_key_value_store=result.get_key_value_store,
+            use_state=self._use_state, # Not sure about this one. TODO: Learn what it is used for
+            log=self._logger, # Not sure, maybe take from new context?
+        )
+
+        await wait_for(
+            lambda: self.__run_request_handler(result_specific_context),
+            timeout=request_handler_timeout,
+            timeout_message='Request handler timed out after '
+                            f'{self._request_handler_timeout.total_seconds()} seconds',
+            logger=self._logger,
+        )
+        return result
+
     def _is_session_blocked_status_code(self, session: Session | None, status_code: int) -> bool:
         """Check if the HTTP status code indicates that the session was blocked by the target website.
 
