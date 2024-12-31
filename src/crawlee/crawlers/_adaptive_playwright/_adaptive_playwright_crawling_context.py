@@ -1,14 +1,19 @@
 from __future__ import annotations
-from collections.abc import Awaitable, Callable
+
 from dataclasses import dataclass, fields
-from typing_extensions import Self
+from typing import TYPE_CHECKING
 
 from bs4 import BeautifulSoup
-from playwright.async_api import Response, Page
 
 from crawlee import HttpHeaders
 from crawlee._utils.docs import docs_group
-from crawlee.crawlers import BeautifulSoupCrawlingContext, PlaywrightCrawlingContext, BeautifulSoupParserType
+from crawlee.crawlers import BeautifulSoupCrawlingContext, BeautifulSoupParserType, PlaywrightCrawlingContext
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
+    from playwright.async_api import Page, Response
+    from typing_extensions import Self
 
 
 @dataclass(frozen=True)

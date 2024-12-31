@@ -1,9 +1,9 @@
 import asyncio
 
-from crawlee.crawlers import PlaywrightCrawlingContext
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler import AdaptivePlaywrightCrawler
-from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import \
-    AdaptivePlaywrightCrawlingContext
+from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import (
+    AdaptivePlaywrightCrawlingContext,
+)
 
 
 async def main() ->None:

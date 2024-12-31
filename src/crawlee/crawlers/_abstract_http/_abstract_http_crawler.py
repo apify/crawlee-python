@@ -5,7 +5,7 @@ from abc import ABC
 from typing import TYPE_CHECKING, Any, Callable, Generic
 
 from pydantic import ValidationError
-from typing_extensions import NotRequired, TypeVar
+from typing_extensions import NotRequired, TypedDict, TypeVar
 
 from crawlee import EnqueueStrategy
 from crawlee._request import BaseRequestData
@@ -30,17 +30,20 @@ TCrawlingContext = TypeVar('TCrawlingContext', bound=ParsedHttpCrawlingContext)
 
 
 @docs_group('Data structures')
-class HttpCrawlerOptions(Generic[TCrawlingContext], BasicCrawlerOptions[TCrawlingContext]):
-    """Arguments for the `AbstractHttpCrawler` constructor.
-
-    It is intended for typing forwarded `__init__` arguments in the subclasses.
-    """
-
+class _HttpCrawlerOptions(Generic[TCrawlingContext], TypedDict):
     additional_http_error_status_codes: NotRequired[Iterable[int]]
     """Additional HTTP status codes to treat as errors, triggering automatic retries when encountered."""
 
     ignore_http_error_status_codes: NotRequired[Iterable[int]]
     """HTTP status codes typically considered errors but to be treated as successful responses."""
+
+@docs_group('Data structures')
+class HttpCrawlerOptions(Generic[TCrawlingContext],_HttpCrawlerOptions, BasicCrawlerOptions[TCrawlingContext]):
+    """Arguments for the `AbstractHttpCrawler` constructor.
+
+    It is intended for typing forwarded `__init__` arguments in the subclasses.
+    """
+
 
 
 @docs_group('Abstract classes')
