@@ -15,21 +15,20 @@ from crawlee._types import (
 )
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.docs import docs_group
-from crawlee.adaptive_crawler._adaptive_crawler import AdaptiveCrawler, _Coordinator
-from crawlee.adaptive_crawler._result_handlers import _PushDataKwargs
+from crawlee.adaptive_crawler._adaptive_crawler import AdaptiveCrawler, TCrawler, _Coordinator
 from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext, BeautifulSoupParserType
-from crawlee.http_clients import HttpResponse
 from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
 from crawlee.storages import RequestQueue
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable, Coroutine, Sequence
+    from collections.abc import Awaitable, Callable, Sequence
 
     from playwright.async_api import Page, Response
     from typing_extensions import Self, Unpack
 
     from crawlee._request import BaseRequestData, Request
-    from crawlee.basic_crawler import BasicCrawler
+    from crawlee.adaptive_crawler._result_handlers import _PushDataKwargs
+    from crawlee.basic_crawler._basic_crawler import _BasicCrawlerOptions
 
 
 @dataclass(frozen=True)
@@ -89,24 +88,23 @@ class AdaptivePlaywrightCrawlingContext(BeautifulSoupCrawlingContext):
                    **context_kwargs)
 
     @staticmethod
-    def create_push_data(coordinator: _Coordinator, crawler: BasicCrawler, request_id: str) ->PushDataFunction:
+    def create_push_data(coordinator: _Coordinator, crawler: TCrawler, request_id: str) ->PushDataFunction:
         async def push_data(data: JsonSerializable,
                       dataset_id: str | None = None,
                       dataset_name: str | None = None,
                       **kwargs: Unpack[PushDataKwargs],
                       ) -> None:
-            push_data_kwargs: _PushDataKwargs = {'data': data, 'dataset_id': dataset_id, 'dataset_name': dataset_name, **kwargs}
+            push_data_kwargs: _PushDataKwargs = {'data': data, 'dataset_id': dataset_id, 'dataset_name': dataset_name,
+                                                 **kwargs}
 
             coordinator.set_push_data(crawler, request_id, push_data_kwargs=push_data_kwargs)
-            return None
         return push_data
 
     @staticmethod
-    def create_add_requests(coordinator: _Coordinator, crawler: BasicCrawler, request_id: str) ->AddRequestsFunction:
+    def create_add_requests(coordinator: _Coordinator, crawler: TCrawler, request_id: str) ->AddRequestsFunction:
         async def add_request(requests: Sequence[str | BaseRequestData | Request],
                               **kwargs: Unpack[EnqueueLinksKwargs]) -> None:
             coordinator.set_add_request(crawler, request_id, add_request_kwargs={'requests': requests, **kwargs})
-            return None
         return add_request
 
 @dataclass(frozen=True)
@@ -135,7 +133,7 @@ class _HttpResponse:
 class AdaptivePlaywrightCrawler(AdaptiveCrawler[AdaptivePlaywrightCrawlingContext]):
 
     @classmethod
-    async def create_with_default_settings(cls, **crawler_kwargs) -> Self:
+    async def create_with_default_settings(cls,**crawler_kwargs: Unpack[_BasicCrawlerOptions]) -> Self:
         beautifulsoup_crawler_kwargs = {**crawler_kwargs, 'parser': 'lxml'}
         playwright_crawler_kwargs = {**crawler_kwargs, 'headless': True}
 
@@ -144,7 +142,7 @@ class AdaptivePlaywrightCrawler(AdaptiveCrawler[AdaptivePlaywrightCrawlingContex
                                         playwright_crawler_kwargs = playwright_crawler_kwargs)
 
     @classmethod
-    async def create_with_custom_settings(cls, crawler_kwargs: dict | None,
+    async def create_with_custom_settings(cls, crawler_kwargs: _BasicCrawlerOptions,
                                            beautifulsoup_crawler_kwargs: dict | None,
                                            playwright_crawler_kwargs: dict | None) -> Self:
         crawler_kwargs = crawler_kwargs or {}
@@ -219,7 +217,7 @@ class AdaptivePlaywrightCrawler(AdaptiveCrawler[AdaptivePlaywrightCrawlingContex
         return adaptive_crawler
 
 
-    async def reroute_to_top_handler(self, sub_crawler: BasicCrawler,
+    async def reroute_to_top_handler(self, sub_crawler: TCrawler,
                                      context: AdaptivePlaywrightCrawlingContext) -> None:
         """Call top crawler router and finalize sub crawler results when completed."""
         try:

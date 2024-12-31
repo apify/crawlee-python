@@ -5,20 +5,25 @@ import contextlib
 from copy import deepcopy
 from dataclasses import dataclass, field
 from random import random
-from typing import TYPE_CHECKING, Any, ContextManager, Callable
+from typing import TYPE_CHECKING, Any, Callable, Union
 
-from typing_extensions import Self, TypeVar, Unpack, override, Never
+from typing_extensions import Self, TypeAlias, TypeVar, Unpack, override
 
 from crawlee._types import BasicCrawlingContext
 from crawlee.adaptive_crawler._crawl_type_predictor import CrawlType, CrawlTypePredictor
 from crawlee.adaptive_crawler._result_handlers import (
     SubCrawlerResult,
-    default_result_comparator, _PushDataKwargs, _AddRequestsKwargs,
+    _AddRequestsKwargs,
+    _PushDataKwargs,
+    default_result_comparator,
 )
 from crawlee.basic_crawler import BasicCrawler, BasicCrawlerOptions, ContextPipeline
+from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler
+from crawlee.parsel_crawler import ParselCrawler
+from crawlee.playwright_crawler import PlaywrightCrawler
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Iterator, Sequence, AsyncIterator, Mapping
+    from collections.abc import AsyncIterator, Generator, Iterator, Sequence
 
     from crawlee import Request
     from crawlee.statistics import FinalStatistics
@@ -28,10 +33,12 @@ TAdaptiveCrawlingContext = TypeVar('TAdaptiveCrawlingContext', bound=BasicCrawli
                                    default=BasicCrawlingContext)
 
 
+TCrawler: TypeAlias = Union[BeautifulSoupCrawler,ParselCrawler,PlaywrightCrawler]
+
 class AdaptiveCrawler(BasicCrawler[TAdaptiveCrawlingContext]):
 
     @classmethod
-    async def from_crawlers(cls,primary_crawler: BasicCrawler, secondary_crawler: BasicCrawler,
+    async def from_crawlers(cls,primary_crawler: TCrawler, secondary_crawler: TCrawler,
                             **crawler_kwargs: Unpack[BasicCrawlerOptions[TAdaptiveCrawlingContext]]) -> Self:
         return cls(primary_crawler=primary_crawler, secondary_crawler=secondary_crawler,
                    primary_request_provider=await primary_crawler.get_request_provider(),
@@ -41,8 +48,8 @@ class AdaptiveCrawler(BasicCrawler[TAdaptiveCrawlingContext]):
     def __init__(
         self,
         # Could be abstracted in more than just two crawlers. Do not do it preemptively unless there is good use for it.
-        primary_crawler: BasicCrawler,  # Preferred crawler, faster
-        secondary_crawler: BasicCrawler,  # Slower back-up crawler
+        primary_crawler: TCrawler,  # Preferred crawler, faster
+        secondary_crawler: TCrawler,  # Slower back-up crawler
         primary_request_provider: RequestProvider,
         secondary_request_provider: RequestProvider,
         **kwargs: Unpack[BasicCrawlerOptions[TAdaptiveCrawlingContext]],
@@ -199,7 +206,7 @@ class _Coordinator:
             return self._future.__await__()
 
 
-    def __init__(self, crawler1: BasicCrawler, crawler2: BasicCrawler) -> None:
+    def __init__(self, crawler1: TCrawler, crawler2: TCrawler) -> None:
         self._id1 = id(crawler1)
         self._id2 = id(crawler2)
         self._results: dict[int, dict[str, _Coordinator._AwaitableSubCrawlerResult]] = {self._id1: {}, self._id2: {}}
@@ -209,24 +216,24 @@ class _Coordinator:
         self._results[self._id1][request_id] = self._AwaitableSubCrawlerResult()
         self._results[self._id2][request_id] = self._AwaitableSubCrawlerResult()
 
-    def finalize_result(self, crawler: BasicCrawler, request_id: str) -> None:
+    def finalize_result(self, crawler: TCrawler, request_id: str) -> None:
         """Finalize result of specific sub crawler for specific request_id. Such result is considered complete."""
         self._results[id(crawler)][request_id].finalize()
 
-    async def get_result(self, crawler: BasicCrawler, request_id: str, timeout: float = 60.) -> SubCrawlerResult:
+    async def get_result(self, crawler: TCrawler, request_id: str, timeout: float = 60.) -> SubCrawlerResult:
         """Get sub crawler result for specific request_id."""
         async with asyncio.timeout(timeout):
             return await self._results[id(crawler)][request_id]
 
-    def set_push_data(self, crawler: BasicCrawler, request_id: str, push_data_kwargs: _PushDataKwargs) -> None:
+    def set_push_data(self, crawler: TCrawler, request_id: str, push_data_kwargs: _PushDataKwargs) -> None:
         """Set 'push_data' related arguments to result of specific sub crawler for specific request_id."""
         self._results[id(crawler)][request_id].push_data_kwargs=push_data_kwargs
 
-    def set_add_request(self, crawler: BasicCrawler, request_id: str, add_request_kwargs: _AddRequestsKwargs) -> None:
+    def set_add_request(self, crawler: TCrawler, request_id: str, add_request_kwargs: _AddRequestsKwargs) -> None:
         """Set 'add_request' related arguments to result of specific sub crawler for specific request_id."""
         self._results[id(crawler)][request_id].add_request_kwargs = add_request_kwargs
 
-    def set_exception(self, crawler: BasicCrawler, request_id: str, exception: Exception) -> None:
+    def set_exception(self, crawler: TCrawler, request_id: str, exception: Exception) -> None:
         """Set 'ok' value. Should be false if sub crawler failed to get results."""
         self._results[id(crawler)][request_id].exception = exception
 
@@ -237,7 +244,7 @@ class _Coordinator:
         if self._results[self._id2]:
             del self._results[self._id2][request_id]
 
-    def result_cleanup(self, request_id: str) -> ContextManager[None]:
+    def result_cleanup(self, request_id: str) -> contextlib.AbstractContextManager[None]:
         """Context for preparing and cleaning sub crawler results for specific request_id."""
 
         @contextlib.contextmanager

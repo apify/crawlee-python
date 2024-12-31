@@ -66,12 +66,8 @@ FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
 
 
 @docs_group('Data structures')
-class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
-    """Arguments for the `BasicCrawler` constructor.
-
-    It is intended for typing forwarded `__init__` arguments in the subclasses.
-    """
-
+class _BasicCrawlerOptions(TypedDict):
+    """Non-generic options for crawler."""
     configuration: NotRequired[Configuration]
     """The configuration object. Some of its properties are used as defaults for the crawler."""
 
@@ -92,9 +88,6 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
 
     http_client: NotRequired[BaseHttpClient]
     """HTTP client used by `BasicCrawlingContext.send_request` method."""
-
-    request_handler: NotRequired[Callable[[TCrawlingContext], Awaitable[None]]]
-    """A callable responsible for handling requests."""
 
     max_request_retries: NotRequired[int]
     """Maximum number of attempts to process a single request."""
@@ -136,16 +129,27 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     configure_logging: NotRequired[bool]
     """If True, the crawler will set up logging infrastructure automatically."""
 
-    _context_pipeline: NotRequired[ContextPipeline[TCrawlingContext]]
-    """Enables extending the request lifecycle and modifying the crawling context. Intended for use by
-    subclasses rather than direct instantiation of `BasicCrawler`."""
-
     _additional_context_managers: NotRequired[Sequence[AbstractAsyncContextManager]]
     """Additional context managers used throughout the crawler lifecycle. Intended for use by
     subclasses rather than direct instantiation of `BasicCrawler`."""
 
     _logger: NotRequired[logging.Logger]
     """A logger instance, typically provided by a subclass, for consistent logging labels. Intended for use by
+    subclasses rather than direct instantiation of `BasicCrawler`."""
+
+
+@docs_group('Data structures')
+class BasicCrawlerOptions(_BasicCrawlerOptions, Generic[TCrawlingContext]):
+    """Arguments for the `BasicCrawler` constructor.
+
+    It is intended for typing forwarded `__init__` arguments in the subclasses.
+    """
+
+    request_handler: NotRequired[Callable[[TCrawlingContext], Awaitable[None]]]
+    """A callable responsible for handling requests."""
+
+    _context_pipeline: NotRequired[ContextPipeline[TCrawlingContext]]
+    """Enables extending the request lifecycle and modifying the crawling context. Intended for use by
     subclasses rather than direct instantiation of `BasicCrawler`."""
 
 

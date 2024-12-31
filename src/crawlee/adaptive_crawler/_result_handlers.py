@@ -1,13 +1,16 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from typing_extensions import NotRequired, TypedDict, Unpack
+from crawlee._types import EnqueueLinksKwargs, JsonSerializable, PushDataKwargs
 
-from crawlee._request import BaseRequestData, Request
-from crawlee._types import PushDataKwargs, EnqueueLinksKwargs, JsonSerializable
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from typing_extensions import NotRequired
+
+    from crawlee._request import BaseRequestData, Request
 
 
 def default_result_comparator(result_1: SubCrawlerResult, result_2: SubCrawlerResult) -> bool:

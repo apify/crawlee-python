@@ -7,13 +7,14 @@ from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
+    Generic,
     Literal,
     Optional,
     Protocol,
     TypeVar,
     Union,
     cast,
-    overload, Generic,
+    overload,
 )
 
 from pydantic import ConfigDict, Field, PlainValidator, RootModel
@@ -365,14 +366,14 @@ class BasicCrawlingContext:
     get_key_value_store: GetKeyValueStoreFromRequestHandlerFunction
     log: logging.Logger
 
-TCrawlingContext = TypeVar('TCrawlingContext', contravariant=True)
+TCrawlingContext_contra = TypeVar('TCrawlingContext_contra', contravariant=True)
 
 
-class _ContextlessEnqueueLinksFunction(Generic[TCrawlingContext], Protocol):
+class ContextlessEnqueueLinksFunction(Generic[TCrawlingContext_contra], Protocol):
     def __call__(
         self,
         *,
-        context: TCrawlingContext,
+        context: TCrawlingContext_contra,
         selector: str = 'a',
         label: str | None = None,
         user_data: dict[str, Any] | None = None,
