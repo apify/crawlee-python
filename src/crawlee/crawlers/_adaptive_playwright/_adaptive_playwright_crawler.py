@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+from copy import deepcopy
+from logging import getLogger
 from random import random
 from typing import TYPE_CHECKING, Any
 
 from IPython.core.completer import TypedDict
 
-from crawlee._types import BasicCrawlingContext, RequestHandlerRunResult
+from crawlee._types import BasicCrawlingContext, JsonSerializable, RequestHandlerRunResult
 from crawlee._utils.docs import docs_group
 from crawlee.crawlers import (
     BasicCrawler,
@@ -92,27 +95,40 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
                  request_handler: Callable[[AdaptivePlaywrightCrawlingContext], Awaitable[None]] | None = None,
                  _context_pipeline: ContextPipeline[AdaptivePlaywrightCrawlingContext] | None = None,
                  **kwargs: Unpack[_BasicCrawlerOptions]) -> None:
+        # TODO: pre navigation hooks support for subcrawlers. How to handle???
+
+        # Sub crawler kwargs might be modified
+        bs_kwargs = deepcopy(kwargs)
+        pw_kwargs = deepcopy(kwargs)
 
         beautifulsoup_crawler_kwargs = beautifulsoup_crawler_kwargs or {}
         beautifulsoup_crawler_kwargs.setdefault('parser', 'lxml')
         playwright_crawler_args = playwright_crawler_args or {}
 
+        # Each sub crawler will use custom logger.
+        bs_logger = getLogger('Subcrawler_BS')
+        bs_logger.setLevel(logging.ERROR)
+        bs_kwargs['_logger'] = bs_logger
+
+        pw_logger = getLogger('Subcrawler_PW')
+        pw_logger.setLevel(logging.ERROR)
+        pw_kwargs['_logger'] = pw_logger
+
+
         self.rendering_type_predictor = rendering_type_predictor or DefaultRenderingTypePredictor()
         self.result_checker = result_checker or (lambda result: True) #  noqa: ARG005
         self.result_comparator = result_comparator or default_result_comparator
 
-        self.beautifulsoup_crawler = BeautifulSoupCrawler(**beautifulsoup_crawler_kwargs, **kwargs)
-        self.playwright_crawler = PlaywrightCrawler(**playwright_crawler_args, **kwargs)
+        self.beautifulsoup_crawler = BeautifulSoupCrawler(**beautifulsoup_crawler_kwargs, **bs_kwargs)
+        self.playwright_crawler = PlaywrightCrawler(**playwright_crawler_args, **pw_kwargs)
 
         @self.beautifulsoup_crawler.router.default_handler
         async def request_handler_beautiful_soup(context: BeautifulSoupCrawlingContext) -> None:
-            context.log.info(f'Processing with BS: {context.request.url} ...')
             adaptive_crawling_context = AdaptivePlaywrightCrawlingContext.from_beautifulsoup_crawling_context(context)
             await self.router(adaptive_crawling_context)
 
         @self.playwright_crawler.router.default_handler
         async def request_handler_playwright(context: PlaywrightCrawlingContext) -> None:
-            context.log.info(f'Processing with PW: {context.request.url} ...')
             adaptive_crawling_context = await AdaptivePlaywrightCrawlingContext.from_playwright_crawling_context(
                 context=context, beautiful_soup_parser_type=beautifulsoup_crawler_kwargs['parser'])
             await self.router(adaptive_crawling_context)
@@ -122,6 +138,13 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
             statistics = AdaptivePlaywrightCrawlerStatistics.from_statistics(statistics=kwargs['statistics'])
         else:
             statistics = AdaptivePlaywrightCrawlerStatistics()
+
+        # Each sub crawler will use custom logger.
+        if '_logger' not in kwargs:
+            top_logger = getLogger(__name__)
+            top_logger.setLevel(logging.DEBUG)
+            kwargs['_logger'] = top_logger
+
         kwargs['statistics'] = statistics #  type:ignore[typeddict-item] # Statistics class would need refactoring beyond the scope of this change. TODO:
         super().__init__(request_handler=request_handler, _context_pipeline=_context_pipeline, **kwargs)
 
@@ -139,12 +162,13 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
 
     # Can't use override as mypy does not like it for double underscore private method.
     async def _BasicCrawler__run_request_handler(self, context: BasicCrawlingContext) -> None: # noqa: N802
-        async def _run_subcrawler(crawler: BeautifulSoupCrawler | PlaywrightCrawler) -> SubCrawlerRun:
+        async def _run_subcrawler(crawler: BeautifulSoupCrawler | PlaywrightCrawler, use_state: dict | None = None) -> SubCrawlerRun:
             try:
                 crawl_result = await crawler.crawl_one(
                 context = context,
                 request_handler_timeout=self._request_handler_timeout,
-                result= RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store))
+                result= RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store),
+                use_state=use_state)
                 return SubCrawlerRun(result=crawl_result)
             except Exception as e:
                 return SubCrawlerRun(exception=e)
@@ -157,6 +181,7 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
             self.log.debug(
                 f'Predicted rendering type {rendering_type_prediction.rendering_type} for {context.request.url}')
             if rendering_type_prediction.rendering_type == 'static':
+                context.log.debug(f'Running static request for {context.request.url}')
                 self.statistics.track_http_only_request_handler_runs()  # type:ignore[attr-defined] # Statistics class would need refactoring beyond the scope of this change. TODO:
 
                 bs_run = await _run_subcrawler(self.beautifulsoup_crawler)
@@ -168,11 +193,18 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
                                           exc_info=bs_run.exception)
                 else:
                     context.log.warning(f'Static crawler: returned a suspicious result for {context.request.url}')
-                    self.stats.rendering_type_mispredictions()  # type:ignore[attr-defined] # Statistics class would need refactoring beyond the scope of this change. TODO:
+                    self.stats.track_rendering_type_mispredictions()  # type:ignore[attr-defined] # Statistics class would need refactoring beyond the scope of this change. TODO:
 
         context.log.debug(f'Running browser request handler for {context.request.url}')
+        # TODO: What is this used for actually???
+        await context.use_state('CRAWLEE_STATE', {'some': 'state'})
+        kvs = await context.get_key_value_store()
+        default_value =dict[str, JsonSerializable]()
+        old_state: dict[str, JsonSerializable] = await kvs.get_value('CRAWLEE_STATE', default_value)
+        old_state_copy = deepcopy(old_state)
+
         pw_run = await _run_subcrawler(self.playwright_crawler)
-        self.stats.browser_request_handler_runs()# type:ignore[attr-defined] # Statistics class would need refactoring beyond the scope of this change. TODO:
+        self.statistics.track_browser_request_handler_runs()# type:ignore[attr-defined] # Statistics class would need refactoring beyond the scope of this change. TODO:
 
         if pw_run.exception is not None:
             raise pw_run.exception
@@ -182,7 +214,7 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
 
             if should_detect_rendering_type:
                 detection_result: RenderingType
-                bs_run = await _run_subcrawler(self.beautifulsoup_crawler)
+                bs_run = await _run_subcrawler(self.beautifulsoup_crawler, use_state=old_state_copy)
 
                 if bs_run.result and self.result_comparator(bs_run.result,pw_run.result):
                     detection_result = 'static'

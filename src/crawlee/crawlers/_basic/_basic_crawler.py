@@ -1115,8 +1115,17 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
 
     async def crawl_one(self, *, context: BasicCrawlingContext, request_handler_timeout: timedelta,
-                        result: RequestHandlerRunResult) -> RequestHandlerRunResult:
+                        result: RequestHandlerRunResult, use_state: dict[str,
+        JsonSerializable] | None = None) -> RequestHandlerRunResult:
         """Populate result by crawling one request from input context. Route context callbacks to result."""
+        if use_state is not None:
+            async def get_old_use_state(key: str, default_value: dict[str,
+            JsonSerializable] | None = None) -> dict[str, JsonSerializable]:
+                return use_state
+            use_state_function = get_old_use_state
+        else:
+            use_state_function = context.use_state
+
         result_specific_context = BasicCrawlingContext(
             request=context.request,
             session=context.session,
@@ -1125,8 +1134,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
             add_requests=result.add_requests,
             push_data=result.push_data,
             get_key_value_store=result.get_key_value_store,
-            use_state=self._use_state, # Not sure about this one. TODO: Learn what it is used for
-            log=self._logger, # Not sure, maybe take from new context?
+            use_state=use_state_function,
+            log=context.log
         )
 
         await wait_for(
