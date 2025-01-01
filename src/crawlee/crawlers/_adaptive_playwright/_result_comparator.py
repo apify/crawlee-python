@@ -12,9 +12,6 @@ class SubCrawlerRun:
     result: RequestHandlerRunResult | None= None
     exception: Exception | None= None
 
-    @property
-    def ok(self) -> bool:
-        return not bool(self.exception)
 
 def default_result_comparator(result_1: RequestHandlerRunResult, result_2: RequestHandlerRunResult) -> bool:
 

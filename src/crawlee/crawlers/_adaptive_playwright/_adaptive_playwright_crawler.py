@@ -119,10 +119,10 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
 
         # Make user adaptive statistics are used
         if 'statistics' in kwargs:
-            statistics = AdaptivePlaywrightCrawlerStatistics.from_statistics()
+            statistics = AdaptivePlaywrightCrawlerStatistics.from_statistics(statistics=kwargs['statistics'])
         else:
             statistics = AdaptivePlaywrightCrawlerStatistics()
-        kwargs['statistics'] = statistics
+        kwargs['statistics'] = statistics #  type:ignore[typeddict-item] # Statistics class would need refactoring beyond the scope of this change. TODO:
         super().__init__(request_handler=request_handler, _context_pipeline=_context_pipeline, **kwargs)
 
     async def run(
@@ -157,35 +157,40 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
             self.log.debug(
                 f'Predicted rendering type {rendering_type_prediction.rendering_type} for {context.request.url}')
             if rendering_type_prediction.rendering_type == 'static':
-                self.statistics.track_http_only_request_handler_runs()
+                self.statistics.track_http_only_request_handler_runs()  # type:ignore[attr-defined] # Statistics class would need refactoring beyond the scope of this change. TODO:
 
                 bs_run = await _run_subcrawler(self.beautifulsoup_crawler)
-                if bs_run.ok and self.result_checker(bs_run.result):
+                if bs_run.result and self.result_checker(bs_run.result):
                     await self.commit_result(result = bs_run.result, context=context)
                     return
-                if not bs_run.ok:
+                if bs_run.exception:
                     context.log.exception(msg=f'Static crawler: failed for {context.request.url}',
                                           exc_info=bs_run.exception)
                 else:
                     context.log.warning(f'Static crawler: returned a suspicious result for {context.request.url}')
+                    self.stats.rendering_type_mispredictions()  # type:ignore[attr-defined] # Statistics class would need refactoring beyond the scope of this change. TODO:
 
+        context.log.debug(f'Running browser request handler for {context.request.url}')
         pw_run = await _run_subcrawler(self.playwright_crawler)
+        self.stats.browser_request_handler_runs()# type:ignore[attr-defined] # Statistics class would need refactoring beyond the scope of this change. TODO:
 
         if pw_run.exception is not None:
             raise pw_run.exception
-        await self.commit_result(result = pw_run.result, context=context)
 
-        if should_detect_rendering_type:
-            detection_result: RenderingType
-            bs_run = await _run_subcrawler(self.beautifulsoup_crawler)
+        if pw_run.result:
+            await self.commit_result(result = pw_run.result, context=context)
 
-            if bs_run.ok and self.result_comparator(bs_run.result,pw_run.result):
-                detection_result = 'static'
-            else:
-                detection_result = 'client only'
+            if should_detect_rendering_type:
+                detection_result: RenderingType
+                bs_run = await _run_subcrawler(self.beautifulsoup_crawler)
 
-            context.log.debug(f'Detected rendering type {detection_result} for {context.request.url}')
-            self.rendering_type_predictor.store_result(context.request.url, context.request.label, detection_result)
+                if bs_run.result and self.result_comparator(bs_run.result,pw_run.result):
+                    detection_result = 'static'
+                else:
+                    detection_result = 'client only'
+
+                context.log.debug(f'Detected rendering type {detection_result} for {context.request.url}')
+                self.rendering_type_predictor.store_result(context.request.url, context.request.label, detection_result)
 
     async def commit_result(self, result: RequestHandlerRunResult, context: BasicCrawlingContext) -> None:
         result_tasks = []

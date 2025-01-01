@@ -97,6 +97,7 @@ class Statistics(Generic[TStatisticsState]):
 
         self._log_message = log_message
         self._periodic_message_logger = periodic_message_logger or logger
+        self._log_interval = log_interval
         self._periodic_logger = RecurringTask(self._log, log_interval)
 
         # Flag to indicate the context state.
