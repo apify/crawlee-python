@@ -7,7 +7,7 @@ from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context
 
 
 async def main() ->None:
-    crawler = AdaptivePlaywrightCrawler(max_requests_per_crawl=2)
+    crawler = AdaptivePlaywrightCrawler(max_requests_per_crawl=10)
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
@@ -17,7 +17,7 @@ async def main() ->None:
 
 
     # Run the crawler with the initial list of URLs.
-    await crawler.run(['https://news.ycombinator.com/'])
+    await crawler.run(['https://crawlee.dev/'])
 
 
 if __name__ == '__main__':

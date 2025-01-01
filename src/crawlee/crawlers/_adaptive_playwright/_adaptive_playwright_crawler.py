@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from random import random
 from typing import TYPE_CHECKING, Any
 
 from IPython.core.completer import TypedDict
@@ -17,9 +18,18 @@ from crawlee.crawlers import (
     PlaywrightCrawlingContext,
 )
 from crawlee.crawlers._abstract_http._abstract_http_crawler import _HttpCrawlerOptions
+from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler_statistics import (
+    AdaptivePlaywrightCrawlerStatistics,
+)
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import (
     AdaptivePlaywrightCrawlingContext,
 )
+from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import (
+    DefaultRenderingTypePredictor,
+    RenderingType,
+    RenderingTypePredictor,
+)
+from crawlee.crawlers._adaptive_playwright._result_comparator import SubCrawlerRun, default_result_comparator
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Mapping, Sequence
@@ -74,6 +84,9 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
     """Adaptive crawler that uses both BeautifulSoup crawler and PlaywrightCrawler."""
 
     def __init__(self,
+                 rendering_type_predictor: RenderingTypePredictor | None = None,
+                 result_checker: Callable[[RequestHandlerRunResult], bool] | None = None,
+                 result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,
                  beautifulsoup_crawler_kwargs: _BeautifulsoupCrawlerAdditionalOptions | None = None,
                  playwright_crawler_args: _PlaywrightCrawlerAdditionalOptions | None = None,
                  request_handler: Callable[[AdaptivePlaywrightCrawlingContext], Awaitable[None]] | None = None,
@@ -83,6 +96,10 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
         beautifulsoup_crawler_kwargs = beautifulsoup_crawler_kwargs or {}
         beautifulsoup_crawler_kwargs.setdefault('parser', 'lxml')
         playwright_crawler_args = playwright_crawler_args or {}
+
+        self.rendering_type_predictor = rendering_type_predictor or DefaultRenderingTypePredictor()
+        self.result_checker = result_checker or (lambda result: True) #  noqa: ARG005
+        self.result_comparator = result_comparator or default_result_comparator
 
         self.beautifulsoup_crawler = BeautifulSoupCrawler(**beautifulsoup_crawler_kwargs, **kwargs)
         self.playwright_crawler = PlaywrightCrawler(**playwright_crawler_args, **kwargs)
@@ -100,6 +117,12 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
                 context=context, beautiful_soup_parser_type=beautifulsoup_crawler_kwargs['parser'])
             await self.router(adaptive_crawling_context)
 
+        # Make user adaptive statistics are used
+        if 'statistics' in kwargs:
+            statistics = AdaptivePlaywrightCrawlerStatistics.from_statistics()
+        else:
+            statistics = AdaptivePlaywrightCrawlerStatistics()
+        kwargs['statistics'] = statistics
         super().__init__(request_handler=request_handler, _context_pipeline=_context_pipeline, **kwargs)
 
     async def run(
@@ -108,22 +131,61 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
         *,
         purge_request_queue: bool = True,
     ) -> FinalStatistics:
+
+        # TODO: Create something more robust that does not leak implementation so much
         async with (self.beautifulsoup_crawler.statistics, self.playwright_crawler.statistics,
-                    self.playwright_crawler._additional_context_managers[0]): # TODO: Create something more robust that does not leak implementation so much
+                    self.playwright_crawler._additional_context_managers[0]):
             return await super().run(requests=requests, purge_request_queue=purge_request_queue)
 
     # Can't use override as mypy does not like it for double underscore private method.
     async def _BasicCrawler__run_request_handler(self, context: BasicCrawlingContext) -> None: # noqa: N802
+        async def _run_subcrawler(crawler: BeautifulSoupCrawler | PlaywrightCrawler) -> SubCrawlerRun:
+            try:
+                crawl_result = await crawler.crawl_one(
+                context = context,
+                request_handler_timeout=self._request_handler_timeout,
+                result= RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store))
+                return SubCrawlerRun(result=crawl_result)
+            except Exception as e:
+                return SubCrawlerRun(exception=e)
 
-        result = RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store)
 
-        await self.beautifulsoup_crawler.crawl_one(context = context,
-                                                    request_handler_timeout=self._request_handler_timeout,
-                                                    result= result)
-        await self.playwright_crawler.crawl_one(context=context,
-                                                request_handler_timeout=self._request_handler_timeout,
-                                                result=result)
-        await self.commit_result(result = result, context = context)
+        rendering_type_prediction = self.rendering_type_predictor.predict(context.request.url, context.request.label)
+        should_detect_rendering_type = random() < rendering_type_prediction.detection_probability_recommendation
+
+        if not should_detect_rendering_type:
+            self.log.debug(
+                f'Predicted rendering type {rendering_type_prediction.rendering_type} for {context.request.url}')
+            if rendering_type_prediction.rendering_type == 'static':
+                self.statistics.track_http_only_request_handler_runs()
+
+                bs_run = await _run_subcrawler(self.beautifulsoup_crawler)
+                if bs_run.ok and self.result_checker(bs_run.result):
+                    await self.commit_result(result = bs_run.result, context=context)
+                    return
+                if not bs_run.ok:
+                    context.log.exception(msg=f'Static crawler: failed for {context.request.url}',
+                                          exc_info=bs_run.exception)
+                else:
+                    context.log.warning(f'Static crawler: returned a suspicious result for {context.request.url}')
+
+        pw_run = await _run_subcrawler(self.playwright_crawler)
+
+        if pw_run.exception is not None:
+            raise pw_run.exception
+        await self.commit_result(result = pw_run.result, context=context)
+
+        if should_detect_rendering_type:
+            detection_result: RenderingType
+            bs_run = await _run_subcrawler(self.beautifulsoup_crawler)
+
+            if bs_run.ok and self.result_comparator(bs_run.result,pw_run.result):
+                detection_result = 'static'
+            else:
+                detection_result = 'client only'
+
+            context.log.debug(f'Detected rendering type {detection_result} for {context.request.url}')
+            self.rendering_type_predictor.store_result(context.request.url, context.request.label, detection_result)
 
     async def commit_result(self, result: RequestHandlerRunResult, context: BasicCrawlingContext) -> None:
         result_tasks = []
