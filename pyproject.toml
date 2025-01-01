@@ -60,7 +60,7 @@ psutil = ">=6.0.0"
 pydantic = ">=2.8.1, !=2.10.0, !=2.10.1, !=2.10.2"
 # TODO: relax the upper bound once the issue is resolved:
 # https://github.com/apify/crawlee-python/issues/814
-pydantic-settings = ">=2.2.0 <2.7.0"
+pydantic-settings = "<2.7.2"
 pyee = ">=9.0.0"
 sortedcollections = ">=2.1.0"
 tldextract = ">=5.1.0"
