@@ -4,7 +4,7 @@ try:
     from ._beautifulsoup_parser import BeautifulSoupParserType
 except ImportError as exc:
     raise ImportError(
-        "To import anything from this subpackage, you need to install the 'beautifulsoup' extra. "
+        "To import this, you need to install the 'beautifulsoup' extra. "
         "For example, if you use pip, run `pip install 'crawlee[beautifulsoup]'`.",
     ) from exc
 
