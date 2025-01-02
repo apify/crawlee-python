@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.5.0 - **not yet released**
+## [0.5.0](https://github.com/apify/crawlee-python/releases/tag/v0.5.0) (2025-01-02)
 
 ### 🚀 Features
 
@@ -37,7 +36,6 @@ All notable changes to this project will be documented in this file.
 - [**breaking**] Update the crawlers &amp; storage clients structure ([#828](https://github.com/apify/crawlee-python/pull/828)) ([0ba04d1](https://github.com/apify/crawlee-python/commit/0ba04d1633881043928a408678932c46fb90e21f)) by [@vdusek](https://github.com/vdusek), closes [#764](https://github.com/apify/crawlee-python/issues/764)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.4.5](https://github.com/apify/crawlee-python/releases/tag/v0.4.5) (2024-12-06)
 
 ### 🚀 Features
