@@ -49,14 +49,16 @@ Example update:
 ### Service locator
 
 - The `crawlee.service_container` was completely refactored and renamed to `crawlee.service_locator`.
+- You can use it to set the configuration, event manager or storage client globally. Or you can pass them to your crawler instance directly and it will use the service locator under the hood.
 
 ### Statistics
 
 - The `crawlee.statistics.Statistics` class do not accept an event manager as an input argument anymore. It uses the default, global one.
+- If you want to set your custom event manager, do it either via the service locator or pass it to the crawler.
 
 ### Request
 
-- Removed properties `json_` and `order_no`.
+- The properties `json_` and `order_no` were removed. They were there only for the internal purpose of the memory storage client, you should not need them.
 
 ### Request storages and loaders
 
