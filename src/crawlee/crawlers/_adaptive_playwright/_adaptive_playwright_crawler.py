@@ -33,7 +33,10 @@ from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import (
     RenderingType,
     RenderingTypePredictor,
 )
-from crawlee.crawlers._adaptive_playwright._result_comparator import SubCrawlerRun, default_result_comparator
+from crawlee.crawlers._adaptive_playwright._result_comparator import (
+    SubCrawlerRun,
+    create_comparator,
+)
 from crawlee.statistics import Statistics
 
 if TYPE_CHECKING:
@@ -104,7 +107,9 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
         # Adaptive crawling related.
         self.rendering_type_predictor = rendering_type_predictor or DefaultRenderingTypePredictor()
         self.result_checker = result_checker or (lambda result: True) #  noqa: ARG005
-        self.result_comparator = result_comparator or default_result_comparator
+
+        self.result_comparator = result_comparator or create_comparator(result_checker)
+
         # Use AdaptivePlaywrightCrawlerStatistics.
         # Very hard to work with current "fake generic" Statistics. TODO: Discuss best approach.
         if 'statistics' in kwargs:
