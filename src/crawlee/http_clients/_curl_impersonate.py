@@ -84,8 +84,8 @@ class CurlImpersonateHttpClient(BaseHttpClient):
     ### Usage
 
     ```python
-    from crawlee.http_clients.curl_impersonate import CurlImpersonateHttpClient
-    from crawlee.http_crawler import HttpCrawler  # or any other HTTP client-based crawler
+    from crawlee.crawlers import HttpCrawler  # or any other HTTP client-based crawler
+    from crawlee.http_clients import CurlImpersonateHttpClient
 
     http_client = CurlImpersonateHttpClient()
     crawler = HttpCrawler(http_client=http_client)

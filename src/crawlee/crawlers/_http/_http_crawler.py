@@ -22,7 +22,7 @@ class HttpCrawler(AbstractHttpCrawler[ParsedHttpCrawlingContext[bytes], bytes]):
     ### Usage
 
     ```python
-    from crawlee.http_crawler import HttpCrawler, HttpCrawlingContext
+    from crawlee.crawlers import HttpCrawler, HttpCrawlingContext
 
     crawler = HttpCrawler()
 
