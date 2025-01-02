@@ -181,6 +181,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         - direct storage interaction helpers,
         - and more.
     """
+    CRAWLEE_STATE_KEY = 'CRAWLEE_STATE'
 
     def __init__(
         self,
@@ -574,10 +575,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
         )
 
     async def _use_state(
-        self, key: str, default_value: dict[str, JsonSerializable] | None = None
+        self, default_value: dict[str, JsonSerializable] | None = None
     ) -> dict[str, JsonSerializable]:
         store = await self.get_key_value_store()
-        return await store.get_auto_saved_value(key, default_value)
+        return await store.get_auto_saved_value(BasicCrawler.CRAWLEE_STATE_KEY, default_value)
 
     async def _save_crawler_state(self) -> None:
         store = await self.get_key_value_store()
@@ -1114,19 +1115,34 @@ class BasicCrawler(Generic[TCrawlingContext]):
         await self._context_pipeline(context, self.router)
 
 
-    async def crawl_one(self, *, context: BasicCrawlingContext, request_handler_timeout: timedelta,
-                        result: RequestHandlerRunResult, use_state: dict[str,
-        JsonSerializable] | None = None) -> RequestHandlerRunResult:
-        """Populate result by crawling one request from input context. Route context callbacks to result."""
+    async def crawl_one(self, *, context: BasicCrawlingContext,
+                        request_handler_timeout: timedelta,
+                        result: RequestHandlerRunResult,
+                        use_state: dict[str,JsonSerializable] | None = None
+                        ) -> RequestHandlerRunResult:
+        """Populate result by crawling one request from input `context`.
+
+         Context callbacks are routed to `result` and are not commited.
+
+        Args:
+            context: Context used for crawling. It contains `request` that will be crawled.
+            request_handler_timeout: Timeout in seconds for request handling.
+            result: Record of calls to storage-related context helpers.
+            use_state: Existing state that will be used when `context.use_state` is called.
+             If none, take `use_state` from input `context`.
+
+        Returns:
+            Same input result object that is mutated in the process.
+        """
         if use_state is not None:
-            async def get_old_use_state(key: str, default_value: dict[str,
-            JsonSerializable] | None = None) -> dict[str, JsonSerializable]:
+            async def get_input_state(default_value: dict[str, JsonSerializable] | None = None  # noqa:ARG001  # Intentionally unused arguments. Closure, that generates same output regardless of inputs.
+                                      ) -> dict[str, JsonSerializable]:
                 return use_state
-            use_state_function = get_old_use_state
+            use_state_function = get_input_state
         else:
             use_state_function = context.use_state
 
-        result_specific_context = BasicCrawlingContext(
+        context_linked_to_result = BasicCrawlingContext(
             request=context.request,
             session=context.session,
             proxy_info=context.proxy_info,
@@ -1139,7 +1155,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         )
 
         await wait_for(
-            lambda: self.__run_request_handler(result_specific_context),
+            lambda: self.__run_request_handler(context_linked_to_result),
             timeout=request_handler_timeout,
             timeout_message='Request handler timed out after '
                             f'{self._request_handler_timeout.total_seconds()} seconds',

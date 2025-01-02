@@ -1,4 +1,6 @@
 import asyncio
+import logging
+from logging import getLogger
 
 from crawlee._types import BasicCrawlingContext
 from crawlee.crawlers import PlaywrightPreNavCrawlingContext
@@ -9,7 +11,12 @@ from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context
 
 
 async def main() ->None:
-    crawler = AdaptivePlaywrightCrawler(max_requests_per_crawl=10)
+    # TODO: remove in review
+    top_logger = getLogger(__name__)
+    top_logger.setLevel(logging.DEBUG)
+
+
+    crawler = AdaptivePlaywrightCrawler(max_requests_per_crawl=10, _logger=top_logger)
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
