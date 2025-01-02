@@ -40,23 +40,23 @@ class HttpCrawlerOptions(Generic[TCrawlingContext], BasicCrawlerOptions[TCrawlin
     """Additional HTTP status codes to treat as errors, triggering automatic retries when encountered."""
 
     ignore_http_error_status_codes: NotRequired[Iterable[int]]
-    """HTTP status codes typically considered errors but to be treated as successful responses."""
+    """HTTP status codes that are typically considered errors but should be treated as successful responses."""
 
 
 @docs_group('Abstract classes')
 class AbstractHttpCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler[TCrawlingContext], ABC):
     """A web crawler for performing HTTP requests.
 
-    The `AbstractHttpCrawler` builds on top of the `BasicCrawler`, which means it inherits all of its features. On top
-    of that it implements the HTTP communication using the HTTP clients. The class allows integration with
-    any HTTP client that implements the `BaseHttpClient` interface. The HTTP client is provided to the crawler
-    as an input parameter to the constructor.
-    AbstractHttpCrawler is generic class and is expected to be used together with specific parser that will be used to
-    parse http response and type of expected TCrawlingContext which is available to the user function.
-    See prepared specific version of it: BeautifulSoupCrawler, ParselCrawler or HttpCrawler for example.
+    The `AbstractHttpCrawler` builds on top of the `BasicCrawler`, inheriting all its features. Additionally,
+    it implements HTTP communication using HTTP clients. The class allows integration with any HTTP client
+    that implements the `BaseHttpClient` interface, provided as an input parameter to the constructor.
 
-    The HTTP client-based crawlers are ideal for websites that do not require JavaScript execution. However,
-    if you need to execute client-side JavaScript, consider using a browser-based crawler like the `PlaywrightCrawler`.
+    `AbstractHttpCrawler` is a generic class intended to be used with a specific parser for parsing HTTP responses
+    and the expected type of `TCrawlingContext` available to the user function. Examples of specific versions include
+    `BeautifulSoupCrawler`, `ParselCrawler`, and `HttpCrawler`.
+
+    HTTP client-based crawlers are ideal for websites that do not require JavaScript execution. For websites that
+    require client-side JavaScript execution, consider using a browser-based crawler like the `PlaywrightCrawler`.
     """
 
     def __init__(

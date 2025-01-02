@@ -32,7 +32,7 @@ class BeautifulSoupCrawler(AbstractHttpCrawler[BeautifulSoupCrawlingContext, Bea
     ### Usage
 
     ```python
-    from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
+    from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 
     crawler = BeautifulSoupCrawler()
 

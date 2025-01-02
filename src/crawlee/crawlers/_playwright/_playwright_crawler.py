@@ -45,7 +45,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
     ### Usage
 
     ```python
-    from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
+    from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext
 
     crawler = PlaywrightCrawler()
 
