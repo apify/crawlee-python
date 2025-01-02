@@ -54,7 +54,7 @@ if TYPE_CHECKING:
     from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
     from crawlee.request_loaders import RequestManager
     from crawlee.sessions import Session
-    from crawlee.statistics import FinalStatistics, StatisticsState
+    from crawlee.statistics import FinalStatistics
     from crawlee.storage_clients import BaseStorageClient
     from crawlee.storage_clients.models import DatasetItemsListPage
     from crawlee.storages._dataset import ExportDataCsvKwargs, ExportDataJsonKwargs, GetDataKwargs, PushDataKwargs
@@ -120,7 +120,7 @@ class _BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     request_handler_timeout: NotRequired[timedelta]
     """Maximum duration allowed for a single request handler to run."""
 
-    statistics: NotRequired[Statistics[StatisticsState]]
+    statistics: NotRequired[Statistics]
     """A custom `Statistics` instance, allowing the use of non-default configuration."""
 
     abort_on_error: NotRequired[bool]
@@ -354,7 +354,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._router = router
 
     @property
-    def statistics(self) -> Statistics[StatisticsState]:
+    def statistics(self) -> Statistics:
         """Statistics about the current (or last) crawler run."""
         return self._statistics
 

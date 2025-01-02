@@ -4,9 +4,7 @@ from __future__ import annotations
 import math
 from datetime import datetime, timedelta, timezone
 from logging import Logger, getLogger
-from typing import TYPE_CHECKING, Any, Generic, cast
-
-from typing_extensions import Self, TypeVar
+from typing import TYPE_CHECKING, Any, cast
 
 from crawlee import service_locator
 from crawlee._utils.context import ensure_context
@@ -20,7 +18,8 @@ from crawlee.storages import KeyValueStore
 if TYPE_CHECKING:
     from types import TracebackType
 
-TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
+    from typing_extensions import Self
+
 
 logger = getLogger(__name__)
 
@@ -54,7 +53,7 @@ class RequestProcessingRecord:
 
 
 @docs_group('Classes')
-class Statistics(Generic[TStatisticsState]):
+class Statistics:
     """An interface to collecting and logging runtime statistics for requests.
 
     All information is saved to the key value store so that it persists between migrations, abortions and resurrections.
@@ -72,7 +71,7 @@ class Statistics(Generic[TStatisticsState]):
         log_message: str = 'Statistics',
         periodic_message_logger: Logger | None = None,
         log_interval: timedelta = timedelta(minutes=1),
-        state_model: type[TStatisticsState] = cast(Any, StatisticsState),  # noqa: B008 - in an ideal world, TStatisticsState would be inferred from this argument, but I haven't managed to do that
+        state_model: type[StatisticsState] = StatisticsState,
     ) -> None:
         self._id = Statistics.__next_id
         Statistics.__next_id += 1

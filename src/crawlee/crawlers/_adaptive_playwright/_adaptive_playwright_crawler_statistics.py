@@ -26,7 +26,7 @@ class PredictorState(BaseModel):
     rendering_type_mispredictions: Annotated[int, Field(alias='rendering_type_mispredictions')] = 0
 
 @docs_group('Classes')
-class AdaptivePlaywrightCrawlerStatistics(Statistics[StatisticsState]):
+class AdaptivePlaywrightCrawlerStatistics(Statistics):
 
 
     def __init__(self,*,
@@ -50,7 +50,7 @@ class AdaptivePlaywrightCrawlerStatistics(Statistics[StatisticsState]):
         self._persist_predictor_state_key = self._get_default_persist_state_key() + '_PREDICTOR'
 
     @classmethod
-    def from_statistics(cls, statistics: Statistics[StatisticsState]) -> Self:
+    def from_statistics(cls, statistics: Statistics) -> Self:
         return cls(persistence_enabled=statistics._persistence_enabled,  # noqa:SLF001  # Accessing private member to create copy like-object.
                          persist_state_kvs_name=statistics._persist_state_kvs_name,  # noqa:SLF001  # Accessing private member to create copy like-object.
                          persist_state_key=statistics._persist_state_key,  # noqa:SLF001  # Accessing private member to create copy like-object.

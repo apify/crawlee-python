@@ -34,7 +34,7 @@ from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import (
     RenderingTypePredictor,
 )
 from crawlee.crawlers._adaptive_playwright._result_comparator import SubCrawlerRun, default_result_comparator
-from crawlee.statistics import Statistics, StatisticsState
+from crawlee.statistics import Statistics
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Mapping, Sequence
@@ -106,12 +106,18 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
         self.result_checker = result_checker or (lambda result: True) #  noqa: ARG005
         self.result_comparator = result_comparator or default_result_comparator
         # Use AdaptivePlaywrightCrawlerStatistics.
+        # Very hard to work with current "fake generic" Statistics. TODO: Discuss best approach.
         if 'statistics' in kwargs:
             # If statistics already specified by user, create AdaptivePlaywrightCrawlerStatistics from it.
             statistics = AdaptivePlaywrightCrawlerStatistics.from_statistics(statistics=kwargs['statistics'])
         else:
             statistics = AdaptivePlaywrightCrawlerStatistics()
         kwargs['statistics'] = statistics
+
+        # self.statistics is hard coded in BasicCrawler to Statistics, so even when we save children class in it, mypy
+        # will complain about using child-specific methods. Save same object to another attribute so that
+        # AdaptivePlaywrightCrawlerStatistics specific methods can be access in "type safe manner".
+        self.adaptive_statistics = statistics
 
 
         # Sub crawlers related.
@@ -129,8 +135,8 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
         pw_kwargs['_logger'] = pw_logger
 
         # Each sub crawler will use own statistics.
-        bs_kwargs['statistics'] = Statistics[StatisticsState]()
-        pw_kwargs['statistics'] = Statistics[StatisticsState]()
+        bs_kwargs['statistics'] = Statistics()
+        pw_kwargs['statistics'] = Statistics()
 
         self.beautifulsoup_crawler = BeautifulSoupCrawler(**beautifulsoup_crawler_kwargs, **bs_kwargs)
         self.playwright_crawler = PlaywrightCrawler(**playwright_crawler_args, **pw_kwargs)
@@ -186,7 +192,7 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
                 f'Predicted rendering type {rendering_type_prediction.rendering_type} for {context.request.url}')
             if rendering_type_prediction.rendering_type == 'static':
                 context.log.debug(f'Running static request for {context.request.url}')
-                self.statistics.track_http_only_request_handler_runs()  # type:ignore[attr-defined] # Statistics class would need refactoring beyond the scope of this change. TODO:
+                self.adaptive_statistics.track_http_only_request_handler_runs()
 
                 bs_run = await _run_subcrawler(self.beautifulsoup_crawler)
                 if bs_run.result and self.result_checker(bs_run.result):
@@ -197,7 +203,7 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
                                           exc_info=bs_run.exception)
                 else:
                     context.log.warning(f'Static crawler: returned a suspicious result for {context.request.url}')
-                    self.stats.track_rendering_type_mispredictions()  # type:ignore[attr-defined] # Statistics class would need refactoring beyond the scope of this change. TODO:
+                    self.adaptive_statistics.track_rendering_type_mispredictions()
 
         context.log.debug(f'Running browser request handler for {context.request.url}')
 
@@ -207,7 +213,7 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
         old_state_copy = deepcopy(old_state)
 
         pw_run = await _run_subcrawler(self.playwright_crawler)
-        self.statistics.track_browser_request_handler_runs()# type:ignore[attr-defined] # Statistics class would need refactoring beyond the scope of this change. TODO:
+        self.adaptive_statistics.track_browser_request_handler_runs()
 
         if pw_run.exception is not None:
             raise pw_run.exception
