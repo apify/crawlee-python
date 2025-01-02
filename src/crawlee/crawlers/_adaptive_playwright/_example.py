@@ -1,5 +1,7 @@
 import asyncio
 
+from crawlee._types import BasicCrawlingContext
+from crawlee.crawlers import PlaywrightPreNavCrawlingContext
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler import AdaptivePlaywrightCrawler
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import (
     AdaptivePlaywrightCrawlingContext,
@@ -15,6 +17,13 @@ async def main() ->None:
         await context.enqueue_links()
         await context.push_data({'Top crwaler Url': context.request.url})
 
+    @crawler.pre_navigation_hook_bs
+    async def bs_hook(context: BasicCrawlingContext) -> None:
+        context.log.info(f'BS pre navigation hook for: {context.request.url} ...')
+
+    @crawler.pre_navigation_hook_pw
+    async def pw_hook(context: PlaywrightPreNavCrawlingContext) -> None:
+        context.log.info(f'PW pre navigation hook for: {context.request.url} ...')
 
     # Run the crawler with the initial list of URLs.
     await crawler.run(['https://crawlee.dev/'])

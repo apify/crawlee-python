@@ -19,6 +19,7 @@ from crawlee.crawlers import (
     ContextPipeline,
     PlaywrightCrawler,
     PlaywrightCrawlingContext,
+    PlaywrightPreNavCrawlingContext,
 )
 from crawlee.crawlers._abstract_http._abstract_http_crawler import _HttpCrawlerOptions
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler_statistics import (
@@ -33,6 +34,7 @@ from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import (
     RenderingTypePredictor,
 )
 from crawlee.crawlers._adaptive_playwright._result_comparator import SubCrawlerRun, default_result_comparator
+from crawlee.statistics import Statistics, StatisticsState
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Mapping, Sequence
@@ -95,7 +97,7 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
                  request_handler: Callable[[AdaptivePlaywrightCrawlingContext], Awaitable[None]] | None = None,
                  _context_pipeline: ContextPipeline[AdaptivePlaywrightCrawlingContext] | None = None,
                  **kwargs: Unpack[_BasicCrawlerOptions]) -> None:
-        # TODO: pre navigation hooks support for subcrawlers. How to handle???
+        # TODO: pre navigation hooks support for subcrawlers. How to handle different contexts??? Not in JS. They have to be separate
 
         # Sub crawler kwargs might be modified
         bs_kwargs = deepcopy(kwargs)
@@ -114,6 +116,9 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
         pw_logger.setLevel(logging.ERROR)
         pw_kwargs['_logger'] = pw_logger
 
+        # Each sub crawler will use own statistics.
+        bs_kwargs['statistics'] = Statistics[StatisticsState]()
+        pw_kwargs['statistics'] = Statistics[StatisticsState]()
 
         self.rendering_type_predictor = rendering_type_predictor or DefaultRenderingTypePredictor()
         self.result_checker = result_checker or (lambda result: True) #  noqa: ARG005
@@ -133,7 +138,8 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
                 context=context, beautiful_soup_parser_type=beautifulsoup_crawler_kwargs['parser'])
             await self.router(adaptive_crawling_context)
 
-        # Make user adaptive statistics are used
+
+        # Make user statistics are used.
         if 'statistics' in kwargs:
             statistics = AdaptivePlaywrightCrawlerStatistics.from_statistics(statistics=kwargs['statistics'])
         else:
@@ -145,7 +151,7 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
             top_logger.setLevel(logging.DEBUG)
             kwargs['_logger'] = top_logger
 
-        kwargs['statistics'] = statistics #  type:ignore[typeddict-item] # Statistics class would need refactoring beyond the scope of this change. TODO:
+        kwargs['statistics'] = statistics
         super().__init__(request_handler=request_handler, _context_pipeline=_context_pipeline, **kwargs)
 
     async def run(
@@ -162,7 +168,8 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
 
     # Can't use override as mypy does not like it for double underscore private method.
     async def _BasicCrawler__run_request_handler(self, context: BasicCrawlingContext) -> None: # noqa: N802
-        async def _run_subcrawler(crawler: BeautifulSoupCrawler | PlaywrightCrawler, use_state: dict | None = None) -> SubCrawlerRun:
+        async def _run_subcrawler(crawler: BeautifulSoupCrawler | PlaywrightCrawler,
+                                  use_state: dict | None = None) -> SubCrawlerRun:
             try:
                 crawl_result = await crawler.crawl_one(
                 context = context,
@@ -233,4 +240,18 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
         await asyncio.gather(*result_tasks)
 
 
+    def pre_navigation_hook(self, hook: Callable[[Any], Awaitable[None]]) -> None:
+        """Pre navigation hooks for adaptive crawler are delegated to sub crawlers."""
+        raise RuntimeError('Pre navigation hooks are ambiguous in adaptive crawling context. Use specific hook instead:'
+                           '`pre_navigation_hook_pw` for playwright sub crawler related hooks or'
+                           '`pre_navigation_hook_bs`for beautifulsoup sub crawler related hooks')
+
+    def pre_navigation_hook_pw(self, hook: Callable[[PlaywrightPreNavCrawlingContext], Awaitable[None]]) -> None:
+        """Pre navigation hooks for playwright sub crawler of adaptive crawler."""
+        self.playwright_crawler.pre_navigation_hook(hook)
+
+
+    def pre_navigation_hook_bs(self, hook: Callable[[BasicCrawlingContext], Awaitable[None]]) -> None:
+        """Pre navigation hooks for beautifulsoup sub crawler of adaptive crawler."""
+        self.beautifulsoup_crawler.pre_navigation_hook(hook)
 
