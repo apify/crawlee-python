@@ -89,7 +89,13 @@ class _PlaywrightCrawlerAdditionalOptions(TypedDict):
 
 
 class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext]):
-    """Adaptive crawler that uses both BeautifulSoup crawler and PlaywrightCrawler."""
+    """Adaptive crawler that uses both `BeautifulSoupCrawler` and `PlaywrightCrawler`.
+
+    It tries to detect whether it is sufficient to crawl with `BeautifulSoupCrawler` (which is faster) or if
+    `PlaywrightCrawler` should be used (in case `BeautifulSoupCrawler` did not work as expected for specific url.).
+
+    # TODO: Add example
+    """
 
     def __init__(self,
                  rendering_type_predictor: RenderingTypePredictor | None = None,
@@ -97,9 +103,21 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
                  result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,
                  beautifulsoup_crawler_kwargs: _BeautifulsoupCrawlerAdditionalOptions | None = None,
                  playwright_crawler_args: _PlaywrightCrawlerAdditionalOptions | None = None,
-                 request_handler: Callable[[AdaptivePlaywrightCrawlingContext], Awaitable[None]] | None = None,
-                 _context_pipeline: ContextPipeline[AdaptivePlaywrightCrawlingContext] | None = None,
                  **kwargs: Unpack[_BasicCrawlerOptions]) -> None:
+        """A default constructor.
+
+        Args:
+            rendering_type_predictor: Object that implements RenderingTypePredictor and is capable of predicting which
+                rendering method should be used. If None, then `DefaultRenderingTypePredictor` is used.
+            result_checker: Function that evaluates whether crawling result is valid or not.
+            result_comparator: Function that compares two crawling results and decides whether they are equivalent.
+            beautifulsoup_crawler_kwargs: BeautifulsoupCrawler only kwargs that are passed to the sub crawler.
+            playwright_crawler_args: PlaywrightCrawler only kwargs that are passed to the sub crawler.
+            kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
+        """
+
+
+
         # Some sub crawler kwargs are internally modified. Prepare copies.
         bs_kwargs = deepcopy(kwargs)
         pw_kwargs = deepcopy(kwargs)
@@ -140,8 +158,8 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
         pw_kwargs['_logger'] = pw_logger
 
         # Each sub crawler will use own statistics.
-        bs_kwargs['statistics'] = Statistics()
-        pw_kwargs['statistics'] = Statistics()
+        bs_kwargs['statistics'] = Statistics(periodic_message_logger=bs_logger)
+        pw_kwargs['statistics'] = Statistics(periodic_message_logger=pw_logger)
 
         self.beautifulsoup_crawler = BeautifulSoupCrawler(**beautifulsoup_crawler_kwargs, **bs_kwargs)
         self.playwright_crawler = PlaywrightCrawler(**playwright_crawler_args, **pw_kwargs)
@@ -160,7 +178,7 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
             await self.router(adaptive_crawling_context)
 
 
-        super().__init__(request_handler=request_handler, _context_pipeline=_context_pipeline, **kwargs)
+        super().__init__(**kwargs)
 
     async def run(
         self,
@@ -168,6 +186,13 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
         *,
         purge_request_queue: bool = True,
     ) -> FinalStatistics:
+        """Run the crawler until all requests are processed.
+
+        Args:
+            requests: The requests to be enqueued before the crawler starts.
+            purge_request_queue: If this is `True` and the crawler is not being run for the first time, the default
+                request queue will be purged.
+        """
 
         # TODO: Create something more robust that does not leak implementation so much
         async with (self.beautifulsoup_crawler.statistics, self.playwright_crawler.statistics,
@@ -176,8 +201,20 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
 
     # Can't use override as mypy does not like it for double underscore private method.
     async def _BasicCrawler__run_request_handler(self, context: BasicCrawlingContext) -> None: # noqa: N802
+        """Overrided BasicCrawler method that delegates request processing to sub crawlers.
+
+        To decide which sub crawler should process the request it runs `rendering_type_predictor`.
+        To check if results are valid it uses `result_checker`.
+        To compare results of both sub crawlers it uses `result_comparator`.
+
+        Reference implementation: https://github.com/apify/crawlee/blob/master/packages/playwright-crawler/src/internals/adaptive-playwright-crawler.ts
+        """
         async def _run_subcrawler(crawler: BeautifulSoupCrawler | PlaywrightCrawler,
                                   use_state: dict | None = None) -> SubCrawlerRun:
+            """Helper closure that creates new `RequestHandlerRunResult` and delegates request handling to sub crawler.
+
+            Produces `SubCrawlerRun` that either contains filled `RequestHandlerRunResult` or exception.
+            """
             try:
                 crawl_result = await crawler.crawl_one(
                 context = context,
@@ -244,7 +281,12 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
             asyncio.create_task(context.push_data(**kwargs)) for kwargs in result.push_data_calls])
         result_tasks.extend([
             asyncio.create_task(context.add_requests(**kwargs)) for kwargs in result.add_requests_calls])
+
+        # What to do with KV changes????
         await asyncio.gather(*result_tasks)
+
+        # Optimize if needed
+        await self._commit_key_value_store_changes(result)
 
 
     def pre_navigation_hook(self, hook: Callable[[Any], Awaitable[None]]) -> None:

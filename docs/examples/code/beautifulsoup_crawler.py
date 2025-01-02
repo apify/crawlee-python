@@ -25,7 +25,7 @@ async def main() -> None:
     @crawler.router.default_handler
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url} ...')
-
+        await context.use_state({"asd":"sad"})
         # Extract data from the page.
         data = {
             'url': context.request.url,

@@ -946,10 +946,17 @@ class BasicCrawler(Generic[TCrawlingContext]):
         for push_data_call in result.push_data_calls:
             await self._push_data(**push_data_call)
 
+        await self._commit_key_value_store_changes(result)
+
+
+
+    async def _commit_key_value_store_changes(self, result: RequestHandlerRunResult) -> None:
         for (id, name), changes in result.key_value_store_changes.items():
             store = await self.get_key_value_store(id=id, name=name)
             for key, value in changes.updates.items():
                 await store.set_value(key, value.content, value.content_type)
+
+
 
     async def __is_finished_function(self) -> bool:
         self._stop_if_max_requests_count_exceeded()
@@ -1140,7 +1147,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 return use_state
             use_state_function = get_input_state
         else:
-            use_state_function = context.use_state
+            use_state_function = result.use_state
 
         context_linked_to_result = BasicCrawlingContext(
             request=context.request,
