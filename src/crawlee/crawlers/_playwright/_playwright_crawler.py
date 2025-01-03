@@ -70,7 +70,9 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
 
     def __init__(
         self,
+        *,
         browser_pool: BrowserPool | None = None,
+        browser_pool_options: Mapping[str, Any] | None = None,
         browser_type: BrowserType | None = None,
         browser_launch_options: Mapping[str, Any] | None = None,
         browser_new_context_options: Mapping[str, Any] | None = None,
@@ -81,6 +83,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
 
         Args:
             browser_pool: A `BrowserPool` instance to be used for launching the browsers and getting pages.
+            browser_pool_options: Arguments passed to `BrowserPool`.
             browser_type: The type of browser to launch ('chromium', 'firefox', or 'webkit').
                 This option should not be used if `browser_pool` is provided.
             browser_launch_options: Keyword arguments to pass to the browser launch method. These options are provided
@@ -113,6 +116,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 browser_type=browser_type,
                 browser_launch_options=browser_launch_options,
                 browser_new_context_options=browser_new_context_options,
+                **(browser_pool_options or {}),
             )
 
         self._browser_pool = browser_pool
