@@ -7,7 +7,7 @@ import pytest
 
 from crawlee import Request
 from crawlee.errors import ProxyError
-from crawlee.http_clients.curl_impersonate import CurlImpersonateHttpClient
+from crawlee.http_clients import CurlImpersonateHttpClient
 from crawlee.statistics import Statistics
 
 if TYPE_CHECKING:

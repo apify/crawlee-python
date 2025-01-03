@@ -15,16 +15,18 @@ from crawlee._utils.docs import docs_group
 from crawlee._utils.lru_cache import LRUCache
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee._utils.wait import wait_for_all_tasks_for_finish
-from crawlee.base_storage_client import BaseStorageClient, ProcessedRequest, RequestQueueMetadata
-from crawlee.events._types import Event
-from crawlee.storages._base_storage import BaseStorage
-from crawlee.storages._request_provider import RequestProvider
+from crawlee.events import Event
+from crawlee.request_loaders import RequestManager
+from crawlee.storage_clients.models import ProcessedRequest, RequestQueueMetadata
+
+from ._base_storage import BaseStorage
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from crawlee._request import Request
+    from crawlee import Request
     from crawlee.configuration import Configuration
+    from crawlee.storage_clients import BaseStorageClient
 
 logger = getLogger(__name__)
 
@@ -63,7 +65,7 @@ class CachedRequest(TypedDict):
 
 
 @docs_group('Classes')
-class RequestQueue(BaseStorage, RequestProvider):
+class RequestQueue(BaseStorage, RequestManager):
     """Represents a queue storage for managing HTTP requests in web crawling operations.
 
     The `RequestQueue` class handles a queue of HTTP requests, each identified by a unique URL, to facilitate structured

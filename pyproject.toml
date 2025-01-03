@@ -51,9 +51,7 @@ curl-cffi = { version = ">=0.7.2", optional = true }
 docutils = ">=0.21.0"
 eval-type-backport = ">=0.2.0"
 html5lib = { version = ">=1.0", optional = true }
-# TODO: relax the upper bound once the issue is resolved:
-# https://github.com/apify/crawlee-python/issues/774
-httpx = { version = "~=0.27.0", extras = ["brotli", "http2"] }
+httpx = {version = ">=0.27.0", extras = ["brotli", "http2", "zstd"]}
 inquirer = ">=3.3.0"
 lxml = { version = ">=5.2.0", optional = true }
 more_itertools = ">=10.2.0"
@@ -75,7 +73,7 @@ yarl = ">=1.18.0"
 build = "~1.2.0"
 filelock = "~3.16.0"
 ipdb = "~0.13.0"
-mypy = "~1.13.0"
+mypy = "~1.14.0"
 pre-commit = "~4.0.0"
 proxy-py = "~2.4.0"
 pydoc-markdown = "~4.8.0"
@@ -85,7 +83,7 @@ pytest-cov = "~6.0.0"
 pytest-only = "~2.1.0"
 pytest-timeout = "~2.3.0"
 pytest-xdist = "~3.6.0"
-respx = "~0.21.0"
+respx = "~0.22.0"
 ruff = "~0.8.0"
 setuptools = "~75.6.0"                    # setuptools are used by pytest, but not explicitly required
 sortedcontainers-stubs = "^2.4.2"

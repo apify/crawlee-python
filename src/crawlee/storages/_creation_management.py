@@ -3,13 +3,15 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING, TypeVar
 
-from crawlee.memory_storage_client import MemoryStorageClient
-from crawlee.storages import Dataset, KeyValueStore, RequestQueue
+from crawlee.storage_clients import MemoryStorageClient
+
+from ._dataset import Dataset
+from ._key_value_store import KeyValueStore
+from ._request_queue import RequestQueue
 
 if TYPE_CHECKING:
-    from crawlee.base_storage_client import BaseStorageClient
-    from crawlee.base_storage_client._types import ResourceClient, ResourceCollectionClient
     from crawlee.configuration import Configuration
+    from crawlee.storage_clients._base import BaseStorageClient, ResourceClient, ResourceCollectionClient
 
 TResource = TypeVar('TResource', Dataset, KeyValueStore, RequestQueue)
 

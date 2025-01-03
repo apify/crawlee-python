@@ -1,7 +1,7 @@
 import asyncio
 
-from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
-from crawlee.http_clients.curl_impersonate import CurlImpersonateHttpClient
+from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
+from crawlee.http_clients import CurlImpersonateHttpClient
 
 
 async def main() -> None:

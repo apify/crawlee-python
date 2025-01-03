@@ -18,8 +18,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
     from ssl import SSLContext
 
+    from crawlee import Request
     from crawlee._types import HttpMethod, HttpPayload
-    from crawlee.base_storage_client._models import Request
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.statistics import Statistics
 
@@ -84,8 +84,8 @@ class HttpxHttpClient(BaseHttpClient):
     ### Usage
 
     ```python
+    from crawlee.crawlers import HttpCrawler  # or any other HTTP client-based crawler
     from crawlee.http_clients import HttpxHttpClient
-    from crawlee.http_crawler import HttpCrawler  # or any other HTTP client-based crawler
 
     http_client = HttpxHttpClient()
     crawler = HttpCrawler(http_client=http_client)

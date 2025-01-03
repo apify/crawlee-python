@@ -1,6 +1,6 @@
 import asyncio
 
-from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext, PlaywrightPreNavigationContext
+from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext, PlaywrightPreNavCrawlingContext
 
 
 async def main() -> None:
@@ -52,7 +52,7 @@ async def main() -> None:
     # browser page among other things. In this example, we log the URL being
     # navigated to.
     @crawler.pre_navigation_hook
-    async def log_navigation_url(context: PlaywrightPreNavigationContext) -> None:
+    async def log_navigation_url(context: PlaywrightPreNavCrawlingContext) -> None:
         context.log.info(f'Navigating to {context.request.url} ...')
 
     # Run the crawler with the initial list of URLs.

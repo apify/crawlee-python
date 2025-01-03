@@ -1,6 +1,6 @@
 import asyncio
 
-from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
+from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext
 from crawlee.proxy_configuration import ProxyConfiguration
 
 

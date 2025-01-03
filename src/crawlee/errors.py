@@ -38,11 +38,11 @@ class SessionError(Exception):
 
 @docs_group('Errors')
 class ServiceConflictError(Exception):
-    """Raised when attempting to reassign a service in service container that was already configured."""
+    """Raised when attempting to reassign a service in service container that is already in use."""
 
     def __init__(self, service: type, new_value: object, existing_value: object) -> None:
         super().__init__(
-            f'Service {service.__name__} has already been set. Existing value: {existing_value}, '
+            f'Service {service.__name__} is already in use. Existing value: {existing_value}, '
             f'attempted new value: {new_value}.'
         )
 
