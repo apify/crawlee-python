@@ -10,14 +10,14 @@ from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
 import pytest
 
 from crawlee import ConcurrencySettings, EnqueueStrategy, Glob, service_locator
 from crawlee._request import BaseRequestData, Request
-from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpHeaders
+from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpHeaders, RequestHandlerRunResult
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
 from crawlee.errors import SessionError, UserDefinedErrorHandlerError
@@ -710,13 +710,13 @@ async def test_context_use_state(key_value_store: KeyValueStore) -> None:
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        await context.use_state('state', {'hello': 'world'})
+        await context.use_state({'hello': 'world'})
 
     await crawler.run(['https://hello.world'])
 
     store = await crawler.get_key_value_store()
 
-    assert (await store.get_value('state')) == {'hello': 'world'}
+    assert (await store.get_value(RequestHandlerRunResult.CRAWLEE_STATE_KEY)) == {'hello': 'world'}
 
 
 async def test_context_handlers_use_state(key_value_store: KeyValueStore) -> None:
@@ -728,20 +728,20 @@ async def test_context_handlers_use_state(key_value_store: KeyValueStore) -> Non
 
     @crawler.router.handler('one')
     async def handler_one(context: BasicCrawlingContext) -> None:
-        state = await context.use_state('state', {'hello': 'world'})
+        state = await context.use_state({'hello': 'world'})
         state_in_handler_one.update(state)
         state['hello'] = 'new_world'
         await context.add_requests([Request.from_url('https://crawlee.dev/docs/quick-start', label='two')])
 
     @crawler.router.handler('two')
     async def handler_two(context: BasicCrawlingContext) -> None:
-        state = await context.use_state('state', {'hello': 'world'})
+        state = await context.use_state({'hello': 'world'})
         state_in_handler_two.update(state)
         state['hello'] = 'last_world'
 
     @crawler.router.handler('three')
     async def handler_three(context: BasicCrawlingContext) -> None:
-        state = await context.use_state('state', {'hello': 'world'})
+        state = await context.use_state({'hello': 'world'})
         state_in_handler_three.update(state)
 
     await crawler.run([Request.from_url('https://crawlee.dev/', label='one')])
@@ -759,7 +759,24 @@ async def test_context_handlers_use_state(key_value_store: KeyValueStore) -> Non
     store = await crawler.get_key_value_store()
 
     # The state in the KVS must match with the last set state
-    assert (await store.get_value('state')) == {'hello': 'last_world'}
+    assert (await store.get_value(RequestHandlerRunResult.CRAWLEE_STATE_KEY)) == {'hello': 'last_world'}
+
+
+async def test_context_handlers_use_state_no_side_effects_without_commit() -> None:
+    """This test prevents results to be commited and expects that use_state related side effects did not happen."""
+    crawler = BasicCrawler()
+
+    @crawler.router.default_handler
+    async def handler_one(context: BasicCrawlingContext) -> None:
+        # This sets use state, but side effects should be delayed until commited.
+        await context.use_state({'hello': 'world'})
+
+    # Only commiting results can trigger side effects caused by using context.use_state
+    with patch.object(crawler, '_commit_request_handler_result', AsyncMock()):
+        await crawler.run([Request.from_url('https://crawlee.dev/')])
+
+    store = await crawler.get_key_value_store()
+    assert (await store.get_value(RequestHandlerRunResult.CRAWLEE_STATE_KEY)) is None
 
 
 async def test_max_requests_per_crawl(httpbin: URL) -> None:
