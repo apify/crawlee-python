@@ -182,37 +182,6 @@ class KeyValueStore(BaseStorage):
         """
         return await self._resource_client.get_public_url(key)
 
-    async def get_auto_saved_value(
-        self,
-        key: str,
-        default_value: dict[str, JsonSerializable] | None = None,
-    ) -> dict[str, JsonSerializable]:
-        """Gets a value from KVS that will be automatically saved on changes.
-
-        Args:
-            key: Key of the record, to store the value.
-            default_value: Value to be used if the record does not exist yet. Should be a dictionary.
-
-        Returns:
-            Returns the value of the key.
-        """
-        default_value = {} if default_value is None else default_value
-
-        if key in self._cache:
-            return self._cache[key]
-
-        value = await self.get_value(key, default_value)
-
-        if not isinstance(value, dict):
-            raise TypeError(
-                f'Expected dictionary for persist state value at key "{key}, but got {type(value).__name__}'
-            )
-
-        self._cache[key] = value
-
-        self._ensure_persist_event()
-
-        return value
 
     @property
     def _cache(self) -> dict[str, dict[str, JsonSerializable]]:

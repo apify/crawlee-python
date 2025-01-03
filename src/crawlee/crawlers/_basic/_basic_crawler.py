@@ -574,12 +574,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
             wait_for_all_requests_to_be_added_timeout=wait_for_all_requests_to_be_added_timeout,
         )
 
-    async def _use_state(
-        self, default_value: dict[str, JsonSerializable] | None = None
-    ) -> dict[str, JsonSerializable]:
-        store = await self.get_key_value_store()
-        return await store.get_auto_saved_value(BasicCrawler.CRAWLEE_STATE_KEY, default_value)
-
     async def _save_crawler_state(self) -> None:
         store = await self.get_key_value_store()
         await store.persist_autosaved_values()
@@ -951,6 +945,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
 
     async def _commit_key_value_store_changes(self, result: RequestHandlerRunResult) -> None:
+        await result.update_mutated_use_state()
         for (id, name), changes in result.key_value_store_changes.items():
             store = await self.get_key_value_store(id=id, name=name)
             for key, value in changes.updates.items():
@@ -1011,7 +1006,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             add_requests=result.add_requests,
             push_data=result.push_data,
             get_key_value_store=result.get_key_value_store,
-            use_state=self._use_state,
+            use_state=result.use_state,
             log=self._logger,
         )
 

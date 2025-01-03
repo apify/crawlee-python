@@ -16,7 +16,6 @@ from crawlee.crawlers import (
     BeautifulSoupCrawler,
     BeautifulSoupCrawlingContext,
     BeautifulSoupParserType,
-    ContextPipeline,
     PlaywrightCrawler,
     PlaywrightCrawlingContext,
     PlaywrightPreNavCrawlingContext,
@@ -115,9 +114,6 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
             playwright_crawler_args: PlaywrightCrawler only kwargs that are passed to the sub crawler.
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
         """
-
-
-
         # Some sub crawler kwargs are internally modified. Prepare copies.
         bs_kwargs = deepcopy(kwargs)
         pw_kwargs = deepcopy(kwargs)
@@ -193,7 +189,6 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
             purge_request_queue: If this is `True` and the crawler is not being run for the first time, the default
                 request queue will be purged.
         """
-
         # TODO: Create something more robust that does not leak implementation so much
         async with (self.beautifulsoup_crawler.statistics, self.playwright_crawler.statistics,
                     self.playwright_crawler._additional_context_managers[0]):
@@ -249,6 +244,8 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
 
         context.log.debug(f'Running browser request handler for {context.request.url}')
 
+
+        # This might not be needed if kvs access is properly routed through results and we commit PW result in the end of the function
         kvs = await context.get_key_value_store()
         default_value =dict[str, JsonSerializable]()
         old_state: dict[str, JsonSerializable] = await kvs.get_value(BasicCrawler.CRAWLEE_STATE_KEY, default_value)
