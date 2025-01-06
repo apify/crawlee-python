@@ -450,7 +450,3 @@ class RequestHandlerRunResult:
             )
 
         return self.key_value_store_changes[id, name]
-
-
-    async def use_state(self):
-        # TODO: Somehow make crawlers add to kvs through this. Currently it does it directly

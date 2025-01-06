@@ -18,7 +18,7 @@ async def main() ->None:
 
     crawler = AdaptivePlaywrightCrawler(max_requests_per_crawl=10,
                                         _logger=top_logger,
-                                        playwright_crawler_args={"headless":False})
+                                        playwright_crawler_args={'headless':False})
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
@@ -27,7 +27,7 @@ async def main() ->None:
         context.log.info(f'Processing with Top adaptive_crawler: {context.request.url} ...')
         await context.enqueue_links()
         await context.push_data({'Top crwaler Url': context.request.url})
-        await context.use_state({"bla":i})
+        await context.use_state({'bla':i})
 
     @crawler.pre_navigation_hook_bs
     async def bs_hook(context: BasicCrawlingContext) -> None:

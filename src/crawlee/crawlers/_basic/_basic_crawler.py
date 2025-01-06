@@ -1147,7 +1147,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 return use_state
             use_state_function = get_input_state
         else:
-            use_state_function = result.use_state
+            use_state_function = context.use_state
 
         context_linked_to_result = BasicCrawlingContext(
             request=context.request,

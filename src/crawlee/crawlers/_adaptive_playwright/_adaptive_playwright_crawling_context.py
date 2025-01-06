@@ -15,6 +15,10 @@ if TYPE_CHECKING:
     from playwright.async_api import Page, Response
     from typing_extensions import Self
 
+class AdaptiveContextError(RuntimeError):
+    pass
+
+
 
 @dataclass(frozen=True)
 @docs_group('Data structures')
@@ -22,24 +26,23 @@ class AdaptivePlaywrightCrawlingContext(BeautifulSoupCrawlingContext):
     _response: Response | None = None
     _infinite_scroll: Callable[[], Awaitable[None]] | None = None
     _page : Page | None = None
-    # TODO: UseStateFunction
 
     @property
     def page(self) -> Page:
         if not self._page:
-            raise RuntimeError('Page was not crawled with PlaywrightCrawler')
+            raise AdaptiveContextError('Page was not crawled with PlaywrightCrawler.')
         return self._page
 
     @property
     def infinite_scroll(self) -> Callable[[], Awaitable[None]]:
         if not self._infinite_scroll:
-            raise RuntimeError('Page was not crawled with PlaywrightCrawler')
+            raise AdaptiveContextError('Page was not crawled with PlaywrightCrawler.')
         return self._infinite_scroll
 
     @property
     def response(self) -> Response:
         if not self._response:
-            raise RuntimeError('Page was not crawled with PlaywrightCrawler')
+            raise AdaptiveContextError('Page was not crawled with PlaywrightCrawler.')
         return self._response
 
     @classmethod
