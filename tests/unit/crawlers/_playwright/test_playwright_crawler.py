@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 from unittest import mock
 
 from crawlee import Glob, Request
-from crawlee._request import CrawleeRequestData
 from crawlee._types import EnqueueStrategy
 from crawlee.crawlers import PlaywrightCrawler
 from crawlee.fingerprint_suite._consts import (
