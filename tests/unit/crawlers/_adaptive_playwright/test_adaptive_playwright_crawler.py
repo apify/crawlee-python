@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 import pytest
 from typing_extensions import override
 
+from crawlee._types import BasicCrawlingContext
+from crawlee.crawlers import PlaywrightPreNavCrawlingContext
 from crawlee.crawlers._adaptive_playwright import AdaptivePlaywrightCrawler, AdaptivePlaywrightCrawlingContext
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import AdaptiveContextError
 from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import (
@@ -17,8 +19,6 @@ from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import (
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from crawlee._types import BasicCrawlingContext
-    from crawlee.crawlers import PlaywrightPreNavCrawlingContext
 
 
 class _SimpleRenderingTypePredictor(RenderingTypePredictor):
@@ -39,17 +39,22 @@ class _SimpleRenderingTypePredictor(RenderingTypePredictor):
 
 
 
-@pytest.mark.parametrize(('expected_pw_count', 'expected_bs_count', 'rendering_types'), [
-    (0,2, cycle(['static'])),
-    (2,0, cycle(['client only'])),
-    (1,1, cycle(['static','client only'])),
+@pytest.mark.parametrize(('expected_pw_count', 'expected_bs_count', 'rendering_types',
+                          'detection_probability_recommendation'), [
+    pytest.param(0,2, cycle(['static']), cycle([0]), id='Static only.'),
+    pytest.param(2,0, cycle(['client only']), cycle([0]), id='Client only.'),
+    pytest.param(1,1, cycle(['static','client only']), cycle([0]),id='Mixed.'),
+    pytest.param(2,2, cycle(['static','client only']), cycle([1]),id='Enforced rendering type detection.'),
 ])
 async def test_adaptive_crawling(expected_pw_count: int, expected_bs_count: int,
-                                 rendering_types: Iterator[RenderingType]) -> None:
+                                 rendering_types: Iterator[RenderingType],
+                                 detection_probability_recommendation: Iterator[int]) -> None:
     """Tests correct routing to pre-nav hooks and correct handling through proper handler."""
+    requests = ['https://crawlee.dev/', 'https://crawlee.dev/docs/quick-start']
+
     static_only_predictor = _SimpleRenderingTypePredictor(
         rendering_types = rendering_types,
-        detection_probability_recommendation=cycle([0])
+        detection_probability_recommendation=detection_probability_recommendation
     )
 
 
@@ -67,6 +72,7 @@ async def test_adaptive_crawling(expected_pw_count: int, expected_bs_count: int,
         nonlocal bs_handler_count
 
         try:
+            # page is available only if it was crawled by PlaywrightCrawler.
             context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
             pw_handler_count += 1
         except AdaptiveContextError:
@@ -84,11 +90,39 @@ async def test_adaptive_crawling(expected_pw_count: int, expected_bs_count: int,
         pw_hook_count += 1
 
 
-    await crawler.run(['https://crawlee.dev/',
-                       'https://crawlee.dev/docs/quick-start'])
+    await crawler.run(requests)
 
     assert pw_handler_count == expected_pw_count
     assert pw_hook_count == expected_pw_count
 
     assert bs_handler_count == expected_bs_count
     assert bs_hook_count == expected_bs_count
+
+
+async def test_adaptive_crawling_context() -> None:
+    """Tests that correct context is used."""
+    requests = ['https://crawlee.dev/']
+
+    static_only_predictor = _SimpleRenderingTypePredictor(
+        rendering_types = cycle(['static']),
+        detection_probability_recommendation=cycle([1])
+    )
+
+    crawler = AdaptivePlaywrightCrawler(rendering_type_predictor=static_only_predictor)
+
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        assert context.request.url == requests[0]
+
+    @crawler.pre_navigation_hook_bs
+    async def bs_hook(context: BasicCrawlingContext) -> None:
+        assert type(context) is BasicCrawlingContext
+        assert context.request.url == requests[0]
+
+    @crawler.pre_navigation_hook_pw
+    async def pw_hook(context: PlaywrightPreNavCrawlingContext) -> None:
+        assert type(context) is PlaywrightPreNavCrawlingContext
+        assert context.request.url == requests[0]
+
+    await crawler.run(requests)

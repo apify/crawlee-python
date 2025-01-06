@@ -11,7 +11,7 @@ from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context
 
 
 async def main() ->None:
-    # TODO: remove in review
+    # TODO: remove in review. Move this to documentation examples instead.
     top_logger = getLogger(__name__)
     top_logger.setLevel(logging.DEBUG)
     i=0
