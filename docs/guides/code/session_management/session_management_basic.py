@@ -25,8 +25,9 @@ async def main() -> None:
     # Define the default request handler that manages session states
     @crawler.router.default_handler
     async def default_handler(context: BasicCrawlingContext) -> None:
-        # Send request, BasicCrawler automatically selects a session from the pool and sets a proxy for it
-        # You can check  it with `context.session` and `context.proxy_info`
+        # Send request, BasicCrawler automatically selects a session from the pool
+        # and sets a proxy for it. You can check it with `context.session`
+        # and `context.proxy_info`.
         response = await context.send_request(context.request.url)
 
         page_content = response.read().decode()
