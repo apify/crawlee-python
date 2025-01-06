@@ -710,13 +710,13 @@ async def test_context_use_state(key_value_store: KeyValueStore) -> None:
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        await context.use_state('state', {'hello': 'world'})
+        await context.use_state({'hello': 'world'})
 
     await crawler.run(['https://hello.world'])
 
     store = await crawler.get_key_value_store()
 
-    assert (await store.get_value('state')) == {'hello': 'world'}
+    assert (await store.get_value(BasicCrawler.CRAWLEE_STATE_KEY)) == {'hello': 'world'}
 
 
 async def test_context_handlers_use_state(key_value_store: KeyValueStore) -> None:
@@ -728,20 +728,20 @@ async def test_context_handlers_use_state(key_value_store: KeyValueStore) -> Non
 
     @crawler.router.handler('one')
     async def handler_one(context: BasicCrawlingContext) -> None:
-        state = await context.use_state('state', {'hello': 'world'})
+        state = await context.use_state({'hello': 'world'})
         state_in_handler_one.update(state)
         state['hello'] = 'new_world'
         await context.add_requests([Request.from_url('https://crawlee.dev/docs/quick-start', label='two')])
 
     @crawler.router.handler('two')
     async def handler_two(context: BasicCrawlingContext) -> None:
-        state = await context.use_state('state', {'hello': 'world'})
+        state = await context.use_state({'hello': 'world'})
         state_in_handler_two.update(state)
         state['hello'] = 'last_world'
 
     @crawler.router.handler('three')
     async def handler_three(context: BasicCrawlingContext) -> None:
-        state = await context.use_state('state', {'hello': 'world'})
+        state = await context.use_state({'hello': 'world'})
         state_in_handler_three.update(state)
 
     await crawler.run([Request.from_url('https://crawlee.dev/', label='one')])
@@ -759,7 +759,7 @@ async def test_context_handlers_use_state(key_value_store: KeyValueStore) -> Non
     store = await crawler.get_key_value_store()
 
     # The state in the KVS must match with the last set state
-    assert (await store.get_value('state')) == {'hello': 'last_world'}
+    assert (await store.get_value(BasicCrawler.CRAWLEE_STATE_KEY)) == {'hello': 'last_world'}
 
 
 async def test_max_requests_per_crawl(httpbin: URL) -> None:
@@ -1046,3 +1046,27 @@ async def test_allows_storage_client_overwrite_before_run(monkeypatch: pytest.Mo
 
     data = await dataset.get_data()
     assert data.items == [{'foo': 'bar'}]
+
+
+async def test_context_use_state_race_condition_in_handlers(key_value_store: KeyValueStore) -> None:
+    """Two parallel handlers increment global variable obtained by `use_state` method.
+
+    Result should be incremented by 2.
+    Method `use_state` must be implemented in a way that prevents race conditions in such scenario."""
+    crawler = BasicCrawler()
+    store = await crawler.get_key_value_store()
+    await store.set_value(BasicCrawler.CRAWLEE_STATE_KEY, {'counter': 0})
+    handler_barrier = asyncio.Barrier(2)
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        state = cast(dict[str, int], await context.use_state())
+        await handler_barrier.wait()  # Block until both handlers get the state.
+        state['counter'] += 1
+        await handler_barrier.wait()  # Block until both handlers increment state.
+
+    await crawler.run(['https://crawlee.dev/', 'https://crawlee.dev/docs/quick-start'])
+
+    store = await crawler.get_key_value_store()
+
+    assert (await store.get_value(BasicCrawler.CRAWLEE_STATE_KEY))['counter'] == 2

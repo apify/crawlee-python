@@ -173,6 +173,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
         - and more.
     """
 
+    CRAWLEE_STATE_KEY = 'CRAWLEE_STATE'
+
     def __init__(
         self,
         *,
@@ -564,11 +566,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
             wait_for_all_requests_to_be_added_timeout=wait_for_all_requests_to_be_added_timeout,
         )
 
-    async def _use_state(
-        self, key: str, default_value: dict[str, JsonSerializable] | None = None
-    ) -> dict[str, JsonSerializable]:
+    async def _use_state(self, default_value: dict[str, JsonSerializable] | None = None) -> dict[str, JsonSerializable]:
         store = await self.get_key_value_store()
-        return await store.get_auto_saved_value(key, default_value)
+        return await store.get_auto_saved_value(self.CRAWLEE_STATE_KEY, default_value)
 
     async def _save_crawler_state(self) -> None:
         store = await self.get_key_value_store()

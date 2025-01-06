@@ -298,7 +298,6 @@ class UseStateFunction(Protocol):
 
     def __call__(
         self,
-        key: str,
         default_value: dict[str, JsonSerializable] | None = None,
     ) -> Coroutine[None, None, dict[str, JsonSerializable]]: ...
 
