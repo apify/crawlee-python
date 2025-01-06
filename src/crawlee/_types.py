@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
-from copy import deepcopy
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Annotated, Any, Literal, Optional, Protocol, TypeVar, Union, cast, overload
@@ -403,17 +402,12 @@ class GetKeyValueStoreFunction(Protocol):
 
 class RequestHandlerRunResult:
     """Record of calls to storage-related context helpers."""
-    CRAWLEE_STATE_KEY = 'CRAWLEE_STATE'
 
     def __init__(self, *, key_value_store_getter: GetKeyValueStoreFunction) -> None:
         self._key_value_store_getter = key_value_store_getter
         self.add_requests_calls = list[AddRequestsKwargs]()
         self.push_data_calls = list[PushDataFunctionCall]()
         self.key_value_store_changes = dict[tuple[Optional[str], Optional[str]], KeyValueStoreChangeRecords]()
-        # This is handle to dict available to user. If it gets mutated, it needs to be reflected in changes.
-        self._use_state_user: None | dict[str, JsonSerializable] = None
-        # Last known use_state by RequestHandlerRunResult. Used for mutation detection by user.
-        self._last_known_use_state: None | dict[str, JsonSerializable] = None
 
     async def add_requests(
         self,
@@ -458,31 +452,5 @@ class RequestHandlerRunResult:
         return self.key_value_store_changes[id, name]
 
 
-    async def use_state(self, default_value: dict[str, JsonSerializable] | None = None) -> dict[str, JsonSerializable]:
-        # Find if the value is already present i
-        _default: dict[str, JsonSerializable] = default_value or {}
-        default_kvs_changes = await self.get_key_value_store()
-
-        use_state: dict[str, JsonSerializable] = await default_kvs_changes.get_value(self.CRAWLEE_STATE_KEY, _default)
-
-        if use_state is _default:
-            # Set default value if there is no value in change records or actual kvs.
-            await default_kvs_changes.set_value(self.CRAWLEE_STATE_KEY, _default)
-
-        # This will be same dict that is available to the user and can be mutated at any point.
-        self._use_state_user = use_state
-        # This will not be available to user and should not be change.
-        self._last_known_use_state = deepcopy(self._use_state_user)
-
-        return use_state
-
-    async def update_mutated_use_state(self) -> None:
-        """Update use_state if it was mutated by the user."""
-        if self._use_state_user != self._last_known_use_state:
-            default_kvs_changes = await self.get_key_value_store()
-            await default_kvs_changes.set_value(self.CRAWLEE_STATE_KEY, self._use_state_user)
-
-
-
-
-
+    async def use_state(self):
+        # TODO: Somehow make crawlers add to kvs through this. Currently it does it directly
