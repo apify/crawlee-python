@@ -1056,17 +1056,46 @@ async def test_context_use_state_race_condition_in_handlers(key_value_store: Key
     crawler = BasicCrawler()
     store = await crawler.get_key_value_store()
     await store.set_value(BasicCrawler.CRAWLEE_STATE_KEY, {'counter': 0})
-    handler_barrier = asyncio.Barrier(2)
+
+    # Asyncio.Barrier introduced in Python 3.11. Code has to be compatible with Python 3.9.
+    # Use asyncio.Event as workaround.
+    both_handlers_got_state = asyncio.Event()
+    both_handlers_incremented_counter = asyncio.Event()
+
+    get_value_barrier = 0
+    increment_barrier = 0
+
+    async def set_events() -> None:
+        while True:
+            if get_value_barrier == 2:
+                both_handlers_got_state.set()
+            if increment_barrier == 2:
+                both_handlers_incremented_counter.set()
+            if both_handlers_got_state.is_set() and both_handlers_incremented_counter.is_set():
+                return
+            await asyncio.sleep(0.01)
+
+    set_events_task = asyncio.create_task(set_events())
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
+        nonlocal increment_barrier
+        nonlocal get_value_barrier
+
         state = cast(dict[str, int], await context.use_state())
-        await handler_barrier.wait()  # Block until both handlers get the state.
+        # Block until both handlers get the state.
+        get_value_barrier += 1
+        await both_handlers_got_state.wait()
+
         state['counter'] += 1
-        await handler_barrier.wait()  # Block until both handlers increment state.
+        # Block until both handlers increment state.
+        increment_barrier += 1
+        await both_handlers_incremented_counter.wait()
 
     await crawler.run(['https://crawlee.dev/', 'https://crawlee.dev/docs/quick-start'])
+    await set_events_task
 
     store = await crawler.get_key_value_store()
-
+    # Ensure that local state is pushed back to kvs.
+    await store.persist_autosaved_values()
     assert (await store.get_value(BasicCrawler.CRAWLEE_STATE_KEY))['counter'] == 2
