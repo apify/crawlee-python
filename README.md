@@ -89,7 +89,7 @@ The [`BeautifulSoupCrawler`](https://crawlee.dev/python/api/class/BeautifulSoupC
 ```python
 import asyncio
 
-from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
+from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 
 
 async def main() -> None:
@@ -129,7 +129,7 @@ The [`PlaywrightCrawler`](https://crawlee.dev/python/api/class/PlaywrightCrawler
 ```python
 import asyncio
 
-from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
+from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext
 
 
 async def main() -> None:
