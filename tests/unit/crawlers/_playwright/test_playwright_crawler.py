@@ -82,6 +82,7 @@ async def test_nonexistent_url_invokes_error_handler() -> None:
 
 
 async def test_redirect_handling(httpbin: URL) -> None:
+    # Set up a dummy crawler that tracks visited URLs
     crawler = PlaywrightCrawler()
     handled_urls = set[str]()
 
@@ -89,12 +90,15 @@ async def test_redirect_handling(httpbin: URL) -> None:
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
         handled_urls.add(context.request.loaded_url or '')
 
+    # Craft a request that points to httpbin initially, but redirects to apify.com
     request = Request.from_url(
         url=str((httpbin / 'redirect-to').update_query(url='https://apify.com')),
     )
 
+    # Ensure that the request uses the SAME_ORIGIN strategy - apify.com will be considered out of scope
     request.crawlee_data.enqueue_strategy = EnqueueStrategy.SAME_ORIGIN
 
+    # No URLs should be visited in the run
     await crawler.run([request])
     assert handled_urls == set()
 
