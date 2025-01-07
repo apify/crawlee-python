@@ -28,7 +28,7 @@ def create_comparator(result_checker: Callable[[RequestHandlerRunResult], bool] 
 
 def full_result_comparator(result_1: RequestHandlerRunResult, result_2: RequestHandlerRunResult) -> bool:
     """Compare results by comparing all their parts."""
-    # PlayWright can produce links with extra arguments compared to pure BS. Default comparator ignores this as it does
+    # PlayWright can produce links with extra arguments compared to pure BS. Default comparator ignores this.
     # Maybe full comparator should have flag about taking into account only urls without parameters.
     # https://sdk.apify.com/docs/guides/getting-started
     # https://sdk.apify.com/docs/guides/getting-started?__hsfp=1136113150&__hssc=7591405.1.1735494277124&__hstc=7591405.e2b9302ed00c5bfaee3a870166792181.1735494277124.1735494277124.1735494277124.1

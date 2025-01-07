@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+from datetime import timedelta
 from itertools import cycle
 from typing import TYPE_CHECKING, cast
 from unittest.mock import Mock, patch
@@ -11,12 +13,16 @@ from crawlee import Request
 from crawlee._types import BasicCrawlingContext
 from crawlee.crawlers import BasicCrawler, PlaywrightPreNavCrawlingContext
 from crawlee.crawlers._adaptive_playwright import AdaptivePlaywrightCrawler, AdaptivePlaywrightCrawlingContext
+from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler_statistics import (
+    AdaptivePlaywrightCrawlerStatistics,
+)
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import AdaptiveContextError
 from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import (
     RenderingType,
     RenderingTypePrediction,
     RenderingTypePredictor,
 )
+from crawlee.statistics import Statistics
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -235,3 +241,85 @@ async def test_adaptive_crawling_statistics() -> None:
     assert crawler.adaptive_statistics.predictor_state.browser_request_handler_runs == 1
     assert crawler.adaptive_statistics.predictor_state.rendering_type_mispredictions == 1
 
+def test_adaptive_default_hooks_raise_exception() -> None:
+    """Trying to attach usual pre-navigation hook raises exception.
+
+    It is ambiguous and so sub crawler specific hooks should be used instead."""
+
+    crawler = AdaptivePlaywrightCrawler()
+
+    with pytest.raises(RuntimeError):
+        @crawler.pre_navigation_hook
+        def some_hook() -> None:
+            pass
+
+
+@pytest.mark.parametrize('error_in_pw_crawler', [
+    pytest.param(False, id='Error only in bs sub crawler'),
+    pytest.param(True, id='Error in both sub crawlers'),
+])
+async def  test_adaptive_crawler_exceptions_in_sub_crawlers(*,error_in_pw_crawler: bool) -> None:
+    """Test that correct results are commited when exceptions are raised in sub crawlers.
+
+    Exception in bs sub crawler will be logged and pw sub crawler used instead.
+    Any result from bs sub crawler will be discarded, result form pw crawler will be saved instead.
+    (But global state modifications through `use_state` will not be reverted!!!)
+
+    Exception in pw sub crawler will prevent any result from being commited. Even if `push_data` was called before
+    the exception
+    """
+    requests = ['https://crawlee.dev/']
+    static_only_no_detection_predictor = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
+
+    crawler = AdaptivePlaywrightCrawler(rendering_type_predictor=static_only_no_detection_predictor)
+    saved_data = {'some': 'data'}
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+
+        try:
+            # page is available only if it was crawled by PlaywrightCrawler.
+            context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
+            await context.push_data(saved_data)
+            if error_in_pw_crawler:
+                raise RuntimeError('Some pw sub crawler related error')
+
+        except AdaptiveContextError:
+            await context.push_data({'this': 'data should not be saved'})
+            raise RuntimeError('Some bs sub crawler related error') from None
+
+    await crawler.run(requests)
+
+    dataset = await crawler.get_dataset()
+    stored_results  = [item async for item in dataset.iterate_items()]
+
+    if error_in_pw_crawler:
+        assert stored_results == []
+    else:
+        assert stored_results == [saved_data]
+
+
+def test_adaptive_playwright_crawler_statistics_in_init() -> None:
+    """Tests that adaptive crawler uses created AdaptivePlaywrightCrawlerStatistics from inputted Statistics."""
+    persistence_enabled = True
+    persist_state_kvs_name = 'some name'
+    persist_state_key = 'come key'
+    log_message = 'some message'
+    periodic_message_logger = logging.getLogger('some logger')  # Accessing private member to create copy like-object.
+    log_interval = timedelta(minutes=2)
+    statistics = Statistics(persistence_enabled=persistence_enabled,
+                            persist_state_kvs_name=persist_state_kvs_name,
+                            persist_state_key=persist_state_key,
+                            log_message=log_message,
+                            periodic_message_logger=periodic_message_logger,
+                            log_interval=log_interval)
+
+    crawler = AdaptivePlaywrightCrawler(statistics=statistics)
+
+    assert type(crawler._statistics) is AdaptivePlaywrightCrawlerStatistics
+    assert crawler._statistics._persistence_enabled == persistence_enabled
+    assert crawler._statistics._persist_state_kvs_name == persist_state_kvs_name
+    assert crawler._statistics._persist_state_key == persist_state_key
+    assert crawler._statistics._log_message == log_message
+    assert crawler._statistics._periodic_message_logger == periodic_message_logger
+    assert crawler._statistics._log_interval == log_interval
