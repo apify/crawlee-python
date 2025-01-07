@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from datetime import timedelta
 from itertools import cycle
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import Mock, patch
 
 import pytest
@@ -250,7 +250,7 @@ def test_adaptive_default_hooks_raise_exception() -> None:
 
     with pytest.raises(RuntimeError):
         @crawler.pre_navigation_hook
-        def some_hook() -> None:
+        async def some_hook(whatever: Any) -> None:
             pass
 
 

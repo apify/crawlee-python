@@ -1122,6 +1122,13 @@ class BasicCrawler(Generic[TCrawlingContext]):
         await self._context_pipeline(context, self.router)
 
 
+    @property
+    def crawl_one_required_contexts(self) -> list[AbstractAsyncContextManager]:
+        """Contexts that have to be active before `crawl_one` can be called."""
+        contexts: list[AbstractAsyncContextManager] = []
+        contexts.append(self.statistics)
+        return contexts
+
     async def crawl_one(self, *, context: BasicCrawlingContext,
                         request_handler_timeout: timedelta,
                         result: RequestHandlerRunResult,

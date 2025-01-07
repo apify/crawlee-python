@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from contextlib import AsyncExitStack
 from copy import deepcopy
 from logging import getLogger
 from random import random
@@ -189,14 +190,27 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
             purge_request_queue: If this is `True` and the crawler is not being run for the first time, the default
                 request queue will be purged.
         """
-        # TODO: Create something more robust that does not leak implementation so much
-        async with (self.beautifulsoup_crawler.statistics, self.playwright_crawler.statistics,
-                    self.playwright_crawler._additional_context_managers[0]):
+        contexts_to_enter = [
+            cm
+            for cm in (self.beautifulsoup_crawler.crawl_one_required_contexts
+                             + self.playwright_crawler.crawl_one_required_contexts)
+            if cm and getattr(cm, 'active', False) is False
+        ]
+
+        # Enter contexts required by sub crawler for them to be able to do `crawl_one`
+        async with AsyncExitStack() as exit_stack:
+            for context in contexts_to_enter:
+                await exit_stack.enter_async_context(context)
             return await super().run(requests=requests, purge_request_queue=purge_request_queue)
+
+        # AsyncExitStack can in theory swallow exceptions and so the return might not execute.
+        # https://github.com/python/mypy/issues/7726
+        raise RuntimeError('FinalStatistics not created.')
+
 
     # Can't use override as mypy does not like it for double underscore private method.
     async def _BasicCrawler__run_request_handler(self, context: BasicCrawlingContext) -> None: # noqa: N802
-        """Overrided BasicCrawler method that delegates request processing to sub crawlers.
+        """Override BasicCrawler method that delegates request processing to sub crawlers.
 
         To decide which sub crawler should process the request it runs `rendering_type_predictor`.
         To check if results are valid it uses `result_checker`.
@@ -271,17 +285,16 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
                 self.rendering_type_predictor.store_result(context.request.url, context.request.label, detection_result)
 
     async def commit_result(self, result: RequestHandlerRunResult, context: BasicCrawlingContext) -> None:
-        result_tasks = []
-        result_tasks.extend([
-            asyncio.create_task(context.push_data(**kwargs)) for kwargs in result.push_data_calls])
-        result_tasks.extend([
-            asyncio.create_task(context.add_requests(**kwargs)) for kwargs in result.add_requests_calls])
+        result_tasks = [
+            asyncio.create_task(context.push_data(**kwargs)) for kwargs in result.push_data_calls
+        ] + [
+            asyncio.create_task(context.add_requests(**kwargs)) for kwargs in result.add_requests_calls
+        ] + [
+            asyncio.create_task(self._commit_key_value_store_changes(result))
+        ]
 
-        # What to do with KV changes????
         await asyncio.gather(*result_tasks)
 
-        # Optimize if needed
-        await self._commit_key_value_store_changes(result)
 
 
     def pre_navigation_hook(self, hook: Callable[[Any], Awaitable[None]]) -> None:
