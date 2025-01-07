@@ -38,7 +38,7 @@ class AdaptivePlaywrightCrawlerStatistics(Statistics):
         periodic_message_logger: Logger | None = None,
         log_interval: timedelta = timedelta(minutes=1),
         state_model: type[StatisticsState] = StatisticsState) -> None:
-        self._predictor_state = PredictorState()
+        self.predictor_state = PredictorState()
         super().__init__(persistence_enabled=persistence_enabled,
                          persist_state_kvs_name=persist_state_kvs_name,
                          persist_state_key=persist_state_key,
@@ -47,7 +47,7 @@ class AdaptivePlaywrightCrawlerStatistics(Statistics):
                          periodic_message_logger=periodic_message_logger,
                          log_interval=log_interval,
                          state_model=state_model)
-        self._persist_predictor_state_key = self._get_default_persist_state_key() + '_PREDICTOR'
+        self._persist_predictor_state_key = self._persist_state_key + '_PREDICTOR'
 
     @classmethod
     def from_statistics(cls, statistics: Statistics) -> Self:
@@ -62,20 +62,20 @@ class AdaptivePlaywrightCrawlerStatistics(Statistics):
                    )
 
     def track_http_only_request_handler_runs(self) -> None:
-        self._predictor_state.http_only_request_handler_runs += 1
+        self.predictor_state.http_only_request_handler_runs += 1
 
     def track_browser_request_handler_runs(self) -> None:
-        self._predictor_state.browser_request_handler_runs += 1
+        self.predictor_state.browser_request_handler_runs += 1
 
     def track_rendering_type_mispredictions(self) -> None:
-        self._predictor_state.rendering_type_mispredictions += 1
+        self.predictor_state.rendering_type_mispredictions += 1
 
     @override
     async def _persist_other_statistics(self, key_value_store: KeyValueStore) -> None:
         """Persist state of predictor."""
         await key_value_store.set_value(
             self._persist_predictor_state_key,
-            self._predictor_state.model_dump(mode='json', by_alias=True),
+            self.predictor_state.model_dump(mode='json', by_alias=True),
             'application/json',
         )
 
@@ -84,5 +84,5 @@ class AdaptivePlaywrightCrawlerStatistics(Statistics):
     async def _load_other_statistics(self, key_value_store: KeyValueStore) -> None:
         """Load state of predictor."""
         stored_state = await key_value_store.get_value(self._persist_predictor_state_key, cast(Any, {}))
-        self._predictor_state = self._predictor_state.__class__.model_validate(stored_state)
+        self.predictor_state = self.predictor_state.__class__.model_validate(stored_state)
 

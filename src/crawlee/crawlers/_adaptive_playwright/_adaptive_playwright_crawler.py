@@ -120,7 +120,7 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
 
         # Adaptive crawling related.
         self.rendering_type_predictor = rendering_type_predictor or DefaultRenderingTypePredictor()
-        self.result_checker = result_checker or (lambda result: True) #  noqa: ARG005
+        self.result_checker = result_checker or (lambda result: True) #  noqa: ARG005  # Intentionally unused argument.
 
         self.result_comparator = result_comparator or create_comparator(result_checker)
 

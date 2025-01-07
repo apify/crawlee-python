@@ -211,3 +211,27 @@ async def test_adaptive_crawling_result_use_state_isolation() -> None:
     assert request_handler_calls == 2
     # Increment of global state happened only once
     assert (await store.get_value(BasicCrawler.CRAWLEE_STATE_KEY))['counter'] == 1
+
+
+async def test_adaptive_crawling_statistics() -> None:
+    """Test adaptive crawling related statistics.
+
+    Crawler set to static crawling, but due to result_checker returning False on static crawling result it
+    will do browser crawling instead well. This increments all three adaptive crawling related stats."""
+    requests = ['https://crawlee.dev/']
+
+    static_only_predictor_no_detection = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
+
+    crawler = AdaptivePlaywrightCrawler(rendering_type_predictor=static_only_predictor_no_detection,
+                                        result_checker=lambda result: False) #  noqa: ARG005  # Intentionally unused argument.
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        pass
+
+    await crawler.run(requests)
+
+    assert crawler.adaptive_statistics.predictor_state.http_only_request_handler_runs == 1
+    assert crawler.adaptive_statistics.predictor_state.browser_request_handler_runs == 1
+    assert crawler.adaptive_statistics.predictor_state.rendering_type_mispredictions == 1
+
