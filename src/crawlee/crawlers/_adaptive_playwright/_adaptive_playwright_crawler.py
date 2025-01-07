@@ -70,7 +70,6 @@ class _PlaywrightCrawlerAdditionalOptions(TypedDict):
     """The type of browser to launch ('chromium', 'firefox', or 'webkit').
                 This option should not be used if `browser_pool` is provided."""
 
-
     browser_launch_options: NotRequired[Mapping[str, Any]]
     """Keyword arguments to pass to the browser launch method. These options are provided
                 directly to Playwright's `browser_type.launch` method. For more details, refer to the Playwright
@@ -97,13 +96,15 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
     # TODO: Add example
     """
 
-    def __init__(self,
-                 rendering_type_predictor: RenderingTypePredictor | None = None,
-                 result_checker: Callable[[RequestHandlerRunResult], bool] | None = None,
-                 result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,
-                 beautifulsoup_crawler_kwargs: _BeautifulsoupCrawlerAdditionalOptions | None = None,
-                 playwright_crawler_args: _PlaywrightCrawlerAdditionalOptions | None = None,
-                 **kwargs: Unpack[_BasicCrawlerOptions]) -> None:
+    def __init__(
+        self,
+        rendering_type_predictor: RenderingTypePredictor | None = None,
+        result_checker: Callable[[RequestHandlerRunResult], bool] | None = None,
+        result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,
+        beautifulsoup_crawler_kwargs: _BeautifulsoupCrawlerAdditionalOptions | None = None,
+        playwright_crawler_args: _PlaywrightCrawlerAdditionalOptions | None = None,
+        **kwargs: Unpack[_BasicCrawlerOptions],
+    ) -> None:
         """A default constructor.
 
         Args:
@@ -121,7 +122,7 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
 
         # Adaptive crawling related.
         self.rendering_type_predictor = rendering_type_predictor or DefaultRenderingTypePredictor()
-        self.result_checker = result_checker or (lambda result: True) #  noqa: ARG005  # Intentionally unused argument.
+        self.result_checker = result_checker or (lambda result: True)  #  noqa: ARG005  # Intentionally unused argument.
 
         self.result_comparator = result_comparator or create_comparator(result_checker)
 
@@ -138,7 +139,6 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
         # will complain about using child-specific methods. Save same object to another attribute so that
         # AdaptivePlaywrightCrawlerStatistics specific methods can be access in "type safe manner".
         self.adaptive_statistics = statistics
-
 
         # Sub crawlers related.
         beautifulsoup_crawler_kwargs = beautifulsoup_crawler_kwargs or {}
@@ -171,9 +171,9 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
         async def request_handler_playwright(context: PlaywrightCrawlingContext) -> None:
             """Handler for routing from playwright_crawler to adaptive_crawler handler."""
             adaptive_crawling_context = await AdaptivePlaywrightCrawlingContext.from_playwright_crawling_context(
-                context=context, beautiful_soup_parser_type=beautifulsoup_crawler_kwargs['parser'])
+                context=context, beautiful_soup_parser_type=beautifulsoup_crawler_kwargs['parser']
+            )
             await self.router(adaptive_crawling_context)
-
 
         super().__init__(**kwargs)
 
@@ -192,8 +192,10 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
         """
         contexts_to_enter = [
             cm
-            for cm in (self.beautifulsoup_crawler.crawl_one_required_contexts
-                             + self.playwright_crawler.crawl_one_required_contexts)
+            for cm in (
+                self.beautifulsoup_crawler.crawl_one_required_contexts
+                + self.playwright_crawler.crawl_one_required_contexts
+            )
             if cm and getattr(cm, 'active', False) is False
         ]
 
@@ -207,9 +209,8 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
         # https://github.com/python/mypy/issues/7726
         raise RuntimeError('FinalStatistics not created.')
 
-
     # Can't use override as mypy does not like it for double underscore private method.
-    async def _BasicCrawler__run_request_handler(self, context: BasicCrawlingContext) -> None: # noqa: N802
+    async def _BasicCrawler__run_request_handler(self, context: BasicCrawlingContext) -> None:  # noqa: N802
         """Override BasicCrawler method that delegates request processing to sub crawlers.
 
         To decide which sub crawler should process the request it runs `rendering_type_predictor`.
@@ -218,40 +219,44 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
 
         Reference implementation: https://github.com/apify/crawlee/blob/master/packages/playwright-crawler/src/internals/adaptive-playwright-crawler.ts
         """
-        async def _run_subcrawler(crawler: BeautifulSoupCrawler | PlaywrightCrawler,
-                                  use_state: dict | None = None) -> SubCrawlerRun:
+
+        async def _run_subcrawler(
+            crawler: BeautifulSoupCrawler | PlaywrightCrawler, use_state: dict | None = None
+        ) -> SubCrawlerRun:
             """Helper closure that creates new `RequestHandlerRunResult` and delegates request handling to sub crawler.
 
             Produces `SubCrawlerRun` that either contains filled `RequestHandlerRunResult` or exception.
             """
             try:
                 crawl_result = await crawler.crawl_one(
-                context = context,
-                request_handler_timeout=self._request_handler_timeout,
-                result= RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store),
-                use_state=use_state)
+                    context=context,
+                    request_handler_timeout=self._request_handler_timeout,
+                    result=RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store),
+                    use_state=use_state,
+                )
                 return SubCrawlerRun(result=crawl_result)
             except Exception as e:
                 return SubCrawlerRun(exception=e)
-
 
         rendering_type_prediction = self.rendering_type_predictor.predict(context.request.url, context.request.label)
         should_detect_rendering_type = random() < rendering_type_prediction.detection_probability_recommendation
 
         if not should_detect_rendering_type:
             self.log.debug(
-                f'Predicted rendering type {rendering_type_prediction.rendering_type} for {context.request.url}')
+                f'Predicted rendering type {rendering_type_prediction.rendering_type} for {context.request.url}'
+            )
             if rendering_type_prediction.rendering_type == 'static':
                 context.log.debug(f'Running static request for {context.request.url}')
                 self.adaptive_statistics.track_http_only_request_handler_runs()
 
                 bs_run = await _run_subcrawler(self.beautifulsoup_crawler)
                 if bs_run.result and self.result_checker(bs_run.result):
-                    await self.commit_result(result = bs_run.result, context=context)
+                    await self.commit_result(result=bs_run.result, context=context)
                     return
                 if bs_run.exception:
-                    context.log.exception(msg=f'Static crawler: failed for {context.request.url}',
-                                          exc_info=bs_run.exception)
+                    context.log.exception(
+                        msg=f'Static crawler: failed for {context.request.url}', exc_info=bs_run.exception
+                    )
                 else:
                     context.log.warning(f'Static crawler: returned a suspicious result for {context.request.url}')
                     self.adaptive_statistics.track_rendering_type_mispredictions()
@@ -259,7 +264,7 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
         context.log.debug(f'Running browser request handler for {context.request.url}')
 
         kvs = await context.get_key_value_store()
-        default_value =dict[str, JsonSerializable]()
+        default_value = dict[str, JsonSerializable]()
         old_state: dict[str, JsonSerializable] = await kvs.get_value(BasicCrawler.CRAWLEE_STATE_KEY, default_value)
         old_state_copy = deepcopy(old_state)
 
@@ -270,13 +275,13 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
             raise pw_run.exception
 
         if pw_run.result:
-            await self.commit_result(result = pw_run.result, context=context)
+            await self.commit_result(result=pw_run.result, context=context)
 
             if should_detect_rendering_type:
                 detection_result: RenderingType
                 bs_run = await _run_subcrawler(self.beautifulsoup_crawler, use_state=old_state_copy)
 
-                if bs_run.result and self.result_comparator(bs_run.result,pw_run.result):
+                if bs_run.result and self.result_comparator(bs_run.result, pw_run.result):
                     detection_result = 'static'
                 else:
                     detection_result = 'client only'
@@ -285,31 +290,27 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
                 self.rendering_type_predictor.store_result(context.request.url, context.request.label, detection_result)
 
     async def commit_result(self, result: RequestHandlerRunResult, context: BasicCrawlingContext) -> None:
-        result_tasks = [
-            asyncio.create_task(context.push_data(**kwargs)) for kwargs in result.push_data_calls
-        ] + [
-            asyncio.create_task(context.add_requests(**kwargs)) for kwargs in result.add_requests_calls
-        ] + [
-            asyncio.create_task(self._commit_key_value_store_changes(result))
-        ]
+        result_tasks = (
+            [asyncio.create_task(context.push_data(**kwargs)) for kwargs in result.push_data_calls]
+            + [asyncio.create_task(context.add_requests(**kwargs)) for kwargs in result.add_requests_calls]
+            + [asyncio.create_task(self._commit_key_value_store_changes(result))]
+        )
 
         await asyncio.gather(*result_tasks)
 
-
-
     def pre_navigation_hook(self, hook: Callable[[Any], Awaitable[None]]) -> None:
         """Pre navigation hooks for adaptive crawler are delegated to sub crawlers."""
-        raise RuntimeError('Pre navigation hooks are ambiguous in adaptive crawling context. Use specific hook instead:'
-                           '`pre_navigation_hook_pw` for playwright sub crawler related hooks or'
-                           '`pre_navigation_hook_bs`for beautifulsoup sub crawler related hooks. \n'
-                           f'{hook=} will not be used!!!')
+        raise RuntimeError(
+            'Pre navigation hooks are ambiguous in adaptive crawling context. Use specific hook instead:'
+            '`pre_navigation_hook_pw` for playwright sub crawler related hooks or'
+            '`pre_navigation_hook_bs`for beautifulsoup sub crawler related hooks. \n'
+            f'{hook=} will not be used!!!'
+        )
 
     def pre_navigation_hook_pw(self, hook: Callable[[PlaywrightPreNavCrawlingContext], Awaitable[None]]) -> None:
         """Pre navigation hooks for playwright sub crawler of adaptive crawler."""
         self.playwright_crawler.pre_navigation_hook(hook)
 
-
     def pre_navigation_hook_bs(self, hook: Callable[[BasicCrawlingContext], Awaitable[None]]) -> None:
         """Pre navigation hooks for beautifulsoup sub crawler of adaptive crawler."""
         self.beautifulsoup_crawler.pre_navigation_hook(hook)
-

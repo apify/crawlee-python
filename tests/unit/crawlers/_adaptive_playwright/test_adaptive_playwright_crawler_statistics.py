@@ -21,14 +21,10 @@ async def test_predictor_state_persistence() -> None:
 
     # new_adaptive_statistics are initialized from the persisted values.
     async with AdaptivePlaywrightCrawlerStatistics(
-        persistence_enabled=True,
-        persist_state_key=persistence_state_key) as new_adaptive_statistics:
+        persistence_enabled=True, persist_state_key=persistence_state_key
+    ) as new_adaptive_statistics:
         pass
 
     assert new_adaptive_statistics.predictor_state.rendering_type_mispredictions == 2
     assert new_adaptive_statistics.predictor_state.http_only_request_handler_runs == 3
     assert new_adaptive_statistics.predictor_state.browser_request_handler_runs == 1
-
-
-
-

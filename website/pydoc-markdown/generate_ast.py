@@ -45,9 +45,4 @@ for module in modules:
 
 repo_root_path = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), '../../'))
 
-print(
-    json.dumps(dump, indent=4).replace(
-        repo_root_path,
-        'REPO_ROOT_PLACEHOLDER'
-    )
-)
+print(json.dumps(dump, indent=4).replace(repo_root_path, 'REPO_ROOT_PLACEHOLDER'))

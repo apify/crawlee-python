@@ -137,9 +137,11 @@ class _BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     """A logger instance, typically provided by a subclass, for consistent logging labels. Intended for use by
     subclasses rather than direct instantiation of `BasicCrawler`."""
 
+
 @docs_group('Data structures')
 class _BasicCrawlerOptionsGeneric(Generic[TCrawlingContext], TypedDict):
     """Generic options for basic crawler."""
+
     request_handler: NotRequired[Callable[[TCrawlingContext], Awaitable[None]]]
     """A callable responsible for handling requests."""
 
@@ -147,10 +149,11 @@ class _BasicCrawlerOptionsGeneric(Generic[TCrawlingContext], TypedDict):
     """Enables extending the request lifecycle and modifying the crawling context. Intended for use by
     subclasses rather than direct instantiation of `BasicCrawler`."""
 
+
 @docs_group('Data structures')
-class BasicCrawlerOptions(Generic[TCrawlingContext],
-                          _BasicCrawlerOptions ,
-                          _BasicCrawlerOptionsGeneric[TCrawlingContext]):
+class BasicCrawlerOptions(
+    Generic[TCrawlingContext], _BasicCrawlerOptions, _BasicCrawlerOptionsGeneric[TCrawlingContext]
+):
     """Arguments for the `BasicCrawler` constructor.
 
     It is intended for typing forwarded `__init__` arguments in the subclasses.
@@ -181,6 +184,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         - direct storage interaction helpers,
         - and more.
     """
+
     CRAWLEE_STATE_KEY = 'CRAWLEE_STATE'
 
     def __init__(
@@ -574,9 +578,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             wait_for_all_requests_to_be_added_timeout=wait_for_all_requests_to_be_added_timeout,
         )
 
-    async def _use_state(
-        self, default_value: dict[str, JsonSerializable] | None = None
-    ) -> dict[str, JsonSerializable]:
+    async def _use_state(self, default_value: dict[str, JsonSerializable] | None = None) -> dict[str, JsonSerializable]:
         store = await self.get_key_value_store()
         return await store.get_auto_saved_value(BasicCrawler.CRAWLEE_STATE_KEY, default_value)
 
@@ -948,15 +950,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         await self._commit_key_value_store_changes(result)
 
-
-
     async def _commit_key_value_store_changes(self, result: RequestHandlerRunResult) -> None:
         for (id, name), changes in result.key_value_store_changes.items():
             store = await self.get_key_value_store(id=id, name=name)
             for key, value in changes.updates.items():
                 await store.set_value(key, value.content, value.content_type)
-
-
 
     async def __is_finished_function(self) -> bool:
         self._stop_if_max_requests_count_exceeded()
@@ -1121,7 +1119,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
     async def __run_request_handler(self, context: BasicCrawlingContext) -> None:
         await self._context_pipeline(context, self.router)
 
-
     @property
     def crawl_one_required_contexts(self) -> list[AbstractAsyncContextManager]:
         """Contexts that have to be active before `crawl_one` can be called."""
@@ -1129,11 +1126,14 @@ class BasicCrawler(Generic[TCrawlingContext]):
         contexts.append(self.statistics)
         return contexts
 
-    async def crawl_one(self, *, context: BasicCrawlingContext,
-                        request_handler_timeout: timedelta,
-                        result: RequestHandlerRunResult,
-                        use_state: dict[str,JsonSerializable] | None = None
-                        ) -> RequestHandlerRunResult:
+    async def crawl_one(
+        self,
+        *,
+        context: BasicCrawlingContext,
+        request_handler_timeout: timedelta,
+        result: RequestHandlerRunResult,
+        use_state: dict[str, JsonSerializable] | None = None,
+    ) -> RequestHandlerRunResult:
         """Populate result by crawling one request from input `context`.
 
          Context callbacks are routed to `result` and are not commited.
@@ -1149,9 +1149,12 @@ class BasicCrawler(Generic[TCrawlingContext]):
             Same input result object that is mutated in the process.
         """
         if use_state is not None:
-            async def get_input_state(default_value: dict[str, JsonSerializable] | None = None  # noqa:ARG001  # Intentionally unused arguments. Closure, that generates same output regardless of inputs.
-                                      ) -> dict[str, JsonSerializable]:
+
+            async def get_input_state(
+                default_value: dict[str, JsonSerializable] | None = None,  # noqa:ARG001  # Intentionally unused arguments. Closure, that generates same output regardless of inputs.
+            ) -> dict[str, JsonSerializable]:
                 return use_state
+
             use_state_function = get_input_state
         else:
             use_state_function = context.use_state
@@ -1165,14 +1168,14 @@ class BasicCrawler(Generic[TCrawlingContext]):
             push_data=result.push_data,
             get_key_value_store=result.get_key_value_store,
             use_state=use_state_function,
-            log=context.log
+            log=context.log,
         )
 
         await wait_for(
             lambda: self.__run_request_handler(context_linked_to_result),
             timeout=request_handler_timeout,
             timeout_message='Request handler timed out after '
-                            f'{self._request_handler_timeout.total_seconds()} seconds',
+            f'{self._request_handler_timeout.total_seconds()} seconds',
             logger=self._logger,
         )
         return result

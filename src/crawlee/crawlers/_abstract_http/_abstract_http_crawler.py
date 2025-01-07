@@ -37,13 +37,13 @@ class _HttpCrawlerOptions(Generic[TCrawlingContext], TypedDict):
     ignore_http_error_status_codes: NotRequired[Iterable[int]]
     """HTTP status codes typically considered errors but to be treated as successful responses."""
 
+
 @docs_group('Data structures')
-class HttpCrawlerOptions(Generic[TCrawlingContext],_HttpCrawlerOptions, BasicCrawlerOptions[TCrawlingContext]):
+class HttpCrawlerOptions(Generic[TCrawlingContext], _HttpCrawlerOptions, BasicCrawlerOptions[TCrawlingContext]):
     """Arguments for the `AbstractHttpCrawler` constructor.
 
     It is intended for typing forwarded `__init__` arguments in the subclasses.
     """
-
 
 
 @docs_group('Abstract classes')

@@ -287,7 +287,6 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
         """
         self._pre_navigation_hooks.append(hook)
 
-
     @property
     def crawl_one_required_contexts(self) -> list[AbstractAsyncContextManager]:
         """Contexts that have to be active before `crawl_one` can be called."""

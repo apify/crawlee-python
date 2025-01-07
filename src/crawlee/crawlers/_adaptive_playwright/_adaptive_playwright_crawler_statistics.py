@@ -25,11 +25,12 @@ class PredictorState(BaseModel):
     browser_request_handler_runs: Annotated[int, Field(alias='browser_request_handler_runs')] = 0
     rendering_type_mispredictions: Annotated[int, Field(alias='rendering_type_mispredictions')] = 0
 
+
 @docs_group('Classes')
 class AdaptivePlaywrightCrawlerStatistics(Statistics):
-
-
-    def __init__(self,*,
+    def __init__(
+        self,
+        *,
         persistence_enabled: bool = False,
         persist_state_kvs_name: str = 'default',
         persist_state_key: str | None = None,
@@ -37,29 +38,33 @@ class AdaptivePlaywrightCrawlerStatistics(Statistics):
         log_message: str = 'Statistics',
         periodic_message_logger: Logger | None = None,
         log_interval: timedelta = timedelta(minutes=1),
-        state_model: type[StatisticsState] = StatisticsState) -> None:
+        state_model: type[StatisticsState] = StatisticsState,
+    ) -> None:
         self.predictor_state = PredictorState()
-        super().__init__(persistence_enabled=persistence_enabled,
-                         persist_state_kvs_name=persist_state_kvs_name,
-                         persist_state_key=persist_state_key,
-                         key_value_store=key_value_store,
-                         log_message=log_message,
-                         periodic_message_logger=periodic_message_logger,
-                         log_interval=log_interval,
-                         state_model=state_model)
+        super().__init__(
+            persistence_enabled=persistence_enabled,
+            persist_state_kvs_name=persist_state_kvs_name,
+            persist_state_key=persist_state_key,
+            key_value_store=key_value_store,
+            log_message=log_message,
+            periodic_message_logger=periodic_message_logger,
+            log_interval=log_interval,
+            state_model=state_model,
+        )
         self._persist_predictor_state_key = self._persist_state_key + '_PREDICTOR'
 
     @classmethod
     def from_statistics(cls, statistics: Statistics) -> Self:
-        return cls(persistence_enabled=statistics._persistence_enabled,  # noqa:SLF001  # Accessing private member to create copy like-object.
-                         persist_state_kvs_name=statistics._persist_state_kvs_name,  # noqa:SLF001  # Accessing private member to create copy like-object.
-                         persist_state_key=statistics._persist_state_key,  # noqa:SLF001  # Accessing private member to create copy like-object.
-                         key_value_store=statistics._key_value_store,  # noqa:SLF001  # Accessing private member to create copy like-object.
-                         log_message=statistics._log_message,  # noqa:SLF001  # Accessing private member to create copy like-object.
-                         periodic_message_logger=statistics._periodic_message_logger,  # noqa:SLF001  # Accessing private member to create copy like-object.
-                         log_interval=statistics._log_interval,  # noqa:SLF001  # Accessing private member to create copy like-object.
-                         state_model=statistics._state_model,  # noqa:SLF001  # Accessing private member to create copy like-object.
-                   )
+        return cls(
+            persistence_enabled=statistics._persistence_enabled,  # noqa:SLF001  # Accessing private member to create copy like-object.
+            persist_state_kvs_name=statistics._persist_state_kvs_name,  # noqa:SLF001  # Accessing private member to create copy like-object.
+            persist_state_key=statistics._persist_state_key,  # noqa:SLF001  # Accessing private member to create copy like-object.
+            key_value_store=statistics._key_value_store,  # noqa:SLF001  # Accessing private member to create copy like-object.
+            log_message=statistics._log_message,  # noqa:SLF001  # Accessing private member to create copy like-object.
+            periodic_message_logger=statistics._periodic_message_logger,  # noqa:SLF001  # Accessing private member to create copy like-object.
+            log_interval=statistics._log_interval,  # noqa:SLF001  # Accessing private member to create copy like-object.
+            state_model=statistics._state_model,  # noqa:SLF001  # Accessing private member to create copy like-object.
+        )
 
     def track_http_only_request_handler_runs(self) -> None:
         self.predictor_state.http_only_request_handler_runs += 1
@@ -79,10 +84,8 @@ class AdaptivePlaywrightCrawlerStatistics(Statistics):
             'application/json',
         )
 
-
     @override
     async def _load_other_statistics(self, key_value_store: KeyValueStore) -> None:
         """Load state of predictor."""
         stored_state = await key_value_store.get_value(self._persist_predictor_state_key, cast(Any, {}))
         self.predictor_state = self.predictor_state.__class__.model_validate(stored_state)
-

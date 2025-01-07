@@ -10,24 +10,24 @@ from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context
 )
 
 
-async def main() ->None:
+async def main() -> None:
     # TODO: remove in review. Move this to documentation examples instead.
     top_logger = getLogger(__name__)
     top_logger.setLevel(logging.DEBUG)
-    i=0
+    i = 0
 
-    crawler = AdaptivePlaywrightCrawler(max_requests_per_crawl=10,
-                                        _logger=top_logger,
-                                        playwright_crawler_args={'headless':False})
+    crawler = AdaptivePlaywrightCrawler(
+        max_requests_per_crawl=10, _logger=top_logger, playwright_crawler_args={'headless': False}
+    )
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
         nonlocal i
-        i = i+1
+        i = i + 1
         context.log.info(f'Processing with Top adaptive_crawler: {context.request.url} ...')
         await context.enqueue_links()
         await context.push_data({'Top crwaler Url': context.request.url})
-        await context.use_state({'bla':i})
+        await context.use_state({'bla': i})
 
     @crawler.pre_navigation_hook_bs
     async def bs_hook(context: BasicCrawlingContext) -> None:

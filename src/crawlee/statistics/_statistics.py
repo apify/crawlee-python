@@ -252,17 +252,17 @@ class Statistics:
             await self._load_other_statistics(self._key_value_store)
 
     async def _load_crawler_statistics(self, key_value_store: KeyValueStore) -> None:
-            stored_state = await key_value_store.get_value(self._persist_state_key, cast(Any, {}))
+        stored_state = await key_value_store.get_value(self._persist_state_key, cast(Any, {}))
 
-            saved_state = self.state.__class__.model_validate(stored_state)
-            self.state = saved_state
+        saved_state = self.state.__class__.model_validate(stored_state)
+        self.state = saved_state
 
-            if saved_state.stats_persisted_at is not None and saved_state.crawler_last_started_at:
-                self._instance_start = datetime.now(timezone.utc) - (
-                    saved_state.stats_persisted_at - saved_state.crawler_last_started_at
-                )
-            elif saved_state.crawler_last_started_at:
-                self._instance_start = saved_state.crawler_last_started_at
+        if saved_state.stats_persisted_at is not None and saved_state.crawler_last_started_at:
+            self._instance_start = datetime.now(timezone.utc) - (
+                saved_state.stats_persisted_at - saved_state.crawler_last_started_at
+            )
+        elif saved_state.crawler_last_started_at:
+            self._instance_start = saved_state.crawler_last_started_at
 
     async def _load_other_statistics(self, key_value_store: KeyValueStore) -> None:
         """Load other statistics. Not implemented in Statistics."""
@@ -291,13 +291,11 @@ class Statistics:
     async def _persist_other_statistics(self, key_value_store: KeyValueStore) -> None:
         """Save other statistics. Not implemented in Statistics."""
 
-
     async def _persist_state(self, event_data: EventPersistStateData) -> None:
         logger.debug(f'Persisting state of the Statistics (event_data={event_data}).')
         if self._persistence_enabled and self._key_value_store is not None and self._instance_start is not None:
             await self._persist_crawler_statistics(self._key_value_store)
             await self._persist_other_statistics(self._key_value_store)
-
 
     def _save_retry_count_for_request(self, record: RequestProcessingRecord) -> None:
         retry_count = record.retry_count

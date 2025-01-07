@@ -28,13 +28,15 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 
-
 class _SimpleRenderingTypePredictor(RenderingTypePredictor):
     """Simplified predictor for tests."""
 
-    def __init__(self, rendering_types: Iterator[RenderingType] | None = None,
-                 detection_probability_recommendation: None |  Iterator[int] = None) -> None:
-        self._rendering_types = rendering_types or  cycle(['static'])
+    def __init__(
+        self,
+        rendering_types: Iterator[RenderingType] | None = None,
+        detection_probability_recommendation: None | Iterator[int] = None,
+    ) -> None:
+        self._rendering_types = rendering_types or cycle(['static'])
         self._detection_probability_recommendation = detection_probability_recommendation or cycle([1])
 
     @override
@@ -46,25 +48,27 @@ class _SimpleRenderingTypePredictor(RenderingTypePredictor):
         pass
 
 
-
-@pytest.mark.parametrize(('expected_pw_count', 'expected_bs_count', 'rendering_types',
-                          'detection_probability_recommendation'), [
-    pytest.param(0,2, cycle(['static']), cycle([0]), id='Static only'),
-    pytest.param(2,0, cycle(['client only']), cycle([0]), id='Client only'),
-    pytest.param(1,1, cycle(['static','client only']), cycle([0]),id='Mixed'),
-    pytest.param(2,2, cycle(['static','client only']), cycle([1]),id='Enforced rendering type detection'),
-])
-async def test_adaptive_crawling(expected_pw_count: int, expected_bs_count: int,
-                                 rendering_types: Iterator[RenderingType],
-                                 detection_probability_recommendation: Iterator[int]) -> None:
+@pytest.mark.parametrize(
+    ('expected_pw_count', 'expected_bs_count', 'rendering_types', 'detection_probability_recommendation'),
+    [
+        pytest.param(0, 2, cycle(['static']), cycle([0]), id='Static only'),
+        pytest.param(2, 0, cycle(['client only']), cycle([0]), id='Client only'),
+        pytest.param(1, 1, cycle(['static', 'client only']), cycle([0]), id='Mixed'),
+        pytest.param(2, 2, cycle(['static', 'client only']), cycle([1]), id='Enforced rendering type detection'),
+    ],
+)
+async def test_adaptive_crawling(
+    expected_pw_count: int,
+    expected_bs_count: int,
+    rendering_types: Iterator[RenderingType],
+    detection_probability_recommendation: Iterator[int],
+) -> None:
     """Tests correct routing to pre-nav hooks and correct handling through proper handler."""
     requests = ['https://crawlee.dev/', 'https://crawlee.dev/docs/quick-start']
 
     predictor = _SimpleRenderingTypePredictor(
-        rendering_types = rendering_types,
-        detection_probability_recommendation=detection_probability_recommendation
+        rendering_types=rendering_types, detection_probability_recommendation=detection_probability_recommendation
     )
-
 
     crawler = AdaptivePlaywrightCrawler(rendering_type_predictor=predictor)
 
@@ -86,7 +90,6 @@ async def test_adaptive_crawling(expected_pw_count: int, expected_bs_count: int,
         except AdaptiveContextError:
             bs_handler_count += 1
 
-
     @crawler.pre_navigation_hook_bs
     async def bs_hook(context: BasicCrawlingContext) -> None:  # noqa:ARG001  # Intentionally unused arg
         nonlocal bs_hook_count
@@ -96,7 +99,6 @@ async def test_adaptive_crawling(expected_pw_count: int, expected_bs_count: int,
     async def pw_hook(context: PlaywrightPreNavCrawlingContext) -> None:  # noqa:ARG001  # Intentionally unused arg
         nonlocal pw_hook_count
         pw_hook_count += 1
-
 
     await crawler.run(requests)
 
@@ -138,7 +140,6 @@ async def test_adaptive_crawling_result() -> None:
     requests = ['https://crawlee.dev/']
     crawler = AdaptivePlaywrightCrawler(rendering_type_predictor=static_only_predictor_enforce_detection)
 
-
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
         try:
@@ -157,20 +158,22 @@ async def test_adaptive_crawling_result() -> None:
     assert items == [{'handler': 'pw'}]
 
 
-
-@pytest.mark.parametrize(('pw_saved_data', 'bs_saved_data', 'expected_result_renderingl_type'), [
-    pytest.param({'some': 'data'}, {'some': 'data'}, 'static', id='Same results from sub crawlers'),
-    pytest.param({'some': 'data'}, {'different': 'data'}, 'client only', id='Different results from sub crawlers'),
-])
-async def test_adaptive_crawling_predictor_calls(pw_saved_data: dict[str, str], bs_saved_data: dict[str, str],
-                                                 expected_result_renderingl_type: RenderingType) -> None:
+@pytest.mark.parametrize(
+    ('pw_saved_data', 'bs_saved_data', 'expected_result_renderingl_type'),
+    [
+        pytest.param({'some': 'data'}, {'some': 'data'}, 'static', id='Same results from sub crawlers'),
+        pytest.param({'some': 'data'}, {'different': 'data'}, 'client only', id='Different results from sub crawlers'),
+    ],
+)
+async def test_adaptive_crawling_predictor_calls(
+    pw_saved_data: dict[str, str], bs_saved_data: dict[str, str], expected_result_renderingl_type: RenderingType
+) -> None:
     """Tests expected predictor calls. Same results."""
     some_label = 'bla'
     some_url = 'https://crawlee.dev/'
     static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
     requests = [Request.from_url(url=some_url, label=some_label)]
     crawler = AdaptivePlaywrightCrawler(rendering_type_predictor=static_only_predictor_enforce_detection)
-
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
@@ -181,9 +184,12 @@ async def test_adaptive_crawling_predictor_calls(pw_saved_data: dict[str, str], 
         except AdaptiveContextError:
             await context.push_data(bs_saved_data)
 
-    with (patch.object(static_only_predictor_enforce_detection, 'store_result', Mock()) as mocked_store_result,
-        patch.object(static_only_predictor_enforce_detection, 'predict', Mock(
-            return_value=RenderingTypePrediction('static', 1))) as mocked_predict):
+    with (
+        patch.object(static_only_predictor_enforce_detection, 'store_result', Mock()) as mocked_store_result,
+        patch.object(
+            static_only_predictor_enforce_detection, 'predict', Mock(return_value=RenderingTypePrediction('static', 1))
+        ) as mocked_predict,
+    ):
         await crawler.run(requests)
 
     mocked_predict.assert_called_once_with(some_url, some_label)
@@ -205,7 +211,7 @@ async def test_adaptive_crawling_result_use_state_isolation() -> None:
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
         nonlocal request_handler_calls
-        state = cast(dict[str, int],await context.use_state())
+        state = cast(dict[str, int], await context.use_state())
         request_handler_calls += 1
         state['counter'] += 1
 
@@ -228,8 +234,10 @@ async def test_adaptive_crawling_statistics() -> None:
 
     static_only_predictor_no_detection = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
 
-    crawler = AdaptivePlaywrightCrawler(rendering_type_predictor=static_only_predictor_no_detection,
-                                        result_checker=lambda result: False) #  noqa: ARG005  # Intentionally unused argument.
+    crawler = AdaptivePlaywrightCrawler(
+        rendering_type_predictor=static_only_predictor_no_detection,
+        result_checker=lambda result: False,  #  noqa: ARG005  # Intentionally unused argument.
+    )
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
@@ -241,6 +249,7 @@ async def test_adaptive_crawling_statistics() -> None:
     assert crawler.adaptive_statistics.predictor_state.browser_request_handler_runs == 1
     assert crawler.adaptive_statistics.predictor_state.rendering_type_mispredictions == 1
 
+
 def test_adaptive_default_hooks_raise_exception() -> None:
     """Trying to attach usual pre-navigation hook raises exception.
 
@@ -249,16 +258,20 @@ def test_adaptive_default_hooks_raise_exception() -> None:
     crawler = AdaptivePlaywrightCrawler()
 
     with pytest.raises(RuntimeError):
+
         @crawler.pre_navigation_hook
         async def some_hook(whatever: Any) -> None:
             pass
 
 
-@pytest.mark.parametrize('error_in_pw_crawler', [
-    pytest.param(False, id='Error only in bs sub crawler'),
-    pytest.param(True, id='Error in both sub crawlers'),
-])
-async def  test_adaptive_crawler_exceptions_in_sub_crawlers(*,error_in_pw_crawler: bool) -> None:
+@pytest.mark.parametrize(
+    'error_in_pw_crawler',
+    [
+        pytest.param(False, id='Error only in bs sub crawler'),
+        pytest.param(True, id='Error in both sub crawlers'),
+    ],
+)
+async def test_adaptive_crawler_exceptions_in_sub_crawlers(*, error_in_pw_crawler: bool) -> None:
     """Test that correct results are commited when exceptions are raised in sub crawlers.
 
     Exception in bs sub crawler will be logged and pw sub crawler used instead.
@@ -276,7 +289,6 @@ async def  test_adaptive_crawler_exceptions_in_sub_crawlers(*,error_in_pw_crawle
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
-
         try:
             # page is available only if it was crawled by PlaywrightCrawler.
             context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
@@ -291,7 +303,7 @@ async def  test_adaptive_crawler_exceptions_in_sub_crawlers(*,error_in_pw_crawle
     await crawler.run(requests)
 
     dataset = await crawler.get_dataset()
-    stored_results  = [item async for item in dataset.iterate_items()]
+    stored_results = [item async for item in dataset.iterate_items()]
 
     if error_in_pw_crawler:
         assert stored_results == []
@@ -307,12 +319,14 @@ def test_adaptive_playwright_crawler_statistics_in_init() -> None:
     log_message = 'some message'
     periodic_message_logger = logging.getLogger('some logger')  # Accessing private member to create copy like-object.
     log_interval = timedelta(minutes=2)
-    statistics = Statistics(persistence_enabled=persistence_enabled,
-                            persist_state_kvs_name=persist_state_kvs_name,
-                            persist_state_key=persist_state_key,
-                            log_message=log_message,
-                            periodic_message_logger=periodic_message_logger,
-                            log_interval=log_interval)
+    statistics = Statistics(
+        persistence_enabled=persistence_enabled,
+        persist_state_kvs_name=persist_state_kvs_name,
+        persist_state_key=persist_state_key,
+        log_message=log_message,
+        periodic_message_logger=periodic_message_logger,
+        log_interval=log_interval,
+    )
 
     crawler = AdaptivePlaywrightCrawler(statistics=statistics)
 
