@@ -30,6 +30,7 @@ from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler_statisti
 )
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import (
     AdaptivePlaywrightCrawlingContext,
+    AdaptivePlaywrightPreNavCrawlingContext,
 )
 from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import (
     DefaultRenderingTypePredictor,
@@ -259,9 +260,9 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
             use_state_function = context.use_state
 
         context_linked_to_result = BasicCrawlingContext(
-            request=context.request,
-            session=context.session,
-            proxy_info=context.proxy_info,
+            request=deepcopy(context.request),
+            session=deepcopy(context.session),
+            proxy_info=deepcopy(context.proxy_info),
             send_request=context.send_request,
             add_requests=result.add_requests,
             push_data=result.push_data,
@@ -400,18 +401,11 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
         await asyncio.gather(*result_tasks)
 
     def pre_navigation_hook(self, hook: Callable[[Any], Awaitable[None]]) -> None:
-        """Pre navigation hooks for adaptive crawler are delegated to sub crawlers."""
-        raise RuntimeError(
-            'Pre navigation hooks are ambiguous in adaptive crawling context. Use specific hook instead:'
-            '`pre_navigation_hook_pw` for playwright sub crawler related hooks or'
-            '`pre_navigation_hook_bs`for beautifulsoup sub crawler related hooks. \n'
-            f'{hook=} will not be used!!!'
-        )
+        """Pre navigation hooks for adaptive crawler are delegated to sub crawlers.
 
-    def pre_navigation_hook_pw(self, hook: Callable[[PlaywrightPreNavCrawlingContext], Awaitable[None]]) -> None:
-        """Pre navigation hooks for playwright sub crawler of adaptive crawler."""
-        self._pw_context_pipeline.pre_navigation_hook(hook)
-
-    def pre_navigation_hook_bs(self, hook: Callable[[BasicCrawlingContext], Awaitable[None]]) -> None:
-        """Pre navigation hooks for beautifulsoup sub crawler of adaptive crawler."""
-        self._bs_context_pipeline.pre_navigation_hook(hook)
+        Hooks are wrapped in context that handles possibly missing `page` object by throwing `AdaptiveContextError`.
+        Hooks that try to access `context.page` will have to catch this exception if triggered by static pipeline.
+        """
+        wrapped_hook = AdaptivePlaywrightPreNavCrawlingContext.wrap_hook_in_temporal_adaptive_context(hook)
+        self._pw_context_pipeline.pre_navigation_hook(wrapped_hook)
+        self._bs_context_pipeline.pre_navigation_hook(wrapped_hook)

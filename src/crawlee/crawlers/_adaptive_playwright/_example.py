@@ -2,10 +2,10 @@ import asyncio
 import logging
 from logging import getLogger
 
-from crawlee._types import BasicCrawlingContext
 from crawlee.crawlers import PlaywrightPreNavCrawlingContext
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler import AdaptivePlaywrightCrawler
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import (
+    AdaptiveContextError,
     AdaptivePlaywrightCrawlingContext,
 )
 
@@ -29,13 +29,13 @@ async def main() -> None:
         await context.push_data({'Top crwaler Url': context.request.url})
         await context.use_state({'bla': i})
 
-    @crawler.pre_navigation_hook_bs
-    async def bs_hook(context: BasicCrawlingContext) -> None:
-        context.log.info(f'BS pre navigation hook for: {context.request.url} ...')
-
-    @crawler.pre_navigation_hook_pw
-    async def pw_hook(context: PlaywrightPreNavCrawlingContext) -> None:
-        context.log.info(f'PW pre navigation hook for: {context.request.url} ...')
+    @crawler.pre_navigation_hook
+    async def hook(context: PlaywrightPreNavCrawlingContext) -> None:
+        try:
+            context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
+            context.log.info(f'PW pre navigation hook for: {context.request.url} ...')
+        except AdaptiveContextError:
+            context.log.info(f'BS pre navigation hook for: {context.request.url} ...')
 
     # Run the crawler with the initial list of URLs.
     await crawler.run(['https://warehouse-theme-metal.myshopify.com/'])

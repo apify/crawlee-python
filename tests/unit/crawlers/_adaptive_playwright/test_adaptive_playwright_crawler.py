@@ -3,14 +3,13 @@ from __future__ import annotations
 import logging
 from datetime import timedelta
 from itertools import cycle
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 from unittest.mock import Mock, patch
 
 import pytest
 from typing_extensions import override
 
 from crawlee import Request
-from crawlee._types import BasicCrawlingContext
 from crawlee.crawlers import BasicCrawler, PlaywrightPreNavCrawlingContext
 from crawlee.crawlers._adaptive_playwright import AdaptivePlaywrightCrawler, AdaptivePlaywrightCrawlingContext
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler_statistics import (
@@ -93,15 +92,17 @@ async def test_adaptive_crawling(
         except AdaptiveContextError:
             bs_handler_count += 1
 
-    @crawler.pre_navigation_hook_bs
-    async def bs_hook(context: BasicCrawlingContext) -> None:  # noqa:ARG001  # Intentionally unused arg
+    @crawler.pre_navigation_hook
+    async def bs_hook(context: PlaywrightPreNavCrawlingContext) -> None:  # Intentionally unused arg
         nonlocal bs_hook_count
-        bs_hook_count += 1
-
-    @crawler.pre_navigation_hook_pw
-    async def pw_hook(context: PlaywrightPreNavCrawlingContext) -> None:  # noqa:ARG001  # Intentionally unused arg
         nonlocal pw_hook_count
-        pw_hook_count += 1
+
+        try:
+            # page is available only if it was crawled by PlaywrightCrawler.
+            context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
+            pw_hook_count += 1
+        except AdaptiveContextError:
+            bs_hook_count += 1
 
     await crawler.run(requests)
 
@@ -112,27 +113,33 @@ async def test_adaptive_crawling(
     assert bs_hook_count == expected_bs_count
 
 
-async def test_adaptive_crawling_context() -> None:
-    """Tests that correct context is used. Enforced rendering type detection to run both sub crawlers."""
+async def test_adaptive_crawling_pre_nav_change_to_context() -> None:
+    """Tests that context can be modified in pre-navigation hooks."""
     static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
-    requests = ['https://warehouse-theme-metal.myshopify.com/']
+
     crawler = AdaptivePlaywrightCrawler(rendering_type_predictor=static_only_predictor_enforce_detection)
+    user_data_in_pre_nav_hook = []
+    user_data_in_handler = []
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
-        assert context.request.url == requests[0]
+        user_data_in_handler.append(context.request.user_data.get('data', None))
 
-    @crawler.pre_navigation_hook_bs
-    async def bs_hook(context: BasicCrawlingContext) -> None:
-        assert type(context) is BasicCrawlingContext
-        assert context.request.url == requests[0]
+    @crawler.pre_navigation_hook
+    async def pre_nav_hook(context: PlaywrightPreNavCrawlingContext) -> None:
+        user_data_in_pre_nav_hook.append(context.request.user_data.get('data', None))
+        try:
+            # page is available only if it was crawled by PlaywrightCrawler.
+            context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
+            context.request.user_data['data'] = 'pw'
+        except AdaptiveContextError:
+            context.request.user_data['data'] = 'bs'
 
-    @crawler.pre_navigation_hook_pw
-    async def pw_hook(context: PlaywrightPreNavCrawlingContext) -> None:
-        assert type(context) is PlaywrightPreNavCrawlingContext
-        assert context.request.url == requests[0]
-
-    await crawler.run(requests)
+    await crawler.run(['https://warehouse-theme-metal.myshopify.com/'])
+    # Check that pre nav hooks does not influence each other
+    assert user_data_in_pre_nav_hook == [None, None]
+    # Check that pre nav hooks can modify context
+    assert user_data_in_handler == ['pw', 'bs']
 
 
 async def test_adaptive_crawling_result() -> None:
@@ -253,20 +260,6 @@ async def test_adaptive_crawling_statistics() -> None:
     assert crawler.predictor_state.rendering_type_mispredictions == 1
 
 
-def test_adaptive_default_hooks_raise_exception() -> None:
-    """Trying to attach usual pre-navigation hook raises exception.
-
-    It is ambiguous and so sub crawler specific hooks should be used instead."""
-
-    crawler = AdaptivePlaywrightCrawler()
-
-    with pytest.raises(RuntimeError):
-
-        @crawler.pre_navigation_hook
-        async def some_hook(whatever: Any) -> None:
-            pass
-
-
 @pytest.mark.parametrize(
     'error_in_pw_crawler',
     [
@@ -340,3 +333,6 @@ def test_adaptive_playwright_crawler_statistics_in_init() -> None:
     assert crawler._statistics._log_message == log_message
     assert crawler._statistics._periodic_message_logger == periodic_message_logger
     assert crawler._statistics._log_interval == log_interval
+
+
+# Add more tests for setattr, if needed at all and pre nav hooks
