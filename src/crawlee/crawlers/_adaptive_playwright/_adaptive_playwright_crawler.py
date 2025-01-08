@@ -8,7 +8,7 @@ from logging import getLogger
 from random import random
 from typing import TYPE_CHECKING, Any
 
-from IPython.core.completer import TypedDict
+from typing_extensions import TypedDict
 
 from crawlee._types import BasicCrawlingContext, JsonSerializable, RequestHandlerRunResult
 from crawlee._utils.docs import docs_group
@@ -304,7 +304,7 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
 
                 bs_run = await _run_subcrawler(self.beautifulsoup_crawler)
                 if bs_run.result and self.result_checker(bs_run.result):
-                    await self.commit_result(result=bs_run.result, context=context)
+                    await self._commit_result(result=bs_run.result, context=context)
                     return
                 if bs_run.exception:
                     context.log.exception(
@@ -328,7 +328,7 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
             raise pw_run.exception
 
         if pw_run.result:
-            await self.commit_result(result=pw_run.result, context=context)
+            await self._commit_result(result=pw_run.result, context=context)
 
             if should_detect_rendering_type:
                 detection_result: RenderingType
@@ -342,11 +342,12 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
                 context.log.debug(f'Detected rendering type {detection_result} for {context.request.url}')
                 self.rendering_type_predictor.store_result(context.request.url, context.request.label, detection_result)
 
-    async def commit_result(self, result: RequestHandlerRunResult, context: BasicCrawlingContext) -> None:
+    async def _commit_result(self, result: RequestHandlerRunResult, context: BasicCrawlingContext) -> None:
+        """Execute calls from `result` on the context."""
         result_tasks = (
             [asyncio.create_task(context.push_data(**kwargs)) for kwargs in result.push_data_calls]
             + [asyncio.create_task(context.add_requests(**kwargs)) for kwargs in result.add_requests_calls]
-            + [asyncio.create_task(self._commit_key_value_store_changes(result))]
+            + [asyncio.create_task(self._commit_key_value_store_changes(result, context.get_key_value_store))]
         )
 
         await asyncio.gather(*result_tasks)

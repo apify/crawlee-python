@@ -22,7 +22,13 @@ from crawlee import EnqueueStrategy, Glob, service_locator
 from crawlee._autoscaling import AutoscaledPool, Snapshotter, SystemStatus
 from crawlee._log_config import configure_logger, get_configured_log_level
 from crawlee._request import Request, RequestState
-from crawlee._types import BasicCrawlingContext, HttpHeaders, RequestHandlerRunResult, SendRequestFunction
+from crawlee._types import (
+    BasicCrawlingContext,
+    GetKeyValueStoreFromRequestHandlerFunction,
+    HttpHeaders,
+    RequestHandlerRunResult,
+    SendRequestFunction,
+)
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
@@ -948,11 +954,14 @@ class BasicCrawler(Generic[TCrawlingContext]):
         for push_data_call in result.push_data_calls:
             await self._push_data(**push_data_call)
 
-        await self._commit_key_value_store_changes(result)
+        await self._commit_key_value_store_changes(result, get_kvs = self.get_key_value_store)
 
-    async def _commit_key_value_store_changes(self, result: RequestHandlerRunResult) -> None:
+    @staticmethod
+    async def _commit_key_value_store_changes(result: RequestHandlerRunResult,
+                                              get_kvs: GetKeyValueStoreFromRequestHandlerFunction) -> None:
+        """Store key value store changes recorded in result."""
         for (id, name), changes in result.key_value_store_changes.items():
-            store = await self.get_key_value_store(id=id, name=name)
+            store = await get_kvs(id=id, name=name)
             for key, value in changes.updates.items():
                 await store.set_value(key, value.content, value.content_type)
 
