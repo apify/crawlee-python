@@ -954,11 +954,12 @@ class BasicCrawler(Generic[TCrawlingContext]):
         for push_data_call in result.push_data_calls:
             await self._push_data(**push_data_call)
 
-        await self._commit_key_value_store_changes(result, get_kvs = self.get_key_value_store)
+        await self._commit_key_value_store_changes(result, get_kvs=self.get_key_value_store)
 
     @staticmethod
-    async def _commit_key_value_store_changes(result: RequestHandlerRunResult,
-                                              get_kvs: GetKeyValueStoreFromRequestHandlerFunction) -> None:
+    async def _commit_key_value_store_changes(
+        result: RequestHandlerRunResult, get_kvs: GetKeyValueStoreFromRequestHandlerFunction
+    ) -> None:
         """Store key value store changes recorded in result."""
         for (id, name), changes in result.key_value_store_changes.items():
             store = await get_kvs(id=id, name=name)

@@ -4,6 +4,7 @@ import asyncio
 import logging
 from contextlib import AbstractAsyncContextManager, AsyncExitStack
 from copy import deepcopy
+from dataclasses import dataclass
 from logging import getLogger
 from random import random
 from typing import TYPE_CHECKING, Any
@@ -18,6 +19,7 @@ from crawlee.crawlers import (
     BeautifulSoupCrawler,
     BeautifulSoupCrawlingContext,
     BeautifulSoupParserType,
+    ContextPipeline,
     PlaywrightCrawler,
     PlaywrightCrawlingContext,
     PlaywrightPreNavCrawlingContext,
@@ -41,7 +43,7 @@ from crawlee.crawlers._adaptive_playwright._result_comparator import (
 from crawlee.statistics import Statistics
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable, Mapping, Sequence
+    from collections.abc import Awaitable, Callable, Coroutine, Mapping, Sequence
     from datetime import timedelta
 
     from typing_extensions import NotRequired, Unpack
@@ -50,6 +52,7 @@ if TYPE_CHECKING:
     from crawlee.browsers import BrowserPool
     from crawlee.browsers._types import BrowserType
     from crawlee.crawlers._basic._basic_crawler import _BasicCrawlerOptions
+    from crawlee.router import Router
     from crawlee.statistics import FinalStatistics
 
 
@@ -87,6 +90,38 @@ class _PlaywrightCrawlerAdditionalOptions(TypedDict):
     headless: NotRequired[bool]
     """Whether to run the browser in headless mode.
                 This option should not be used if `browser_pool` is provided."""
+
+
+@dataclass
+class _OrphanPlaywrightContextPipeline:
+    pre_navigation_hook: Callable[[Callable[[PlaywrightPreNavCrawlingContext], Awaitable[None]]], None]
+    pipeline: ContextPipeline[PlaywrightCrawlingContext]
+    needed_contexts: list[AbstractAsyncContextManager]
+    top_router: Router[AdaptivePlaywrightCrawlingContext]
+
+    def create_pipeline_call(self, top_context: BasicCrawlingContext) -> Coroutine[Any, Any, None]:
+        async def from_pw_to_router(context: PlaywrightCrawlingContext) -> None:
+            adaptive_crawling_context = await AdaptivePlaywrightCrawlingContext.from_playwright_crawling_context(
+                context=context, beautiful_soup_parser_type='lxml'
+            )
+            await self.top_router(adaptive_crawling_context)
+
+        return self.pipeline(top_context, from_pw_to_router)
+
+
+@dataclass
+class _OrphanBeautifulsoupContextPipeline:
+    pre_navigation_hook: Callable[[Callable[[BasicCrawlingContext], Awaitable[None]]], None]
+    pipeline: ContextPipeline[BeautifulSoupCrawlingContext]
+    needed_contexts: list[AbstractAsyncContextManager]
+    top_router: Router[AdaptivePlaywrightCrawlingContext]
+
+    def create_pipeline_call(self, top_context: BasicCrawlingContext) -> Coroutine[Any, Any, None]:
+        async def from_pw_to_router(context: BeautifulSoupCrawlingContext) -> None:
+            adaptive_crawling_context = AdaptivePlaywrightCrawlingContext.from_beautifulsoup_crawling_context(context)
+            await self.top_router(adaptive_crawling_context)
+
+        return self.pipeline(top_context, from_pw_to_router)
 
 
 class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext]):
@@ -142,6 +177,8 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
         # AdaptivePlaywrightCrawlerStatistics specific methods can be access in "type safe manner".
         self.adaptive_statistics = statistics
 
+        super().__init__(**kwargs)
+
         # Sub crawlers related.
         beautifulsoup_crawler_kwargs = beautifulsoup_crawler_kwargs or {}
         beautifulsoup_crawler_kwargs.setdefault('parser', 'lxml')
@@ -160,28 +197,34 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
         bs_kwargs['statistics'] = Statistics(periodic_message_logger=bs_logger)
         pw_kwargs['statistics'] = Statistics(periodic_message_logger=pw_logger)
 
-        self.beautifulsoup_crawler = BeautifulSoupCrawler(**beautifulsoup_crawler_kwargs, **bs_kwargs)
-        self.playwright_crawler = PlaywrightCrawler(**playwright_crawler_args, **pw_kwargs)
+        # Initialize sub crawlers to create their pipelines.
+        beautifulsoup_crawler = BeautifulSoupCrawler(**beautifulsoup_crawler_kwargs, **bs_kwargs)
+        playwright_crawler = PlaywrightCrawler(**playwright_crawler_args, **pw_kwargs)
 
-        @self.beautifulsoup_crawler.router.default_handler
-        async def request_handler_beautiful_soup(context: BeautifulSoupCrawlingContext) -> None:
-            """Handler for routing from beautifulsoup_crawler to adaptive_crawler handler."""
-            adaptive_crawling_context = AdaptivePlaywrightCrawlingContext.from_beautifulsoup_crawling_context(context)
-            await self.router(adaptive_crawling_context)
+        required_contexts_pw_crawler: list[AbstractAsyncContextManager] = [
+            playwright_crawler._statistics,  # noqa:SLF001  # Intentional access to private member.
+            playwright_crawler._browser_pool,  # noqa:SLF001  # Intentional access to private member.
+        ]
+        required_contexts_bs_crawler: list[AbstractAsyncContextManager] = [
+            beautifulsoup_crawler._statistics,  # noqa:SLF001  # Intentional access to private member.
+        ]
 
-        @self.playwright_crawler.router.default_handler
-        async def request_handler_playwright(context: PlaywrightCrawlingContext) -> None:
-            """Handler for routing from playwright_crawler to adaptive_crawler handler."""
-            adaptive_crawling_context = await AdaptivePlaywrightCrawlingContext.from_playwright_crawling_context(
-                context=context, beautiful_soup_parser_type=beautifulsoup_crawler_kwargs['parser']
-            )
-            await self.router(adaptive_crawling_context)
+        self._pw_context_pipeline = _OrphanPlaywrightContextPipeline(
+            pipeline=playwright_crawler._context_pipeline,  # noqa:SLF001  # Intentional access to private member.
+            needed_contexts=required_contexts_pw_crawler,
+            top_router=self.router,
+            pre_navigation_hook=playwright_crawler.pre_navigation_hook,
+        )
+        self._bs_context_pipeline = _OrphanBeautifulsoupContextPipeline(
+            pipeline=beautifulsoup_crawler._context_pipeline,  # noqa:SLF001  # Intentional access to private member.
+            needed_contexts=required_contexts_bs_crawler,
+            top_router=self.router,
+            pre_navigation_hook=beautifulsoup_crawler.pre_navigation_hook,
+        )
 
-        super().__init__(**kwargs)
-
-    @staticmethod
     async def crawl_one_with(
-        crawler: BeautifulSoupCrawler | PlaywrightCrawler,
+        self,
+        subcrawler_pipeline: _OrphanPlaywrightContextPipeline | _OrphanBeautifulsoupContextPipeline,
         context: BasicCrawlingContext,
         timeout: timedelta,
         result: RequestHandlerRunResult,
@@ -210,17 +253,11 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
             log=context.log,
         )
 
-        # Mypy needs type narrowing.
-        if type(crawler) is PlaywrightCrawler:
-            run_pipeline = crawler._context_pipeline(context_linked_to_result, crawler.router)  # noqa:SLF001  # Intentional access to private member.
-        if type(crawler) is BeautifulSoupCrawler:
-            run_pipeline = crawler._context_pipeline(context_linked_to_result, crawler.router)  # noqa:SLF001  # Intentional access to private member.
-
         await wait_for(
-            lambda: run_pipeline,
+            lambda: subcrawler_pipeline.create_pipeline_call(context_linked_to_result),
             timeout=timeout,
             timeout_message=f'Sub crawler timed out after {timeout.total_seconds()} seconds',
-            logger=crawler._logger,  # noqa:SLF001  # Intentional access to private member.
+            logger=self._logger,
         )
         return result
 
@@ -237,17 +274,9 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
             purge_request_queue: If this is `True` and the crawler is not being run for the first time, the default
                 request queue will be purged.
         """
-        required_contexts_pw_crawler: list[AbstractAsyncContextManager] = [
-            self.playwright_crawler._statistics,  # noqa:SLF001  # Intentional access to private member.
-            self.playwright_crawler._browser_pool,  # noqa:SLF001  # Intentional access to private member.
-        ]
-        required_contexts_bs_crawler: list[AbstractAsyncContextManager] = [
-            self.beautifulsoup_crawler._statistics,  # noqa:SLF001  # Intentional access to private member.
-        ]
-
         contexts_to_enter = [
             cm
-            for cm in (required_contexts_pw_crawler + required_contexts_bs_crawler)
+            for cm in self._bs_context_pipeline.needed_contexts + self._pw_context_pipeline.needed_contexts
             if cm and getattr(cm, 'active', False) is False
         ]
 
@@ -273,7 +302,8 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
         """
 
         async def _run_subcrawler(
-            crawler: BeautifulSoupCrawler | PlaywrightCrawler, use_state: dict | None = None
+            subcrawler_pipeline: _OrphanPlaywrightContextPipeline | _OrphanBeautifulsoupContextPipeline,
+            use_state: dict | None = None,
         ) -> SubCrawlerRun:
             """Helper closure that creates new `RequestHandlerRunResult` and delegates request handling to sub crawler.
 
@@ -281,7 +311,7 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
             """
             try:
                 crawl_result = await self.crawl_one_with(
-                    crawler=crawler,
+                    subcrawler_pipeline=subcrawler_pipeline,
                     context=context,
                     timeout=self._request_handler_timeout,
                     result=RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store),
@@ -302,7 +332,7 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
                 context.log.debug(f'Running static request for {context.request.url}')
                 self.adaptive_statistics.track_http_only_request_handler_runs()
 
-                bs_run = await _run_subcrawler(self.beautifulsoup_crawler)
+                bs_run = await _run_subcrawler(self._bs_context_pipeline)
                 if bs_run.result and self.result_checker(bs_run.result):
                     await self._commit_result(result=bs_run.result, context=context)
                     return
@@ -321,7 +351,7 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
         old_state: dict[str, JsonSerializable] = await kvs.get_value(BasicCrawler.CRAWLEE_STATE_KEY, default_value)
         old_state_copy = deepcopy(old_state)
 
-        pw_run = await _run_subcrawler(self.playwright_crawler)
+        pw_run = await _run_subcrawler(self._pw_context_pipeline)
         self.adaptive_statistics.track_browser_request_handler_runs()
 
         if pw_run.exception is not None:
@@ -332,7 +362,7 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
 
             if should_detect_rendering_type:
                 detection_result: RenderingType
-                bs_run = await _run_subcrawler(self.beautifulsoup_crawler, use_state=old_state_copy)
+                bs_run = await _run_subcrawler(self._bs_context_pipeline, use_state=old_state_copy)
 
                 if bs_run.result and self.result_comparator(bs_run.result, pw_run.result):
                     detection_result = 'static'
@@ -363,8 +393,8 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
 
     def pre_navigation_hook_pw(self, hook: Callable[[PlaywrightPreNavCrawlingContext], Awaitable[None]]) -> None:
         """Pre navigation hooks for playwright sub crawler of adaptive crawler."""
-        self.playwright_crawler.pre_navigation_hook(hook)
+        self._pw_context_pipeline.pre_navigation_hook(hook)
 
     def pre_navigation_hook_bs(self, hook: Callable[[BasicCrawlingContext], Awaitable[None]]) -> None:
         """Pre navigation hooks for beautifulsoup sub crawler of adaptive crawler."""
-        self.beautifulsoup_crawler.pre_navigation_hook(hook)
+        self._bs_context_pipeline.pre_navigation_hook(hook)
