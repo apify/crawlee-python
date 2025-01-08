@@ -20,7 +20,6 @@ from ._utils import infinite_scroll
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable, Mapping
-    from contextlib import AbstractAsyncContextManager
 
     from typing_extensions import Unpack
 
@@ -286,10 +285,3 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
             hook: A coroutine function to be called before each navigation.
         """
         self._pre_navigation_hooks.append(hook)
-
-    @property
-    def crawl_one_required_contexts(self) -> list[AbstractAsyncContextManager]:
-        """Contexts that have to be active before `crawl_one` can be called."""
-        contexts = super().crawl_one_required_contexts
-        contexts.append(self._browser_pool)
-        return contexts

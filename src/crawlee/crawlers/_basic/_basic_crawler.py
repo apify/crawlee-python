@@ -1119,67 +1119,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
     async def __run_request_handler(self, context: BasicCrawlingContext) -> None:
         await self._context_pipeline(context, self.router)
 
-    @property
-    def crawl_one_required_contexts(self) -> list[AbstractAsyncContextManager]:
-        """Contexts that have to be active before `crawl_one` can be called."""
-        contexts: list[AbstractAsyncContextManager] = []
-        contexts.append(self.statistics)
-        return contexts
-
-    async def crawl_one(
-        self,
-        *,
-        context: BasicCrawlingContext,
-        request_handler_timeout: timedelta,
-        result: RequestHandlerRunResult,
-        use_state: dict[str, JsonSerializable] | None = None,
-    ) -> RequestHandlerRunResult:
-        """Populate result by crawling one request from input `context`.
-
-         Context callbacks are routed to `result` and are not commited.
-
-        Args:
-            context: Context used for crawling. It contains `request` that will be crawled.
-            request_handler_timeout: Timeout in seconds for request handling.
-            result: Record of calls to storage-related context helpers.
-            use_state: Existing state that will be used when `context.use_state` is called.
-             If none, take `use_state` from input `context`.
-
-        Returns:
-            Same input result object that is mutated in the process.
-        """
-        if use_state is not None:
-
-            async def get_input_state(
-                default_value: dict[str, JsonSerializable] | None = None,  # noqa:ARG001  # Intentionally unused arguments. Closure, that generates same output regardless of inputs.
-            ) -> dict[str, JsonSerializable]:
-                return use_state
-
-            use_state_function = get_input_state
-        else:
-            use_state_function = context.use_state
-
-        context_linked_to_result = BasicCrawlingContext(
-            request=context.request,
-            session=context.session,
-            proxy_info=context.proxy_info,
-            send_request=context.send_request,
-            add_requests=result.add_requests,
-            push_data=result.push_data,
-            get_key_value_store=result.get_key_value_store,
-            use_state=use_state_function,
-            log=context.log,
-        )
-
-        await wait_for(
-            lambda: self.__run_request_handler(context_linked_to_result),
-            timeout=request_handler_timeout,
-            timeout_message='Request handler timed out after '
-            f'{self._request_handler_timeout.total_seconds()} seconds',
-            logger=self._logger,
-        )
-        return result
-
     def _is_session_blocked_status_code(self, session: Session | None, status_code: int) -> bool:
         """Check if the HTTP status code indicates that the session was blocked by the target website.
 

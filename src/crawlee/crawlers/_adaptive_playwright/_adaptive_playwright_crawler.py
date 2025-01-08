@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from contextlib import AsyncExitStack
+from contextlib import AbstractAsyncContextManager, AsyncExitStack
 from copy import deepcopy
 from logging import getLogger
 from random import random
@@ -12,6 +12,7 @@ from IPython.core.completer import TypedDict
 
 from crawlee._types import BasicCrawlingContext, JsonSerializable, RequestHandlerRunResult
 from crawlee._utils.docs import docs_group
+from crawlee._utils.wait import wait_for
 from crawlee.crawlers import (
     BasicCrawler,
     BeautifulSoupCrawler,
@@ -41,6 +42,7 @@ from crawlee.statistics import Statistics
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Mapping, Sequence
+    from datetime import timedelta
 
     from typing_extensions import NotRequired, Unpack
 
@@ -177,6 +179,51 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
 
         super().__init__(**kwargs)
 
+    @staticmethod
+    async def crawl_one_with(
+        crawler: BeautifulSoupCrawler | PlaywrightCrawler,
+        context: BasicCrawlingContext,
+        timeout: timedelta,
+        result: RequestHandlerRunResult,
+        state: dict[str, JsonSerializable] | None = None,
+    ) -> RequestHandlerRunResult:
+        if state is not None:
+
+            async def get_input_state(
+                default_value: dict[str, JsonSerializable] | None = None,  # noqa:ARG001  # Intentionally unused arguments. Closure, that generates same output regardless of inputs.
+            ) -> dict[str, JsonSerializable]:
+                return state
+
+            use_state_function = get_input_state
+        else:
+            use_state_function = context.use_state
+
+        context_linked_to_result = BasicCrawlingContext(
+            request=context.request,
+            session=context.session,
+            proxy_info=context.proxy_info,
+            send_request=context.send_request,
+            add_requests=result.add_requests,
+            push_data=result.push_data,
+            get_key_value_store=result.get_key_value_store,
+            use_state=use_state_function,
+            log=context.log,
+        )
+
+        # Mypy needs type narrowing.
+        if type(crawler) is PlaywrightCrawler:
+            run_pipeline = crawler._context_pipeline(context_linked_to_result, crawler.router)  # noqa:SLF001  # Intentional access to private member.
+        if type(crawler) is BeautifulSoupCrawler:
+            run_pipeline = crawler._context_pipeline(context_linked_to_result, crawler.router)  # noqa:SLF001  # Intentional access to private member.
+
+        await wait_for(
+            lambda: run_pipeline,
+            timeout=timeout,
+            timeout_message=f'Sub crawler timed out after {timeout.total_seconds()} seconds',
+            logger=crawler._logger,  # noqa:SLF001  # Intentional access to private member.
+        )
+        return result
+
     async def run(
         self,
         requests: Sequence[str | Request] | None = None,
@@ -190,12 +237,17 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
             purge_request_queue: If this is `True` and the crawler is not being run for the first time, the default
                 request queue will be purged.
         """
+        required_contexts_pw_crawler: list[AbstractAsyncContextManager] = [
+            self.playwright_crawler._statistics,  # noqa:SLF001  # Intentional access to private member.
+            self.playwright_crawler._browser_pool,  # noqa:SLF001  # Intentional access to private member.
+        ]
+        required_contexts_bs_crawler: list[AbstractAsyncContextManager] = [
+            self.beautifulsoup_crawler._statistics,  # noqa:SLF001  # Intentional access to private member.
+        ]
+
         contexts_to_enter = [
             cm
-            for cm in (
-                self.beautifulsoup_crawler.crawl_one_required_contexts
-                + self.playwright_crawler.crawl_one_required_contexts
-            )
+            for cm in (required_contexts_pw_crawler + required_contexts_bs_crawler)
             if cm and getattr(cm, 'active', False) is False
         ]
 
@@ -228,11 +280,12 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
             Produces `SubCrawlerRun` that either contains filled `RequestHandlerRunResult` or exception.
             """
             try:
-                crawl_result = await crawler.crawl_one(
+                crawl_result = await self.crawl_one_with(
+                    crawler=crawler,
                     context=context,
-                    request_handler_timeout=self._request_handler_timeout,
+                    timeout=self._request_handler_timeout,
                     result=RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store),
-                    use_state=use_state,
+                    state=use_state,
                 )
                 return SubCrawlerRun(result=crawl_result)
             except Exception as e:
