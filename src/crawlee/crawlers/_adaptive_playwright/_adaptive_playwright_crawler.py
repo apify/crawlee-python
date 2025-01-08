@@ -9,7 +9,7 @@ from logging import getLogger
 from random import random
 from typing import TYPE_CHECKING, Any
 
-from typing_extensions import TypedDict
+from typing_extensions import Self, TypedDict
 
 from crawlee._types import BasicCrawlingContext, JsonSerializable, RequestHandlerRunResult
 from crawlee._utils.docs import docs_group
@@ -45,6 +45,7 @@ from crawlee.statistics import Statistics
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Coroutine, Mapping, Sequence
     from datetime import timedelta
+    from types import TracebackType
 
     from typing_extensions import NotRequired, Unpack
 
@@ -90,6 +91,22 @@ class _PlaywrightCrawlerAdditionalOptions(TypedDict):
     headless: NotRequired[bool]
     """Whether to run the browser in headless mode.
                 This option should not be used if `browser_pool` is provided."""
+
+
+class _NoActiveStatistics(Statistics):
+    """Statistics compliant object that is not supposed to do anything when active. To be used in sub crawlers."""
+
+    async def __aenter__(self) -> Self:
+        self._active = True
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        exc_traceback: TracebackType | None,
+    ) -> None:
+        self._active = False
 
 
 @dataclass
@@ -193,9 +210,9 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
         pw_logger.setLevel(logging.ERROR)
         pw_kwargs['_logger'] = pw_logger
 
-        # Each sub crawler will use own statistics.
-        bs_kwargs['statistics'] = Statistics(periodic_message_logger=bs_logger)
-        pw_kwargs['statistics'] = Statistics(periodic_message_logger=pw_logger)
+        # Each sub crawler will use own dummy statistics.
+        bs_kwargs['statistics'] = _NoActiveStatistics()
+        pw_kwargs['statistics'] = _NoActiveStatistics()
 
         # Initialize sub crawlers to create their pipelines.
         beautifulsoup_crawler = BeautifulSoupCrawler(**beautifulsoup_crawler_kwargs, **bs_kwargs)

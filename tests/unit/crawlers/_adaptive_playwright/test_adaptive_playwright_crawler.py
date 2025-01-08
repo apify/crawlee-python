@@ -64,7 +64,10 @@ async def test_adaptive_crawling(
     detection_probability_recommendation: Iterator[int],
 ) -> None:
     """Tests correct routing to pre-nav hooks and correct handling through proper handler."""
-    requests = ['https://crawlee.dev/', 'https://crawlee.dev/docs/quick-start']
+    requests = [
+        'https://warehouse-theme-metal.myshopify.com/',
+        'https://warehouse-theme-metal.myshopify.com/collections',
+    ]
 
     predictor = _SimpleRenderingTypePredictor(
         rendering_types=rendering_types, detection_probability_recommendation=detection_probability_recommendation
@@ -112,7 +115,7 @@ async def test_adaptive_crawling(
 async def test_adaptive_crawling_context() -> None:
     """Tests that correct context is used. Enforced rendering type detection to run both sub crawlers."""
     static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
-    requests = ['https://crawlee.dev/']
+    requests = ['https://warehouse-theme-metal.myshopify.com/']
     crawler = AdaptivePlaywrightCrawler(rendering_type_predictor=static_only_predictor_enforce_detection)
 
     @crawler.router.default_handler
@@ -137,7 +140,7 @@ async def test_adaptive_crawling_result() -> None:
 
     Enforced rendering type detection to run both sub crawlers."""
     static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
-    requests = ['https://crawlee.dev/']
+    requests = ['https://warehouse-theme-metal.myshopify.com/']
     crawler = AdaptivePlaywrightCrawler(rendering_type_predictor=static_only_predictor_enforce_detection)
 
     @crawler.router.default_handler
@@ -170,7 +173,7 @@ async def test_adaptive_crawling_predictor_calls(
 ) -> None:
     """Tests expected predictor calls. Same results."""
     some_label = 'bla'
-    some_url = 'https://crawlee.dev/'
+    some_url = 'https://warehouse-theme-metal.myshopify.com/'
     static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
     requests = [Request.from_url(url=some_url, label=some_label)]
     crawler = AdaptivePlaywrightCrawler(rendering_type_predictor=static_only_predictor_enforce_detection)
@@ -202,7 +205,7 @@ async def test_adaptive_crawling_result_use_state_isolation() -> None:
 
     Enforced rendering type detection to run both sub crawlers."""
     static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
-    requests = ['https://crawlee.dev/']
+    requests = ['https://warehouse-theme-metal.myshopify.com/']
     crawler = AdaptivePlaywrightCrawler(rendering_type_predictor=static_only_predictor_enforce_detection)
     store = await crawler.get_key_value_store()
     await store.set_value(BasicCrawler.CRAWLEE_STATE_KEY, {'counter': 0})
@@ -230,7 +233,7 @@ async def test_adaptive_crawling_statistics() -> None:
 
     Crawler set to static crawling, but due to result_checker returning False on static crawling result it
     will do browser crawling instead well. This increments all three adaptive crawling related stats."""
-    requests = ['https://crawlee.dev/']
+    requests = ['https://warehouse-theme-metal.myshopify.com/']
 
     static_only_predictor_no_detection = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
 
@@ -281,7 +284,7 @@ async def test_adaptive_crawler_exceptions_in_sub_crawlers(*, error_in_pw_crawle
     Exception in pw sub crawler will prevent any result from being commited. Even if `push_data` was called before
     the exception
     """
-    requests = ['https://crawlee.dev/']
+    requests = ['https://warehouse-theme-metal.myshopify.com/']
     static_only_no_detection_predictor = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
 
     crawler = AdaptivePlaywrightCrawler(rendering_type_predictor=static_only_no_detection_predictor)

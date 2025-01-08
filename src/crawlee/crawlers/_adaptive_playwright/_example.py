@@ -11,7 +11,7 @@ from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context
 
 
 async def main() -> None:
-    # TODO: remove in review. Move this to documentation examples instead.
+    # remove in review. Move this to documentation examples instead.
     top_logger = getLogger(__name__)
     top_logger.setLevel(logging.DEBUG)
     i = 0
@@ -38,7 +38,7 @@ async def main() -> None:
         context.log.info(f'PW pre navigation hook for: {context.request.url} ...')
 
     # Run the crawler with the initial list of URLs.
-    await crawler.run(['https://crawlee.dev/'])
+    await crawler.run(['https://warehouse-theme-metal.myshopify.com/'])
 
 
 if __name__ == '__main__':
