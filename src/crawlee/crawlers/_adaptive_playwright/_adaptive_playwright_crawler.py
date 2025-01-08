@@ -192,7 +192,7 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
         # self.statistics is hard coded in BasicCrawler to Statistics, so even when we save children class in it, mypy
         # will complain about using child-specific methods. Save same object to another attribute so that
         # AdaptivePlaywrightCrawlerStatistics specific methods can be access in "type safe manner".
-        self.adaptive_statistics = statistics
+        self.predictor_state = statistics.predictor_state
 
         super().__init__(**kwargs)
 
@@ -347,7 +347,7 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
             )
             if rendering_type_prediction.rendering_type == 'static':
                 context.log.debug(f'Running static request for {context.request.url}')
-                self.adaptive_statistics.track_http_only_request_handler_runs()
+                self.predictor_state.track_http_only_request_handler_runs()
 
                 bs_run = await _run_subcrawler(self._bs_context_pipeline)
                 if bs_run.result and self.result_checker(bs_run.result):
@@ -359,7 +359,7 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
                     )
                 else:
                     context.log.warning(f'Static crawler: returned a suspicious result for {context.request.url}')
-                    self.adaptive_statistics.track_rendering_type_mispredictions()
+                    self.predictor_state.track_rendering_type_mispredictions()
 
         context.log.debug(f'Running browser request handler for {context.request.url}')
 
@@ -369,7 +369,7 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
         old_state_copy = deepcopy(old_state)
 
         pw_run = await _run_subcrawler(self._pw_context_pipeline)
-        self.adaptive_statistics.track_browser_request_handler_runs()
+        self.predictor_state.track_browser_request_handler_runs()
 
         if pw_run.exception is not None:
             raise pw_run.exception

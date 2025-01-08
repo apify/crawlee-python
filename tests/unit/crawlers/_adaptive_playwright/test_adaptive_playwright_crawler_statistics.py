@@ -7,14 +7,14 @@ async def test_predictor_state_persistence() -> None:
     """Test that adaptive statistics can be correctly persisted and initialized from persisted values."""
 
     async with AdaptivePlaywrightCrawlerStatistics(persistence_enabled=True) as adaptive_statistics:
-        adaptive_statistics.track_rendering_type_mispredictions()
-        adaptive_statistics.track_rendering_type_mispredictions()
+        adaptive_statistics.predictor_state.track_rendering_type_mispredictions()
+        adaptive_statistics.predictor_state.track_rendering_type_mispredictions()
 
-        adaptive_statistics.track_http_only_request_handler_runs()
-        adaptive_statistics.track_http_only_request_handler_runs()
-        adaptive_statistics.track_http_only_request_handler_runs()
+        adaptive_statistics.predictor_state.track_http_only_request_handler_runs()
+        adaptive_statistics.predictor_state.track_http_only_request_handler_runs()
+        adaptive_statistics.predictor_state.track_http_only_request_handler_runs()
 
-        adaptive_statistics.track_browser_request_handler_runs()
+        adaptive_statistics.predictor_state.track_browser_request_handler_runs()
 
         persistence_state_key = adaptive_statistics._persist_state_key
     # adaptive_statistics are persisted after leaving the context

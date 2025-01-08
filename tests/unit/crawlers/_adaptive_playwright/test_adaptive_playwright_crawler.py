@@ -248,9 +248,9 @@ async def test_adaptive_crawling_statistics() -> None:
 
     await crawler.run(requests)
 
-    assert crawler.adaptive_statistics.predictor_state.http_only_request_handler_runs == 1
-    assert crawler.adaptive_statistics.predictor_state.browser_request_handler_runs == 1
-    assert crawler.adaptive_statistics.predictor_state.rendering_type_mispredictions == 1
+    assert crawler.predictor_state.http_only_request_handler_runs == 1
+    assert crawler.predictor_state.browser_request_handler_runs == 1
+    assert crawler.predictor_state.rendering_type_mispredictions == 1
 
 
 def test_adaptive_default_hooks_raise_exception() -> None:

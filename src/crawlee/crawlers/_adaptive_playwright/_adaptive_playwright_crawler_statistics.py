@@ -25,6 +25,15 @@ class PredictorState(BaseModel):
     browser_request_handler_runs: Annotated[int, Field(alias='browser_request_handler_runs')] = 0
     rendering_type_mispredictions: Annotated[int, Field(alias='rendering_type_mispredictions')] = 0
 
+    def track_http_only_request_handler_runs(self) -> None:
+        self.http_only_request_handler_runs += 1
+
+    def track_browser_request_handler_runs(self) -> None:
+        self.browser_request_handler_runs += 1
+
+    def track_rendering_type_mispredictions(self) -> None:
+        self.rendering_type_mispredictions += 1
+
 
 @docs_group('Classes')
 class AdaptivePlaywrightCrawlerStatistics(Statistics):
@@ -65,15 +74,6 @@ class AdaptivePlaywrightCrawlerStatistics(Statistics):
             log_interval=statistics._log_interval,  # noqa:SLF001  # Accessing private member to create copy like-object.
             state_model=statistics._state_model,  # noqa:SLF001  # Accessing private member to create copy like-object.
         )
-
-    def track_http_only_request_handler_runs(self) -> None:
-        self.predictor_state.http_only_request_handler_runs += 1
-
-    def track_browser_request_handler_runs(self) -> None:
-        self.predictor_state.browser_request_handler_runs += 1
-
-    def track_rendering_type_mispredictions(self) -> None:
-        self.predictor_state.rendering_type_mispredictions += 1
 
     @override
     async def _persist_other_statistics(self, key_value_store: KeyValueStore) -> None:
