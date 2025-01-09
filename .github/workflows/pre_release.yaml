@@ -8,7 +8,10 @@ on:
     tags-ignore:
       - "**" # Ignore all tags to prevent duplicate builds when tags are pushed.
 
-concurrency: 
+  # Or it can be triggered manually.
+  workflow_dispatch:
+
+concurrency:
   group: release
   cancel-in-progress: false
 
@@ -72,7 +75,7 @@ jobs:
     steps:
       - name: Prepare distribution
         uses: apify/workflows/prepare-pypi-distribution@main
-        with: 
+        with:
           package_name: crawlee
           is_prerelease: "yes"
           version_number: ${{ needs.release_metadata.outputs.version_number }}
