@@ -400,12 +400,23 @@ class AdaptivePlaywrightCrawler(BasicCrawler[AdaptivePlaywrightCrawlingContext])
 
         await asyncio.gather(*result_tasks)
 
-    def pre_navigation_hook(self, hook: Callable[[Any], Awaitable[None]]) -> None:
+    def pre_navigation_hook(
+        self,
+        hook: Callable[[AdaptivePlaywrightPreNavCrawlingContext], Awaitable[None]],
+    ) -> None:
         """Pre navigation hooks for adaptive crawler are delegated to sub crawlers.
 
         Hooks are wrapped in context that handles possibly missing `page` object by throwing `AdaptiveContextError`.
         Hooks that try to access `context.page` will have to catch this exception if triggered by static pipeline.
         """
-        wrapped_hook = AdaptivePlaywrightPreNavCrawlingContext.wrap_hook_in_temporal_adaptive_context(hook)
-        self._pw_context_pipeline.pre_navigation_hook(wrapped_hook)
-        self._bs_context_pipeline.pre_navigation_hook(wrapped_hook)
+
+        def wrapped_bs_hook(context: BasicCrawlingContext) -> Awaitable[None]:
+            wrapped_context = AdaptivePlaywrightPreNavCrawlingContext.from_pre_navigation_contexts(context)
+            return hook(wrapped_context)
+
+        def wrapped_pw_hook(context: PlaywrightPreNavCrawlingContext) -> Awaitable[None]:
+            wrapped_context = AdaptivePlaywrightPreNavCrawlingContext.from_pre_navigation_contexts(context)
+            return hook(wrapped_context)
+
+        self._pw_context_pipeline.pre_navigation_hook(wrapped_pw_hook)
+        self._bs_context_pipeline.pre_navigation_hook(wrapped_bs_hook)

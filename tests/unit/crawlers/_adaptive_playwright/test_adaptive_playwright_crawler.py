@@ -10,12 +10,15 @@ import pytest
 from typing_extensions import override
 
 from crawlee import Request
-from crawlee.crawlers import BasicCrawler, PlaywrightPreNavCrawlingContext
+from crawlee.crawlers import BasicCrawler
 from crawlee.crawlers._adaptive_playwright import AdaptivePlaywrightCrawler, AdaptivePlaywrightCrawlingContext
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler_statistics import (
     AdaptivePlaywrightCrawlerStatistics,
 )
-from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import AdaptiveContextError
+from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import (
+    AdaptiveContextError,
+    AdaptivePlaywrightPreNavCrawlingContext,
+)
 from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import (
     RenderingType,
     RenderingTypePrediction,
@@ -93,7 +96,7 @@ async def test_adaptive_crawling(
             bs_handler_count += 1
 
     @crawler.pre_navigation_hook
-    async def bs_hook(context: PlaywrightPreNavCrawlingContext) -> None:  # Intentionally unused arg
+    async def pre_nav_hook(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:  # Intentionally unused arg
         nonlocal bs_hook_count
         nonlocal pw_hook_count
 
@@ -126,7 +129,7 @@ async def test_adaptive_crawling_pre_nav_change_to_context() -> None:
         user_data_in_handler.append(context.request.user_data.get('data', None))
 
     @crawler.pre_navigation_hook
-    async def pre_nav_hook(context: PlaywrightPreNavCrawlingContext) -> None:
+    async def pre_nav_hook(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
         user_data_in_pre_nav_hook.append(context.request.user_data.get('data', None))
         try:
             # page is available only if it was crawled by PlaywrightCrawler.
@@ -333,6 +336,3 @@ def test_adaptive_playwright_crawler_statistics_in_init() -> None:
     assert crawler._statistics._log_message == log_message
     assert crawler._statistics._periodic_message_logger == periodic_message_logger
     assert crawler._statistics._log_interval == log_interval
-
-
-# Add more tests for setattr, if needed at all and pre nav hooks

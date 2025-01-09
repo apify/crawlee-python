@@ -2,11 +2,11 @@ import asyncio
 import logging
 from logging import getLogger
 
-from crawlee.crawlers import PlaywrightPreNavCrawlingContext
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler import AdaptivePlaywrightCrawler
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import (
     AdaptiveContextError,
     AdaptivePlaywrightCrawlingContext,
+    AdaptivePlaywrightPreNavCrawlingContext,
 )
 
 
@@ -30,7 +30,7 @@ async def main() -> None:
         await context.use_state({'bla': i})
 
     @crawler.pre_navigation_hook
-    async def hook(context: PlaywrightPreNavCrawlingContext) -> None:
+    async def hook(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
         try:
             context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
             context.log.info(f'PW pre navigation hook for: {context.request.url} ...')

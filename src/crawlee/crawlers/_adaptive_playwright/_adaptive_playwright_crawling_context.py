@@ -1,18 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, fields
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 
 from bs4 import BeautifulSoup
 
-from crawlee import HttpHeaders, Request
+from crawlee import HttpHeaders
 from crawlee._types import BasicCrawlingContext
 from crawlee._utils.docs import docs_group
 from crawlee.crawlers import (
     BeautifulSoupCrawlingContext,
     BeautifulSoupParserType,
     PlaywrightCrawlingContext,
-    PlaywrightPreNavCrawlingContext,
 )
 
 if TYPE_CHECKING:
@@ -78,57 +77,29 @@ class AdaptivePlaywrightCrawlingContext(BeautifulSoupCrawlingContext):
         )
 
 
-class AdaptivePlaywrightPreNavCrawlingContext:
+@dataclass(frozen=True)
+class AdaptivePlaywrightPreNavCrawlingContext(BasicCrawlingContext):
     """This is just wrapper around BasicCrawlingContext or AdaptivePlaywrightCrawlingContext.
 
-    Changes done to this context are done to the wrapped context.
     Trying to access `page` on this context will raise AdaptiveContextError if wrapped context is BasicCrawlingContext.
     """
 
-    def __init__(self, context: BasicCrawlingContext | AdaptivePlaywrightCrawlingContext) -> None:
-        self._context = context
+    _page: Page | None = None
 
     @property
     def page(self) -> Page:
-        if type(self._context) is PlaywrightPreNavCrawlingContext:
-            return self._context.page
+        if self._page is not None:
+            return self._page
         raise AdaptiveContextError('Page is not crawled with PlaywrightCrawler.')
 
-    @property
-    def request(self) -> Request:
-        return self._context.request
-
-    def __getattr__(self, name: str) -> Any:
-        if name == '_context':
-            return super().__getattribute__(name)
-
-        if name == 'page' and type(self._context) is BasicCrawlingContext:
-            raise AdaptiveContextError('Page is not crawled with PlaywrightCrawler.')
-
-        return getattr(self._context, name)
-
-    def __setattr__(self, name: str, value: Any) -> None:
-        """Maybe not needed if all allowed changes on context are mutation and not assignment???"""
-        if name == '_context':
-            super().__setattr__(name, value)
-            return
-        setattr(self._context, name, value)
-
     @classmethod
-    def wrap_hook_in_temporal_adaptive_context(
-        cls, hook: Callable[[PlaywrightPreNavCrawlingContext], Awaitable[None]]
-    ) -> Callable[[PlaywrightPreNavCrawlingContext | BasicCrawlingContext], Awaitable[None]]:
-        """This will wrap context entering hook functions in unified AdaptivePlaywrightPreNavCrawlingContext.
-
-        Any changes done to this wrapped context happens to the original context.
-        """
-
-        def wrapped_hook(context: PlaywrightPreNavCrawlingContext | BasicCrawlingContext) -> Awaitable[None]:
-            # This cast is done to hide PlaywrightPreNavCrawlingContext from user.
-            wrapped_context = cast(PlaywrightPreNavCrawlingContext, cls(context))
-            return hook(wrapped_context)
-
-        return wrapped_hook
+    def from_pre_navigation_contexts(
+        cls, context: AdaptivePlaywrightPreNavCrawlingContext | BasicCrawlingContext
+    ) -> Self:
+        """Convenience constructor that creates new context from existing pre navigation contexts."""
+        context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
+        context_kwargs['_page'] = context_kwargs.pop('page', None)
+        return cls(**context_kwargs)
 
 
 @dataclass(frozen=True)
