@@ -18,11 +18,12 @@ from crawlee.fingerprint_suite._consts import (
     PW_CHROMIUM_HEADLESS_DEFAULT_USER_AGENT,
     PW_FIREFOX_HEADLESS_DEFAULT_USER_AGENT,
 )
+from crawlee.proxy_configuration import ProxyConfiguration
 
 if TYPE_CHECKING:
     from yarl import URL
 
-    from crawlee.crawlers import PlaywrightCrawlingContext
+    from crawlee.crawlers import PlaywrightCrawlingContext, PlaywrightPreNavCrawlingContext
 
 
 async def test_basic_request(httpbin: URL) -> None:
@@ -188,3 +189,24 @@ async def test_pre_navigation_hook(httpbin: URL) -> None:
     await crawler.run(['https://example.com', str(httpbin)])
 
     assert mock_hook.call_count == 2
+
+
+async def test_proxy_set() -> None:
+    proxy_value = 'http://1111:1111'
+    mock_handler = mock.AsyncMock(return_value=None)
+    crawler = PlaywrightCrawler(proxy_configuration=ProxyConfiguration(proxy_urls=[proxy_value]))
+
+    handler_data = {}
+
+    crawler.router.default_handler(mock_handler)
+
+    @crawler.pre_navigation_hook
+    async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
+        if context.proxy_info:
+            handler_data['proxy'] = context.proxy_info.url
+
+        await context.page.route('**/*', lambda route: route.fulfill(status=200, body=''))
+
+    await crawler.run(['https://test.com'])
+
+    assert handler_data.get('proxy') == proxy_value
