@@ -173,7 +173,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         - and more.
     """
 
-    CRAWLEE_STATE_KEY = 'CRAWLEE_STATE'
+    _CRAWLEE_STATE_KEY = 'CRAWLEE_STATE'
 
     def __init__(
         self,
