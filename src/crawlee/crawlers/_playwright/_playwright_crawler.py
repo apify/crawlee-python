@@ -4,6 +4,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Callable
 
 from pydantic import ValidationError
+from typing_extensions import NotRequired, TypedDict
 
 from crawlee import EnqueueStrategy
 from crawlee._request import BaseRequestData
@@ -285,3 +286,35 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
             hook: A coroutine function to be called before each navigation.
         """
         self._pre_navigation_hooks.append(hook)
+
+
+@docs_group('Data structures')
+class PlaywrightCrawlerAdditionalOptions(TypedDict):
+    """Additional arguments for the `PlaywrightCrawler` constructor.
+
+    It is intended for typing forwarded `__init__` arguments in the subclasses.
+    All arguments are `BasicCrawlerOptions` + `PlaywrightCrawlerAdditionalOptions`
+    """
+
+    browser_pool: NotRequired[BrowserPool]
+    """A `BrowserPool` instance to be used for launching the browsers and getting pages."""
+
+    browser_type: NotRequired[BrowserType]
+    """The type of browser to launch ('chromium', 'firefox', or 'webkit').
+                This option should not be used if `browser_pool` is provided."""
+
+    browser_launch_options: NotRequired[Mapping[str, Any]]
+    """Keyword arguments to pass to the browser launch method. These options are provided
+                directly to Playwright's `browser_type.launch` method. For more details, refer to the Playwright
+                documentation: https://playwright.dev/python/docs/api/class-browsertype#browser-type-launch.
+                This option should not be used if `browser_pool` is provided."""
+
+    browser_new_context_options: NotRequired[Mapping[str, Any]]
+    """Keyword arguments to pass to the browser new context method. These options
+                are provided directly to Playwright's `browser.new_context` method. For more details, refer to the
+                Playwright documentation: https://playwright.dev/python/docs/api/class-browser#browser-new-context.
+                This option should not be used if `browser_pool` is provided."""
+
+    headless: NotRequired[bool]
+    """Whether to run the browser in headless mode.
+                This option should not be used if `browser_pool` is provided."""

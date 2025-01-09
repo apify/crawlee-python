@@ -11,10 +11,9 @@ from typing import TYPE_CHECKING, Any, Generic
 
 from bs4 import BeautifulSoup
 from parsel import Selector
-from typing_extensions import Self, TypedDict, TypeVar
+from typing_extensions import Self, TypeVar
 
 from crawlee._types import BasicCrawlingContext, JsonSerializable, RequestHandlerRunResult
-from crawlee._utils.docs import docs_group
 from crawlee._utils.wait import wait_for
 from crawlee.crawlers import (
     AbstractHttpCrawler,
@@ -50,51 +49,22 @@ from crawlee.crawlers._parsel._parsel_parser import ParselParser
 from crawlee.statistics import Statistics
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable, Coroutine, Mapping, Sequence
+    from collections.abc import Awaitable, Callable, Coroutine, Sequence
     from datetime import timedelta
     from types import TracebackType
 
-    from typing_extensions import NotRequired, Unpack
+    from typing_extensions import Unpack
 
     from crawlee import Request
-    from crawlee.browsers import BrowserPool
-    from crawlee.browsers._types import BrowserType
     from crawlee.crawlers._abstract_http._abstract_http_crawler import _HttpCrawlerOptions
     from crawlee.crawlers._basic._basic_crawler import _BasicCrawlerOptions
+    from crawlee.crawlers._playwright._playwright_crawler import PlaywrightCrawlerAdditionalOptions
     from crawlee.router import Router
     from crawlee.statistics import FinalStatistics
 
 
 TStaticParseResult = TypeVar('TStaticParseResult')
 TStaticCrawlingContext = TypeVar('TStaticCrawlingContext', bound=ParsedHttpCrawlingContext)
-
-
-@docs_group('Data structures')
-class _PlaywrightCrawlerAdditionalOptions(TypedDict):
-    """Additional options that can be specified for PlaywrightCrawler."""
-
-    browser_pool: NotRequired[BrowserPool]
-    """A `BrowserPool` instance to be used for launching the browsers and getting pages."""
-
-    browser_type: NotRequired[BrowserType]
-    """The type of browser to launch ('chromium', 'firefox', or 'webkit').
-                This option should not be used if `browser_pool` is provided."""
-
-    browser_launch_options: NotRequired[Mapping[str, Any]]
-    """Keyword arguments to pass to the browser launch method. These options are provided
-                directly to Playwright's `browser_type.launch` method. For more details, refer to the Playwright
-                documentation: https://playwright.dev/python/docs/api/class-browsertype#browser-type-launch.
-                This option should not be used if `browser_pool` is provided."""
-
-    browser_new_context_options: NotRequired[Mapping[str, Any]]
-    """Keyword arguments to pass to the browser new context method. These options
-                are provided directly to Playwright's `browser.new_context` method. For more details, refer to the
-                Playwright documentation: https://playwright.dev/python/docs/api/class-browser#browser-new-context.
-                This option should not be used if `browser_pool` is provided."""
-
-    headless: NotRequired[bool]
-    """Whether to run the browser in headless mode.
-                This option should not be used if `browser_pool` is provided."""
 
 
 class _NoActiveStatistics(Statistics):
@@ -115,6 +85,8 @@ class _NoActiveStatistics(Statistics):
 
 @dataclass
 class _OrphanPlaywrightContextPipeline(Generic[TStaticParseResult]):
+    """Minimal setup required by playwright context pipeline to work without crawler."""
+
     pre_navigation_hook: Callable[[Callable[[PlaywrightPreNavCrawlingContext], Awaitable[None]]], None]
     pipeline: ContextPipeline[PlaywrightCrawlingContext]
     needed_contexts: list[AbstractAsyncContextManager]
@@ -122,28 +94,34 @@ class _OrphanPlaywrightContextPipeline(Generic[TStaticParseResult]):
     static_parser: AbstractHttpParser[TStaticParseResult]
 
     def create_pipeline_call(self, top_context: BasicCrawlingContext) -> Coroutine[Any, Any, None]:
-        async def from_pw_to_router(context: PlaywrightCrawlingContext) -> None:
+        """Call that will be used by the top crawler to run through the pipeline."""
+
+        async def from_pipeline_to_top_router(context: PlaywrightCrawlingContext) -> None:
             adaptive_crawling_context = await AdaptivePlaywrightCrawlingContext.from_playwright_crawling_context(
                 context=context, parser=self.static_parser
             )
             await self.top_router(adaptive_crawling_context)
 
-        return self.pipeline(top_context, from_pw_to_router)
+        return self.pipeline(top_context, from_pipeline_to_top_router)
 
 
 @dataclass
 class _OrphanStaticContextPipeline(Generic[TStaticCrawlingContext]):
+    """Minimal setup required by static context pipeline to work without crawler."""
+
     pre_navigation_hook: Callable[[Callable[[BasicCrawlingContext], Awaitable[None]]], None]
     pipeline: ContextPipeline[TStaticCrawlingContext]
     needed_contexts: list[AbstractAsyncContextManager]
     top_router: Router[AdaptivePlaywrightCrawlingContext]
 
     def create_pipeline_call(self, top_context: BasicCrawlingContext) -> Coroutine[Any, Any, None]:
-        async def from_pw_to_router(context: TStaticCrawlingContext) -> None:
+        """Call that will be used by the top crawler to run through the pipeline."""
+
+        async def from_pipeline_to_top_router(context: TStaticCrawlingContext) -> None:
             adaptive_crawling_context = AdaptivePlaywrightCrawlingContext.from_parsed_http_crawling_context(context)
             await self.top_router(adaptive_crawling_context)
 
-        return self.pipeline(top_context, from_pw_to_router)
+        return self.pipeline(top_context, from_pipeline_to_top_router)
 
 
 class AdaptivePlaywrightCrawler(
@@ -165,7 +143,7 @@ class AdaptivePlaywrightCrawler(
         result_checker: Callable[[RequestHandlerRunResult], bool] | None = None,
         result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,
         static_crawler_specific_kwargs: _HttpCrawlerOptions | None = None,
-        playwright_crawler_specific_kwargs: _PlaywrightCrawlerAdditionalOptions | None = None,
+        playwright_crawler_specific_kwargs: PlaywrightCrawlerAdditionalOptions | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> None:
         """A default constructor.
@@ -257,7 +235,7 @@ class AdaptivePlaywrightCrawler(
         result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,
         parser_type: BeautifulSoupParserType = 'lxml',
         static_crawler_specific_kwargs: _HttpCrawlerOptions[BeautifulSoupCrawlingContext] | None = None,
-        playwright_crawler_specific_kwargs: _PlaywrightCrawlerAdditionalOptions | None = None,
+        playwright_crawler_specific_kwargs: PlaywrightCrawlerAdditionalOptions | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[BeautifulSoup], BeautifulSoup]:
         """Creates `AdaptivePlaywrightCrawler` that uses `BeautifulSoup` for parsing static content."""
@@ -279,7 +257,7 @@ class AdaptivePlaywrightCrawler(
         result_checker: Callable[[RequestHandlerRunResult], bool] | None = None,
         result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,
         static_crawler_specific_kwargs: _HttpCrawlerOptions[ParselCrawlingContext] | None = None,
-        playwright_crawler_specific_kwargs: _PlaywrightCrawlerAdditionalOptions | None = None,
+        playwright_crawler_specific_kwargs: PlaywrightCrawlerAdditionalOptions | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[Selector], Selector]:
         """Creates `AdaptivePlaywrightCrawler` that uses `Parcel` for parsing static content."""
@@ -372,7 +350,7 @@ class AdaptivePlaywrightCrawler(
         Reference implementation: https://github.com/apify/crawlee/blob/master/packages/playwright-crawler/src/internals/adaptive-playwright-crawler.ts
         """
 
-        async def _run_subcrawler(
+        async def _run_subcrawler_pipeline(
             subcrawler_pipeline: _OrphanPlaywrightContextPipeline | _OrphanStaticContextPipeline,
             use_state: dict | None = None,
         ) -> SubCrawlerRun:
@@ -403,7 +381,7 @@ class AdaptivePlaywrightCrawler(
                 context.log.debug(f'Running static request for {context.request.url}')
                 self.predictor_state.track_http_only_request_handler_runs()
 
-                static_run = await _run_subcrawler(self._static_context_pipeline)
+                static_run = await _run_subcrawler_pipeline(self._static_context_pipeline)
                 if static_run.result and self.result_checker(static_run.result):
                     await self._commit_result(result=static_run.result, context=context)
                     return
@@ -427,7 +405,7 @@ class AdaptivePlaywrightCrawler(
             old_state: dict[str, JsonSerializable] = await kvs.get_value(BasicCrawler.CRAWLEE_STATE_KEY, default_value)
             old_state_copy = deepcopy(old_state)
 
-        pw_run = await _run_subcrawler(self._pw_context_pipeline)
+        pw_run = await _run_subcrawler_pipeline(self._pw_context_pipeline)
         self.predictor_state.track_browser_request_handler_runs()
 
         if pw_run.exception is not None:
@@ -438,7 +416,7 @@ class AdaptivePlaywrightCrawler(
 
             if should_detect_rendering_type:
                 detection_result: RenderingType
-                static_run = await _run_subcrawler(self._static_context_pipeline, use_state=old_state_copy)
+                static_run = await _run_subcrawler_pipeline(self._static_context_pipeline, use_state=old_state_copy)
 
                 if static_run.result and self.result_comparator(static_run.result, pw_run.result):
                     detection_result = 'static'

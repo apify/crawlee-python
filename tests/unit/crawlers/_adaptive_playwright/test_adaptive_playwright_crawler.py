@@ -51,7 +51,7 @@ class _SimpleRenderingTypePredictor(RenderingTypePredictor):
 
 
 @pytest.mark.parametrize(
-    ('expected_pw_count', 'expected_bs_count', 'rendering_types', 'detection_probability_recommendation'),
+    ('expected_pw_count', 'expected_static_count', 'rendering_types', 'detection_probability_recommendation'),
     [
         pytest.param(0, 2, cycle(['static']), cycle([0]), id='Static only'),
         pytest.param(2, 0, cycle(['client only']), cycle([0]), id='Client only'),
@@ -61,7 +61,7 @@ class _SimpleRenderingTypePredictor(RenderingTypePredictor):
 )
 async def test_adaptive_crawling(
     expected_pw_count: int,
-    expected_bs_count: int,
+    expected_static_count: int,
     rendering_types: Iterator[RenderingType],
     detection_probability_recommendation: Iterator[int],
 ) -> None:
@@ -78,26 +78,26 @@ async def test_adaptive_crawling(
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(rendering_type_predictor=predictor)
 
     pw_handler_count = 0
-    bs_handler_count = 0
+    static_handler_count = 0
 
     pw_hook_count = 0
-    bs_hook_count = 0
+    static_hook_count = 0
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
         nonlocal pw_handler_count
-        nonlocal bs_handler_count
+        nonlocal static_handler_count
 
         try:
             # page is available only if it was crawled by PlaywrightCrawler.
             context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
             pw_handler_count += 1
         except AdaptiveContextError:
-            bs_handler_count += 1
+            static_handler_count += 1
 
     @crawler.pre_navigation_hook
     async def pre_nav_hook(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:  # Intentionally unused arg
-        nonlocal bs_hook_count
+        nonlocal static_hook_count
         nonlocal pw_hook_count
 
         try:
@@ -105,15 +105,49 @@ async def test_adaptive_crawling(
             context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
             pw_hook_count += 1
         except AdaptiveContextError:
-            bs_hook_count += 1
+            static_hook_count += 1
 
     await crawler.run(requests)
 
     assert pw_handler_count == expected_pw_count
     assert pw_hook_count == expected_pw_count
 
-    assert bs_handler_count == expected_bs_count
-    assert bs_hook_count == expected_bs_count
+    assert static_handler_count == expected_static_count
+    assert static_hook_count == expected_static_count
+
+
+async def test_adaptive_crawling_parcel() -> None:
+    """Top level test for parcel. Only one argument combination. (The rest of code is tested with bs variant.)"""
+    requests = [
+        'https://warehouse-theme-metal.myshopify.com/',
+        'https://warehouse-theme-metal.myshopify.com/collections',
+    ]
+
+    predictor = _SimpleRenderingTypePredictor(
+        rendering_types=cycle(['static', 'client only']), detection_probability_recommendation=cycle([0])
+    )
+
+    crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(rendering_type_predictor=predictor)
+
+    pw_handler_count = 0
+    static_handler_count = 0
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        nonlocal pw_handler_count
+        nonlocal static_handler_count
+
+        try:
+            # page is available only if it was crawled by PlaywrightCrawler.
+            context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
+            pw_handler_count += 1
+        except AdaptiveContextError:
+            static_handler_count += 1
+
+    await crawler.run(requests)
+
+    assert pw_handler_count == 1
+    assert static_handler_count == 1
 
 
 async def test_adaptive_crawling_pre_nav_change_to_context() -> None:
@@ -152,10 +186,10 @@ async def test_adaptive_crawling_result() -> None:
 
     Enforced rendering type detection to run both sub crawlers."""
     static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
-    requests = ['https://warehouse-theme-metal.myshopify.com/']
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
         rendering_type_predictor=static_only_predictor_enforce_detection
     )
+    requests = ['https://warehouse-theme-metal.myshopify.com/']
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
@@ -176,14 +210,14 @@ async def test_adaptive_crawling_result() -> None:
 
 
 @pytest.mark.parametrize(
-    ('pw_saved_data', 'bs_saved_data', 'expected_result_renderingl_type'),
+    ('pw_saved_data', 'static_saved_data', 'expected_result_renderingl_type'),
     [
         pytest.param({'some': 'data'}, {'some': 'data'}, 'static', id='Same results from sub crawlers'),
         pytest.param({'some': 'data'}, {'different': 'data'}, 'client only', id='Different results from sub crawlers'),
     ],
 )
 async def test_adaptive_crawling_predictor_calls(
-    pw_saved_data: dict[str, str], bs_saved_data: dict[str, str], expected_result_renderingl_type: RenderingType
+    pw_saved_data: dict[str, str], static_saved_data: dict[str, str], expected_result_renderingl_type: RenderingType
 ) -> None:
     """Tests expected predictor calls. Same results."""
     some_label = 'bla'
@@ -201,7 +235,7 @@ async def test_adaptive_crawling_predictor_calls(
             context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
             await context.push_data(pw_saved_data)
         except AdaptiveContextError:
-            await context.push_data(bs_saved_data)
+            await context.push_data(static_saved_data)
 
     with (
         patch.object(static_only_predictor_enforce_detection, 'store_result', Mock()) as mocked_store_result,
