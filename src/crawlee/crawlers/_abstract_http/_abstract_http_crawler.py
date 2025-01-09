@@ -90,6 +90,31 @@ class AbstractHttpCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler[
         kwargs.setdefault('_logger', logging.getLogger(__name__))
         super().__init__(**kwargs)
 
+    @staticmethod
+    def create_parsed_http_crawler_class(
+        static_parser: AbstractHttpParser[TParseResult],
+    ) -> type[AbstractHttpCrawler[ParsedHttpCrawlingContext[TParseResult], TParseResult]]:
+        """Convenience class factory that creates specific version of `AbstractHttpCrawler` class.
+
+        In general typing sense two generic types of `AbstractHttpCrawler` do not have to be dependent on each other.
+        This is convenience constructor for specific cases when `TParseResult` is used to specify both generic
+        parameters in `AbstractHttpCrawler`.
+        """
+
+        class _ParsedHttpCrawler(AbstractHttpCrawler[ParsedHttpCrawlingContext[TParseResult], TParseResult]):
+            def __init__(
+                self,
+                parser: AbstractHttpParser[TParseResult] = static_parser,
+                **kwargs: Unpack[HttpCrawlerOptions[ParsedHttpCrawlingContext[TParseResult]]],
+            ) -> None:
+                kwargs['_context_pipeline'] = self._create_static_content_crawler_pipeline()
+                super().__init__(
+                    parser=parser,
+                    **kwargs,
+                )
+
+        return _ParsedHttpCrawler
+
     def _create_static_content_crawler_pipeline(self) -> ContextPipeline[ParsedHttpCrawlingContext[TParseResult]]:
         """Create static content crawler context pipeline with expected pipeline steps."""
         return (

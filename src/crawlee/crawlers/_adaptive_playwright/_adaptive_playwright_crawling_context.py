@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, fields
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Generic
 
-from bs4 import BeautifulSoup
+from typing_extensions import TypeVar
 
 from crawlee import HttpHeaders
 from crawlee._types import BasicCrawlingContext
 from crawlee._utils.docs import docs_group
 from crawlee.crawlers import (
-    BeautifulSoupCrawlingContext,
-    BeautifulSoupParserType,
+    AbstractHttpParser,
+    ParsedHttpCrawlingContext,
     PlaywrightCrawlingContext,
 )
 
@@ -25,9 +25,12 @@ class AdaptiveContextError(RuntimeError):
     pass
 
 
+TStaticParseResult = TypeVar('TStaticParseResult')
+
+
 @dataclass(frozen=True)
 @docs_group('Data structures')
-class AdaptivePlaywrightCrawlingContext(BeautifulSoupCrawlingContext):
+class AdaptivePlaywrightCrawlingContext(Generic[TStaticParseResult], ParsedHttpCrawlingContext[TStaticParseResult]):
     _response: Response | None = None
     _infinite_scroll: Callable[[], Awaitable[None]] | None = None
     _page: Page | None = None
@@ -51,13 +54,15 @@ class AdaptivePlaywrightCrawlingContext(BeautifulSoupCrawlingContext):
         return self._response
 
     @classmethod
-    def from_beautifulsoup_crawling_context(cls, context: BeautifulSoupCrawlingContext) -> Self:
-        """Convenience constructor that creates new context from existing `BeautifulSoupCrawlingContext`."""
+    def from_parsed_http_crawling_context(
+        cls, context: ParsedHttpCrawlingContext[TStaticParseResult]
+    ) -> AdaptivePlaywrightCrawlingContext[TStaticParseResult]:
+        """Convenience constructor that creates new context from existing `ParsedHttpCrawlingContext`."""
         return cls(**{field.name: getattr(context, field.name) for field in fields(context)})
 
     @classmethod
     async def from_playwright_crawling_context(
-        cls, context: PlaywrightCrawlingContext, beautiful_soup_parser_type: BeautifulSoupParserType | None
+        cls, context: PlaywrightCrawlingContext, parser: AbstractHttpParser[TStaticParseResult]
     ) -> Self:
         """Convenience constructor that creates new context from existing `PlaywrightCrawlingContext`."""
         context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
@@ -65,13 +70,13 @@ class AdaptivePlaywrightCrawlingContext(BeautifulSoupCrawlingContext):
         context_kwargs['_response'] = context_kwargs.pop('response')
         context_kwargs['_page'] = context_kwargs.pop('page')
         context_kwargs['_infinite_scroll'] = context_kwargs.pop('infinite_scroll')
-        # This might be always available.
+        # This might not be always available.
         protocol_guess = await context_kwargs['_page'].evaluate('() => performance.getEntries()[0].nextHopProtocol')
         http_response = await _HttpResponse.from_playwright_response(
             response=context.response, protocol=protocol_guess or ''
         )
         return cls(
-            parsed_content=BeautifulSoup(http_response.read(), features=beautiful_soup_parser_type),
+            parsed_content=await parser.parse(http_response),
             http_response=http_response,
             **context_kwargs,
         )

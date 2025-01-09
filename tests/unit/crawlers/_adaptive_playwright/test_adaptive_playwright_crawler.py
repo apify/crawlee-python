@@ -75,7 +75,7 @@ async def test_adaptive_crawling(
         rendering_types=rendering_types, detection_probability_recommendation=detection_probability_recommendation
     )
 
-    crawler = AdaptivePlaywrightCrawler(rendering_type_predictor=predictor)
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(rendering_type_predictor=predictor)
 
     pw_handler_count = 0
     bs_handler_count = 0
@@ -120,7 +120,9 @@ async def test_adaptive_crawling_pre_nav_change_to_context() -> None:
     """Tests that context can be modified in pre-navigation hooks."""
     static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
 
-    crawler = AdaptivePlaywrightCrawler(rendering_type_predictor=static_only_predictor_enforce_detection)
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=static_only_predictor_enforce_detection
+    )
     user_data_in_pre_nav_hook = []
     user_data_in_handler = []
 
@@ -151,7 +153,9 @@ async def test_adaptive_crawling_result() -> None:
     Enforced rendering type detection to run both sub crawlers."""
     static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
     requests = ['https://warehouse-theme-metal.myshopify.com/']
-    crawler = AdaptivePlaywrightCrawler(rendering_type_predictor=static_only_predictor_enforce_detection)
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=static_only_predictor_enforce_detection
+    )
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
@@ -186,7 +190,9 @@ async def test_adaptive_crawling_predictor_calls(
     some_url = 'https://warehouse-theme-metal.myshopify.com/'
     static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
     requests = [Request.from_url(url=some_url, label=some_label)]
-    crawler = AdaptivePlaywrightCrawler(rendering_type_predictor=static_only_predictor_enforce_detection)
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=static_only_predictor_enforce_detection
+    )
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
@@ -216,7 +222,9 @@ async def test_adaptive_crawling_result_use_state_isolation() -> None:
     Enforced rendering type detection to run both sub crawlers."""
     static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
     requests = ['https://warehouse-theme-metal.myshopify.com/']
-    crawler = AdaptivePlaywrightCrawler(rendering_type_predictor=static_only_predictor_enforce_detection)
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=static_only_predictor_enforce_detection
+    )
     store = await crawler.get_key_value_store()
     await store.set_value(BasicCrawler.CRAWLEE_STATE_KEY, {'counter': 0})
     request_handler_calls = 0
@@ -247,7 +255,7 @@ async def test_adaptive_crawling_statistics() -> None:
 
     static_only_predictor_no_detection = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
 
-    crawler = AdaptivePlaywrightCrawler(
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
         rendering_type_predictor=static_only_predictor_no_detection,
         result_checker=lambda result: False,  #  noqa: ARG005  # Intentionally unused argument.
     )
@@ -283,7 +291,9 @@ async def test_adaptive_crawler_exceptions_in_sub_crawlers(*, error_in_pw_crawle
     requests = ['https://warehouse-theme-metal.myshopify.com/']
     static_only_no_detection_predictor = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
 
-    crawler = AdaptivePlaywrightCrawler(rendering_type_predictor=static_only_no_detection_predictor)
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=static_only_no_detection_predictor
+    )
     saved_data = {'some': 'data'}
 
     @crawler.router.default_handler
@@ -327,7 +337,7 @@ def test_adaptive_playwright_crawler_statistics_in_init() -> None:
         log_interval=log_interval,
     )
 
-    crawler = AdaptivePlaywrightCrawler(statistics=statistics)
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(statistics=statistics)
 
     assert type(crawler._statistics) is AdaptivePlaywrightCrawlerStatistics
     assert crawler._statistics._persistence_enabled == persistence_enabled

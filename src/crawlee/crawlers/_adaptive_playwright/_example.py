@@ -16,9 +16,15 @@ async def main() -> None:
     top_logger.setLevel(logging.DEBUG)
     i = 0
 
-    crawler = AdaptivePlaywrightCrawler(
-        max_requests_per_crawl=10, _logger=top_logger, playwright_crawler_args={'headless': False}
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        max_requests_per_crawl=10, _logger=top_logger, playwright_crawler_specific_kwargs={'headless': False}
     )
+    """
+
+    crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(
+        max_requests_per_crawl=10, _logger=top_logger, playwright_crawler_specific_kwargs={'headless': False}
+    )
+    """
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
