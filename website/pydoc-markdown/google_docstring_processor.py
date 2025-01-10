@@ -79,37 +79,37 @@ class ApifyGoogleProcessor(Processor):
     """
 
     _param_res = [
-        re.compile(r'^(?P<param>\S+):\s+(?P<desc>.+)$'),
-        re.compile(r'^(?P<param>\S+)\s+\((?P<type>[^)]+)\):\s+(?P<desc>.+)$'),
-        re.compile(r'^(?P<param>\S+)\s+--\s+(?P<desc>.+)$'),
-        re.compile(r'^(?P<param>\S+)\s+\{\[(?P<type>\S+)\]\}\s+--\s+(?P<desc>.+)$'),
-        re.compile(r'^(?P<param>\S+)\s+\{(?P<type>\S+)\}\s+--\s+(?P<desc>.+)$'),
+        re.compile(r"^(?P<param>\S+):\s+(?P<desc>.+)$"),
+        re.compile(r"^(?P<param>\S+)\s+\((?P<type>[^)]+)\):\s+(?P<desc>.+)$"),
+        re.compile(r"^(?P<param>\S+)\s+--\s+(?P<desc>.+)$"),
+        re.compile(r"^(?P<param>\S+)\s+\{\[(?P<type>\S+)\]\}\s+--\s+(?P<desc>.+)$"),
+        re.compile(r"^(?P<param>\S+)\s+\{(?P<type>\S+)\}\s+--\s+(?P<desc>.+)$"),
     ]
 
     _keywords_map = {
-        'Args:': 'Arguments',
-        'Arguments:': 'Arguments',
-        'Attributes:': 'Attributes',
-        'Example:': 'Example',
-        'Examples:': 'Examples',
-        'Keyword Args:': 'Arguments',
-        'Keyword Arguments:': 'Arguments',
-        'Methods:': 'Methods',
-        'Note:': 'Notes',
-        'Notes:': 'Notes',
-        'Other Parameters:': 'Arguments',
-        'Parameters:': 'Arguments',
-        'Return:': 'Returns',
-        'Returns:': 'Returns',
-        'Raises:': 'Raises',
-        'References:': 'References',
-        'See Also:': 'See Also',
-        'Todo:': 'Todo',
-        'Warning:': 'Warnings',
-        'Warnings:': 'Warnings',
-        'Warns:': 'Warns',
-        'Yield:': 'Yields',
-        'Yields:': 'Yields',
+        "Args:": "Arguments",
+        "Arguments:": "Arguments",
+        "Attributes:": "Attributes",
+        "Example:": "Example",
+        "Examples:": "Examples",
+        "Keyword Args:": "Arguments",
+        "Keyword Arguments:": "Arguments",
+        "Methods:": "Methods",
+        "Note:": "Notes",
+        "Notes:": "Notes",
+        "Other Parameters:": "Arguments",
+        "Parameters:": "Arguments",
+        "Return:": "Returns",
+        "Returns:": "Returns",
+        "Raises:": "Raises",
+        "References:": "References",
+        "See Also:": "See Also",
+        "Todo:": "Todo",
+        "Warning:": "Warnings",
+        "Warnings:": "Warnings",
+        "Warns:": "Warns",
+        "Yield:": "Yields",
+        "Yields:": "Yields",
     }
 
     def check_docstring_format(self, docstring: str) -> bool:
@@ -139,9 +139,9 @@ class ApifyGoogleProcessor(Processor):
                 lines.extend(current_lines)
             current_lines.clear()
 
-        for line in node.docstring.content.split('\n'):
+        for line in node.docstring.content.split("\n"):
             multiline_argument_offset += 1
-            if line.lstrip().startswith('```'):
+            if line.lstrip().startswith("```"):
                 in_codeblock = not in_codeblock
                 current_lines.append(line)
                 if not in_codeblock:
@@ -171,16 +171,15 @@ class ApifyGoogleProcessor(Processor):
 
             if not param_match:
                 if multiline_argument_offset == 1:
-                    current_lines[-1]['desc'] += '\n' + line
+                    current_lines[-1]["desc"] += "\n" + line
                     multiline_argument_offset = 0
                 else:
                     current_lines.append(line)
 
         _commit()
-        node.docstring.content = json.dumps(
-            {
-                'text': '\n'.join(lines),
-                'sections': sections,
-            },
-            indent=None,
-        )
+        node.docstring.content = json.dumps({
+            "text": "\n".join(lines),
+            "sections": sections,
+        }, indent=None)
+        
+
