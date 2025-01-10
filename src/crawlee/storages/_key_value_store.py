@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, overload
 
@@ -67,6 +68,7 @@ class KeyValueStore(BaseStorage):
 
         # Get resource clients from storage client
         self._resource_client = storage_client.key_value_store(self._id)
+        self._autosave_lock = asyncio.Lock()
 
     @property
     @override
@@ -198,17 +200,18 @@ class KeyValueStore(BaseStorage):
         """
         default_value = {} if default_value is None else default_value
 
-        if key in self._cache:
-            return self._cache[key]
+        async with self._autosave_lock:
+            if key in self._cache:
+                return self._cache[key]
 
-        value = await self.get_value(key, default_value)
+            value = await self.get_value(key, default_value)
 
-        if not isinstance(value, dict):
-            raise TypeError(
-                f'Expected dictionary for persist state value at key "{key}, but got {type(value).__name__}'
-            )
+            if not isinstance(value, dict):
+                raise TypeError(
+                    f'Expected dictionary for persist state value at key "{key}, but got {type(value).__name__}'
+                )
 
-        self._cache[key] = value
+            self._cache[key] = value
 
         self._ensure_persist_event()
 
