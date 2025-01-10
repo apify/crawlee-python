@@ -192,20 +192,24 @@ async def test_pre_navigation_hook(httpbin: URL) -> None:
 
 
 async def test_proxy_set() -> None:
+    # Configure crawler with proxy settings
     proxy_value = 'http://1111:1111'
-    mock_handler = mock.AsyncMock(return_value=None)
     crawler = PlaywrightCrawler(proxy_configuration=ProxyConfiguration(proxy_urls=[proxy_value]))
 
     handler_data = {}
 
+    mock_handler = mock.AsyncMock(return_value=None)
     crawler.router.default_handler(mock_handler)
 
+    # Use pre_navigation_hook to verify proxy and configure playwright route
     @crawler.pre_navigation_hook
     async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
         if context.proxy_info:
+            # Store information about the used proxy
             handler_data['proxy'] = context.proxy_info.url
 
-        await context.page.route('**/*', lambda route: route.fulfill(status=200, body=''))
+        # Emulate server response to prevent Playwright from making real requests
+        await context.page.route('**/*', lambda route: route.fulfill(status=200))
 
     await crawler.run(['https://test.com'])
 
