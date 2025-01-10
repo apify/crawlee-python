@@ -62,7 +62,7 @@ Our crawlers will now use the selected proxies for all connections.
 
 The <ApiLink to="class/ProxyConfiguration#new_url">`proxy_configuration.new_url()`</ApiLink> method allows us to pass a `session_id` parameter. This creates a `session_id`-`proxy_url` pair, ensuring that subsequent `new_url()` calls with the same `session_id` return the same `proxy_url`. This is extremely useful in scraping, because we want to create the impression of a real user. See the <ApiLink to="class/SessionPool">`SessionPool`</ApiLink> class for more information on how maintaining a real session helps avoid blocking.
 
-{/* TODO: link session management guide */}
+For more details on session management, check out the [Session management](./session-management) guide.
 
 When no `session_id` is provided, our proxy URLs are rotated round-robin.
 

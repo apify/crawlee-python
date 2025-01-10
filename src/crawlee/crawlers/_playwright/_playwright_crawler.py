@@ -87,12 +87,12 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
             browser_type: The type of browser to launch ('chromium', 'firefox', or 'webkit').
                 This option should not be used if `browser_pool` is provided.
             browser_launch_options: Keyword arguments to pass to the browser launch method. These options are provided
-                directly to Playwright's `browser_type.launch` method. For more details, refer to the Playwright
-                documentation: https://playwright.dev/python/docs/api/class-browsertype#browser-type-launch.
+                directly to Playwright's `browser_type.launch` method. For more details, refer to the
+                [Playwright documentation](https://playwright.dev/python/docs/api/class-browsertype#browser-type-launch).
                 This option should not be used if `browser_pool` is provided.
             browser_new_context_options: Keyword arguments to pass to the browser new context method. These options
                 are provided directly to Playwright's `browser.new_context` method. For more details, refer to the
-                Playwright documentation: https://playwright.dev/python/docs/api/class-browser#browser-new-context.
+                [Playwright documentation](https://playwright.dev/python/docs/api/class-browser#browser-new-context).
                 This option should not be used if `browser_pool` is provided.
             headless: Whether to run the browser in headless mode.
                 This option should not be used if `browser_pool` is provided.
