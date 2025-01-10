@@ -88,7 +88,7 @@ RequestManager <|-- RequestManagerTandem
 
 ## Request loader
 
-The <ApiLink to="class/RequestLoader">`RequestLoader`</ApiLink> interface defines the foundation for fetching requests during a crawl. It provides abstract methods for basic operations like retrieving, marking, or checking the status of requests. Concrete implementations, such as <ApiLink to="class/RequestList">`RequestList`</ApiLink>, build on this interface to handle specific scenarios. You may create your own loader that reads from an external file, a web endpoint, a database or matches your other specific scenario. For more details refer to the <ApiLink to="class/RequestLoader">`RequestLoader`</ApiLink> API reference.
+The <ApiLink to="class/RequestLoader">`RequestLoader`</ApiLink> interface defines the foundation for fetching requests during a crawl. It provides abstract methods for basic operations like retrieving, marking, or checking the status of requests. Concrete implementations, such as <ApiLink to="class/RequestList">`RequestList`</ApiLink>, build on this interface to handle specific scenarios. You may create your own loader that reads from an external file, a web endpoint, a database or matches some other specific scenario. For more details refer to the <ApiLink to="class/RequestLoader">`RequestLoader`</ApiLink> API reference.
 
 Here is a basic example of working with the <ApiLink to="class/RequestList">`RequestList`</ApiLink>:
 
@@ -102,7 +102,7 @@ The <ApiLink to="class/RequestManager">`RequestManager`</ApiLink> extends `Reque
 
 ## Request manager tandem
 
-The <ApiLink to="class/RequestManagerTandem">`RequestManagerTandem`</ApiLink> class allows you to combine the read-only capabilities `RequestLoader` (like <ApiLink to="class/RequestList">`RequestList`</ApiLink>) with a writable capabilities `RequestManager` (like <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>). This is useful for scenarios where you need to load initial requests from a static source (like a file or database) and dynamically add or retry requests during the crawl. Under the hood, <ApiLink to="class/RequestManagerTandem">`RequestManagerTandem`</ApiLink> manages whether the read-only loader still has pending requests. If so, each new request from the loader is transferred to the manager. Any newly added or reclaimed requests go directly to the manager side.
+The <ApiLink to="class/RequestManagerTandem">`RequestManagerTandem`</ApiLink> class allows you to combine the read-only capabilities `RequestLoader` (like <ApiLink to="class/RequestList">`RequestList`</ApiLink>) with a writable capabilities `RequestManager` (like <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>). This is useful for scenarios where you need to load initial requests from a static source (like a file or database) and dynamically add or retry requests during the crawl. Additionally, it provides deduplication capabilities, ensuring that requests are not processed multiple times. Under the hood, <ApiLink to="class/RequestManagerTandem">`RequestManagerTandem`</ApiLink> manages whether the read-only loader still has pending requests. If so, each new request from the loader is transferred to the manager. Any newly added or reclaimed requests go directly to the manager side.
 
 ### Request list with request queue
 
