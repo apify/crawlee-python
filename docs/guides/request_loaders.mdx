@@ -88,7 +88,7 @@ RequestManager <|-- RequestManagerTandem
 
 ## Request loader
 
-The <ApiLink to="class/RequestLoader">`RequestLoader`</ApiLink> interface defines the foundation for fetching requests during a crawl. It provides abstract methods for basic operations like retrieving, marking, or checking the status of requests. Concrete implementations, such as <ApiLink to="class/RequestList">`RequestList`</ApiLink>, build on this interface to handle specific scenarios. You may create your own loader that reads from an external file, a web endpoint, a database or matches your other specific scenario. For more details refer to the [`RequestLoader`](https://crawlee.dev/python/docs/api/crawlee.request_loaders#requestloader) API reference.
+The <ApiLink to="class/RequestLoader">`RequestLoader`</ApiLink> interface defines the foundation for fetching requests during a crawl. It provides abstract methods for basic operations like retrieving, marking, or checking the status of requests. Concrete implementations, such as <ApiLink to="class/RequestList">`RequestList`</ApiLink>, build on this interface to handle specific scenarios. You may create your own loader that reads from an external file, a web endpoint, a database or matches your other specific scenario. For more details refer to the <ApiLink to="class/RequestLoader">`RequestLoader`</ApiLink> API reference.
 
 Here is a basic example of working with the <ApiLink to="class/RequestList">`RequestList`</ApiLink>:
 
@@ -98,7 +98,7 @@ Here is a basic example of working with the <ApiLink to="class/RequestList">`Req
 
 ## Request manager
 
-The <ApiLink to="class/RequestManager">`RequestManager`</ApiLink> extends `RequestLoader` with write capabilities. In addition to reading requests, a request manager can add or reclaim them. This is important for dynamic crawling projects, where new URLs may emerge during the crawl process. Or when certain requests may failed and need to be retried. For more details refer to the [`RequestManager`](https://crawlee.dev/python/docs/api/crawlee.request_loaders#requestmanager) API reference.
+The <ApiLink to="class/RequestManager">`RequestManager`</ApiLink> extends `RequestLoader` with write capabilities. In addition to reading requests, a request manager can add or reclaim them. This is important for dynamic crawling projects, where new URLs may emerge during the crawl process. Or when certain requests may failed and need to be retried. For more details refer to the <ApiLink to="class/RequestManager">`RequestManager`</ApiLink> API reference.
 
 ## Request manager tandem
 
