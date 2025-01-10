@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.5.2 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Avoid `use_state` race conditions. Remove key argument to `use_state` ([#868](https://github.com/apify/crawlee-python/pull/868)) ([000b976](https://github.com/apify/crawlee-python/commit/000b9761211502d86a893a31e3ca21998a6e3b99)) by [@Pijukatel](https://github.com/Pijukatel), closes [#856](https://github.com/apify/crawlee-python/issues/856)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.5.1](https://github.com/apify/crawlee-python/releases/tag/v0.5.1) (2025-01-07)
 
 ### 🐛 Bug Fixes
