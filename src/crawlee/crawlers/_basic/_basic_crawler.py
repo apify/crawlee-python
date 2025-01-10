@@ -568,7 +568,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     async def _use_state(self, default_value: dict[str, JsonSerializable] | None = None) -> dict[str, JsonSerializable]:
         store = await self.get_key_value_store()
-        return await store.get_auto_saved_value(self.CRAWLEE_STATE_KEY, default_value)
+        return await store.get_auto_saved_value(self._CRAWLEE_STATE_KEY, default_value)
 
     async def _save_crawler_state(self) -> None:
         store = await self.get_key_value_store()

@@ -5,6 +5,7 @@ import asyncio
 import json
 import logging
 import os
+import sys
 from collections import Counter
 from dataclasses import dataclass
 from datetime import timedelta
@@ -716,7 +717,7 @@ async def test_context_use_state(key_value_store: KeyValueStore) -> None:
 
     store = await crawler.get_key_value_store()
 
-    assert (await store.get_value(BasicCrawler.CRAWLEE_STATE_KEY)) == {'hello': 'world'}
+    assert (await store.get_value(BasicCrawler._CRAWLEE_STATE_KEY)) == {'hello': 'world'}
 
 
 async def test_context_handlers_use_state(key_value_store: KeyValueStore) -> None:
@@ -759,7 +760,7 @@ async def test_context_handlers_use_state(key_value_store: KeyValueStore) -> Non
     store = await crawler.get_key_value_store()
 
     # The state in the KVS must match with the last set state
-    assert (await store.get_value(BasicCrawler.CRAWLEE_STATE_KEY)) == {'hello': 'last_world'}
+    assert (await store.get_value(BasicCrawler._CRAWLEE_STATE_KEY)) == {'hello': 'last_world'}
 
 
 async def test_max_requests_per_crawl(httpbin: URL) -> None:
@@ -1048,54 +1049,29 @@ async def test_allows_storage_client_overwrite_before_run(monkeypatch: pytest.Mo
     assert data.items == [{'foo': 'bar'}]
 
 
+@pytest.mark.skipif(sys.version_info[:3] < (3, 11), reason='asyncio.Barrier was introduced in Python 3.11.')
 async def test_context_use_state_race_condition_in_handlers(key_value_store: KeyValueStore) -> None:
     """Two parallel handlers increment global variable obtained by `use_state` method.
 
     Result should be incremented by 2.
     Method `use_state` must be implemented in a way that prevents race conditions in such scenario."""
+    from asyncio import Barrier  # type:ignore[attr-defined]  # Test is skipped in older Python versions.
+
     crawler = BasicCrawler()
     store = await crawler.get_key_value_store()
-    await store.set_value(BasicCrawler.CRAWLEE_STATE_KEY, {'counter': 0})
-
-    # Asyncio.Barrier introduced in Python 3.11. Code has to be compatible with Python 3.9.
-    # Use asyncio.Event as workaround.
-    both_handlers_got_state = asyncio.Event()
-    both_handlers_incremented_counter = asyncio.Event()
-
-    get_value_barrier = 0
-    increment_barrier = 0
-
-    async def set_events() -> None:
-        while True:
-            if get_value_barrier == 2:
-                both_handlers_got_state.set()
-            if increment_barrier == 2:
-                both_handlers_incremented_counter.set()
-            if both_handlers_got_state.is_set() and both_handlers_incremented_counter.is_set():
-                return
-            await asyncio.sleep(0.01)
-
-    set_events_task = asyncio.create_task(set_events())
+    await store.set_value(BasicCrawler._CRAWLEE_STATE_KEY, {'counter': 0})
+    handler_barrier = Barrier(2)
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        nonlocal increment_barrier
-        nonlocal get_value_barrier
-
         state = cast(dict[str, int], await context.use_state())
-        # Block until both handlers get the state.
-        get_value_barrier += 1
-        await both_handlers_got_state.wait()
-
+        await handler_barrier.wait()  # Block until both handlers get the state.
         state['counter'] += 1
-        # Block until both handlers increment state.
-        increment_barrier += 1
-        await both_handlers_incremented_counter.wait()
+        await handler_barrier.wait()  # Block until both handlers increment the state.
 
     await crawler.run(['https://crawlee.dev/', 'https://crawlee.dev/docs/quick-start'])
-    await set_events_task
 
     store = await crawler.get_key_value_store()
     # Ensure that local state is pushed back to kvs.
     await store.persist_autosaved_values()
-    assert (await store.get_value(BasicCrawler.CRAWLEE_STATE_KEY))['counter'] == 2
+    assert (await store.get_value(BasicCrawler._CRAWLEE_STATE_KEY))['counter'] == 2

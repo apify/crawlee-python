@@ -201,7 +201,7 @@ async def test_get_auto_saved_value_auto_save_race_conditions(key_value_store: K
         state['counter'] += 1
 
     with patch.object(key_value_store, 'get_value', delayed_get_value):
-        tasks = [asyncio.create_task(increment_counter()) for _ in range(2)]
+        tasks = [asyncio.create_task(increment_counter()), asyncio.create_task(increment_counter())]
         await asyncio.gather(*tasks)
 
     assert (await key_value_store.get_auto_saved_value('state'))['counter'] == 2
