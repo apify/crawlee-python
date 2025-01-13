@@ -1,6 +1,13 @@
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
+
+from crawlee.browsers._types import BrowserType
+
+
+SupportedOperatingSystems= Literal["windows", "macos", "linux", "android", "ios"]
+SupportedDevices = Literal["desktop", "mobile"]
+SupportedHttpVersion = Literal["1", "2"]
 
 class ScreenFingerprint(BaseModel):
     """
@@ -9,7 +16,7 @@ class ScreenFingerprint(BaseModel):
     https://developer.mozilla.org/en-US/docs/Web/API/Screen
     https://developer.mozilla.org/en-US/docs/Web/API/ScreenDetailed
     https://developer.mozilla.org/en-US/docs/Web/API/Window
-    https://developer.mozilla.org/en-US/docs/Web/API/Element/clientWidth
+    https://developer.mozilla.org/en-US/docs/Web/API/Element
     """
 
     avail_height: Annotated[float, Field(alias="availHeight")]
@@ -79,8 +86,22 @@ class NavigatorFingerprint(BaseModel):
     user_agent: Annotated[str, Field(alias="userAgent")]
     """https://developer.mozilla.org/en-US/docs/Web/API/Navigator/userAgent"""
 
-    user_agent_data: Annotated[str, Field(alias="userAgentData")]
-    """https://developer.mozilla.org/en-US/docs/Web/API/WorkerNavigator/userAgentData"""
+
+
+    user_agent_data: Annotated[dict[str, str | list[dict[str, str]] | bool], Field(alias="userAgentData")]
+    """https://developer.mozilla.org/en-US/docs/Web/API/WorkerNavigator/userAgentData
+
+    In JS this is just userAgentData: Record<string, string>, but it can contain more stuff like
+
+    mobile = False
+    'fullVersionList' = [
+    {'brand': 'Google Chrome', 'version': '131.0.6778.86'},
+    {'brand': 'Chromium', 'version': '131.0.6778.86'},
+    {'brand': 'Not_A Brand', 'version': '24.0.0.0'}
+    ]
+    so more generic type should be allowed
+
+    """
 
     do_not_track: Annotated[str, Field(alias="doNotTrack")]
     """https://developer.mozilla.org/en-US/docs/Web/API/Navigator/doNotTrack"""
@@ -118,20 +139,24 @@ class NavigatorFingerprint(BaseModel):
     product: str
     """https://developer.mozilla.org/en-US/docs/Web/API/Navigator/product"""
 
-    productSub: str
+    product_sub: Annotated[str, Field(alias="productSub")]
     """https://developer.mozilla.org/en-US/docs/Web/API/Navigator/productSub"""
 
     vendor: str
     """https://developer.mozilla.org/en-US/docs/Web/API/Navigator/vendor"""
 
-    vendorSub: str
+    vendor_sub: Annotated[str, Field(alias="vendorSub")]
     """https://developer.mozilla.org/en-US/docs/Web/API/Navigator/vendorSub"""
 
     max_touch_points: Annotated[float|None, Field(alias="maxTouchPoints")] = None
     """https://developer.mozilla.org/en-US/docs/Web/API/Navigator/maxTouchPoints"""
 
-    extraProperties: dict[str, str]
+    extra_properties: Annotated[dict[str, str], Field(alias="extraProperties")] = []
 
+
+class VideoCard(BaseModel):
+    rendered: str
+    vendor: str
 
 class Fingerprint(BaseModel):
     """Represents specific browser fingerprint collection.
@@ -140,8 +165,66 @@ class Fingerprint(BaseModel):
     Such fingerprint can be used to collect various information or track or group users, or thus also detect web
     crawlers by inspecting suspiciously looking browser fingerprints.
     This object contains attributes that are sub set of such specific fingerprint.
-    See `https://docs.apify.com/academy/anti-scraping/mitigation/generating-fingerprints`
-    TODO: Update guide with Python example."""
+    See `https://docs.apify.com/academy/anti-scraping/mitigation/generating-fingerprints` TODO: Update guide with Python example.
+    """
 
     screen: ScreenFingerprint
     navigator: NavigatorFingerprint
+    video_codecs: Annotated[dict[str, str], Field(alias="videoCodecs")] = None
+    audio_codecs: Annotated[dict[str, str], Field(alias="audioCodecs")] = None
+    plugins_data: Annotated[dict[str, str], Field(alias="pluginsData")] = None
+    battery: dict[str, str] | None = None
+    video_card: VideoCard
+    multimedia_devices: Annotated[list[str], Field(alias="multimediaDevices")]
+    fonts: list[str] = []
+    mock_web_rtc: Annotated[bool, Field(alias="mockWebRTC")]
+    slim: Annotated[bool|None, Field(alias="slim")]=None
+
+
+class ScreenOptions(BaseModel):
+    """Defines the screen dimensions of the generated fingerprint."""
+    min_width: Annotated[float|None, Field(alias="minWidth")] = None
+    max_width: Annotated[float | None, Field(alias="maxWidth")] = None
+    min_height: Annotated[float | None, Field(alias="minHeight")] = None
+    max_height: Annotated[float | None, Field(alias="maxHeight")] = None
+
+class Browser:
+    name: BrowserType
+    """Name of the browser."""
+    min_version: Annotated[float|None, Field(alias="minVersion")] = None
+    """Minimum version of browser used."""
+    max_version: Annotated[float | None, Field(alias="maxVersion")] = None
+    """Maximum version of browser used."""
+    http_version: Annotated[SupportedHttpVersion | None, Field(alias="httpVersion")] = None
+    """HTTP version to be used for header generation (the headers differ depending on the version)."""
+
+
+
+class HeaderGeneratorOptions(BaseModel):
+    browsers: BrowserType
+    """List of BrowserSpecifications to generate the headers for."""
+
+    operating_systems: Annotated[list[SupportedOperatingSystems], Field(alias="operatingSystems")]
+    """List of operating systems to generate the headers for."""
+
+    devices: list[SupportedDevices]
+    """List of devices to generate the headers for."""
+
+    locales: list[str]
+    """List of at most 10 languages to include in the [Accept-Language]
+    (https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Accept-Language) request header
+    in the language format accepted by that header, for example `en`, `en-US` or `de`."""
+
+    http_version: Annotated[SupportedHttpVersion, Field(alias="httpVersion")]
+    """HTTP version to be used for header generation (the headers differ depending on the version)."""
+
+    strict: bool
+    """If true, the generator will throw an error if it cannot generate headers based on the input."""
+
+class FingerprintGeneratorOptions(BaseModel):
+    header_options: HeaderGeneratorOptions
+    screen: ScreenOptions
+    mock_web_rtc: Annotated[bool, Field(alias="mockWebRTC")] = None
+    """Whether to mock WebRTC when injecting the fingerprint."""
+    slim: Annotated[bool | None, Field(alias="slim")] = None
+    """Disables performance-heavy evasions when injecting the fingerprint."""
