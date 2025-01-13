@@ -1,36 +1,27 @@
 import pytest
 
-from crawlee.fingerprint_suite._browserforge_adapter import FingerprintGenerator as bf_FingerprintGenerator
+from crawlee.fingerprint_suite._browserforge_adapter import FingerprintGenerator
 from crawlee.fingerprint_suite._fingerprint_generator import AbstractFingerprintGenerator
 from crawlee.fingerprint_suite._types import FingerprintGeneratorOptions, ScreenOptions, HeaderGeneratorOptions
 
 
-@pytest.mark.parametrize("fingerprint_generator",[
-                pytest.param(bf_FingerprintGenerator, id="Browserforge"),
-])
-def test_fingerprint_generator_has_default(fingerprint_generator: AbstractFingerprintGenerator):
+def test_fingerprint_generator_has_default():
     """Test that header generator can work without any options."""
-    assert fingerprint_generator.generate()
+    assert FingerprintGenerator().generate()
 
 
 
-@pytest.mark.parametrize("fingerprint_generator",[
-                pytest.param(bf_FingerprintGenerator, id="Browserforge"),
-])
-def test_fingerprint_generator_some_options(fingerprint_generator: AbstractFingerprintGenerator):
+def test_fingerprint_generator_some_options():
     """Test that header generator can work with only some options."""
     options = FingerprintGeneratorOptions(screen=ScreenOptions(min_width = 500), mockWebRTC=True)
 
-    fingerprint = fingerprint_generator.generate(options=options)
+    fingerprint = FingerprintGenerator(fingerprint_generator_options=options).generate()
 
     assert fingerprint.mockWebRTC == True
     assert fingerprint.screen.availWidth >= 500
 
 
-@pytest.mark.parametrize("fingerprint_generator",[
-                pytest.param(bf_FingerprintGenerator, id="Browserforge"),
-])
-def test_fingerprint_generator_all_options(fingerprint_generator: AbstractFingerprintGenerator):
+def test_fingerprint_generator_all_options():
     """Test that header generator can work with all the options. Some most basic checks of fingerprint.
 
     Fingerprint generation option might have no effect if there is no fingerprint sample present in collected data.
@@ -60,7 +51,7 @@ def test_fingerprint_generator_all_options(fingerprint_generator: AbstractFinger
         )
     )
 
-    fingerprint = fingerprint_generator.generate(options=options)
+    fingerprint = FingerprintGenerator(fingerprint_generator_options=options).generate()
 
     assert fingerprint.screen.availWidth >= min_width
     assert fingerprint.screen.availWidth <= max_width

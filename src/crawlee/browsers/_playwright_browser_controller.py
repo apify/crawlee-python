@@ -13,6 +13,7 @@ from crawlee._utils.docs import docs_group
 from crawlee.browsers._base_browser_controller import BaseBrowserController
 from crawlee.browsers._types import BrowserType
 from crawlee.fingerprint_suite import HeaderGenerator
+from crawlee.fingerprint_suite._fingerprint_generator import AbstractFingerprintGenerator
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -43,8 +44,7 @@ class PlaywrightBrowserController(BaseBrowserController):
         *,
         max_open_pages_per_browser: int = 20,
         header_generator: HeaderGenerator | None = _DEFAULT_HEADER_GENERATOR,
-        use_fingerprints: bool = True,
-        fingerprint_generator_options: dict[str, Any] | None = None,
+        fingerprint_generator: AbstractFingerprintGenerator | None = None,
     ) -> None:
         """A default constructor.
 
@@ -54,18 +54,21 @@ class PlaywrightBrowserController(BaseBrowserController):
             header_generator: An optional `HeaderGenerator` instance used to generate and manage HTTP headers for
                 requests made by the browser. By default, a predefined header generator is used. Set to `None` to
                 disable automatic header modifications.
-            use_fingerprints: Inject generated fingerprints to page.
-            fingerprint_generator_options: Override generated fingerprints with these specific values, if possible.
+            fingerprint_generator: An optional instance of implementation of `AbstractFingerprintGenerator` that is used
+                to generate browser fingerprints together with headers.
         """
+        if header_generator and fingerprint_generator:
+            raise ValueError("Do not use `header_generator` and `fingerprint_generator` arguments at the same time. "
+                             "Choose only one. `fingerprint_generator` generates headers as well.")
         self._browser = browser
         self._max_open_pages_per_browser = max_open_pages_per_browser
         self._header_generator = header_generator
+        self._fingerprint_generator = fingerprint_generator
 
         self._browser_context: BrowserContext | None = None
         self._pages = list[Page]()
         self._last_page_opened_at = datetime.now(timezone.utc)
 
-        self._use_fingerprints = use_fingerprints
         self._fingerprint_generator_options = fingerprint_generator_options
 
     @property
@@ -152,8 +155,8 @@ class PlaywrightBrowserController(BaseBrowserController):
     ) -> None:
         """Set browser context.
 
-        Create context using `browserforge`  if `_use_fingerprints` is True.
-        Create context without fingerprints with headers based header generator if available.
+        Create context using `browserforge` if `self._fingerprint_generator` exists.
+        Create context without fingerprints with headers based on header generator if available.
         """
         browser_new_context_options = dict(browser_new_context_options) if browser_new_context_options else {}
 
@@ -167,7 +170,7 @@ class PlaywrightBrowserController(BaseBrowserController):
                 password=proxy_info.password,
             )
 
-        if self._use_fingerprints:
+        if self._fingerprint_generator:
             self._browser_context = await AsyncNewContext(
                 browser=self._browser, fingerprint_options=(fingerprint_options or {}), **browser_new_context_options
             )

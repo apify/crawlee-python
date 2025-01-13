@@ -148,6 +148,6 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         return PlaywrightBrowserController(
             browser,
             max_open_pages_per_browser=self._max_open_pages_per_browser,
-            use_fingerprints=self._use_fingerprints,
+            fingerprint_generator=self.fingerprint_generator,
             fingerprint_generator_options=self._fingerprint_generator_options,
         )

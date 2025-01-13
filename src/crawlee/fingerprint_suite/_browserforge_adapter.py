@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 from browserforge.fingerprints import Fingerprint as bf_Fingerprint, FingerprintGenerator as bf_FingerprintGenerator, \
     Screen
 from typing_extensions import override
@@ -7,27 +9,29 @@ from crawlee.fingerprint_suite._types import FingerprintGeneratorOptions
 
 class FingerprintGenerator(AbstractFingerprintGenerator):
 
-    @override
-    @staticmethod
-    def generate(options: FingerprintGeneratorOptions | None = None, strict: bool = False) -> bf_Fingerprint:
-        options = options or FingerprintGeneratorOptions()
-        bf_options = FingerprintGenerator._prepare_options(options)
+    def __init__(self, fingerprint_generator_options: FingerprintGeneratorOptions | None = None, strict: bool = False):
+        self._fingerprint_generator_options = FingerprintGenerator._prepare_options(
+            fingerprint_generator_options or FingerprintGeneratorOptions())
+        self._strict = strict
 
-        bf_fingerprint = bf_FingerprintGenerator().generate(
-            screen = Screen(**(bf_options["screen"] or {})),
-            mock_webrtc = bf_options["mock_web_rtc"],
-            slim=bf_options["slim"],
-            **bf_options["header_options"])
+    @override
+    def generate(self) -> bf_Fingerprint:
+        bf_fingerprint = bf_FingerprintGenerator().generate(**self._fingerprint_generator_options)
         return bf_fingerprint
 
     @staticmethod
     def _prepare_options(options: FingerprintGeneratorOptions) -> dict[any,any]:
-        bf_options = options.model_dump()
-        if bf_options["header_options"] is None:
-            bf_options["header_options"] = dict()
+        raw_options = options.model_dump()
+        bf_options = {}
+        if raw_options["header_options"] is None:
+            header_options = dict()
         else:
-            bf_options["header_options"]["browser"] = bf_options["header_options"].pop("browsers", None)
-            bf_options["header_options"]["os"] = bf_options["header_options"].pop("operating_systems", None)
-            bf_options["header_options"]["device"] = bf_options["header_options"].pop("devices", None)
-            bf_options["header_options"]["locale"] = bf_options["header_options"].pop("locales", None)
-        return bf_options
+            header_options = deepcopy(raw_options["header_options"])
+            header_options["browser"] = header_options.pop("browsers", None)
+            header_options["os"] = header_options.pop("operating_systems", None)
+            header_options["device"] = header_options.pop("devices", None)
+            header_options["locale"] = header_options.pop("locales", None)
+
+        bf_options["mock_webrtc"] = raw_options["mock_web_rtc"]
+        bf_options["screen"] = Screen(**(raw_options.get("screen") or {}))
+        return {**bf_options , **header_options}
