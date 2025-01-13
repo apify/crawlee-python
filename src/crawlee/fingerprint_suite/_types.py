@@ -188,6 +188,10 @@ class ScreenOptions(BaseModel):
     min_height: Annotated[float | None, Field(alias="minHeight")] = None
     max_height: Annotated[float | None, Field(alias="maxHeight")] = None
 
+    class Config:
+        extra = "forbid"
+        populate_by_name = True
+
 class Browser:
     name: BrowserType
     """Name of the browser."""
@@ -198,33 +202,49 @@ class Browser:
     http_version: Annotated[SupportedHttpVersion | None, Field(alias="httpVersion")] = None
     """HTTP version to be used for header generation (the headers differ depending on the version)."""
 
+    class Config:
+        extra = "forbid"
+        populate_by_name = True
 
 
 class HeaderGeneratorOptions(BaseModel):
-    browsers: BrowserType
+    browsers: list[BrowserType] | None = None
     """List of BrowserSpecifications to generate the headers for."""
 
-    operating_systems: Annotated[list[SupportedOperatingSystems], Field(alias="operatingSystems")]
+    operating_systems: Annotated[list[SupportedOperatingSystems]| None, Field(alias="operatingSystems")] = None
     """List of operating systems to generate the headers for."""
 
-    devices: list[SupportedDevices]
+    devices: list[SupportedDevices]| None = None
     """List of devices to generate the headers for."""
 
-    locales: list[str]
+    locales: list[str]| None = None
     """List of at most 10 languages to include in the [Accept-Language]
     (https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Accept-Language) request header
     in the language format accepted by that header, for example `en`, `en-US` or `de`."""
 
-    http_version: Annotated[SupportedHttpVersion, Field(alias="httpVersion")]
+    http_version: Annotated[SupportedHttpVersion| None, Field(alias="httpVersion")]= None
     """HTTP version to be used for header generation (the headers differ depending on the version)."""
 
-    strict: bool
+    strict: bool| None = None
     """If true, the generator will throw an error if it cannot generate headers based on the input."""
 
+    class Config:
+        extra = "forbid"
+        populate_by_name = True
+
 class FingerprintGeneratorOptions(BaseModel):
-    header_options: HeaderGeneratorOptions
-    screen: ScreenOptions
+    """All generator options are optional. If any value si s not specified, then a default value will be used.
+
+     Default values are implementation detail of used fingerprint generator.
+     Specific default values should not be relied upon. Use explicit values if it matters for your use case.
+     """
+
+    header_options: HeaderGeneratorOptions | None = None
+    screen: ScreenOptions | None = None
     mock_web_rtc: Annotated[bool, Field(alias="mockWebRTC")] = None
     """Whether to mock WebRTC when injecting the fingerprint."""
     slim: Annotated[bool | None, Field(alias="slim")] = None
     """Disables performance-heavy evasions when injecting the fingerprint."""
+    class Config:
+        extra = "forbid"
+        populate_by_name = True
