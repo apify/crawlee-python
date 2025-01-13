@@ -1005,7 +1005,10 @@ async def test_crawler_multiple_stops_in_parallel(httpbin: URL) -> None:
 
 async def test_sets_services() -> None:
     custom_configuration = Configuration()
-    custom_event_manager = LocalEventManager()
+    custom_event_manager = LocalEventManager(
+        system_info_interval=timedelta(seconds=3),
+        persist_state_interval=timedelta(seconds=30),
+    )
     custom_storage_client = MemoryStorageClient.from_config(custom_configuration)
 
     crawler = BasicCrawler(

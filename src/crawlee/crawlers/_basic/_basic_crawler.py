@@ -23,7 +23,6 @@ from crawlee._autoscaling import AutoscaledPool, Snapshotter, SystemStatus
 from crawlee._log_config import configure_logger, get_configured_log_level
 from crawlee._request import Request, RequestState
 from crawlee._types import BasicCrawlingContext, HttpHeaders, RequestHandlerRunResult, SendRequestFunction
-from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
@@ -305,10 +304,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         # Internal, not explicitly configurable components
         self._tld_extractor = TLDExtract(cache_dir=tempfile.TemporaryDirectory().name)
-        self._snapshotter = Snapshotter(
-            max_memory_size=ByteSize.from_mb(config.memory_mbytes) if config.memory_mbytes else None,
-            available_memory_ratio=config.available_memory_ratio,
-        )
+        self._snapshotter = Snapshotter()
         self._autoscaled_pool = AutoscaledPool(
             system_status=SystemStatus(self._snapshotter),
             is_finished_function=self.__is_finished_function,

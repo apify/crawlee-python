@@ -44,7 +44,11 @@ class Configuration(BaseSettings):
             )
         ),
     ] = None
-    """This setting is currently unused. For more details, see https://github.com/apify/crawlee-python/issues/670."""
+    """Specifies the path to the browser executable. Currently primarily for Playwright-based features. This option
+    is passed directly to Playwright's `browser_type.launch` method as `executable_path` argument. For more details,
+    refer to the Playwright documentation:
+    https://playwright.dev/docs/api/class-browsertype#browser-type-launch.
+    """
 
     disable_browser_sandbox: Annotated[
         bool,
@@ -55,7 +59,10 @@ class Configuration(BaseSettings):
             )
         ),
     ] = False
-    """This setting is currently unused. For more details, see https://github.com/apify/crawlee-python/issues/670."""
+    """Disables the sandbox for the browser. Currently primarily for Playwright-based features. This option
+    is passed directly to Playwright's `browser_type.launch` method as `chromium_sandbox`. For more details,
+    refer to the Playwright documentation:
+    https://playwright.dev/docs/api/class-browsertype#browser-type-launch."""
 
     log_level: Annotated[
         Literal['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
@@ -79,7 +86,7 @@ class Configuration(BaseSettings):
             )
         ),
     ] = 'default'
-    """The default dataset ID."""
+    """The default dataset ID. This option is utilized by the storage client."""
 
     default_key_value_store_id: Annotated[
         str,
@@ -91,7 +98,7 @@ class Configuration(BaseSettings):
             )
         ),
     ] = 'default'
-    """The default key-value store ID."""
+    """The default key-value store ID. This option is utilized by the storage client."""
 
     default_request_queue_id: Annotated[
         str,
@@ -103,7 +110,7 @@ class Configuration(BaseSettings):
             )
         ),
     ] = 'default'
-    """The default request queue ID."""
+    """The default request queue ID. This option is utilized by the storage client."""
 
     purge_on_start: Annotated[
         bool,
@@ -114,10 +121,10 @@ class Configuration(BaseSettings):
             )
         ),
     ] = True
-    """Whether to purge the storage on the start."""
+    """Whether to purge the storage on the start. This option is utilized by the `MemoryStorageClient`."""
 
     write_metadata: Annotated[bool, Field(alias='crawlee_write_metadata')] = True
-    """Whether to write the storage metadata."""
+    """Whether to write the storage metadata. This option is utilized by the `MemoryStorageClient`."""
 
     persist_storage: Annotated[
         bool,
@@ -128,7 +135,7 @@ class Configuration(BaseSettings):
             )
         ),
     ] = True
-    """Whether to persist the storage."""
+    """Whether to persist the storage. This option is utilized by the `MemoryStorageClient`."""
 
     persist_state_interval: Annotated[
         timedelta_ms,
@@ -139,7 +146,8 @@ class Configuration(BaseSettings):
             )
         ),
     ] = timedelta(minutes=1)
-    """This setting is currently unused. For more details, see https://github.com/apify/crawlee-python/issues/670."""
+    """Interval at which `PersistState` events are emitted. The event ensures the state persistence during
+    the crawler run. This option is utilized by the `EventManager`."""
 
     system_info_interval: Annotated[
         timedelta_ms,
@@ -150,7 +158,8 @@ class Configuration(BaseSettings):
             )
         ),
     ] = timedelta(seconds=1)
-    """This setting is currently unused. For more details, see https://github.com/apify/crawlee-python/issues/670."""
+    """Interval at which `SystemInfo` events are emitted. The event represents the current status of the system.
+    This option is utilized by the `LocalEventManager`."""
 
     max_used_cpu_ratio: Annotated[
         float,
@@ -161,7 +170,8 @@ class Configuration(BaseSettings):
             )
         ),
     ] = 0.95
-    """This setting is currently unused. For more details, see https://github.com/apify/crawlee-python/issues/670."""
+    """The maximum CPU usage ratio. If the CPU usage exceeds this ratio, it is considered overloaded.
+    This option is used by the `Snapshotter`."""
 
     memory_mbytes: Annotated[
         int | None,
@@ -173,7 +183,7 @@ class Configuration(BaseSettings):
             )
         ),
     ] = None
-    """The maximum memory in megabytes. The `Snapshotter.max_memory_size` is set to this value."""
+    """The maximum used memory in megabytes. This option is utilized by the `Snapshotter`."""
 
     available_memory_ratio: Annotated[
         float,
@@ -184,8 +194,8 @@ class Configuration(BaseSettings):
             )
         ),
     ] = 0.25
-    """The ratio of system memory to use when memory_mbytes is not specified. The `Snapshotter.available_memory_ratio`
-    is set to this value."""
+    """The maximum proportion of system memory to use. If `memory_mbytes` is not provided, this ratio is used to
+    calculate the maximum memory. This option is utilized by the `Snapshotter`."""
 
     storage_dir: Annotated[
         str,
@@ -196,7 +206,7 @@ class Configuration(BaseSettings):
             ),
         ),
     ] = './storage'
-    """The path to the storage directory."""
+    """The path to the storage directory. This option is utilized by the `MemoryStorageClient`."""
 
     chrome_executable_path: Annotated[
         str | None,
@@ -207,7 +217,7 @@ class Configuration(BaseSettings):
             )
         ),
     ] = None
-    """This setting is currently unused. For more details, see https://github.com/apify/crawlee-python/issues/670."""
+    """This setting is currently unused."""
 
     headless: Annotated[
         bool,
@@ -218,7 +228,11 @@ class Configuration(BaseSettings):
             )
         ),
     ] = True
-    """This setting is currently unused. For more details, see https://github.com/apify/crawlee-python/issues/670."""
+    """Whether to run the browser in headless mode. Currently primarily for Playwright-based features. This option
+    is passed directly to Playwright's `browser_type.launch` method as `headless`. For more details,
+    refer to the Playwright documentation:
+    https://playwright.dev/docs/api/class-browsertype#browser-type-launch.
+    """
 
     xvfb: Annotated[
         bool,
@@ -229,7 +243,7 @@ class Configuration(BaseSettings):
             )
         ),
     ] = False
-    """This setting is currently unused. For more details, see https://github.com/apify/crawlee-python/issues/670."""
+    """This setting is currently unused."""
 
     @classmethod
     def get_global_configuration(cls) -> Self:

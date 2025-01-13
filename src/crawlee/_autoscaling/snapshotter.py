@@ -41,7 +41,7 @@ class Snapshotter:
         *,
         event_loop_snapshot_interval: timedelta = timedelta(milliseconds=500),
         client_snapshot_interval: timedelta = timedelta(milliseconds=1000),
-        max_used_cpu_ratio: float = 0.95,
+        max_used_cpu_ratio: None | float = None,
         max_memory_size: ByteSize | None = None,
         max_used_memory_ratio: float = 0.9,
         max_event_loop_delay: timedelta = timedelta(milliseconds=50),
@@ -58,10 +58,10 @@ class Snapshotter:
             event_loop_snapshot_interval: The interval at which the event loop is sampled.
             client_snapshot_interval: The interval at which the client is sampled.
             max_used_cpu_ratio: Sets the ratio, defining the maximum CPU usage. When the CPU usage is higher than
-                the provided ratio, the CPU is considered overloaded.
+                the provided ratio, the CPU is considered overloaded. The default value is taken from
+                the `Configuration`.
             max_memory_size: Sets the maximum amount of system memory to be used by the `AutoscaledPool`. If `None`
-                is provided, the max amount of memory to be used is set to one quarter of total system memory.
-                I.e. on a system with 8192 MB, the `AutoscaledPool` will only use up to 2048 MB of memory.
+                is provided, the max amount of memory to be used is determined by the `available_memory_ratio`.
             max_used_memory_ratio: Sets the ratio, defining the maximum ratio of memory usage. When the memory usage
                 is higher than the provided ratio of `max_memory_size`, the memory is considered overloaded.
             max_event_loop_delay: Sets the maximum delay of the event loop. When the delay is higher than the provided
@@ -69,7 +69,9 @@ class Snapshotter:
             max_client_errors: Sets the maximum number of client errors (HTTP 429). When the number of client errors
                 is higher than the provided number, the client is considered overloaded.
             snapshot_history: Sets the time interval for which the snapshots are kept.
-            available_memory_ratio: How big part of the system memory should be used if `max_memory_size` is not given.
+            available_memory_ratio: The maximum proportion of system memory to use. If `max_memory_size` is not
+                provided, this ratio is used to calculate the maximum memory. The default value is taken from
+                the `Configuration`.
             reserve_memory_ratio: Fraction of memory kept in reserve. Used to calculate critical memory overload
                 threshold.
             memory_warning_cooldown_period: Minimum time interval between logging successive critical memory overload
@@ -77,13 +79,13 @@ class Snapshotter:
             client_rate_limit_error_retry_count: Number of retries for a client request before considering it a failure
                 due to rate limiting.
         """
-        if available_memory_ratio is None and max_memory_size is None:
-            raise ValueError('At least one of `available_memory_ratio` or `max_memory_size` must be specified')
+        config = service_locator.get_configuration()
 
+        self._available_memory_ratio = available_memory_ratio or config.available_memory_ratio
         self._event_loop_snapshot_interval = event_loop_snapshot_interval
         self._client_snapshot_interval = client_snapshot_interval
         self._max_event_loop_delay = max_event_loop_delay
-        self._max_used_cpu_ratio = max_used_cpu_ratio
+        self._max_used_cpu_ratio = max_used_cpu_ratio or config.max_used_cpu_ratio
         self._max_used_memory_ratio = max_used_memory_ratio
         self._max_client_errors = max_client_errors
         self._snapshot_history = snapshot_history
@@ -91,9 +93,8 @@ class Snapshotter:
         self._memory_warning_cooldown_period = memory_warning_cooldown_period
         self._client_rate_limit_error_retry_count = client_rate_limit_error_retry_count
         self._max_memory_size = max_memory_size or self._get_default_max_memory_size(
-            cast(float, available_memory_ratio)
+            config.memory_mbytes, self._available_memory_ratio
         )
-
         self._cpu_snapshots = self._get_sorted_list_by_created_at(list[CpuSnapshot]())
         self._event_loop_snapshots = self._get_sorted_list_by_created_at(list[EventLoopSnapshot]())
         self._memory_snapshots = self._get_sorted_list_by_created_at(list[MemorySnapshot]())
@@ -112,8 +113,11 @@ class Snapshotter:
         return SortedList(input_list, key=attrgetter('created_at'))
 
     @staticmethod
-    def _get_default_max_memory_size(available_memory_ratio: float) -> ByteSize:
-        """Default `memory_max_size` is 1/4 of the total system memory."""
+    def _get_default_max_memory_size(memory_mbytes: int | None, available_memory_ratio: float) -> ByteSize:
+        """If `memory_mbytes` is not provided, calculates the default `max_memory_size` based on the system memory."""
+        if memory_mbytes:
+            return ByteSize.from_mb(memory_mbytes)
+
         max_memory_size_in_bytes = int(psutil.virtual_memory().total * available_memory_ratio)
         max_memory_size = ByteSize(max_memory_size_in_bytes)
         logger.info(f'Setting max_memory_size of this run to {max_memory_size}.')

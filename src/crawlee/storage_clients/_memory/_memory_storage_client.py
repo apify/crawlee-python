@@ -68,6 +68,9 @@ class MemoryStorageClient(BaseStorageClient):
     ) -> None:
         """A default constructor.
 
+        In the most cases you should use the `from_config` constructor to create an new instance based on
+        the provided configuration.
+
         Args:
             write_metadata: Whether to write metadata to the storage.
             persist_storage: Whether to persist the storage.
@@ -98,7 +101,7 @@ class MemoryStorageClient(BaseStorageClient):
         All the memory storage client parameters are taken from the configuration object.
 
         Args:
-            config: The configuration object.
+            config: The configuration object. Uses the global (default) configuration if not provided.
         """
         config = config or Configuration.get_global_configuration()
 
