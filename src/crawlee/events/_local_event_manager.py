@@ -33,12 +33,11 @@ class LocalEventManager(EventManager):
     ) -> None:
         """A default constructor.
 
-        In the most cases you should use the `from_config` constructor to create an new instance based on
+        In most cases, you should use the `from_config` constructor to create a new instance based on
         the provided configuration.
 
         Args:
-            system_info_interval: Interval at which `SystemInfo` events are emitted. The default value is taken
-                from the `Configuration`.
+            system_info_interval: Interval at which `SystemInfo` events are emitted.
             event_manager_options: Additional options for the parent class.
         """
         self._system_info_interval = system_info_interval

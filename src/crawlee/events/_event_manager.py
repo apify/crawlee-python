@@ -68,7 +68,6 @@ class EventManager:
 
         Args:
             persist_state_interval: Interval between emitted `PersistState` events to maintain state persistence.
-                The default value is taken from the `Configuration`.
             close_timeout: Optional timeout for canceling pending event listeners if they exceed this duration.
         """
         self._persist_state_interval = persist_state_interval

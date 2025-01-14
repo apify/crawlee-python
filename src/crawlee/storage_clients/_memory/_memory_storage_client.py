@@ -68,7 +68,7 @@ class MemoryStorageClient(BaseStorageClient):
     ) -> None:
         """A default constructor.
 
-        In the most cases you should use the `from_config` constructor to create an new instance based on
+        In most cases, you should use the `from_config` constructor to create a new instance based on
         the provided configuration.
 
         Args:

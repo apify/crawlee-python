@@ -92,7 +92,7 @@ class Snapshotter:
         self._reserve_memory_ratio = reserve_memory_ratio
         self._memory_warning_cooldown_period = memory_warning_cooldown_period
         self._client_rate_limit_error_retry_count = client_rate_limit_error_retry_count
-        self._max_memory_size = max_memory_size or self._get_default_max_memory_size(
+        self._max_memory_size = max_memory_size or self._determine_max_memory_size(
             config.memory_mbytes, self._available_memory_ratio
         )
         self._cpu_snapshots = self._get_sorted_list_by_created_at(list[CpuSnapshot]())
@@ -113,8 +113,12 @@ class Snapshotter:
         return SortedList(input_list, key=attrgetter('created_at'))
 
     @staticmethod
-    def _get_default_max_memory_size(memory_mbytes: int | None, available_memory_ratio: float) -> ByteSize:
-        """If `memory_mbytes` is not provided, calculates the default `max_memory_size` based on the system memory."""
+    def _determine_max_memory_size(memory_mbytes: int | None, available_memory_ratio: float) -> ByteSize:
+        """Determine the maximum memory size for the current run.
+
+        If `memory_mbytes` is provided, it uses that value. Otherwise, it calculates the default `max_memory_size`
+        as a proportion of the system's total available memory based on `available_memory_ratio`.
+        """
         if memory_mbytes:
             return ByteSize.from_mb(memory_mbytes)
 
