@@ -8,11 +8,10 @@ import json
 from typing import TYPE_CHECKING, Any
 from unittest import mock
 
-from crawlee.fingerprint_suite import DefaultFingerprintGenerator
-
 from crawlee import Glob, Request
 from crawlee._types import EnqueueStrategy
 from crawlee.crawlers import PlaywrightCrawler
+from crawlee.fingerprint_suite import DefaultFingerprintGenerator
 from crawlee.fingerprint_suite._consts import (
     PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA,
     PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_MOBILE,
@@ -200,13 +199,12 @@ async def test_custom_fingerprint_uses_generator_options(httpbin: URL) -> None:
     max_height = 1200
 
     fingerprint_options = FingerprintGeneratorOptions(
-        header_options=HeaderGeneratorOptions(browsers=["firefox"], operating_systems=["android"]),
-        screen=ScreenOptions(min_width=min_width, max_width=max_width, min_height=min_height, max_height=max_height)
+        header_options=HeaderGeneratorOptions(browsers=['firefox'], operating_systems=['android']),
+        screen=ScreenOptions(min_width=min_width, max_width=max_width, min_height=min_height, max_height=max_height),
     )
 
     crawler = PlaywrightCrawler(
-        headless=True,
-        browser_pool_options={'fingerprint_generator': DefaultFingerprintGenerator(fingerprint_options)}
+        headless=True, browser_pool_options={'fingerprint_generator': DefaultFingerprintGenerator(fingerprint_options)}
     )
 
     response_headers = dict[str, str]()
@@ -239,8 +237,9 @@ async def test_custom_fingerprint_uses_generator_options(httpbin: URL) -> None:
 async def test_custom_fingerprint_matches_header_user_agent(httpbin: URL) -> None:
     """Test that generated fingerprint and header have matching user agent."""
 
-    crawler = PlaywrightCrawler(headless=True,
-                                browser_pool_options={'fingerprint_generator': DefaultFingerprintGenerator()})
+    crawler = PlaywrightCrawler(
+        headless=True, browser_pool_options={'fingerprint_generator': DefaultFingerprintGenerator()}
+    )
     response_headers = dict[str, str]()
     fingerprints = dict[str, str]()
 

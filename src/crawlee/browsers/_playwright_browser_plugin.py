@@ -12,13 +12,13 @@ from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 from crawlee.browsers._base_browser_plugin import BaseBrowserPlugin
 from crawlee.browsers._playwright_browser_controller import PlaywrightBrowserController
-from crawlee.fingerprint_suite._fingerprint_generator import AbstractFingerprintGenerator
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
     from types import TracebackType
 
     from crawlee.browsers._types import BrowserType
+    from crawlee.fingerprint_suite._fingerprint_generator import AbstractFingerprintGenerator
 
 logger = getLogger(__name__)
 
@@ -53,7 +53,8 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
                 Playwright documentation: https://playwright.dev/python/docs/api/class-browser#browser-new-context.
             max_open_pages_per_browser: The maximum number of pages that can be opened in a single browser instance.
                 Once reached, a new browser instance will be launched to handle the excess.
-            fingerprint_generator: Use fingerprint generator to generate headers with consistent browser fingerprints.
+            fingerprint_generator: An optional instance of implementation of `AbstractFingerprintGenerator` that is used
+                to generate browser fingerprints together with consistent headers.
         """
         self._browser_type = browser_type
         self._browser_launch_options = browser_launch_options or {}

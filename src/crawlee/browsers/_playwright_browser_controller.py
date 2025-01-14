@@ -13,13 +13,13 @@ from crawlee._utils.docs import docs_group
 from crawlee.browsers._base_browser_controller import BaseBrowserController
 from crawlee.browsers._types import BrowserType
 from crawlee.fingerprint_suite import HeaderGenerator
-from crawlee.fingerprint_suite._fingerprint_generator import AbstractFingerprintGenerator
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from playwright.async_api import Browser
 
+    from crawlee.fingerprint_suite._fingerprint_generator import AbstractFingerprintGenerator
     from crawlee.proxy_configuration import ProxyInfo
 
 from logging import getLogger
@@ -55,11 +55,13 @@ class PlaywrightBrowserController(BaseBrowserController):
                 requests made by the browser. By default, a predefined header generator is used. Set to `None` to
                 disable automatic header modifications.
             fingerprint_generator: An optional instance of implementation of `AbstractFingerprintGenerator` that is used
-                to generate browser fingerprints together with headers.
+                to generate browser fingerprints together with consistent headers.
         """
         if fingerprint_generator and header_generator is not self._DEFAULT_HEADER_GENERATOR:
-            raise ValueError("Do not use `header_generator` and `fingerprint_generator` arguments at the same time. "
-                             "Choose only one. `fingerprint_generator` generates headers as well.")
+            raise ValueError(
+                'Do not use `header_generator` and `fingerprint_generator` arguments at the same time. '
+                'Choose only one. `fingerprint_generator` generates headers as well.'
+            )
         self._browser = browser
         self._max_open_pages_per_browser = max_open_pages_per_browser
         self._header_generator = header_generator
@@ -68,7 +70,6 @@ class PlaywrightBrowserController(BaseBrowserController):
         self._browser_context: BrowserContext | None = None
         self._pages = list[Page]()
         self._last_page_opened_at = datetime.now(timezone.utc)
-
 
     @property
     @override
