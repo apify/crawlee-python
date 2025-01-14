@@ -1,13 +1,18 @@
-from crawlee.fingerprint_suite._browserforge_adapter import FingerprintGenerator
+import pytest
+
+from crawlee.fingerprint_suite import AbstractFingerprintGenerator
+from crawlee.fingerprint_suite._browserforge_adapter import FingerprintGenerator as BrowserForgeAdapter
 from crawlee.fingerprint_suite._types import FingerprintGeneratorOptions, HeaderGeneratorOptions, ScreenOptions
 
 
-def test_fingerprint_generator_has_default() -> None:
+@pytest.mark.parametrize('FingerprintGenerator', [pytest.param(BrowserForgeAdapter, id='browserforge')])
+def test_fingerprint_generator_has_default(FingerprintGenerator: type[AbstractFingerprintGenerator]) -> None:  # noqa:N803  # Test is more readable if argument(class) is PascalCase
     """Test that header generator can work without any options."""
     assert FingerprintGenerator().generate()
 
 
-def test_fingerprint_generator_some_options() -> None:
+@pytest.mark.parametrize('FingerprintGenerator', [pytest.param(BrowserForgeAdapter, id='browserforge')])
+def test_fingerprint_generator_some_options(FingerprintGenerator: type[AbstractFingerprintGenerator]) -> None:  # noqa:N803  # Test is more readable if argument(class) is PascalCase
     """Test that header generator can work with only some options."""
     options = FingerprintGeneratorOptions(screen=ScreenOptions(min_width=500), mock_web_rtc=True)
 
@@ -17,7 +22,8 @@ def test_fingerprint_generator_some_options() -> None:
     assert fingerprint.screen.availWidth >= 500
 
 
-def test_fingerprint_generator_all_options() -> None:
+@pytest.mark.parametrize('FingerprintGenerator', [pytest.param(BrowserForgeAdapter, id='browserforge')])
+def test_fingerprint_generator_all_options(FingerprintGenerator: type[AbstractFingerprintGenerator]) -> None:  # noqa:N803  # Test is more readable if argument(class) is PascalCase
     """Test that header generator can work with all the options. Some most basic checks of fingerprint.
 
     Fingerprint generation option might have no effect if there is no fingerprint sample present in collected data.
@@ -41,7 +47,7 @@ def test_fingerprint_generator_all_options() -> None:
             browsers=['firefox'],
             operating_systems=['windows'],
             devices=['mobile'],
-            locales=['en'],  #  This does not seem to generate any other values than `en-US` regardless of the input
+            locales=['en'],  #  Does not generate any other values than `en-US` regardless of the input in browserforge
             http_version='2',  # Http1 does not work in browserforge
         ),
     )

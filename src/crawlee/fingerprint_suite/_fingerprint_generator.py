@@ -1,13 +1,17 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
-from browserforge.fingerprints import Fingerprint
+if TYPE_CHECKING:
+    from browserforge.fingerprints import Fingerprint
 
-from crawlee.fingerprint_suite._types import FingerprintGeneratorOptions
+    from crawlee.fingerprint_suite._types import FingerprintGeneratorOptions
 
 
 class AbstractFingerprintGenerator(ABC):
     @abstractmethod
-    def __init__(self, options: FingerprintGeneratorOptions, *, strict: bool = False) -> None:
+    def __init__(self, options: FingerprintGeneratorOptions | None = None, *, strict: bool = False) -> None:
         """A default constructor.
 
         Args:
