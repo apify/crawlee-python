@@ -146,12 +146,33 @@ class PlaywrightBrowserController(BaseBrowserController):
 
         return page
 
+    @override
+    async def close(self, *, force: bool = False) -> None:
+        """Close the browser.
+
+        Args:
+            force: Whether to force close all open pages before closing the browser.
+
+        Raises:
+            ValueError: If there are still open pages when trying to close the browser.
+        """
+        if self.pages_count > 0 and not force:
+            raise ValueError('Cannot close the browser while there are open pages.')
+
+        if self._browser_context:
+            await self._browser_context.close()
+        await self._browser.close()
+
+    def _on_page_close(self, page: Page) -> None:
+        """Handle actions after a page is closed."""
+        self._pages.remove(page)
+
     async def _create_browser_context(
         self,
         browser_new_context_options: Mapping[str, Any] | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> BrowserContext:
-        """Set browser context.
+        """Create a new browser context with the specified proxy settings.
 
         Create context with fingerprints and headers using with `self._fingerprint_generator` if available.
         Create context without fingerprints, but with headers based on `self._header_generator` if available.
@@ -161,7 +182,7 @@ class PlaywrightBrowserController(BaseBrowserController):
         browser_new_context_options = dict(browser_new_context_options) if browser_new_context_options else {}
 
         if proxy_info:
-            if browser_new_context_options['proxy']:
+            if browser_new_context_options.get('proxy'):
                 logger.warning("browser_new_context_options['proxy'] overriden by explicit `proxy_info` argument.")
 
             browser_new_context_options['proxy'] = ProxySettings(
@@ -189,24 +210,3 @@ class PlaywrightBrowserController(BaseBrowserController):
         )
 
         return await self._browser.new_context(**browser_new_context_options)
-
-    @override
-    async def close(self, *, force: bool = False) -> None:
-        """Close the browser.
-
-        Args:
-            force: Whether to force close all open pages before closing the browser.
-
-        Raises:
-            ValueError: If there are still open pages when trying to close the browser.
-        """
-        if self.pages_count > 0 and not force:
-            raise ValueError('Cannot close the browser while there are open pages.')
-
-        if self._browser_context:
-            await self._browser_context.close()
-        await self._browser.close()
-
-    def _on_page_close(self, page: Page) -> None:
-        """Handle actions after a page is closed."""
-        self._pages.remove(page)
