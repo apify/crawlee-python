@@ -1,17 +1,21 @@
 import pytest
 
-from crawlee.fingerprint_suite import AbstractFingerprintGenerator
-from crawlee.fingerprint_suite._browserforge_adapter import FingerprintGenerator as BrowserForgeAdapter
-from crawlee.fingerprint_suite._types import FingerprintGeneratorOptions, HeaderGeneratorOptions, ScreenOptions
+from crawlee.fingerprint_suite import (
+    AbstractFingerprintGenerator,
+    DefaultFingerprintGenerator,
+    FingerprintGeneratorOptions,
+    HeaderGeneratorOptions,
+    ScreenOptions,
+)
 
 
-@pytest.mark.parametrize('FingerprintGenerator', [pytest.param(BrowserForgeAdapter, id='browserforge')])
+@pytest.mark.parametrize('FingerprintGenerator', [pytest.param(DefaultFingerprintGenerator, id='browserforge')])
 def test_fingerprint_generator_has_default(FingerprintGenerator: type[AbstractFingerprintGenerator]) -> None:  # noqa:N803  # Test is more readable if argument(class) is PascalCase
     """Test that header generator can work without any options."""
     assert FingerprintGenerator().generate()
 
 
-@pytest.mark.parametrize('FingerprintGenerator', [pytest.param(BrowserForgeAdapter, id='browserforge')])
+@pytest.mark.parametrize('FingerprintGenerator', [pytest.param(DefaultFingerprintGenerator, id='browserforge')])
 def test_fingerprint_generator_some_options(FingerprintGenerator: type[AbstractFingerprintGenerator]) -> None:  # noqa:N803  # Test is more readable if argument(class) is PascalCase
     """Test that header generator can work with only some options."""
     options = FingerprintGeneratorOptions(screen=ScreenOptions(min_width=500), mock_web_rtc=True)
@@ -22,7 +26,7 @@ def test_fingerprint_generator_some_options(FingerprintGenerator: type[AbstractF
     assert fingerprint.screen.availWidth >= 500
 
 
-@pytest.mark.parametrize('FingerprintGenerator', [pytest.param(BrowserForgeAdapter, id='browserforge')])
+@pytest.mark.parametrize('FingerprintGenerator', [pytest.param(DefaultFingerprintGenerator, id='browserforge')])
 def test_fingerprint_generator_all_options(FingerprintGenerator: type[AbstractFingerprintGenerator]) -> None:  # noqa:N803  # Test is more readable if argument(class) is PascalCase
     """Test that header generator can work with all the options. Some most basic checks of fingerprint.
 

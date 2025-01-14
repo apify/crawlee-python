@@ -11,7 +11,12 @@ from unittest import mock
 from crawlee import Glob, Request
 from crawlee._types import EnqueueStrategy
 from crawlee.crawlers import PlaywrightCrawler
-from crawlee.fingerprint_suite import DefaultFingerprintGenerator
+from crawlee.fingerprint_suite import (
+    DefaultFingerprintGenerator,
+    FingerprintGeneratorOptions,
+    HeaderGeneratorOptions,
+    ScreenOptions,
+)
 from crawlee.fingerprint_suite._consts import (
     PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA,
     PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_MOBILE,
@@ -19,7 +24,6 @@ from crawlee.fingerprint_suite._consts import (
     PW_CHROMIUM_HEADLESS_DEFAULT_USER_AGENT,
     PW_FIREFOX_HEADLESS_DEFAULT_USER_AGENT,
 )
-from crawlee.fingerprint_suite._types import FingerprintGeneratorOptions, HeaderGeneratorOptions, ScreenOptions
 
 if TYPE_CHECKING:
     from yarl import URL
