@@ -203,9 +203,7 @@ async def test_custom_fingerprint_uses_generator_options(httpbin: URL) -> None:
         screen=ScreenOptions(min_width=min_width, max_width=max_width, min_height=min_height, max_height=max_height),
     )
 
-    crawler = PlaywrightCrawler(
-        headless=True, browser_pool_options={'fingerprint_generator': DefaultFingerprintGenerator(fingerprint_options)}
-    )
+    crawler = PlaywrightCrawler(headless=True, fingerprint_generator=DefaultFingerprintGenerator(fingerprint_options))
 
     response_headers = dict[str, str]()
     fingerprints = dict[str, Any]()
@@ -237,9 +235,7 @@ async def test_custom_fingerprint_uses_generator_options(httpbin: URL) -> None:
 async def test_custom_fingerprint_matches_header_user_agent(httpbin: URL) -> None:
     """Test that generated fingerprint and header have matching user agent."""
 
-    crawler = PlaywrightCrawler(
-        headless=True, browser_pool_options={'fingerprint_generator': DefaultFingerprintGenerator()}
-    )
+    crawler = PlaywrightCrawler(headless=True, fingerprint_generator=DefaultFingerprintGenerator())
     response_headers = dict[str, str]()
     fingerprints = dict[str, str]()
 

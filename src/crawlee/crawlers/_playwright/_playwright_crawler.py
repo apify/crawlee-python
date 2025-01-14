@@ -25,6 +25,7 @@ if TYPE_CHECKING:
 
     from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs
     from crawlee.browsers._types import BrowserType
+    from crawlee.fingerprint_suite import AbstractFingerprintGenerator
 
 
 @docs_group('Classes')
@@ -72,10 +73,10 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
         self,
         *,
         browser_pool: BrowserPool | None = None,
-        browser_pool_options: Mapping[str, Any] | None = None,
         browser_type: BrowserType | None = None,
         browser_launch_options: Mapping[str, Any] | None = None,
         browser_new_context_options: Mapping[str, Any] | None = None,
+        fingerprint_generator: AbstractFingerprintGenerator | None = None,
         headless: bool | None = None,
         **kwargs: Unpack[BasicCrawlerOptions[PlaywrightCrawlingContext]],
     ) -> None:
@@ -83,7 +84,6 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
 
         Args:
             browser_pool: A `BrowserPool` instance to be used for launching the browsers and getting pages.
-            browser_pool_options: Arguments passed to `BrowserPool`.
             browser_type: The type of browser to launch ('chromium', 'firefox', or 'webkit').
                 This option should not be used if `browser_pool` is provided.
             browser_launch_options: Keyword arguments to pass to the browser launch method. These options are provided
@@ -94,6 +94,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 are provided directly to Playwright's `browser.new_context` method. For more details, refer to the
                 [Playwright documentation](https://playwright.dev/python/docs/api/class-browser#browser-new-context).
                 This option should not be used if `browser_pool` is provided.
+            fingerprint_generator: An optional instance of implementation of `AbstractFingerprintGenerator` that is used
+                to generate browser fingerprints together with consistent headers.
             headless: Whether to run the browser in headless mode.
                 This option should not be used if `browser_pool` is provided.
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
@@ -102,11 +104,18 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
             # Raise an exception if browser_pool is provided together with other browser-related arguments.
             if any(
                 param is not None
-                for param in (headless, browser_type, browser_launch_options, browser_new_context_options)
+                for param in (
+                    headless,
+                    browser_type,
+                    browser_launch_options,
+                    browser_new_context_options,
+                    fingerprint_generator,
+                )
             ):
                 raise ValueError(
-                    'You cannot provide `headless`, `browser_type`, `browser_launch_options` or '
-                    '`browser_new_context_options` arguments when `browser_pool` is provided.'
+                    'You cannot provide `headless`, `browser_type`, `browser_launch_options`, '
+                    '`browser_new_context_options` or `fingerprint_generator` arguments when `browser_pool` '
+                    'is provided.'
                 )
 
         # If browser_pool is not provided, create a new instance of BrowserPool with specified arguments.
@@ -116,7 +125,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 browser_type=browser_type,
                 browser_launch_options=browser_launch_options,
                 browser_new_context_options=browser_new_context_options,
-                **(browser_pool_options or {}),
+                fingerprint_generator=fingerprint_generator,
             )
 
         self._browser_pool = browser_pool

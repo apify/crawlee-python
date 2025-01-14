@@ -127,7 +127,7 @@ class PlaywrightBrowserController(BaseBrowserController):
             ValueError: If the browser has reached the maximum number of open pages.
         """
         if not self._browser_context:
-            await self._set_browser_context(
+            self._browser_context = await self._create_browser_context(
                 browser_new_context_options=browser_new_context_options,
                 proxy_info=proxy_info,
             )
@@ -135,7 +135,7 @@ class PlaywrightBrowserController(BaseBrowserController):
         if not self.has_free_capacity:
             raise ValueError('Cannot open more pages in this browser.')
 
-        page = await self._get_browser_context().new_page()
+        page = await self._browser_context.new_page()
 
         # Handle page close event
         page.on(event='close', f=self._on_page_close)
@@ -146,15 +146,17 @@ class PlaywrightBrowserController(BaseBrowserController):
 
         return page
 
-    async def _set_browser_context(
+    async def _create_browser_context(
         self,
         browser_new_context_options: Mapping[str, Any] | None = None,
         proxy_info: ProxyInfo | None = None,
-    ) -> None:
+    ) -> BrowserContext:
         """Set browser context.
 
-        Create context using `browserforge` if `self._fingerprint_generator` exists.
-        Create context without fingerprints with headers based on header generator if available.
+        Create context with fingerprints and headers using with `self._fingerprint_generator` if available.
+        Create context without fingerprints, but with headers based on `self._header_generator` if available.
+        Create context without headers and without fingerprints if neither `self._header_generator` nor
+        `self._fingerprint_generator` is available.
         """
         browser_new_context_options = dict(browser_new_context_options) if browser_new_context_options else {}
 
@@ -169,10 +171,9 @@ class PlaywrightBrowserController(BaseBrowserController):
             )
 
         if self._fingerprint_generator:
-            self._browser_context = await AsyncNewContext(
+            return await AsyncNewContext(
                 browser=self._browser, fingerprint=self._fingerprint_generator.generate(), **browser_new_context_options
             )
-            return
 
         if self._header_generator:
             common_headers = self._header_generator.get_common_headers()
@@ -187,12 +188,7 @@ class PlaywrightBrowserController(BaseBrowserController):
             'extra_http_headers', extra_http_headers
         )
 
-        self._browser_context = await self._browser.new_context(**browser_new_context_options)
-
-    def _get_browser_context(self) -> BrowserContext:
-        if not self._browser_context:
-            raise RuntimeError('Browser context was not set yet.')
-        return self._browser_context
+        return await self._browser.new_context(**browser_new_context_options)
 
     @override
     async def close(self, *, force: bool = False) -> None:
