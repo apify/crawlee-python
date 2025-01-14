@@ -42,11 +42,11 @@ class _SimpleRenderingTypePredictor(RenderingTypePredictor):
         self._detection_probability_recommendation = detection_probability_recommendation or cycle([1])
 
     @override
-    def predict(self, url: str, label: str | None) -> RenderingTypePrediction:
+    def predict(self, request: Request) -> RenderingTypePrediction:
         return RenderingTypePrediction(next(self._rendering_types), next(self._detection_probability_recommendation))
 
     @override
-    def store_result(self, url: str, label: str | None, crawl_type: RenderingType) -> None:
+    def store_result(self, request: Request, crawl_type: RenderingType) -> None:
         pass
 
 
@@ -245,9 +245,9 @@ async def test_adaptive_crawling_predictor_calls(
     ):
         await crawler.run(requests)
 
-    mocked_predict.assert_called_once_with(some_url, some_label)
+    mocked_predict.assert_called_once_with(requests[0])
     # If `static` and `client only` results are same, `store_result` should be called with `static`.
-    mocked_store_result.assert_called_once_with(some_url, some_label, expected_result_renderingl_type)
+    mocked_store_result.assert_called_once_with(requests[0], expected_result_renderingl_type)
 
 
 async def test_adaptive_crawling_result_use_state_isolation() -> None:

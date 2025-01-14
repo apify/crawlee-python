@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from contextlib import AbstractAsyncContextManager, AsyncExitStack
 from copy import deepcopy
 from dataclasses import dataclass
 from logging import getLogger
@@ -36,13 +35,15 @@ from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context
     AdaptivePlaywrightPreNavCrawlingContext,
 )
 from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import (
-    DefaultRenderingTypePredictor,
+    RandomRenderingTypePredictor as DefaultRenderingTypePredictor,
+)
+from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import (
     RenderingType,
     RenderingTypePredictor,
 )
 from crawlee.crawlers._adaptive_playwright._result_comparator import (
     SubCrawlerRun,
-    create_comparator,
+    create_default_comparator,
 )
 from crawlee.crawlers._beautifulsoup._beautifulsoup_parser import BeautifulSoupParser
 from crawlee.crawlers._parsel._parsel_parser import ParselParser
@@ -50,6 +51,7 @@ from crawlee.statistics import Statistics
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Coroutine, Sequence
+    from contextlib import AbstractAsyncContextManager
     from datetime import timedelta
     from types import TracebackType
 
@@ -70,6 +72,10 @@ TStaticCrawlingContext = TypeVar('TStaticCrawlingContext', bound=ParsedHttpCrawl
 class _NoActiveStatistics(Statistics):
     """Statistics compliant object that is not supposed to do anything when active. To be used in sub crawlers."""
 
+    def __init__(self) -> None:
+        super().__init__()
+        self._active = True
+
     async def __aenter__(self) -> Self:
         self._active = True
         return self
@@ -89,7 +95,7 @@ class _OrphanPlaywrightContextPipeline(Generic[TStaticParseResult]):
 
     pre_navigation_hook: Callable[[Callable[[PlaywrightPreNavCrawlingContext], Awaitable[None]]], None]
     pipeline: ContextPipeline[PlaywrightCrawlingContext]
-    needed_contexts: list[AbstractAsyncContextManager]
+    needed_context: AbstractAsyncContextManager
     top_router: Router[AdaptivePlaywrightCrawlingContext]
     static_parser: AbstractHttpParser[TStaticParseResult]
 
@@ -111,7 +117,6 @@ class _OrphanStaticContextPipeline(Generic[TStaticCrawlingContext]):
 
     pre_navigation_hook: Callable[[Callable[[BasicCrawlingContext], Awaitable[None]]], None]
     pipeline: ContextPipeline[TStaticCrawlingContext]
-    needed_contexts: list[AbstractAsyncContextManager]
     top_router: Router[AdaptivePlaywrightCrawlingContext]
 
     def create_pipeline_call(self, top_context: BasicCrawlingContext) -> Coroutine[Any, Any, None]:
@@ -129,8 +134,8 @@ class AdaptivePlaywrightCrawler(
 ):
     """Adaptive crawler that uses both specific implementation of `AbstractHttpCrawler` and `PlaywrightCrawler`.
 
-    It tries to detect whether it is sufficient to crawl with `BeautifulSoupCrawler` (which is faster) or if
-    `PlaywrightCrawler` should be used (in case `BeautifulSoupCrawler` did not work as expected for specific url.).
+    It tries to detect whether it is sufficient to crawl without browser (which is faster) or if
+    `PlaywrightCrawler` should be used (in case previous method did not work as expected for specific url.).
 
     # TODO: Add example
     """
@@ -146,7 +151,7 @@ class AdaptivePlaywrightCrawler(
         playwright_crawler_specific_kwargs: PlaywrightCrawlerAdditionalOptions | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> None:
-        """A default constructor.
+        """A default constructor. Recommended way to create instance is to call factory methods `with_*_static_parser`.
 
         Args:
             rendering_type_predictor: Object that implements RenderingTypePredictor and is capable of predicting which
@@ -165,7 +170,7 @@ class AdaptivePlaywrightCrawler(
         # Adaptive crawling related.
         self.rendering_type_predictor = rendering_type_predictor or DefaultRenderingTypePredictor()
         self.result_checker = result_checker or (lambda result: True)  #  noqa: ARG005  # Intentionally unused argument.
-        self.result_comparator = result_comparator or create_comparator(result_checker)
+        self.result_comparator = result_comparator or create_default_comparator(result_checker)
 
         # Use AdaptivePlaywrightCrawlerStatistics.
         if 'statistics' in kwargs:
@@ -206,24 +211,15 @@ class AdaptivePlaywrightCrawler(
             **playwright_crawler_specific_kwargs, **basic_crawler_kwargs_for_pw_crawler
         )
 
-        required_contexts_pw_crawler: list[AbstractAsyncContextManager] = [
-            playwright_crawler._statistics,  # noqa:SLF001  # Intentional access to private member.
-            playwright_crawler._browser_pool,  # noqa:SLF001  # Intentional access to private member.
-        ]
-        required_contexts_static_crawler: list[AbstractAsyncContextManager] = [
-            static_crawler._statistics,  # noqa:SLF001  # Intentional access to private member.
-        ]
-
         self._pw_context_pipeline = _OrphanPlaywrightContextPipeline(
             pipeline=playwright_crawler._context_pipeline,  # noqa:SLF001  # Intentional access to private member.
-            needed_contexts=required_contexts_pw_crawler,
+            needed_context=playwright_crawler._browser_pool,  # noqa:SLF001  # Intentional access to private member.
             top_router=self.router,
             pre_navigation_hook=playwright_crawler.pre_navigation_hook,
             static_parser=static_parser,
         )
         self._static_context_pipeline = _OrphanStaticContextPipeline[ParsedHttpCrawlingContext[TStaticParseResult]](
             pipeline=static_crawler._context_pipeline,  # noqa:SLF001  # Intentional access to private member.
-            needed_contexts=required_contexts_static_crawler,
             top_router=self.router,
             pre_navigation_hook=static_crawler.pre_navigation_hook,
         )
@@ -239,13 +235,11 @@ class AdaptivePlaywrightCrawler(
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[BeautifulSoup], BeautifulSoup]:
         """Creates `AdaptivePlaywrightCrawler` that uses `BeautifulSoup` for parsing static content."""
-        parser_kwargs = {'parser': parser_type} if parser_type else {}
-
         return AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[BeautifulSoup], BeautifulSoup](
             rendering_type_predictor=rendering_type_predictor,
             result_checker=result_checker,
             result_comparator=result_comparator,
-            static_parser=BeautifulSoupParser(**parser_kwargs),
+            static_parser=BeautifulSoupParser(parser=parser_type),
             static_crawler_specific_kwargs=static_crawler_specific_kwargs,
             playwright_crawler_specific_kwargs=playwright_crawler_specific_kwargs,
             **kwargs,
@@ -323,21 +317,11 @@ class AdaptivePlaywrightCrawler(
             purge_request_queue: If this is `True` and the crawler is not being run for the first time, the default
                 request queue will be purged.
         """
-        contexts_to_enter = [
-            cm
-            for cm in self._static_context_pipeline.needed_contexts + self._pw_context_pipeline.needed_contexts
-            if cm and getattr(cm, 'active', False) is False
-        ]
-
-        # Enter contexts required by sub crawler for them to be able to do `crawl_one`
-        async with AsyncExitStack() as exit_stack:
-            for context in contexts_to_enter:
-                await exit_stack.enter_async_context(context)
+        if not getattr(self._pw_context_pipeline.needed_context, 'active', False):
+            async with self._pw_context_pipeline.needed_context:
+                return await super().run(requests=requests, purge_request_queue=purge_request_queue)
+        else:
             return await super().run(requests=requests, purge_request_queue=purge_request_queue)
-
-        # AsyncExitStack can in theory swallow exceptions and so the return might not execute.
-        # https://github.com/python/mypy/issues/7726
-        raise RuntimeError('FinalStatistics not created.')
 
     # Can't use override as mypy does not like it for double underscore private method.
     async def _BasicCrawler__run_request_handler(self, context: BasicCrawlingContext) -> None:  # noqa: N802
@@ -370,7 +354,7 @@ class AdaptivePlaywrightCrawler(
             except Exception as e:
                 return SubCrawlerRun(exception=e)
 
-        rendering_type_prediction = self.rendering_type_predictor.predict(context.request.url, context.request.label)
+        rendering_type_prediction = self.rendering_type_predictor.predict(context.request)
         should_detect_rendering_type = random() < rendering_type_prediction.detection_probability_recommendation
 
         if not should_detect_rendering_type:
@@ -383,7 +367,7 @@ class AdaptivePlaywrightCrawler(
 
                 static_run = await _run_subcrawler_pipeline(self._static_context_pipeline)
                 if static_run.result and self.result_checker(static_run.result):
-                    await self._commit_result(result=static_run.result, context=context)
+                    await self._push_result_to_context(result=static_run.result, context=context)
                     return
                 if static_run.exception:
                     context.log.exception(
@@ -412,7 +396,7 @@ class AdaptivePlaywrightCrawler(
             raise pw_run.exception
 
         if pw_run.result:
-            await self._commit_result(result=pw_run.result, context=context)
+            await self._push_result_to_context(result=pw_run.result, context=context)
 
             if should_detect_rendering_type:
                 detection_result: RenderingType
@@ -424,9 +408,9 @@ class AdaptivePlaywrightCrawler(
                     detection_result = 'client only'
 
                 context.log.debug(f'Detected rendering type {detection_result} for {context.request.url}')
-                self.rendering_type_predictor.store_result(context.request.url, context.request.label, detection_result)
+                self.rendering_type_predictor.store_result(context.request, detection_result)
 
-    async def _commit_result(self, result: RequestHandlerRunResult, context: BasicCrawlingContext) -> None:
+    async def _push_result_to_context(self, result: RequestHandlerRunResult, context: BasicCrawlingContext) -> None:
         """Execute calls from `result` on the context."""
         result_tasks = (
             [asyncio.create_task(context.push_data(**kwargs)) for kwargs in result.push_data_calls]

@@ -15,7 +15,7 @@ class SubCrawlerRun:
     exception: Exception | None = None
 
 
-def create_comparator(
+def create_default_comparator(
     result_checker: Callable[[RequestHandlerRunResult], bool] | None,
 ) -> Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool]:
     """Factory for creating comparator function."""
