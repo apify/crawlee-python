@@ -12,6 +12,7 @@ from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 from crawlee.browsers._base_browser_plugin import BaseBrowserPlugin
 from crawlee.browsers._playwright_browser_controller import PlaywrightBrowserController
+from crawlee.fingerprint_suite._fingerprint_generator import AbstractFingerprintGenerator
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -38,8 +39,7 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         browser_launch_options: Mapping[str, Any] | None = None,
         browser_new_context_options: Mapping[str, Any] | None = None,
         max_open_pages_per_browser: int = 20,
-        use_fingerprints: bool = True,
-        fingerprint_generator_options: dict[str, Any] | None = None,
+        fingerprint_generator: AbstractFingerprintGenerator | None = None,
     ) -> None:
         """A default constructor.
 
@@ -53,9 +53,7 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
                 Playwright documentation: https://playwright.dev/python/docs/api/class-browser#browser-new-context.
             max_open_pages_per_browser: The maximum number of pages that can be opened in a single browser instance.
                 Once reached, a new browser instance will be launched to handle the excess.
-            use_fingerprints: Inject generated fingerprints to page.
-            fingerprint_generator_options: Override generated fingerprints with these specific values, if possible.
-
+            fingerprint_generator: Use fingerprint generator to generate headers with consistent browser fingerprints.
         """
         self._browser_type = browser_type
         self._browser_launch_options = browser_launch_options or {}
@@ -68,8 +66,7 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         # Flag to indicate the context state.
         self._active = False
 
-        self._use_fingerprints = use_fingerprints
-        self._fingerprint_generator_options = fingerprint_generator_options
+        self._fingerprint_generator = fingerprint_generator
 
     @property
     @override
@@ -148,6 +145,5 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         return PlaywrightBrowserController(
             browser,
             max_open_pages_per_browser=self._max_open_pages_per_browser,
-            fingerprint_generator=self.fingerprint_generator,
-            fingerprint_generator_options=self._fingerprint_generator_options,
+            fingerprint_generator=self._fingerprint_generator,
         )

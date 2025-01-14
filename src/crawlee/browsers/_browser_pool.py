@@ -16,7 +16,8 @@ from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee.browsers._base_browser_controller import BaseBrowserController
 from crawlee.browsers._playwright_browser_plugin import PlaywrightBrowserPlugin
-from crawlee.browsers._types import BrowserType, CrawleePage
+from crawlee.browsers._types import CrawleePage, BrowserType
+from crawlee.fingerprint_suite._fingerprint_generator import AbstractFingerprintGenerator
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -51,8 +52,6 @@ class BrowserPool:
         browser_inactive_threshold: timedelta = timedelta(seconds=10),
         identify_inactive_browsers_interval: timedelta = timedelta(seconds=20),
         close_inactive_browsers_interval: timedelta = timedelta(seconds=30),
-        use_fingerprints: bool = True,
-        fingerprint_generator_options: dict[str, Any] | None = None,
     ) -> None:
         """A default constructor.
 
@@ -68,8 +67,6 @@ class BrowserPool:
             close_inactive_browsers_interval: The interval at which the pool checks for inactive browsers
                 and closes them. The browser is considered as inactive if it has no active pages and has been idle
                 for the specified period.
-            use_fingerprints: Inject generated fingerprints to page.
-            fingerprint_generator_options: Override generated fingerprints with these specific values, if possible.
         """
         self._plugins = plugins or [PlaywrightBrowserPlugin()]
         self._operation_timeout = operation_timeout
@@ -99,8 +96,6 @@ class BrowserPool:
         # Flag to indicate the context state.
         self._active = False
 
-        self._use_fingerprints = use_fingerprints
-        self._fingerprint_generator_options = fingerprint_generator_options
 
     @classmethod
     def with_default_plugin(
@@ -110,8 +105,7 @@ class BrowserPool:
         browser_launch_options: Mapping[str, Any] | None = None,
         browser_new_context_options: Mapping[str, Any] | None = None,
         headless: bool | None = None,
-        use_fingerprints: bool = False,
-        fingerprint_generator_options: dict[str, Any] | None = None,
+        fingerprint_generator: AbstractFingerprintGenerator | None = None,
         **kwargs: Any,
     ) -> BrowserPool:
         """Create a new instance with a single `PlaywrightBrowserPlugin` configured with the provided options.
@@ -125,8 +119,7 @@ class BrowserPool:
                 are provided directly to Playwright's `browser.new_context` method. For more details, refer to the
                 Playwright documentation: https://playwright.dev/python/docs/api/class-browser#browser-new-context.
             headless: Whether to run the browser in headless mode.
-            use_fingerprints: Inject generated fingerprints to page.
-            fingerprint_generator_options: Override generated fingerprints with these specific values, if possible.
+            fingerprint_generator:
             kwargs: Additional arguments for default constructor.
         """
         plugin_options: dict = defaultdict(dict)
@@ -141,8 +134,7 @@ class BrowserPool:
 
         plugin = PlaywrightBrowserPlugin(
             **plugin_options,
-            use_fingerprints=use_fingerprints,
-            fingerprint_generator_options=fingerprint_generator_options,
+            fingerprint_generator=fingerprint_generator,
         )
         return cls(plugins=[plugin], **kwargs)
 

@@ -18,7 +18,7 @@ from crawlee.fingerprint_suite._consts import (
 )
 
 if TYPE_CHECKING:
-    from crawlee.browsers._types import BrowserType
+    from crawlee.fingerprint_suite._types import BrowserType
 
 
 @docs_group('Classes')

@@ -1,13 +1,13 @@
+from __future__ import annotations
+
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
-from crawlee.browsers._types import BrowserType
-
-
 SupportedOperatingSystems= Literal["windows", "macos", "linux", "android", "ios"]
 SupportedDevices = Literal["desktop", "mobile"]
 SupportedHttpVersion = Literal["1", "2"]
+SupportedBrowserType = Literal['chromium', 'firefox', 'webkit', 'edge']
 
 class ScreenFingerprint(BaseModel):
     """
@@ -193,7 +193,7 @@ class ScreenOptions(BaseModel):
         populate_by_name = True
 
 class Browser:
-    name: BrowserType
+    name: SupportedBrowserType
     """Name of the browser."""
     min_version: Annotated[float|None, Field(alias="minVersion")] = None
     """Minimum version of browser used."""
@@ -208,7 +208,7 @@ class Browser:
 
 
 class HeaderGeneratorOptions(BaseModel):
-    browsers: list[BrowserType] | None = None
+    browsers: list[SupportedBrowserType] | None = None
     """List of BrowserSpecifications to generate the headers for."""
 
     operating_systems: Annotated[list[SupportedOperatingSystems]| None, Field(alias="operatingSystems")] = None
@@ -248,3 +248,5 @@ class FingerprintGeneratorOptions(BaseModel):
     class Config:
         extra = "forbid"
         populate_by_name = True
+
+

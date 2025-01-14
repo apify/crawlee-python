@@ -57,7 +57,7 @@ class PlaywrightBrowserController(BaseBrowserController):
             fingerprint_generator: An optional instance of implementation of `AbstractFingerprintGenerator` that is used
                 to generate browser fingerprints together with headers.
         """
-        if header_generator and fingerprint_generator:
+        if fingerprint_generator and header_generator is not self._DEFAULT_HEADER_GENERATOR:
             raise ValueError("Do not use `header_generator` and `fingerprint_generator` arguments at the same time. "
                              "Choose only one. `fingerprint_generator` generates headers as well.")
         self._browser = browser
@@ -69,7 +69,6 @@ class PlaywrightBrowserController(BaseBrowserController):
         self._pages = list[Page]()
         self._last_page_opened_at = datetime.now(timezone.utc)
 
-        self._fingerprint_generator_options = fingerprint_generator_options
 
     @property
     @override
@@ -129,7 +128,6 @@ class PlaywrightBrowserController(BaseBrowserController):
         if not self._browser_context:
             await self._set_browser_context(
                 browser_new_context_options=browser_new_context_options,
-                fingerprint_options=self._fingerprint_generator_options,
                 proxy_info=proxy_info,
             )
 
@@ -151,7 +149,6 @@ class PlaywrightBrowserController(BaseBrowserController):
         self,
         browser_new_context_options: Mapping[str, Any] | None = None,
         proxy_info: ProxyInfo | None = None,
-        fingerprint_options: dict | None = None,
     ) -> None:
         """Set browser context.
 
@@ -172,7 +169,7 @@ class PlaywrightBrowserController(BaseBrowserController):
 
         if self._fingerprint_generator:
             self._browser_context = await AsyncNewContext(
-                browser=self._browser, fingerprint_options=(fingerprint_options or {}), **browser_new_context_options
+                browser=self._browser, fingerprint=self._fingerprint_generator.generate(), **browser_new_context_options
             )
             return
 

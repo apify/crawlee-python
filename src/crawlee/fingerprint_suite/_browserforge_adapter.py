@@ -21,17 +21,19 @@ class FingerprintGenerator(AbstractFingerprintGenerator):
 
     @staticmethod
     def _prepare_options(options: FingerprintGeneratorOptions) -> dict[any,any]:
+        """Adapt options for `browserforge.fingerprints.FingerprintGenerator`."""
         raw_options = options.model_dump()
         bf_options = {}
         if raw_options["header_options"] is None:
-            header_options = dict()
+            bf_header_options = dict()
         else:
-            header_options = deepcopy(raw_options["header_options"])
-            header_options["browser"] = header_options.pop("browsers", None)
-            header_options["os"] = header_options.pop("operating_systems", None)
-            header_options["device"] = header_options.pop("devices", None)
-            header_options["locale"] = header_options.pop("locales", None)
+            bf_header_options = deepcopy(raw_options["header_options"])
+            bf_header_options["browser"] = bf_header_options.pop("browsers", None)
+            bf_header_options["os"] = bf_header_options.pop("operating_systems", None)
+            bf_header_options["device"] = bf_header_options.pop("devices", None)
+            bf_header_options["locale"] = bf_header_options.pop("locales", None)
 
         bf_options["mock_webrtc"] = raw_options["mock_web_rtc"]
         bf_options["screen"] = Screen(**(raw_options.get("screen") or {}))
-        return {**bf_options , **header_options}
+        bf_options["slim"] = raw_options["slim"]
+        return {**bf_options , **bf_header_options}
