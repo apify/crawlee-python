@@ -5,12 +5,18 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest import mock
 
 from crawlee import Glob, Request
 from crawlee._types import EnqueueStrategy
 from crawlee.crawlers import PlaywrightCrawler
+from crawlee.fingerprint_suite import (
+    DefaultFingerprintGenerator,
+    FingerprintGeneratorOptions,
+    HeaderGeneratorOptions,
+    ScreenOptions,
+)
 from crawlee.fingerprint_suite._consts import (
     PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA,
     PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_MOBILE,
@@ -188,3 +194,63 @@ async def test_pre_navigation_hook(httpbin: URL) -> None:
     await crawler.run(['https://example.com', str(httpbin)])
 
     assert mock_hook.call_count == 2
+
+
+async def test_custom_fingerprint_uses_generator_options(httpbin: URL) -> None:
+    min_width = 300
+    max_width = 600
+    min_height = 500
+    max_height = 1200
+
+    fingerprint_options = FingerprintGeneratorOptions(
+        header_options=HeaderGeneratorOptions(browsers=['firefox'], operating_systems=['android']),
+        screen=ScreenOptions(min_width=min_width, max_width=max_width, min_height=min_height, max_height=max_height),
+    )
+
+    crawler = PlaywrightCrawler(headless=True, fingerprint_generator=DefaultFingerprintGenerator(fingerprint_options))
+
+    response_headers = dict[str, str]()
+    fingerprints = dict[str, Any]()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        response = await context.response.text()
+        context_response_headers = dict(json.loads(response)).get('headers', {})
+
+        for key, val in context_response_headers.items():
+            response_headers[key] = val
+
+        for relevant_key in (
+            'window.navigator.userAgent',
+            'window.navigator.userAgentData',
+            'window.screen.height',
+            'window.screen.width',
+        ):
+            fingerprints[relevant_key] = await context.page.evaluate(f'()=>{relevant_key}')
+
+    await crawler.run([Request.from_url(str(httpbin / 'get'))])
+
+    assert 'Firefox' in fingerprints['window.navigator.userAgent']
+    assert fingerprints['window.navigator.userAgentData']['platform'] == 'Android'
+    assert min_width <= int(fingerprints['window.screen.width']) <= max_width
+    assert min_height <= int(fingerprints['window.screen.height']) <= max_height
+
+
+async def test_custom_fingerprint_matches_header_user_agent(httpbin: URL) -> None:
+    """Test that generated fingerprint and header have matching user agent."""
+
+    crawler = PlaywrightCrawler(headless=True, fingerprint_generator=DefaultFingerprintGenerator())
+    response_headers = dict[str, str]()
+    fingerprints = dict[str, str]()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        response = await context.response.text()
+        context_response_headers = dict(json.loads(response)).get('headers', {})
+
+        response_headers['User-Agent'] = context_response_headers['User-Agent']
+        fingerprints['window.navigator.userAgent'] = await context.page.evaluate('()=>window.navigator.userAgent')
+
+    await crawler.run([Request.from_url(str(httpbin / 'get'))])
+
+    assert response_headers['User-Agent'] == fingerprints['window.navigator.userAgent']
