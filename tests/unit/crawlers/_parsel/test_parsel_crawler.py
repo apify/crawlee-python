@@ -245,7 +245,7 @@ def test_import_error_handled() -> None:
 
     # Check if the raised ImportError contains the expected message
     assert str(import_error.value) == (
-        "To import anything from this subpackage, you need to install the 'parsel' extra."
+        "To import this, you need to install the 'parsel' extra."
         "For example, if you use pip, run `pip install 'crawlee[parsel]'`."
     )
 

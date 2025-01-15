@@ -8,13 +8,13 @@ _install_import_hook(__name__)
 
 # The following imports use try_import to handle optional dependencies, as they may not always be available.
 
-with _try_import(__name__, 'BeautifulSoupCrawler', 'BeautifulSoupCrawlingContext', 'BeautifulSoupParserType'):
+with _try_import(__name__, 'CurlImpersonateHttpClient'):
     from ._curl_impersonate import CurlImpersonateHttpClient
 
 
 __all__ = [
     'BaseHttpClient',
-    'CurlImpersonatedHttpClient',
+    'CurlImpersonateHttpClient',
     'HttpCrawlingResult',
     'HttpResponse',
     'HttpxHttpClient',

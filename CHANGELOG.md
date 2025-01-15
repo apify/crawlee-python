@@ -3,7 +3,24 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 0.5.0 - **not yet released**
+## 0.5.2 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Avoid `use_state` race conditions. Remove key argument to `use_state` ([#868](https://github.com/apify/crawlee-python/pull/868)) ([000b976](https://github.com/apify/crawlee-python/commit/000b9761211502d86a893a31e3ca21998a6e3b99)) by [@Pijukatel](https://github.com/Pijukatel), closes [#856](https://github.com/apify/crawlee-python/issues/856)
+- Restore proxy functionality for PlaywrightCrawler broken in v0.5 ([#889](https://github.com/apify/crawlee-python/pull/889)) ([908c944](https://github.com/apify/crawlee-python/commit/908c944ff9b1fc8ed7eb35f0078a1de71e34d5c5)) by [@Mantisus](https://github.com/Mantisus), closes [#887](https://github.com/apify/crawlee-python/issues/887)
+- Fix the usage of Configuration ([#899](https://github.com/apify/crawlee-python/pull/899)) ([0f1cf6f](https://github.com/apify/crawlee-python/commit/0f1cf6f0b52c92ca4e465a2a01f8111cd9ab42ec)) by [@vdusek](https://github.com/vdusek), closes [#670](https://github.com/apify/crawlee-python/issues/670)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.5.1](https://github.com/apify/crawlee-python/releases/tag/v0.5.1) (2025-01-07)
+
+### 🐛 Bug Fixes
+
+- Make result of RequestList.is_empty independent of fetch_next_request calls ([#876](https://github.com/apify/crawlee-python/pull/876)) ([d50249e](https://github.com/apify/crawlee-python/commit/d50249ecbfe2a04f508fcdc3261e050349bd0da2)) by [@janbuchar](https://github.com/janbuchar)
+
+
+## [0.5.0](https://github.com/apify/crawlee-python/releases/tag/v0.5.0) (2025-01-02)
 
 ### 🚀 Features
 
@@ -26,6 +43,7 @@ All notable changes to this project will be documented in this file.
 - Respect user configuration for work with status codes ([#812](https://github.com/apify/crawlee-python/pull/812)) ([8daf4bd](https://github.com/apify/crawlee-python/commit/8daf4bd49c1b09a0924f827daedebf7600ac609b)) by [@Mantisus](https://github.com/Mantisus), closes [#708](https://github.com/apify/crawlee-python/issues/708), [#756](https://github.com/apify/crawlee-python/issues/756)
 - `abort-on-error` for successive runs ([#834](https://github.com/apify/crawlee-python/pull/834)) ([0cea673](https://github.com/apify/crawlee-python/commit/0cea67387bf366800b447de784af580159b199ee)) by [@Mantisus](https://github.com/Mantisus)
 - Relax ServiceLocator restrictions ([#837](https://github.com/apify/crawlee-python/pull/837)) ([aa3667f](https://github.com/apify/crawlee-python/commit/aa3667f344d78945df3eca77431e1409f43f8bb5)) by [@janbuchar](https://github.com/janbuchar), closes [#806](https://github.com/apify/crawlee-python/issues/806)
+- Fix typo in exports ([#841](https://github.com/apify/crawlee-python/pull/841)) ([8fa6ac9](https://github.com/apify/crawlee-python/commit/8fa6ac994fe4f3f6430cb796a0c6a732c93c672b)) by [@janbuchar](https://github.com/janbuchar)
 
 ### Refactor
 
@@ -36,7 +54,6 @@ All notable changes to this project will be documented in this file.
 - [**breaking**] Update the crawlers &amp; storage clients structure ([#828](https://github.com/apify/crawlee-python/pull/828)) ([0ba04d1](https://github.com/apify/crawlee-python/commit/0ba04d1633881043928a408678932c46fb90e21f)) by [@vdusek](https://github.com/vdusek), closes [#764](https://github.com/apify/crawlee-python/issues/764)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.4.5](https://github.com/apify/crawlee-python/releases/tag/v0.4.5) (2024-12-06)
 
 ### 🚀 Features

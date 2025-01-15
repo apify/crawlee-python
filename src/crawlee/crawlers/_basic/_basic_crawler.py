@@ -29,7 +29,6 @@ from crawlee._types import (
     RequestHandlerRunResult,
     SendRequestFunction,
 )
-from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
@@ -194,7 +193,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         - and more.
     """
 
-    CRAWLEE_STATE_KEY = 'CRAWLEE_STATE'
+    _CRAWLEE_STATE_KEY = 'CRAWLEE_STATE'
 
     def __init__(
         self,
@@ -329,10 +328,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         # Internal, not explicitly configurable components
         self._tld_extractor = TLDExtract(cache_dir=tempfile.TemporaryDirectory().name)
-        self._snapshotter = Snapshotter(
-            max_memory_size=ByteSize.from_mb(config.memory_mbytes) if config.memory_mbytes else None,
-            available_memory_ratio=config.available_memory_ratio,
-        )
+        self._snapshotter = Snapshotter.from_config(config)
         self._autoscaled_pool = AutoscaledPool(
             system_status=SystemStatus(self._snapshotter),
             is_finished_function=self.__is_finished_function,
@@ -592,7 +588,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     async def _use_state(self, default_value: dict[str, JsonSerializable] | None = None) -> dict[str, JsonSerializable]:
         store = await self.get_key_value_store()
-        return await store.get_auto_saved_value(BasicCrawler.CRAWLEE_STATE_KEY, default_value)
+        return await store.get_auto_saved_value(self._CRAWLEE_STATE_KEY, default_value)
 
     async def _save_crawler_state(self) -> None:
         store = await self.get_key_value_store()

@@ -254,7 +254,7 @@ class ExportToFunction(Protocol):
 
 
 class EnqueueLinksFunction(Protocol):
-    """A function type for enqueueing new URLs to crawl, based on elements selected by a CSS selector.
+    """A function type for enqueueing new URLs to crawl, based on elements selected by a selector.
 
     This function is used to extract and enqueue new URLs from the current page for further crawling.
     """
@@ -270,7 +270,10 @@ class EnqueueLinksFunction(Protocol):
         """A call dunder method.
 
         Args:
-            selector: CSS selector used to find the elements containing the links.
+            selector: selector used to find the elements containing the links.
+                - PlaywrightCrawler: supports CSS and XPath selectors
+                - ParselCrawler: supports CSS selectors
+                - BeautifulSoupCrawler: supports CSS selectors
             label: Label for the newly created `Request` objects, used for request routing.
             user_data: User data to be provided to the newly created `Request` objects.
             **kwargs: Additional arguments for the `add_requests` method.

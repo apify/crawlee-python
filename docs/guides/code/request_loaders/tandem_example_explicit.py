@@ -6,20 +6,22 @@ from crawlee.storages import RequestQueue
 
 
 async def main() -> None:
-    # Create a static request list
+    # Create a static request list.
     request_list = RequestList(['https://crawlee.dev', 'https://apify.com'])
 
-    # Open the default request queue
+    # Open the default request queue.
     request_queue = await RequestQueue.open()
 
-    crawler = ParselCrawler(
-        # Requests from the list will be processed first, but they will be enqueued in the default request queue first
-        request_manager=RequestManagerTandem(request_list, request_queue),
-    )
+    # And combine them together to a sinhle request manager.
+    request_manager = RequestManagerTandem(request_list, request_queue)
+
+    # Create a crawler and pass the request manager to it.
+    crawler = ParselCrawler(request_manager=request_manager)
 
     @crawler.router.default_handler
     async def handler(context: ParselCrawlingContext) -> None:
-        await context.enqueue_links()  # New links will be enqueued directly to the queue
+        # New links will be enqueued directly to the queue.
+        await context.enqueue_links()
 
     await crawler.run()
 

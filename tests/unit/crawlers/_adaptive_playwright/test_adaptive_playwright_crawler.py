@@ -261,7 +261,7 @@ async def test_adaptive_crawling_result_use_state_isolation() -> None:
         rendering_type_predictor=static_only_predictor_enforce_detection
     )
     store = await crawler.get_key_value_store()
-    await store.set_value(BasicCrawler.CRAWLEE_STATE_KEY, {'counter': 0})
+    await store.set_value(BasicCrawler._CRAWLEE_STATE_KEY, {'counter': 0})
     request_handler_calls = 0
 
     @crawler.router.default_handler
@@ -278,7 +278,7 @@ async def test_adaptive_crawling_result_use_state_isolation() -> None:
     # Request handler was called twice
     assert request_handler_calls == 2
     # Increment of global state happened only once
-    assert (await store.get_value(BasicCrawler.CRAWLEE_STATE_KEY))['counter'] == 1
+    assert (await store.get_value(BasicCrawler._CRAWLEE_STATE_KEY))['counter'] == 1
 
 
 async def test_adaptive_crawling_statistics() -> None:

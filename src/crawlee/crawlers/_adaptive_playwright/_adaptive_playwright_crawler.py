@@ -376,7 +376,7 @@ class AdaptivePlaywrightCrawler(
             # (This static crawl is performed only to evaluate rendering type detection.)
             kvs = await context.get_key_value_store()
             default_value = dict[str, JsonSerializable]()
-            old_state: dict[str, JsonSerializable] = await kvs.get_value(BasicCrawler.CRAWLEE_STATE_KEY, default_value)
+            old_state: dict[str, JsonSerializable] = await kvs.get_value(self._CRAWLEE_STATE_KEY, default_value)
             old_state_copy = deepcopy(old_state)
 
         pw_run = await _run_subcrawler_pipeline(self._pw_context_pipeline)
