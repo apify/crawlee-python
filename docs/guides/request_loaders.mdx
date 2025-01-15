@@ -31,6 +31,12 @@ And one specific request loader:
 Below is a class diagram that illustrates the relationships between these components and the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>:
 
 ```mermaid
+---
+config:
+    class:
+        hideEmptyMembersBox: true
+---
+
 classDiagram
 
 %% ========================
@@ -47,7 +53,6 @@ class BaseStorage {
 
 class RequestLoader {
     <<abstract>>
-    _attributes_
     + fetch_next_request()
     + mark_request_as_handled()
     + is_empty()
@@ -59,7 +64,6 @@ class RequestLoader {
 
 class RequestManager {
     <<abstract>>
-    _attributes_
     + add_request()
     + add_requests_batched()
     + reclaim_request()
