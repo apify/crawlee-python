@@ -1029,13 +1029,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         try:
             request.state = RequestState.REQUEST_HANDLER
 
-            await wait_for(
-                lambda: self.__run_request_handler(context),
-                timeout=self._request_handler_timeout,
-                timeout_message='Request handler timed out after '
-                f'{self._request_handler_timeout.total_seconds()} seconds',
-                logger=self._logger,
-            )
+            await self._run_request_handler(context=context)
 
             await self._commit_request_handler_result(context, result)
 
@@ -1126,8 +1120,14 @@ class BasicCrawler(Generic[TCrawlingContext]):
             )
             raise
 
-    async def __run_request_handler(self, context: BasicCrawlingContext) -> None:
-        await self._context_pipeline(context, self.router)
+    async def _run_request_handler(self, context: BasicCrawlingContext) -> None:
+        await wait_for(
+            lambda: self._context_pipeline(context, self.router),
+            timeout=self._request_handler_timeout,
+            timeout_message='Request handler timed out after '
+            f'{self._request_handler_timeout.total_seconds()} seconds',
+            logger=self._logger,
+        )
 
     def _is_session_blocked_status_code(self, session: Session | None, status_code: int) -> bool:
         """Check if the HTTP status code indicates that the session was blocked by the target website.

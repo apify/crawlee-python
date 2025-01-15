@@ -275,9 +275,6 @@ class AdaptivePlaywrightCrawler(
         state: dict[str, JsonSerializable] | None = None,
     ) -> RequestHandlerRunResult:
         # Timeout to ensure that both sub crawlers can finish one request withing top crawler `request_handler_timeout`.
-        sub_crawler_timeout_coefficient = 0.45
-        timeout = self._request_handler_timeout * sub_crawler_timeout_coefficient
-
         if state is not None:
 
             async def get_input_state(
@@ -303,14 +300,14 @@ class AdaptivePlaywrightCrawler(
 
         await wait_for(
             lambda: subcrawler_pipeline.create_pipeline_call(context_linked_to_result),
-            timeout=timeout,
-            timeout_message=f'Sub crawler timed out after {timeout.total_seconds()} seconds',
+            timeout=self._request_handler_timeout,
+            timeout_message=f'Sub crawler timed out after {self._request_handler_timeout.total_seconds()} seconds',
             logger=self._logger,
         )
         return result
 
     # Can't use override as mypy does not like it for double underscore private method.
-    async def _BasicCrawler__run_request_handler(self, context: BasicCrawlingContext) -> None:  # noqa: N802
+    async def _run_request_handler(self, context: BasicCrawlingContext) -> None:
         """Override BasicCrawler method that delegates request processing to sub crawlers.
 
         To decide which sub crawler should process the request it runs `rendering_type_predictor`.
