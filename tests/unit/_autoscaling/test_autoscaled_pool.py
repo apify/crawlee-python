@@ -169,6 +169,7 @@ async def test_autoscales(system_status: SystemStatus | Mock) -> None:
 
     cast(Mock, system_status.get_historical_system_info).side_effect = get_historical_system_info
 
+    AutoscaledPool._AUTOSCALE_INTERVAL = timedelta(seconds=0.1)
     pool = AutoscaledPool(
         system_status=system_status,
         run_task_function=run,
@@ -179,7 +180,6 @@ async def test_autoscales(system_status: SystemStatus | Mock) -> None:
             desired_concurrency=1,
             max_concurrency=4,
         ),
-        autoscale_interval=timedelta(seconds=0.1),
     )
 
     pool_run_task = asyncio.create_task(pool.run(), name='pool run task')
@@ -237,6 +237,8 @@ async def test_autoscales_uses_desired_concurrency_ratio(system_status: SystemSt
 
     cast(Mock, system_status.get_historical_system_info).side_effect = get_historical_system_info
 
+    AutoscaledPool._AUTOSCALE_INTERVAL = timedelta(seconds=0.1)
+    AutoscaledPool._DESIRED_CONCURRENCY_RATIO = 1
     pool = AutoscaledPool(
         system_status=system_status,
         run_task_function=run,
@@ -247,8 +249,6 @@ async def test_autoscales_uses_desired_concurrency_ratio(system_status: SystemSt
             desired_concurrency=2,
             max_concurrency=4,
         ),
-        autoscale_interval=timedelta(seconds=0.1),
-        desired_concurrency_ratio=1,
     )
 
     pool_run_task = asyncio.create_task(pool.run(), name='pool run task')
