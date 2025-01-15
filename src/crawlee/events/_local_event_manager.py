@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.system import get_cpu_info, get_memory_info
+from crawlee.configuration import Configuration
 from crawlee.events._event_manager import EventManager, EventManagerOptions
 from crawlee.events._types import Event, EventSystemInfoData
 
@@ -32,6 +33,9 @@ class LocalEventManager(EventManager):
     ) -> None:
         """A default constructor.
 
+        In most cases, you should use the `from_config` constructor to create a new instance based on
+        the provided configuration.
+
         Args:
             system_info_interval: Interval at which `SystemInfo` events are emitted.
             event_manager_options: Additional options for the parent class.
@@ -45,6 +49,20 @@ class LocalEventManager(EventManager):
         )
 
         super().__init__(**event_manager_options)
+
+    @classmethod
+    def from_config(cls, config: Configuration | None = None) -> LocalEventManager:
+        """Create a new instance based on the provided configuration.
+
+        Args:
+            config: The configuration object. Uses the global (default) configuration if not provided.
+        """
+        config = config or Configuration.get_global_configuration()
+
+        return cls(
+            system_info_interval=config.system_info_interval,
+            persist_state_interval=config.persist_state_interval,
+        )
 
     async def __aenter__(self) -> LocalEventManager:
         """Initializes the local event manager upon entering the async context.
