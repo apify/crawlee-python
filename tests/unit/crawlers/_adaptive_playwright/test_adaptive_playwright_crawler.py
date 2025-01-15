@@ -301,9 +301,9 @@ async def test_adaptive_crawling_statistics() -> None:
 
     await crawler.run(requests)
 
-    assert crawler.predictor_state.http_only_request_handler_runs == 1
-    assert crawler.predictor_state.browser_request_handler_runs == 1
-    assert crawler.predictor_state.rendering_type_mispredictions == 1
+    assert crawler.statistics.state.http_only_request_handler_runs == 1
+    assert crawler.statistics.state.browser_request_handler_runs == 1
+    assert crawler.statistics.state.rendering_type_mispredictions == 1
 
     # Despite running both sub crawlers the top crawler statistics should count this as one request finished.
     assert crawler.statistics.state.requests_finished == 1
@@ -313,7 +313,7 @@ async def test_adaptive_crawling_statistics() -> None:
 @pytest.mark.parametrize(
     'error_in_pw_crawler',
     [
-        pytest.param(False, id='Error only in bs sub crawler'),
+        pytest.param(False, id='Error only in static sub crawler'),
         pytest.param(True, id='Error in both sub crawlers'),
     ],
 )
@@ -367,7 +367,7 @@ def test_adaptive_playwright_crawler_statistics_in_init() -> None:
     log_message = 'some message'
     periodic_message_logger = logging.getLogger('some logger')  # Accessing private member to create copy like-object.
     log_interval = timedelta(minutes=2)
-    statistics = Statistics(
+    statistics = Statistics.with_default_state(
         persistence_enabled=persistence_enabled,
         persist_state_kvs_name=persist_state_kvs_name,
         persist_state_key=persist_state_key,

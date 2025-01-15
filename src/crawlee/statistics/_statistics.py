@@ -4,7 +4,9 @@ from __future__ import annotations
 import math
 from datetime import datetime, timedelta, timezone
 from logging import Logger, getLogger
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Generic, cast
+
+from typing_extensions import Self, TypeVar
 
 from crawlee import service_locator
 from crawlee._utils.context import ensure_context
@@ -18,9 +20,7 @@ from crawlee.storages import KeyValueStore
 if TYPE_CHECKING:
     from types import TracebackType
 
-    from typing_extensions import Self
-
-
+TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
 logger = getLogger(__name__)
 
 
@@ -53,7 +53,7 @@ class RequestProcessingRecord:
 
 
 @docs_group('Classes')
-class Statistics:
+class Statistics(Generic[TStatisticsState]):
     """An interface to collecting and logging runtime statistics for requests.
 
     All information is saved to the key value store so that it persists between migrations, abortions and resurrections.
@@ -71,13 +71,13 @@ class Statistics:
         log_message: str = 'Statistics',
         periodic_message_logger: Logger | None = None,
         log_interval: timedelta = timedelta(minutes=1),
-        state_model: type[StatisticsState] = StatisticsState,
+        state_model: type[TStatisticsState],
     ) -> None:
         self._id = Statistics.__next_id
         Statistics.__next_id += 1
 
         self._state_model = state_model
-        self.state: StatisticsState = self._state_model()
+        self.state = self._state_model()
         self._instance_start: datetime | None = None
         self._retry_histogram = dict[int, int]()
 
@@ -87,7 +87,7 @@ class Statistics:
         self._requests_in_progress = dict[str, RequestProcessingRecord]()
 
         if persist_state_key is None:
-            persist_state_key = self._get_default_persist_state_key()
+            persist_state_key = f'SDK_CRAWLER_STATISTICS_{self._id}'
 
         self._persistence_enabled = persistence_enabled
         self._persist_state_key = persist_state_key
@@ -102,8 +102,28 @@ class Statistics:
         # Flag to indicate the context state.
         self._active = False
 
-    def _get_default_persist_state_key(self) -> str:
-        return f'SDK_CRAWLER_STATISTICS_{self._id}'
+    @staticmethod
+    def with_default_state(
+        *,
+        persistence_enabled: bool = False,
+        persist_state_kvs_name: str = 'default',
+        persist_state_key: str | None = None,
+        key_value_store: KeyValueStore | None = None,
+        log_message: str = 'Statistics',
+        periodic_message_logger: Logger | None = None,
+        log_interval: timedelta = timedelta(minutes=1),
+    ) -> Statistics[StatisticsState]:
+        """Convenience constructor for creating a `Statistics` with default state model `StatisticsState`."""
+        return Statistics[StatisticsState](
+            persistence_enabled=persistence_enabled,
+            persist_state_kvs_name=persist_state_kvs_name,
+            persist_state_key=persist_state_key,
+            key_value_store=key_value_store,
+            log_message=log_message,
+            periodic_message_logger=periodic_message_logger,
+            log_interval=log_interval,
+            state_model=StatisticsState,
+        )
 
     @property
     def active(self) -> bool:
@@ -247,12 +267,13 @@ class Statistics:
         self._periodic_message_logger.info(f'{self._log_message}\n{stats.to_table()}')
 
     async def _maybe_load_statistics(self) -> None:
-        if self._persistence_enabled and self._key_value_store is not None:
-            await self._load_crawler_statistics(self._key_value_store)
-            await self._load_other_statistics(self._key_value_store)
+        if not self._persistence_enabled:
+            return
 
-    async def _load_crawler_statistics(self, key_value_store: KeyValueStore) -> None:
-        stored_state = await key_value_store.get_value(self._persist_state_key, cast(Any, {}))
+        if not self._key_value_store:
+            return
+
+        stored_state = await self._key_value_store.get_value(self._persist_state_key, cast(Any, {}))
 
         saved_state = self.state.__class__.model_validate(stored_state)
         self.state = saved_state
@@ -264,10 +285,18 @@ class Statistics:
         elif saved_state.crawler_last_started_at:
             self._instance_start = saved_state.crawler_last_started_at
 
-    async def _load_other_statistics(self, key_value_store: KeyValueStore) -> None:
-        """Load other statistics. Not implemented in Statistics."""
+    async def _persist_state(self, event_data: EventPersistStateData) -> None:
+        logger.debug(f'Persisting state of the Statistics (event_data={event_data}).')
 
-    async def _persist_crawler_statistics(self, key_value_store: KeyValueStore) -> None:
+        if not self._persistence_enabled:
+            return
+
+        if not self._key_value_store:
+            return
+
+        if not self._instance_start:
+            return
+
         final_statistics = self.calculate()
         persisted_state = StatisticsPersistedState(
             stats_id=self._id,
@@ -282,20 +311,11 @@ class Statistics:
 
         logger.debug('Persisting state')
 
-        await key_value_store.set_value(
+        await self._key_value_store.set_value(
             self._persist_state_key,
             self.state.model_dump(mode='json', by_alias=True) | persisted_state.model_dump(mode='json', by_alias=True),
             'application/json',
         )
-
-    async def _persist_other_statistics(self, key_value_store: KeyValueStore) -> None:
-        """Save other statistics. Not implemented in Statistics."""
-
-    async def _persist_state(self, event_data: EventPersistStateData) -> None:
-        logger.debug(f'Persisting state of the Statistics (event_data={event_data}).')
-        if self._persistence_enabled and self._key_value_store is not None and self._instance_start is not None:
-            await self._persist_crawler_statistics(self._key_value_store)
-            await self._persist_other_statistics(self._key_value_store)
 
     def _save_retry_count_for_request(self, record: RequestProcessingRecord) -> None:
         retry_count = record.retry_count

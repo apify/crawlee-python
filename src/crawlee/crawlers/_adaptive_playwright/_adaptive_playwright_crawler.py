@@ -48,7 +48,7 @@ from crawlee.crawlers._adaptive_playwright._result_comparator import (
 )
 from crawlee.crawlers._beautifulsoup._beautifulsoup_parser import BeautifulSoupParser
 from crawlee.crawlers._parsel._parsel_parser import ParselParser
-from crawlee.statistics import Statistics
+from crawlee.statistics import Statistics, StatisticsState
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
@@ -70,7 +70,7 @@ class _NoActiveStatistics(Statistics):
     """Statistics compliant object that is not supposed to do anything when active. To be used in sub crawlers."""
 
     def __init__(self) -> None:
-        super().__init__()
+        super().__init__(state_model=StatisticsState)
         self._active = True
 
     async def __aenter__(self) -> Self:
@@ -173,8 +173,6 @@ class AdaptivePlaywrightCrawler(
         else:
             statistics = AdaptivePlaywrightCrawlerStatistics()
         kwargs['statistics'] = statistics
-
-        self.predictor_state = statistics.predictor_state
 
         super().__init__(**kwargs)
 
@@ -345,7 +343,7 @@ class AdaptivePlaywrightCrawler(
             )
             if rendering_type_prediction.rendering_type == 'static':
                 context.log.debug(f'Running static request for {context.request.url}')
-                self.predictor_state.track_http_only_request_handler_runs()
+                self.statistics.track_http_only_request_handler_runs()
 
                 static_run = await _run_subcrawler_pipeline(self._static_context_pipeline)
                 if static_run.result and self.result_checker(static_run.result):
@@ -357,7 +355,7 @@ class AdaptivePlaywrightCrawler(
                     )
                 else:
                     context.log.warning(f'Static crawler: returned a suspicious result for {context.request.url}')
-                    self.predictor_state.track_rendering_type_mispredictions()
+                    self.statistics.track_rendering_type_mispredictions()
 
         context.log.debug(f'Running browser request handler for {context.request.url}')
 
@@ -372,7 +370,7 @@ class AdaptivePlaywrightCrawler(
             old_state_copy = deepcopy(old_state)
 
         pw_run = await _run_subcrawler_pipeline(self._pw_context_pipeline)
-        self.predictor_state.track_browser_request_handler_runs()
+        self.statistics.track_browser_request_handler_runs()
 
         if pw_run.exception is not None:
             raise pw_run.exception

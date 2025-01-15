@@ -44,7 +44,7 @@ from crawlee.errors import (
 from crawlee.http_clients import HttpxHttpClient
 from crawlee.router import Router
 from crawlee.sessions import SessionPool
-from crawlee.statistics import Statistics
+from crawlee.statistics import Statistics, StatisticsState
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 from ._context_pipeline import ContextPipeline
@@ -66,6 +66,7 @@ if TYPE_CHECKING:
     from crawlee.storages._dataset import ExportDataCsvKwargs, ExportDataJsonKwargs, GetDataKwargs, PushDataKwargs
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
+TStatisticsState = TypeVar('TStatisticsState', bound=BasicCrawlingContext, default=StatisticsState)
 ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Union[Request, None]]]
 FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
 
@@ -313,7 +314,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._logger = _logger or logging.getLogger(__name__)
 
         # Statistics
-        self._statistics = statistics or Statistics(
+        self._statistics = statistics or Statistics.with_default_state(
             periodic_message_logger=self._logger,
             log_message='Current request statistics:',
         )

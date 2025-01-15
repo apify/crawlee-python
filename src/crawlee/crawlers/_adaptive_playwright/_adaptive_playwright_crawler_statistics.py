@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import TYPE_CHECKING, Annotated, Any, cast
+from typing import TYPE_CHECKING, Annotated
 
-from pydantic import BaseModel, ConfigDict, Field
-from typing_extensions import override
+from pydantic import ConfigDict, Field
 
 from crawlee._utils.docs import docs_group
 from crawlee.statistics import Statistics, StatisticsState
@@ -18,25 +17,16 @@ if TYPE_CHECKING:
 
 
 @docs_group('Data structures')
-class PredictorState(BaseModel):
+class AdaptivePlaywrightCrawlerStatisticState(StatisticsState):
     model_config = ConfigDict(populate_by_name=True, ser_json_inf_nan='constants')
 
     http_only_request_handler_runs: Annotated[int, Field(alias='http_only_request_handler_runs')] = 0
     browser_request_handler_runs: Annotated[int, Field(alias='browser_request_handler_runs')] = 0
     rendering_type_mispredictions: Annotated[int, Field(alias='rendering_type_mispredictions')] = 0
 
-    def track_http_only_request_handler_runs(self) -> None:
-        self.http_only_request_handler_runs += 1
-
-    def track_browser_request_handler_runs(self) -> None:
-        self.browser_request_handler_runs += 1
-
-    def track_rendering_type_mispredictions(self) -> None:
-        self.rendering_type_mispredictions += 1
-
 
 @docs_group('Classes')
-class AdaptivePlaywrightCrawlerStatistics(Statistics):
+class AdaptivePlaywrightCrawlerStatistics(Statistics[AdaptivePlaywrightCrawlerStatisticState]):
     def __init__(
         self,
         *,
@@ -47,9 +37,7 @@ class AdaptivePlaywrightCrawlerStatistics(Statistics):
         log_message: str = 'Statistics',
         periodic_message_logger: Logger | None = None,
         log_interval: timedelta = timedelta(minutes=1),
-        state_model: type[StatisticsState] = StatisticsState,
     ) -> None:
-        self.predictor_state = PredictorState()
         super().__init__(
             persistence_enabled=persistence_enabled,
             persist_state_kvs_name=persist_state_kvs_name,
@@ -58,9 +46,9 @@ class AdaptivePlaywrightCrawlerStatistics(Statistics):
             log_message=log_message,
             periodic_message_logger=periodic_message_logger,
             log_interval=log_interval,
-            state_model=state_model,
+            state_model=AdaptivePlaywrightCrawlerStatisticState,
         )
-        self._persist_predictor_state_key = self._persist_state_key + '_PREDICTOR'
+        self.state
 
     @classmethod
     def from_statistics(cls, statistics: Statistics) -> Self:
@@ -72,20 +60,13 @@ class AdaptivePlaywrightCrawlerStatistics(Statistics):
             log_message=statistics._log_message,  # noqa:SLF001  # Accessing private member to create copy like-object.
             periodic_message_logger=statistics._periodic_message_logger,  # noqa:SLF001  # Accessing private member to create copy like-object.
             log_interval=statistics._log_interval,  # noqa:SLF001  # Accessing private member to create copy like-object.
-            state_model=statistics._state_model,  # noqa:SLF001  # Accessing private member to create copy like-object.
         )
 
-    @override
-    async def _persist_other_statistics(self, key_value_store: KeyValueStore) -> None:
-        """Persist state of predictor."""
-        await key_value_store.set_value(
-            self._persist_predictor_state_key,
-            self.predictor_state.model_dump(mode='json', by_alias=True),
-            'application/json',
-        )
+    def track_http_only_request_handler_runs(self) -> None:
+        self.state.http_only_request_handler_runs += 1
 
-    @override
-    async def _load_other_statistics(self, key_value_store: KeyValueStore) -> None:
-        """Load state of predictor."""
-        stored_state = await key_value_store.get_value(self._persist_predictor_state_key, cast(Any, {}))
-        self.predictor_state = self.predictor_state.__class__.model_validate(stored_state)
+    def track_browser_request_handler_runs(self) -> None:
+        self.state.browser_request_handler_runs += 1
+
+    def track_rendering_type_mispredictions(self) -> None:
+        self.state.rendering_type_mispredictions += 1
