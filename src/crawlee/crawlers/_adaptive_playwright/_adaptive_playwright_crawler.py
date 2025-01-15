@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from copy import deepcopy
 from dataclasses import dataclass
 from logging import getLogger
@@ -50,7 +51,7 @@ from crawlee.crawlers._parsel._parsel_parser import ParselParser
 from crawlee.statistics import Statistics
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable, Coroutine, Sequence
+    from collections.abc import Coroutine, Sequence
     from contextlib import AbstractAsyncContextManager
     from types import TracebackType
 
@@ -92,7 +93,6 @@ class _NoActiveStatistics(Statistics):
 class _OrphanPlaywrightContextPipeline(Generic[TStaticParseResult]):
     """Minimal setup required by playwright context pipeline to work without crawler."""
 
-    pre_navigation_hook: Callable[[Callable[[PlaywrightPreNavCrawlingContext], Awaitable[None]]], None]
     pipeline: ContextPipeline[PlaywrightCrawlingContext]
     top_router: Router[AdaptivePlaywrightCrawlingContext]
     needed_context: AbstractAsyncContextManager
@@ -114,7 +114,6 @@ class _OrphanPlaywrightContextPipeline(Generic[TStaticParseResult]):
 class _OrphanStaticContextPipeline(Generic[TStaticCrawlingContext]):
     """Minimal setup required by static context pipeline to work without crawler."""
 
-    pre_navigation_hook: Callable[[Callable[[BasicCrawlingContext], Awaitable[None]]], None]
     pipeline: ContextPipeline[TStaticCrawlingContext]
     top_router: Router[AdaptivePlaywrightCrawlingContext]
 
@@ -210,17 +209,24 @@ class AdaptivePlaywrightCrawler(
             **playwright_crawler_specific_kwargs, **basic_crawler_kwargs_for_pw_crawler
         )
 
+        self._pre_navigation_hooks = list[Callable[[AdaptivePlaywrightPreNavCrawlingContext], Awaitable[None]]]()
+
+        async def adaptive_pre_navigation_hook(context: BasicCrawlingContext | PlaywrightPreNavCrawlingContext) -> None:
+            for hook in self._pre_navigation_hooks:
+                await hook(AdaptivePlaywrightPreNavCrawlingContext.from_pre_navigation_contexts(context))
+
+        playwright_crawler.pre_navigation_hook(adaptive_pre_navigation_hook)
+        static_crawler.pre_navigation_hook(adaptive_pre_navigation_hook)
+
         self._pw_context_pipeline = _OrphanPlaywrightContextPipeline(
             pipeline=playwright_crawler._context_pipeline,  # noqa:SLF001  # Intentional access to private member.
             needed_context=playwright_crawler._browser_pool,  # noqa:SLF001  # Intentional access to private member.
             top_router=self.router,
-            pre_navigation_hook=playwright_crawler.pre_navigation_hook,
             static_parser=static_parser,
         )
         self._static_context_pipeline = _OrphanStaticContextPipeline[ParsedHttpCrawlingContext[TStaticParseResult]](
             pipeline=static_crawler._context_pipeline,  # noqa:SLF001  # Intentional access to private member.
             top_router=self.router,
-            pre_navigation_hook=static_crawler.pre_navigation_hook,
         )
 
     @staticmethod
@@ -430,12 +436,4 @@ class AdaptivePlaywrightCrawler(
         Hooks are wrapped in context that handles possibly missing `page` object by throwing `AdaptiveContextError`.
         Hooks that try to access `context.page` will have to catch this exception if triggered by static pipeline.
         """
-
-        def hook_with_wrapped_context(
-            context: BasicCrawlingContext | PlaywrightPreNavCrawlingContext,
-        ) -> Awaitable[None]:
-            wrapped_context = AdaptivePlaywrightPreNavCrawlingContext.from_pre_navigation_contexts(context)
-            return hook(wrapped_context)
-
-        self._pw_context_pipeline.pre_navigation_hook(hook_with_wrapped_context)
-        self._static_context_pipeline.pre_navigation_hook(hook_with_wrapped_context)
+        self._pre_navigation_hooks.append(hook)
