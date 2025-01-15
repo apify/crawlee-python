@@ -1004,13 +1004,16 @@ class BasicCrawler(Generic[TCrawlingContext]):
         try:
             request.state = RequestState.REQUEST_HANDLER
 
-            await wait_for(
-                lambda: self.__run_request_handler(context),
-                timeout=self._request_handler_timeout,
-                timeout_message='Request handler timed out after '
-                f'{self._request_handler_timeout.total_seconds()} seconds',
-                logger=self._logger,
-            )
+            try:
+                await wait_for(
+                    lambda: self.__run_request_handler(context),
+                    timeout=self._request_handler_timeout,
+                    timeout_message='Request handler timed out after '
+                    f'{self._request_handler_timeout.total_seconds()} seconds',
+                    logger=self._logger,
+                )
+            except asyncio.TimeoutError as e:
+                raise RequestHandlerError(e, context) from e
 
             await self._commit_request_handler_result(context, result)
 
