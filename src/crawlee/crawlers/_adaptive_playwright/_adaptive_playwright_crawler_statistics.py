@@ -48,7 +48,6 @@ class AdaptivePlaywrightCrawlerStatistics(Statistics[AdaptivePlaywrightCrawlerSt
             log_interval=log_interval,
             state_model=AdaptivePlaywrightCrawlerStatisticState,
         )
-        self.state
 
     @classmethod
     def from_statistics(cls, statistics: Statistics) -> Self:
@@ -61,12 +60,3 @@ class AdaptivePlaywrightCrawlerStatistics(Statistics[AdaptivePlaywrightCrawlerSt
             periodic_message_logger=statistics._periodic_message_logger,  # noqa:SLF001  # Accessing private member to create copy like-object.
             log_interval=statistics._log_interval,  # noqa:SLF001  # Accessing private member to create copy like-object.
         )
-
-    def track_http_only_request_handler_runs(self) -> None:
-        self.state.http_only_request_handler_runs += 1
-
-    def track_browser_request_handler_runs(self) -> None:
-        self.state.browser_request_handler_runs += 1
-
-    def track_rendering_type_mispredictions(self) -> None:
-        self.state.rendering_type_mispredictions += 1

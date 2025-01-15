@@ -14,6 +14,7 @@ from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.browsers import BrowserPool
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
+from crawlee.statistics import StatisticsState
 
 from ._playwright_crawling_context import PlaywrightCrawlingContext
 from ._playwright_pre_nav_crawling_context import PlaywrightPreNavCrawlingContext
@@ -29,7 +30,7 @@ if TYPE_CHECKING:
 
 
 @docs_group('Classes')
-class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
+class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]):
     """A web crawler that leverages the `Playwright` browser automation library.
 
     The `PlaywrightCrawler` builds on top of the `BasicCrawler`, which means it inherits all of its features.
@@ -76,7 +77,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
         browser_launch_options: Mapping[str, Any] | None = None,
         browser_new_context_options: Mapping[str, Any] | None = None,
         headless: bool | None = None,
-        **kwargs: Unpack[BasicCrawlerOptions[PlaywrightCrawlingContext]],
+        **kwargs: Unpack[BasicCrawlerOptions[PlaywrightCrawlingContext, StatisticsState]],
     ) -> None:
         """A default constructor.
 

@@ -66,13 +66,13 @@ if TYPE_CHECKING:
     from crawlee.storages._dataset import ExportDataCsvKwargs, ExportDataJsonKwargs, GetDataKwargs, PushDataKwargs
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
-TStatisticsState = TypeVar('TStatisticsState', bound=BasicCrawlingContext, default=StatisticsState)
+TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
 ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Union[Request, None]]]
 FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
 
 
 @docs_group('Data structures')
-class _BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
+class _BasicCrawlerOptions(TypedDict):
     """Non-generic options for basic crawler."""
 
     configuration: NotRequired[Configuration]
@@ -127,9 +127,6 @@ class _BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     request_handler_timeout: NotRequired[timedelta]
     """Maximum duration allowed for a single request handler to run."""
 
-    statistics: NotRequired[Statistics]
-    """A custom `Statistics` instance, allowing the use of non-default configuration."""
-
     abort_on_error: NotRequired[bool]
     """If True, the crawler stops immediately when any request handler error occurs."""
 
@@ -146,7 +143,7 @@ class _BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
 
 
 @docs_group('Data structures')
-class _BasicCrawlerOptionsGeneric(Generic[TCrawlingContext], TypedDict):
+class _BasicCrawlerOptionsGeneric(Generic[TCrawlingContext, TStatisticsState], TypedDict):
     """Generic options for basic crawler."""
 
     request_handler: NotRequired[Callable[[TCrawlingContext], Awaitable[None]]]
@@ -156,10 +153,15 @@ class _BasicCrawlerOptionsGeneric(Generic[TCrawlingContext], TypedDict):
     """Enables extending the request lifecycle and modifying the crawling context. Intended for use by
     subclasses rather than direct instantiation of `BasicCrawler`."""
 
+    statistics: NotRequired[Statistics[TStatisticsState]]
+    """A custom `Statistics` instance, allowing the use of non-default configuration."""
+
 
 @docs_group('Data structures')
 class BasicCrawlerOptions(
-    Generic[TCrawlingContext], _BasicCrawlerOptions, _BasicCrawlerOptionsGeneric[TCrawlingContext]
+    Generic[TCrawlingContext, TStatisticsState],
+    _BasicCrawlerOptions,
+    _BasicCrawlerOptionsGeneric[TCrawlingContext, TStatisticsState],
 ):
     """Arguments for the `BasicCrawler` constructor.
 
@@ -168,7 +170,7 @@ class BasicCrawlerOptions(
 
 
 @docs_group('Classes')
-class BasicCrawler(Generic[TCrawlingContext]):
+class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     """A basic web crawler providing a framework for crawling websites.
 
     The `BasicCrawler` provides a low-level functionality for crawling websites, allowing users to define their
@@ -213,7 +215,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         retry_on_blocked: bool = True,
         concurrency_settings: ConcurrencySettings | None = None,
         request_handler_timeout: timedelta = timedelta(minutes=1),
-        statistics: Statistics | None = None,
+        statistics: Statistics[TStatisticsState] | None = None,
         abort_on_error: bool = False,
         configure_logging: bool = True,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
@@ -314,9 +316,12 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._logger = _logger or logging.getLogger(__name__)
 
         # Statistics
-        self._statistics = statistics or Statistics.with_default_state(
-            periodic_message_logger=self._logger,
-            log_message='Current request statistics:',
+        self._statistics = statistics or cast(
+            Statistics[TStatisticsState],
+            Statistics.with_default_state(
+                periodic_message_logger=self._logger,
+                log_message='Current request statistics:',
+            ),
         )
 
         # Additional context managers to enter and exit
@@ -365,7 +370,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._router = router
 
     @property
-    def statistics(self) -> Statistics:
+    def statistics(self) -> Statistics[TStatisticsState]:
         """Statistics about the current (or last) crawler run."""
         return self._statistics
 

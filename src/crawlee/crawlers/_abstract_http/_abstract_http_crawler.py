@@ -14,6 +14,7 @@ from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
 from crawlee.http_clients import HttpxHttpClient
+from crawlee.statistics import StatisticsState
 
 from ._http_crawling_context import HttpCrawlingContext, ParsedHttpCrawlingContext, TParseResult
 
@@ -27,6 +28,7 @@ if TYPE_CHECKING:
     from ._abstract_http_parser import AbstractHttpParser
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=ParsedHttpCrawlingContext)
+TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
 
 
 @docs_group('Data structures')
@@ -39,7 +41,11 @@ class _HttpCrawlerOptions(Generic[TCrawlingContext], TypedDict):
 
 
 @docs_group('Data structures')
-class HttpCrawlerOptions(Generic[TCrawlingContext], _HttpCrawlerOptions, BasicCrawlerOptions[TCrawlingContext]):
+class HttpCrawlerOptions(
+    Generic[TCrawlingContext, TStatisticsState],
+    _HttpCrawlerOptions,
+    BasicCrawlerOptions[TCrawlingContext, StatisticsState],
+):
     """Arguments for the `AbstractHttpCrawler` constructor.
 
     It is intended for typing forwarded `__init__` arguments in the subclasses.
@@ -47,7 +53,9 @@ class HttpCrawlerOptions(Generic[TCrawlingContext], _HttpCrawlerOptions, BasicCr
 
 
 @docs_group('Abstract classes')
-class AbstractHttpCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler[TCrawlingContext], ABC):
+class AbstractHttpCrawler(
+    Generic[TCrawlingContext, TParseResult], BasicCrawler[TCrawlingContext, StatisticsState], ABC
+):
     """A web crawler for performing HTTP requests.
 
     The `AbstractHttpCrawler` builds on top of the `BasicCrawler`, which means it inherits all of its features. On top
@@ -68,7 +76,7 @@ class AbstractHttpCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler[
         parser: AbstractHttpParser[TParseResult],
         additional_http_error_status_codes: Iterable[int] = (),
         ignore_http_error_status_codes: Iterable[int] = (),
-        **kwargs: Unpack[BasicCrawlerOptions[TCrawlingContext]],
+        **kwargs: Unpack[BasicCrawlerOptions[TCrawlingContext, StatisticsState]],
     ) -> None:
         self._parser = parser
         self._pre_navigation_hooks: list[Callable[[BasicCrawlingContext], Awaitable[None]]] = []
