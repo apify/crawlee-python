@@ -84,13 +84,13 @@ async def test_successful_request_makes_tier_go_down() -> None:
 
     info = None
     for tier in tiered_proxy_urls:
-        info = await config.new_proxy_info('session_id', request_1, None)
+        info = await config.new_proxy_info(None, request_1, None)
         assert info is not None
         assert info.url == tier[0]
 
     for i in range(100):
         new_request = Request(url=f'http://some.domain/{i}', unique_key=str(i), id=str(i))
-        info = await config.new_proxy_info('session_id', new_request, None)
+        info = await config.new_proxy_info(None, new_request, None)
 
     assert info is not None
     assert info.url == tiered_proxy_urls[0][0]

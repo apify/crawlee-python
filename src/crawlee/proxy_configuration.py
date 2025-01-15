@@ -197,7 +197,7 @@ class ProxyConfiguration:
         else:
             raise RuntimeError('Invalid state')
 
-        if session_id is None or request is not None:
+        if session_id is None:
             url = urls[self._next_custom_url_index % len(urls)]
             self._next_custom_url_index += 1
             return url, proxy_tier
