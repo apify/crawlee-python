@@ -51,18 +51,15 @@ from crawlee.crawlers._parsel._parsel_parser import ParselParser
 from crawlee.statistics import Statistics
 
 if TYPE_CHECKING:
-    from collections.abc import Coroutine, Sequence
-    from contextlib import AbstractAsyncContextManager
+    from collections.abc import Coroutine
     from types import TracebackType
 
     from typing_extensions import Unpack
 
-    from crawlee import Request
     from crawlee.crawlers._abstract_http._abstract_http_crawler import _HttpCrawlerOptions
     from crawlee.crawlers._basic._basic_crawler import _BasicCrawlerOptions
     from crawlee.crawlers._playwright._playwright_crawler import PlaywrightCrawlerAdditionalOptions
     from crawlee.router import Router
-    from crawlee.statistics import FinalStatistics
 
 
 TStaticParseResult = TypeVar('TStaticParseResult')
@@ -95,7 +92,6 @@ class _OrphanPlaywrightContextPipeline(Generic[TStaticParseResult]):
 
     pipeline: ContextPipeline[PlaywrightCrawlingContext]
     top_router: Router[AdaptivePlaywrightCrawlingContext]
-    needed_context: AbstractAsyncContextManager
     static_parser: AbstractHttpParser[TStaticParseResult]
 
     def create_pipeline_call(self, top_context: BasicCrawlingContext) -> Coroutine[Any, Any, None]:
@@ -218,9 +214,10 @@ class AdaptivePlaywrightCrawler(
         playwright_crawler.pre_navigation_hook(adaptive_pre_navigation_hook)
         static_crawler.pre_navigation_hook(adaptive_pre_navigation_hook)
 
+        self._additional_context_managers = [*self._additional_context_managers, playwright_crawler._browser_pool]  # noqa: SLF001 # Intentional access to private member.
+
         self._pw_context_pipeline = _OrphanPlaywrightContextPipeline(
             pipeline=playwright_crawler._context_pipeline,  # noqa:SLF001  # Intentional access to private member.
-            needed_context=playwright_crawler._browser_pool,  # noqa:SLF001  # Intentional access to private member.
             top_router=self.router,
             static_parser=static_parser,
         )
@@ -311,25 +308,6 @@ class AdaptivePlaywrightCrawler(
             logger=self._logger,
         )
         return result
-
-    async def run(
-        self,
-        requests: Sequence[str | Request] | None = None,
-        *,
-        purge_request_queue: bool = True,
-    ) -> FinalStatistics:
-        """Run the crawler until all requests are processed.
-
-        Args:
-            requests: The requests to be enqueued before the crawler starts.
-            purge_request_queue: If this is `True` and the crawler is not being run for the first time, the default
-                request queue will be purged.
-        """
-        if not getattr(self._pw_context_pipeline.needed_context, 'active', False):
-            async with self._pw_context_pipeline.needed_context:
-                return await super().run(requests=requests, purge_request_queue=purge_request_queue)
-        else:
-            return await super().run(requests=requests, purge_request_queue=purge_request_queue)
 
     # Can't use override as mypy does not like it for double underscore private method.
     async def _BasicCrawler__run_request_handler(self, context: BasicCrawlingContext) -> None:  # noqa: N802
