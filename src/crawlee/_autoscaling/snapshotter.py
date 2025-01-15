@@ -7,7 +7,6 @@ from logging import getLogger
 from operator import attrgetter
 from typing import TYPE_CHECKING, TypeVar, cast
 
-import psutil
 from sortedcontainers import SortedList
 
 from crawlee import service_locator
@@ -16,6 +15,7 @@ from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
+from crawlee._utils.system import get_memory_info
 from crawlee.events._types import Event, EventSystemInfoData
 
 if TYPE_CHECKING:
@@ -108,7 +108,15 @@ class Snapshotter:
             config: The configuration object. Uses the global (default) configuration if not provided.
         """
         config = service_locator.get_configuration()
-        max_memory_size = cls._determine_max_memory_size(config.memory_mbytes, config.available_memory_ratio)
+
+        # Compute the maximum memory size based on the provided configuration. If `memory_mbytes` is provided,
+        # it uses that value. Otherwise, it calculates the `max_memory_size` as a proportion of the system's
+        # total available memory based on `available_memory_ratio`.
+        max_memory_size = (
+            ByteSize.from_mb(config.memory_mbytes)
+            if config.memory_mbytes
+            else ByteSize(int(get_memory_info().total_size.bytes * config.available_memory_ratio))
+        )
 
         return cls(
             max_used_cpu_ratio=config.max_used_cpu_ratio,
@@ -121,21 +129,6 @@ class Snapshotter:
     @staticmethod
     def _get_sorted_list_by_created_at(input_list: list[T]) -> SortedList[T]:
         return SortedList(input_list, key=attrgetter('created_at'))
-
-    @staticmethod
-    def _determine_max_memory_size(memory_mbytes: int | None, available_memory_ratio: float) -> ByteSize:
-        """Determine the maximum memory size for the current run.
-
-        If `memory_mbytes` is provided, it uses that value. Otherwise, it calculates the default `max_memory_size`
-        as a proportion of the system's total available memory based on `available_memory_ratio`.
-        """
-        if memory_mbytes:
-            return ByteSize.from_mb(memory_mbytes)
-
-        max_memory_size_in_bytes = int(psutil.virtual_memory().total * available_memory_ratio)
-        max_memory_size = ByteSize(max_memory_size_in_bytes)
-        logger.info(f'Setting max_memory_size of this run to {max_memory_size}.')
-        return max_memory_size
 
     @property
     def active(self) -> bool:
