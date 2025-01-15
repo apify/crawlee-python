@@ -31,6 +31,12 @@ And one specific request loader:
 Below is a class diagram that illustrates the relationships between these components and the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>:
 
 ```mermaid
+---
+config:
+    class:
+        hideEmptyMembersBox: true
+---
+
 classDiagram
 
 %% ========================
@@ -39,20 +45,29 @@ classDiagram
 
 class BaseStorage {
     <<abstract>>
-    _attributes_
-    _methods_()
+    + id
+    + name
+    + open()
+    + drop()
 }
 
 class RequestLoader {
     <<abstract>>
-    _attributes_
-    _methods_()
+    + fetch_next_request()
+    + mark_request_as_handled()
+    + is_empty()
+    + is_finished()
+    + get_handled_count()
+    + get_total_count()
+    + to_tandem()
 }
 
 class RequestManager {
     <<abstract>>
-    _attributes_
-    _methods_()
+    + add_request()
+    + add_requests_batched()
+    + reclaim_request()
+    + drop()
 }
 
 %% ========================
@@ -90,6 +105,8 @@ RequestManager <|-- RequestManagerTandem
 
 The <ApiLink to="class/RequestLoader">`RequestLoader`</ApiLink> interface defines the foundation for fetching requests during a crawl. It provides abstract methods for basic operations like retrieving, marking, or checking the status of requests. Concrete implementations, such as <ApiLink to="class/RequestList">`RequestList`</ApiLink>, build on this interface to handle specific scenarios. You may create your own loader that reads from an external file, a web endpoint, a database or matches some other specific scenario. For more details refer to the <ApiLink to="class/RequestLoader">`RequestLoader`</ApiLink> API reference.
 
+The <ApiLink to="class/RequestList">`RequestList`</ApiLink> can accept an asynchronous generator as input. This allows the requests to be streamed, rather than loading them all into memory at once. This can significantly reduce the memory usage, especially when working with large sets of URLs.
+
 Here is a basic example of working with the <ApiLink to="class/RequestList">`RequestList`</ApiLink>:
 
 <CodeBlock className="language-python">
@@ -102,11 +119,11 @@ The <ApiLink to="class/RequestManager">`RequestManager`</ApiLink> extends `Reque
 
 ## Request manager tandem
 
-The <ApiLink to="class/RequestManagerTandem">`RequestManagerTandem`</ApiLink> class allows you to combine the read-only capabilities `RequestLoader` (like <ApiLink to="class/RequestList">`RequestList`</ApiLink>) with a writable capabilities `RequestManager` (like <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>). This is useful for scenarios where you need to load initial requests from a static source (like a file or database) and dynamically add or retry requests during the crawl. Additionally, it provides deduplication capabilities, ensuring that requests are not processed multiple times. Under the hood, <ApiLink to="class/RequestManagerTandem">`RequestManagerTandem`</ApiLink> manages whether the read-only loader still has pending requests. If so, each new request from the loader is transferred to the manager. Any newly added or reclaimed requests go directly to the manager side.
+The <ApiLink to="class/RequestManagerTandem">`RequestManagerTandem`</ApiLink> class allows you to combine the read-only capabilities `RequestLoader` (like <ApiLink to="class/RequestList">`RequestList`</ApiLink>) with read-write capabilities of a `RequestManager` (like <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>). This is useful for scenarios where you need to load initial requests from a static source (like a file or database) and dynamically add or retry requests during the crawl. Additionally, it provides deduplication capabilities, ensuring that requests are not processed multiple times. Under the hood, <ApiLink to="class/RequestManagerTandem">`RequestManagerTandem`</ApiLink> checks whether the read-only loader still has pending requests. If so, each new request from the loader is transferred to the manager. Any newly added or reclaimed requests go directly to the manager side.
 
 ### Request list with request queue
 
-This sections describes the combination of the <ApiLink to="class/RequestList">`RequestList`</ApiLink> and <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> classes. This setup is particularly useful when you have a static list of URLs that you want to crawl, but you also need to handle dynamic requests during the crawl process. The <ApiLink to="class/RequestManagerTandem">`RequestManagerTandem`</ApiLink> class facilitates this combination, with the <ApiLink to="class/RequestLoader#to_tandem">`RequestLoader.to_tandem`</ApiLink> method available as a convenient shortcut. Requests from the <ApiLink to="class/RequestList">`RequestList`</ApiLink> are processed first by enqueuing them into the default <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, which handles persistence and retries for failed requests.
+This sections describes the combination of the <ApiLink to="class/RequestList">`RequestList`</ApiLink> and <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> classes. This setup is particularly useful when you have a static list of URLs that you want to crawl, but you also need to handle dynamic requests during the crawl process. The <ApiLink to="class/RequestManagerTandem">`RequestManagerTandem`</ApiLink> class facilitates this combination, with the <ApiLink to="class/RequestLoader#to_tandem">`RequestLoader.to_tandem`</ApiLink> method available as a convenient shortcut. Requests from the <ApiLink to="class/RequestList">`RequestList`</ApiLink> are processed first by enqueuing them into the default <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, which handles persistence and retries failed requests.
 
 <Tabs groupId="request_manager_tandem">
     <TabItem value="request_manager_tandem_explicit" label="Explicitly usage">

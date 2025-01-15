@@ -61,6 +61,16 @@ You can override default storage IDs using these environment variables: `CRAWLEE
 
 The <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> is the primary storage for URLs in Crawlee, especially useful for deep crawling. It supports dynamic addition and removal of URLs, making it ideal for recursive tasks where URLs are discovered and added during the crawling process (e.g., following links across multiple pages). Each Crawlee project has a **default request queue**, which can be used to store URLs during a specific run. The <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> is highly useful for large-scale and complex crawls.
 
+By default, data are stored using the following path structure:
+
+```text
+{CRAWLEE_STORAGE_DIR}/request_queues/{QUEUE_ID}/{INDEX}.json
+```
+
+- `{CRAWLEE_STORAGE_DIR}`: The root directory for all storage data, specified by the environment variable.
+- `{QUEUE_ID}`: The ID of the request queue, "default" by default.
+- `{INDEX}`: Represents the zero-based index of the record within the queue.
+
 The following code demonstrates the usage of the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>:
 
 <Tabs groupId="request_queue">
