@@ -52,7 +52,6 @@ from crawlee.statistics import Statistics
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Coroutine, Sequence
     from contextlib import AbstractAsyncContextManager
-    from datetime import timedelta
     from types import TracebackType
 
     from typing_extensions import Unpack
@@ -95,8 +94,8 @@ class _OrphanPlaywrightContextPipeline(Generic[TStaticParseResult]):
 
     pre_navigation_hook: Callable[[Callable[[PlaywrightPreNavCrawlingContext], Awaitable[None]]], None]
     pipeline: ContextPipeline[PlaywrightCrawlingContext]
-    needed_context: AbstractAsyncContextManager
     top_router: Router[AdaptivePlaywrightCrawlingContext]
+    needed_context: AbstractAsyncContextManager
     static_parser: AbstractHttpParser[TStaticParseResult]
 
     def create_pipeline_call(self, top_context: BasicCrawlingContext) -> Coroutine[Any, Any, None]:
@@ -269,10 +268,13 @@ class AdaptivePlaywrightCrawler(
         self,
         subcrawler_pipeline: _OrphanPlaywrightContextPipeline | _OrphanStaticContextPipeline,
         context: BasicCrawlingContext,
-        timeout: timedelta,
         result: RequestHandlerRunResult,
         state: dict[str, JsonSerializable] | None = None,
     ) -> RequestHandlerRunResult:
+        # Timeout to ensure that both sub crawlers can finish one request withing top crawler `request_handler_timeout`.
+        sub_crawler_timeout_coefficient = 0.45
+        timeout = self._request_handler_timeout * sub_crawler_timeout_coefficient
+
         if state is not None:
 
             async def get_input_state(
@@ -346,7 +348,6 @@ class AdaptivePlaywrightCrawler(
                 crawl_result = await self.crawl_one_with(
                     subcrawler_pipeline=subcrawler_pipeline,
                     context=context,
-                    timeout=self._request_handler_timeout,
                     result=RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store),
                     state=use_state,
                 )

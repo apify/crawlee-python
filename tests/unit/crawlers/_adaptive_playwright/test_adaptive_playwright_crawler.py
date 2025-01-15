@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import timedelta
 from itertools import cycle
@@ -281,10 +282,10 @@ async def test_adaptive_crawling_result_use_state_isolation() -> None:
 
 
 async def test_adaptive_crawling_statistics() -> None:
-    """Test adaptive crawling related statistics.
+    """Test adaptive crawler statistics.
 
     Crawler set to static crawling, but due to result_checker returning False on static crawling result it
-    will do browser crawling instead well. This increments all three adaptive crawling related stats."""
+    will do browser crawling instead as well. This increments all three adaptive crawling related stats."""
     requests = ['https://warehouse-theme-metal.myshopify.com/']
 
     static_only_predictor_no_detection = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
@@ -303,6 +304,10 @@ async def test_adaptive_crawling_statistics() -> None:
     assert crawler.predictor_state.http_only_request_handler_runs == 1
     assert crawler.predictor_state.browser_request_handler_runs == 1
     assert crawler.predictor_state.rendering_type_mispredictions == 1
+
+    # Despite running both sub crawlers the top crawler statistics should count this as one request finished.
+    assert crawler.statistics.state.requests_finished == 1
+    assert crawler.statistics.state.requests_failed == 0
 
 
 @pytest.mark.parametrize(
@@ -380,3 +385,39 @@ def test_adaptive_playwright_crawler_statistics_in_init() -> None:
     assert crawler._statistics._log_message == log_message
     assert crawler._statistics._periodic_message_logger == periodic_message_logger
     assert crawler._statistics._log_interval == log_interval
+
+
+async def test_adaptive_playwright_crawler_timeout_in_sub_crawler() -> None:
+    """Tests that timeout used by sub crawlers ensure that both have chance to run within top crawler timeout.
+
+    Create situation where static sub crawler blocks(should timeout), such error should start browser sub
+    crawler, which must be capable of running without top crawler handler timing out."""
+    requests = ['https://warehouse-theme-metal.myshopify.com/']
+
+    static_only_predictor_no_detection = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
+    top_crawler_handler_timeout = timedelta(seconds=2)
+
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=static_only_predictor_no_detection,
+        result_checker=lambda result: False,  #  noqa: ARG005  # Intentionally unused argument.
+        request_handler_timeout=top_crawler_handler_timeout,
+    )
+    mocked_static_handler = Mock()
+    mocked_browser_handler = Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        try:
+            # page is available only if it was crawled by PlaywrightCrawler.
+            context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
+            mocked_browser_handler()
+        except AdaptiveContextError:
+            mocked_static_handler()
+            # Sleep for time obviously larger than top crawler timeout.
+            await asyncio.sleep(top_crawler_handler_timeout.total_seconds() * 2)
+
+    await crawler.run(requests)
+
+    mocked_static_handler.assert_called_once_with()
+    # Browser handler was capable of running despite static handler having sleep time larger than top handler timeout.
+    mocked_browser_handler.assert_called_once_with()
