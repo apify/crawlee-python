@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 
 - Avoid `use_state` race conditions. Remove key argument to `use_state` ([#868](https://github.com/apify/crawlee-python/pull/868)) ([000b976](https://github.com/apify/crawlee-python/commit/000b9761211502d86a893a31e3ca21998a6e3b99)) by [@Pijukatel](https://github.com/Pijukatel), closes [#856](https://github.com/apify/crawlee-python/issues/856)
 - Restore proxy functionality for PlaywrightCrawler broken in v0.5 ([#889](https://github.com/apify/crawlee-python/pull/889)) ([908c944](https://github.com/apify/crawlee-python/commit/908c944ff9b1fc8ed7eb35f0078a1de71e34d5c5)) by [@Mantisus](https://github.com/Mantisus), closes [#887](https://github.com/apify/crawlee-python/issues/887)
+- Fix the usage of Configuration ([#899](https://github.com/apify/crawlee-python/pull/899)) ([0f1cf6f](https://github.com/apify/crawlee-python/commit/0f1cf6f0b52c92ca4e465a2a01f8111cd9ab42ec)) by [@vdusek](https://github.com/vdusek), closes [#670](https://github.com/apify/crawlee-python/issues/670)
 
 
 <!-- git-cliff-unreleased-end -->
