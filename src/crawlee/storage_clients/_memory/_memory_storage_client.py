@@ -98,8 +98,6 @@ class MemoryStorageClient(BaseStorageClient):
     def from_config(cls, config: Configuration | None = None) -> MemoryStorageClient:
         """Create a new instance based on the provided configuration.
 
-        All the memory storage client parameters are taken from the configuration object.
-
         Args:
             config: The configuration object. Uses the global (default) configuration if not provided.
         """

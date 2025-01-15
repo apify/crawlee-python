@@ -21,6 +21,8 @@ from crawlee.events._types import Event, EventSystemInfoData
 if TYPE_CHECKING:
     from types import TracebackType
 
+    from crawlee.configuration import Configuration
+
 logger = getLogger(__name__)
 
 T = TypeVar('T')
@@ -36,77 +38,85 @@ class Snapshotter:
     dynamically based on the current demand and system load.
     """
 
+    _EVENT_LOOP_SNAPSHOT_INTERVAL = timedelta(milliseconds=500)
+    """The interval at which the event loop is sampled."""
+
+    _CLIENT_SNAPSHOT_INTERVAL = timedelta(milliseconds=1000)
+    """The interval at which the client is sampled."""
+
+    _SNAPSHOT_HISTORY = timedelta(seconds=30)
+    """The time interval for which the snapshots are kept."""
+
+    _RESERVE_MEMORY_RATIO = 0.5
+    """Fraction of memory kept in reserve. Used to calculate critical memory overload threshold."""
+
+    _MEMORY_WARNING_COOLDOWN_PERIOD = timedelta(milliseconds=10000)
+    """Minimum time interval between logging successive critical memory overload warnings."""
+
+    _CLIENT_RATE_LIMIT_ERROR_RETRY_COUNT = 2
+    """Number of retries for a client request before considering it a failure due to rate limiting."""
+
     def __init__(
         self,
         *,
-        event_loop_snapshot_interval: timedelta = timedelta(milliseconds=500),
-        client_snapshot_interval: timedelta = timedelta(milliseconds=1000),
-        max_used_cpu_ratio: None | float = None,
-        max_memory_size: ByteSize | None = None,
-        max_used_memory_ratio: float = 0.9,
-        max_event_loop_delay: timedelta = timedelta(milliseconds=50),
-        max_client_errors: int = 1,
-        snapshot_history: timedelta = timedelta(seconds=30),
-        available_memory_ratio: float | None = None,
-        reserve_memory_ratio: float = 0.5,
-        memory_warning_cooldown_period: timedelta = timedelta(milliseconds=10000),
-        client_rate_limit_error_retry_count: int = 2,
+        max_used_cpu_ratio: float,
+        max_used_memory_ratio: float,
+        max_event_loop_delay: timedelta,
+        max_client_errors: int,
+        max_memory_size: ByteSize,
     ) -> None:
         """A default constructor.
 
+        In most cases, you should use the `from_config` constructor to create a new instance based on
+        the provided configuration.
+
         Args:
-            event_loop_snapshot_interval: The interval at which the event loop is sampled.
-            client_snapshot_interval: The interval at which the client is sampled.
             max_used_cpu_ratio: Sets the ratio, defining the maximum CPU usage. When the CPU usage is higher than
-                the provided ratio, the CPU is considered overloaded. The default value is taken from
-                the `Configuration`.
-            max_memory_size: Sets the maximum amount of system memory to be used by the `AutoscaledPool`. If `None`
-                is provided, the max amount of memory to be used is determined by the `available_memory_ratio`.
+                the provided ratio, the CPU is considered overloaded.
             max_used_memory_ratio: Sets the ratio, defining the maximum ratio of memory usage. When the memory usage
                 is higher than the provided ratio of `max_memory_size`, the memory is considered overloaded.
             max_event_loop_delay: Sets the maximum delay of the event loop. When the delay is higher than the provided
                 value, the event loop is considered overloaded.
             max_client_errors: Sets the maximum number of client errors (HTTP 429). When the number of client errors
                 is higher than the provided number, the client is considered overloaded.
-            snapshot_history: Sets the time interval for which the snapshots are kept.
-            available_memory_ratio: The maximum proportion of system memory to use. If `max_memory_size` is not
-                provided, this ratio is used to calculate the maximum memory. The default value is taken from
-                the `Configuration`.
-            reserve_memory_ratio: Fraction of memory kept in reserve. Used to calculate critical memory overload
-                threshold.
-            memory_warning_cooldown_period: Minimum time interval between logging successive critical memory overload
-                warnings.
-            client_rate_limit_error_retry_count: Number of retries for a client request before considering it a failure
-                due to rate limiting.
+            max_memory_size: Sets the maximum amount of system memory to be used by the `AutoscaledPool`.
         """
-        config = service_locator.get_configuration()
-
-        self._available_memory_ratio = available_memory_ratio or config.available_memory_ratio
-        self._event_loop_snapshot_interval = event_loop_snapshot_interval
-        self._client_snapshot_interval = client_snapshot_interval
-        self._max_event_loop_delay = max_event_loop_delay
-        self._max_used_cpu_ratio = max_used_cpu_ratio or config.max_used_cpu_ratio
+        self._max_used_cpu_ratio = max_used_cpu_ratio
         self._max_used_memory_ratio = max_used_memory_ratio
+        self._max_event_loop_delay = max_event_loop_delay
         self._max_client_errors = max_client_errors
-        self._snapshot_history = snapshot_history
-        self._reserve_memory_ratio = reserve_memory_ratio
-        self._memory_warning_cooldown_period = memory_warning_cooldown_period
-        self._client_rate_limit_error_retry_count = client_rate_limit_error_retry_count
-        self._max_memory_size = max_memory_size or self._determine_max_memory_size(
-            config.memory_mbytes, self._available_memory_ratio
-        )
+        self._max_memory_size = max_memory_size
+
         self._cpu_snapshots = self._get_sorted_list_by_created_at(list[CpuSnapshot]())
         self._event_loop_snapshots = self._get_sorted_list_by_created_at(list[EventLoopSnapshot]())
         self._memory_snapshots = self._get_sorted_list_by_created_at(list[MemorySnapshot]())
         self._client_snapshots = self._get_sorted_list_by_created_at(list[ClientSnapshot]())
 
-        self._snapshot_event_loop_task = RecurringTask(self._snapshot_event_loop, self._event_loop_snapshot_interval)
-        self._snapshot_client_task = RecurringTask(self._snapshot_client, self._client_snapshot_interval)
+        self._snapshot_event_loop_task = RecurringTask(self._snapshot_event_loop, self._EVENT_LOOP_SNAPSHOT_INTERVAL)
+        self._snapshot_client_task = RecurringTask(self._snapshot_client, self._CLIENT_SNAPSHOT_INTERVAL)
 
         self._timestamp_of_last_memory_warning: datetime = datetime.now(timezone.utc) - timedelta(hours=1)
 
         # Flag to indicate the context state.
         self._active = False
+
+    @classmethod
+    def from_config(cls, config: Configuration | None = None) -> Snapshotter:
+        """Create a new instance based on the provided configuration.
+
+        Args:
+            config: The configuration object. Uses the global (default) configuration if not provided.
+        """
+        config = service_locator.get_configuration()
+        max_memory_size = cls._determine_max_memory_size(config.memory_mbytes, config.available_memory_ratio)
+
+        return cls(
+            max_used_cpu_ratio=config.max_used_cpu_ratio,
+            max_used_memory_ratio=config.max_used_memory_ratio,
+            max_event_loop_delay=config.max_event_loop_delay,
+            max_client_errors=config.max_client_errors,
+            max_memory_size=max_memory_size,
+        )
 
     @staticmethod
     def _get_sorted_list_by_created_at(input_list: list[T]) -> SortedList[T]:
@@ -289,7 +299,7 @@ class Snapshotter:
         previous_snapshot = self._event_loop_snapshots[-1] if self._event_loop_snapshots else None
 
         if previous_snapshot:
-            event_loop_delay = snapshot.created_at - previous_snapshot.created_at - self._event_loop_snapshot_interval
+            event_loop_delay = snapshot.created_at - previous_snapshot.created_at - self._EVENT_LOOP_SNAPSHOT_INTERVAL
             snapshot.delay = event_loop_delay
 
         snapshots = cast(list[Snapshot], self._event_loop_snapshots)
@@ -327,7 +337,7 @@ class Snapshotter:
         # We'll keep snapshots from this index onwards.
         keep_from_index = None
         for i, snapshot in enumerate(snapshots):
-            if now - snapshot.created_at <= self._snapshot_history:
+            if now - snapshot.created_at <= self._SNAPSHOT_HISTORY:
                 keep_from_index = i
                 break
 
@@ -346,11 +356,11 @@ class Snapshotter:
             snapshot_timestamp: The time at which the memory snapshot was taken.
         """
         # Check if the warning has been logged recently to avoid spamming
-        if snapshot_timestamp < self._timestamp_of_last_memory_warning + self._memory_warning_cooldown_period:
+        if snapshot_timestamp < self._timestamp_of_last_memory_warning + self._MEMORY_WARNING_COOLDOWN_PERIOD:
             return
 
         threshold_memory_size = self._max_used_memory_ratio * self._max_memory_size
-        buffer_memory_size = self._max_memory_size * (1 - self._max_used_memory_ratio) * self._reserve_memory_ratio
+        buffer_memory_size = self._max_memory_size * (1 - self._max_used_memory_ratio) * self._RESERVE_MEMORY_RATIO
         overload_memory_threshold_size = threshold_memory_size + buffer_memory_size
 
         # Log a warning if current memory usage exceeds the critical overload threshold

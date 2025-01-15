@@ -54,8 +54,6 @@ class LocalEventManager(EventManager):
     def from_config(cls, config: Configuration | None = None) -> LocalEventManager:
         """Create a new instance based on the provided configuration.
 
-        All the event manager parameters are taken from the configuration.
-
         Args:
             config: The configuration object. Uses the global (default) configuration if not provided.
         """

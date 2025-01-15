@@ -304,7 +304,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         # Internal, not explicitly configurable components
         self._tld_extractor = TLDExtract(cache_dir=tempfile.TemporaryDirectory().name)
-        self._snapshotter = Snapshotter()
+        self._snapshotter = Snapshotter.from_config(config)
         self._autoscaled_pool = AutoscaledPool(
             system_status=SystemStatus(self._snapshotter),
             is_finished_function=self.__is_finished_function,

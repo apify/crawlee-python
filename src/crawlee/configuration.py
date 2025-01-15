@@ -170,7 +170,43 @@ class Configuration(BaseSettings):
             )
         ),
     ] = 0.95
-    """The maximum CPU usage ratio. If the CPU usage exceeds this ratio, it is considered overloaded.
+    """The maximum CPU usage ratio. If the CPU usage exceeds this value, the system is considered overloaded.
+    This option is used by the `Snapshotter`."""
+
+    max_used_memory_ratio: Annotated[
+        float,
+        Field(
+            validation_alias=AliasChoices(
+                'apify_max_used_memory_ratio',
+                'crawlee_max_used_memory_ratio',
+            )
+        ),
+    ] = 0.9
+    """The maximum memory usage ratio. If the memory usage exceeds this ratio, it is considered overloaded.
+    This option is used by the `Snapshotter`."""
+
+    max_event_loop_delay: Annotated[
+        timedelta_ms,
+        Field(
+            validation_alias=AliasChoices(
+                'apify_max_event_loop_delay_millis',
+                'crawlee_max_event_loop_delay_millis',
+            )
+        ),
+    ] = timedelta(milliseconds=50)
+    """The maximum event loop delay. If the event loop delay exceeds this value, it is considered overloaded.
+    This option is used by the `Snapshotter`."""
+
+    max_client_errors: Annotated[
+        int,
+        Field(
+            validation_alias=AliasChoices(
+                'apify_max_client_errors',
+                'crawlee_max_client_errors',
+            )
+        ),
+    ] = 1
+    """The maximum number of client errors (HTTP 429) allowed before the system is considered overloaded.
     This option is used by the `Snapshotter`."""
 
     memory_mbytes: Annotated[

@@ -15,6 +15,7 @@ from crawlee._autoscaling.types import (
     SystemInfo,
 )
 from crawlee._utils.byte_size import ByteSize
+from crawlee.configuration import Configuration
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -22,7 +23,8 @@ if TYPE_CHECKING:
 
 @pytest.fixture
 async def snapshotter() -> AsyncGenerator[Snapshotter, None]:
-    async with Snapshotter(available_memory_ratio=0.25) as snapshotter:
+    config = Configuration(available_memory_ratio=0.25)
+    async with Snapshotter.from_config(config) as snapshotter:
         yield snapshotter
 
 
@@ -32,7 +34,9 @@ def now() -> datetime:
 
 
 async def test_start_stop_lifecycle() -> None:
-    async with Snapshotter(available_memory_ratio=0.25) as snapshotter:
+    config = Configuration(available_memory_ratio=0.25)
+
+    async with Snapshotter.from_config(config) as snapshotter:
         system_status = SystemStatus(snapshotter)
         system_status.get_current_system_info()
         system_status.get_historical_system_info()
