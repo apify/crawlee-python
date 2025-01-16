@@ -153,7 +153,7 @@ indent-style = "space"
     "T20",     # flake8-print
     "TRY301",  # Abstract `raise` to an inner function
 ]
-"**/{docs}/**" = [
+"**/{docs,website}/**" = [
     "D",      # Everything from the pydocstyle
     "INP001", # File {filename} is part of an implicit namespace package, add an __init__.py
     "F841",   # Local variable {variable} is assigned to but never used
@@ -192,7 +192,7 @@ timeout = 1200
 python_version = "3.9"
 plugins = ["pydantic.mypy"]
 exclude = ["project_template"]
-files = ["src", "tests", "docs"]
+files = ["src", "tests", "docs", "website"]
 check_untyped_defs = true
 disallow_incomplete_defs = true
 disallow_untyped_calls = true
@@ -215,7 +215,7 @@ ignore_missing_imports = true
 [tool.basedpyright]
 pythonVersion = "3.9"
 typeCheckingMode = "standard"
-include = ["src", "tests", "docs"]
+include = ["src", "tests", "docs", "website"]
 
 [tool.coverage.report]
 exclude_lines = [

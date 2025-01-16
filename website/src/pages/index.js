@@ -13,7 +13,7 @@ import Highlights from '../components/Highlights';
 import 'react-lite-youtube-embed/dist/LiteYouTubeEmbed.css';
 import RunnableCodeBlock from '../components/RunnableCodeBlock';
 
-import HomePageExample from '!!raw-loader!../../../docs/home_page_example.py';
+import HomePageExample from '!!raw-loader!./home_page_example.py';
 
 
 function Hero() {
