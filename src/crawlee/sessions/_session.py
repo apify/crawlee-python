@@ -15,15 +15,16 @@ logger = getLogger(__name__)
 
 @docs_group('Data structures')
 class Session:
-    """Session object represents a single user session.
+    """Represent a single user session, managing cookies, error states, and usage limits.
 
-    Sessions are used to store information such as cookies and can be used for generating fingerprints and proxy
-    sessions. You can imagine each session as a specific user, with its own cookies, IP (via proxy) and potentially
-    a unique browser fingerprint. Session internal state can be enriched with custom user data for example some
-    authorization tokens and specific headers in general.
+    A `Session` simulates a specific user with attributes like cookies, IP (via proxy), and potentially
+    a unique browser fingerprint. It maintains its internal state, which can include custom user data
+    (e.g., authorization tokens or headers) and tracks its usability through metrics such as error score,
+    usage count, and expiration.
     """
 
     _DEFAULT_BLOCKED_STATUS_CODES: ClassVar = [401, 403, 429]
+    """Default status codes that indicate a session is blocked."""
 
     def __init__(
         self,
@@ -69,7 +70,7 @@ class Session:
 
     @classmethod
     def from_model(cls, model: SessionModel) -> Session:
-        """Create a new instance from a SessionModel."""
+        """Create a new instance from a `SessionModel`."""
         return cls(**model.model_dump())
 
     def __repr__(self) -> str:

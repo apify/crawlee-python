@@ -27,19 +27,19 @@ class RequestLoader(ABC):
 
     @abstractmethod
     async def get_total_count(self) -> int:
-        """Returns an offline approximation of the total number of requests in the source (i.e. pending + handled)."""
+        """Return an offline approximation of the total number of requests in the source (i.e. pending + handled)."""
 
     @abstractmethod
     async def is_empty(self) -> bool:
-        """Returns True if there are no more requests in the source (there might still be unfinished requests)."""
+        """Return True if there are no more requests in the source (there might still be unfinished requests)."""
 
     @abstractmethod
     async def is_finished(self) -> bool:
-        """Returns True if all requests have been handled."""
+        """Return True if all requests have been handled."""
 
     @abstractmethod
     async def fetch_next_request(self) -> Request | None:
-        """Returns the next request to be processed, or `null` if there are no more pending requests."""
+        """Return the next request to be processed, or `null` if there are no more pending requests."""
 
     @abstractmethod
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
@@ -47,7 +47,7 @@ class RequestLoader(ABC):
 
     @abstractmethod
     async def get_handled_count(self) -> int:
-        """Returns the number of handled requests."""
+        """Return the number of handled requests."""
 
     async def to_tandem(self, request_manager: RequestManager | None = None) -> RequestManagerTandem:
         """Combine the loader with a request manager to support adding and reclaiming requests.

@@ -96,10 +96,10 @@ class MemoryStorageClient(BaseStorageClient):
 
     @classmethod
     def from_config(cls, config: Configuration | None = None) -> MemoryStorageClient:
-        """Create a new instance based on the provided configuration.
+        """Create a new instance based on the provided `Configuration`.
 
         Args:
-            config: The configuration object. Uses the global (default) configuration if not provided.
+            config: The `Configuration` instance. Uses the global (default) one if not provided.
         """
         config = config or Configuration.get_global_configuration()
 

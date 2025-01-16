@@ -86,7 +86,7 @@ class Configuration(BaseSettings):
             )
         ),
     ] = 'default'
-    """The default dataset ID. This option is utilized by the storage client."""
+    """The default `Dataset` ID. This option is utilized by the storage client."""
 
     default_key_value_store_id: Annotated[
         str,
@@ -98,7 +98,7 @@ class Configuration(BaseSettings):
             )
         ),
     ] = 'default'
-    """The default key-value store ID. This option is utilized by the storage client."""
+    """The default `KeyValueStore` ID. This option is utilized by the storage client."""
 
     default_request_queue_id: Annotated[
         str,
@@ -110,7 +110,7 @@ class Configuration(BaseSettings):
             )
         ),
     ] = 'default'
-    """The default request queue ID. This option is utilized by the storage client."""
+    """The default `RequestQueue` ID. This option is utilized by the storage client."""
 
     purge_on_start: Annotated[
         bool,

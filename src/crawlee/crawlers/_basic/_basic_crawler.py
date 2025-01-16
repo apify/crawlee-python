@@ -71,7 +71,7 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     """
 
     configuration: NotRequired[Configuration]
-    """The configuration object. Some of its properties are used as defaults for the crawler."""
+    """The `Configuration` instance. Some of its properties are used as defaults for the crawler."""
 
     event_manager: NotRequired[EventManager]
     """The event manager for managing events for the crawler and all its components."""
@@ -203,7 +203,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         """A default constructor.
 
         Args:
-            configuration: The configuration object. Some of its properties are used as defaults for the crawler.
+            configuration: The `Configuration` instance. Some of its properties are used as defaults for the crawler.
             event_manager: The event manager for managing events for the crawler and all its components.
             storage_client: The storage client for managing storages for the crawler and all its components.
             request_manager: Manager of requests that should be processed by the crawler.
@@ -328,7 +328,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     @property
     def router(self) -> Router[TCrawlingContext]:
-        """The router used to handle each individual crawling request."""
+        """The `Router` used to handle each individual crawling request."""
         if self._router is None:
             self._router = Router[TCrawlingContext]()
 
@@ -393,7 +393,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         )
 
     async def get_request_manager(self) -> RequestManager:
-        """Return the configured request provider. If none is configured, open and return the default request queue."""
+        """Return the configured request manager. If none is configured, open and return the default request queue."""
         if not self._request_manager:
             self._request_manager = await RequestQueue.open()
 
@@ -405,7 +405,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         id: str | None = None,
         name: str | None = None,
     ) -> Dataset:
-        """Return the dataset with the given ID or name. If none is provided, return the default dataset."""
+        """Return the `Dataset` with the given ID or name. If none is provided, return the default one."""
         return await Dataset.open(id=id, name=name)
 
     async def get_key_value_store(
@@ -414,7 +414,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         id: str | None = None,
         name: str | None = None,
     ) -> KeyValueStore:
-        """Return the key-value store with the given ID or name. If none is provided, return the default KVS."""
+        """Return the `KeyValueStore` with the given ID or name. If none is provided, return the default KVS."""
         return await KeyValueStore.open(id=id, name=name)
 
     def error_handler(
@@ -543,7 +543,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         wait_for_all_requests_to_be_added: bool = False,
         wait_for_all_requests_to_be_added_timeout: timedelta | None = None,
     ) -> None:
-        """Add requests to the underlying request provider in batches.
+        """Add requests to the underlying request manager in batches.
 
         Args:
             requests: A list of requests to add to the queue.
@@ -576,15 +576,15 @@ class BasicCrawler(Generic[TCrawlingContext]):
         dataset_name: str | None = None,
         **kwargs: Unpack[GetDataKwargs],
     ) -> DatasetItemsListPage:
-        """Retrieve data from a dataset.
+        """Retrieve data from a `Dataset`.
 
-        This helper method simplifies the process of retrieving data from a dataset. It opens the specified
-        dataset and then retrieves the data based on the provided parameters.
+        This helper method simplifies the process of retrieving data from a `Dataset`. It opens the specified
+        one and then retrieves the data based on the provided parameters.
 
         Args:
-            dataset_id: The ID of the dataset.
-            dataset_name: The name of the dataset.
-            kwargs: Keyword arguments to be passed to the dataset's `get_data` method.
+            dataset_id: The ID of the `Dataset`.
+            dataset_name: The name of the `Dataset`.
+            kwargs: Keyword arguments to be passed to the `Dataset.get_data()` method.
 
         Returns:
             The retrieved data.
@@ -598,16 +598,16 @@ class BasicCrawler(Generic[TCrawlingContext]):
         dataset_id: str | None = None,
         dataset_name: str | None = None,
     ) -> None:
-        """Export data from a dataset.
+        """Export data from a `Dataset`.
 
-        This helper method simplifies the process of exporting data from a dataset. It opens the specified
-        dataset and then exports the data based on the provided parameters. If you need to pass options
+        This helper method simplifies the process of exporting data from a `Dataset`. It opens the specified
+        one and then exports the data based on the provided parameters. If you need to pass options
         specific to the output format, use the `export_data_csv` or `export_data_json` method instead.
 
         Args:
             path: The destination path.
-            dataset_id: The ID of the dataset.
-            dataset_name: The name of the dataset.
+            dataset_id: The ID of the `Dataset`.
+            dataset_name: The name of the `Dataset`.
         """
         dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
 
@@ -629,16 +629,16 @@ class BasicCrawler(Generic[TCrawlingContext]):
         dataset_name: str | None = None,
         **kwargs: Unpack[ExportDataCsvKwargs],
     ) -> None:
-        """Export data from a dataset to a CSV file.
+        """Export data from a `Dataset` to a CSV file.
 
-        This helper method simplifies the process of exporting data from a dataset in csv format. It opens the specified
-        dataset and then exports the data based on the provided parameters.
+        This helper method simplifies the process of exporting data from a `Dataset` in csv format. It opens
+        the specified one and then exports the data based on the provided parameters.
 
         Args:
             path: The destination path.
             content_type: The output format.
-            dataset_id: The ID of the dataset.
-            dataset_name: The name of the dataset.
+            dataset_id: The ID of the `Dataset`.
+            dataset_name: The name of the `Dataset`.
             kwargs: Extra configurations for dumping/writing in csv format.
         """
         dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
@@ -654,15 +654,15 @@ class BasicCrawler(Generic[TCrawlingContext]):
         dataset_name: str | None = None,
         **kwargs: Unpack[ExportDataJsonKwargs],
     ) -> None:
-        """Export data from a dataset to a JSON file.
+        """Export data from a `Dataset` to a JSON file.
 
-        This helper method simplifies the process of exporting data from a dataset in json format. It opens the
-        specified dataset and then exports the data based on the provided parameters.
+        This helper method simplifies the process of exporting data from a `Dataset` in json format. It opens the
+        specified one and then exports the data based on the provided parameters.
 
         Args:
             path: The destination path
-            dataset_id: The ID of the dataset.
-            dataset_name: The name of the dataset.
+            dataset_id: The ID of the `Dataset`.
+            dataset_name: The name of the `Dataset`.
             kwargs: Extra configurations for dumping/writing in json format.
         """
         dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
@@ -677,16 +677,16 @@ class BasicCrawler(Generic[TCrawlingContext]):
         dataset_name: str | None = None,
         **kwargs: Unpack[PushDataKwargs],
     ) -> None:
-        """Push data to a dataset.
+        """Push data to a `Dataset`.
 
-        This helper method simplifies the process of pushing data to a dataset. It opens the specified
-        dataset and then pushes the provided data to it.
+        This helper method simplifies the process of pushing data to a `Dataset`. It opens the specified
+        one and then pushes the provided data to it.
 
         Args:
-            data: The data to push to the dataset.
-            dataset_id: The ID of the dataset.
-            dataset_name: The name of the dataset.
-            kwargs: Keyword arguments to be passed to the dataset's `push_data` method.
+            data: The data to push to the `Dataset`.
+            dataset_id: The ID of the `Dataset`.
+            dataset_name: The name of the `Dataset`.
+            kwargs: Keyword arguments to be passed to the `Dataset.push_data()` method.
         """
         dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
         await dataset.push_data(data, **kwargs)
