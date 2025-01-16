@@ -1,14 +1,11 @@
 from __future__ import annotations
 
 from itertools import cycle
-from typing import TYPE_CHECKING
 
 import pytest
 
+from crawlee import Request
 from crawlee.proxy_configuration import ProxyConfiguration
-
-if TYPE_CHECKING:
-    from crawlee import Request
 
 
 async def test_returns_proxy_info() -> None:
@@ -89,6 +86,7 @@ async def test_rotates_proxies() -> None:
 
 async def test_rotates_proxies_with_sessions() -> None:
     proxy_urls: list[str | None] = ['http://proxy:1111', 'http://proxy:2222', 'http://proxy:3333']
+    request = Request(url='http://some.domain/abc', unique_key='1', id='1')
     sessions = [f'session_{i}' for i in range(6)]
 
     config = ProxyConfiguration(proxy_urls=proxy_urls)
@@ -106,12 +104,20 @@ async def test_rotates_proxies_with_sessions() -> None:
     assert info is not None
     assert info.url == proxy_urls[0]
 
+    info = await config.new_proxy_info(sessions[0], request, None)
+    assert info is not None
+    assert info.url == proxy_urls[0]
+
+    info = await config.new_proxy_info(sessions[0], request, None)
+    assert info is not None
+    assert info.url == proxy_urls[0]
+
     # Different sessions should get rotated proxies
     info = await config.new_proxy_info(sessions[1], None, None)
     assert info is not None
     assert info.url == proxy_urls[1]
 
-    info = await config.new_proxy_info(sessions[2], None, None)
+    info = await config.new_proxy_info(sessions[2], request, None)
     assert info is not None
     assert info.url == proxy_urls[2]
 
@@ -123,7 +129,7 @@ async def test_rotates_proxies_with_sessions() -> None:
     assert info is not None
     assert info.url == proxy_urls[1]
 
-    info = await config.new_proxy_info(sessions[5], None, None)
+    info = await config.new_proxy_info(sessions[5], request, None)
     assert info is not None
     assert info.url == proxy_urls[2]
 
