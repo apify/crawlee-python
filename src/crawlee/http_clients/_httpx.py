@@ -131,6 +131,7 @@ class HttpxHttpClient(BaseHttpClient):
 
         self._ssl_context = httpx.create_ssl_context(verify=verify)
         self._transport = _HttpxTransport(
+            http1=http1,
             http2=http2,
             verify=self._ssl_context,
             limits=httpx.Limits(max_connections=1000, max_keepalive_connections=200),
