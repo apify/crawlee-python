@@ -7,6 +7,7 @@ from itertools import cycle
 from typing import TYPE_CHECKING, cast
 from unittest.mock import Mock, patch
 
+import httpx
 import pytest
 from typing_extensions import override
 
@@ -29,6 +30,23 @@ from crawlee.statistics import Statistics
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    import respx
+
+
+@pytest.fixture
+def mocked_urls(respx_mock: respx.MockRouter) -> list[str]:
+    """Mock example pages used in the test to reduce test time and avoid flakiness."""
+    urls = [
+        'https://warehouse-theme-metal.myshopify.com/',
+        'https://warehouse-theme-metal.myshopify.com/collections',
+    ]
+    for url in urls:
+        respx_mock.get(url).return_value = httpx.Response(
+            status_code=200, content=b'<!DOCTYPE html><html><body>bla</body></html>'
+        )
+
+    return urls
 
 
 class _SimpleRenderingTypePredictor(RenderingTypePredictor):
@@ -65,12 +83,9 @@ async def test_adaptive_crawling(
     expected_static_count: int,
     rendering_types: Iterator[RenderingType],
     detection_probability_recommendation: Iterator[int],
+    mocked_urls: list[str],
 ) -> None:
     """Tests correct routing to pre-nav hooks and correct handling through proper handler."""
-    requests = [
-        'https://warehouse-theme-metal.myshopify.com/',
-        'https://warehouse-theme-metal.myshopify.com/collections',
-    ]
 
     predictor = _SimpleRenderingTypePredictor(
         rendering_types=rendering_types, detection_probability_recommendation=detection_probability_recommendation
@@ -108,7 +123,7 @@ async def test_adaptive_crawling(
         except AdaptiveContextError:
             static_hook_count += 1
 
-    await crawler.run(requests)
+    await crawler.run(mocked_urls)
 
     assert pw_handler_count == expected_pw_count
     assert pw_hook_count == expected_pw_count
@@ -117,13 +132,8 @@ async def test_adaptive_crawling(
     assert static_hook_count == expected_static_count
 
 
-async def test_adaptive_crawling_parcel() -> None:
+async def test_adaptive_crawling_parcel(mocked_urls: list[str]) -> None:
     """Top level test for parcel. Only one argument combination. (The rest of code is tested with bs variant.)"""
-    requests = [
-        'https://warehouse-theme-metal.myshopify.com/',
-        'https://warehouse-theme-metal.myshopify.com/collections',
-    ]
-
     predictor = _SimpleRenderingTypePredictor(
         rendering_types=cycle(['static', 'client only']), detection_probability_recommendation=cycle([0])
     )
@@ -145,13 +155,13 @@ async def test_adaptive_crawling_parcel() -> None:
         except AdaptiveContextError:
             static_handler_count += 1
 
-    await crawler.run(requests)
+    await crawler.run(mocked_urls)
 
     assert pw_handler_count == 1
     assert static_handler_count == 1
 
 
-async def test_adaptive_crawling_pre_nav_change_to_context() -> None:
+async def test_adaptive_crawling_pre_nav_change_to_context(mocked_urls: list[str]) -> None:
     """Tests that context can be modified in pre-navigation hooks."""
     static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
 
@@ -175,14 +185,14 @@ async def test_adaptive_crawling_pre_nav_change_to_context() -> None:
         except AdaptiveContextError:
             context.request.user_data['data'] = 'bs'
 
-    await crawler.run(['https://warehouse-theme-metal.myshopify.com/'])
+    await crawler.run(mocked_urls[:1])
     # Check that pre nav hooks does not influence each other
     assert user_data_in_pre_nav_hook == [None, None]
     # Check that pre nav hooks can modify context
     assert user_data_in_handler == ['pw', 'bs']
 
 
-async def test_adaptive_crawling_result() -> None:
+async def test_adaptive_crawling_result(mocked_urls: list[str]) -> None:
     """Tests that result only from one sub crawler is saved.
 
     Enforced rendering type detection to run both sub crawlers."""
@@ -190,7 +200,6 @@ async def test_adaptive_crawling_result() -> None:
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
         rendering_type_predictor=static_only_predictor_enforce_detection
     )
-    requests = ['https://warehouse-theme-metal.myshopify.com/']
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
@@ -201,7 +210,7 @@ async def test_adaptive_crawling_result() -> None:
         except AdaptiveContextError:
             await context.push_data({'handler': 'bs'})
 
-    await crawler.run(requests)
+    await crawler.run(mocked_urls[:1])
 
     dataset = await crawler.get_dataset()
     items = [item async for item in dataset.iterate_items()]
@@ -218,11 +227,14 @@ async def test_adaptive_crawling_result() -> None:
     ],
 )
 async def test_adaptive_crawling_predictor_calls(
-    pw_saved_data: dict[str, str], static_saved_data: dict[str, str], expected_result_renderingl_type: RenderingType
+    pw_saved_data: dict[str, str],
+    static_saved_data: dict[str, str],
+    expected_result_renderingl_type: RenderingType,
+    mocked_urls: list[str],
 ) -> None:
     """Tests expected predictor calls. Same results."""
     some_label = 'bla'
-    some_url = 'https://warehouse-theme-metal.myshopify.com/'
+    some_url = mocked_urls[0]
     static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
     requests = [Request.from_url(url=some_url, label=some_label)]
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
@@ -251,12 +263,11 @@ async def test_adaptive_crawling_predictor_calls(
     mocked_store_result.assert_called_once_with(requests[0], expected_result_renderingl_type)
 
 
-async def test_adaptive_crawling_result_use_state_isolation() -> None:
+async def test_adaptive_crawling_result_use_state_isolation(mocked_urls: list[str]) -> None:
     """Tests that global state accessed through `use_state` is changed only by one sub crawler.
 
     Enforced rendering type detection to run both sub crawlers."""
     static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
-    requests = ['https://warehouse-theme-metal.myshopify.com/']
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
         rendering_type_predictor=static_only_predictor_enforce_detection
     )
@@ -271,7 +282,7 @@ async def test_adaptive_crawling_result_use_state_isolation() -> None:
         request_handler_calls += 1
         state['counter'] += 1
 
-    await crawler.run(requests)
+    await crawler.run(mocked_urls[:1])
 
     await store.persist_autosaved_values()
 
@@ -281,13 +292,11 @@ async def test_adaptive_crawling_result_use_state_isolation() -> None:
     assert (await store.get_value(BasicCrawler._CRAWLEE_STATE_KEY))['counter'] == 1
 
 
-async def test_adaptive_crawling_statistics() -> None:
+async def test_adaptive_crawling_statistics(mocked_urls: list[str]) -> None:
     """Test adaptive crawler statistics.
 
     Crawler set to static crawling, but due to result_checker returning False on static crawling result it
     will do browser crawling instead as well. This increments all three adaptive crawling related stats."""
-    requests = ['https://warehouse-theme-metal.myshopify.com/']
-
     static_only_predictor_no_detection = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
 
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
@@ -299,7 +308,7 @@ async def test_adaptive_crawling_statistics() -> None:
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
         pass
 
-    await crawler.run(requests)
+    await crawler.run(mocked_urls[:1])
 
     assert crawler.statistics.state.http_only_request_handler_runs == 1
     assert crawler.statistics.state.browser_request_handler_runs == 1
@@ -317,7 +326,9 @@ async def test_adaptive_crawling_statistics() -> None:
         pytest.param(True, id='Error in both sub crawlers'),
     ],
 )
-async def test_adaptive_crawler_exceptions_in_sub_crawlers(*, error_in_pw_crawler: bool) -> None:
+async def test_adaptive_crawler_exceptions_in_sub_crawlers(
+    *, error_in_pw_crawler: bool, mocked_urls: list[str]
+) -> None:
     """Test that correct results are commited when exceptions are raised in sub crawlers.
 
     Exception in bs sub crawler will be logged and pw sub crawler used instead.
@@ -327,7 +338,6 @@ async def test_adaptive_crawler_exceptions_in_sub_crawlers(*, error_in_pw_crawle
     Exception in pw sub crawler will prevent any result from being commited. Even if `push_data` was called before
     the exception
     """
-    requests = ['https://warehouse-theme-metal.myshopify.com/']
     static_only_no_detection_predictor = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
 
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
@@ -348,7 +358,7 @@ async def test_adaptive_crawler_exceptions_in_sub_crawlers(*, error_in_pw_crawle
             await context.push_data({'this': 'data should not be saved'})
             raise RuntimeError('Some bs sub crawler related error') from None
 
-    await crawler.run(requests)
+    await crawler.run(mocked_urls[:1])
 
     dataset = await crawler.get_dataset()
     stored_results = [item async for item in dataset.iterate_items()]
@@ -387,15 +397,14 @@ def test_adaptive_playwright_crawler_statistics_in_init() -> None:
     assert crawler._statistics._log_interval == log_interval
 
 
-async def test_adaptive_playwright_crawler_timeout_in_sub_crawler() -> None:
+async def test_adaptive_playwright_crawler_timeout_in_sub_crawler(mocked_urls: list[str]) -> None:
     """Tests that timeout used by sub crawlers ensure that both have chance to run within top crawler timeout.
 
     Create situation where static sub crawler blocks(should timeout), such error should start browser sub
     crawler, which must be capable of running without top crawler handler timing out."""
-    requests = ['https://warehouse-theme-metal.myshopify.com/']
 
     static_only_predictor_no_detection = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
-    top_crawler_handler_timeout = timedelta(seconds=2)
+    top_crawler_handler_timeout = timedelta(seconds=3)
 
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
         rendering_type_predictor=static_only_predictor_no_detection,
@@ -416,7 +425,7 @@ async def test_adaptive_playwright_crawler_timeout_in_sub_crawler() -> None:
             # Sleep for time obviously larger than top crawler timeout.
             await asyncio.sleep(top_crawler_handler_timeout.total_seconds() * 2)
 
-    await crawler.run(requests)
+    await crawler.run(mocked_urls[:1])
 
     mocked_static_handler.assert_called_once_with()
     # Browser handler was capable of running despite static handler having sleep time larger than top handler timeout.
