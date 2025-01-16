@@ -103,12 +103,12 @@ function Features() {
 
 const example = `import asyncio
 
-from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
+from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext
 
 
 async def main() -> None:
     crawler = PlaywrightCrawler(
-        max_requests_per_crawl=5,  # Limit the crawl to 5 requests.
+        max_requests_per_crawl=5,  # Limit the crawl to 5 requests at most.
         headless=False,  # Show the browser window.
         browser_type='firefox',  # Use the Firefox browser.
     )
@@ -118,7 +118,7 @@ async def main() -> None:
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url} ...')
 
-        # Enqueue all links found on the page.
+        # Extract and enqueue all links found on the page.
         await context.enqueue_links()
 
         # Extract data from the page using Playwright API.
