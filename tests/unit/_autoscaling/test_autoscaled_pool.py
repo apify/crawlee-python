@@ -143,7 +143,10 @@ async def test_propagates_exceptions_after_finished(system_status: SystemStatus 
         await pool.run()
 
 
-async def test_autoscales(system_status: SystemStatus | Mock) -> None:
+async def test_autoscales(
+    monkeypatch: pytest.MonkeyPatch,
+    system_status: SystemStatus | Mock,
+) -> None:
     done_count = 0
 
     async def run() -> None:
@@ -169,6 +172,9 @@ async def test_autoscales(system_status: SystemStatus | Mock) -> None:
 
     cast(Mock, system_status.get_historical_system_info).side_effect = get_historical_system_info
 
+    # Override AP class attributes using monkeypatch.
+    monkeypatch.setattr(AutoscaledPool, '_AUTOSCALE_INTERVAL', timedelta(seconds=0.1))
+
     pool = AutoscaledPool(
         system_status=system_status,
         run_task_function=run,
@@ -179,7 +185,6 @@ async def test_autoscales(system_status: SystemStatus | Mock) -> None:
             desired_concurrency=1,
             max_concurrency=4,
         ),
-        autoscale_interval=timedelta(seconds=0.1),
     )
 
     pool_run_task = asyncio.create_task(pool.run(), name='pool run task')
@@ -209,7 +214,10 @@ async def test_autoscales(system_status: SystemStatus | Mock) -> None:
             await pool_run_task
 
 
-async def test_autoscales_uses_desired_concurrency_ratio(system_status: SystemStatus | Mock) -> None:
+async def test_autoscales_uses_desired_concurrency_ratio(
+    monkeypatch: pytest.MonkeyPatch,
+    system_status: SystemStatus | Mock,
+) -> None:
     """Test that desired concurrency ratio can limit desired concurrency.
 
     This test creates situation where only one task is ready and then no other task is ever ready.
@@ -217,7 +225,8 @@ async def test_autoscales_uses_desired_concurrency_ratio(system_status: SystemSt
     desired_concurrency_ratio=1 means that first the system would have to increase current concurrency to same number as
     desired concurrency and due to no other task ever being ready, it will never happen. Thus desired concurrency will
     stay 2 as was the initial setup, even though other conditions would allow the increase. (max_concurrency=4,
-    system being idle)."""
+    system being idle).
+    """
 
     async def run() -> None:
         await asyncio.sleep(0.1)
@@ -237,6 +246,10 @@ async def test_autoscales_uses_desired_concurrency_ratio(system_status: SystemSt
 
     cast(Mock, system_status.get_historical_system_info).side_effect = get_historical_system_info
 
+    # Override AP class attributes using monkeypatch.
+    monkeypatch.setattr(AutoscaledPool, '_AUTOSCALE_INTERVAL', timedelta(seconds=0.1))
+    monkeypatch.setattr(AutoscaledPool, '_DESIRED_CONCURRENCY_RATIO', 1)
+
     pool = AutoscaledPool(
         system_status=system_status,
         run_task_function=run,
@@ -247,8 +260,6 @@ async def test_autoscales_uses_desired_concurrency_ratio(system_status: SystemSt
             desired_concurrency=2,
             max_concurrency=4,
         ),
-        autoscale_interval=timedelta(seconds=0.1),
-        desired_concurrency_ratio=1,
     )
 
     pool_run_task = asyncio.create_task(pool.run(), name='pool run task')

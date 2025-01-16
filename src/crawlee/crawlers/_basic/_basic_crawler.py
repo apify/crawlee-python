@@ -307,10 +307,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._snapshotter = Snapshotter.from_config(config)
         self._autoscaled_pool = AutoscaledPool(
             system_status=SystemStatus(self._snapshotter),
+            concurrency_settings=concurrency_settings,
             is_finished_function=self.__is_finished_function,
             is_task_ready_function=self.__is_task_ready_function,
             run_task_function=self.__run_task_function,
-            concurrency_settings=concurrency_settings,
         )
 
         # State flags
