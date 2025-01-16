@@ -24,7 +24,7 @@ logger = getLogger(__name__)
 
 @docs_group('Classes')
 class LocalEventManager(EventManager):
-    """Local event manager for emitting system info events.
+    """Event manager for local environments.
 
     It extends the `EventManager` to emit `SystemInfo` events at regular intervals. The `LocalEventManager`
     is intended to be used in local environments, where the system metrics are required managing the `Snapshotter`
