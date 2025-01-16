@@ -26,7 +26,7 @@ class BaseBrowserPlugin(ABC):
     @property
     @abstractmethod
     def active(self) -> bool:
-        """Indicates whether the context is active."""
+        """Indicate whether the context is active."""
 
     @property
     @abstractmethod
