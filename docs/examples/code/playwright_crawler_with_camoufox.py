@@ -18,7 +18,7 @@ class CamoufoxPlugin(PlaywrightBrowserPlugin):
             raise RuntimeError('Playwright browser plugin is not initialized.')
 
         return PlaywrightBrowserController(
-            browser=await AsyncNewBrowser(self._playwright, headless=True, **self._browser_launch_options),
+            browser=await AsyncNewBrowser(self._playwright, **self._browser_launch_options),
             max_open_pages_per_browser=1,  # Increase, if camoufox can handle it in your use case.
             header_generator=None,  # This turns off the crawlee header_generation. Camoufox has its own.
         )
