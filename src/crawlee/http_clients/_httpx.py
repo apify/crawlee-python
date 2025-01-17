@@ -229,15 +229,20 @@ class HttpxHttpClient(BaseHttpClient):
         if proxy_url not in self._client_by_proxy_url:
             # Prepare a default kwargs for the new client.
             kwargs: dict[str, Any] = {
-                'transport': self._transport,
                 'proxy': proxy_url,
                 'http1': self._http1,
                 'http2': self._http2,
-                'verify': self._ssl_context,
             }
 
             # Update the default kwargs with any additional user-provided kwargs.
             kwargs.update(self._async_client_kwargs)
+
+            kwargs.update(
+                {
+                    'transport': self._transport,
+                    'verify': self._ssl_context,
+                }
+            )
 
             client = httpx.AsyncClient(**kwargs)
             self._client_by_proxy_url[proxy_url] = client
