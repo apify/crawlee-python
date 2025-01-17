@@ -3,7 +3,15 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 0.5.2 - **not yet released**
+## 0.5.3 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Fix crawler not retrying user handler if there was timeout in the handler ([#909](https://github.com/apify/crawlee-python/pull/909)) ([f4090ef](https://github.com/apify/crawlee-python/commit/f4090ef0ea0281d53dab16a77ceea2ef6ac43d76)) by [@Pijukatel](https://github.com/Pijukatel), closes [#907](https://github.com/apify/crawlee-python/issues/907)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.5.2](https://github.com/apify/crawlee-python/releases/tag/v0.5.2) (2025-01-17)
 
 ### 🐛 Bug Fixes
 
@@ -12,7 +20,6 @@ All notable changes to this project will be documented in this file.
 - Fix the usage of Configuration ([#899](https://github.com/apify/crawlee-python/pull/899)) ([0f1cf6f](https://github.com/apify/crawlee-python/commit/0f1cf6f0b52c92ca4e465a2a01f8111cd9ab42ec)) by [@vdusek](https://github.com/vdusek), closes [#670](https://github.com/apify/crawlee-python/issues/670)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.5.1](https://github.com/apify/crawlee-python/releases/tag/v0.5.1) (2025-01-07)
 
 ### 🐛 Bug Fixes

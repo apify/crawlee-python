@@ -29,8 +29,8 @@ logger = getLogger(__name__)
 class PlaywrightBrowserController(BaseBrowserController):
     """Controller for managing Playwright browser instances and their pages.
 
-    This class provides methods to manage pages within a browser instance, ensuring that the number
-    of open pages does not exceed the specified limit and tracking the state of the pages.
+    It provides methods to control browser instances, manage their pages, and handle context-specific
+    configurations. It enforces limits on the number of open pages and tracks their state.
     """
 
     AUTOMATION_LIBRARY = 'playwright'

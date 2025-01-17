@@ -24,7 +24,12 @@ logger = getLogger(__name__)
 
 @docs_group('Classes')
 class LocalEventManager(EventManager):
-    """Local event manager for emitting system info events."""
+    """Event manager for local environments.
+
+    It extends the `EventManager` to emit `SystemInfo` events at regular intervals. The `LocalEventManager`
+    is intended to be used in local environments, where the system metrics are required managing the `Snapshotter`
+    and `AutoscaledPool`.
+    """
 
     def __init__(
         self,
@@ -52,10 +57,10 @@ class LocalEventManager(EventManager):
 
     @classmethod
     def from_config(cls, config: Configuration | None = None) -> LocalEventManager:
-        """Create a new instance based on the provided configuration.
+        """Create a new instance based on the provided `Configuration`.
 
         Args:
-            config: The configuration object. Uses the global (default) configuration if not provided.
+            config: The `Configuration` instance. Uses the global (default) one if not provided.
         """
         config = config or Configuration.get_global_configuration()
 

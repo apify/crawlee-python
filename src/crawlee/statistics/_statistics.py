@@ -54,9 +54,12 @@ class RequestProcessingRecord:
 
 @docs_group('Classes')
 class Statistics(Generic[TStatisticsState]):
-    """An interface to collecting and logging runtime statistics for requests.
+    """A class for collecting, tracking, and logging runtime statistics for requests.
 
-    All information is saved to the key value store so that it persists between migrations, abortions and resurrections.
+    It is designed to record information such as request durations, retries, successes, and failures, enabling
+    analysis of crawler performance. The collected statistics are persisted to a `KeyValueStore`, ensuring they
+    remain available across crawler migrations, abortions, and restarts. This persistence allows for tracking
+    and evaluation of crawler behavior over its lifecycle.
     """
 
     __next_id = 0
@@ -127,7 +130,7 @@ class Statistics(Generic[TStatisticsState]):
 
     @property
     def active(self) -> bool:
-        """Indicates whether the context is active."""
+        """Indicate whether the context is active."""
         return self._active
 
     async def __aenter__(self) -> Self:

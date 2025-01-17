@@ -27,7 +27,11 @@ logger = getLogger(__name__)
 class PlaywrightBrowserPlugin(BaseBrowserPlugin):
     """A plugin for managing Playwright automation library.
 
-    It should work as a factory for creating new browser instances.
+    It is a plugin designed to manage browser instances using the Playwright automation library. It acts as a factory
+    for creating new browser instances and provides a unified interface for interacting with different browser types
+    (chromium, firefox, and webkit). This class integrates configuration options for browser launches (headless mode,
+    executable paths, sandboxing, ...). It also manages browser contexts and the number of pages open within each
+    browser instance, ensuring that resource limits are respected.
     """
 
     AUTOMATION_LIBRARY = 'playwright'

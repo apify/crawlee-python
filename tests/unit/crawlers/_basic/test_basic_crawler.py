@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import sys
+import time
 from collections import Counter
 from dataclasses import dataclass
 from datetime import timedelta
@@ -1075,3 +1076,51 @@ async def test_context_use_state_race_condition_in_handlers(key_value_store: Key
     # Ensure that local state is pushed back to kvs.
     await store.persist_autosaved_values()
     assert (await store.get_value(BasicCrawler._CRAWLEE_STATE_KEY))['counter'] == 2
+
+
+@pytest.mark.skipif(sys.version_info[:3] < (3, 11), reason='asyncio.timeout was introduced in Python 3.11.')
+@pytest.mark.parametrize(
+    'sleep_type',
+    [
+        pytest.param('async_sleep'),
+        pytest.param('sync_sleep', marks=pytest.mark.skip(reason='https://github.com/apify/crawlee-python/issues/908')),
+    ],
+)
+async def test_timeout_in_handler(sleep_type: str) -> None:
+    """Test that timeout from request handler is treated the same way as exception thrown in request handler.
+
+    Handler should be able to time out even if the code causing the timeout is blocking sync code.
+    Crawler should attempt to retry it.
+    This test creates situation where the request handler times out twice, on third retry it does not time out."""
+    from asyncio import timeout  # type:ignore[attr-defined]  # Test is skipped in older Python versions.
+
+    handler_timeout = timedelta(seconds=1)
+    max_request_retries = 3
+    double_handler_timeout_s = handler_timeout.total_seconds() * 2
+    handler_sleep = iter([double_handler_timeout_s, double_handler_timeout_s, 0])
+
+    crawler = BasicCrawler(request_handler_timeout=handler_timeout, max_request_retries=max_request_retries)
+
+    mocked_handler_before_sleep = Mock()
+    mocked_handler_after_sleep = Mock()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        mocked_handler_before_sleep()
+
+        if sleep_type == 'async_sleep':
+            await asyncio.sleep(next(handler_sleep))
+        else:
+            time.sleep(next(handler_sleep))  # noqa:ASYNC251  # Using blocking sleep in async function is the test.
+
+        # This will not execute if timeout happens.
+        mocked_handler_after_sleep()
+
+    # Timeout in pytest, because previous implementation would run crawler until following:
+    # "The request queue seems to be stuck for 300.0s, resetting internal state."
+    async with timeout(max_request_retries * double_handler_timeout_s):
+        await crawler.run(['http://a.com/'])
+
+    assert crawler.statistics.state.requests_finished == 1
+    assert mocked_handler_before_sleep.call_count == max_request_retries
+    assert mocked_handler_after_sleep.call_count == 1

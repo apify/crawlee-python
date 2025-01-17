@@ -29,7 +29,7 @@ class BaseBrowserController(ABC):
     @property
     @abstractmethod
     def pages_count(self) -> int:
-        """Returns the number of currently open pages."""
+        """Return the number of currently open pages."""
 
     @property
     @abstractmethod
