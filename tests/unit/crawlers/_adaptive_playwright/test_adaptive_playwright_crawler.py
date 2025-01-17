@@ -7,10 +7,12 @@ from itertools import cycle
 from typing import TYPE_CHECKING, cast
 from unittest.mock import Mock, patch
 
+import httpx
 import pytest
 from typing_extensions import override
 
 from crawlee import Request
+from crawlee.browsers import BrowserPool
 from crawlee.crawlers import BasicCrawler
 from crawlee.crawlers._adaptive_playwright import AdaptivePlaywrightCrawler, AdaptivePlaywrightCrawlingContext
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler_statistics import (
@@ -30,14 +32,46 @@ from crawlee.statistics import Statistics
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    import respx
+
+    from crawlee.browsers._base_browser_plugin import BaseBrowserPlugin
+    from crawlee.browsers._types import CrawleePage
+    from crawlee.proxy_configuration import ProxyInfo
+
 
 @pytest.fixture
-def test_urls() -> list[str]:
-    """Example pages used in the test to reduce test."""
-    return [
+def test_urls(respx_mock: respx.MockRouter) -> list[str]:
+    """Example pages used in the test to reduce test. Mock for static requests."""
+    urls = [
         'https://warehouse-theme-metal.myshopify.com/',
         'https://warehouse-theme-metal.myshopify.com/collections',
     ]
+
+    for url in urls:
+        respx_mock.get(url).return_value = httpx.Response(
+            status_code=200, content=b'<!DOCTYPE html><html><body>What a body!</body></html>'
+        )
+    return urls
+
+
+class _StaticRedirectBrowserPool(BrowserPool):
+    """BrowserPool for redirecting browser requests to static content."""
+
+    async def new_page(
+        self,
+        *,
+        page_id: str | None = None,
+        browser_plugin: BaseBrowserPlugin | None = None,
+        proxy_info: ProxyInfo | None = None,
+    ) -> CrawleePage:
+        crawlee_page = await super().new_page(page_id=page_id, browser_plugin=browser_plugin, proxy_info=proxy_info)
+        await crawlee_page.page.route(
+            '**/*',
+            lambda route: route.fulfill(
+                status=200, content_type='text/plain', body='<!DOCTYPE html><html><body>What a body!</body></html>'
+            ),
+        )
+        return crawlee_page
 
 
 class _SimpleRenderingTypePredictor(RenderingTypePredictor):
@@ -82,7 +116,10 @@ async def test_adaptive_crawling(
         rendering_types=rendering_types, detection_probability_recommendation=detection_probability_recommendation
     )
 
-    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(rendering_type_predictor=predictor)
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=predictor,
+        playwright_crawler_specific_kwargs={'browser_pool': _StaticRedirectBrowserPool.with_default_plugin()},
+    )
 
     pw_handler_count = 0
     static_handler_count = 0
@@ -129,7 +166,10 @@ async def test_adaptive_crawling_parcel(test_urls: list[str]) -> None:
         rendering_types=cycle(['static', 'client only']), detection_probability_recommendation=cycle([0])
     )
 
-    crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(rendering_type_predictor=predictor)
+    crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(
+        rendering_type_predictor=predictor,
+        playwright_crawler_specific_kwargs={'browser_pool': _StaticRedirectBrowserPool.with_default_plugin()},
+    )
 
     pw_handler_count = 0
     static_handler_count = 0
@@ -157,7 +197,8 @@ async def test_adaptive_crawling_pre_nav_change_to_context(test_urls: list[str])
     static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
 
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
-        rendering_type_predictor=static_only_predictor_enforce_detection
+        rendering_type_predictor=static_only_predictor_enforce_detection,
+        playwright_crawler_specific_kwargs={'browser_pool': _StaticRedirectBrowserPool.with_default_plugin()},
     )
     user_data_in_pre_nav_hook = []
     user_data_in_handler = []
@@ -189,7 +230,8 @@ async def test_adaptive_crawling_result(test_urls: list[str]) -> None:
     Enforced rendering type detection to run both sub crawlers."""
     static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
-        rendering_type_predictor=static_only_predictor_enforce_detection
+        rendering_type_predictor=static_only_predictor_enforce_detection,
+        playwright_crawler_specific_kwargs={'browser_pool': _StaticRedirectBrowserPool.with_default_plugin()},
     )
 
     @crawler.router.default_handler
@@ -229,7 +271,8 @@ async def test_adaptive_crawling_predictor_calls(
     static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
     requests = [Request.from_url(url=some_url, label=some_label)]
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
-        rendering_type_predictor=static_only_predictor_enforce_detection
+        rendering_type_predictor=static_only_predictor_enforce_detection,
+        playwright_crawler_specific_kwargs={'browser_pool': _StaticRedirectBrowserPool.with_default_plugin()},
     )
 
     @crawler.router.default_handler
@@ -260,7 +303,8 @@ async def test_adaptive_crawling_result_use_state_isolation(test_urls: list[str]
     Enforced rendering type detection to run both sub crawlers."""
     static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
-        rendering_type_predictor=static_only_predictor_enforce_detection
+        rendering_type_predictor=static_only_predictor_enforce_detection,
+        playwright_crawler_specific_kwargs={'browser_pool': _StaticRedirectBrowserPool.with_default_plugin()},
     )
     store = await crawler.get_key_value_store()
     await store.set_value(BasicCrawler._CRAWLEE_STATE_KEY, {'counter': 0})
@@ -293,6 +337,7 @@ async def test_adaptive_crawling_statistics(test_urls: list[str]) -> None:
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
         rendering_type_predictor=static_only_predictor_no_detection,
         result_checker=lambda result: False,  #  noqa: ARG005  # Intentionally unused argument.
+        playwright_crawler_specific_kwargs={'browser_pool': _StaticRedirectBrowserPool.with_default_plugin()},
     )
 
     @crawler.router.default_handler
@@ -330,7 +375,8 @@ async def test_adaptive_crawler_exceptions_in_sub_crawlers(*, error_in_pw_crawle
     static_only_no_detection_predictor = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
 
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
-        rendering_type_predictor=static_only_no_detection_predictor
+        rendering_type_predictor=static_only_no_detection_predictor,
+        playwright_crawler_specific_kwargs={'browser_pool': _StaticRedirectBrowserPool.with_default_plugin()},
     )
     saved_data = {'some': 'data'}
 
@@ -389,16 +435,17 @@ def test_adaptive_playwright_crawler_statistics_in_init() -> None:
 async def test_adaptive_playwright_crawler_timeout_in_sub_crawler(test_urls: list[str]) -> None:
     """Tests that timeout used by sub crawlers ensure that both have chance to run within top crawler timeout.
 
-    Create situation where static sub crawler blocks(should timeout), such error should start browser sub
+    Create situation where static sub crawler blocks(should time out), such error should start browser sub
     crawler, which must be capable of running without top crawler handler timing out."""
 
     static_only_predictor_no_detection = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
-    request_handler_timeout = timedelta(seconds=5)
+    request_handler_timeout = timedelta(seconds=2)
 
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
         rendering_type_predictor=static_only_predictor_no_detection,
         result_checker=lambda result: False,  #  noqa: ARG005  # Intentionally unused argument.
         request_handler_timeout=request_handler_timeout,
+        playwright_crawler_specific_kwargs={'browser_pool': _StaticRedirectBrowserPool.with_default_plugin()},
     )
     mocked_static_handler = Mock()
     mocked_browser_handler = Mock()
