@@ -133,6 +133,27 @@ async def test_rotates_proxies_with_sessions() -> None:
     assert info is not None
     assert info.url == proxy_urls[2]
 
+    # Without sessions should get rotated proxies
+    info = await config.new_proxy_info(None, None, None)
+    assert info is not None
+    assert info.url == proxy_urls[0]
+
+    info = await config.new_proxy_info(None, request, None)
+    assert info is not None
+    assert info.url == proxy_urls[1]
+
+    info = await config.new_proxy_info(None, None, None)
+    assert info is not None
+    assert info.url == proxy_urls[2]
+
+    info = await config.new_proxy_info(None, None, None)
+    assert info is not None
+    assert info.url == proxy_urls[0]
+
+    info = await config.new_proxy_info(None, request, None)
+    assert info is not None
+    assert info.url == proxy_urls[1]
+
 
 @pytest.mark.parametrize(
     ('url', 'expected_port'),
