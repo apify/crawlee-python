@@ -106,6 +106,9 @@ class _OrphanPlaywrightContextPipeline(Generic[TStaticParseResult]):
 
         return self.pipeline(top_context, from_pipeline_to_top_router)
 
+    def __str__(self) -> str:
+        return 'Playwright context pipeline'
+
 
 @dataclass
 class _OrphanStaticContextPipeline(Generic[TStaticCrawlingContext]):
@@ -122,6 +125,9 @@ class _OrphanStaticContextPipeline(Generic[TStaticCrawlingContext]):
             await self.top_router(adaptive_crawling_context)
 
         return self.pipeline(top_context, from_pipeline_to_top_router)
+
+    def __str__(self) -> str:
+        return 'Static context pipeline'
 
 
 class AdaptivePlaywrightCrawler(
@@ -309,7 +315,9 @@ class AdaptivePlaywrightCrawler(
         await wait_for(
             lambda: subcrawler_pipeline.create_pipeline_call(context_linked_to_result),
             timeout=self._request_handler_timeout,
-            timeout_message=f'Sub crawler timed out after {self._request_handler_timeout.total_seconds()} seconds',
+            timeout_message=(
+                f'{subcrawler_pipeline=!s} timed out after {self._request_handler_timeout.total_seconds()}seconds'
+            ),
             logger=self._logger,
         )
         return result
