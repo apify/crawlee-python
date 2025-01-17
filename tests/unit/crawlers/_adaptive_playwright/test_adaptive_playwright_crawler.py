@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 
 @pytest.fixture
 def test_urls(respx_mock: respx.MockRouter) -> list[str]:
-    """Example pages used in the test to reduce test. Mock for static requests."""
+    """Example pages used in the test are mocked for static requests."""
     urls = [
         'https://warehouse-theme-metal.myshopify.com/',
         'https://warehouse-theme-metal.myshopify.com/collections',
