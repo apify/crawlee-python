@@ -1,0 +1,69 @@
+---
+id: playwright-crawler-guide
+title: PlaywrightCrawler
+description: Configuration and management of <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> using <ApiLink to="class/BrowserPool">`BrowserPool`</ApiLink>
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import CodeBlock from '@theme/CodeBlock';
+
+import MultipleLaunchExample from '!!raw-loader!./code/playwright_crawler/multiple_launch_example.py';
+import BrowserConfiguration from '!!raw-loader!./code/playwright_crawler/browser_configuration_example.py';
+import PluginBrowserConfiguration from '!!raw-loader!./code/playwright_crawler/plugin_browser_configuration_example.py';
+import PreNavigation from '!!raw-loader!./code/playwright_crawler/pre_navigation_hook_example.py';
+
+<ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> is a powerful web crawler built on top of the `Playwright` browser automation library. It provides a robust foundation for automated web interactions, particularly when dealing with modern, dynamic websites.
+
+## When to use PlaywrightCrawler
+
+<ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> is designed for complex scenarios requiring browser functionality:
+
+* **Dynamic Content Rendering**: Handles websites that rely on client-side JavaScript for content generation and dynamic rendering
+
+* **Anti-Scraping Protection**: Works with websites implementing advanced protection mechanisms and JavaScript-based security measures
+
+* **Complex Cookie Management**: Supports sites with client-side cookie generation logic and session management requirements
+
+This makes <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> an essential tool when implementation using http-based crawler is not feasible.
+
+The following [example](../examples/playwright-crawler) demonstrates the basic usage of <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>
+
+## Advanced usage
+
+You can flexibly configure <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> using <ApiLink to="class/BrowserPool">`BrowserPool`</ApiLink> and <ApiLink to="class/PlaywrightBrowserPlugin">`PlaywrightBrowserPlugin`</ApiLink>.
+
+<ApiLink to="class/PlaywrightBrowserPlugin">`PlaywrightBrowserPlugin`</ApiLink> manages settings for browser instance launches. It allows you to pass both [launch](https://playwright.dev/python/docs/api/class-browsertype#browser-type-launch) and [context](https://playwright.dev/python/docs/api/class-browser#browser-new-context) configuration options.
+
+<ApiLink to="class/BrowserPool">`BrowserPool`</ApiLink> manages browser lifecycles.
+
+## Launching Multiple Browsers
+
+You might need to launch multiple browser instances for different scenarios, such as testing various approaches or implementing browser rotation during crawling.
+
+<CodeBlock className="language-python">
+    {MultipleLaunchExample}
+</CodeBlock>
+
+## Configuring browser and context
+
+<ApiLink to="class/PlaywrightBrowserPlugin">`PlaywrightBrowserPlugin`</ApiLink> supports all configuration options available in Playwright for both [browser launch](https://playwright.dev/python/docs/api/class-browsertype#browser-type-launch) and [context creation](https://playwright.dev/python/docs/api/class-browser#browser-new-context).
+
+<CodeBlock className="language-python">
+    {BrowserConfiguration}
+</CodeBlock>
+
+Similarly, you can configure each plugin in <ApiLink to="class/BrowserPool">`BrowserPool`</ApiLink>
+
+<CodeBlock className="language-python">
+    {PluginBrowserConfiguration}
+</CodeBlock>
+
+You might also be interested in checking out the [example of running PlaywrightCrawler with Camoufox](../examples/playwright-crawler-with-camoufox)
+
+## Configuring page using pre_navigation_hook
+
+In some cases, you may need to apply specific settings to the page before the crawler navigates to the target URL, such as setting a navigation timeout.
+
+<CodeBlock className="language-python">
+    {PreNavigation}
+</CodeBlock>
