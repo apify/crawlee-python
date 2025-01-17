@@ -134,7 +134,7 @@ class HttpxHttpClient(BaseHttpClient):
             http1=http1,
             http2=http2,
             verify=self._ssl_context,
-            limits=httpx.Limits(max_connections=1000, max_keepalive_connections=200),
+            limits=async_client_kwargs.get('limits', httpx.Limits(max_connections=1000, max_keepalive_connections=200)),
         )
         self._client_by_proxy_url = dict[Optional[str], httpx.AsyncClient]()
 
