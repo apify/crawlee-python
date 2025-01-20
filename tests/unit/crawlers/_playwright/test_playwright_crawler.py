@@ -13,7 +13,6 @@ from crawlee._types import EnqueueStrategy
 from crawlee.crawlers import PlaywrightCrawler
 from crawlee.fingerprint_suite import (
     DefaultFingerprintGenerator,
-    FingerprintGeneratorOptions,
     HeaderGeneratorOptions,
     ScreenOptions,
 )
@@ -202,12 +201,14 @@ async def test_custom_fingerprint_uses_generator_options(httpbin: URL) -> None:
     min_height = 500
     max_height = 1200
 
-    fingerprint_options = FingerprintGeneratorOptions(
+    fingerprint_generator = DefaultFingerprintGenerator(
         header_options=HeaderGeneratorOptions(browsers=['firefox'], operating_systems=['android']),
-        screen=ScreenOptions(min_width=min_width, max_width=max_width, min_height=min_height, max_height=max_height),
+        screen_options=ScreenOptions(
+            min_width=min_width, max_width=max_width, min_height=min_height, max_height=max_height
+        ),
     )
 
-    crawler = PlaywrightCrawler(headless=True, fingerprint_generator=DefaultFingerprintGenerator(fingerprint_options))
+    crawler = PlaywrightCrawler(headless=True, fingerprint_generator=fingerprint_generator)
 
     response_headers = dict[str, str]()
     fingerprints = dict[str, Any]()

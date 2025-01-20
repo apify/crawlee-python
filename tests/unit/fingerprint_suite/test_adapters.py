@@ -3,7 +3,6 @@ import pytest
 from crawlee.fingerprint_suite import (
     AbstractFingerprintGenerator,
     DefaultFingerprintGenerator,
-    FingerprintGeneratorOptions,
     HeaderGeneratorOptions,
     ScreenOptions,
 )
@@ -18,9 +17,12 @@ def test_fingerprint_generator_has_default(FingerprintGenerator: type[AbstractFi
 @pytest.mark.parametrize('FingerprintGenerator', [pytest.param(DefaultFingerprintGenerator, id='browserforge')])
 def test_fingerprint_generator_some_options(FingerprintGenerator: type[AbstractFingerprintGenerator]) -> None:  # noqa:N803  # Test is more readable if argument(class) is PascalCase
     """Test that header generator can work with only some options."""
-    options = FingerprintGeneratorOptions(screen=ScreenOptions(min_width=500), mock_web_rtc=True)
 
-    fingerprint = FingerprintGenerator(options=options).generate()
+    fingerprint = FingerprintGenerator(
+        mock_web_rtc=True,
+        screen_options=ScreenOptions(min_width=500),
+        header_options=HeaderGeneratorOptions(strict=True),
+    ).generate()
 
     assert fingerprint.mockWebRTC is True
     assert fingerprint.screen.availWidth >= 500
@@ -37,15 +39,15 @@ def test_fingerprint_generator_all_options(FingerprintGenerator: type[AbstractFi
     min_height = 400
     max_height = 1200
 
-    options = FingerprintGeneratorOptions(
-        screen=ScreenOptions(
+    fingerprint = FingerprintGenerator(
+        mock_web_rtc=True,
+        slim=True,
+        screen_options=ScreenOptions(
             min_width=min_width,
             max_width=max_width,
             min_height=min_height,
             max_height=max_height,
         ),
-        mock_web_rtc=True,
-        slim=False,
         header_options=HeaderGeneratorOptions(
             strict=True,
             browsers=['firefox'],
@@ -54,9 +56,7 @@ def test_fingerprint_generator_all_options(FingerprintGenerator: type[AbstractFi
             locales=['en'],  #  Does not generate any other values than `en-US` regardless of the input in browserforge
             http_version='2',  # Http1 does not work in browserforge
         ),
-    )
-
-    fingerprint = FingerprintGenerator(options=options).generate()
+    ).generate()
 
     assert fingerprint.screen.availWidth >= min_width
     assert fingerprint.screen.availWidth <= max_width
@@ -64,7 +64,7 @@ def test_fingerprint_generator_all_options(FingerprintGenerator: type[AbstractFi
     assert fingerprint.screen.availHeight <= max_height
 
     assert fingerprint.mockWebRTC is True
-    assert fingerprint.slim is False
+    assert fingerprint.slim is True
     assert 'Firefox' in fingerprint.navigator.userAgent
     assert 'Win' in fingerprint.navigator.oscpu
     assert 'en-US' in fingerprint.navigator.languages

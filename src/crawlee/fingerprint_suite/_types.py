@@ -11,7 +11,7 @@ SupportedBrowserType = Literal['chromium', 'firefox', 'webkit', 'edge']
 
 
 class ScreenOptions(BaseModel):
-    """Defines the screen constrains for the fingerprint generator ."""
+    """Defines the screen constrains for the fingerprint generator."""
 
     min_width: Annotated[float | None, Field(alias='minWidth')] = None
     max_width: Annotated[float | None, Field(alias='maxWidth')] = None
@@ -45,26 +45,6 @@ class HeaderGeneratorOptions(BaseModel):
 
     strict: bool | None = None
     """If true, the generator will throw an error if it cannot generate headers based on the input."""
-
-    class Config:
-        extra = 'forbid'
-        populate_by_name = True
-
-
-class FingerprintGeneratorOptions(BaseModel):
-    """Collection of fingerprint related attributes that can be used by the fingerprint generator.
-
-    All generator options are optional. If any value is not specified, then `None` is set in the options.
-    Default values for options set to `None` are implementation detail of used fingerprint generator.
-    Specific default values should not be relied upon. Use explicit values if it matters for your use case.
-    """
-
-    header_options: HeaderGeneratorOptions | None = None
-    screen: ScreenOptions | None = None
-    mock_web_rtc: Annotated[bool | None, Field(alias='mockWebRTC')] = None
-    """Whether to mock WebRTC when injecting the fingerprint."""
-    slim: Annotated[bool | None, Field(alias='slim')] = None
-    """Disables performance-heavy evasions when injecting the fingerprint."""
 
     class Config:
         extra = 'forbid'
