@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, cast
 
 from pydantic import ValidationError
 
 from crawlee import EnqueueStrategy
-from crawlee._request import BaseRequestData
+from crawlee._request import BaseRequestData, Request
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
@@ -189,6 +189,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 selector: str = 'a',
                 label: str | None = None,
                 user_data: dict | None = None,
+                transform_request_function: Callable[[Request], Request | None] | None = None,
                 **kwargs: Unpack[EnqueueLinksKwargs],
             ) -> None:
                 """The `PlaywrightCrawler` implementation of the `EnqueueLinksFunction` function."""
@@ -222,6 +223,12 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                                 'Please ensure the URL is correct and retry.'
                             )
                             continue
+
+                        if transform_request_function:
+                            transform_request = transform_request_function(cast(Request, cast))
+                            if not transform_request:
+                                continue
+                            request = transform_request
 
                         requests.append(request)
 
