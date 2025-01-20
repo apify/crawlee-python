@@ -118,6 +118,7 @@ class ProxyConfiguration:
 
         If called repeatedly with the same request, it is assumed that the request is being retried.
         If a previously used session ID is received, it will return the same proxy url.
+        If neither session_id nor request is provided, a new proxy url will be returned on each call.
         """
         if self._proxy_tier_tracker is not None and session_id is None:
             session_id = crypto_random_object_id(6)
@@ -157,6 +158,7 @@ class ProxyConfiguration:
 
         If called repeatedly with the same request, it is assumed that the request is being retried.
         If a previously used session ID is received, it will return the same proxy url.
+        If neither session_id nor request is provided, a new proxy url will be returned on each call.
         """
         proxy_info = await self.new_proxy_info(session_id, request, proxy_tier)
         return proxy_info.url if proxy_info else None
