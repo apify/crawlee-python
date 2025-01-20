@@ -1126,11 +1126,19 @@ async def test_timeout_in_handler(sleep_type: str) -> None:
     assert mocked_handler_after_sleep.call_count == 1
 
 
-@pytest.mark.parametrize('keep_alive', [True, False])
-async def test_keep_alive(*, keep_alive: bool) -> None:
-    """Test that crawler can be kept alive without any requests and stopped with `crawler.stop()`."""
+@pytest.mark.parametrize(
+    ('keep_alive', 'max_requests_per_crawl', 'should_process_added_request'),
+    [
+        pytest.param(True, 1, True, id='keep_alive'),
+        pytest.param(True, 0, False, id='keep_alive, but max_requests_per_crawl achieved'),
+        pytest.param(False, 1, False, id='Crawler without keep_alive (default)'),
+    ],
+)
+async def test_keep_alive(*, keep_alive: bool, max_requests_per_crawl: int, should_process_added_request: bool) -> None:
+    """Test that crawler can be kept alive without any requests and stopped with `crawler.stop()`.
 
-    crawler = BasicCrawler(keep_alive=keep_alive)
+    Crawler should stop if `max_requests_per_crawl` is reached regardless of the `keep_alive` flag."""
+    crawler = BasicCrawler(keep_alive=keep_alive, max_requests_per_crawl=max_requests_per_crawl)
     mocked_handler = Mock()
 
     @crawler.router.default_handler
@@ -1146,7 +1154,7 @@ async def test_keep_alive(*, keep_alive: bool) -> None:
 
     await asyncio.gather(crawler_run_task, add_request_task)
 
-    if keep_alive:
+    if should_process_added_request:
         mocked_handler.assert_called_once_with('http://a.com/')
     else:
         mocked_handler.assert_not_called()

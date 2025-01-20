@@ -220,6 +220,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 this limit. Setting this value can help avoid infinite loops in misconfigured crawlers. `None` means
                 no limit. Due to concurrency settings, the actual number of pages visited may slightly exceed
                 this value.
+                If used together with `keep_alive`, then the crawler will be kept alive only until
+                `max_requests_per_crawl` is achieved.
             max_session_rotations: Maximum number of session rotations per request. The crawler rotates the session
                 if a proxy error occurs or if the website blocks the request.
             max_crawl_depth: Specifies the maximum crawl depth. If set, the crawler will stop processing links beyond
