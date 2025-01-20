@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, call
 
 import httpx
 import pytest
@@ -1127,34 +1127,45 @@ async def test_timeout_in_handler(sleep_type: str) -> None:
 
 
 @pytest.mark.parametrize(
-    ('keep_alive', 'max_requests_per_crawl', 'should_process_added_request'),
+    ('keep_alive', 'max_requests_per_crawl', 'expected_handled_requests_count', 'should_be_alive'),
     [
-        pytest.param(True, 1, True, id='keep_alive'),
-        pytest.param(True, 0, False, id='keep_alive, but max_requests_per_crawl achieved'),
-        pytest.param(False, 1, False, id='Crawler without keep_alive (default)'),
+        pytest.param(True, 2, 2, True, id='keep_alive, 2 requests'),
+        pytest.param(True, 1, 1, True, id='keep_alive, but max_requests_per_crawl achieved after 1 request'),
+        pytest.param(
+            False, 2, 0, False, id='Crawler without keep_alive (default), crawler finished before adding requests'
+        ),
     ],
 )
-async def test_keep_alive(*, keep_alive: bool, max_requests_per_crawl: int, should_process_added_request: bool) -> None:
+async def test_keep_alive(
+    *, keep_alive: bool, max_requests_per_crawl: int, expected_handled_requests_count: int, should_be_alive: bool
+) -> None:
     """Test that crawler can be kept alive without any requests and stopped with `crawler.stop()`.
 
     Crawler should stop if `max_requests_per_crawl` is reached regardless of the `keep_alive` flag."""
-    crawler = BasicCrawler(keep_alive=keep_alive, max_requests_per_crawl=max_requests_per_crawl)
+    additional_urls = ['http://a.com/', 'http://b.com/']
+    expected_handler_calls = [call(url) for url in additional_urls[:expected_handled_requests_count]]
+
+    crawler = BasicCrawler(
+        keep_alive=keep_alive,
+        max_requests_per_crawl=max_requests_per_crawl,
+        # If more request can run in parallel, then max_requests_per_crawl is not deterministic.
+        concurrency_settings=ConcurrencySettings(max_concurrency=1),
+    )
     mocked_handler = Mock()
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
         mocked_handler(context.request.url)
-        crawler.stop()
+        if context.request == additional_urls[-1]:
+            crawler.stop()
 
     crawler_run_task = asyncio.create_task(crawler.run())
 
     # Give some time to crawler to finish(or be in keep_alive state) and add new request.
     await asyncio.sleep(1)
-    add_request_task = asyncio.create_task(crawler.add_requests(['http://a.com/']))
+    assert crawler_run_task.done() != should_be_alive
+    add_request_task = asyncio.create_task(crawler.add_requests(additional_urls))
 
     await asyncio.gather(crawler_run_task, add_request_task)
 
-    if should_process_added_request:
-        mocked_handler.assert_called_once_with('http://a.com/')
-    else:
-        mocked_handler.assert_not_called()
+    mocked_handler.assert_has_calls(expected_handler_calls)
