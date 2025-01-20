@@ -1127,17 +1127,15 @@ async def test_timeout_in_handler(sleep_type: str) -> None:
 
 
 @pytest.mark.parametrize(
-    ('keep_alive', 'max_requests_per_crawl', 'expected_handled_requests_count', 'should_be_alive'),
+    ('keep_alive', 'max_requests_per_crawl', 'expected_handled_requests_count'),
     [
-        pytest.param(True, 2, 2, True, id='keep_alive, 2 requests'),
-        pytest.param(True, 1, 1, True, id='keep_alive, but max_requests_per_crawl achieved after 1 request'),
-        pytest.param(
-            False, 2, 0, False, id='Crawler without keep_alive (default), crawler finished before adding requests'
-        ),
+        pytest.param(True, 2, 2, id='keep_alive, 2 requests'),
+        pytest.param(True, 1, 1, id='keep_alive, but max_requests_per_crawl achieved after 1 request'),
+        pytest.param(False, 2, 0, id='Crawler without keep_alive (default), crawler finished before adding requests'),
     ],
 )
 async def test_keep_alive(
-    *, keep_alive: bool, max_requests_per_crawl: int, expected_handled_requests_count: int, should_be_alive: bool
+    *, keep_alive: bool, max_requests_per_crawl: int, expected_handled_requests_count: int
 ) -> None:
     """Test that crawler can be kept alive without any requests and stopped with `crawler.stop()`.
 
@@ -1163,7 +1161,7 @@ async def test_keep_alive(
 
     # Give some time to crawler to finish(or be in keep_alive state) and add new request.
     await asyncio.sleep(1)
-    assert crawler_run_task.done() != should_be_alive
+    assert crawler_run_task.done() != keep_alive
     add_request_task = asyncio.create_task(crawler.add_requests(additional_urls))
 
     await asyncio.gather(crawler_run_task, add_request_task)
