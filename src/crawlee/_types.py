@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Annotated, Any, Literal, Optional, Protocol, TypeVar, Union, cast, overload
+from typing import TYPE_CHECKING, Annotated, Any, Callable, Literal, Optional, Protocol, TypeVar, Union, cast, overload
 
 from pydantic import ConfigDict, Field, PlainValidator, RootModel
 from typing_extensions import NotRequired, TypeAlias, TypedDict, Unpack
@@ -341,6 +341,7 @@ class EnqueueLinksFunction(Protocol):
         selector: str = 'a',
         label: str | None = None,
         user_data: dict[str, Any] | None = None,
+        transform_request_function: Callable[[Request], Request | None] | None = None,
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> Coroutine[None, None, None]:
         """A call dunder method.
@@ -353,6 +354,9 @@ class EnqueueLinksFunction(Protocol):
                 - `BeautifulSoupCrawler` supports CSS selectors.
             label: Label for the newly created `Request` objects, used for request routing.
             user_data: User data to be provided to the newly created `Request` objects.
+            transform_request_function: A function that takes a Request object and returns either a modified
+                Request object or None. If the function returns None, the request will be skipped.
+                This allows for custom filtering and modification of requests before they are enqueued.
             **kwargs: Additional keyword arguments.
         """
 

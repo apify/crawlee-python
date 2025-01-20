@@ -8,13 +8,14 @@ import pytest
 import respx
 from httpx import Response
 
-from crawlee import ConcurrencySettings
+from crawlee import ConcurrencySettings, HttpHeaders
 from crawlee._request import BaseRequestData
 from crawlee.crawlers import ParselCrawler
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
+    from crawlee._types import Request
     from crawlee.crawlers import ParselCrawlingContext
 
 
@@ -197,6 +198,40 @@ async def test_enqueue_links_with_max_crawl(server: respx.MockRouter) -> None:
     assert len(processed_urls) == 3
     assert stats.requests_total == 3
     assert stats.requests_finished == 3
+
+
+async def test_enqueue_links_with_transform_request_function(server: respx.MockRouter) -> None:
+    crawler = ParselCrawler()
+    visit = mock.Mock()
+    headers = []
+
+    def test_transform_request_function(request: Request) -> Request | None:
+        if 'uiop' in request.url:
+            return None
+
+        request.headers = HttpHeaders({'transform-header': 'my-header'})
+        return request
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        visit(context.request.url)
+        headers.append(context.request.headers)
+        await context.enqueue_links(transform_request_function=test_transform_request_function, label='test')
+
+    await crawler.run(['https://test.io/'])
+
+    assert server['index_endpoint'].called
+    assert server['secondary_index_endpoint'].called
+
+    visited = {call[0][0] for call in visit.call_args_list}
+
+    # url https://test.io/uiop should not be visited
+    assert visited == {'https://test.io/', 'https://test.io/asdf', 'https://test.io/hjkl', 'https://test.io/qwer'}
+
+    # all urls added to `enqueue_links` must have a custom header
+    assert headers[1]['transform-header'] == 'my-header'
+    assert headers[2]['transform-header'] == 'my-header'
+    assert headers[3]['transform-header'] == 'my-header'
 
 
 async def test_handle_blocked_request(server: respx.MockRouter) -> None:

@@ -10,6 +10,7 @@ import OriginalCodeExample from '!!raw-loader!./code/03_original_code.py';
 import FindingNewLinksExample from '!!raw-loader!./code/03_finding_new_links.py';
 import EnqueueStrategyExample from '!!raw-loader!./code/03_enqueue_strategy.py';
 import GlobsExample from '!!raw-loader!./code/03_globs.py';
+import TransformExample from '!!raw-loader!./code/03_transform_request.py';
 
 Previously you've built a very simple crawler that downloads HTML of a single page, reads its title and prints it to the console. This is the original source code:
 
@@ -106,11 +107,13 @@ For even more control, you can use the `include` or `exclude` parameters, either
     {GlobsExample}
 </CodeBlock>
 
-{/* TODO:
-### Transform requests
+### Transform requests before enqueuing
 
-...
-*/}
+For cases where you need to modify or filter requests before they are enqueued, you can use the transform_request_function parameter. This function takes a Request object as input and should return either a modified Request object or None. If the function returns None, the request will be skipped.
+
+<CodeBlock className="language-python">
+    {TransformExample}
+</CodeBlock>
 
 ## Next steps
 
