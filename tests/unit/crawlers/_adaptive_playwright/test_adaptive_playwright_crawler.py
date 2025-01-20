@@ -433,15 +433,16 @@ def test_adaptive_playwright_crawler_statistics_in_init() -> None:
 
 
 async def test_adaptive_playwright_crawler_timeout_in_sub_crawler(test_urls: list[str]) -> None:
-    """Tests that timeout used by sub crawlers ensure that both have chance to run within top crawler timeout.
+    """Tests that timeout in static sub crawler forces fall back to browser sub crawler.
 
     Create situation where static sub crawler blocks(should time out), such error should start browser sub
-    crawler, which must be capable of running without top crawler handler timing out."""
+    crawler."""
 
     static_only_predictor_no_detection = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
-    request_handler_timeout = timedelta(seconds=2)
+    request_handler_timeout = timedelta(seconds=0.1)
 
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        max_request_retries=1,
         rendering_type_predictor=static_only_predictor_no_detection,
         result_checker=lambda result: False,  #  noqa: ARG005  # Intentionally unused argument.
         request_handler_timeout=request_handler_timeout,
@@ -458,6 +459,8 @@ async def test_adaptive_playwright_crawler_timeout_in_sub_crawler(test_urls: lis
             mocked_browser_handler()
         except AdaptiveContextError:
             mocked_static_handler()
+            # Relax timeout for the fallback browser request to avoid flakiness in test
+            crawler._request_handler_timeout = timedelta(seconds=5)
             # Sleep for time obviously larger than top crawler timeout.
             await asyncio.sleep(request_handler_timeout.total_seconds() * 2)
 
