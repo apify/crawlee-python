@@ -135,7 +135,7 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     """If True, the crawler will set up logging infrastructure automatically."""
 
     keep_alive: NotRequired[bool]
-    """Flag that can keeps crawler running even when no requests are in queue."""
+    """Flag that can keep crawler running even when there are no requests in queue."""
 
     _context_pipeline: NotRequired[ContextPipeline[TCrawlingContext]]
     """Enables extending the request lifecycle and modifying the crawling context. Intended for use by
@@ -947,11 +947,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 await store.set_value(key, value.content, value.content_type)
 
     async def __is_finished_function(self) -> bool:
-        """Return true if the crawler can finish.
-
-        Args:
-            keep_alive: Will keep crawler alive even when request_manager is finished (no requests in queue).
-        """
         self._stop_if_max_requests_count_exceeded()
         if self._unexpected_stop:
             self._logger.info('The crawler will finish any remaining ongoing requests and shut down.')
