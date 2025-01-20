@@ -94,14 +94,14 @@ types-psutil = "~5.9.5.20240205"
 types-python-dateutil = "~2.9.0.20240316"
 
 [tool.poetry.extras]
-# Basic extras
+# Support for re-using groups in other groups https://peps.python.org/pep-0735/ in poetry:
+# https://github.com/python-poetry/poetry/issues/9751
+adaptive_playwright = ["playwright", "scikit-learn", "jaro-winkler"]
+all = ["playwright", "scikit-learn", "jaro-winkler","beautifulsoup4", "lxml", "html5lib","curl-cffi","parsel"]
 beautifulsoup = ["beautifulsoup4", "lxml", "html5lib"]
 curl-impersonate = ["curl-cffi"]
 playwright = ["playwright"]
 parsel = ["parsel"]
-# Composite extras
-adaptive_playwright = ["crawlee[playwright]", "scikit-learn", "jaro-winkler"]
-all = ["crawlee[adaptive_playwright,beautifulsoup,curl-impersonate,parsel]"]
 
 [tool.poetry.scripts]
 crawlee = "crawlee._cli:cli"

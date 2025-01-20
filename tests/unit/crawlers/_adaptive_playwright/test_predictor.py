@@ -1,7 +1,10 @@
 from dataclasses import dataclass
 
+import pytest
+
 from crawlee import Request
-from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import LogisticalRegressionPredictor
+from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import LogisticalRegressionPredictor, \
+    calculate_similarity
 
 
 def test_predictor():
@@ -26,3 +29,13 @@ def test_predictor():
     assert predictor.predict("http://www.ijk.com", "static for sure") == "static"
     assert predictor.predict("http://www.ddd.com", "browser for sure") == "browser"
     assert predictor.predict("http://www.ijk.com", "browser for sure") == "browser"
+
+
+@pytest.mark.parametrize(("url_1", "url_2", "expected_rounded_metric"), [
+    ("https://docs.python.org/3/library/itertools.html#itertools.zip_longest",
+     "https://docs.python.org/3.7/library/itertools.html#itertools.zip_longest", 0.67),
+    ("https://differente.com/same", "https://differenta.com/same", 0),
+    ("https://different.com/almost_the_same", "https://different.com/almost_the_sama", 1)
+])
+def test_url_similarity(url_1: str, url_2: str, expected_rounded_metric: float):
+    assert round(calculate_similarity(url_1=url_1, url_2=url_2),2) == expected_rounded_metric

@@ -3962,14 +3962,14 @@ cffi = {version = ">=1.11", markers = "platform_python_implementation == \"PyPy\
 cffi = ["cffi (>=1.11)"]
 
 [extras]
-adaptive-playwright = ["scikit-learn"]
+adaptive-playwright = ["jaro-winkler", "playwright", "scikit-learn"]
 all = ["beautifulsoup4", "curl-cffi", "html5lib", "jaro-winkler", "lxml", "parsel", "playwright", "scikit-learn"]
 beautifulsoup = ["beautifulsoup4", "html5lib", "lxml"]
 curl-impersonate = ["curl-cffi"]
 parsel = ["parsel"]
-playwright = ["jaro-winkler", "playwright"]
+playwright = ["playwright"]
 
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "f2337577c4a12fd34ab68004299219f91f9412f3a539245e0140286976172eba"
+content-hash = "4daff96932c4227da2dc0d69e535d02aa62f62ff580bbd3cedf5c7d33470422c"
