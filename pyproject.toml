@@ -52,6 +52,7 @@ eval-type-backport = ">=0.2.0"
 html5lib = { version = ">=1.0", optional = true }
 httpx = {version = ">=0.27.0", extras = ["brotli", "http2", "zstd"]}
 inquirer = ">=3.3.0"
+jaro-winkler = ">=2.0.3"
 lxml = { version = ">=5.2.0", optional = true }
 more_itertools = ">=10.2.0"
 parsel = { version = ">=1.9.0", optional = true }
@@ -93,12 +94,14 @@ types-psutil = "~5.9.5.20240205"
 types-python-dateutil = "~2.9.0.20240316"
 
 [tool.poetry.extras]
-adaptive_playwright = ["scikit-learn"]
-all = ["beautifulsoup4", "curl-cffi", "lxml", "html5lib", "parsel", "playwright", "scikit-learn"]
+# Basic extras
 beautifulsoup = ["beautifulsoup4", "lxml", "html5lib"]
 curl-impersonate = ["curl-cffi"]
 playwright = ["playwright"]
 parsel = ["parsel"]
+# Composite extras
+adaptive_playwright = ["crawlee[playwright]", "scikit-learn", "jaro-winkler"]
+all = ["crawlee[adaptive_playwright,beautifulsoup,curl-impersonate,parsel]"]
 
 [tool.poetry.scripts]
 crawlee = "crawlee._cli:cli"
