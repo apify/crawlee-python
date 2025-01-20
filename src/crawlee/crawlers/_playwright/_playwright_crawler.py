@@ -225,7 +225,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                             continue
 
                         if transform_request_function:
-                            transform_request = transform_request_function(cast(Request, cast))
+                            transform_request = transform_request_function(cast(Request, request))
                             if not transform_request:
                                 continue
                             request = transform_request
