@@ -29,7 +29,6 @@ from crawlee.crawlers import (
     PlaywrightPreNavCrawlingContext,
 )
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler_statistics import (
-    AdaptivePlaywrightCrawlerStatistics,
     AdaptivePlaywrightCrawlerStatisticState,
 )
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import (
@@ -241,9 +240,9 @@ class AdaptivePlaywrightCrawler(
     ) -> AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[BeautifulSoup], BeautifulSoup]:
         """Creates `AdaptivePlaywrightCrawler` that uses `BeautifulSoup` for parsing static content."""
         if statistics is not None:
-            adaptive_statistics = AdaptivePlaywrightCrawlerStatistics.from_statistics(statistics=statistics)
+            adaptive_statistics = statistics.replace_state_model(AdaptivePlaywrightCrawlerStatisticState)
         else:
-            adaptive_statistics = AdaptivePlaywrightCrawlerStatistics()
+            adaptive_statistics = Statistics(state_model=AdaptivePlaywrightCrawlerStatisticState)
         return AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[BeautifulSoup], BeautifulSoup](
             rendering_type_predictor=rendering_type_predictor,
             result_checker=result_checker,
@@ -266,10 +265,11 @@ class AdaptivePlaywrightCrawler(
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[Selector], Selector]:
         """Creates `AdaptivePlaywrightCrawler` that uses `Parcel` for parsing static content."""
+        """Creates `AdaptivePlaywrightCrawler` that uses `BeautifulSoup` for parsing static content."""
         if statistics is not None:
-            adaptive_statistics = AdaptivePlaywrightCrawlerStatistics.from_statistics(statistics=statistics)
+            adaptive_statistics = statistics.replace_state_model(AdaptivePlaywrightCrawlerStatisticState)
         else:
-            adaptive_statistics = AdaptivePlaywrightCrawlerStatistics()
+            adaptive_statistics = Statistics(state_model=AdaptivePlaywrightCrawlerStatisticState)
         return AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[Selector], Selector](
             rendering_type_predictor=rendering_type_predictor,
             result_checker=result_checker,

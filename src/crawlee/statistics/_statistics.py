@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from types import TracebackType
 
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
+TNewStatisticsState = TypeVar('TNewStatisticsState', bound=StatisticsState, default=StatisticsState)
 logger = getLogger(__name__)
 
 
@@ -99,11 +100,24 @@ class Statistics(Generic[TStatisticsState]):
 
         self._log_message = log_message
         self._periodic_message_logger = periodic_message_logger or logger
-        self._log_interval = log_interval
         self._periodic_logger = RecurringTask(self._log, log_interval)
 
         # Flag to indicate the context state.
         self._active = False
+
+    def replace_state_model(self, state_model: type[TNewStatisticsState]) -> Statistics[TNewStatisticsState]:
+        """Method that produces near copy of the Statistics with replaced state model."""
+        new_statistics: Statistics[TNewStatisticsState] = Statistics(
+            persistence_enabled=self._persistence_enabled,
+            persist_state_kvs_name=self._persist_state_kvs_name,
+            persist_state_key=self._persist_state_key,
+            key_value_store=self._key_value_store,
+            log_message=self._log_message,
+            periodic_message_logger=self._periodic_message_logger,
+            state_model=state_model,
+        )
+        new_statistics._periodic_logger = self._periodic_logger  # noqa:SLF001  # Accessing private member to create copy like-object.
+        return new_statistics
 
     @staticmethod
     def with_default_state(

@@ -16,7 +16,7 @@ from crawlee.browsers import BrowserPool
 from crawlee.crawlers import BasicCrawler
 from crawlee.crawlers._adaptive_playwright import AdaptivePlaywrightCrawler, AdaptivePlaywrightCrawlingContext
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler_statistics import (
-    AdaptivePlaywrightCrawlerStatistics,
+    AdaptivePlaywrightCrawlerStatisticState,
 )
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import (
     AdaptiveContextError,
@@ -423,13 +423,12 @@ def test_adaptive_playwright_crawler_statistics_in_init() -> None:
 
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(statistics=statistics)
 
-    assert type(crawler._statistics) is AdaptivePlaywrightCrawlerStatistics
+    assert type(crawler._statistics.state) is AdaptivePlaywrightCrawlerStatisticState
     assert crawler._statistics._persistence_enabled == persistence_enabled
     assert crawler._statistics._persist_state_kvs_name == persist_state_kvs_name
     assert crawler._statistics._persist_state_key == persist_state_key
     assert crawler._statistics._log_message == log_message
     assert crawler._statistics._periodic_message_logger == periodic_message_logger
-    assert crawler._statistics._log_interval == log_interval
 
 
 async def test_adaptive_playwright_crawler_timeout_in_sub_crawler(test_urls: list[str]) -> None:
