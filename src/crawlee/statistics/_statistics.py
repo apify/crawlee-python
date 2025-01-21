@@ -106,7 +106,7 @@ class Statistics(Generic[TStatisticsState]):
         self._active = False
 
     def replace_state_model(self, state_model: type[TNewStatisticsState]) -> Statistics[TNewStatisticsState]:
-        """Method that produces near copy of the Statistics with replaced state model."""
+        """Create near copy of the `Statistics` with replaced `state_model`."""
         new_statistics: Statistics[TNewStatisticsState] = Statistics(
             persistence_enabled=self._persistence_enabled,
             persist_state_kvs_name=self._persist_state_kvs_name,
