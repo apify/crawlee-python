@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, Generic
 
 from bs4 import BeautifulSoup
 from parsel import Selector
-from typing_extensions import Self, TypeVar
+from typing_extensions import Self, TypeVar, override
 
 from crawlee._types import BasicCrawlingContext, JsonSerializable, RequestHandlerRunResult
 from crawlee._utils.wait import wait_for
@@ -280,14 +280,17 @@ class AdaptivePlaywrightCrawler(
             **kwargs,
         )
 
-    async def crawl_one_with(
+    async def _crawl_one_with(
         self,
         subcrawler_pipeline: _OrphanPlaywrightContextPipeline | _OrphanStaticContextPipeline,
         context: BasicCrawlingContext,
         result: RequestHandlerRunResult,
         state: dict[str, JsonSerializable] | None = None,
     ) -> RequestHandlerRunResult:
-        # Timeout to ensure that both sub crawlers can finish one request withing top crawler `request_handler_timeout`.
+        """Perform a one request crawl with specific context pipeline and return result of this crawl.
+
+        Use `context`, `result` and `state` to create new copy-like context that is passed to the `subcrawler_pipeline`.
+        """
         if state is not None:
 
             async def get_input_state(
@@ -321,7 +324,7 @@ class AdaptivePlaywrightCrawler(
         )
         return result
 
-    # Can't use override as mypy does not like it for double underscore private method.
+    @override
     async def _run_request_handler(self, context: BasicCrawlingContext) -> None:
         """Override BasicCrawler method that delegates request processing to sub crawlers.
 
@@ -341,7 +344,7 @@ class AdaptivePlaywrightCrawler(
             Produces `SubCrawlerRun` that either contains filled `RequestHandlerRunResult` or exception.
             """
             try:
-                crawl_result = await self.crawl_one_with(
+                crawl_result = await self._crawl_one_with(
                     subcrawler_pipeline=subcrawler_pipeline,
                     context=context,
                     result=RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store),
