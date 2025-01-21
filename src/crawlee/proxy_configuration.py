@@ -114,11 +114,16 @@ class ProxyConfiguration:
     async def new_proxy_info(
         self, session_id: str | None, request: Request | None, proxy_tier: int | None
     ) -> ProxyInfo | None:
-        """Return a new ProxyInfo object.
+        """Returns a new ProxyInfo object based on the configured proxy rotation strategy.
 
-        If called repeatedly with the same request, it is assumed that the request is being retried.
-        If a previously used session ID is received, it will return the same proxy url.
-        If neither session_id nor request is provided, a new proxy url will be returned on each call.
+        Args:
+            session_id: Session identifier. If provided, same proxy URL will be returned for
+                subsequent calls with this ID. Will be auto-generated for tiered proxies if
+                not provided.
+            request: Request object used for proxy rotation and tier selection. Required for
+                tiered proxies to track retries and adjust tier accordingly.
+            proxy_tier: Specific proxy tier to use. If not provided, will be automatically
+                selected based on configuration.
         """
         if self._proxy_tier_tracker is not None and session_id is None:
             session_id = crypto_random_object_id(6)
@@ -154,11 +159,16 @@ class ProxyConfiguration:
     async def new_url(
         self, session_id: str | None = None, request: Request | None = None, proxy_tier: int | None = None
     ) -> str | None:
-        """Return a new proxy url.
+        """Returns a proxy URL string based on the configured proxy rotation strategy.
 
-        If called repeatedly with the same request, it is assumed that the request is being retried.
-        If a previously used session ID is received, it will return the same proxy url.
-        If neither session_id nor request is provided, a new proxy url will be returned on each call.
+        Args:
+            session_id: Session identifier. If provided, same proxy URL will be returned for
+                subsequent calls with this ID. Will be auto-generated for tiered proxies if
+                not provided.
+            request: Request object used for proxy rotation and tier selection. Required for
+                tiered proxies to track retries and adjust tier accordingly.
+            proxy_tier: Specific proxy tier to use. If not provided, will be automatically
+                selected based on configuration.
         """
         proxy_info = await self.new_proxy_info(session_id, request, proxy_tier)
         return proxy_info.url if proxy_info else None
