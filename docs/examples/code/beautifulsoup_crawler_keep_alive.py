@@ -10,10 +10,10 @@ async def main() -> None:
         keep_alive=True,
     )
 
-    def stop_crawler_if_ulr_visited(context: BasicCrawlingContext) -> None:
+    def stop_crawler_if_url_visited(context: BasicCrawlingContext) -> None:
         """Stop crawler once specific url is visited. Just an example of guard condition to stop the crawler."""
         if context.request.url == 'https://crawlee.dev/docs/examples':
-            crawler.stop('Stop crawler that was in keep_alive state after specific url was visited.')
+            crawler.stop('Stop crawler that was in keep_alive state after specific url was visited')
         else:
             context.log.info('keep_alive=True, waiting for more requests to come.')
 
@@ -29,7 +29,7 @@ async def main() -> None:
         context.log.info(f'Processing {context.request.url} ...')
 
         # Stop crawler if some guard condition has been met.
-        stop_crawler_if_ulr_visited(context)
+        stop_crawler_if_url_visited(context)
 
     # Start some tasks that will add some requests later to simulate real situation,
     # where requests are added later by external code.
