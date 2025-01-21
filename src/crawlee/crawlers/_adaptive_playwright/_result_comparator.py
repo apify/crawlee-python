@@ -41,5 +41,5 @@ def full_result_comparator(result_1: RequestHandlerRunResult, result_2: RequestH
 
 
 def push_data_only_comparator(result_1: RequestHandlerRunResult, result_2: RequestHandlerRunResult) -> bool:
-    """Compare results by comparing their push dara calls. Ignore other parts of results in comparison."""
+    """Compare results by comparing their push data calls. Ignore other parts of results in comparison."""
     return result_1.push_data_calls == result_2.push_data_calls

@@ -37,18 +37,31 @@ class AdaptivePlaywrightCrawlingContext(Generic[TStaticParseResult], ParsedHttpC
 
     @property
     def page(self) -> Page:
+        """The Playwright `Page` object for the current page.
+
+        Raises `AdaptiveContextError` if accessed during static crawling.
+        """
         if not self._page:
             raise AdaptiveContextError('Page was not crawled with PlaywrightCrawler.')
         return self._page
 
     @property
     def infinite_scroll(self) -> Callable[[], Awaitable[None]]:
+        """A function to perform infinite scrolling on the page.
+
+        This scrolls to the bottom, triggering the loading of additional content if present.
+        Raises `AdaptiveContextError` if accessed during static crawling.
+        """
         if not self._infinite_scroll:
             raise AdaptiveContextError('Page was not crawled with PlaywrightCrawler.')
         return self._infinite_scroll
 
     @property
     def response(self) -> Response:
+        """The Playwright `Response` object containing the response details for the current URL.
+
+        Raises `AdaptiveContextError` if accessed during static crawling.
+        """
         if not self._response:
             raise AdaptiveContextError('Page was not crawled with PlaywrightCrawler.')
         return self._response
@@ -93,6 +106,10 @@ class AdaptivePlaywrightPreNavCrawlingContext(BasicCrawlingContext):
 
     @property
     def page(self) -> Page:
+        """The Playwright `Page` object for the current page.
+
+        Raises `AdaptiveContextError` if accessed during static crawling.
+        """
         if self._page is not None:
             return self._page
         raise AdaptiveContextError('Page is not crawled with PlaywrightCrawler.')
