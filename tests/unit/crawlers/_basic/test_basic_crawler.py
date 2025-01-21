@@ -1160,6 +1160,8 @@ async def test_keep_alive(
     crawler_run_task = asyncio.create_task(crawler.run())
 
     # Give some time to crawler to finish(or be in keep_alive state) and add new request.
+    # TODO: Replace sleep time by waiting for specific crawler state.
+    # https://github.com/apify/crawlee-python/issues/925
     await asyncio.sleep(1)
     assert crawler_run_task.done() != keep_alive
     add_request_task = asyncio.create_task(crawler.add_requests(additional_urls))
