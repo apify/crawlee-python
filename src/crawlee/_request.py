@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator, MutableMapping
 from datetime import datetime
 from enum import IntEnum
-from typing import TYPE_CHECKING, Annotated, Any, cast
+from typing import TYPE_CHECKING, Annotated, Any, TypedDict, cast
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, PlainSerializer, PlainValidator, TypeAdapter
 from yarl import URL
@@ -106,6 +106,23 @@ class UserData(BaseModel, MutableMapping[str, JsonSerializable]):
 
 
 user_data_adapter = TypeAdapter(UserData)
+
+
+class RequestOptions(TypedDict, total=False):
+    """Options that can be used to customize request creation.
+
+    This type exactly matches the parameters of BaseRequestData.from_url() method.
+    """
+
+    url: str  # Required field, so not marked as NotRequired
+    method: HttpMethod
+    headers: HttpHeaders | dict[str, str] | None
+    payload: HttpPayload | str | None
+    label: str | None
+    unique_key: str | None
+    keep_url_fragment: bool
+    use_extended_unique_key: bool
+    user_data: dict[str, JsonSerializable]
 
 
 class BaseRequestData(BaseModel):

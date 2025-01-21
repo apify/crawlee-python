@@ -13,7 +13,7 @@ from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
-    from crawlee._types import Request
+    from crawlee._request import RequestOptions
 
 
 @pytest.fixture
@@ -166,12 +166,12 @@ async def test_enqueue_links_with_transform_request_function(server: respx.MockR
     visit = mock.Mock()
     headers = []
 
-    def test_transform_request_function(request: Request) -> Request | None:
-        if 'uiop' in request.url:
+    def test_transform_request_function(request_options: RequestOptions) -> RequestOptions | None:
+        if 'uiop' in request_options['url']:
             return None
 
-        request.headers = HttpHeaders({'transform-header': 'my-header'})
-        return request
+        request_options['headers'] = HttpHeaders({'transform-header': 'my-header'})
+        return request_options
 
     @crawler.router.default_handler
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:

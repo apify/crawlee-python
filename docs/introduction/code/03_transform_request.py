@@ -1,21 +1,21 @@
 from __future__ import annotations
 
-from crawlee import HttpHeaders, Request
+from crawlee import HttpHeaders, RequestOptions
 from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 
 
-def transform_request(request: Request) -> Request | None:
+def transform_request(request: RequestOptions) -> RequestOptions | None:
     # Skip requests to PDF files
-    if request.url.endswith('.pdf'):
+    if request['url'].endswith('.pdf'):
         return None
 
     # Add custom headers to requests to specific sections
-    if '/docs' in request.url:
-        request.headers = HttpHeaders({'Custom-Header': 'value'})
+    if '/docs' in request['url']:
+        request['headers'] = HttpHeaders({'Custom-Header': 'value'})
 
     # Add label for certain URLs
-    if '/blog' in request.url:
-        request.user_data['label'] = 'BLOG'
+    if '/blog' in request['url']:
+        request['label'] = 'BLOG'
 
     return request
 

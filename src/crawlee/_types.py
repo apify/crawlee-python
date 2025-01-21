@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from collections.abc import Coroutine, Sequence
 
     from crawlee import Glob, Request
-    from crawlee._request import BaseRequestData
+    from crawlee._request import BaseRequestData, RequestOptions
     from crawlee.http_clients import HttpResponse
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions import Session
@@ -341,7 +341,7 @@ class EnqueueLinksFunction(Protocol):
         selector: str = 'a',
         label: str | None = None,
         user_data: dict[str, Any] | None = None,
-        transform_request_function: Callable[[Request], Request | None] | None = None,
+        transform_request_function: Callable[[RequestOptions], RequestOptions | None] | None = None,
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> Coroutine[None, None, None]:
         """A call dunder method.
@@ -354,9 +354,8 @@ class EnqueueLinksFunction(Protocol):
                 - `BeautifulSoupCrawler` supports CSS selectors.
             label: Label for the newly created `Request` objects, used for request routing.
             user_data: User data to be provided to the newly created `Request` objects.
-            transform_request_function: A function that takes a Request object and returns either a modified
-                Request object or None. If the function returns None, the request will be skipped.
-                This allows for custom filtering and modification of requests before they are enqueued.
+            transform_request_function: A function that processes request options before creating a request.
+                Takes RequestOptions dictionary and returns modified RequestOptions or None to skip the request.
             **kwargs: Additional keyword arguments.
         """
 

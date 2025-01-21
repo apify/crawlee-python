@@ -23,6 +23,7 @@ from crawlee.proxy_configuration import ProxyConfiguration
 if TYPE_CHECKING:
     from yarl import URL
 
+    from crawlee._request import RequestOptions
     from crawlee.crawlers import PlaywrightCrawlingContext, PlaywrightPreNavCrawlingContext
 
 
@@ -69,9 +70,9 @@ async def test_enqueue_links_with_transform_request_function() -> None:
     visit = mock.Mock()
     headers = []
 
-    def test_transform_request_function(request: Request) -> Request | None:
-        if request.url == 'https://crawlee.dev/python/docs/introduction':
-            request.headers = HttpHeaders({'transform-header': 'my-header'})
+    def test_transform_request_function(request: RequestOptions) -> RequestOptions | None:
+        if request['url'] == 'https://crawlee.dev/python/docs/introduction':
+            request['headers'] = HttpHeaders({'transform-header': 'my-header'})
             return request
         return None
 

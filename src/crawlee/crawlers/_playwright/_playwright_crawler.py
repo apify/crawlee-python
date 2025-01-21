@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Callable, cast
+from typing import TYPE_CHECKING, Any, Callable
 
 from pydantic import ValidationError
 
 from crawlee import EnqueueStrategy
-from crawlee._request import BaseRequestData, Request
+from crawlee._request import BaseRequestData, RequestOptions
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
@@ -189,14 +189,14 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 selector: str = 'a',
                 label: str | None = None,
                 user_data: dict | None = None,
-                transform_request_function: Callable[[Request], Request | None] | None = None,
+                transform_request_function: Callable[[RequestOptions], RequestOptions | None] | None = None,
                 **kwargs: Unpack[EnqueueLinksKwargs],
             ) -> None:
                 """The `PlaywrightCrawler` implementation of the `EnqueueLinksFunction` function."""
                 kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
 
                 requests = list[BaseRequestData]()
-                user_data = user_data or {}
+                base_user_data = user_data or {}
 
                 elements = await context.page.query_selector_all(selector)
 
@@ -209,13 +209,16 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                         if not is_url_absolute(url):
                             url = convert_to_absolute_url(context.request.url, url)
 
-                        link_user_data = user_data.copy()
+                        request_option = RequestOptions({'url': url, 'user_data': {**base_user_data}, 'label': label})
 
-                        if label is not None:
-                            link_user_data.setdefault('label', label)
+                        if transform_request_function:
+                            transform_request_option = transform_request_function(request_option)
+                            if not transform_request_option:
+                                continue
+                            request_option = transform_request_option
 
                         try:
-                            request = BaseRequestData.from_url(url, user_data=link_user_data)
+                            request = BaseRequestData.from_url(**request_option)
                         except ValidationError as exc:
                             context.log.debug(
                                 f'Skipping URL "{url}" due to invalid format: {exc}. '
@@ -223,12 +226,6 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                                 'Please ensure the URL is correct and retry.'
                             )
                             continue
-
-                        if transform_request_function:
-                            transform_request = transform_request_function(cast(Request, request))
-                            if not transform_request:
-                                continue
-                            request = transform_request
 
                         requests.append(request)
 
