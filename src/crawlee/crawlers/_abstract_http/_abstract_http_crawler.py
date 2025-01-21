@@ -31,8 +31,7 @@ TCrawlingContext = TypeVar('TCrawlingContext', bound=ParsedHttpCrawlingContext)
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
 
 
-@docs_group('Data structures')
-class _HttpCrawlerOptions(Generic[TCrawlingContext], TypedDict):
+class _HttpCrawlerAdditionalOptions(TypedDict):
     additional_http_error_status_codes: NotRequired[Iterable[int]]
     """Additional HTTP status codes to treat as errors, triggering automatic retries when encountered."""
 
@@ -43,7 +42,7 @@ class _HttpCrawlerOptions(Generic[TCrawlingContext], TypedDict):
 @docs_group('Data structures')
 class HttpCrawlerOptions(
     Generic[TCrawlingContext, TStatisticsState],
-    _HttpCrawlerOptions,
+    _HttpCrawlerAdditionalOptions,
     BasicCrawlerOptions[TCrawlingContext, StatisticsState],
 ):
     """Arguments for the `AbstractHttpCrawler` constructor.

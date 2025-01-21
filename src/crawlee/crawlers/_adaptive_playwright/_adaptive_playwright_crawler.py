@@ -19,11 +19,9 @@ from crawlee.crawlers import (
     AbstractHttpCrawler,
     AbstractHttpParser,
     BasicCrawler,
-    BeautifulSoupCrawlingContext,
     BeautifulSoupParserType,
     ContextPipeline,
     ParsedHttpCrawlingContext,
-    ParselCrawlingContext,
     PlaywrightCrawler,
     PlaywrightCrawlingContext,
     PlaywrightPreNavCrawlingContext,
@@ -56,9 +54,11 @@ if TYPE_CHECKING:
 
     from typing_extensions import Unpack
 
-    from crawlee.crawlers._abstract_http._abstract_http_crawler import _HttpCrawlerOptions
+    from crawlee.crawlers._abstract_http._abstract_http_crawler import (
+        _HttpCrawlerAdditionalOptions,
+    )
     from crawlee.crawlers._basic._basic_crawler import _BasicCrawlerOptions
-    from crawlee.crawlers._playwright._playwright_crawler import PlaywrightCrawlerAdditionalOptions
+    from crawlee.crawlers._playwright._playwright_crawler import _PlaywrightCrawlerAdditionalOptions
     from crawlee.router import Router
 
 
@@ -148,8 +148,8 @@ class AdaptivePlaywrightCrawler(
         rendering_type_predictor: RenderingTypePredictor | None = None,
         result_checker: Callable[[RequestHandlerRunResult], bool] | None = None,
         result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,
-        static_crawler_specific_kwargs: _HttpCrawlerOptions | None = None,
-        playwright_crawler_specific_kwargs: PlaywrightCrawlerAdditionalOptions | None = None,
+        static_crawler_specific_kwargs: _HttpCrawlerAdditionalOptions | None = None,
+        playwright_crawler_specific_kwargs: _PlaywrightCrawlerAdditionalOptions | None = None,
         statistics: Statistics[AdaptivePlaywrightCrawlerStatisticState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> None:
@@ -233,8 +233,8 @@ class AdaptivePlaywrightCrawler(
         result_checker: Callable[[RequestHandlerRunResult], bool] | None = None,
         result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,
         parser_type: BeautifulSoupParserType = 'lxml',
-        static_crawler_specific_kwargs: _HttpCrawlerOptions[BeautifulSoupCrawlingContext] | None = None,
-        playwright_crawler_specific_kwargs: PlaywrightCrawlerAdditionalOptions | None = None,
+        static_crawler_specific_kwargs: _HttpCrawlerAdditionalOptions | None = None,
+        playwright_crawler_specific_kwargs: _PlaywrightCrawlerAdditionalOptions | None = None,
         statistics: Statistics[StatisticsState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[BeautifulSoup], BeautifulSoup]:
@@ -259,13 +259,12 @@ class AdaptivePlaywrightCrawler(
         rendering_type_predictor: RenderingTypePredictor | None = None,
         result_checker: Callable[[RequestHandlerRunResult], bool] | None = None,
         result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,
-        static_crawler_specific_kwargs: _HttpCrawlerOptions[ParselCrawlingContext] | None = None,
-        playwright_crawler_specific_kwargs: PlaywrightCrawlerAdditionalOptions | None = None,
+        static_crawler_specific_kwargs: _HttpCrawlerAdditionalOptions | None = None,
+        playwright_crawler_specific_kwargs: _PlaywrightCrawlerAdditionalOptions | None = None,
         statistics: Statistics[StatisticsState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[Selector], Selector]:
         """Creates `AdaptivePlaywrightCrawler` that uses `Parcel` for parsing static content."""
-        """Creates `AdaptivePlaywrightCrawler` that uses `BeautifulSoup` for parsing static content."""
         if statistics is not None:
             adaptive_statistics = statistics.replace_state_model(AdaptivePlaywrightCrawlerStatisticState)
         else:

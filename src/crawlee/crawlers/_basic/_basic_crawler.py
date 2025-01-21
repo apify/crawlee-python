@@ -70,9 +70,8 @@ ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Union[Request, 
 FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
 
 
-@docs_group('Data structures')
 class _BasicCrawlerOptions(TypedDict):
-    """Non-generic options for basic crawler."""
+    """Non-generic options the `BasicCrawler` constructor."""
 
     configuration: NotRequired[Configuration]
     """The `Configuration` instance. Some of its properties are used as defaults for the crawler."""
@@ -141,9 +140,8 @@ class _BasicCrawlerOptions(TypedDict):
     subclasses rather than direct instantiation of `BasicCrawler`."""
 
 
-@docs_group('Data structures')
 class _BasicCrawlerOptionsGeneric(Generic[TCrawlingContext, TStatisticsState], TypedDict):
-    """Generic options for basic crawler."""
+    """Generic options the `BasicCrawler` constructor."""
 
     request_handler: NotRequired[Callable[[TCrawlingContext], Awaitable[None]]]
     """A callable responsible for handling requests."""
