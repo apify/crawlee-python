@@ -283,13 +283,14 @@ class AdaptivePlaywrightCrawler(
         self,
         subcrawler_pipeline: _OrphanPlaywrightContextPipeline | _OrphanStaticContextPipeline,
         context: BasicCrawlingContext,
-        result: RequestHandlerRunResult,
         state: dict[str, JsonSerializable] | None = None,
-    ) -> RequestHandlerRunResult:
-        """Perform a one request crawl with specific context pipeline and return result of this crawl.
+    ) -> SubCrawlerRun:
+        """Perform a one request crawl with specific context pipeline and return `SubCrawlerRun`.
 
+        `SubCrawlerRun` container either result of the crawl or the exception that was thrown during the crawl.
         Use `context`, `result` and `state` to create new copy-like context that is passed to the `subcrawler_pipeline`.
         """
+        result = RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store)
         if state is not None:
 
             async def get_input_state(
@@ -313,15 +314,18 @@ class AdaptivePlaywrightCrawler(
             log=context.log,
         )
 
-        await wait_for(
-            lambda: subcrawler_pipeline.create_pipeline_call(context_linked_to_result),
-            timeout=self._request_handler_timeout,
-            timeout_message=(
-                f'{subcrawler_pipeline=!s} timed out after {self._request_handler_timeout.total_seconds()}seconds'
-            ),
-            logger=self._logger,
-        )
-        return result
+        try:
+            await wait_for(
+                lambda: subcrawler_pipeline.create_pipeline_call(context_linked_to_result),
+                timeout=self._request_handler_timeout,
+                timeout_message=(
+                    f'{subcrawler_pipeline=!s} timed out after {self._request_handler_timeout.total_seconds()}seconds'
+                ),
+                logger=self._logger,
+            )
+            return SubCrawlerRun(result=result)
+        except Exception as e:
+            return SubCrawlerRun(exception=e)
 
     @override
     async def _run_request_handler(self, context: BasicCrawlingContext) -> None:
@@ -333,26 +337,6 @@ class AdaptivePlaywrightCrawler(
 
         Reference implementation: https://github.com/apify/crawlee/blob/master/packages/playwright-crawler/src/internals/adaptive-playwright-crawler.ts
         """
-
-        async def _run_subcrawler_pipeline(
-            subcrawler_pipeline: _OrphanPlaywrightContextPipeline | _OrphanStaticContextPipeline,
-            use_state: dict | None = None,
-        ) -> SubCrawlerRun:
-            """Helper closure that creates new `RequestHandlerRunResult` and delegates request handling to sub crawler.
-
-            Produces `SubCrawlerRun` that either contains filled `RequestHandlerRunResult` or exception.
-            """
-            try:
-                crawl_result = await self._crawl_one_with(
-                    subcrawler_pipeline=subcrawler_pipeline,
-                    context=context,
-                    result=RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store),
-                    state=use_state,
-                )
-                return SubCrawlerRun(result=crawl_result)
-            except Exception as e:
-                return SubCrawlerRun(exception=e)
-
         rendering_type_prediction = self.rendering_type_predictor.predict(context.request)
         should_detect_rendering_type = random() < rendering_type_prediction.detection_probability_recommendation
 
@@ -364,7 +348,7 @@ class AdaptivePlaywrightCrawler(
                 context.log.debug(f'Running static request for {context.request.url}')
                 self.track_http_only_request_handler_runs()
 
-                static_run = await _run_subcrawler_pipeline(self._static_context_pipeline)
+                static_run = await self._crawl_one_with(self._static_context_pipeline, context=context)
                 if static_run.result and self.result_checker(static_run.result):
                     await self._push_result_to_context(result=static_run.result, context=context)
                     return
@@ -388,7 +372,7 @@ class AdaptivePlaywrightCrawler(
             old_state: dict[str, JsonSerializable] = await kvs.get_value(self._CRAWLEE_STATE_KEY, default_value)
             old_state_copy = deepcopy(old_state)
 
-        pw_run = await _run_subcrawler_pipeline(self._pw_context_pipeline)
+        pw_run = await self._crawl_one_with(self._pw_context_pipeline, context=context)
         self.track_browser_request_handler_runs()
 
         if pw_run.exception is not None:
@@ -399,7 +383,9 @@ class AdaptivePlaywrightCrawler(
 
             if should_detect_rendering_type:
                 detection_result: RenderingType
-                static_run = await _run_subcrawler_pipeline(self._static_context_pipeline, use_state=old_state_copy)
+                static_run = await self._crawl_one_with(
+                    self._static_context_pipeline, context=context, state=old_state_copy
+                )
 
                 if static_run.result and self.result_comparator(static_run.result, pw_run.result):
                     detection_result = 'static'
