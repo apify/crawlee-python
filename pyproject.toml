@@ -70,7 +70,7 @@ yarl = ">=1.18.0"
 
 [tool.poetry.group.dev.dependencies]
 build = "~1.2.0"
-filelock = "~3.16.0"
+filelock = "~3.17.0"
 ipdb = "~0.13.0"
 mypy = "~1.14.0"
 pre-commit = "~4.1.0"
