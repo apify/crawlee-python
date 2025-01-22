@@ -108,7 +108,7 @@ class UserData(BaseModel, MutableMapping[str, JsonSerializable]):
 user_data_adapter = TypeAdapter(UserData)
 
 
-class RequestOptions(TypedDict, total=False):
+class RequestOptions(TypedDict):
     """Options that can be used to customize request creation.
 
     This type exactly matches the parameters of Request.from_url() method.
