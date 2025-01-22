@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Protocol
 
 
+@docs_group('Functions')
 class BlockRequestsFunction(Protocol):
     """Protocol defining the interface for block_requests function."""
 
