@@ -4,6 +4,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Coroutine
 from copy import deepcopy
+from dataclasses import dataclass
 from logging import getLogger
 from random import random
 from typing import TYPE_CHECKING, Any, Generic, get_args
@@ -38,7 +39,6 @@ from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import (
     RenderingTypePredictor,
 )
 from crawlee.crawlers._adaptive_playwright._result_comparator import (
-    SubCrawlerRun,
     create_default_comparator,
 )
 from crawlee.crawlers._beautifulsoup._beautifulsoup_parser import BeautifulSoupParser
@@ -402,3 +402,9 @@ class AdaptivePlaywrightCrawler(
 
     def track_rendering_type_mispredictions(self) -> None:
         self.statistics.state.rendering_type_mispredictions += 1
+
+
+@dataclass(frozen=True)
+class SubCrawlerRun:
+    result: RequestHandlerRunResult | None = None
+    exception: Exception | None = None

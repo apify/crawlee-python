@@ -1,18 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from crawlee._types import RequestHandlerRunResult
-
-
-@dataclass(frozen=True)
-class SubCrawlerRun:
-    result: RequestHandlerRunResult | None = None
-    exception: Exception | None = None
 
 
 def create_default_comparator(
