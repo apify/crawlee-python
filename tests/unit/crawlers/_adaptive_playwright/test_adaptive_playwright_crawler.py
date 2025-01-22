@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import dataclass
 from datetime import timedelta
 from itertools import cycle
 from typing import TYPE_CHECKING, cast
@@ -80,7 +81,7 @@ class _SimpleRenderingTypePredictor(RenderingTypePredictor):
     def __init__(
         self,
         rendering_types: Iterator[RenderingType] | None = None,
-        detection_probability_recommendation: None | Iterator[int] = None,
+        detection_probability_recommendation: None | Iterator[float] = None,
     ) -> None:
         self._rendering_types = rendering_types or cycle(['static'])
         self._detection_probability_recommendation = detection_probability_recommendation or cycle([1])
@@ -94,26 +95,64 @@ class _SimpleRenderingTypePredictor(RenderingTypePredictor):
         pass
 
 
+@dataclass(frozen=True)
+class _TestInput:
+    expected_pw_count: int
+    expected_static_count: int
+    rendering_types: Iterator[RenderingType]
+    detection_probability_recommendation: Iterator[float]
+
+
 @pytest.mark.parametrize(
-    ('expected_pw_count', 'expected_static_count', 'rendering_types', 'detection_probability_recommendation'),
+    'test_input',
     [
-        pytest.param(0, 2, cycle(['static']), cycle([0]), id='Static only'),
-        pytest.param(2, 0, cycle(['client only']), cycle([0]), id='Client only'),
-        pytest.param(1, 1, cycle(['static', 'client only']), cycle([0]), id='Mixed'),
-        pytest.param(2, 2, cycle(['static', 'client only']), cycle([1]), id='Enforced rendering type detection'),
+        pytest.param(
+            _TestInput(
+                expected_pw_count=0,
+                expected_static_count=2,
+                rendering_types=cycle(['static']),
+                detection_probability_recommendation=cycle([0]),
+            ),
+            id='Static only',
+        ),
+        pytest.param(
+            _TestInput(
+                expected_pw_count=2,
+                expected_static_count=0,
+                rendering_types=cycle(['client only']),
+                detection_probability_recommendation=cycle([0]),
+            ),
+            id='Client only',
+        ),
+        pytest.param(
+            _TestInput(
+                expected_pw_count=1,
+                expected_static_count=1,
+                rendering_types=cycle(['static', 'client only']),
+                detection_probability_recommendation=cycle([0]),
+            ),
+            id='Mixed',
+        ),
+        pytest.param(
+            _TestInput(
+                expected_pw_count=2,
+                expected_static_count=2,
+                rendering_types=cycle(['static', 'client only']),
+                detection_probability_recommendation=cycle([1]),
+            ),
+            id='Enforced rendering type detection',
+        ),
     ],
 )
 async def test_adaptive_crawling(
-    expected_pw_count: int,
-    expected_static_count: int,
-    rendering_types: Iterator[RenderingType],
-    detection_probability_recommendation: Iterator[int],
+    test_input: _TestInput,
     test_urls: list[str],
 ) -> None:
     """Tests correct routing to pre-nav hooks and correct handling through proper handler."""
 
     predictor = _SimpleRenderingTypePredictor(
-        rendering_types=rendering_types, detection_probability_recommendation=detection_probability_recommendation
+        rendering_types=test_input.rendering_types,
+        detection_probability_recommendation=test_input.detection_probability_recommendation,
     )
 
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
@@ -153,11 +192,11 @@ async def test_adaptive_crawling(
 
     await crawler.run(test_urls)
 
-    assert pw_handler_count == expected_pw_count
-    assert pw_hook_count == expected_pw_count
+    assert pw_handler_count == test_input.expected_pw_count
+    assert pw_hook_count == test_input.expected_pw_count
 
-    assert static_handler_count == expected_static_count
-    assert static_hook_count == expected_static_count
+    assert static_handler_count == test_input.expected_static_count
+    assert static_hook_count == test_input.expected_static_count
 
 
 async def test_adaptive_crawling_parcel(test_urls: list[str]) -> None:
