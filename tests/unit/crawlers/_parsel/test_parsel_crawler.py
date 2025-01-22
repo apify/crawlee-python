@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 from unittest import mock
 
 import pytest
@@ -9,7 +9,6 @@ import respx
 from httpx import Response
 
 from crawlee import ConcurrencySettings, HttpHeaders
-from crawlee._request import BaseRequestData
 from crawlee.crawlers import ParselCrawler
 
 if TYPE_CHECKING:
@@ -156,24 +155,16 @@ async def test_enqueue_links_selector(server: respx.MockRouter) -> None:
 
     @crawler.router.default_handler
     async def request_handler(context: ParselCrawlingContext) -> None:
-        url = str(context.request.url)
-        visit(url)
-        await context.enqueue_links(selector='a.foo', label='foo')
+        visit(context.request.url)
+        await context.enqueue_links(selector='a.foo')
 
-    with mock.patch.object(BaseRequestData, 'from_url', wraps=BaseRequestData.from_url) as from_url:
-        await crawler.run(['https://test.io/'])
+    await crawler.run(['https://test.io/'])
 
     assert server['index_endpoint'].called
     assert server['secondary_index_endpoint'].called
 
     visited = {call[0][0] for call in visit.call_args_list}
-    assert visited == {
-        'https://test.io/',
-        'https://test.io/asdf',
-    }
-
-    assert from_url.call_count == 1
-    assert from_url.call_args == ((), {'url': 'https://test.io/asdf', 'user_data': {}, 'label': 'foo'})
+    assert visited == {'https://test.io/', 'https://test.io/asdf'}
 
 
 async def test_enqueue_links_with_max_crawl(server: respx.MockRouter) -> None:
@@ -205,9 +196,11 @@ async def test_enqueue_links_with_transform_request_function(server: respx.MockR
     visit = mock.Mock()
     headers = []
 
-    def test_transform_request_function(request_options: RequestOptions) -> RequestOptions | None:
+    def test_transform_request_function(
+        request_options: RequestOptions,
+    ) -> RequestOptions | Literal['skip', 'unchanged']:
         if 'uiop' in request_options['url']:
-            return None
+            return 'skip'
 
         request_options['headers'] = HttpHeaders({'transform-header': 'my-header'})
         return request_options

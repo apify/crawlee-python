@@ -1,23 +1,29 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from crawlee import HttpHeaders, RequestOptions
 from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 
 
-def transform_request(request: RequestOptions) -> RequestOptions | None:
+def transform_request(request_options: RequestOptions) -> RequestOptions | Literal['skip', 'unchanged']:
     # Skip requests to PDF files
-    if request['url'].endswith('.pdf'):
-        return None
+    if request_options['url'].endswith('.pdf'):
+        return 'skip'
 
-    # Add custom headers to requests to specific sections
-    if '/docs' in request['url']:
-        request['headers'] = HttpHeaders({'Custom-Header': 'value'})
+    if '/docs' in request_options['url']:
+        # Add custom headers to requests to specific URLs
+        request_options['headers'] = HttpHeaders({'Custom-Header': 'value'})
 
-    # Add label for certain URLs
-    if '/blog' in request['url']:
-        request['label'] = 'BLOG'
+    elif '/blog' in request_options['url']:
+        # Add label for certain URLs
+        request_options['label'] = 'BLOG'
 
-    return request
+    else:
+        # Signal that the request should proceed without any transformation
+        return 'unchanged'
+
+    return request_options
 
 
 async def main() -> None:

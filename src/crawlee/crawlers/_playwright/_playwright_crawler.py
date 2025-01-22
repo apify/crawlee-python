@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, Literal
 
 from pydantic import ValidationError
 
 from crawlee import EnqueueStrategy
-from crawlee._request import BaseRequestData, RequestOptions
+from crawlee._request import Request, RequestOptions
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
@@ -189,13 +189,14 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 selector: str = 'a',
                 label: str | None = None,
                 user_data: dict | None = None,
-                transform_request_function: Callable[[RequestOptions], RequestOptions | None] | None = None,
+                transform_request_function: Callable[[RequestOptions], RequestOptions | Literal['skip', 'unchanged']]
+                | None = None,
                 **kwargs: Unpack[EnqueueLinksKwargs],
             ) -> None:
                 """The `PlaywrightCrawler` implementation of the `EnqueueLinksFunction` function."""
                 kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
 
-                requests = list[BaseRequestData]()
+                requests = list[Request]()
                 base_user_data = user_data or {}
 
                 elements = await context.page.query_selector_all(selector)
@@ -213,12 +214,13 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
 
                         if transform_request_function:
                             transform_request_option = transform_request_function(request_option)
-                            if not transform_request_option:
+                            if transform_request_option == 'skip':
                                 continue
-                            request_option = transform_request_option
+                            if transform_request_option != 'unchanged':
+                                request_option = transform_request_option
 
                         try:
-                            request = BaseRequestData.from_url(**request_option)
+                            request = Request.from_url(**request_option)
                         except ValidationError as exc:
                             context.log.debug(
                                 f'Skipping URL "{url}" due to invalid format: {exc}. '

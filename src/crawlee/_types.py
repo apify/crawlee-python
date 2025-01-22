@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from collections.abc import Coroutine, Sequence
 
     from crawlee import Glob, Request
-    from crawlee._request import BaseRequestData, RequestOptions
+    from crawlee._request import RequestOptions
     from crawlee.http_clients import HttpResponse
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions import Session
@@ -182,7 +182,7 @@ class EnqueueLinksKwargs(TypedDict):
 class AddRequestsKwargs(EnqueueLinksKwargs):
     """Keyword arguments for the `add_requests` methods."""
 
-    requests: Sequence[str | BaseRequestData | Request]
+    requests: Sequence[str | Request]
     """Requests to be added to the `RequestManager`."""
 
 
@@ -264,7 +264,7 @@ class RequestHandlerRunResult:
 
     async def add_requests(
         self,
-        requests: Sequence[str | BaseRequestData],
+        requests: Sequence[str | Request],
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> None:
         """Track a call to the `add_requests` context helper."""
@@ -315,7 +315,7 @@ class AddRequestsFunction(Protocol):
 
     def __call__(
         self,
-        requests: Sequence[str | BaseRequestData | Request],
+        requests: Sequence[str | Request],
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> Coroutine[None, None, None]:
         """Call dunder method.
@@ -341,7 +341,8 @@ class EnqueueLinksFunction(Protocol):
         selector: str = 'a',
         label: str | None = None,
         user_data: dict[str, Any] | None = None,
-        transform_request_function: Callable[[RequestOptions], RequestOptions | None] | None = None,
+        transform_request_function: Callable[[RequestOptions], RequestOptions | Literal['skip', 'unchanged']]
+        | None = None,
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> Coroutine[None, None, None]:
         """A call dunder method.
@@ -354,8 +355,10 @@ class EnqueueLinksFunction(Protocol):
                 - `BeautifulSoupCrawler` supports CSS selectors.
             label: Label for the newly created `Request` objects, used for request routing.
             user_data: User data to be provided to the newly created `Request` objects.
-            transform_request_function: A function that processes request options before creating a request.
-                Takes RequestOptions dictionary and returns modified RequestOptions or None to skip the request.
+            transform_request_function: A function that takes RequestOptions and returns either:
+                - Modified RequestOptions to update the request configuration
+                - 'skip' to exclude the request from being enqueued
+                - 'unchanged' to use the original request options without modification
             **kwargs: Additional keyword arguments.
         """
 

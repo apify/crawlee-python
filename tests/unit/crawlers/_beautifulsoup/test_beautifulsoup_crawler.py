@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 from unittest import mock
 
 import pytest
@@ -166,9 +166,11 @@ async def test_enqueue_links_with_transform_request_function(server: respx.MockR
     visit = mock.Mock()
     headers = []
 
-    def test_transform_request_function(request_options: RequestOptions) -> RequestOptions | None:
+    def test_transform_request_function(
+        request_options: RequestOptions,
+    ) -> RequestOptions | Literal['skip', 'unchanged']:
         if 'uiop' in request_options['url']:
-            return None
+            return 'skip'
 
         request_options['headers'] = HttpHeaders({'transform-header': 'my-header'})
         return request_options
@@ -177,7 +179,8 @@ async def test_enqueue_links_with_transform_request_function(server: respx.MockR
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         visit(context.request.url)
         headers.append(context.request.headers)
-        await context.enqueue_links(transform_request_function=test_transform_request_function, label='test')
+
+        await context.enqueue_links(transform_request_function=test_transform_request_function)
 
     await crawler.run(['https://test.io/'])
 
@@ -189,7 +192,7 @@ async def test_enqueue_links_with_transform_request_function(server: respx.MockR
     # url https://test.io/uiop should not be visited
     assert visited == {'https://test.io/', 'https://test.io/asdf', 'https://test.io/hjkl', 'https://test.io/qwer'}
 
-    # all urls added to `enqueue_links` must have a custom header
+    # # all urls added to `enqueue_links` must have a custom header
     assert headers[1]['transform-header'] == 'my-header'
     assert headers[2]['transform-header'] == 'my-header'
     assert headers[3]['transform-header'] == 'my-header'
