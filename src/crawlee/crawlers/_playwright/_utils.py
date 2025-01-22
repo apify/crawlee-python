@@ -8,7 +8,18 @@ if TYPE_CHECKING:
     from playwright.async_api import Page
     from playwright.async_api import Request as PlaywrightRequest
 
-_DEFAULT_BLOCK_REQUEST_URL_PATTERNS = ['.css', '.jpg', '.jpeg', '.png', '.svg', '.gif', '.woff', '.pdf', '.zip']
+_DEFAULT_BLOCK_REQUEST_URL_PATTERNS = [
+    '.css',
+    '.webp',
+    '.jpg',
+    '.jpeg',
+    '.png',
+    '.svg',
+    '.gif',
+    '.woff',
+    '.pdf',
+    '.zip',
+]
 
 
 async def infinite_scroll(page: Page) -> None:
@@ -70,7 +81,7 @@ async def infinite_scroll(page: Page) -> None:
 async def block_requests(
     page: Page, url_patterns: list[str] | None = None, extra_url_patterns: list[str] | None = None
 ) -> None:
-    """Blocks network requests matching specified URL patterns. Works only for Chromium browser.
+    """Blocks network requests matching specified URL patterns.
 
     Args:
         page: Playwright Page object to block requests on.
@@ -83,10 +94,17 @@ async def block_requests(
 
     browser_type = page.context.browser.browser_type.name if page.context.browser else 'undefined'
 
-    if browser_type != 'chromium':
-        raise TypeError('block_requests helper is incompatible with non-Chromium browsers.')
+    if browser_type == 'chromium':
+        client = await page.context.new_cdp_session(page)
 
-    client = await page.context.new_cdp_session(page)
+        await client.send('Network.enable')
+        await client.send('Network.setBlockedURLs', {'urls': url_patterns})
+    else:
+        extensions = [pattern.strip('*.') for pattern in url_patterns if pattern.startswith(('*.', '.'))]
+        specific_files = [pattern for pattern in url_patterns if not pattern.startswith(('*.', '.'))]
 
-    await client.send('Network.enable')
-    await client.send('Network.setBlockedURLs', {'urls': url_patterns})
+        if extensions:
+            await page.route(f"**/*.{{{','.join(extensions)}}}*", lambda route, _: route.abort())
+
+        if specific_files:
+            await page.route(f"**/{{{','.join(specific_files)}}}*", lambda route, _: route.abort())
