@@ -11,8 +11,6 @@ class BlockRequestsFunction(Protocol):
 
     It simplifies the process of blocking specific HTTP requests during page navigation.
     The function allows blocking both default resource types (like images, fonts, stylesheets) and custom URL patterns.
-
-    Default patterns for blocking ['.css', '.webp', '.jpg', '.jpeg', '.png', '.svg', '.gif', '.woff', '.pdf', '.zip']
     """
 
     async def __call__(
