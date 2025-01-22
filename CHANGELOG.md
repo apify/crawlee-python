@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.5.3 - **not yet released**
 
+### 🚀 Features
+
+- Add keep_alive flag to `crawler.__init__` ([#921](https://github.com/apify/crawlee-python/pull/921)) ([7a82d0c](https://github.com/apify/crawlee-python/commit/7a82d0cbdbe6c8739d4bf6a9b014e31f07e5a520)) by [@Pijukatel](https://github.com/Pijukatel), closes [#891](https://github.com/apify/crawlee-python/issues/891)
+
 ### 🐛 Bug Fixes
 
 - Fix crawler not retrying user handler if there was timeout in the handler ([#909](https://github.com/apify/crawlee-python/pull/909)) ([f4090ef](https://github.com/apify/crawlee-python/commit/f4090ef0ea0281d53dab16a77ceea2ef6ac43d76)) by [@Pijukatel](https://github.com/Pijukatel), closes [#907](https://github.com/apify/crawlee-python/issues/907)
