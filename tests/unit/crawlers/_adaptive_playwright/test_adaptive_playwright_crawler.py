@@ -218,9 +218,9 @@ async def test_adaptive_crawling_pre_nav_change_to_context(test_urls: list[str])
             context.request.user_data['data'] = 'bs'
 
     await crawler.run(test_urls[:1])
-    # Check that pre nav hooks does not influence each other
+    # Check that repeated pre nav hook invocations do not influence each other while probing
     assert user_data_in_pre_nav_hook == [None, None]
-    # Check that pre nav hooks can modify context
+    # Check that the request handler sees changes to user data done by pre nav hooks
     assert user_data_in_handler == ['pw', 'bs']
 
 
