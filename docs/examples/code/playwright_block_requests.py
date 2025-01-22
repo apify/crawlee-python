@@ -21,7 +21,7 @@ async def main() -> None:
     async def navigation_hook(context: PlaywrightPreNavCrawlingContext) -> None:
         context.log.info(f'Navigating to {context.request.url} ...')
 
-        # block all requests to URLs that include `adsbygoogle.js` and also all defaults.
+        # Block all requests to URLs that include `adsbygoogle.js` and also all defaults.
         await context.block_requests(extra_url_patterns=['adsbygoogle.js'])
 
     # Run the crawler with the initial list of URLs.
