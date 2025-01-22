@@ -245,15 +245,12 @@ async def test_adaptive_crawling_result(test_urls: list[str]) -> None:
 
     await crawler.run(test_urls[:1])
 
-    dataset = await crawler.get_dataset()
-    items = [item async for item in dataset.iterate_items()]
-
     # Enforced rendering type detection will trigger both sub crawlers, but only pw crawler result is saved.
-    assert items == [{'handler': 'pw'}]
+    assert (await crawler.get_data()).items == [{'handler': 'pw'}]
 
 
 @pytest.mark.parametrize(
-    ('pw_saved_data', 'static_saved_data', 'expected_result_renderingl_type'),
+    ('pw_saved_data', 'static_saved_data', 'expected_result_rendering_type'),
     [
         pytest.param({'some': 'data'}, {'some': 'data'}, 'static', id='Same results from sub crawlers'),
         pytest.param({'some': 'data'}, {'different': 'data'}, 'client only', id='Different results from sub crawlers'),
@@ -262,7 +259,7 @@ async def test_adaptive_crawling_result(test_urls: list[str]) -> None:
 async def test_adaptive_crawling_predictor_calls(
     pw_saved_data: dict[str, str],
     static_saved_data: dict[str, str],
-    expected_result_renderingl_type: RenderingType,
+    expected_result_rendering_type: RenderingType,
     test_urls: list[str],
 ) -> None:
     """Tests expected predictor calls. Same results."""
@@ -294,7 +291,7 @@ async def test_adaptive_crawling_predictor_calls(
 
     mocked_predict.assert_called_once_with(requests[0])
     # If `static` and `client only` results are same, `store_result` should be called with `static`.
-    mocked_store_result.assert_called_once_with(requests[0], expected_result_renderingl_type)
+    mocked_store_result.assert_called_once_with(requests[0], expected_result_rendering_type)
 
 
 async def test_adaptive_crawling_result_use_state_isolation(test_urls: list[str]) -> None:

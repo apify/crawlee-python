@@ -24,7 +24,6 @@ from crawlee.crawlers import (
     ParsedHttpCrawlingContext,
     PlaywrightCrawler,
     PlaywrightCrawlingContext,
-    PlaywrightPreNavCrawlingContext,
 )
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler_statistics import (
     AdaptivePlaywrightCrawlerStatisticState,
@@ -208,7 +207,7 @@ class AdaptivePlaywrightCrawler(
 
         self._pre_navigation_hooks = list[Callable[[AdaptivePlaywrightPreNavCrawlingContext], Awaitable[None]]]()
 
-        async def adaptive_pre_navigation_hook(context: BasicCrawlingContext | PlaywrightPreNavCrawlingContext) -> None:
+        async def adaptive_pre_navigation_hook(context: BasicCrawlingContext) -> None:
             for hook in self._pre_navigation_hooks:
                 await hook(AdaptivePlaywrightPreNavCrawlingContext.from_pre_navigation_contexts(context))
 

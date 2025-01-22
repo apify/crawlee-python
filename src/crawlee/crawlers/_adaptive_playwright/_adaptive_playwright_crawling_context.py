@@ -85,7 +85,7 @@ class AdaptivePlaywrightCrawlingContext(Generic[TStaticParseResult], ParsedHttpC
         context_kwargs['_infinite_scroll'] = context_kwargs.pop('infinite_scroll')
         # This might not be always available.
         protocol_guess = await context_kwargs['_page'].evaluate('() => performance.getEntries()[0].nextHopProtocol')
-        http_response = await _HttpResponse.from_playwright_response(
+        http_response = await _PlaywrightHttpResponse.from_playwright_response(
             response=context.response, protocol=protocol_guess or ''
         )
         return cls(
@@ -115,9 +115,7 @@ class AdaptivePlaywrightPreNavCrawlingContext(BasicCrawlingContext):
         raise AdaptiveContextError('Page is not crawled with PlaywrightCrawler.')
 
     @classmethod
-    def from_pre_navigation_contexts(
-        cls, context: AdaptivePlaywrightPreNavCrawlingContext | BasicCrawlingContext
-    ) -> Self:
+    def from_pre_navigation_contexts(cls, context: BasicCrawlingContext) -> Self:
         """Convenience constructor that creates new context from existing pre navigation contexts."""
         context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
         context_kwargs['_page'] = context_kwargs.pop('page', None)
@@ -125,7 +123,9 @@ class AdaptivePlaywrightPreNavCrawlingContext(BasicCrawlingContext):
 
 
 @dataclass(frozen=True)
-class _HttpResponse:
+class _PlaywrightHttpResponse:
+    """Wrapper class for playwright `Response` object to implement `HttpResponse` protocol."""
+
     http_version: str
     status_code: int
     headers: HttpHeaders
