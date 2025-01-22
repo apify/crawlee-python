@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Coroutine
 from copy import deepcopy
-from dataclasses import dataclass
 from logging import getLogger
 from random import random
-from typing import TYPE_CHECKING, Any, Generic
+from typing import TYPE_CHECKING, Any, Generic, get_args
 
 from bs4 import BeautifulSoup
 from parsel import Selector
@@ -20,7 +19,6 @@ from crawlee.crawlers import (
     AbstractHttpParser,
     BasicCrawler,
     BeautifulSoupParserType,
-    ContextPipeline,
     ParsedHttpCrawlingContext,
     PlaywrightCrawler,
     PlaywrightCrawlingContext,
@@ -48,7 +46,6 @@ from crawlee.crawlers._parsel._parsel_parser import ParselParser
 from crawlee.statistics import Statistics, StatisticsState
 
 if TYPE_CHECKING:
-    from collections.abc import Coroutine
     from types import TracebackType
 
     from typing_extensions import Unpack
@@ -58,7 +55,6 @@ if TYPE_CHECKING:
     )
     from crawlee.crawlers._basic._basic_crawler import _BasicCrawlerOptions
     from crawlee.crawlers._playwright._playwright_crawler import _PlaywrightCrawlerAdditionalOptions
-    from crawlee.router import Router
 
 
 TStaticParseResult = TypeVar('TStaticParseResult')
@@ -83,49 +79,6 @@ class _NoActiveStatistics(Statistics):
         exc_traceback: TracebackType | None,
     ) -> None:
         self._active = False
-
-
-@dataclass
-class _OrphanPlaywrightContextPipeline(Generic[TStaticParseResult]):
-    """Minimal setup required by playwright context pipeline to work without crawler."""
-
-    pipeline: ContextPipeline[PlaywrightCrawlingContext]
-    top_router: Router[AdaptivePlaywrightCrawlingContext]
-    static_parser: AbstractHttpParser[TStaticParseResult]
-
-    def create_pipeline_call(self, top_context: BasicCrawlingContext) -> Coroutine[Any, Any, None]:
-        """Call that will be used by the top crawler to run through the pipeline."""
-
-        async def from_pipeline_to_top_router(context: PlaywrightCrawlingContext) -> None:
-            adaptive_crawling_context = await AdaptivePlaywrightCrawlingContext.from_playwright_crawling_context(
-                context=context, parser=self.static_parser
-            )
-            await self.top_router(adaptive_crawling_context)
-
-        return self.pipeline(top_context, from_pipeline_to_top_router)
-
-    def __str__(self) -> str:
-        return 'Playwright context pipeline'
-
-
-@dataclass
-class _OrphanStaticContextPipeline(Generic[TStaticCrawlingContext]):
-    """Minimal setup required by static context pipeline to work without crawler."""
-
-    pipeline: ContextPipeline[TStaticCrawlingContext]
-    top_router: Router[AdaptivePlaywrightCrawlingContext]
-
-    def create_pipeline_call(self, top_context: BasicCrawlingContext) -> Coroutine[Any, Any, None]:
-        """Call that will be used by the top crawler to run through the pipeline."""
-
-        async def from_pipeline_to_top_router(context: TStaticCrawlingContext) -> None:
-            adaptive_crawling_context = AdaptivePlaywrightCrawlingContext.from_parsed_http_crawling_context(context)
-            await self.top_router(adaptive_crawling_context)
-
-        return self.pipeline(top_context, from_pipeline_to_top_router)
-
-    def __str__(self) -> str:
-        return 'Static context pipeline'
 
 
 class AdaptivePlaywrightCrawler(
@@ -216,15 +169,10 @@ class AdaptivePlaywrightCrawler(
 
         self._additional_context_managers = [*self._additional_context_managers, playwright_crawler._browser_pool]  # noqa: SLF001 # Intentional access to private member.
 
-        self._pw_context_pipeline = _OrphanPlaywrightContextPipeline(
-            pipeline=playwright_crawler._context_pipeline,  # noqa:SLF001  # Intentional access to private member.
-            top_router=self.router,
-            static_parser=static_parser,
-        )
-        self._static_context_pipeline = _OrphanStaticContextPipeline[ParsedHttpCrawlingContext[TStaticParseResult]](
-            pipeline=static_crawler._context_pipeline,  # noqa:SLF001  # Intentional access to private member.
-            top_router=self.router,
-        )
+        # Sub crawler pipeline related
+        self._pw_context_pipeline = playwright_crawler._context_pipeline  # noqa:SLF001  # Intentional access to private member.
+        self._static_context_pipeline = static_crawler._context_pipeline  # noqa:SLF001  # Intentional access to private member.
+        self._static_parser = static_parser
 
     @staticmethod
     def with_beautifulsoup_static_parser(
@@ -279,18 +227,18 @@ class AdaptivePlaywrightCrawler(
             **kwargs,
         )
 
-    async def _crawl_one_with(
+    async def _crawl_one(
         self,
-        subcrawler_pipeline: _OrphanPlaywrightContextPipeline | _OrphanStaticContextPipeline,
+        rendering_type: RenderingType,
         context: BasicCrawlingContext,
         state: dict[str, JsonSerializable] | None = None,
     ) -> SubCrawlerRun:
         """Perform a one request crawl with specific context pipeline and return `SubCrawlerRun`.
 
-        `SubCrawlerRun` container either result of the crawl or the exception that was thrown during the crawl.
-        Use `context`, `result` and `state` to create new copy-like context that is passed to the `subcrawler_pipeline`.
+        `SubCrawlerRun` contains either result of the crawl or the exception that was thrown during the crawl.
+        Sub crawler pipeline call is dynamically created based on the `rendering_type`.
+        New copy-like context is created from passed `context` and `state` and is passed to sub crawler pipeline.
         """
-        result = RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store)
         if state is not None:
 
             async def get_input_state(
@@ -302,6 +250,8 @@ class AdaptivePlaywrightCrawler(
         else:
             use_state_function = context.use_state
 
+        # New result is created and injected to newly created context. This is done to ensure isolation of sub crawlers.
+        result = RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store)
         context_linked_to_result = BasicCrawlingContext(
             request=deepcopy(context.request),
             session=deepcopy(context.session),
@@ -316,16 +266,46 @@ class AdaptivePlaywrightCrawler(
 
         try:
             await wait_for(
-                lambda: subcrawler_pipeline.create_pipeline_call(context_linked_to_result),
+                lambda: self._pipeline_call_factory(
+                    rendering_type=rendering_type, context_linked_to_result=context_linked_to_result
+                ),
                 timeout=self._request_handler_timeout,
                 timeout_message=(
-                    f'{subcrawler_pipeline=!s} timed out after {self._request_handler_timeout.total_seconds()}seconds'
+                    f'{rendering_type=!s} timed out after {self._request_handler_timeout.total_seconds()}seconds'
                 ),
                 logger=self._logger,
             )
             return SubCrawlerRun(result=result)
         except Exception as e:
             return SubCrawlerRun(exception=e)
+
+    def _pipeline_call_factory(
+        self, rendering_type: RenderingType, context_linked_to_result: BasicCrawlingContext
+    ) -> Coroutine[Any, Any, None]:
+        """Create sub crawler pipeline call."""
+        if rendering_type == 'static':
+
+            async def from_static_pipeline_to_top_router(
+                context: ParsedHttpCrawlingContext[TStaticParseResult],
+            ) -> None:
+                adaptive_crawling_context = AdaptivePlaywrightCrawlingContext.from_parsed_http_crawling_context(context)
+                await self.router(adaptive_crawling_context)
+
+            return self._static_context_pipeline(context_linked_to_result, from_static_pipeline_to_top_router)
+
+        if rendering_type == 'client only':
+
+            async def from_pw_pipeline_to_top_router(context: PlaywrightCrawlingContext) -> None:
+                adaptive_crawling_context = await AdaptivePlaywrightCrawlingContext.from_playwright_crawling_context(
+                    context=context, parser=self._static_parser
+                )
+                await self.router(adaptive_crawling_context)
+
+            return self._pw_context_pipeline(context_linked_to_result, from_pw_pipeline_to_top_router)
+
+        raise RuntimeError(
+            f"Not a valid rendering type. Must be one of the following: {', '.join(get_args(RenderingType))}"
+        )
 
     @override
     async def _run_request_handler(self, context: BasicCrawlingContext) -> None:
@@ -348,7 +328,7 @@ class AdaptivePlaywrightCrawler(
                 context.log.debug(f'Running static request for {context.request.url}')
                 self.track_http_only_request_handler_runs()
 
-                static_run = await self._crawl_one_with(self._static_context_pipeline, context=context)
+                static_run = await self._crawl_one(rendering_type='static', context=context)
                 if static_run.result and self.result_checker(static_run.result):
                     await self._push_result_to_context(result=static_run.result, context=context)
                     return
@@ -372,7 +352,7 @@ class AdaptivePlaywrightCrawler(
             old_state: dict[str, JsonSerializable] = await kvs.get_value(self._CRAWLEE_STATE_KEY, default_value)
             old_state_copy = deepcopy(old_state)
 
-        pw_run = await self._crawl_one_with(self._pw_context_pipeline, context=context)
+        pw_run = await self._crawl_one('client only', context=context)
         self.track_browser_request_handler_runs()
 
         if pw_run.exception is not None:
@@ -383,9 +363,7 @@ class AdaptivePlaywrightCrawler(
 
             if should_detect_rendering_type:
                 detection_result: RenderingType
-                static_run = await self._crawl_one_with(
-                    self._static_context_pipeline, context=context, state=old_state_copy
-                )
+                static_run = await self._crawl_one('static', context=context, state=old_state_copy)
 
                 if static_run.result and self.result_comparator(static_run.result, pw_run.result):
                     detection_result = 'static'
