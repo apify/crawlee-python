@@ -30,9 +30,9 @@ logger = getLogger(__name__)
 
 @docs_group('Classes')
 class BrowserPool:
-    """Manages a pool of browsers and their pages, handling lifecycle events and resource allocation.
+    """Manage a pool of browsers and pages, handling their lifecycle and resource allocation.
 
-    This class is responsible for opening and closing browsers, managing pages within those browsers,
+    The `BrowserPool` is responsible for opening and closing browsers, managing pages within those browsers,
     and handling the overall lifecycle of these resources. It provides flexible configuration via
     constructor options, which include various hooks that allow for the insertion of custom behavior
     at different stages of the browser and page lifecycles.
@@ -153,12 +153,12 @@ class BrowserPool:
 
     @property
     def total_pages_count(self) -> int:
-        """Returns the total number of pages opened since the browser pool was launched."""
+        """Return the total number of pages opened since the browser pool was launched."""
         return self._total_pages_count
 
     @property
     def active(self) -> bool:
-        """Indicates whether the context is active."""
+        """Indicate whether the context is active."""
         return self._active
 
     async def __aenter__(self) -> BrowserPool:
@@ -218,7 +218,7 @@ class BrowserPool:
         browser_plugin: BaseBrowserPlugin | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> CrawleePage:
-        """Opens a new page in a browser using the specified or a random browser plugin.
+        """Open a new page in a browser using the specified or a random browser plugin.
 
         Args:
             page_id: The ID to assign to the new page. If not provided, a random ID is generated.

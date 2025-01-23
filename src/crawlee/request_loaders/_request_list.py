@@ -39,13 +39,12 @@ class RequestList(RequestLoader):
         self._assumed_total_count = 0
 
         self._in_progress = set[str]()
-        self._is_empty = False
+        self._next: Request | None = None
 
         if isinstance(requests, AsyncIterable):
             self._requests = requests.__aiter__()
         elif requests is None:
             self._requests = self._iterate_in_threadpool([])
-            self._is_empty = True
         else:
             self._requests = self._iterate_in_threadpool(requests)
 
@@ -61,30 +60,27 @@ class RequestList(RequestLoader):
 
     @override
     async def is_empty(self) -> bool:
-        return self._is_empty
+        await self._ensure_next_request()
+        return self._next is None
 
     @override
     async def is_finished(self) -> bool:
-        return self._is_empty and len(self._in_progress) == 0
+        return len(self._in_progress) == 0 and await self.is_empty()
 
     @override
     async def fetch_next_request(self) -> Request | None:
-        if self._is_empty:
+        await self._ensure_next_request()
+
+        if self._next is None:
             return None
 
-        if self._requests_lock is None:
-            self._requests_lock = asyncio.Lock()
+        self._in_progress.add(self._next.id)
+        self._assumed_total_count += 1
 
-        try:
-            async with self._requests_lock:
-                request = self._transform_request(await self._requests.__anext__())
-        except StopAsyncIteration:
-            self._is_empty = True
-            return None
-        else:
-            self._in_progress.add(request.id)
-            self._assumed_total_count += 1
-            return request
+        next_request = self._next
+        self._next = None
+
+        return next_request
 
     @override
     async def mark_request_as_handled(self, request: Request) -> None:
@@ -94,6 +90,17 @@ class RequestList(RequestLoader):
     @override
     async def get_handled_count(self) -> int:
         return self._handled_count
+
+    async def _ensure_next_request(self) -> None:
+        if self._requests_lock is None:
+            self._requests_lock = asyncio.Lock()
+
+        try:
+            async with self._requests_lock:
+                if self._next is None:
+                    self._next = self._transform_request(await self._requests.__anext__())
+        except StopAsyncIteration:
+            self._next = None
 
     async def _iterate_in_threadpool(self, iterable: Iterable[str | Request]) -> AsyncIterator[str | Request]:
         """Inspired by a function of the same name from encode/starlette."""
@@ -115,4 +122,4 @@ class RequestList(RequestLoader):
             while True:
                 yield await asyncio.to_thread(_next)
         except _StopIteration:
-            raise StopAsyncIteration  # noqa: B904
+            return

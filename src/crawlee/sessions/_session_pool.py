@@ -26,7 +26,12 @@ CreateSessionFunctionType = Callable[[], Session]
 
 @docs_group('Classes')
 class SessionPool:
-    """Session pool is a pool of sessions that are rotated based on the usage count or age."""
+    """A pool of sessions that are managed, rotated, and persisted based on usage and age.
+
+    It ensures effective session management by maintaining a pool of sessions and rotating them based on
+    usage count, expiration time, or custom rules. It provides methods to retrieve sessions, manage their
+    lifecycle, and optionally persist the state to enable recovery.
+    """
 
     def __init__(
         self,
@@ -95,7 +100,7 @@ class SessionPool:
 
     @property
     def active(self) -> bool:
-        """Indicates whether the context is active."""
+        """Indicate whether the context is active."""
         return self._active
 
     async def __aenter__(self) -> SessionPool:
@@ -177,10 +182,13 @@ class SessionPool:
 
     @ensure_context
     def add_session(self, session: Session) -> None:
-        """Add a specific session to the pool.
+        """Add an externally created session to the pool.
 
         This is intened only for the cases when you want to add a session that was created outside of the pool.
         Otherwise, the pool will create new sessions automatically.
+
+        Args:
+            session: The session to add to the pool.
         """
         if session.id in self._sessions:
             logger.warning(f'Session with ID {session.id} already exists in the pool.')

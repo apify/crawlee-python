@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "crawlee"
-version = "0.5.0"
+version = "0.5.3"
 description = "Crawlee for Python"
 authors = ["Apify Technologies s.r.o. <support@apify.com>"]
 license = "Apache-2.0"
@@ -72,10 +72,10 @@ yarl = ">=1.18.0"
 
 [tool.poetry.group.dev.dependencies]
 build = "~1.2.0"
-filelock = "~3.16.0"
+filelock = "~3.17.0"
 ipdb = "~0.13.0"
 mypy = "~1.14.0"
-pre-commit = "~4.0.0"
+pre-commit = "~4.1.0"
 proxy-py = "~2.4.0"
 pydoc-markdown = "~4.8.0"
 pytest = "~8.3.0"
@@ -86,7 +86,7 @@ pytest-timeout = "~2.3.0"
 pytest-xdist = "~3.6.0"
 respx = "~0.22.0"
 ruff = "~0.8.0"
-setuptools = "~75.7.0"                    # setuptools are used by pytest, but not explicitly required
+setuptools = "~75.8.0"                    # setuptools are used by pytest, but not explicitly required
 sortedcontainers-stubs = "^2.4.2"
 types-beautifulsoup4 = "~4.12.0.20240229"
 types-colorama = "~0.4.15.20240106"
@@ -158,7 +158,7 @@ indent-style = "space"
     "T20",     # flake8-print
     "TRY301",  # Abstract `raise` to an inner function
 ]
-"**/{docs}/**" = [
+"**/{docs,website}/**" = [
     "D",      # Everything from the pydocstyle
     "INP001", # File {filename} is part of an implicit namespace package, add an __init__.py
     "F841",   # Local variable {variable} is assigned to but never used
@@ -197,7 +197,7 @@ timeout = 1200
 python_version = "3.9"
 plugins = ["pydantic.mypy"]
 exclude = ["project_template"]
-files = ["src", "tests"]
+files = ["src", "tests", "docs", "website"]
 check_untyped_defs = true
 disallow_incomplete_defs = true
 disallow_untyped_calls = true
@@ -220,7 +220,7 @@ ignore_missing_imports = true
 [tool.basedpyright]
 pythonVersion = "3.9"
 typeCheckingMode = "standard"
-include = ["src", "tests", "docs"]
+include = ["src", "tests", "docs", "website"]
 
 [tool.coverage.report]
 exclude_lines = [

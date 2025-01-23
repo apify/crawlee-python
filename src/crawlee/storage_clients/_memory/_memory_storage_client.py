@@ -68,6 +68,9 @@ class MemoryStorageClient(BaseStorageClient):
     ) -> None:
         """A default constructor.
 
+        In most cases, you should use the `from_config` constructor to create a new instance based on
+        the provided configuration.
+
         Args:
             write_metadata: Whether to write metadata to the storage.
             persist_storage: Whether to persist the storage.
@@ -93,12 +96,10 @@ class MemoryStorageClient(BaseStorageClient):
 
     @classmethod
     def from_config(cls, config: Configuration | None = None) -> MemoryStorageClient:
-        """Create a new instance based on the provided configuration.
-
-        All the memory storage client parameters are taken from the configuration object.
+        """Create a new instance based on the provided `Configuration`.
 
         Args:
-            config: The configuration object.
+            config: The `Configuration` instance. Uses the global (default) one if not provided.
         """
         config = config or Configuration.get_global_configuration()
 

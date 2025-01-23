@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING
+from itertools import chain, repeat
+from typing import TYPE_CHECKING, cast
 from unittest.mock import patch
 from urllib.parse import urlparse
 
@@ -178,3 +179,29 @@ async def test_get_auto_saved_value_auto_save(key_value_store: KeyValueStore, mo
 
     value['hello'] = 'new_world'
     assert await autosaved_within_deadline(key=key_name, expected_value={'hello': 'new_world'})
+
+
+async def test_get_auto_saved_value_auto_save_race_conditions(key_value_store: KeyValueStore) -> None:
+    """Two parallel functions increment global variable obtained by `get_auto_saved_value`.
+
+    Result should be incremented by 2.
+    Method `get_auto_saved_value` must be implemented in a way that prevents race conditions in such scenario.
+    Test creates situation where first `get_auto_saved_value` call to kvs gets delayed. Such situation can happen
+    and unless handled, it can cause race condition in getting the state value."""
+    await key_value_store.set_value('state', {'counter': 0})
+
+    sleep_time_iterator = chain(iter([0.5]), repeat(0))
+
+    async def delayed_get_value(key: str, default_value: None) -> None:
+        await asyncio.sleep(next(sleep_time_iterator))
+        return await KeyValueStore.get_value(key_value_store, key=key, default_value=default_value)
+
+    async def increment_counter() -> None:
+        state = cast(dict[str, int], await key_value_store.get_auto_saved_value('state'))
+        state['counter'] += 1
+
+    with patch.object(key_value_store, 'get_value', delayed_get_value):
+        tasks = [asyncio.create_task(increment_counter()), asyncio.create_task(increment_counter())]
+        await asyncio.gather(*tasks)
+
+    assert (await key_value_store.get_auto_saved_value('state'))['counter'] == 2

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from unittest import mock
 
 from crawlee import Glob, Request
+from crawlee._types import EnqueueStrategy
 from crawlee.crawlers import PlaywrightCrawler
 from crawlee.fingerprint_suite._consts import (
     PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA,
@@ -17,11 +18,12 @@ from crawlee.fingerprint_suite._consts import (
     PW_CHROMIUM_HEADLESS_DEFAULT_USER_AGENT,
     PW_FIREFOX_HEADLESS_DEFAULT_USER_AGENT,
 )
+from crawlee.proxy_configuration import ProxyConfiguration
 
 if TYPE_CHECKING:
     from yarl import URL
 
-    from crawlee.crawlers import PlaywrightCrawlingContext
+    from crawlee.crawlers import PlaywrightCrawlingContext, PlaywrightPreNavCrawlingContext
 
 
 async def test_basic_request(httpbin: URL) -> None:
@@ -78,6 +80,28 @@ async def test_nonexistent_url_invokes_error_handler() -> None:
     await crawler.run(['https://this-does-not-exist-22343434.com'])
     assert error_handler.call_count == 3
     assert failed_handler.call_count == 1
+
+
+async def test_redirect_handling(httpbin: URL) -> None:
+    # Set up a dummy crawler that tracks visited URLs
+    crawler = PlaywrightCrawler()
+    handled_urls = set[str]()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        handled_urls.add(context.request.loaded_url or '')
+
+    # Craft a request that points to httpbin initially, but redirects to apify.com
+    request = Request.from_url(
+        url=str((httpbin / 'redirect-to').update_query(url='https://apify.com')),
+    )
+
+    # Ensure that the request uses the SAME_ORIGIN strategy - apify.com will be considered out of scope
+    request.crawlee_data.enqueue_strategy = EnqueueStrategy.SAME_ORIGIN
+
+    # No URLs should be visited in the run
+    await crawler.run([request])
+    assert handled_urls == set()
 
 
 async def test_chromium_headless_headers(httpbin: URL) -> None:
@@ -165,3 +189,28 @@ async def test_pre_navigation_hook(httpbin: URL) -> None:
     await crawler.run(['https://example.com', str(httpbin)])
 
     assert mock_hook.call_count == 2
+
+
+async def test_proxy_set() -> None:
+    # Configure crawler with proxy settings
+    proxy_value = 'http://1111:1111'
+    crawler = PlaywrightCrawler(proxy_configuration=ProxyConfiguration(proxy_urls=[proxy_value]))
+
+    handler_data = {}
+
+    mock_handler = mock.AsyncMock(return_value=None)
+    crawler.router.default_handler(mock_handler)
+
+    # Use pre_navigation_hook to verify proxy and configure playwright route
+    @crawler.pre_navigation_hook
+    async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
+        if context.proxy_info:
+            # Store information about the used proxy
+            handler_data['proxy'] = context.proxy_info.url
+
+        # Emulate server response to prevent Playwright from making real requests
+        await context.page.route('**/*', lambda route: route.fulfill(status=200))
+
+    await crawler.run(['https://test.com'])
+
+    assert handler_data.get('proxy') == proxy_value

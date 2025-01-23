@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from playwright.async_api import Playwright, async_playwright
 from typing_extensions import override
 
+from crawlee import service_locator
 from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 from crawlee.browsers._base_browser_plugin import BaseBrowserPlugin
@@ -26,7 +27,11 @@ logger = getLogger(__name__)
 class PlaywrightBrowserPlugin(BaseBrowserPlugin):
     """A plugin for managing Playwright automation library.
 
-    It should work as a factory for creating new browser instances.
+    It is a plugin designed to manage browser instances using the Playwright automation library. It acts as a factory
+    for creating new browser instances and provides a unified interface for interacting with different browser types
+    (chromium, firefox, and webkit). This class integrates configuration options for browser launches (headless mode,
+    executable paths, sandboxing, ...). It also manages browser contexts and the number of pages open within each
+    browser instance, ensuring that resource limits are respected.
     """
 
     AUTOMATION_LIBRARY = 'playwright'
@@ -35,8 +40,8 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         self,
         *,
         browser_type: BrowserType = 'chromium',
-        browser_launch_options: Mapping[str, Any] | None = None,
-        browser_new_context_options: Mapping[str, Any] | None = None,
+        browser_launch_options: dict[str, Any] | None = None,
+        browser_new_context_options: dict[str, Any] | None = None,
         max_open_pages_per_browser: int = 20,
     ) -> None:
         """A default constructor.
@@ -52,8 +57,17 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
             max_open_pages_per_browser: The maximum number of pages that can be opened in a single browser instance.
                 Once reached, a new browser instance will be launched to handle the excess.
         """
+        config = service_locator.get_configuration()
+
+        # Default browser launch options are based on the configuration.
+        default_launch_browser_options = {
+            'headless': config.headless,
+            'executable_path': config.default_browser_path,
+            'chromium_sandbox': not config.disable_browser_sandbox,
+        }
+
         self._browser_type = browser_type
-        self._browser_launch_options = browser_launch_options or {}
+        self._browser_launch_options = default_launch_browser_options | (browser_launch_options or {})
         self._browser_new_context_options = browser_new_context_options or {}
         self._max_open_pages_per_browser = max_open_pages_per_browser
 
