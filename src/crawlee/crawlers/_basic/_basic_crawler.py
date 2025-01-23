@@ -10,6 +10,7 @@ from asyncio import CancelledError
 from collections.abc import AsyncGenerator, Awaitable, Sequence
 from contextlib import AsyncExitStack, suppress
 from datetime import timedelta
+from enum import auto, Enum
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Generic, Union, cast
@@ -148,6 +149,35 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     _logger: NotRequired[logging.Logger]
     """A logger instance, typically provided by a subclass, for consistent logging labels. Intended for use by
     subclasses rather than direct instantiation of `BasicCrawler`."""
+
+
+@docs_group('Data structures')
+class CrawlerRunState(str, Enum):
+    """State of a crawler run."""
+
+    NOT_STARTED = auto()
+    """Crawler was not started yet."""
+
+    RUNNING = auto()
+    """Crawler was not started yet."""
+
+    STANDBY = auto()
+    """Running, waiting for requests due to keep_alive."""
+
+    FINISHED = auto()
+    'Finished has finished.'
+
+    FAILING = auto()
+    'Error was raised during the run, crawler is finishing.'
+
+    FAILED = auto()
+    'Crawler has finished with error.'
+
+    STOPPING = auto()
+    '`Crawler.stop()` was called and crawler is stopping.'
+
+    STOPPED = auto()
+    'Crawler was stopped.'
 
 
 @docs_group('Classes')
@@ -353,6 +383,27 @@ class BasicCrawler(Generic[TCrawlingContext]):
     def statistics(self) -> Statistics[StatisticsState]:
         """Statistics about the current (or last) crawler run."""
         return self._statistics
+
+    async def get_run_state(self) -> CrawlerRunState:
+        """Get the current state of the crawler run."""
+        if self._running:
+            if self._keep_alive:
+                request_manager = await self.get_request_manager()
+                if await request_manager.is_finished():
+                    return CrawlerRunState.STANDBY
+            if self._failed:
+                return CrawlerRunState.FAILING
+            if self._unexpected_stop:
+                return CrawlerRunState.STOPPING
+            return CrawlerRunState.RUNNING
+
+        if not self._has_finished_before:
+            return CrawlerRunState.NOT_STARTED
+        if self._failed:
+            return CrawlerRunState.FAILED
+        if self._unexpected_stop:
+            return CrawlerRunState.STOPPED
+        return CrawlerRunState.FINISHED
 
     def stop(self, reason: str = 'Stop was called externally.') -> None:
         """Set flag to stop crawler.

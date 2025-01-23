@@ -7,6 +7,7 @@ import logging
 import os
 import sys
 import time
+from asyncio import Barrier
 from collections import Counter
 from dataclasses import dataclass
 from datetime import timedelta
@@ -22,6 +23,7 @@ from crawlee._request import BaseRequestData, Request
 from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpHeaders
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
+from crawlee.crawlers._basic._basic_crawler import CrawlerRunState
 from crawlee.errors import SessionError, UserDefinedErrorHandlerError
 from crawlee.events._local_event_manager import LocalEventManager
 from crawlee.request_loaders import RequestList, RequestManagerTandem
@@ -1169,3 +1171,29 @@ async def test_keep_alive(
     await asyncio.gather(crawler_run_task, add_request_task)
 
     mocked_handler.assert_has_calls(expected_handler_calls)
+
+
+
+async def test_run_state_typical_run():
+
+
+    crawler = BasicCrawler()
+    handler_running = asyncio.Event()
+    handler_can_stop = asyncio.Event()
+
+    @crawler.router.default_handler
+    async def  request_handler():
+        print("a")
+        handler_running.set()
+        print("b")
+        # await handler_can_stop.wait()
+
+    assert await crawler.get_run_state() == CrawlerRunState.NOT_STARTED
+
+    crawler_run_task = asyncio.create_task(crawler.run(["http://a.com/"]))
+    await handler_running.wait()
+    assert await crawler.get_run_state() == CrawlerRunState.RUNNING
+    #handler_can_stop.set()
+    await asyncio.gather(crawler_run_task)
+
+
