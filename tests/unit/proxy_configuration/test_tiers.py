@@ -66,6 +66,42 @@ async def test_retrying_request_makes_tier_go_up() -> None:
     assert info.url == tiered_proxy_urls[2][0]
 
 
+async def test_retrying_request_makes_tier_go_up_with_sessions() -> None:
+    tiered_proxy_urls: list[list[str | None]] = [
+        ['http://proxy:1111'],
+        ['http://proxy:2222'],
+        ['http://proxy:3333'],
+        ['http://proxy:4444'],
+    ]
+
+    config = ProxyConfiguration(tiered_proxy_urls=tiered_proxy_urls)
+
+    request = Request(url='http://some.domain/abc', unique_key='1', id='1')
+
+    # Calling `new_proxy_info` with the same request likely means that it is being retried.
+    # However, a single session should always receive the same proxy
+    info = await config.new_proxy_info('session_id', request, None)
+    assert info is not None
+    assert info.url == tiered_proxy_urls[0][0]
+
+    info = await config.new_proxy_info('session_id', request, None)
+    assert info is not None
+    assert info.url == tiered_proxy_urls[0][0]
+
+    info = await config.new_proxy_info('session_id', request, None)
+    assert info is not None
+    assert info.url == tiered_proxy_urls[0][0]
+
+    # For a new session, we will get a proxy from the corresponding tier
+    info = await config.new_proxy_info('session_id2', request, None)
+    assert info is not None
+    assert info.url == tiered_proxy_urls[3][0]
+
+    info = await config.new_proxy_info('session_id2', request, None)
+    assert info is not None
+    assert info.url == tiered_proxy_urls[3][0]
+
+
 async def test_successful_request_makes_tier_go_down() -> None:
     """Repeatedly requesting a proxy for a single request will cause the proxy tier to go up -
     ProxyConfiguration assumes those are retries. Then, requesting a proxy for different requests to the same domain
@@ -84,13 +120,13 @@ async def test_successful_request_makes_tier_go_down() -> None:
 
     info = None
     for tier in tiered_proxy_urls:
-        info = await config.new_proxy_info('session_id', request_1, None)
+        info = await config.new_proxy_info(None, request_1, None)
         assert info is not None
         assert info.url == tier[0]
 
     for i in range(100):
         new_request = Request(url=f'http://some.domain/{i}', unique_key=str(i), id=str(i))
-        info = await config.new_proxy_info('session_id', new_request, None)
+        info = await config.new_proxy_info(None, new_request, None)
 
     assert info is not None
     assert info.url == tiered_proxy_urls[0][0]

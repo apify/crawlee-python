@@ -37,6 +37,10 @@ def prepare_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callabl
     """
 
     def _prepare_test_env() -> None:
+        # Disable the browser sandbox by setting the environment variable. This is required for running
+        # Playwright tests in the CI environment, where the sandbox is not supported.
+        monkeypatch.setenv('CRAWLEE_DISABLE_BROWSER_SANDBOX', 'true')
+
         # Set the environment variable for the local storage directory to the temporary path.
         monkeypatch.setenv('CRAWLEE_STORAGE_DIR', str(tmp_path))
 

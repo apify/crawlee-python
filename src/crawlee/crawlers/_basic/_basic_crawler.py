@@ -23,7 +23,6 @@ from crawlee._autoscaling import AutoscaledPool, Snapshotter, SystemStatus
 from crawlee._log_config import configure_logger, get_configured_log_level
 from crawlee._request import Request, RequestState
 from crawlee._types import BasicCrawlingContext, HttpHeaders, RequestHandlerRunResult, SendRequestFunction
-from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
@@ -72,7 +71,7 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     """
 
     configuration: NotRequired[Configuration]
-    """The configuration object. Some of its properties are used as defaults for the crawler."""
+    """The `Configuration` instance. Some of its properties are used as defaults for the crawler."""
 
     event_manager: NotRequired[EventManager]
     """The event manager for managing events for the crawler and all its components."""
@@ -135,6 +134,9 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     configure_logging: NotRequired[bool]
     """If True, the crawler will set up logging infrastructure automatically."""
 
+    keep_alive: NotRequired[bool]
+    """Flag that can keep crawler running even when there are no requests in queue."""
+
     _context_pipeline: NotRequired[ContextPipeline[TCrawlingContext]]
     """Enables extending the request lifecycle and modifying the crawling context. Intended for use by
     subclasses rather than direct instantiation of `BasicCrawler`."""
@@ -173,6 +175,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
         - and more.
     """
 
+    _CRAWLEE_STATE_KEY = 'CRAWLEE_STATE'
+
     def __init__(
         self,
         *,
@@ -194,6 +198,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         request_handler_timeout: timedelta = timedelta(minutes=1),
         statistics: Statistics | None = None,
         abort_on_error: bool = False,
+        keep_alive: bool = False,
         configure_logging: bool = True,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         _additional_context_managers: Sequence[AbstractAsyncContextManager] | None = None,
@@ -202,7 +207,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         """A default constructor.
 
         Args:
-            configuration: The configuration object. Some of its properties are used as defaults for the crawler.
+            configuration: The `Configuration` instance. Some of its properties are used as defaults for the crawler.
             event_manager: The event manager for managing events for the crawler and all its components.
             storage_client: The storage client for managing storages for the crawler and all its components.
             request_manager: Manager of requests that should be processed by the crawler.
@@ -214,7 +219,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
             max_requests_per_crawl: Maximum number of pages to open during a crawl. The crawl stops upon reaching
                 this limit. Setting this value can help avoid infinite loops in misconfigured crawlers. `None` means
                 no limit. Due to concurrency settings, the actual number of pages visited may slightly exceed
-                this value.
+                this value. If used together with `keep_alive`, then the crawler will be kept alive only until
+                `max_requests_per_crawl` is achieved.
             max_session_rotations: Maximum number of session rotations per request. The crawler rotates the session
                 if a proxy error occurs or if the website blocks the request.
             max_crawl_depth: Specifies the maximum crawl depth. If set, the crawler will stop processing links beyond
@@ -227,6 +233,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
             request_handler_timeout: Maximum duration allowed for a single request handler to run.
             statistics: A custom `Statistics` instance, allowing the use of non-default configuration.
             abort_on_error: If True, the crawler stops immediately when any request handler error occurs.
+            keep_alive: If True, it will keep crawler alive even if there are no requests in queue.
+                Use `crawler.stop()` to exit the crawler.
             configure_logging: If True, the crawler will set up logging infrastructure automatically.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
@@ -303,19 +311,17 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         # Internal, not explicitly configurable components
         self._tld_extractor = TLDExtract(cache_dir=tempfile.TemporaryDirectory().name)
-        self._snapshotter = Snapshotter(
-            max_memory_size=ByteSize.from_mb(config.memory_mbytes) if config.memory_mbytes else None,
-            available_memory_ratio=config.available_memory_ratio,
-        )
+        self._snapshotter = Snapshotter.from_config(config)
         self._autoscaled_pool = AutoscaledPool(
             system_status=SystemStatus(self._snapshotter),
+            concurrency_settings=concurrency_settings,
             is_finished_function=self.__is_finished_function,
             is_task_ready_function=self.__is_task_ready_function,
             run_task_function=self.__run_task_function,
-            concurrency_settings=concurrency_settings,
         )
 
         # State flags
+        self._keep_alive = keep_alive
         self._running = False
         self._has_finished_before = False
 
@@ -330,7 +336,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
     @property
     def router(self) -> Router[TCrawlingContext]:
-        """The router used to handle each individual crawling request."""
+        """The `Router` used to handle each individual crawling request."""
         if self._router is None:
             self._router = Router[TCrawlingContext]()
 
@@ -395,7 +401,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         )
 
     async def get_request_manager(self) -> RequestManager:
-        """Return the configured request provider. If none is configured, open and return the default request queue."""
+        """Return the configured request manager. If none is configured, open and return the default request queue."""
         if not self._request_manager:
             self._request_manager = await RequestQueue.open()
 
@@ -407,7 +413,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         id: str | None = None,
         name: str | None = None,
     ) -> Dataset:
-        """Return the dataset with the given ID or name. If none is provided, return the default dataset."""
+        """Return the `Dataset` with the given ID or name. If none is provided, return the default one."""
         return await Dataset.open(id=id, name=name)
 
     async def get_key_value_store(
@@ -416,7 +422,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         id: str | None = None,
         name: str | None = None,
     ) -> KeyValueStore:
-        """Return the key-value store with the given ID or name. If none is provided, return the default KVS."""
+        """Return the `KeyValueStore` with the given ID or name. If none is provided, return the default KVS."""
         return await KeyValueStore.open(id=id, name=name)
 
     def error_handler(
@@ -545,7 +551,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         wait_for_all_requests_to_be_added: bool = False,
         wait_for_all_requests_to_be_added_timeout: timedelta | None = None,
     ) -> None:
-        """Add requests to the underlying request provider in batches.
+        """Add requests to the underlying request manager in batches.
 
         Args:
             requests: A list of requests to add to the queue.
@@ -564,11 +570,9 @@ class BasicCrawler(Generic[TCrawlingContext]):
             wait_for_all_requests_to_be_added_timeout=wait_for_all_requests_to_be_added_timeout,
         )
 
-    async def _use_state(
-        self, key: str, default_value: dict[str, JsonSerializable] | None = None
-    ) -> dict[str, JsonSerializable]:
+    async def _use_state(self, default_value: dict[str, JsonSerializable] | None = None) -> dict[str, JsonSerializable]:
         store = await self.get_key_value_store()
-        return await store.get_auto_saved_value(key, default_value)
+        return await store.get_auto_saved_value(self._CRAWLEE_STATE_KEY, default_value)
 
     async def _save_crawler_state(self) -> None:
         store = await self.get_key_value_store()
@@ -580,15 +584,15 @@ class BasicCrawler(Generic[TCrawlingContext]):
         dataset_name: str | None = None,
         **kwargs: Unpack[GetDataKwargs],
     ) -> DatasetItemsListPage:
-        """Retrieve data from a dataset.
+        """Retrieve data from a `Dataset`.
 
-        This helper method simplifies the process of retrieving data from a dataset. It opens the specified
-        dataset and then retrieves the data based on the provided parameters.
+        This helper method simplifies the process of retrieving data from a `Dataset`. It opens the specified
+        one and then retrieves the data based on the provided parameters.
 
         Args:
-            dataset_id: The ID of the dataset.
-            dataset_name: The name of the dataset.
-            kwargs: Keyword arguments to be passed to the dataset's `get_data` method.
+            dataset_id: The ID of the `Dataset`.
+            dataset_name: The name of the `Dataset`.
+            kwargs: Keyword arguments to be passed to the `Dataset.get_data()` method.
 
         Returns:
             The retrieved data.
@@ -602,16 +606,16 @@ class BasicCrawler(Generic[TCrawlingContext]):
         dataset_id: str | None = None,
         dataset_name: str | None = None,
     ) -> None:
-        """Export data from a dataset.
+        """Export data from a `Dataset`.
 
-        This helper method simplifies the process of exporting data from a dataset. It opens the specified
-        dataset and then exports the data based on the provided parameters. If you need to pass options
+        This helper method simplifies the process of exporting data from a `Dataset`. It opens the specified
+        one and then exports the data based on the provided parameters. If you need to pass options
         specific to the output format, use the `export_data_csv` or `export_data_json` method instead.
 
         Args:
             path: The destination path.
-            dataset_id: The ID of the dataset.
-            dataset_name: The name of the dataset.
+            dataset_id: The ID of the `Dataset`.
+            dataset_name: The name of the `Dataset`.
         """
         dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
 
@@ -633,16 +637,16 @@ class BasicCrawler(Generic[TCrawlingContext]):
         dataset_name: str | None = None,
         **kwargs: Unpack[ExportDataCsvKwargs],
     ) -> None:
-        """Export data from a dataset to a CSV file.
+        """Export data from a `Dataset` to a CSV file.
 
-        This helper method simplifies the process of exporting data from a dataset in csv format. It opens the specified
-        dataset and then exports the data based on the provided parameters.
+        This helper method simplifies the process of exporting data from a `Dataset` in csv format. It opens
+        the specified one and then exports the data based on the provided parameters.
 
         Args:
             path: The destination path.
             content_type: The output format.
-            dataset_id: The ID of the dataset.
-            dataset_name: The name of the dataset.
+            dataset_id: The ID of the `Dataset`.
+            dataset_name: The name of the `Dataset`.
             kwargs: Extra configurations for dumping/writing in csv format.
         """
         dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
@@ -658,15 +662,15 @@ class BasicCrawler(Generic[TCrawlingContext]):
         dataset_name: str | None = None,
         **kwargs: Unpack[ExportDataJsonKwargs],
     ) -> None:
-        """Export data from a dataset to a JSON file.
+        """Export data from a `Dataset` to a JSON file.
 
-        This helper method simplifies the process of exporting data from a dataset in json format. It opens the
-        specified dataset and then exports the data based on the provided parameters.
+        This helper method simplifies the process of exporting data from a `Dataset` in json format. It opens the
+        specified one and then exports the data based on the provided parameters.
 
         Args:
             path: The destination path
-            dataset_id: The ID of the dataset.
-            dataset_name: The name of the dataset.
+            dataset_id: The ID of the `Dataset`.
+            dataset_name: The name of the `Dataset`.
             kwargs: Extra configurations for dumping/writing in json format.
         """
         dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
@@ -681,16 +685,16 @@ class BasicCrawler(Generic[TCrawlingContext]):
         dataset_name: str | None = None,
         **kwargs: Unpack[PushDataKwargs],
     ) -> None:
-        """Push data to a dataset.
+        """Push data to a `Dataset`.
 
-        This helper method simplifies the process of pushing data to a dataset. It opens the specified
-        dataset and then pushes the provided data to it.
+        This helper method simplifies the process of pushing data to a `Dataset`. It opens the specified
+        one and then pushes the provided data to it.
 
         Args:
-            data: The data to push to the dataset.
-            dataset_id: The ID of the dataset.
-            dataset_name: The name of the dataset.
-            kwargs: Keyword arguments to be passed to the dataset's `push_data` method.
+            data: The data to push to the `Dataset`.
+            dataset_id: The ID of the `Dataset`.
+            dataset_name: The name of the `Dataset`.
+            kwargs: Keyword arguments to be passed to the `Dataset.push_data()` method.
         """
         dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
         await dataset.push_data(data, **kwargs)
@@ -947,14 +951,15 @@ class BasicCrawler(Generic[TCrawlingContext]):
             self._logger.info('The crawler will finish any remaining ongoing requests and shut down.')
             return True
 
-        request_manager = await self.get_request_manager()
-        is_finished = await request_manager.is_finished()
-
         if self._abort_on_error and self._failed:
             self._failed = False
             return True
 
-        return is_finished
+        if self._keep_alive:
+            return False
+
+        request_manager = await self.get_request_manager()
+        return await request_manager.is_finished()
 
     async def __is_task_ready_function(self) -> bool:
         self._stop_if_max_requests_count_exceeded()
@@ -1004,13 +1009,16 @@ class BasicCrawler(Generic[TCrawlingContext]):
         try:
             request.state = RequestState.REQUEST_HANDLER
 
-            await wait_for(
-                lambda: self.__run_request_handler(context),
-                timeout=self._request_handler_timeout,
-                timeout_message='Request handler timed out after '
-                f'{self._request_handler_timeout.total_seconds()} seconds',
-                logger=self._logger,
-            )
+            try:
+                await wait_for(
+                    lambda: self.__run_request_handler(context),
+                    timeout=self._request_handler_timeout,
+                    timeout_message='Request handler timed out after '
+                    f'{self._request_handler_timeout.total_seconds()} seconds',
+                    logger=self._logger,
+                )
+            except asyncio.TimeoutError as e:
+                raise RequestHandlerError(e, context) from e
 
             await self._commit_request_handler_result(context, result)
 

@@ -43,6 +43,24 @@ class AutoscaledPool:
     any of the tasks, it is propagated and the pool is stopped.
     """
 
+    _AUTOSCALE_INTERVAL = timedelta(seconds=10)
+    """Interval at which the autoscaled pool adjusts the desired concurrency based on the latest system status."""
+
+    _LOGGING_INTERVAL = timedelta(minutes=1)
+    """Interval at which the autoscaled pool logs its current state."""
+
+    _DESIRED_CONCURRENCY_RATIO = 0.9
+    """Minimum ratio of desired concurrency that must be reached before allowing further scale-up."""
+
+    _SCALE_UP_STEP_RATIO = 0.05
+    """Fraction of desired concurrency to add during each scale-up operation."""
+
+    _SCALE_DOWN_STEP_RATIO = 0.05
+    """Fraction of desired concurrency to remove during each scale-down operation."""
+
+    _TASK_TIMEOUT: timedelta | None = None
+    """Timeout within which the `run_task_function` must complete."""
+
     def __init__(
         self,
         *,
@@ -51,17 +69,12 @@ class AutoscaledPool:
         run_task_function: Callable[[], Awaitable],
         is_task_ready_function: Callable[[], Awaitable[bool]],
         is_finished_function: Callable[[], Awaitable[bool]],
-        task_timeout: timedelta | None = None,
-        autoscale_interval: timedelta = timedelta(seconds=10),
-        logging_interval: timedelta = timedelta(minutes=1),
-        desired_concurrency_ratio: float = 0.9,
-        scale_up_step_ratio: float = 0.05,
-        scale_down_step_ratio: float = 0.05,
     ) -> None:
         """A default constructor.
 
         Args:
             system_status: Provides data about system utilization (load).
+            concurrency_settings: Settings of concurrency levels.
             run_task_function: A function that performs an asynchronous resource-intensive task.
             is_task_ready_function: A function that indicates whether `run_task_function` should be called. This
                 function is called every time there is free capacity for a new task and it should indicate whether
@@ -71,44 +84,21 @@ class AutoscaledPool:
                 resolves to `True` then the pool's run finishes. Being called only when there are no tasks being
                 processed means that as long as `is_task_ready_function` keeps resolving to `True`,
                 `is_finished_function` will never be called. To abort a run, use the `abort` method.
-            task_timeout: Timeout in which the `run_task_function` needs to finish.
-            autoscale_interval: Defines how often the pool should attempt to adjust the desired concurrency based on
-                the latest system status. Setting it lower than 1 might have a severe impact on performance. We suggest
-                using a value from 5 to 20.
-            logging_interval: Specifies a period in which the instance logs its state, in seconds.
-            desired_concurrency_ratio: Minimum level of desired concurrency to reach before more scaling up is allowed.
-            scale_up_step_ratio: Defines the fractional amount of desired concurrency to be added with each scaling up.
-            scale_down_step_ratio: Defines the amount of desired concurrency to be subtracted with each scaling down.
-            concurrency_settings: Settings of concurrency levels.
         """
-        self._system_status = system_status
+        concurrency_settings = concurrency_settings or ConcurrencySettings()
 
+        self._system_status = system_status
         self._run_task_function = run_task_function
         self._is_task_ready_function = is_task_ready_function
         self._is_finished_function = is_finished_function
-
-        self._task_timeout = task_timeout
-
-        self._logging_interval = logging_interval
-        self._log_system_status_task = RecurringTask(self._log_system_status, logging_interval)
-
-        self._autoscale_task = RecurringTask(self._autoscale, autoscale_interval)
-
-        if desired_concurrency_ratio < 0 or desired_concurrency_ratio > 1:
-            raise ValueError('desired_concurrency_ratio must be between 0 and 1 (non-inclusive)')
-
-        self._desired_concurrency_ratio = desired_concurrency_ratio
-
-        concurrency_settings = concurrency_settings or ConcurrencySettings()
-
         self._desired_concurrency = concurrency_settings.desired_concurrency
         self._max_concurrency = concurrency_settings.max_concurrency
         self._min_concurrency = concurrency_settings.min_concurrency
-
-        self._scale_up_step_ratio = scale_up_step_ratio
-        self._scale_down_step_ratio = scale_down_step_ratio
-
         self._max_tasks_per_minute = concurrency_settings.max_tasks_per_minute
+
+        self._log_system_status_task = RecurringTask(self._log_system_status, self._LOGGING_INTERVAL)
+        self._autoscale_task = RecurringTask(self._autoscale, self._AUTOSCALE_INTERVAL)
+
         self._is_paused = False
         self._current_run: _AutoscaledPoolRun | None = None
 
@@ -195,7 +185,7 @@ class AutoscaledPool:
         """Inspect system load status and adjust desired concurrency if necessary. Do not call directly."""
         status = self._system_status.get_historical_system_info()
 
-        min_current_concurrency = math.floor(self._desired_concurrency_ratio * self.desired_concurrency)
+        min_current_concurrency = math.floor(self._DESIRED_CONCURRENCY_RATIO * self.desired_concurrency)
         should_scale_up = (
             status.is_system_idle
             and self._desired_concurrency < self._max_concurrency
@@ -205,10 +195,10 @@ class AutoscaledPool:
         should_scale_down = not status.is_system_idle and self._desired_concurrency > self._min_concurrency
 
         if should_scale_up:
-            step = math.ceil(self._scale_up_step_ratio * self._desired_concurrency)
+            step = math.ceil(self._SCALE_UP_STEP_RATIO * self._desired_concurrency)
             self._desired_concurrency = min(self._max_concurrency, self._desired_concurrency + step)
         elif should_scale_down:
-            step = math.ceil(self._scale_down_step_ratio * self._desired_concurrency)
+            step = math.ceil(self._SCALE_DOWN_STEP_RATIO * self._desired_concurrency)
             self._desired_concurrency = max(self._min_concurrency, self._desired_concurrency - step)
 
     def _log_system_status(self) -> None:
@@ -286,10 +276,10 @@ class AutoscaledPool:
         try:
             await asyncio.wait_for(
                 self._run_task_function(),
-                timeout=self._task_timeout.total_seconds() if self._task_timeout is not None else None,
+                timeout=self._TASK_TIMEOUT.total_seconds() if self._TASK_TIMEOUT is not None else None,
             )
         except asyncio.TimeoutError:
-            timeout_str = self._task_timeout.total_seconds() if self._task_timeout is not None else '*not set*'
+            timeout_str = self._TASK_TIMEOUT.total_seconds() if self._TASK_TIMEOUT is not None else '*not set*'
             logger.warning(f'Task timed out after {timeout_str} seconds')
         finally:
             logger.debug('Worker task finished')

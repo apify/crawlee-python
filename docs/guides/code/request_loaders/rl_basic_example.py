@@ -8,7 +8,11 @@ async def main() -> None:
     # Leave name empty to use the default request list.
     request_list = RequestList(
         name='my-request-list',
-        requests=['https://apify.com/', 'https://crawlee.dev/', 'https://crawlee.dev/python/'],
+        requests=[
+            'https://apify.com/',
+            'https://crawlee.dev/',
+            'https://crawlee.dev/python/',
+        ],
     )
 
     # Fetch and process requests from the queue.

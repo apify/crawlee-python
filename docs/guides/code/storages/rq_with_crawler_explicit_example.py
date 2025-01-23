@@ -13,7 +13,7 @@ async def main() -> None:
     await request_queue.add_requests_batched(['https://apify.com/', 'https://crawlee.dev/'])
 
     # Create a new crawler (it can be any subclass of BasicCrawler) and pass the request
-    # list as request provider to it. It will be managed by the crawler.
+    # list as request manager to it. It will be managed by the crawler.
     crawler = HttpCrawler(request_manager=request_queue)
 
     # Define the default request handler, which will be called for every request.

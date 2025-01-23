@@ -5,9 +5,12 @@ from crawlee.crawlers import HttpCrawler, HttpCrawlingContext
 
 
 async def main() -> None:
+    # Set the purge_on_start field to False to avoid purging the storage on start.
     # highlight-next-line
-    config = Configuration(purge_on_start=False)
-    crawler = HttpCrawler(configuration=config)
+    configuration = Configuration(purge_on_start=False)
+
+    # Pass the configuration to the crawler.
+    crawler = HttpCrawler(configuration=configuration)
 
     @crawler.router.default_handler
     async def request_handler(context: HttpCrawlingContext) -> None:

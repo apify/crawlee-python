@@ -7,31 +7,22 @@ import ApiLink from '@site/src/components/ApiLink';
 import CodeBlock from '@theme/CodeBlock';
 
 import FinalCodeExample from '!!raw-loader!./code/07_final_code.py';
+import FirstCodeExample from '!!raw-loader!./code/07_first_code.py';
 
 A data extraction job would not be complete without saving the data for later use and processing. You've come to the final and most difficult part of this tutorial so make sure to pay attention very carefully!
 
 ## Save data to the dataset
 
-Crawlee provides a <ApiLink to="class/Dataset">`Dataset`</ApiLink> class, which acts as an abstraction over tabular storage, making it useful for storing scraping results. First, add the following import to the top of your file:
+Crawlee provides a <ApiLink to="class/Dataset">`Dataset`</ApiLink> class, which acts as an abstraction over tabular storage, making it useful for storing scraping results. To get started:
 
-```python
-from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
-from crawlee.storages.dataset import Dataset
+- Add the necessary imports: Include the <ApiLink to="class/Dataset">`Dataset`</ApiLink> and any required crawler classes at the top of your file.
+- Create a Dataset instance: Use the asynchronous <ApiLink to="class/Dataset#open">`Dataset.open`</ApiLink> constructor to initialize the dataset instance within your crawler's setup.
 
-# ...
-```
+Here's an example:
 
-Next, under the section where you create an instance of your crawler, create an instance of the dataset using the asynchronous constructor  <ApiLink to="class/Dataset#open">`Dataset.open`</ApiLink>:
-
-```python
-# ...
-
-async def main() -> None:
-    crawler = PlaywrightCrawler()
-    dataset = await Dataset.open()
-
-    # ...
-```
+<CodeBlock className="language-python">
+    {FirstCodeExample}
+</CodeBlock>
 
 Finally, instead of logging the extracted data to stdout, we can export them to the dataset:
 
