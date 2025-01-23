@@ -199,8 +199,8 @@ async def test_adaptive_crawling(
     assert static_hook_count == test_input.expected_static_count
 
 
-async def test_adaptive_crawling_parcel(test_urls: list[str]) -> None:
-    """Top level test for parcel. Only one argument combination. (The rest of code is tested with bs variant.)"""
+async def test_adaptive_crawling_parsel(test_urls: list[str]) -> None:
+    """Top level test for parsel. Only one argument combination. (The rest of code is tested with bs variant.)"""
     predictor = _SimpleRenderingTypePredictor(
         rendering_types=cycle(['static', 'client only']), detection_probability_recommendation=cycle([0])
     )

@@ -61,8 +61,11 @@ TStaticParseResult = TypeVar('TStaticParseResult')
 TStaticCrawlingContext = TypeVar('TStaticCrawlingContext', bound=ParsedHttpCrawlingContext)
 
 
-class _NoActiveStatistics(Statistics):
-    """Statistics compliant object that is not supposed to do anything when active. To be used in sub crawlers."""
+class _NonPersistentStatistics(Statistics):
+    """Statistics compliant object that is not supposed to do anything when entering/exiting context.
+
+    To be used in sub crawlers.
+    """
 
     def __init__(self) -> None:
         super().__init__(state_model=StatisticsState)
@@ -148,12 +151,12 @@ class AdaptivePlaywrightCrawler(
 
         static_crawler = static_crawler_class(
             parser=static_parser,
-            statistics=_NoActiveStatistics(),
+            statistics=_NonPersistentStatistics(),
             **static_crawler_specific_kwargs,
             **basic_crawler_kwargs_for_static_crawler,
         )
         playwright_crawler = PlaywrightCrawler(
-            statistics=_NoActiveStatistics(),
+            statistics=_NonPersistentStatistics(),
             **playwright_crawler_specific_kwargs,
             **basic_crawler_kwargs_for_pw_crawler,
         )
@@ -162,7 +165,7 @@ class AdaptivePlaywrightCrawler(
 
         async def adaptive_pre_navigation_hook(context: BasicCrawlingContext) -> None:
             for hook in self._pre_navigation_hooks:
-                await hook(AdaptivePlaywrightPreNavCrawlingContext.from_pre_navigation_contexts(context))
+                await hook(AdaptivePlaywrightPreNavCrawlingContext.from_pre_navigation_context(context))
 
         playwright_crawler.pre_navigation_hook(adaptive_pre_navigation_hook)
         static_crawler.pre_navigation_hook(adaptive_pre_navigation_hook)

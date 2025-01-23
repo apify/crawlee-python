@@ -115,7 +115,7 @@ class AdaptivePlaywrightPreNavCrawlingContext(BasicCrawlingContext):
         raise AdaptiveContextError('Page is not crawled with PlaywrightCrawler.')
 
     @classmethod
-    def from_pre_navigation_contexts(cls, context: BasicCrawlingContext) -> Self:
+    def from_pre_navigation_context(cls, context: BasicCrawlingContext) -> Self:
         """Convenience constructor that creates new context from existing pre navigation contexts."""
         context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
         context_kwargs['_page'] = context_kwargs.pop('page', None)

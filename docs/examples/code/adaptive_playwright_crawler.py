@@ -15,24 +15,21 @@ async def main() -> None:
         max_requests_per_crawl=5, playwright_crawler_specific_kwargs={'headless': False}
     )
 
+    @crawler.router.handler(label='label')
+    async def request_handler_for_label(context: AdaptivePlaywrightCrawlingContext) -> None:
+        # Do some processing using `page`
+        some_locator = context.page.locator('div').first
+        await some_locator.wait_for()
+        # Do stuff with locator...
+        context.log.info(f'Playwright processing of: {context.request.url} ...')
+
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
-        # Code that will be executed in both crawl types
         context.log.info(f'User handler processing: {context.request.url} ...')
+        # Do some processing using `parsed_content`
+        context.log.info(context.parsed_content.title)
 
-        try:
-            some_locator = context.page.locator('div').first
-            # Code that will be executed only in Playwright crawl.
-            # Trying to access `context.page` in static crawl will throw `AdaptiveContextError`.
-
-            await some_locator.wait_for()
-            # Do stuff with locator...
-            context.log.info(f'Playwright processing of: {context.request.url} ...')
-        except AdaptiveContextError:
-            # Code that will be executed in only in static crawl
-            context.log.info(f'Static processing of: {context.request.url} ...')
-
-        # FInd more links and enqueue them.
+        # Find more links and enqueue them.
         await context.enqueue_links()
         await context.push_data({'Top crawler Url': context.request.url})
 
