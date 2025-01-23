@@ -25,10 +25,23 @@ class RenderingTypePrediction:
 
 class RenderingTypePredictor(ABC):
     @abstractmethod
-    def predict(self, request: Request) -> RenderingTypePrediction: ...
+    def predict(self, request: Request) -> RenderingTypePrediction:
+        """Get `RenderingTypePrediction` based on the input request.
+
+        Args:
+            request: `Request` instance for which the prediction is made.
+        """
+        ...
 
     @abstractmethod
-    def store_result(self, request: Request, crawl_type: RenderingType) -> None: ...
+    def store_result(self, request: Request, rendering_type: RenderingType) -> None:
+        """Store prediction results and retrain the model.
+
+        Args:
+            request: Used request.
+            rendering_type: Known suitable RenderingType.
+        """
+        ...
 
 
 class LogisticalRegressionPredictor(RenderingTypePredictor):
@@ -49,13 +62,17 @@ class LogisticalRegressionPredictor(RenderingTypePredictor):
 
         # Used to increase detection probability recommendation for initial recommendations of each label.
         # Reaches 1 (no additional increase) after n samples of specific label is already present in
-        # _rendering_type_detection_results.
+        # `self._rendering_type_detection_results`.
         n = 3
-        self._detection_ratio_start_up_coefficients: dict[str, float] = defaultdict(lambda: n + 2)
+        self._labels_coefficients: dict[str, float] = defaultdict(lambda: n + 2)
 
     @override
     def predict(self, request: Request) -> RenderingTypePrediction:
-        """Get `RenderingTypePrediction` based on the input request."""
+        """Get `RenderingTypePrediction` based on the input request.
+
+        Args:
+            request: `Request` instance for which the prediction is made.
+        """
         similarity_threshold = 0.1  #  Prediction probability difference threshold to consider prediction unreliable.
         label = request.label or ''
 
@@ -71,7 +88,7 @@ class LogisticalRegressionPredictor(RenderingTypePredictor):
             else:
                 detection_probability_recommendation = self._detection_ratio
                 # Increase recommendation for uncommon labels.
-                detection_probability_recommendation *= self._detection_ratio_start_up_coefficients[label]
+                detection_probability_recommendation *= self._labels_coefficients[label]
 
             return RenderingTypePrediction(
                 rendering_type=('client only', 'static')[int(prediction)],
@@ -82,11 +99,16 @@ class LogisticalRegressionPredictor(RenderingTypePredictor):
 
     @override
     def store_result(self, request: Request, rendering_type: RenderingType) -> None:
-        """Store prediction results and retrain the model."""
+        """Store prediction results and retrain the model.
+
+        Args:
+            request: Used `Request` instance.
+            rendering_type: Known suitable `RenderingType` for the used `Request` instance.
+        """
         label = request.label or ''
         self._rendering_type_detection_results[rendering_type][label].append(get_url_components(request.url))
-        if self._detection_ratio_start_up_coefficients[label] > 1:
-            self._detection_ratio_start_up_coefficients[label] -= 1
+        if self._labels_coefficients[label] > 1:
+            self._labels_coefficients[label] -= 1
         self._retrain()
 
     def _retrain(self) -> None:
@@ -141,7 +163,7 @@ def calculate_url_similarity(url_1: UrlComponents, url_2: UrlComponents) -> floa
     if url_1 == url_2:
         return 1
 
-    # Each additional path component from longer path is replaced by empty string in the shorter path.
+    # Each additional path component from longer path is compared to empty string.
     return mean(
         1 if jaro_winkler_metric(path_1, path_2) > similarity_cutoff else 0
         for path_1, path_2 in zip_longest(url_1[1:], url_2[1:], fillvalue='')

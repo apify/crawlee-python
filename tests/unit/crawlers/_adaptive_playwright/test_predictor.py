@@ -96,8 +96,8 @@ def test_unreliable_prediction() -> None:
         Request.from_url(url='http://www.aaa.com/some/otherstuff', label=learnt_label), rendering_type='client only'
     )
 
-    # Predict for new label. Predictor have not enough information to give any good guess and should make it
-    # clear in by setting detection_probability_recommendation=1
+    # Predict for new label. Predictor does not have enough information to give any reliable guess and should make it
+    # clear by setting detection_probability_recommendation=1
     assert (
         predictor.predict(
             Request.from_url(url='http://www.unknown.com', label='new label')
