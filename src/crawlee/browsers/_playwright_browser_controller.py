@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
     from playwright.async_api import Browser
 
-    from crawlee.fingerprint_suite._fingerprint_generator import AbstractFingerprintGenerator
+    from crawlee.fingerprint_suite._fingerprint_generator import FingerprintGenerator
     from crawlee.proxy_configuration import ProxyInfo
 
 from logging import getLogger
@@ -44,7 +44,7 @@ class PlaywrightBrowserController(BaseBrowserController):
         *,
         max_open_pages_per_browser: int = 20,
         header_generator: HeaderGenerator | None = _DEFAULT_HEADER_GENERATOR,
-        fingerprint_generator: AbstractFingerprintGenerator | None = None,
+        fingerprint_generator: FingerprintGenerator | None = None,
     ) -> None:
         """A default constructor.
 
@@ -54,7 +54,7 @@ class PlaywrightBrowserController(BaseBrowserController):
             header_generator: An optional `HeaderGenerator` instance used to generate and manage HTTP headers for
                 requests made by the browser. By default, a predefined header generator is used. Set to `None` to
                 disable automatic header modifications.
-            fingerprint_generator: An optional instance of implementation of `AbstractFingerprintGenerator` that is used
+            fingerprint_generator: An optional instance of implementation of `FingerprintGenerator` that is used
                 to generate browser fingerprints together with consistent headers.
         """
         if fingerprint_generator and header_generator is not self._DEFAULT_HEADER_GENERATOR:

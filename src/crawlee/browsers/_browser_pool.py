@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from types import TracebackType
 
     from crawlee.browsers._base_browser_plugin import BaseBrowserPlugin
-    from crawlee.fingerprint_suite._fingerprint_generator import AbstractFingerprintGenerator
+    from crawlee.fingerprint_suite._fingerprint_generator import FingerprintGenerator
     from crawlee.proxy_configuration import ProxyInfo
 
 logger = getLogger(__name__)
@@ -104,7 +104,7 @@ class BrowserPool:
         browser_launch_options: Mapping[str, Any] | None = None,
         browser_new_context_options: Mapping[str, Any] | None = None,
         headless: bool | None = None,
-        fingerprint_generator: AbstractFingerprintGenerator | None = None,
+        fingerprint_generator: FingerprintGenerator | None = None,
         **kwargs: Any,
     ) -> BrowserPool:
         """Create a new instance with a single `PlaywrightBrowserPlugin` configured with the provided options.
@@ -118,7 +118,7 @@ class BrowserPool:
                 are provided directly to Playwright's `browser.new_context` method. For more details, refer to the
                 Playwright documentation: https://playwright.dev/python/docs/api/class-browser#browser-new-context.
             headless: Whether to run the browser in headless mode.
-            fingerprint_generator: An optional instance of implementation of `AbstractFingerprintGenerator` that is used
+            fingerprint_generator: An optional instance of implementation of `FingerprintGenerator` that is used
                 to generate browser fingerprints together with consistent headers.
             kwargs: Additional arguments for default constructor.
         """

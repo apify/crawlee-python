@@ -1,24 +1,19 @@
-import pytest
-
 from crawlee.fingerprint_suite import (
-    AbstractFingerprintGenerator,
     DefaultFingerprintGenerator,
     HeaderGeneratorOptions,
     ScreenOptions,
 )
 
 
-@pytest.mark.parametrize('FingerprintGenerator', [pytest.param(DefaultFingerprintGenerator, id='browserforge')])
-def test_fingerprint_generator_has_default(FingerprintGenerator: type[AbstractFingerprintGenerator]) -> None:  # noqa:N803  # Test is more readable if argument(class) is PascalCase
+def test_fingerprint_generator_has_default() -> None:  # Test is more readable if argument(class) is PascalCase
     """Test that header generator can work without any options."""
-    assert FingerprintGenerator().generate()
+    assert DefaultFingerprintGenerator().generate()
 
 
-@pytest.mark.parametrize('FingerprintGenerator', [pytest.param(DefaultFingerprintGenerator, id='browserforge')])
-def test_fingerprint_generator_some_options(FingerprintGenerator: type[AbstractFingerprintGenerator]) -> None:  # noqa:N803  # Test is more readable if argument(class) is PascalCase
+def test_fingerprint_generator_some_options() -> None:  # Test is more readable if argument(class) is PascalCase
     """Test that header generator can work with only some options."""
 
-    fingerprint = FingerprintGenerator(
+    fingerprint = DefaultFingerprintGenerator(
         mock_web_rtc=True,
         screen_options=ScreenOptions(min_width=500),
         header_options=HeaderGeneratorOptions(strict=True),
@@ -28,8 +23,7 @@ def test_fingerprint_generator_some_options(FingerprintGenerator: type[AbstractF
     assert fingerprint.screen.availWidth >= 500
 
 
-@pytest.mark.parametrize('FingerprintGenerator', [pytest.param(DefaultFingerprintGenerator, id='browserforge')])
-def test_fingerprint_generator_all_options(FingerprintGenerator: type[AbstractFingerprintGenerator]) -> None:  # noqa:N803  # Test is more readable if argument(class) is PascalCase
+def test_fingerprint_generator_all_options() -> None:  # Test is more readable if argument(class) is PascalCase
     """Test that header generator can work with all the options. Some most basic checks of fingerprint.
 
     Fingerprint generation option might have no effect if there is no fingerprint sample present in collected data.
@@ -39,7 +33,7 @@ def test_fingerprint_generator_all_options(FingerprintGenerator: type[AbstractFi
     min_height = 400
     max_height = 1200
 
-    fingerprint = FingerprintGenerator(
+    fingerprint = DefaultFingerprintGenerator(
         mock_web_rtc=True,
         slim=True,
         screen_options=ScreenOptions(

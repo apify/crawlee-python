@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
     from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs
     from crawlee.browsers._types import BrowserType
-    from crawlee.fingerprint_suite import AbstractFingerprintGenerator
+    from crawlee.fingerprint_suite import FingerprintGenerator
 
 
 @docs_group('Classes')
@@ -76,7 +76,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
         browser_type: BrowserType | None = None,
         browser_launch_options: Mapping[str, Any] | None = None,
         browser_new_context_options: Mapping[str, Any] | None = None,
-        fingerprint_generator: AbstractFingerprintGenerator | None = None,
+        fingerprint_generator: FingerprintGenerator | None = None,
         headless: bool | None = None,
         **kwargs: Unpack[BasicCrawlerOptions[PlaywrightCrawlingContext]],
     ) -> None:
@@ -94,7 +94,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 are provided directly to Playwright's `browser.new_context` method. For more details, refer to the
                 [Playwright documentation](https://playwright.dev/python/docs/api/class-browser#browser-new-context).
                 This option should not be used if `browser_pool` is provided.
-            fingerprint_generator: An optional instance of implementation of `AbstractFingerprintGenerator` that is used
+            fingerprint_generator: An optional instance of implementation of `FingerprintGenerator` that is used
                 to generate browser fingerprints together with consistent headers.
             headless: Whether to run the browser in headless mode.
                 This option should not be used if `browser_pool` is provided.
