@@ -355,10 +355,10 @@ class EnqueueLinksFunction(Protocol):
                 - `BeautifulSoupCrawler` supports CSS selectors.
             label: Label for the newly created `Request` objects, used for request routing.
             user_data: User data to be provided to the newly created `Request` objects.
-            transform_request_function: A function that takes RequestOptions and returns either:
-                - Modified RequestOptions to update the request configuration
-                - 'skip' to exclude the request from being enqueued
-                - 'unchanged' to use the original request options without modification
+            transform_request_function: A function that takes `RequestOptions` and returns either:
+                - Modified `RequestOptions` to update the request configuration,
+                - `'skip'` to exclude the request from being enqueued,
+                - `'unchanged'` to use the original request options without modification.
             **kwargs: Additional keyword arguments.
         """
 
