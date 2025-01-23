@@ -15,7 +15,7 @@ async def test_periodic_logging(caplog: pytest.LogCaptureFixture) -> None:
     caplog.set_level(logging.INFO)
 
     log_message = 'Periodic statistics XYZ'
-    statistics = Statistics(log_interval=timedelta(milliseconds=50), log_message=log_message)
+    statistics = Statistics.with_default_state(log_interval=timedelta(milliseconds=50), log_message=log_message)
 
     async with statistics:
         await asyncio.sleep(0.1)
