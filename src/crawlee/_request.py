@@ -111,7 +111,7 @@ user_data_adapter = TypeAdapter(UserData)
 class RequestOptions(TypedDict):
     """Options that can be used to customize request creation.
 
-    This type exactly matches the parameters of Request.from_url() method.
+    This type exactly matches the parameters of `Request.from_url` method.
     """
 
     url: Required[str]
