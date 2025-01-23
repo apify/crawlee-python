@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 from unittest import mock
 
 import pytest
 import respx
 from httpx import Response
 
-from crawlee import ConcurrencySettings, HttpHeaders
+from crawlee import ConcurrencySettings, HttpHeaders, RequestTransformAction
 from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 
 if TYPE_CHECKING:
@@ -168,7 +168,7 @@ async def test_enqueue_links_with_transform_request_function(server: respx.MockR
 
     def test_transform_request_function(
         request_options: RequestOptions,
-    ) -> RequestOptions | Literal['skip', 'unchanged']:
+    ) -> RequestOptions | RequestTransformAction:
         if 'uiop' in request_options['url']:
             return 'skip'
 

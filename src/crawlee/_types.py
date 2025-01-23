@@ -44,6 +44,8 @@ HttpMethod: TypeAlias = Literal['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT
 
 HttpPayload: TypeAlias = bytes
 
+RequestTransformAction: TypeAlias = Literal['skip', 'unchanged']
+
 
 def _normalize_headers(headers: Mapping[str, str]) -> dict[str, str]:
     """Converts all header keys to lowercase, strips whitespace, and returns them sorted by key."""
@@ -341,8 +343,7 @@ class EnqueueLinksFunction(Protocol):
         selector: str = 'a',
         label: str | None = None,
         user_data: dict[str, Any] | None = None,
-        transform_request_function: Callable[[RequestOptions], RequestOptions | Literal['skip', 'unchanged']]
-        | None = None,
+        transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> Coroutine[None, None, None]:
         """A call dunder method.

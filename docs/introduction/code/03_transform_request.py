@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from typing import Literal
-
-from crawlee import HttpHeaders, RequestOptions
+from crawlee import HttpHeaders, RequestOptions, RequestTransformAction
 from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 
 
-def transform_request(request_options: RequestOptions) -> RequestOptions | Literal['skip', 'unchanged']:
+def transform_request(request_options: RequestOptions) -> RequestOptions | RequestTransformAction:
     # Skip requests to PDF files
     if request_options['url'].endswith('.pdf'):
         return 'skip'

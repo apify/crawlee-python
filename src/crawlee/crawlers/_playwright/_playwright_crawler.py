@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import logging
 from functools import partial
-from typing import TYPE_CHECKING, Any, Callable, Literal
+from typing import TYPE_CHECKING, Any, Callable
 
 from pydantic import ValidationError
 
-from crawlee import EnqueueStrategy
+from crawlee import EnqueueStrategy, RequestTransformAction
 from crawlee._request import Request, RequestOptions
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.docs import docs_group
@@ -191,7 +191,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 selector: str = 'a',
                 label: str | None = None,
                 user_data: dict | None = None,
-                transform_request_function: Callable[[RequestOptions], RequestOptions | Literal['skip', 'unchanged']]
+                transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
                 | None = None,
                 **kwargs: Unpack[EnqueueLinksKwargs],
             ) -> None:

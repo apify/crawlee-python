@@ -5,10 +5,10 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 from unittest import mock
 
-from crawlee import Glob, HttpHeaders, Request
+from crawlee import Glob, HttpHeaders, Request, RequestTransformAction
 from crawlee._types import EnqueueStrategy
 from crawlee.crawlers import PlaywrightCrawler
 from crawlee.fingerprint_suite._consts import (
@@ -70,7 +70,7 @@ async def test_enqueue_links_with_transform_request_function() -> None:
     visit = mock.Mock()
     headers = []
 
-    def test_transform_request_function(request: RequestOptions) -> RequestOptions | Literal['skip', 'unchanged']:
+    def test_transform_request_function(request: RequestOptions) -> RequestOptions | RequestTransformAction:
         if request['url'] == 'https://crawlee.dev/python/docs/introduction':
             request['headers'] = HttpHeaders({'transform-header': 'my-header'})
             return request

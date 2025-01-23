@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import logging
 from abc import ABC
-from typing import TYPE_CHECKING, Any, Callable, Generic, Literal
+from typing import TYPE_CHECKING, Any, Callable, Generic
 
 from pydantic import ValidationError
 from typing_extensions import NotRequired, TypeVar
 
-from crawlee import EnqueueStrategy
+from crawlee import EnqueueStrategy, RequestTransformAction
 from crawlee._request import Request, RequestOptions
 from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
@@ -140,7 +140,7 @@ class AbstractHttpCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler[
             selector: str = 'a',
             label: str | None = None,
             user_data: dict[str, Any] | None = None,
-            transform_request_function: Callable[[RequestOptions], RequestOptions | Literal['skip', 'unchanged']]
+            transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
             | None = None,
             **kwargs: Unpack[EnqueueLinksKwargs],
         ) -> None:
