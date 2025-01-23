@@ -96,7 +96,7 @@ types-python-dateutil = "~2.9.0.20240316"
 [tool.poetry.extras]
 # Support for re-using groups in other groups https://peps.python.org/pep-0735/ in poetry:
 # https://github.com/python-poetry/poetry/issues/9751
-adaptive_playwright = ["jaro-winkler", "playwright", "scikit-learn"]
+adaptive-playwright = ["jaro-winkler", "playwright", "scikit-learn"]
 all = ["beautifulsoup4","curl-cffi", "html5lib", "jaro-winkler", "lxml","parsel", "playwright","scikit-learn"]
 beautifulsoup = ["beautifulsoup4", "lxml", "html5lib"]
 curl-impersonate = ["curl-cffi"]
