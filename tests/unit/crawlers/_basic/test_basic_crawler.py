@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, call
 
 import httpx
 import pytest
@@ -1124,3 +1124,48 @@ async def test_timeout_in_handler(sleep_type: str) -> None:
     assert crawler.statistics.state.requests_finished == 1
     assert mocked_handler_before_sleep.call_count == max_request_retries
     assert mocked_handler_after_sleep.call_count == 1
+
+
+@pytest.mark.parametrize(
+    ('keep_alive', 'max_requests_per_crawl', 'expected_handled_requests_count'),
+    [
+        pytest.param(True, 2, 2, id='keep_alive, 2 requests'),
+        pytest.param(True, 1, 1, id='keep_alive, but max_requests_per_crawl achieved after 1 request'),
+        pytest.param(False, 2, 0, id='Crawler without keep_alive (default), crawler finished before adding requests'),
+    ],
+)
+async def test_keep_alive(
+    *, keep_alive: bool, max_requests_per_crawl: int, expected_handled_requests_count: int
+) -> None:
+    """Test that crawler can be kept alive without any requests and stopped with `crawler.stop()`.
+
+    Crawler should stop if `max_requests_per_crawl` is reached regardless of the `keep_alive` flag."""
+    additional_urls = ['http://a.com/', 'http://b.com/']
+    expected_handler_calls = [call(url) for url in additional_urls[:expected_handled_requests_count]]
+
+    crawler = BasicCrawler(
+        keep_alive=keep_alive,
+        max_requests_per_crawl=max_requests_per_crawl,
+        # If more request can run in parallel, then max_requests_per_crawl is not deterministic.
+        concurrency_settings=ConcurrencySettings(max_concurrency=1),
+    )
+    mocked_handler = Mock()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        mocked_handler(context.request.url)
+        if context.request == additional_urls[-1]:
+            crawler.stop()
+
+    crawler_run_task = asyncio.create_task(crawler.run())
+
+    # Give some time to crawler to finish(or be in keep_alive state) and add new request.
+    # TODO: Replace sleep time by waiting for specific crawler state.
+    # https://github.com/apify/crawlee-python/issues/925
+    await asyncio.sleep(1)
+    assert crawler_run_task.done() != keep_alive
+    add_request_task = asyncio.create_task(crawler.add_requests(additional_urls))
+
+    await asyncio.gather(crawler_run_task, add_request_task)
+
+    mocked_handler.assert_has_calls(expected_handler_calls)

@@ -125,9 +125,21 @@ class HttpxHttpClient(BaseHttpClient):
         )
         self._http1 = http1
         self._http2 = http2
-        self._verify = verify
+
         self._async_client_kwargs = async_client_kwargs
         self._header_generator = header_generator
+
+        self._ssl_context = httpx.create_ssl_context(verify=verify)
+
+        # Configure connection pool limits and keep-alive connections for transport
+        limits = async_client_kwargs.get('limits', httpx.Limits(max_connections=1000, max_keepalive_connections=200))
+
+        self._transport = _HttpxTransport(
+            http1=http1,
+            http2=http2,
+            verify=self._ssl_context,
+            limits=limits,
+        )
 
         self._client_by_proxy_url = dict[Optional[str], httpx.AsyncClient]()
 
@@ -222,17 +234,20 @@ class HttpxHttpClient(BaseHttpClient):
         if proxy_url not in self._client_by_proxy_url:
             # Prepare a default kwargs for the new client.
             kwargs: dict[str, Any] = {
-                'transport': _HttpxTransport(
-                    proxy=proxy_url, http1=self._http1, http2=self._http2, verify=self._verify
-                ),
                 'proxy': proxy_url,
                 'http1': self._http1,
                 'http2': self._http2,
-                'verify': self._verify,
             }
 
             # Update the default kwargs with any additional user-provided kwargs.
             kwargs.update(self._async_client_kwargs)
+
+            kwargs.update(
+                {
+                    'transport': self._transport,
+                    'verify': self._ssl_context,
+                }
+            )
 
             client = httpx.AsyncClient(**kwargs)
             self._client_by_proxy_url[proxy_url] = client

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, Literal
 
 from pydantic import ValidationError
@@ -16,7 +17,7 @@ from crawlee.errors import SessionError
 
 from ._playwright_crawling_context import PlaywrightCrawlingContext
 from ._playwright_pre_nav_crawling_context import PlaywrightPreNavCrawlingContext
-from ._utils import infinite_scroll
+from ._utils import block_requests, infinite_scroll
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable, Mapping
@@ -148,6 +149,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
             get_key_value_store=context.get_key_value_store,
             log=context.log,
             page=crawlee_page.page,
+            block_requests=partial(block_requests, page=crawlee_page.page),
         )
 
         for hook in self._pre_navigation_hooks:
@@ -169,8 +171,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
             SessionError: If the URL cannot be loaded by the browser.
 
         Yields:
-            The enhanced crawling context with the Playwright-specific features (page, response, enqueue_links, and
-                infinite_scroll).
+            The enhanced crawling context with the Playwright-specific features (page, response, enqueue_links,
+                infinite_scroll and block_requests).
         """
         async with context.page:
             if context.request.headers:
@@ -247,6 +249,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 infinite_scroll=lambda: infinite_scroll(context.page),
                 response=response,
                 enqueue_links=enqueue_links,
+                block_requests=partial(block_requests, page=context.page),
             )
 
     async def _handle_blocked_request(

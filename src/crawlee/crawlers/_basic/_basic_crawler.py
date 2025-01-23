@@ -134,6 +134,9 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     configure_logging: NotRequired[bool]
     """If True, the crawler will set up logging infrastructure automatically."""
 
+    keep_alive: NotRequired[bool]
+    """Flag that can keep crawler running even when there are no requests in queue."""
+
     _context_pipeline: NotRequired[ContextPipeline[TCrawlingContext]]
     """Enables extending the request lifecycle and modifying the crawling context. Intended for use by
     subclasses rather than direct instantiation of `BasicCrawler`."""
@@ -195,6 +198,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         request_handler_timeout: timedelta = timedelta(minutes=1),
         statistics: Statistics | None = None,
         abort_on_error: bool = False,
+        keep_alive: bool = False,
         configure_logging: bool = True,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         _additional_context_managers: Sequence[AbstractAsyncContextManager] | None = None,
@@ -215,7 +219,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
             max_requests_per_crawl: Maximum number of pages to open during a crawl. The crawl stops upon reaching
                 this limit. Setting this value can help avoid infinite loops in misconfigured crawlers. `None` means
                 no limit. Due to concurrency settings, the actual number of pages visited may slightly exceed
-                this value.
+                this value. If used together with `keep_alive`, then the crawler will be kept alive only until
+                `max_requests_per_crawl` is achieved.
             max_session_rotations: Maximum number of session rotations per request. The crawler rotates the session
                 if a proxy error occurs or if the website blocks the request.
             max_crawl_depth: Specifies the maximum crawl depth. If set, the crawler will stop processing links beyond
@@ -228,6 +233,8 @@ class BasicCrawler(Generic[TCrawlingContext]):
             request_handler_timeout: Maximum duration allowed for a single request handler to run.
             statistics: A custom `Statistics` instance, allowing the use of non-default configuration.
             abort_on_error: If True, the crawler stops immediately when any request handler error occurs.
+            keep_alive: If True, it will keep crawler alive even if there are no requests in queue.
+                Use `crawler.stop()` to exit the crawler.
             configure_logging: If True, the crawler will set up logging infrastructure automatically.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
@@ -314,6 +321,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         )
 
         # State flags
+        self._keep_alive = keep_alive
         self._running = False
         self._has_finished_before = False
 
@@ -939,14 +947,15 @@ class BasicCrawler(Generic[TCrawlingContext]):
             self._logger.info('The crawler will finish any remaining ongoing requests and shut down.')
             return True
 
-        request_manager = await self.get_request_manager()
-        is_finished = await request_manager.is_finished()
-
         if self._abort_on_error and self._failed:
             self._failed = False
             return True
 
-        return is_finished
+        if self._keep_alive:
+            return False
+
+        request_manager = await self.get_request_manager()
+        return await request_manager.is_finished()
 
     async def __is_task_ready_function(self) -> bool:
         self._stop_if_max_requests_count_exceeded()
