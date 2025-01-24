@@ -91,6 +91,17 @@ async def test_router_specific_handler_invoked() -> None:
     mock_handler_b.assert_called()
 
 
+async def test_router_handler_not_nullified() -> None:
+    router = Router[MockContext]()
+    mock_handler = Mock()
+
+    @router.handler('A')
+    async def handler_a(_context: MockContext) -> None:
+        mock_handler()
+
+    assert handler_a is not None
+
+
 async def test_router_multi_labelled_handler() -> None:
     router = Router[MockContext]()
     mock_handler = Mock()
@@ -100,11 +111,8 @@ async def test_router_multi_labelled_handler() -> None:
     async def handler(_context: MockContext) -> None:
         mock_handler(_context.request.label)
 
-    # The handler should be invoked for both labels
     await router(MockContext(label='A'))
     mock_handler.assert_called_with('A')
     await router(MockContext(label='B'))
     mock_handler.assert_called_with('B')
     assert mock_handler.call_count == 2
-
-    assert handler is not None, 'Handler should be defined still.'
