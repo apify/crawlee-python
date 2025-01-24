@@ -89,3 +89,29 @@ async def test_router_specific_handler_invoked() -> None:
     mock_default_handler.assert_not_called()
     mock_handler_a.assert_not_called()
     mock_handler_b.assert_called()
+
+
+async def test_router_handler_not_nullified() -> None:
+    router = Router[MockContext]()
+
+    @router.handler('A')
+    async def handler_a(_context: MockContext) -> None:
+        pass
+
+    assert handler_a is not None
+
+
+async def test_router_multi_labelled_handler() -> None:
+    router = Router[MockContext]()
+    mock_handler = Mock()
+
+    @router.handler('A')
+    @router.handler('B')
+    async def handler(_context: MockContext) -> None:
+        mock_handler(_context.request.label)
+
+    await router(MockContext(label='A'))
+    mock_handler.assert_called_with('A')
+    await router(MockContext(label='B'))
+    mock_handler.assert_called_with('B')
+    assert mock_handler.call_count == 2
