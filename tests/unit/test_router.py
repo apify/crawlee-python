@@ -93,11 +93,10 @@ async def test_router_specific_handler_invoked() -> None:
 
 async def test_router_handler_not_nullified() -> None:
     router = Router[MockContext]()
-    mock_handler = Mock()
 
     @router.handler('A')
     async def handler_a(_context: MockContext) -> None:
-        mock_handler()
+        pass
 
     assert handler_a is not None
 
