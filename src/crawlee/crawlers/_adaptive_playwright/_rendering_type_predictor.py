@@ -6,8 +6,8 @@ from statistics import mean
 from typing import Literal
 from urllib.parse import urlparse
 
-from jaro import jaro_winkler_metric  # type: ignore[import-untyped]  # Untyped and stubs not available
-from sklearn.linear_model import LogisticRegression  # type: ignore[import-untyped]  # Untyped and stubs not available
+from jaro import jaro_winkler_metric
+from sklearn.linear_model import LogisticRegression
 from typing_extensions import override
 
 from crawlee import Request
@@ -42,8 +42,12 @@ class RenderingTypePredictor(ABC):
         """
 
 
-class LogisticalRegressionPredictor(RenderingTypePredictor):
-    """Stores rendering type for previously crawled URLs and predicts the rendering type for unvisited urls."""
+class DefaultRenderingTypePredictor(RenderingTypePredictor):
+    """Stores rendering type for previously crawled URLs and predicts the rendering type for unvisited urls.
+
+    `RenderingTypePredictor` implementation based on logistic regression:
+    https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html
+    """
 
     def __init__(self, detection_ratio: float = 0.1) -> None:
         """A default constructor.

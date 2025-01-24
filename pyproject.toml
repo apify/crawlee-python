@@ -215,8 +215,10 @@ warn_unused_ignores = true
 [[tool.mypy.overrides]]
 # Example codes are sometimes showing integration of crawlee with external tool, which is not dependency of crawlee.
 module = [
-    "apify",    # Example code shows integration of apify and crawlee.
-    "camoufox", # Example code shows integration of camoufox and crawlee.
+    "apify",                # Example code shows integration of apify and crawlee.
+    "camoufox",             # Example code shows integration of camoufox and crawlee.
+    "jaro",                 # Untyped and stubs not available
+    "sklearn.linear_model", # Untyped and stubs not available
 ]
 ignore_missing_imports = true
 

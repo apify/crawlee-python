@@ -4,7 +4,7 @@ import pytest
 
 from crawlee import Request
 from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import (
-    LogisticalRegressionPredictor,
+    DefaultRenderingTypePredictor,
     RenderingType,
     calculate_url_similarity,
     get_url_components,
@@ -23,8 +23,8 @@ from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import (
         ('http://www.ddf.com/some', 'client only'),
     ],
 )
-def test_predictor_same_label(url: str, expected_prediction: RenderingType, label: str | None) -> None:
-    predictor = LogisticalRegressionPredictor()
+def ictor_same_label(url: str, expected_prediction: RenderingType, label: str | None) -> None:
+    predictor = DefaultRenderingTypePredictor()
 
     learning_inputs: tuple[tuple[str, RenderingType], ...] = (
         ('http://www.aaa.com/some/stuff', 'static'),
@@ -48,7 +48,7 @@ def test_predictor_new_label_increased_detection_probability_recommendation() ->
     This increase should gradually drop as the predictor learns more data with this label."""
     detection_ratio = 0.01
     label = 'some label'
-    predictor = LogisticalRegressionPredictor(detection_ratio=detection_ratio)
+    predictor = DefaultRenderingTypePredictor(detection_ratio=detection_ratio)
 
     # Learn first prediction of this label
     predictor.store_result(Request.from_url(url='http://www.aaa.com/some/stuff', label=label), rendering_type='static')
@@ -86,7 +86,7 @@ def test_unreliable_prediction() -> None:
      It's first prediction is not reliable as both options have 50% chance, so it should set maximum
     detection_probability_recommendation."""
     learnt_label = 'some label'
-    predictor = LogisticalRegressionPredictor()
+    predictor = DefaultRenderingTypePredictor()
 
     # Learn two predictions of some label. One of each to make predictor very uncertain.
     predictor.store_result(
@@ -110,7 +110,7 @@ def test_no_learning_data_prediction() -> None:
     """Test that predictor can predict even if it never learnt anything before.
 
     It should give some prediction, but it has to set detection_probability_recommendation=1"""
-    predictor = LogisticalRegressionPredictor()
+    predictor = DefaultRenderingTypePredictor()
     assert (
         predictor.predict(
             Request.from_url(url='http://www.unknown.com', label='new label')
