@@ -31,7 +31,6 @@ class RenderingTypePredictor(ABC):
         Args:
             request: `Request` instance for which the prediction is made.
         """
-        ...
 
     @abstractmethod
     def store_result(self, request: Request, rendering_type: RenderingType) -> None:
@@ -41,7 +40,6 @@ class RenderingTypePredictor(ABC):
             request: Used request.
             rendering_type: Known suitable RenderingType.
         """
-        ...
 
 
 class LogisticalRegressionPredictor(RenderingTypePredictor):
