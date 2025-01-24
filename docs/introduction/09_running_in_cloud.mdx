@@ -10,7 +10,7 @@ import MainExample from '!!raw-loader!./code/09_apify_sdk.py';
 
 ## Apify Platform
 
-Crawlee is developed by [**Apify**](https://apify.com), the web scraping and automation platform. You could say it is the **home of Crawlee projects**. In this section you'll see how to deploy the crawler there with just a few simple steps. You can deploy a **Crawlee** project wherever you want, but using the [**Apify Platform**](https://console.apify.com) will give you the best experience.
+Crawlee is developed by [**Apify**](https://apify.com), the web scraping and automation platform. You could say it is the **home of Crawlee projects**. In this section you'll see how to deploy the crawler there with just a few simple steps. You can deploy a **Crawlee** project wherever you want, but using the [**Apify platform**](https://console.apify.com) will give you the best experience.
 
 {/*In case you want to deploy your Crawlee project to other platforms, check out the [**Deployment**](../deployment) section.*/}
 
@@ -24,24 +24,17 @@ We started this guide by using the Crawlee CLI to bootstrap the project - it off
 
 ## Dependencies
 
-The first step will be installing two new dependencies:
+Before we get started, you'll need to install two new dependencies:
 
-- Apify SDK, a toolkit for working with the Apify Platform. This will allow us to wire the storages (e.g. [`RequestQueue`](https://docs.apify.com/sdk/python/reference/class/RequestQueue) and [`Dataset`](https://docs.apify.com/sdk/python/reference/class/Dataset)) to the Apify cloud products. This will be a dependency of our project.
+- [**Apify SDK**](https://pypi.org/project/apify/), a toolkit for working with the Apify platform. This will allow us to wire the storages (e.g. [`RequestQueue`](https://docs.apify.com/sdk/python/reference/class/RequestQueue) and [`Dataset`](https://docs.apify.com/sdk/python/reference/class/Dataset)) to the Apify cloud products. The Apify SDK, like Crawlee itself, is available as a PyPI package and can be installed with any Python package manager. To install it using [Pip](https://pipx.pypa.io/), run:
 
-    ```bash
-    poetry add apify
-    ```
-
-- Alternatively, if you don't use `poetry` to manage your project, you may just install the SDK with `pip`:
-
-    ```bash
+    ```sh
     pip install apify
     ```
 
+- [**Apify CLI**](https://docs.apify.com/cli/), a command-line tool that will help us with authentication and deployment. It is a [Node.js](https://nodejs.org/) package, and can be installed using any Node.js package manager. In this guide, we will use [NPM](https://www.npmjs.com/). We will install it globally, so you can use it across all your Crawlee and Apify projects. To install it using NPM, run:
 
-- Apify CLI, a command-line tool that will help us with authentication and deployment. This will be a globally installed tool, you will install it only once and use it in all your Crawlee/Apify projects.
-
-    ```bash
+    ```sh
     npm install -g apify-cli
     ```
 
@@ -49,7 +42,7 @@ The first step will be installing two new dependencies:
 
 The next step will be [creating your Apify account](https://console.apify.com/sign-up). Don't worry, we have a **free tier**, so you can try things out before you buy in! Once you have that, it's time to log in with the just-installed [Apify CLI](https://docs.apify.com/cli/). You will need your personal access token, which you can find at https://console.apify.com/account#/integrations.
 
-```bash
+```sh
 apify login
 ```
 
@@ -75,7 +68,7 @@ The [`Actor`](https://docs.apify.com/sdk/python/reference/class/Actor) context m
 
 You will also need to initialize the project for Apify, to do that, use the Apify CLI again:
 
-```bash
+```sh
 apify init
 ```
 
@@ -85,7 +78,7 @@ This will create a folder called `.actor`, and an `actor.json` file inside it - 
 
 And that's all, your project is now ready to be published on the Apify Platform. You can use the Apify CLI once more to do that:
 
-```bash
+```sh
 apify push
 ```
 
