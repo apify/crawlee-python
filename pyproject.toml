@@ -41,7 +41,7 @@ keywords = [
 "Repository" = "https://github.com/apify/crawlee-python"
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = "^3.9"
 apify = { version = ">=2.0.0", optional = true }
 beautifulsoup4 = { version = ">=4.12.0", optional = true }
 colorama = ">=0.4.0"
@@ -63,7 +63,10 @@ pydantic = ">=2.8.1, !=2.10.0, !=2.10.1, !=2.10.2"
 # https://github.com/apify/crawlee-python/issues/814
 pydantic-settings = ">=2.2.0 <2.7.0"
 pyee = ">=9.0.0"
-scikit-learn = { version = ">=1.6.0", optional = true }
+scikit-learn =  [
+    {version = ">=1.6.0", python = ">=3.10", optional = true},
+    {version = "==1.5.2", python = "==3.9", optional = true}
+]
 sortedcollections = ">=2.1.0"
 tldextract = ">=5.1.0"
 typer = ">=0.12.0"
