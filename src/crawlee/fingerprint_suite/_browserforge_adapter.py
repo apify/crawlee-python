@@ -54,7 +54,19 @@ class BrowserforgeFingerprintGenerator(FingerprintGenerator):
             bf_options['screen'] = Screen(**screen_options.model_dump())
 
         self._options = {**bf_options, **bf_header_options}
+        self._generator = bf_FingerprintGenerator()
 
     @override
     def generate(self) -> bf_Fingerprint:
-        return bf_FingerprintGenerator().generate(**self._options)
+        # browserforge fingerprint generation can be flaky
+        # https://github.com/daijro/browserforge/issues/22"
+        # During test runs around 10 % flakiness was detected.
+        # Max attempt set to 10 as (0.1)^10 is considered sufficiently low probability.
+        max_attempts = 10
+        for attempt in range(max_attempts):
+            try:
+                return self._generator.generate(**self._options)
+            except ValueError:  # noqa:PERF203
+                if attempt == max_attempts:
+                    raise
+        raise RuntimeError('Failed to generate fingerprint.')

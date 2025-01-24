@@ -5,25 +5,27 @@ from crawlee.fingerprint_suite import (
 )
 
 
-def test_fingerprint_generator_has_default() -> None:  # Test is more readable if argument(class) is PascalCase
+def test_fingerprint_generator_has_default() -> None:
     """Test that header generator can work without any options."""
     assert DefaultFingerprintGenerator().generate()
 
 
-def test_fingerprint_generator_some_options() -> None:  # Test is more readable if argument(class) is PascalCase
-    """Test that header generator can work with only some options."""
-
-    fingerprint = DefaultFingerprintGenerator(
+def test_fingerprint_generator_some_options_stress_test() -> None:
+    """Test that header generator can work consistently."""
+    fingerprint_generator = DefaultFingerprintGenerator(
         mock_web_rtc=True,
         screen_options=ScreenOptions(min_width=500),
         header_options=HeaderGeneratorOptions(strict=True),
-    ).generate()
+    )
 
-    assert fingerprint.mockWebRTC is True
-    assert fingerprint.screen.availWidth >= 500
+    for _ in range(20):
+        fingerprint = fingerprint_generator.generate()
+
+        assert fingerprint.mockWebRTC is True
+        assert fingerprint.screen.availWidth > 500
 
 
-def test_fingerprint_generator_all_options() -> None:  # Test is more readable if argument(class) is PascalCase
+def test_fingerprint_generator_all_options() -> None:
     """Test that header generator can work with all the options. Some most basic checks of fingerprint.
 
     Fingerprint generation option might have no effect if there is no fingerprint sample present in collected data.
