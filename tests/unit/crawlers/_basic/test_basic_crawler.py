@@ -18,7 +18,7 @@ import httpx
 import pytest
 
 from crawlee import ConcurrencySettings, EnqueueStrategy, Glob, service_locator
-from crawlee._request import BaseRequestData, Request
+from crawlee._request import Request
 from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpHeaders
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
@@ -341,7 +341,7 @@ async def test_send_request_works(respx_mock: respx.MockRouter) -> None:
 @dataclass
 class AddRequestsTestInput:
     start_url: str
-    requests: Sequence[str | BaseRequestData]
+    requests: Sequence[str | Request]
     expected_urls: Sequence[str]
     kwargs: EnqueueLinksKwargs
 
@@ -371,7 +371,7 @@ INCLUDE_TEST_URLS = (
                 start_url='https://a.com/',
                 requests=[
                     'https://a.com/',
-                    BaseRequestData.from_url('http://b.com/'),
+                    Request.from_url('http://b.com/'),
                     'http://c.com/',
                 ],
                 kwargs={},
