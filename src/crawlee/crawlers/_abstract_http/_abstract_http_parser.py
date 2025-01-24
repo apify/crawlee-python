@@ -30,6 +30,15 @@ class AbstractHttpParser(Generic[TParseResult], ABC):
             Parsed HTTP response.
         """
 
+    @abstractmethod
+    async def parse_text(self, text: str) -> TParseResult:
+        ...
+
+    @abstractmethod
+    async def select(self,parsed_content: TParseResult, selector: str) -> TParseResult|None:
+        ...
+
+
     def is_blocked(self, parsed_content: TParseResult) -> BlockedInfo:
         """Detect if blocked and return BlockedInfo with additional information.
 

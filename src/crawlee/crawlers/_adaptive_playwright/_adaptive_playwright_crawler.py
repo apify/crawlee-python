@@ -9,7 +9,7 @@ from logging import getLogger
 from random import random
 from typing import TYPE_CHECKING, Any, Generic, get_args
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from parsel import Selector
 from typing_extensions import Self, TypeVar, override
 
@@ -187,13 +187,13 @@ class AdaptivePlaywrightCrawler(
         playwright_crawler_specific_kwargs: _PlaywrightCrawlerAdditionalOptions | None = None,
         statistics: Statistics[StatisticsState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
-    ) -> AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[BeautifulSoup], BeautifulSoup]:
+    ) -> AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[Tag], Tag]:
         """Creates `AdaptivePlaywrightCrawler` that uses `BeautifulSoup` for parsing static content."""
         if statistics is not None:
             adaptive_statistics = statistics.replace_state_model(AdaptivePlaywrightCrawlerStatisticState)
         else:
             adaptive_statistics = Statistics(state_model=AdaptivePlaywrightCrawlerStatisticState)
-        return AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[BeautifulSoup], BeautifulSoup](
+        return AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[Tag], Tag](
             rendering_type_predictor=rendering_type_predictor,
             result_checker=result_checker,
             result_comparator=result_comparator,
@@ -291,7 +291,8 @@ class AdaptivePlaywrightCrawler(
             async def from_static_pipeline_to_top_router(
                 context: ParsedHttpCrawlingContext[TStaticParseResult],
             ) -> None:
-                adaptive_crawling_context = AdaptivePlaywrightCrawlingContext.from_parsed_http_crawling_context(context)
+                adaptive_crawling_context = AdaptivePlaywrightCrawlingContext.from_parsed_http_crawling_context(
+                    context=context, parser=self._static_parser)
                 await self.router(adaptive_crawling_context)
 
             return self._static_context_pipeline(context_linked_to_result, from_static_pipeline_to_top_router)

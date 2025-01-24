@@ -6,10 +6,11 @@ from dataclasses import dataclass
 from datetime import timedelta
 from itertools import cycle
 from typing import TYPE_CHECKING, cast
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, call
 
 import httpx
 import pytest
+from bs4 import Tag, BeautifulSoup
 from typing_extensions import override
 
 from crawlee import Request
@@ -50,7 +51,7 @@ def test_urls(respx_mock: respx.MockRouter) -> list[str]:
 
     for url in urls:
         respx_mock.get(url).return_value = httpx.Response(
-            status_code=200, content=b'<!DOCTYPE html><html><body>What a body!</body></html>'
+            status_code=200, content=b'<h1>Bla</h1>'
         )
     return urls
 
@@ -69,9 +70,14 @@ class _StaticRedirectBrowserPool(BrowserPool):
         await crawlee_page.page.route(
             '**/*',
             lambda route: route.fulfill(
-                status=200, content_type='text/plain', body='<!DOCTYPE html><html><body>What a body!</body></html>'
+                status=200, content_type='text/plain', body='<h1>Bla</h1>'
             ),
         )
+        #
+        add_h2_js = '''() => {let h2 = document.createElement('h2'); h2.innerText = "Blo"; document.getElementsByTagName("body")[0].append(h2)}'''
+
+        asyncio.create_task(crawlee_page.page.evaluate(add_h2_js))
+
         return crawlee_page
 
 
@@ -504,3 +510,47 @@ async def test_adaptive_playwright_crawler_timeout_in_sub_crawler(test_urls: lis
     mocked_static_handler.assert_called_once_with()
     # Browser handler was capable of running despite static handler having sleep time larger than top handler timeout.
     mocked_browser_handler.assert_called_once_with()
+
+
+
+async def test_adaptive_context_helpers(test_urls):
+    """Test that context helpers work regardless of the crawl type.
+
+    Handler tries to locate two elements h1 and h2.
+    h1 exists immediately, h2 is created dynamically after small timeout
+    Create situation where page is crawled with static sub crawler first.
+    Static sub crawler should be able to locate only h1. It wil try to wait for h2, trying to wait for h2 will trigger
+    `AdaptiveContextError` which will force the adaptive crawler to try playwright sub crawler instead. Playwright sub
+     crawler is able to wait for the h2 element."""
+    # Get page with injected JS code that will add some element after timeout
+    static_only_predictor_no_detection = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
+    request_handler_timeout = timedelta(seconds=5)
+
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        max_request_retries=1,
+        rendering_type_predictor=static_only_predictor_no_detection,
+        result_checker=lambda result: False,  #  noqa: ARG005  # Intentionally unused argument.
+        request_handler_timeout=request_handler_timeout,
+        playwright_crawler_specific_kwargs={'browser_pool': _StaticRedirectBrowserPool.with_default_plugin()},
+    )
+
+    mocked_h1_handler = Mock()
+    mocked_h2_handler = Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        h1 = await context.query_selector("h1",2)
+        mocked_h1_handler(h1)
+        h2 = await context.query_selector("h2",2)
+        mocked_h2_handler(h2)
+
+    await crawler.run(test_urls[:1])
+
+    expected_h1_tag = Tag(name = "h1")
+    expected_h1_tag.append("Bla")
+
+    expected_h2_tag = Tag(name = "h2")
+    expected_h2_tag.append("Blo")
+
+    mocked_h1_handler.assert_has_calls([call(expected_h1_tag), call(expected_h1_tag)])
+    mocked_h2_handler.assert_has_calls([call(expected_h2_tag)])

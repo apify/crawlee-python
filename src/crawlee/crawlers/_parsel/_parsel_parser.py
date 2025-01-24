@@ -1,3 +1,4 @@
+from __future__ import annotations
 import asyncio
 from collections.abc import Iterable
 
@@ -14,6 +15,15 @@ class ParselParser(AbstractHttpParser[Selector]):
     @override
     async def parse(self, response: HttpResponse) -> Selector:
         return await asyncio.to_thread(lambda: Selector(body=response.read()))
+
+    @override
+    async def parse_text(self, text: str) -> Selector:
+        raise NotImplementedError()
+
+    @override
+    async def select(self,parsed_content: Selector, selector: str) -> Selector|None:
+        raise NotImplementedError()
+
 
     @override
     def is_matching_selector(self, parsed_content: Selector, selector: str) -> bool:
