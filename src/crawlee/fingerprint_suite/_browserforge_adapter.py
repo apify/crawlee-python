@@ -8,13 +8,18 @@ from browserforge.fingerprints import FingerprintGenerator as bf_FingerprintGene
 from browserforge.fingerprints import Screen
 from typing_extensions import override
 
+from crawlee._utils.docs import docs_group
+
 from ._fingerprint_generator import FingerprintGenerator
 
 if TYPE_CHECKING:
     from ._types import HeaderGeneratorOptions, ScreenOptions
 
 
+@docs_group('Classes')
 class BrowserforgeFingerprintGenerator(FingerprintGenerator):
+    """`FingerprintGenerator` adapter for fingerprint generator from `browserforge`."""
+
     def __init__(
         self,
         *,
