@@ -112,7 +112,11 @@ class AdaptivePlaywrightPreNavCrawlingContext(BasicCrawlingContext):
         """
         if self._page is not None:
             return self._page
-        raise AdaptiveContextError('Page is not crawled with PlaywrightCrawler.')
+        raise AdaptiveContextError(
+            'Page was crawled with static sub crawler and not with crawled with PlaywrightCrawler. For Playwright only '
+            'hooks please use `playwright_only`=True when registering the hook. '
+            'For example: @crawler.pre_navigation_hook(playwright_only=True)'
+        )
 
     @classmethod
     def from_pre_navigation_context(cls, context: BasicCrawlingContext) -> Self:

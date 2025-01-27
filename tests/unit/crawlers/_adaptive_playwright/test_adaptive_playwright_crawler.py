@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from itertools import cycle
 from typing import TYPE_CHECKING, cast
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 import httpx
 import pytest
@@ -261,6 +261,40 @@ async def test_adaptive_crawling_pre_nav_change_to_context(test_urls: list[str])
     assert user_data_in_pre_nav_hook == [None, None]
     # Check that the request handler sees changes to user data done by pre nav hooks
     assert user_data_in_handler == ['pw', 'bs']
+
+
+async def test_playwright_only_hook(test_urls: list[str]) -> None:
+    """Test that hook can be registered for playwright only sub crawler.
+
+    Create a situation where one page is crawled by both sub crawlers. One common pre navigation hook is registered and
+    one playwright only pre navigation hook is registered."""
+    static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
+
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=static_only_predictor_enforce_detection,
+        playwright_crawler_specific_kwargs={'browser_pool': _StaticRedirectBrowserPool.with_default_plugin()},
+    )
+    pre_nav_hook_common = Mock()
+    pre_nav_hook_playwright = Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        pass
+
+    @crawler.pre_navigation_hook
+    async def pre_nav_hook(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
+        pre_nav_hook_common(context.request.url)
+
+    @crawler.pre_navigation_hook(playwright_only=True)
+    async def pre_nav_hook_pw_only(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
+        pre_nav_hook_playwright(context.page.url)
+
+    await crawler.run(test_urls[:1])
+
+    # Default behavior. Hook is called everytime, both static sub crawler and playwright sub crawler.
+    pre_nav_hook_common.assert_has_calls([call(test_urls[0]), call(test_urls[0])])
+    # Hook is called only by playwright sub crawler.
+    pre_nav_hook_playwright.assert_called_once_with('about:blank')
 
 
 async def test_adaptive_crawling_result(test_urls: list[str]) -> None:

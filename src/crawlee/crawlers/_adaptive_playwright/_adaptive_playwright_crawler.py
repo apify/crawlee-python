@@ -23,6 +23,7 @@ from crawlee.crawlers import (
     ParsedHttpCrawlingContext,
     PlaywrightCrawler,
     PlaywrightCrawlingContext,
+    PlaywrightPreNavCrawlingContext,
 )
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler_statistics import (
     AdaptivePlaywrightCrawlerStatisticState,
@@ -161,14 +162,22 @@ class AdaptivePlaywrightCrawler(
             **basic_crawler_kwargs_for_pw_crawler,
         )
 
+        # Register pre navigation hooks on sub crawlers
         self._pre_navigation_hooks = list[Callable[[AdaptivePlaywrightPreNavCrawlingContext], Awaitable[None]]]()
+        self._pre_navigation_hooks_pw_only = list[
+            Callable[[AdaptivePlaywrightPreNavCrawlingContext], Awaitable[None]]
+        ]()
 
-        async def adaptive_pre_navigation_hook(context: BasicCrawlingContext) -> None:
+        async def adaptive_pre_navigation_hook_static(context: BasicCrawlingContext) -> None:
             for hook in self._pre_navigation_hooks:
                 await hook(AdaptivePlaywrightPreNavCrawlingContext.from_pre_navigation_context(context))
 
-        playwright_crawler.pre_navigation_hook(adaptive_pre_navigation_hook)
-        static_crawler.pre_navigation_hook(adaptive_pre_navigation_hook)
+        async def adaptive_pre_navigation_hook_pw(context: PlaywrightPreNavCrawlingContext) -> None:
+            for hook in self._pre_navigation_hooks + self._pre_navigation_hooks_pw_only:
+                await hook(AdaptivePlaywrightPreNavCrawlingContext.from_pre_navigation_context(context))
+
+        static_crawler.pre_navigation_hook(adaptive_pre_navigation_hook_static)
+        playwright_crawler.pre_navigation_hook(adaptive_pre_navigation_hook_pw)
 
         self._additional_context_managers = [*self._additional_context_managers, playwright_crawler._browser_pool]  # noqa: SLF001 # Intentional access to private member.
 
@@ -388,14 +397,28 @@ class AdaptivePlaywrightCrawler(
 
     def pre_navigation_hook(
         self,
-        hook: Callable[[AdaptivePlaywrightPreNavCrawlingContext], Awaitable[None]],
-    ) -> None:
+        hook: Callable[[AdaptivePlaywrightPreNavCrawlingContext], Awaitable[None]] | None = None,
+        *,
+        playwright_only: bool = False,
+    ) -> Callable[[Callable[[AdaptivePlaywrightPreNavCrawlingContext], Awaitable[None]]], None]:
         """Pre navigation hooks for adaptive crawler are delegated to sub crawlers.
 
-        Hooks are wrapped in context that handles possibly missing `page` object by throwing `AdaptiveContextError`.
-        Hooks that try to access `context.page` will have to catch this exception if triggered by static pipeline.
+        Optionally parametrized decorator.
+        Hooks are wrapped in context that handles possibly missing `page` object by raising `AdaptiveContextError`.
         """
-        self._pre_navigation_hooks.append(hook)
+
+        def register_hooks(hook: Callable[[AdaptivePlaywrightPreNavCrawlingContext], Awaitable[None]]) -> None:
+            if playwright_only:
+                self._pre_navigation_hooks_pw_only.append(hook)
+            else:
+                self._pre_navigation_hooks.append(hook)
+
+        # No parameter in decorator. Execute directly.
+        if hook:
+            register_hooks(hook)
+
+        # Return parametrized decorator that will be executed through decorator syntax if called with parameter.
+        return register_hooks
 
     def track_http_only_request_handler_runs(self) -> None:
         self.statistics.state.http_only_request_handler_runs += 1
