@@ -1018,16 +1018,16 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         session = await self._get_session()
         proxy_info = await self._get_proxy_info(request, session)
-        result = RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store)
+        empty_result = RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store)
 
         context = BasicCrawlingContext(
             request=request,
             session=session,
             proxy_info=proxy_info,
             send_request=self._prepare_send_request_function(session, proxy_info),
-            add_requests=result.add_requests,
-            push_data=result.push_data,
-            get_key_value_store=result.get_key_value_store,
+            add_requests=empty_result.add_requests,
+            push_data=empty_result.push_data,
+            get_key_value_store=empty_result.get_key_value_store,
             use_state=self._use_state,
             log=self._logger,
         )
@@ -1039,7 +1039,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             request.state = RequestState.REQUEST_HANDLER
 
             try:
-                await self._run_request_handler(context=context)
+                result = await self._run_request_handler(context=context, result=empty_result)
             except asyncio.TimeoutError as e:
                 raise RequestHandlerError(e, context) from e
 
@@ -1132,7 +1132,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             )
             raise
 
-    async def _run_request_handler(self, context: BasicCrawlingContext) -> None:
+    async def _run_request_handler(
+        self, context: BasicCrawlingContext, result: RequestHandlerRunResult
+    ) -> RequestHandlerRunResult:
         await wait_for(
             lambda: self._context_pipeline(context, self.router),
             timeout=self._request_handler_timeout,
@@ -1140,6 +1142,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             f'{self._request_handler_timeout.total_seconds()} seconds',
             logger=self._logger,
         )
+        return result
 
     def _is_session_blocked_status_code(self, session: Session | None, status_code: int) -> bool:
         """Check if the HTTP status code indicates that the session was blocked by the target website.

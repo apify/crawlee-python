@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Coroutine
 from copy import deepcopy
@@ -320,7 +319,9 @@ class AdaptivePlaywrightCrawler(
         )
 
     @override
-    async def _run_request_handler(self, context: BasicCrawlingContext) -> None:
+    async def _run_request_handler(
+        self, context: BasicCrawlingContext, result: RequestHandlerRunResult
+    ) -> RequestHandlerRunResult:
         """Override BasicCrawler method that delegates request processing to sub crawlers.
 
         To decide which sub crawler should process the request it runs `rendering_type_predictor`.
@@ -342,8 +343,7 @@ class AdaptivePlaywrightCrawler(
 
                 static_run = await self._crawl_one(rendering_type='static', context=context)
                 if static_run.result and self.result_checker(static_run.result):
-                    await self._push_result_to_context(result=static_run.result, context=context)
-                    return
+                    return static_run.result
                 if static_run.exception:
                     context.log.exception(
                         msg=f'Static crawler: failed for {context.request.url}', exc_info=static_run.exception
@@ -367,12 +367,7 @@ class AdaptivePlaywrightCrawler(
         pw_run = await self._crawl_one('client only', context=context)
         self.track_browser_request_handler_runs()
 
-        if pw_run.exception is not None:
-            raise pw_run.exception
-
         if pw_run.result:
-            await self._push_result_to_context(result=pw_run.result, context=context)
-
             if should_detect_rendering_type:
                 detection_result: RenderingType
                 static_run = await self._crawl_one('static', context=context, state=old_state_copy)
@@ -384,16 +379,11 @@ class AdaptivePlaywrightCrawler(
 
                 context.log.debug(f'Detected rendering type {detection_result} for {context.request.url}')
                 self.rendering_type_predictor.store_result(context.request, detection_result)
-
-    async def _push_result_to_context(self, result: RequestHandlerRunResult, context: BasicCrawlingContext) -> None:
-        """Execute calls from `result` on the context."""
-        result_tasks = (
-            [asyncio.create_task(context.push_data(**kwargs)) for kwargs in result.push_data_calls]
-            + [asyncio.create_task(context.add_requests(**kwargs)) for kwargs in result.add_requests_calls]
-            + [asyncio.create_task(self._commit_key_value_store_changes(result, context.get_key_value_store))]
-        )
-
-        await asyncio.gather(*result_tasks)
+            return pw_run.result
+        if pw_run.exception is not None:
+            raise pw_run.exception
+        # Unreachable code, but mypy can't know it.
+        raise RuntimeError('Missing both result and exception.')
 
     def pre_navigation_hook(
         self,
