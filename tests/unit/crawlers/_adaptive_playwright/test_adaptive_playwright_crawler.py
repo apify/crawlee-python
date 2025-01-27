@@ -526,7 +526,7 @@ async def test_adaptive_context_helpers(test_urls: list[str]) -> None:
     # Get page with injected JS code that will add some element after timeout
     static_only_predictor_no_detection = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
 
-    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+    crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(
         max_request_retries=1,
         rendering_type_predictor=static_only_predictor_no_detection,
         playwright_crawler_specific_kwargs={'browser_pool': _StaticRedirectBrowserPool.with_default_plugin()},

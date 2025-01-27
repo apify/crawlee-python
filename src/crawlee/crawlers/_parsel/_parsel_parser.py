@@ -23,11 +23,13 @@ class ParselParser(AbstractHttpParser[Selector]):
 
     @override
     async def parse_text(self, text: str) -> Selector:
-        raise NotImplementedError
+        return Selector(text=text)
 
     @override
     async def select(self, parsed_content: Selector, selector: str) -> Selector | None:
-        raise NotImplementedError
+        # This is super weird
+        if found_content:=parsed_content.css(selector).get():
+            return Selector(found_content)
 
     @override
     def is_matching_selector(self, parsed_content: Selector, selector: str) -> bool:
