@@ -16,4 +16,3 @@ class FingerprintGenerator(ABC):
         Return type is temporarily set to `Fingerprint` from `browserforge`. This is subject to change and most likely
         it will change to custom `Fingerprint` class defined in this repo later.
         """
-        ...

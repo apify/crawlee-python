@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from types import TracebackType
 
     from crawlee.browsers._types import BrowserType
-    from crawlee.fingerprint_suite._fingerprint_generator import FingerprintGenerator
+    from crawlee.fingerprint_suite import FingerprintGenerator
 
 logger = getLogger(__name__)
 

@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
     from playwright.async_api import Browser
 
-    from crawlee.fingerprint_suite._fingerprint_generator import FingerprintGenerator
+    from crawlee.fingerprint_suite import FingerprintGenerator
     from crawlee.proxy_configuration import ProxyInfo
 
 from logging import getLogger

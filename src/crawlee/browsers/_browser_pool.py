@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from types import TracebackType
 
     from crawlee.browsers._base_browser_plugin import BaseBrowserPlugin
-    from crawlee.fingerprint_suite._fingerprint_generator import FingerprintGenerator
+    from crawlee.fingerprint_suite import FingerprintGenerator
     from crawlee.proxy_configuration import ProxyInfo
 
 logger = getLogger(__name__)
