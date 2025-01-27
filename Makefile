@@ -12,6 +12,7 @@ install-dev:
 	poetry install --all-extras
 	poetry run pre-commit install
 	poetry run playwright install
+	poetry run python -m browserforge update
 
 build:
 	poetry build --no-interaction -vv
