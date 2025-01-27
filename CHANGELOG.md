@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Add keep_alive flag to `crawler.__init__` ([#921](https://github.com/apify/crawlee-python/pull/921)) ([7a82d0c](https://github.com/apify/crawlee-python/commit/7a82d0cbdbe6c8739d4bf6a9b014e31f07e5a520)) by [@Pijukatel](https://github.com/Pijukatel), closes [#891](https://github.com/apify/crawlee-python/issues/891)
+- Add `block_requests` helper for `PlaywrightCrawler` ([#919](https://github.com/apify/crawlee-python/pull/919)) ([1030459](https://github.com/apify/crawlee-python/commit/103045994908f80cffee5ccfff91a040e0042f48)) by [@Mantisus](https://github.com/Mantisus), closes [#848](https://github.com/apify/crawlee-python/issues/848)
 
 ### 🐛 Bug Fixes
 
