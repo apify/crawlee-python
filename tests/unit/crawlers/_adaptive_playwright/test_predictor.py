@@ -36,8 +36,8 @@ def ictor_same_label(url: str, expected_prediction: RenderingType, label: str | 
     )
 
     # Learn from small set
-    for url, rendering_type in learning_inputs:
-        predictor.store_result(Request.from_url(url=url, label=label), rendering_type=rendering_type)
+    for learned_url, rendering_type in learning_inputs:
+        predictor.store_result(Request.from_url(url=learned_url, label=label), rendering_type=rendering_type)
 
     assert predictor.predict(Request.from_url(url=url, label=label)).rendering_type == expected_prediction
 
