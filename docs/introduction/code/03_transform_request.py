@@ -31,7 +31,7 @@ async def main() -> None:
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url}.')
 
-        # Transfor request befor enqueue
+        # Transform request before enqueueing
         await context.enqueue_links(transform_request_function=transform_request)
 
     @crawler.router.handler('BLOG')
