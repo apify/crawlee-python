@@ -154,17 +154,17 @@ class AbstractHttpCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler[
                 if not is_url_absolute(url):
                     url = convert_to_absolute_url(context.request.url, url)
 
-                request_option = RequestOptions(url=url, user_data={**base_user_data}, label=label)
+                request_options = RequestOptions(url=url, user_data={**base_user_data}, label=label)
 
                 if transform_request_function:
-                    transform_request_option = transform_request_function(request_option)
-                    if transform_request_option == 'skip':
+                    transform_request_options = transform_request_function(request_options)
+                    if transform_request_options == 'skip':
                         continue
-                    if transform_request_option != 'unchanged':
-                        request_option = transform_request_option
+                    if transform_request_options != 'unchanged':
+                        request_options = transform_request_options
 
                 try:
-                    request = Request.from_url(**request_option)
+                    request = Request.from_url(**request_options)
                 except ValidationError as exc:
                     context.log.debug(
                         f'Skipping URL "{url}" due to invalid format: {exc}. '
