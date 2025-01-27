@@ -25,11 +25,11 @@ class NoParser(AbstractHttpParser[bytes]):
 
     @override
     async def parse_text(self, text: str) -> bytes:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @override
-    async def select(self,parsed_content: bytes, selector: str) -> bytes|None:
-        raise NotImplementedError()
+    async def select(self, parsed_content: bytes, selector: str) -> bytes | None:
+        raise NotImplementedError
 
     @override
     def is_blocked(self, parsed_content: bytes) -> BlockedInfo:  # Intentional unused argument.

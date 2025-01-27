@@ -9,7 +9,7 @@ from logging import getLogger
 from random import random
 from typing import TYPE_CHECKING, Any, Generic, get_args
 
-from bs4 import BeautifulSoup, Tag
+from bs4 import Tag
 from parsel import Selector
 from typing_extensions import Self, TypeVar, override
 
@@ -292,7 +292,8 @@ class AdaptivePlaywrightCrawler(
                 context: ParsedHttpCrawlingContext[TStaticParseResult],
             ) -> None:
                 adaptive_crawling_context = AdaptivePlaywrightCrawlingContext.from_parsed_http_crawling_context(
-                    context=context, parser=self._static_parser)
+                    context=context, parser=self._static_parser
+                )
                 await self.router(adaptive_crawling_context)
 
             return self._static_context_pipeline(context_linked_to_result, from_static_pipeline_to_top_router)

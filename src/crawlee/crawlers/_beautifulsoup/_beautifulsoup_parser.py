@@ -32,7 +32,7 @@ class BeautifulSoupParser(AbstractHttpParser[Tag]):
         return parsed_content.select_one(selector) is not None
 
     @override
-    async def select(self,parsed_content: Tag, selector: str) -> Tag|None:
+    async def select(self, parsed_content: Tag, selector: str) -> Tag | None:
         return parsed_content.select_one(selector)
 
     @override

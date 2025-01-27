@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from bs4 import BeautifulSoup, Tag
+from bs4 import Tag
 
 from crawlee._utils.docs import docs_group
 from crawlee.crawlers._abstract_http import AbstractHttpCrawler, HttpCrawlerOptions
