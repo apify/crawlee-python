@@ -20,6 +20,8 @@ if TYPE_CHECKING:
     from playwright.async_api import Page, Response
     from typing_extensions import Self
 
+    from crawlee.crawlers._playwright._types import BlockRequestsFunction
+
 
 class AdaptiveContextError(RuntimeError):
     pass
@@ -88,6 +90,8 @@ class AdaptivePlaywrightCrawlingContext(Generic[TStaticParseResult], ParsedHttpC
         http_response = await _PlaywrightHttpResponse.from_playwright_response(
             response=context.response, protocol=protocol_guess or ''
         )
+        # block_requests is useful only on pre-navigation contexts. It is useless here.
+        context_kwargs.pop('block_requests')
         return cls(
             parsed_content=await parser.parse(http_response),
             http_response=http_response,
@@ -103,6 +107,7 @@ class AdaptivePlaywrightPreNavCrawlingContext(BasicCrawlingContext):
     """
 
     _page: Page | None = None
+    block_requests: BlockRequestsFunction | None = None
 
     @property
     def page(self) -> Page:
@@ -123,6 +128,15 @@ class AdaptivePlaywrightPreNavCrawlingContext(BasicCrawlingContext):
         """Convenience constructor that creates new context from existing pre navigation contexts."""
         context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
         context_kwargs['_page'] = context_kwargs.pop('page', None)
+
+        # For static sub crawler replace block requests by function doing nothing.
+        async def dummy_block_requests(
+            url_patterns: list[str] | None = None,  # noqa:ARG001
+            extra_url_patterns: list[str] | None = None,  # noqa:ARG001
+        ) -> None:
+            return
+
+        context_kwargs['block_requests'] = context_kwargs.pop('block_requests', dummy_block_requests)
         return cls(**context_kwargs)
 
 

@@ -69,7 +69,7 @@ class _StaticRedirectBrowserPool(BrowserPool):
         await crawlee_page.page.route(
             '**/*',
             lambda route: route.fulfill(
-                status=200, content_type='text/plain', body='<!DOCTYPE html><html><body>What a body!</body></html>'
+                status=200, content_type='text/html', body='<!DOCTYPE html><html><body>What a body!</body></html>'
             ),
         )
         return crawlee_page
