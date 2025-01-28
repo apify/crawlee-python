@@ -6,14 +6,16 @@ from typing import TYPE_CHECKING, Any
 from browserforge.fingerprints import Fingerprint as bf_Fingerprint
 from browserforge.fingerprints import FingerprintGenerator as bf_FingerprintGenerator
 from browserforge.fingerprints import Screen
+from browserforge.headers.generator import HeaderGenerator as bf_HeaderGenerator
 from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
 
+from ._consts import BROWSER_TYPE_HEADER_KEYWORD
 from ._fingerprint_generator import FingerprintGenerator
 
 if TYPE_CHECKING:
-    from ._types import HeaderGeneratorOptions, ScreenOptions
+    from ._types import HeaderGeneratorOptions, ScreenOptions, SupportedBrowserType
 
 
 @docs_group('Classes')
@@ -75,3 +77,26 @@ class BrowserforgeFingerprintGenerator(FingerprintGenerator):
                 if attempt == max_attempts:
                     raise
         raise RuntimeError('Failed to generate fingerprint.')
+
+
+@docs_group('Classes')
+class BrowserforgeHeaderGenerator:
+
+    def __init__(self):
+        self._generator = bf_HeaderGenerator()
+
+    def generate(self, browser_type: SupportedBrowserType) -> bf_Fingerprint:
+        # browserforge header generation can be flaky. Enforce basic QA on generated headers
+        max_attempts = 10
+
+        if browser_type=='webkit':
+            bf_browser_type = 'safari'
+        else:
+            bf_browser_type = browser_type
+
+        for attempt in range(max_attempts):
+            generated_header = self._generator.generate(browser=bf_browser_type)
+            if any(keyword in generated_header['User-Agent'] for keyword in BROWSER_TYPE_HEADER_KEYWORD[browser_type]):
+                return generated_header
+            print(generated_header['User-Agent'])
+        raise RuntimeError('Failed to generate header.')

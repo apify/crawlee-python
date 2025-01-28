@@ -4,14 +4,12 @@ import pytest
 
 from crawlee.fingerprint_suite import HeaderGenerator
 from crawlee.fingerprint_suite._consts import (
+    BROWSER_TYPE_HEADER_KEYWORD,
     PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA,
     PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_MOBILE,
     PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_PLATFORM,
-    PW_CHROMIUM_HEADLESS_DEFAULT_USER_AGENT,
-    PW_FIREFOX_HEADLESS_DEFAULT_USER_AGENT,
-    PW_WEBKIT_HEADLESS_DEFAULT_USER_AGENT,
-    USER_AGENT_POOL,
 )
+from crawlee.fingerprint_suite._types import SupportedBrowserType
 
 
 def test_get_common_headers() -> None:
@@ -28,34 +26,23 @@ def test_get_random_user_agent_header() -> None:
     headers = header_generator.get_random_user_agent_header()
 
     assert 'User-Agent' in headers
-    assert headers['User-Agent'] in USER_AGENT_POOL
+    assert headers['User-Agent']
 
 
-def test_get_user_agent_header_chromium() -> None:
-    """Test that the User-Agent header is generated correctly for Chromium."""
+
+@pytest.mark.parametrize('_', range(100))
+@pytest.mark.parametrize('browser_type', [
+    'chromium','firefox','edge','webkit'
+])
+def test_get_user_agent_header_stress_test(browser_type: SupportedBrowserType,_) -> None:
+    """Test that the User-Agent header is consistently generated correctly.
+
+    (Very fast even when stress tested.)"""
     header_generator = HeaderGenerator()
-    headers = header_generator.get_user_agent_header(browser_type='chromium')
+    headers = header_generator.get_user_agent_header(browser_type=browser_type)
 
     assert 'User-Agent' in headers
-    assert headers['User-Agent'] == PW_CHROMIUM_HEADLESS_DEFAULT_USER_AGENT
-
-
-def test_get_user_agent_header_firefox() -> None:
-    """Test that the User-Agent header is generated correctly for Firefox."""
-    header_generator = HeaderGenerator()
-    headers = header_generator.get_user_agent_header(browser_type='firefox')
-
-    assert 'User-Agent' in headers
-    assert headers['User-Agent'] == PW_FIREFOX_HEADLESS_DEFAULT_USER_AGENT
-
-
-def test_get_user_agent_header_webkit() -> None:
-    """Test that the User-Agent header is generated correctly for WebKit."""
-    header_generator = HeaderGenerator()
-    headers = header_generator.get_user_agent_header(browser_type='webkit')
-
-    assert 'User-Agent' in headers
-    assert headers['User-Agent'] == PW_WEBKIT_HEADLESS_DEFAULT_USER_AGENT
+    assert any(keyword in headers['User-Agent'] for keyword in BROWSER_TYPE_HEADER_KEYWORD[browser_type])
 
 
 def test_get_user_agent_header_invalid_browser_type() -> None:
