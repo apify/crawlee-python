@@ -11,6 +11,7 @@ from unittest.mock import Mock, call, patch
 import httpx
 import pytest
 from bs4 import Tag
+from parsel import Selector
 from typing_extensions import override
 
 from crawlee import Request
@@ -42,7 +43,7 @@ if TYPE_CHECKING:
 
 _H1_TEXT = 'Static'
 _H2_TEXT = 'Only in browser'
-_PAGE_CONTENT = f"""
+_PAGE_CONTENT_STATIC = f"""
 <h1>{_H1_TEXT}</h1>
 <script>
     let h2 = document.createElement('h2');
@@ -61,7 +62,7 @@ def test_urls(respx_mock: respx.MockRouter) -> list[str]:
     ]
 
     for url in urls:
-        respx_mock.get(url).return_value = httpx.Response(status_code=200, content=_PAGE_CONTENT.encode())
+        respx_mock.get(url).return_value = httpx.Response(status_code=200, content=_PAGE_CONTENT_STATIC.encode())
     return urls
 
 
@@ -78,7 +79,7 @@ class _StaticRedirectBrowserPool(BrowserPool):
         crawlee_page = await super().new_page(page_id=page_id, browser_plugin=browser_plugin, proxy_info=proxy_info)
         await crawlee_page.page.route(
             '**/*',
-            lambda route: route.fulfill(status=200, content_type='text/html', body=_PAGE_CONTENT),
+            lambda route: route.fulfill(status=200, content_type='text/html', body=_PAGE_CONTENT_STATIC),
         )
         return crawlee_page
 
@@ -513,7 +514,7 @@ async def test_adaptive_playwright_crawler_timeout_in_sub_crawler(test_urls: lis
     mocked_browser_handler.assert_called_once_with()
 
 
-async def test_adaptive_context_helpers(test_urls: list[str]) -> None:
+async def test_adaptive_context_helpers_beautiful_soup(test_urls: list[str]) -> None:
     """Test that context helpers work regardless of the crawl type.
 
     Handler tries to locate two elements h1 and h2.
@@ -526,7 +527,7 @@ async def test_adaptive_context_helpers(test_urls: list[str]) -> None:
     # Get page with injected JS code that will add some element after timeout
     static_only_predictor_no_detection = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
 
-    crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
         max_request_retries=1,
         rendering_type_predictor=static_only_predictor_no_detection,
         playwright_crawler_specific_kwargs={'browser_pool': _StaticRedirectBrowserPool.with_default_plugin()},
@@ -554,3 +555,42 @@ async def test_adaptive_context_helpers(test_urls: list[str]) -> None:
     mocked_h1_handler.assert_has_calls([call(expected_h1_tag), call(expected_h1_tag)])
     # Called only by pw sub crawler
     mocked_h2_handler.assert_has_calls([call(expected_h2_tag)])
+
+
+async def test_adaptive_context_helpers_parsel(test_urls: list[str]) -> None:
+    """Test that context helpers work regardless of the crawl type.
+
+    Handler tries to locate two elements h1 and h2.
+    h1 exists immediately, h2 is created dynamically by inline JS snippet embedded in the html.
+    Create situation where page is crawled with static sub crawler first.
+    Static sub crawler should be able to locate only h1. It wil try to wait for h2, trying to wait for h2 will trigger
+    `AdaptiveContextError` which will force the adaptive crawler to try playwright sub crawler instead. Playwright sub
+    crawler is able to wait for the h2 element."""
+
+    # Get page with injected JS code that will add some element after timeout
+    static_only_predictor_no_detection = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
+    expected_h1_tag = f'<h1>{_H1_TEXT}</h1>'
+    expected_h2_tag = f'<h2>{_H2_TEXT}</h2>'
+
+    crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(
+        max_request_retries=1,
+        rendering_type_predictor=static_only_predictor_no_detection,
+        playwright_crawler_specific_kwargs={'browser_pool': _StaticRedirectBrowserPool.with_default_plugin()},
+    )
+
+    mocked_h1_handler = Mock()
+    mocked_h2_handler = Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        h1 = await context.query_selector('h1', timedelta(milliseconds=1000))
+        mocked_h1_handler(type(h1), h1.get())
+        h2 = await context.query_selector('h2', timedelta(milliseconds=1000))
+        mocked_h2_handler(type(h2), h2.get())
+
+    await crawler.run(test_urls[:1])
+
+    # Called by both sub crawlers
+    mocked_h1_handler.assert_has_calls([call(Selector, expected_h1_tag), call(Selector, expected_h1_tag)])
+    # Called only by pw sub crawler
+    mocked_h2_handler.assert_has_calls([call(Selector, expected_h2_tag)])

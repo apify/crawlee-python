@@ -27,9 +27,9 @@ class ParselParser(AbstractHttpParser[Selector]):
 
     @override
     async def select(self, parsed_content: Selector, selector: str) -> Selector | None:
-        # This is super weird
-        if found_content:=parsed_content.css(selector).get():
-            return Selector(found_content)
+        if selector_list := parsed_content.css(selector):
+            return selector_list[0]
+        return None
 
     @override
     def is_matching_selector(self, parsed_content: Selector, selector: str) -> bool:
