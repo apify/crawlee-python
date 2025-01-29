@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 
 - Fix crawler not retrying user handler if there was timeout in the handler ([#909](https://github.com/apify/crawlee-python/pull/909)) ([f4090ef](https://github.com/apify/crawlee-python/commit/f4090ef0ea0281d53dab16a77ceea2ef6ac43d76)) by [@Pijukatel](https://github.com/Pijukatel), closes [#907](https://github.com/apify/crawlee-python/issues/907)
 - Optimize memory consumption for `HttpxHttpClient`, fix proxy handling ([#905](https://github.com/apify/crawlee-python/pull/905)) ([d7ad480](https://github.com/apify/crawlee-python/commit/d7ad480834263ae0480049cb0a8db4dfc3946d8d)) by [@Mantisus](https://github.com/Mantisus), closes [#895](https://github.com/apify/crawlee-python/issues/895)
+- Fix `BrowserPool` and `PlaywrightBrowserPlugin` closure ([#932](https://github.com/apify/crawlee-python/pull/932)) ([997543d](https://github.com/apify/crawlee-python/commit/997543d2fa5afba49929f4407ee95d7a4933a50d)) by [@Mantisus](https://github.com/Mantisus)
 
 
 <!-- git-cliff-unreleased-end -->
