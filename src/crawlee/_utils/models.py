@@ -24,6 +24,7 @@ def _timedelta_to_secs(td: timedelta | None) -> float | None:
         return td
     return td.total_seconds()
 
+
 _number_parser = TypeAdapter(float)
 
 
@@ -41,7 +42,11 @@ def _timedelta_from_ms(value: float | timedelta | Any | None, handler: Callable[
 
     return timedelta(milliseconds=value)
 
-def _timedelta_from_secs(value: float | timedelta | Any | None, handler: Callable[[Any], timedelta]) -> timedelta | None:
+
+def _timedelta_from_secs(
+    value: float | timedelta | Any | None,
+    handler: Callable[[Any], timedelta],
+) -> timedelta | None:
     if value == float('inf'):
         return timedelta.max
 

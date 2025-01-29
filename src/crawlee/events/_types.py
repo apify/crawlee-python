@@ -7,8 +7,8 @@ from typing import Annotated, Any, TypeVar, Union
 from pydantic import BaseModel, ConfigDict, Field
 
 from crawlee._utils.docs import docs_group
-from crawlee._utils.system import CpuInfo, MemoryUsageInfo
 from crawlee._utils.models import timedelta_secs
+from crawlee._utils.system import CpuInfo, MemoryUsageInfo
 
 
 class Event(str, Enum):
