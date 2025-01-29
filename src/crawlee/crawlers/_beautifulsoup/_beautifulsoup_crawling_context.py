@@ -19,7 +19,7 @@ class BeautifulSoupCrawlingContext(ParsedHttpCrawlingContext[Tag]):
     """
 
     @property
-    def soup(self) -> Tag:
+    def soup(self) -> BeautifulSoup:
         """Convenience alias."""
         return cast(BeautifulSoup, self.parsed_content)
 

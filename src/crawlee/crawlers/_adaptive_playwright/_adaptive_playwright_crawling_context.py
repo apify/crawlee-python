@@ -68,13 +68,10 @@ class AdaptivePlaywrightCrawlingContext(Generic[TStaticParseResult], ParsedHttpC
             raise AdaptiveContextError('Page was not crawled with PlaywrightCrawler.')
         return self._response
 
-    async def wait_for_selector(self, selector: str, timeout: int = 5) -> None:
-        if self._static_parser.select(self.parsed_content, selector):
+    async def wait_for_selector(self, selector: str, timeout: timedelta = timedelta(seconds=5)) -> None:
+        if await self._static_parser.select(self.parsed_content, selector):
             return
-        await self.page.locator(selector).wait_for(timeout=timeout * 1000)
-        # Should we parse the whole page again? But context is not mutable...
-        # without reparsing, what is the use case for wait_for_selector? Seems useless and
-        # all use cases are satisfied with query_selector
+        await self.page.locator(selector).wait_for(timeout=timeout.total_seconds() * 1000)
 
     async def query_selector(self, selector: str, timeout: timedelta = timedelta(seconds=5)) -> TStaticParseResult:
         static_content = await self._static_parser.select(self.parsed_content, selector)
@@ -83,18 +80,21 @@ class AdaptivePlaywrightCrawlingContext(Generic[TStaticParseResult], ParsedHttpC
 
         locator = self.page.locator(selector)
         await locator.wait_for(timeout=timeout.total_seconds() * 1000)
-        # Should we parse the whole page again? But context is not mutable...
 
         parsed_selector = await self._static_parser.select(
-            await self.parse_with_static_parser(await locator.evaluate('el => el.outerHTML')), selector
+            await self._static_parser.parse_text(await locator.evaluate('el => el.outerHTML')), selector
         )
         if parsed_selector is not None:
             return parsed_selector
         # Selector worked in Playwright, but not in static parser and
         raise AdaptiveContextError('Used selector is not a valid static selector')
 
-    async def parse_with_static_parser(self, text: str) -> TStaticParseResult:
-        return await self._static_parser.parse_text(text)
+    async def parse_with_static_parser(
+        self, selector: str | None, timeout: timedelta = timedelta(seconds=5)
+    ) -> TStaticParseResult:
+        if selector:
+            await self.wait_for_selector(selector, timeout)
+        return await self._static_parser.parse_text(await self.page.content())
 
     @classmethod
     def from_parsed_http_crawling_context(

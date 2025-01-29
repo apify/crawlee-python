@@ -43,12 +43,17 @@ if TYPE_CHECKING:
 
 _H1_TEXT = 'Static'
 _H2_TEXT = 'Only in browser'
+_INJECTED_JS_DELAY_MS = 100
 _PAGE_CONTENT_STATIC = f"""
 <h1>{_H1_TEXT}</h1>
 <script>
+    setTimeout(function() {{
     let h2 = document.createElement('h2');
     h2.innerText = "{_H2_TEXT}";
     document.getElementsByTagName("body")[0].append(h2)
+
+    }}, {_INJECTED_JS_DELAY_MS});
+
 </script>
 """
 
@@ -514,8 +519,8 @@ async def test_adaptive_playwright_crawler_timeout_in_sub_crawler(test_urls: lis
     mocked_browser_handler.assert_called_once_with()
 
 
-async def test_adaptive_context_helpers_beautiful_soup(test_urls: list[str]) -> None:
-    """Test that context helpers work regardless of the crawl type.
+async def test_adaptive_context_query_selector_beautiful_soup(test_urls: list[str]) -> None:
+    """Test that `context.query_selector` works regardless of the crawl type for BeautifulSoup variant.
 
     Handler tries to locate two elements h1 and h2.
     h1 exists immediately, h2 is created dynamically by inline JS snippet embedded in the html.
@@ -538,9 +543,9 @@ async def test_adaptive_context_helpers_beautiful_soup(test_urls: list[str]) -> 
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
-        h1 = await context.query_selector('h1', timedelta(milliseconds=1000))
+        h1 = await context.query_selector('h1', timedelta(milliseconds=_INJECTED_JS_DELAY_MS * 2))
         mocked_h1_handler(h1)
-        h2 = await context.query_selector('h2', timedelta(milliseconds=1000))
+        h2 = await context.query_selector('h2', timedelta(milliseconds=_INJECTED_JS_DELAY_MS * 2))
         mocked_h2_handler(h2)
 
     await crawler.run(test_urls[:1])
@@ -557,8 +562,8 @@ async def test_adaptive_context_helpers_beautiful_soup(test_urls: list[str]) -> 
     mocked_h2_handler.assert_has_calls([call(expected_h2_tag)])
 
 
-async def test_adaptive_context_helpers_parsel(test_urls: list[str]) -> None:
-    """Test that context helpers work regardless of the crawl type.
+async def test_adaptive_context_query_selector_parsel(test_urls: list[str]) -> None:
+    """Test that `context.query_selector` works regardless of the crawl type for Parsel variant.
 
     Handler tries to locate two elements h1 and h2.
     h1 exists immediately, h2 is created dynamically by inline JS snippet embedded in the html.
@@ -583,9 +588,9 @@ async def test_adaptive_context_helpers_parsel(test_urls: list[str]) -> None:
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
-        h1 = await context.query_selector('h1', timedelta(milliseconds=1000))
+        h1 = await context.query_selector('h1', timedelta(milliseconds=_INJECTED_JS_DELAY_MS * 2))
         mocked_h1_handler(type(h1), h1.get())
-        h2 = await context.query_selector('h2', timedelta(milliseconds=1000))
+        h2 = await context.query_selector('h2', timedelta(milliseconds=_INJECTED_JS_DELAY_MS * 2))
         mocked_h2_handler(type(h2), h2.get())
 
     await crawler.run(test_urls[:1])
@@ -594,3 +599,42 @@ async def test_adaptive_context_helpers_parsel(test_urls: list[str]) -> None:
     mocked_h1_handler.assert_has_calls([call(Selector, expected_h1_tag), call(Selector, expected_h1_tag)])
     # Called only by pw sub crawler
     mocked_h2_handler.assert_has_calls([call(Selector, expected_h2_tag)])
+
+
+async def test_adaptive_context_parse_with_static_parser_parsel(test_urls: list[str]) -> None:
+    """Test `context.parse_with_static_parser` works regardless of the crawl type for Parsel variant.
+
+    (Test covers also  `context.wait_for_selector`, which is called by `context.parse_with_static_parser`)
+    Create situation where
+    """
+    static_only_predictor_no_detection = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
+    expected_h2_tag = f'<h2>{_H2_TEXT}</h2>'
+
+    crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(
+        max_request_retries=1,
+        rendering_type_predictor=static_only_predictor_no_detection,
+        playwright_crawler_specific_kwargs={'browser_pool': _StaticRedirectBrowserPool.with_default_plugin()},
+    )
+
+    mocked_h2_handler = Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        h2_static = context.parsed_content.css('h2')  # Should not find anything
+        mocked_h2_handler(h2_static)
+
+        # Reparse whole page after h2 appears
+        parsed_content_after_h2_appeared = await context.parse_with_static_parser(
+            selector='h2', timeout=timedelta(milliseconds=_INJECTED_JS_DELAY_MS * 2)
+        )
+        mocked_h2_handler(parsed_content_after_h2_appeared.css('h2')[0].get())
+
+    await crawler.run(test_urls[:1])
+
+    mocked_h2_handler.assert_has_calls(
+        [
+            call([]),  # Static sub crawler tried and did not find h2.
+            call([]),  # Playwright sub crawler tried and did not find h2 without waiting.
+            call(expected_h2_tag),
+        ]
+    )  # Playwright waited for h2 to appear.
