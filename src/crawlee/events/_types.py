@@ -61,7 +61,7 @@ class EventMigratingData(BaseModel):
 
     # The remaining time in seconds before the migration is forced and the process is killed
     # Optional because it's not present when the event handler is called manually
-    time_remaining_secs: Annotated[float | None, Field(alias='timeRemainingSecs')]
+    time_remaining_secs: Annotated[float | None, Field(alias='timeRemainingSecs')] = None
 
 
 @docs_group('Event payloads')
