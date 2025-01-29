@@ -70,6 +70,7 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         self._browser_launch_options = default_launch_browser_options | (browser_launch_options or {})
         self._browser_new_context_options = browser_new_context_options or {}
         self._max_open_pages_per_browser = max_open_pages_per_browser
+        self._use_incognito_pages: bool = self._browser_launch_options.pop('use_incognito_pages', False)
 
         self._playwright_context_manager = async_playwright()
         self._playwright: Playwright | None = None
@@ -153,5 +154,6 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
 
         return PlaywrightBrowserController(
             browser,
+            use_incognito_pages=self._use_incognito_pages,
             max_open_pages_per_browser=self._max_open_pages_per_browser,
         )

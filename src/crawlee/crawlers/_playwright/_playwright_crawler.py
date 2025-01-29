@@ -5,6 +5,7 @@ from functools import partial
 from typing import TYPE_CHECKING, Any, Callable
 
 from pydantic import ValidationError
+from yarl import URL
 
 from crawlee import EnqueueStrategy, RequestTransformAction
 from crawlee._request import Request, RequestOptions
@@ -22,6 +23,7 @@ from ._utils import block_requests, infinite_scroll
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable, Mapping
 
+    from playwright.async_api import Page
     from typing_extensions import Unpack
 
     from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs
@@ -175,6 +177,9 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 infinite_scroll and block_requests).
         """
         async with context.page:
+            if context.session:
+                await self._set_cookies(context.page, context.request.url, context.session.cookies)
+
             if context.request.headers:
                 await context.page.set_extra_http_headers(context.request.headers.model_dump())
             # Navigate to the URL and get response.
@@ -185,6 +190,10 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
 
             # Set the loaded URL to the actual URL after redirection.
             context.request.loaded_url = context.page.url
+
+            if context.session:
+                cookies = await self._get_cookies(context.page)
+                context.session.cookies.update(cookies)
 
             async def enqueue_links(
                 *,
@@ -294,3 +303,15 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
             hook: A coroutine function to be called before each navigation.
         """
         self._pre_navigation_hooks.append(hook)
+
+    async def _get_cookies(self, page: Page) -> dict[str, str]:
+        """Get the cookies from the page."""
+        cookies = await page.context.cookies()
+        return {cookie['name']: cookie['value'] for cookie in cookies if cookie.get('name') and cookie.get('value')}
+
+    async def _set_cookies(self, page: Page, url: str, cookies: dict[str, str]) -> None:
+        """Set the cookies to the page."""
+        parsed_url = URL(url)
+        await page.context.add_cookies(
+            [{'name': name, 'value': value, 'domain': parsed_url.host, 'path': '/'} for name, value in cookies.items()]
+        )
