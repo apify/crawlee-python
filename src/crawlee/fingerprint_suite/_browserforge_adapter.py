@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any
 
@@ -84,30 +83,31 @@ class BrowserforgeFingerprintGenerator(FingerprintGenerator):
 
 @docs_group('Classes')
 class BrowserforgeHeaderGenerator:
+    def __init__(self) -> None:
+        self._generator = bf_HeaderGenerator(locale=["en-Us", "en"])
 
-    def __init__(self):
-        self._generator = bf_HeaderGenerator()
-
-    def generate(self, browser_type: SupportedBrowserType = "chromium") -> bf_Fingerprint:
+    def generate(self, browser_type: SupportedBrowserType = 'chromium') -> dict[str, str]:
         # browserforge header generation can be flaky. Enforce basic QA on generated headers
         max_attempts = 10
 
-        if browser_type=='webkit':
-            bf_browser_type = 'safari'
-        else:
-            bf_browser_type = browser_type
+        bf_browser_type = 'safari' if browser_type == 'webkit' else browser_type
 
-        for attempt in range(max_attempts):
+        for _attempt in range(max_attempts):
             generated_header = self._generator.generate(browser=bf_browser_type)
             if any(keyword in generated_header['User-Agent'] for keyword in BROWSER_TYPE_HEADER_KEYWORD[browser_type]):
                 return generated_header
-            print(generated_header['User-Agent'])
         raise RuntimeError('Failed to generate header.')
 
 
+def get_available_header_network() -> dict:
+    """Get header network that contains possible header values."""
+    return extract_json(DATA_DIR / 'header-network.zip')
 
-def get_user_agent_pool() -> set[str]:
-    """Get set of `User-Agent` strings available to browserforge."""
-    header_network = extract_json((DATA_DIR / "header-network.zip"))
-    return set(header_network['nodes'][6]['possibleValues']) | set(header_network['nodes'][7]['possibleValues'])
 
+def get_available_header_values(header_network: dict, node_name: str | set[str]) -> set[str]:
+    """Get set of possible header values from available header network."""
+    node_names = {node_name} if isinstance(node_name, str) else node_name
+    for node in header_network['nodes']:
+        if node['name'] in node_names:
+            return set(node['possibleValues'])
+    return None

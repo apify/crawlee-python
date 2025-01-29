@@ -16,14 +16,9 @@ from crawlee.fingerprint_suite import (
     HeaderGeneratorOptions,
     ScreenOptions,
 )
-from crawlee.fingerprint_suite._consts import (
-    PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA,
-    PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_MOBILE,
-    PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_PLATFORM,
-    PW_CHROMIUM_HEADLESS_DEFAULT_USER_AGENT,
-    PW_FIREFOX_HEADLESS_DEFAULT_USER_AGENT,
-)
+from crawlee.fingerprint_suite._consts import BROWSER_TYPE_HEADER_KEYWORD
 from crawlee.proxy_configuration import ProxyConfiguration
+from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_values
 
 if TYPE_CHECKING:
     from yarl import URL
@@ -109,8 +104,9 @@ async def test_redirect_handling(httpbin: URL) -> None:
     assert handled_urls == set()
 
 
-async def test_chromium_headless_headers(httpbin: URL) -> None:
-    crawler = PlaywrightCrawler(headless=True, browser_type='chromium')
+async def test_chromium_headless_headers(httpbin: URL, header_network: dict) -> None:
+    browser_type = 'chromium'
+    crawler = PlaywrightCrawler(headless=True, browser_type=browser_type)
     headers = dict[str, str]()
 
     @crawler.router.default_handler
@@ -123,22 +119,21 @@ async def test_chromium_headless_headers(httpbin: URL) -> None:
 
     await crawler.run([str(httpbin / 'get')])
 
-    assert 'User-Agent' in headers
-    assert 'Sec-Ch-Ua' in headers
-    assert 'Sec-Ch-Ua-Mobile' in headers
-    assert 'Sec-Ch-Ua-Platform' in headers
+    user_agent = headers.get('User-Agent')
+    assert user_agent in get_available_header_values(header_network, {'user-agent', 'User-Agent'})
+    assert any(keyword in user_agent for keyword in BROWSER_TYPE_HEADER_KEYWORD[browser_type])
+
+    assert headers.get('Sec-Ch-Ua') in get_available_header_values(header_network, 'sec-ch-ua')
+    assert headers.get('Sec-Ch-Ua-Mobile') in get_available_header_values(header_network, 'sec-ch-ua-mobile')
+    assert headers.get('Sec-Ch-Ua-Platform') in get_available_header_values(header_network, 'sec-ch-ua-platform')
 
     assert 'headless' not in headers['Sec-Ch-Ua'].lower()
     assert 'headless' not in headers['User-Agent'].lower()
 
-    assert headers['Sec-Ch-Ua'] == PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA
-    assert headers['Sec-Ch-Ua-Mobile'] == PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_MOBILE
-    assert headers['Sec-Ch-Ua-Platform'] == PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_PLATFORM
-    assert headers['User-Agent'] == PW_CHROMIUM_HEADLESS_DEFAULT_USER_AGENT
 
-
-async def test_firefox_headless_headers(httpbin: URL) -> None:
-    crawler = PlaywrightCrawler(headless=True, browser_type='firefox')
+async def test_firefox_headless_headers(httpbin: URL, header_network: dict) -> None:
+    browser_type = 'firefox'
+    crawler = PlaywrightCrawler(headless=True, browser_type=browser_type)
     headers = dict[str, str]()
 
     @crawler.router.default_handler
@@ -158,7 +153,9 @@ async def test_firefox_headless_headers(httpbin: URL) -> None:
 
     assert 'headless' not in headers['User-Agent'].lower()
 
-    assert headers['User-Agent'] == PW_FIREFOX_HEADLESS_DEFAULT_USER_AGENT
+    user_agent = headers.get('User-Agent')
+    assert user_agent in get_available_header_values(header_network, {'user-agent', 'User-Agent'})
+    assert any(keyword in user_agent for keyword in BROWSER_TYPE_HEADER_KEYWORD[browser_type])
 
 
 async def test_custom_headers(httpbin: URL) -> None:

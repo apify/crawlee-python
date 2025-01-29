@@ -5,11 +5,6 @@ from typing import TYPE_CHECKING
 from crawlee._types import HttpHeaders
 from crawlee._utils.docs import docs_group
 from crawlee.fingerprint_suite._browserforge_adapter import BrowserforgeHeaderGenerator
-from crawlee.fingerprint_suite._consts import (
-    PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA,
-    PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_MOBILE,
-    PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_PLATFORM,
-)
 
 if TYPE_CHECKING:
     from crawlee.fingerprint_suite._types import SupportedBrowserType
@@ -19,12 +14,11 @@ if TYPE_CHECKING:
 class HeaderGenerator:
     """Generates realistic looking or browser-like HTTP headers."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._generator = BrowserforgeHeaderGenerator()
 
-    def _get_specific_headers(self, all_headers: dict[str,str], header_names: set[str]) -> HttpHeaders:
-        return HttpHeaders({key:value for key, value in all_headers.items() if key in header_names})
-
+    def _get_specific_headers(self, all_headers: dict[str, str], header_names: set[str]) -> HttpHeaders:
+        return HttpHeaders({key: value for key, value in all_headers.items() if key in header_names})
 
     def get_common_headers(self) -> HttpHeaders:
         """Get common HTTP headers ("Accept", "Accept-Language").
@@ -39,7 +33,6 @@ class HeaderGenerator:
         """Get a random User-Agent header."""
         all_headers = self._generator.generate()
         return self._get_specific_headers(all_headers, header_names={'User-Agent'})
-
 
     def get_user_agent_header(
         self,
@@ -57,22 +50,10 @@ class HeaderGenerator:
         *,
         browser_type: SupportedBrowserType = 'chromium',
     ) -> HttpHeaders:
-        """Get the Sec-Ch-Ua headers based on the browser type."""
-        headers = dict[str, str]()
-
-        if browser_type == 'chromium':
-            # Currently, only Chromium uses Sec-Ch-Ua headers.
-            headers['Sec-Ch-Ua'] = PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA
-            headers['Sec-Ch-Ua-Mobile'] = PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_MOBILE
-            headers['Sec-Ch-Ua-Platform'] = PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_PLATFORM
-
-        elif browser_type == 'firefox':  # noqa: SIM114
-            pass
-
-        elif browser_type == 'webkit':
-            pass
-
-        else:
+        """Get the sec-ch-ua headers based on the browser type."""
+        if browser_type not in {'chromium', 'firefox', 'webkit', 'edge'}:
             raise ValueError(f'Unsupported browser type: {browser_type}')
-
-        return HttpHeaders(headers)
+        all_headers = self._generator.generate(browser_type=browser_type)
+        return self._get_specific_headers(
+            all_headers, header_names={'sec-ch-ua', 'sec-ch-ua-mobile', 'sec-ch-ua-platform'}
+        )

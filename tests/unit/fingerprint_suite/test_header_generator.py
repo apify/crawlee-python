@@ -1,20 +1,18 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 
 from crawlee.fingerprint_suite import HeaderGenerator
-from crawlee.fingerprint_suite._browserforge_adapter import get_user_agent_pool
+from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_values
 from crawlee.fingerprint_suite._consts import (
     BROWSER_TYPE_HEADER_KEYWORD,
-    PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA,
-    PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_MOBILE,
-    PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_PLATFORM,
 )
-from crawlee.fingerprint_suite._types import SupportedBrowserType
 
-@pytest.fixture(scope="session")
-def user_agents_pool():
-    return get_user_agent_pool()
+if TYPE_CHECKING:
+    from crawlee.fingerprint_suite._types import SupportedBrowserType
+
 
 def test_get_common_headers() -> None:
     header_generator = HeaderGenerator()
@@ -33,21 +31,18 @@ def test_get_random_user_agent_header() -> None:
     assert headers['User-Agent']
 
 
-
-@pytest.mark.parametrize('_', range(100))
-@pytest.mark.parametrize('browser_type', [
-    'chromium','firefox','edge','webkit'
-])
-def test_get_user_agent_header_stress_test(browser_type: SupportedBrowserType,user_agents_pool,_) -> None:
+@pytest.mark.parametrize('browser_type', ['chromium', 'firefox', 'edge', 'webkit'])
+def test_get_user_agent_header_stress_test(browser_type: SupportedBrowserType, header_network: dict) -> None:
     """Test that the User-Agent header is consistently generated correctly.
 
     (Very fast even when stress tested.)"""
-    header_generator = HeaderGenerator()
-    headers = header_generator.get_user_agent_header(browser_type=browser_type)
+    for _ in range(100):
+        header_generator = HeaderGenerator()
+        headers = header_generator.get_user_agent_header(browser_type=browser_type)
 
-    assert 'User-Agent' in headers
-    assert any(keyword in headers['User-Agent'] for keyword in BROWSER_TYPE_HEADER_KEYWORD[browser_type])
-    assert headers['User-Agent'] in user_agents_pool
+        assert 'User-Agent' in headers
+        assert any(keyword in headers['User-Agent'] for keyword in BROWSER_TYPE_HEADER_KEYWORD[browser_type])
+        assert headers['User-Agent'] in get_available_header_values(header_network, {'user-agent', 'User-Agent'})
 
 
 def test_get_user_agent_header_invalid_browser_type() -> None:
@@ -58,21 +53,23 @@ def test_get_user_agent_header_invalid_browser_type() -> None:
         header_generator.get_user_agent_header(browser_type='invalid_browser')  # type: ignore[arg-type]
 
 
-def test_get_sec_ch_ua_headers_chromium() -> None:
-    """Test that Sec-Ch-Ua headers are generated correctly for Chromium."""
+def test_get_sec_ch_ua_headers_chromium(header_network: dict) -> None:
+    """Test that sec-ch-ua headers are generated correctly for Chromium."""
     header_generator = HeaderGenerator()
     headers = header_generator.get_sec_ch_ua_headers(browser_type='chromium')
 
-    assert 'Sec-Ch-Ua' in headers
-    assert headers['Sec-Ch-Ua'] == PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA
-    assert 'Sec-Ch-Ua-Mobile' in headers
-    assert headers['Sec-Ch-Ua-Mobile'] == PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_MOBILE
-    assert 'Sec-Ch-Ua-Platform' in headers
-    assert headers['Sec-Ch-Ua-Platform'] == PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_PLATFORM
+    assert 'sec-ch-ua' in headers
+    assert headers['sec-ch-ua'] in get_available_header_values(header_network, 'sec-ch-ua')
+
+    assert 'sec-ch-ua-mobile' in headers
+    assert headers['sec-ch-ua-mobile'] in get_available_header_values(header_network, 'sec-ch-ua-mobile')
+
+    assert 'sec-ch-ua-platform' in headers
+    assert headers['sec-ch-ua-platform'] in get_available_header_values(header_network, 'sec-ch-ua-platform')
 
 
 def test_get_sec_ch_ua_headers_firefox() -> None:
-    """Test that Sec-Ch-Ua headers are not generated for Firefox."""
+    """Test that sec-ch-ua headers are not generated for Firefox."""
     header_generator = HeaderGenerator()
     headers = header_generator.get_sec_ch_ua_headers(browser_type='firefox')
 
@@ -80,7 +77,7 @@ def test_get_sec_ch_ua_headers_firefox() -> None:
 
 
 def test_get_sec_ch_ua_headers_webkit() -> None:
-    """Test that Sec-Ch-Ua headers are not generated for WebKit."""
+    """Test that sec-ch-ua headers are not generated for WebKit."""
     header_generator = HeaderGenerator()
     headers = header_generator.get_sec_ch_ua_headers(browser_type='webkit')
 
@@ -88,7 +85,7 @@ def test_get_sec_ch_ua_headers_webkit() -> None:
 
 
 def test_get_sec_ch_ua_headers_invalid_browser_type() -> None:
-    """Test that an invalid browser type raises a ValueError for Sec-Ch-Ua headers."""
+    """Test that an invalid browser type raises a ValueError for sec-ch-ua headers."""
     header_generator = HeaderGenerator()
 
     with pytest.raises(ValueError, match='Unsupported browser type'):
