@@ -135,6 +135,7 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
             raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
         await self._playwright_context_manager.__aexit__(exc_type, exc_value, exc_traceback)
+        self._playwright_context_manager = async_playwright()
         self._active = False
 
     @override

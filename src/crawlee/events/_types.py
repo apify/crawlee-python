@@ -7,6 +7,7 @@ from typing import Annotated, Any, TypeVar, Union
 from pydantic import BaseModel, ConfigDict, Field
 
 from crawlee._utils.docs import docs_group
+from crawlee._utils.models import timedelta_secs
 from crawlee._utils.system import CpuInfo, MemoryUsageInfo
 
 
@@ -58,6 +59,10 @@ class EventMigratingData(BaseModel):
     """Data for the migrating event."""
 
     model_config = ConfigDict(populate_by_name=True)
+
+    # The remaining time in seconds before the migration is forced and the process is killed
+    # Optional because it's not present when the event handler is called manually
+    time_remaining: Annotated[timedelta_secs | None, Field(alias='timeRemainingSecs')] = None
 
 
 @docs_group('Event payloads')
