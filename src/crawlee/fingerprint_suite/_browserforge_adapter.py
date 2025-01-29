@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import json
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any
 
+from browserforge.bayesian_network import extract_json
 from browserforge.fingerprints import Fingerprint as bf_Fingerprint
 from browserforge.fingerprints import FingerprintGenerator as bf_FingerprintGenerator
 from browserforge.fingerprints import Screen
+from browserforge.headers.generator import DATA_DIR
 from browserforge.headers.generator import HeaderGenerator as bf_HeaderGenerator
 from typing_extensions import override
 
@@ -85,7 +88,7 @@ class BrowserforgeHeaderGenerator:
     def __init__(self):
         self._generator = bf_HeaderGenerator()
 
-    def generate(self, browser_type: SupportedBrowserType) -> bf_Fingerprint:
+    def generate(self, browser_type: SupportedBrowserType = "chromium") -> bf_Fingerprint:
         # browserforge header generation can be flaky. Enforce basic QA on generated headers
         max_attempts = 10
 
@@ -100,3 +103,11 @@ class BrowserforgeHeaderGenerator:
                 return generated_header
             print(generated_header['User-Agent'])
         raise RuntimeError('Failed to generate header.')
+
+
+
+def get_user_agent_pool() -> set[str]:
+    """Get set of `User-Agent` strings available to browserforge."""
+    header_network = extract_json((DATA_DIR / "header-network.zip"))
+    return set(header_network['nodes'][6]['possibleValues']) | set(header_network['nodes'][7]['possibleValues'])
+

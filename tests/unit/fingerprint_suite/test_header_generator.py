@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from crawlee.fingerprint_suite import HeaderGenerator
+from crawlee.fingerprint_suite._browserforge_adapter import get_user_agent_pool
 from crawlee.fingerprint_suite._consts import (
     BROWSER_TYPE_HEADER_KEYWORD,
     PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA,
@@ -11,6 +12,9 @@ from crawlee.fingerprint_suite._consts import (
 )
 from crawlee.fingerprint_suite._types import SupportedBrowserType
 
+@pytest.fixture(scope="session")
+def user_agents_pool():
+    return get_user_agent_pool()
 
 def test_get_common_headers() -> None:
     header_generator = HeaderGenerator()
@@ -34,7 +38,7 @@ def test_get_random_user_agent_header() -> None:
 @pytest.mark.parametrize('browser_type', [
     'chromium','firefox','edge','webkit'
 ])
-def test_get_user_agent_header_stress_test(browser_type: SupportedBrowserType,_) -> None:
+def test_get_user_agent_header_stress_test(browser_type: SupportedBrowserType,user_agents_pool,_) -> None:
     """Test that the User-Agent header is consistently generated correctly.
 
     (Very fast even when stress tested.)"""
@@ -43,6 +47,7 @@ def test_get_user_agent_header_stress_test(browser_type: SupportedBrowserType,_)
 
     assert 'User-Agent' in headers
     assert any(keyword in headers['User-Agent'] for keyword in BROWSER_TYPE_HEADER_KEYWORD[browser_type])
+    assert headers['User-Agent'] in user_agents_pool
 
 
 def test_get_user_agent_header_invalid_browser_type() -> None:

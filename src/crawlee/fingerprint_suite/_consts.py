@@ -17,7 +17,6 @@ PW_FIREFOX_HEADLESS_DEFAULT_USER_AGENT = (
 )
 PW_WEBKIT_HEADLESS_DEFAULT_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15'
 
-
 BROWSER_TYPE_HEADER_KEYWORD = {
     'chromium':{'Chrome', 'CriOS'},
     'firefox':{'Firefox', 'FxiOS'},

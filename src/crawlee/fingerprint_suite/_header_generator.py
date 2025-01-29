@@ -22,6 +22,10 @@ class HeaderGenerator:
     def __init__(self):
         self._generator = BrowserforgeHeaderGenerator()
 
+    def _get_specific_headers(self, all_headers: dict[str,str], header_names: set[str]) -> HttpHeaders:
+        return HttpHeaders({key:value for key, value in all_headers.items() if key in header_names})
+
+
     def get_common_headers(self) -> HttpHeaders:
         """Get common HTTP headers ("Accept", "Accept-Language").
 
@@ -29,12 +33,12 @@ class HeaderGenerator:
         by the HTTP client or browser.
         """
         all_headers = self._generator.generate()
-        return HttpHeaders({key:value for key, value in all_headers.items() if key in {'Accept', 'Accept-Language'}})
+        return self._get_specific_headers(all_headers, header_names={'Accept', 'Accept-Language'})
 
     def get_random_user_agent_header(self) -> HttpHeaders:
         """Get a random User-Agent header."""
         all_headers = self._generator.generate()
-        return HttpHeaders({'User-Agent':all_headers['User-Agent']})
+        return self._get_specific_headers(all_headers, header_names={'User-Agent'})
 
 
     def get_user_agent_header(
@@ -43,12 +47,10 @@ class HeaderGenerator:
         browser_type: SupportedBrowserType = 'chromium',
     ) -> HttpHeaders:
         """Get the User-Agent header based on the browser type."""
-        headers = dict[str, str]()
-
         if browser_type not in {'chromium', 'firefox', 'webkit', 'edge'}:
             raise ValueError(f'Unsupported browser type: {browser_type}')
         all_headers = self._generator.generate(browser_type=browser_type)
-        return HttpHeaders({'User-Agent': all_headers['User-Agent']})
+        return self._get_specific_headers(all_headers, header_names={'User-Agent'})
 
     def get_sec_ch_ua_headers(
         self,
