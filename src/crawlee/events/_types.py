@@ -59,6 +59,10 @@ class EventMigratingData(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
+    # The remaining time in seconds before the migration is forced and the process is killed
+    # Optional because it's not present when the event handler is called manually
+    time_remaining_secs: Annotated[float | None, Field(alias='timeRemainingSecs')]
+
 
 @docs_group('Event payloads')
 class EventAbortingData(BaseModel):
