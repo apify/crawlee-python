@@ -38,7 +38,7 @@ class RenderingTypePredictor(ABC):
 
         Args:
             request: Used request.
-            rendering_type: Known suitable RenderingType.
+            rendering_type: Known suitable `RenderingType`.
         """
 
 
