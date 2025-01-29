@@ -14,6 +14,7 @@ from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Generic, Union, cast
 from urllib.parse import ParseResult, urlparse
+from weakref import WeakKeyDictionary
 
 from tldextract import TLDExtract
 from typing_extensions import NotRequired, TypedDict, TypeVar, Unpack, assert_never
@@ -289,6 +290,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._error_handler: ErrorHandler[TCrawlingContext | BasicCrawlingContext] | None = None
         self._failed_request_handler: FailedRequestHandler[TCrawlingContext | BasicCrawlingContext] | None = None
         self._abort_on_error = abort_on_error
+
+        # Context of each request with matching result.
+        self._context_result_map = WeakKeyDictionary[BasicCrawlingContext, RequestHandlerRunResult]()
 
         # Context pipeline
         self._context_pipeline = (_context_pipeline or ContextPipeline()).compose(self._check_url_after_redirects)
@@ -908,9 +912,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         return send_request
 
-    async def _commit_request_handler_result(
-        self, context: BasicCrawlingContext, result: RequestHandlerRunResult
-    ) -> None:
+    async def _commit_request_handler_result(self, context: BasicCrawlingContext) -> None:
+        result = self._context_result_map[context]
+
         request_manager = await self.get_request_manager()
         origin = context.request.loaded_url or context.request.url
 
@@ -1018,19 +1022,20 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         session = await self._get_session()
         proxy_info = await self._get_proxy_info(request, session)
-        empty_result = RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store)
+        result = RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store)
 
         context = BasicCrawlingContext(
             request=request,
             session=session,
             proxy_info=proxy_info,
             send_request=self._prepare_send_request_function(session, proxy_info),
-            add_requests=empty_result.add_requests,
-            push_data=empty_result.push_data,
-            get_key_value_store=empty_result.get_key_value_store,
+            add_requests=result.add_requests,
+            push_data=result.push_data,
+            get_key_value_store=result.get_key_value_store,
             use_state=self._use_state,
             log=self._logger,
         )
+        self._context_result_map[context] = result
 
         statistics_id = request.id or request.unique_key
         self._statistics.record_request_processing_start(statistics_id)
@@ -1039,12 +1044,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             request.state = RequestState.REQUEST_HANDLER
 
             try:
-                result = await self._run_request_handler(context=context, result=empty_result)
+                await self._run_request_handler(context=context)
             except asyncio.TimeoutError as e:
                 raise RequestHandlerError(e, context) from e
 
-            await self._commit_request_handler_result(context, result)
-
+            await self._commit_request_handler_result(context)
             await wait_for(
                 lambda: request_manager.mark_request_as_handled(context.request),
                 timeout=self._internal_timeout,
@@ -1132,9 +1136,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             )
             raise
 
-    async def _run_request_handler(
-        self, context: BasicCrawlingContext, result: RequestHandlerRunResult
-    ) -> RequestHandlerRunResult:
+    async def _run_request_handler(self, context: BasicCrawlingContext) -> None:
         await wait_for(
             lambda: self._context_pipeline(context, self.router),
             timeout=self._request_handler_timeout,
@@ -1142,7 +1144,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             f'{self._request_handler_timeout.total_seconds()} seconds',
             logger=self._logger,
         )
-        return result
 
     def _is_session_blocked_status_code(self, session: Session | None, status_code: int) -> bool:
         """Check if the HTTP status code indicates that the session was blocked by the target website.
