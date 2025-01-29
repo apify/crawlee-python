@@ -187,7 +187,7 @@ function ActorExample() {
 //                 </CodeBlock>
 //                 <p>
 //                     2️⃣ The next step is to add <code>Actor.init()</code> to the beginning of your main script and <code>Actor.exit()</code> to the end of it.
-//                     This will enable the integration to the Apify Platform, so the <a href="https://apify.com/storage" target="_blank" rel="noreferrer">cloud
+//                     This will enable the integration to the Apify platform, so the <a href="https://apify.com/storage" target="_blank" rel="noreferrer">cloud
 //                     storages</a> (e.g. <code>RequestQueue</code>) will be used. The code should look like this:
 //                 </p>
 //                 <RunnableCodeBlock className="language-typescript" type="playwright">

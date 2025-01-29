@@ -14,12 +14,12 @@ This guide will help you get started with Crawlee by setting it up on your compu
 
 Before installing Crawlee itself, make sure that your system meets the following requirements:
 
-- **Python 3.9 or higher**: Crawlee requires Python 3.9 or a newer version. You can download Python from the [official website](https://www.python.org/downloads/).
-- **Python package manager**: While this guide uses Pip (the most common package manager), you can also use any package manager you want. You can download Pip from the [official website](https://pip.pypa.io/en/stable/installation/).
+- **Python 3.9 or higher**: Crawlee requires Python 3.9 or a newer version. You can download Python from the [official website](https://python.org/downloads/).
+- **Python package manager**: While this guide uses [pip](https://pip.pypa.io/) (the most common package manager), you can also use any package manager you want. You can download pip from the [official website](https://pip.pypa.io/en/stable/installation/).
 
 ### Verifying prerequisites
 
-To check if Python and the Pip package manager are installed, run the following commands:
+To check if Python and pip are installed, run the following commands:
 
 ```sh
 python --version
@@ -33,7 +33,7 @@ If these commands return the respective versions, you're ready to continue.
 
 ## Installing Crawlee
 
-Crawlee is available as the [`crawlee`](https://pypi.org/project/crawlee/) package on PyPI. The core package includes the core functionality, while additional features are available as optional extras to keep dependencies and package size minimal.
+Crawlee is available as [`crawlee`](https://pypi.org/project/crawlee/) package on PyPI. This package includes the core functionality, while additional features are available as optional extras to keep dependencies and package size minimal.
 
 ### Basic installation
 
@@ -51,7 +51,7 @@ python -c 'import crawlee; print(crawlee.__version__)'
 
 ### Full installation
 
-If you want to install Crawlee with all optional features, and/or you do not mind the package size, run the following command:
+If you do not mind the package size, you can run the following command to install Crawlee with all optional features:
 
 ```sh
 pip install 'crawlee[all]'
