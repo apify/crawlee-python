@@ -111,6 +111,7 @@ crawlee = "crawlee._cli:cli"
 
 [tool.ruff]
 line-length = 120
+include = ["src/**/*.py", "tests/**/*.py", "docs/**/*.py", "website/**/*.py"]
 extend-exclude = ["project_template"]
 
 [tool.ruff.lint]
