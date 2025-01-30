@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from crawlee.http_clients import HttpResponse
 
 
-class ParselParser(AbstractHttpParser[Selector]):
+class ParselParser(AbstractHttpParser[Selector, Selector]):
     """Parser for parsing HTTP response using Parsel."""
 
     @override

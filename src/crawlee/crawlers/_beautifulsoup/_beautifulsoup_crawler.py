@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from bs4 import Tag
+from bs4 import BeautifulSoup, Tag
 
 from crawlee._utils.docs import docs_group
 from crawlee.crawlers._abstract_http import AbstractHttpCrawler, HttpCrawlerOptions
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 
 @docs_group('Classes')
-class BeautifulSoupCrawler(AbstractHttpCrawler[BeautifulSoupCrawlingContext, Tag]):
+class BeautifulSoupCrawler(AbstractHttpCrawler[BeautifulSoupCrawlingContext, BeautifulSoup, Tag]):
     """A web crawler for performing HTTP requests and parsing HTML/XML content.
 
     The `BeautifulSoupCrawler` builds on top of the `AbstractHttpCrawler`, which means it inherits all of its features.
@@ -68,7 +68,7 @@ class BeautifulSoupCrawler(AbstractHttpCrawler[BeautifulSoupCrawlingContext, Tag
         """
 
         async def final_step(
-            context: ParsedHttpCrawlingContext[Tag],
+            context: ParsedHttpCrawlingContext[BeautifulSoup],
         ) -> AsyncGenerator[BeautifulSoupCrawlingContext, None]:
             """Enhance `ParsedHttpCrawlingContext[BeautifulSoup]` with `soup` property."""
             yield BeautifulSoupCrawlingContext.from_parsed_http_crawling_context(context)

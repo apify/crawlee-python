@@ -13,18 +13,18 @@ if TYPE_CHECKING:
     from crawlee.http_clients import HttpResponse
 
 
-class BeautifulSoupParser(AbstractHttpParser[Tag]):
+class BeautifulSoupParser(AbstractHttpParser[BeautifulSoup, Tag]):
     """Parser for parsing HTTP response using `BeautifulSoup`."""
 
     def __init__(self, parser: BeautifulSoupParserType = 'lxml') -> None:
         self._parser = parser
 
     @override
-    async def parse(self, response: HttpResponse) -> Tag:
+    async def parse(self, response: HttpResponse) -> BeautifulSoup:
         return BeautifulSoup(response.read(), features=self._parser)
 
     @override
-    async def parse_text(self, text: str) -> Tag:
+    async def parse_text(self, text: str) -> BeautifulSoup:
         return BeautifulSoup(text, features=self._parser)
 
     @override

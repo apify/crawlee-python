@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, fields
 from datetime import timedelta
-from typing import TYPE_CHECKING, Generic
-
-from typing_extensions import TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 from crawlee import HttpHeaders
 from crawlee._types import BasicCrawlingContext
@@ -22,17 +20,20 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
 
+TStaticParseResult = TypeVar('TStaticParseResult')
+TStaticSelectResult = TypeVar('TStaticSelectResult')
+
+
 class AdaptiveContextError(RuntimeError):
     pass
 
 
-TStaticParseResult = TypeVar('TStaticParseResult')
-
-
 @dataclass(frozen=True)
 @docs_group('Data structures')
-class AdaptivePlaywrightCrawlingContext(Generic[TStaticParseResult], ParsedHttpCrawlingContext[TStaticParseResult]):
-    _static_parser: AbstractHttpParser[TStaticParseResult]
+class AdaptivePlaywrightCrawlingContext(
+    Generic[TStaticParseResult, TStaticSelectResult], ParsedHttpCrawlingContext[TStaticParseResult]
+):
+    _static_parser: AbstractHttpParser[TStaticParseResult, TStaticSelectResult]
     _response: Response | None = None
     _infinite_scroll: Callable[[], Awaitable[None]] | None = None
     _page: Page | None = None
@@ -73,7 +74,7 @@ class AdaptivePlaywrightCrawlingContext(Generic[TStaticParseResult], ParsedHttpC
             return
         await self.page.locator(selector).wait_for(timeout=timeout.total_seconds() * 1000)
 
-    async def query_selector(self, selector: str, timeout: timedelta = timedelta(seconds=5)) -> TStaticParseResult:
+    async def query_selector(self, selector: str, timeout: timedelta = timedelta(seconds=5)) -> TStaticSelectResult:
         static_content = await self._static_parser.select(self.parsed_content, selector)
         if static_content is not None:
             return static_content
@@ -98,15 +99,17 @@ class AdaptivePlaywrightCrawlingContext(Generic[TStaticParseResult], ParsedHttpC
 
     @classmethod
     def from_parsed_http_crawling_context(
-        cls, context: ParsedHttpCrawlingContext[TStaticParseResult], parser: AbstractHttpParser[TStaticParseResult]
-    ) -> AdaptivePlaywrightCrawlingContext[TStaticParseResult]:
+        cls,
+        context: ParsedHttpCrawlingContext[TStaticParseResult],
+        parser: AbstractHttpParser[TStaticParseResult, TStaticSelectResult],
+    ) -> AdaptivePlaywrightCrawlingContext[TStaticParseResult, TStaticSelectResult]:
         """Convenience constructor that creates new context from existing `ParsedHttpCrawlingContext`."""
         return cls(_static_parser=parser, **{field.name: getattr(context, field.name) for field in fields(context)})
 
     @classmethod
     async def from_playwright_crawling_context(
-        cls, context: PlaywrightCrawlingContext, parser: AbstractHttpParser[TStaticParseResult]
-    ) -> Self:
+        cls, context: PlaywrightCrawlingContext, parser: AbstractHttpParser[TStaticParseResult, TStaticSelectResult]
+    ) -> AdaptivePlaywrightCrawlingContext[TStaticParseResult, TStaticSelectResult]:
         """Convenience constructor that creates new context from existing `PlaywrightCrawlingContext`."""
         context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
         # Remove playwright specific attributes and pass them as private instead to be available as property.

@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from crawlee.http_clients import HttpResponse
 
 
-class NoParser(AbstractHttpParser[bytes]):
+class NoParser(AbstractHttpParser[bytes, bytes]):
     """Dummy parser for backwards compatibility.
 
     To enable using `HttpCrawler` without need for additional specific parser.

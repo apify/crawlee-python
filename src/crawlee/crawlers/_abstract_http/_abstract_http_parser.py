@@ -7,7 +7,7 @@ from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.docs import docs_group
 from crawlee.crawlers._types import BlockedInfo
 
-from ._http_crawling_context import TParseResult
+from ._http_crawling_context import TParseResult, TSelectResult
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 
 @docs_group('Abstract classes')
-class AbstractHttpParser(Generic[TParseResult], ABC):
+class AbstractHttpParser(Generic[TParseResult, TSelectResult], ABC):
     """Parser used for parsing http response and inspecting parsed result to find links or detect blocking."""
 
     @abstractmethod
@@ -34,7 +34,7 @@ class AbstractHttpParser(Generic[TParseResult], ABC):
     async def parse_text(self, text: str) -> TParseResult: ...
 
     @abstractmethod
-    async def select(self, parsed_content: TParseResult, selector: str) -> TParseResult | None: ...
+    async def select(self, parsed_content: TParseResult, selector: str) -> TSelectResult | None: ...
 
     def is_blocked(self, parsed_content: TParseResult) -> BlockedInfo:
         """Detect if blocked and return BlockedInfo with additional information.

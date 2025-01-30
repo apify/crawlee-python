@@ -1,7 +1,6 @@
 from dataclasses import dataclass, fields
-from typing import cast
 
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup
 from typing_extensions import Self
 
 from crawlee._utils.docs import docs_group
@@ -12,7 +11,7 @@ from ._utils import html_to_text
 
 @dataclass(frozen=True)
 @docs_group('Data structures')
-class BeautifulSoupCrawlingContext(ParsedHttpCrawlingContext[Tag]):
+class BeautifulSoupCrawlingContext(ParsedHttpCrawlingContext[BeautifulSoup]):
     """The crawling context used by the `BeautifulSoupCrawler`.
 
     It provides access to key objects as well as utility functions for handling crawling tasks.
@@ -21,10 +20,10 @@ class BeautifulSoupCrawlingContext(ParsedHttpCrawlingContext[Tag]):
     @property
     def soup(self) -> BeautifulSoup:
         """Convenience alias."""
-        return cast(BeautifulSoup, self.parsed_content)
+        return self.parsed_content
 
     @classmethod
-    def from_parsed_http_crawling_context(cls, context: ParsedHttpCrawlingContext[Tag]) -> Self:
+    def from_parsed_http_crawling_context(cls, context: ParsedHttpCrawlingContext[BeautifulSoup]) -> Self:
         """Convenience constructor that creates new context from existing `ParsedHttpCrawlingContext[BeautifulSoup]`."""
         return cls(**{field.name: getattr(context, field.name) for field in fields(context)})
 
