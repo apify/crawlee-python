@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from crawlee.http_clients import HttpResponse
 
 
-class BeautifulSoupParser(AbstractHttpParser[BeautifulSoup]):
+class BeautifulSoupParser(AbstractHttpParser[BeautifulSoup, Tag]):
     """Parser for parsing HTTP response using `BeautifulSoup`."""
 
     def __init__(self, parser: BeautifulSoupParserType = 'lxml') -> None:
@@ -24,8 +24,16 @@ class BeautifulSoupParser(AbstractHttpParser[BeautifulSoup]):
         return BeautifulSoup(response.read(), features=self._parser)
 
     @override
+    async def parse_text(self, text: str) -> BeautifulSoup:
+        return BeautifulSoup(text, features=self._parser)
+
+    @override
     def is_matching_selector(self, parsed_content: Tag, selector: str) -> bool:
         return parsed_content.select_one(selector) is not None
+
+    @override
+    async def select(self, parsed_content: Tag, selector: str) -> Tag | None:
+        return parsed_content.select_one(selector)
 
     @override
     def find_links(self, parsed_content: Tag, selector: str) -> Iterable[str]:
@@ -36,10 +44,6 @@ class BeautifulSoupParser(AbstractHttpParser[BeautifulSoup]):
             if url:
                 urls.append(url.strip())
         return urls
-
-    @property
-    def parser(self) -> BeautifulSoupParserType:
-        return self._parser
 
 
 BeautifulSoupParserType = Literal['html.parser', 'lxml', 'xml', 'html5lib']
