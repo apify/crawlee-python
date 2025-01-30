@@ -291,7 +291,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._failed_request_handler: FailedRequestHandler[TCrawlingContext | BasicCrawlingContext] | None = None
         self._abort_on_error = abort_on_error
 
-        # Context of each request with matching result.
+        # Context of each request with matching result of request handler.
+        # Inheritors can use this to override the result of individual request handler runs in `_run_request_handler`.
         self._context_result_map = WeakKeyDictionary[BasicCrawlingContext, RequestHandlerRunResult]()
 
         # Context pipeline
@@ -913,6 +914,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         return send_request
 
     async def _commit_request_handler_result(self, context: BasicCrawlingContext) -> None:
+        """Commit request handler result for the input `context`. Result is stored in `_context_result_map`."""
         result = self._context_result_map[context]
 
         request_manager = await self.get_request_manager()
