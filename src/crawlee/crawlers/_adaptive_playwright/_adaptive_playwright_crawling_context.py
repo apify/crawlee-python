@@ -8,7 +8,6 @@ from crawlee import HttpHeaders
 from crawlee._types import BasicCrawlingContext
 from crawlee._utils.docs import docs_group
 from crawlee.crawlers import (
-    AbstractHttpParser,
     ParsedHttpCrawlingContext,
     PlaywrightCrawlingContext,
 )
@@ -18,6 +17,8 @@ if TYPE_CHECKING:
 
     from playwright.async_api import Page, Response
     from typing_extensions import Self
+
+    from crawlee.crawlers._adaptive_playwright._adaptive_parser import ParserWithSelect
 
 
 TStaticParseResult = TypeVar('TStaticParseResult')
@@ -33,7 +34,7 @@ class AdaptiveContextError(RuntimeError):
 class AdaptivePlaywrightCrawlingContext(
     Generic[TStaticParseResult, TStaticSelectResult], ParsedHttpCrawlingContext[TStaticParseResult]
 ):
-    _static_parser: AbstractHttpParser[TStaticParseResult, TStaticSelectResult]
+    _static_parser: ParserWithSelect[TStaticParseResult, TStaticSelectResult]
     _response: Response | None = None
     _infinite_scroll: Callable[[], Awaitable[None]] | None = None
     _page: Page | None = None
@@ -101,14 +102,14 @@ class AdaptivePlaywrightCrawlingContext(
     def from_parsed_http_crawling_context(
         cls,
         context: ParsedHttpCrawlingContext[TStaticParseResult],
-        parser: AbstractHttpParser[TStaticParseResult, TStaticSelectResult],
+        parser: ParserWithSelect[TStaticParseResult, TStaticSelectResult],
     ) -> AdaptivePlaywrightCrawlingContext[TStaticParseResult, TStaticSelectResult]:
         """Convenience constructor that creates new context from existing `ParsedHttpCrawlingContext`."""
         return cls(_static_parser=parser, **{field.name: getattr(context, field.name) for field in fields(context)})
 
     @classmethod
     async def from_playwright_crawling_context(
-        cls, context: PlaywrightCrawlingContext, parser: AbstractHttpParser[TStaticParseResult, TStaticSelectResult]
+        cls, context: PlaywrightCrawlingContext, parser: ParserWithSelect[TStaticParseResult, TStaticSelectResult]
     ) -> AdaptivePlaywrightCrawlingContext[TStaticParseResult, TStaticSelectResult]:
         """Convenience constructor that creates new context from existing `PlaywrightCrawlingContext`."""
         context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
@@ -122,7 +123,7 @@ class AdaptivePlaywrightCrawlingContext(
             response=context.response, protocol=protocol_guess or ''
         )
         return cls(
-            parsed_content=await parser.parse(http_response),
+            parsed_content=await parser.static_parser.parse(http_response),
             http_response=http_response,
             _static_parser=parser,
             **context_kwargs,

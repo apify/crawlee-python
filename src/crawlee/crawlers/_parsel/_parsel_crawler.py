@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 
 @docs_group('Classes')
-class ParselCrawler(AbstractHttpCrawler[ParselCrawlingContext, Selector, Selector]):
+class ParselCrawler(AbstractHttpCrawler[ParselCrawlingContext, Selector]):
     """A web crawler for performing HTTP requests and parsing HTML/XML content.
 
     The `ParselCrawler` builds on top of the `AbstractHttpCrawler`, which means it inherits all of its features.

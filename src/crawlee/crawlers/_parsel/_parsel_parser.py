@@ -14,22 +14,12 @@ if TYPE_CHECKING:
     from crawlee.http_clients import HttpResponse
 
 
-class ParselParser(AbstractHttpParser[Selector, Selector]):
+class ParselParser(AbstractHttpParser[Selector]):
     """Parser for parsing HTTP response using Parsel."""
 
     @override
     async def parse(self, response: HttpResponse) -> Selector:
         return await asyncio.to_thread(lambda: Selector(body=response.read()))
-
-    @override
-    async def parse_text(self, text: str) -> Selector:
-        return Selector(text=text)
-
-    @override
-    async def select(self, parsed_content: Selector, selector: str) -> Selector | None:
-        if selector_list := parsed_content.css(selector):
-            return selector_list[0]
-        return None
 
     @override
     def is_matching_selector(self, parsed_content: Selector, selector: str) -> bool:
