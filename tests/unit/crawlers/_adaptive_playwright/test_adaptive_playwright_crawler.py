@@ -538,3 +538,28 @@ async def test_adaptive_playwright_crawler_timeout_in_sub_crawler(test_urls: lis
     mocked_static_handler.assert_called_once_with()
     # Browser handler was capable of running despite static handler having sleep time larger than top handler timeout.
     mocked_browser_handler.assert_called_once_with()
+
+
+async def test_adaptive_playwright_crawler_default_predictor(test_urls: list[str]) -> None:
+    """Test default rendering type predictor integration into crawler."""
+
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        playwright_crawler_specific_kwargs={'browser_pool': _StaticRedirectBrowserPool.with_default_plugin()},
+    )
+    mocked_static_handler = Mock()
+    mocked_browser_handler = Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        try:
+            # page is available only if it was crawled by PlaywrightCrawler.
+            context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
+            mocked_browser_handler()
+        except AdaptiveContextError:
+            mocked_static_handler()
+
+    await crawler.run(test_urls[:1])
+
+    # First prediction should trigger rendering type detection as the predictor does not have any data for prediction.
+    mocked_static_handler.assert_called_once_with()
+    mocked_browser_handler.assert_called_once_with()

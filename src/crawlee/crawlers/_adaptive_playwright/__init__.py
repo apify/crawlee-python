@@ -1,7 +1,20 @@
-from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler import AdaptivePlaywrightCrawler
-from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import (
+try:
+    from ._rendering_type_predictor import RenderingTypePredictor
+except ImportError as exc:
+    raise ImportError(
+        "To import this, you need to install the 'adaptive-playwright' extra. "
+        "For example, if you use pip, run `pip install 'crawlee[adaptive-playwright]'`.",
+    ) from exc
+
+from ._adaptive_playwright_crawler import AdaptivePlaywrightCrawler
+from ._adaptive_playwright_crawling_context import (
     AdaptivePlaywrightCrawlingContext,
     AdaptivePlaywrightPreNavCrawlingContext,
 )
 
-__all__ = ['AdaptivePlaywrightCrawler', 'AdaptivePlaywrightCrawlingContext', 'AdaptivePlaywrightPreNavCrawlingContext']
+__all__ = [
+    'AdaptivePlaywrightCrawler',
+    'AdaptivePlaywrightCrawlingContext',
+    'AdaptivePlaywrightPreNavCrawlingContext',
+    'RenderingTypePredictor',
+]
