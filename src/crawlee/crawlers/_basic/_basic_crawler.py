@@ -941,10 +941,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                         absolute_url = convert_to_absolute_url(base_url, request)
                         dst_request = Request.from_url(absolute_url)
 
-                # If the request is a BaseRequestData, convert it to Request object.
-                else:
-                    dst_request = Request.from_base_request_data(request)
-
                 # Update the crawl depth of the request.
                 dst_request.crawl_depth = context.request.crawl_depth + 1
 

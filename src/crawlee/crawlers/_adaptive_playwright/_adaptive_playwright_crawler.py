@@ -32,9 +32,7 @@ from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context
     AdaptivePlaywrightPreNavCrawlingContext,
 )
 from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import (
-    RandomRenderingTypePredictor as DefaultRenderingTypePredictor,
-)
-from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import (
+    DefaultRenderingTypePredictor,
     RenderingType,
     RenderingTypePredictor,
 )
