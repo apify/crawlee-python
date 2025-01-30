@@ -31,10 +31,30 @@ class AbstractHttpParser(Generic[TParseResult, TSelectResult], ABC):
         """
 
     @abstractmethod
-    async def parse_text(self, text: str) -> TParseResult: ...
+    async def parse_text(self, text: str) -> TParseResult:
+        """Parse test.
+
+        Args:
+            text: String containing html.
+
+        Returns:
+            Parsed text.
+        """
 
     @abstractmethod
-    async def select(self, parsed_content: TParseResult, selector: str) -> TSelectResult | None: ...
+    async def select(self, parsed_content: TParseResult, selector: str) -> TSelectResult | None:
+        """Use css selector to select page element and return it.
+
+        Default implementation that expects `is_matching_selector` abstract method to be implemented.
+        Override this method if your parser has different way of blockage detection.
+
+        Args:
+            parsed_content: content where the page element will be located
+            selector: css selector
+
+        Returns:
+            Selected element.
+        """
 
     def is_blocked(self, parsed_content: TParseResult) -> BlockedInfo:
         """Detect if blocked and return BlockedInfo with additional information.

@@ -19,6 +19,7 @@ class RenderingTypePrediction:
     detection_probability_recommendation: float
 
 
+@dataclass(frozen=True)
 class RenderingTypePredictor(ABC):
     @abstractmethod
     def predict(self, request: Request) -> RenderingTypePrediction: ...
