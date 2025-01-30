@@ -26,7 +26,7 @@ python --version
 ```
 
 ```sh
-pip --version
+python -m pip --version
 ```
 
 If these commands return the respective versions, you're ready to continue.
@@ -40,7 +40,7 @@ Crawlee is available as [`crawlee`](https://pypi.org/project/crawlee/) package o
 To install the core package, run:
 
 ```sh
-pip install crawlee
+python -m pip install crawlee
 ```
 
 After installation, verify that Crawlee is installed correctly by checking its version:
@@ -54,7 +54,7 @@ python -c 'import crawlee; print(crawlee.__version__)'
 If you do not mind the package size, you can run the following command to install Crawlee with all optional features:
 
 ```sh
-pip install 'crawlee[all]'
+python -m pip install 'crawlee[all]'
 ```
 
 ### Installing specific extras
@@ -64,25 +64,25 @@ Depending on your use case, you may want to install specific extras to enable ad
 For using the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, install the `beautifulsoup` extra:
 
 ```sh
-pip install 'crawlee[beautifulsoup]'
+python -m pip install 'crawlee[beautifulsoup]'
 ```
 
 For using the <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink>, install the `parsel` extra:
 
 ```sh
-pip install 'crawlee[parsel]'
+python -m pip install 'crawlee[parsel]'
 ```
 
 For using the <ApiLink to="class/CurlImpersonateHttpClient">`CurlImpersonateHttpClient`</ApiLink>, install the `curl-impersonate` extra:
 
 ```sh
-pip install 'crawlee[curl-impersonate]'
+python -m pip install 'crawlee[curl-impersonate]'
 ```
 
 If you plan to use a (headless) browser with <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>, install Crawlee with the `playwright` extra:
 
 ```sh
-pip install 'crawlee[playwright]'
+python -m pip install 'crawlee[playwright]'
 ```
 
 After installing the playwright extra, install the necessary Playwright dependencies:
@@ -96,7 +96,7 @@ playwright install
 You can install multiple extras at once by using a comma as a separator:
 
 ```sh
-pip install 'crawlee[beautifulsoup,curl-impersonate]'
+python -m pip install 'crawlee[beautifulsoup,curl-impersonate]'
 ```
 
 ## Start a new project
@@ -133,17 +133,18 @@ Follow the interactive prompts in the CLI to choose a crawler type and set up yo
 
 To run your newly created project, navigate to the project directory, activate the virtual environment, and execute the Python interpreter with the project module:
 
-```sh
-cd -m my_crawler
-```
-
-```sh
-source .venv/bin/activate
-```
-
-```sh
-python -m my_crawler
-```
+<Tabs>
+  <TabItem value="Linux" label="Linux" default>
+      <CodeBlock language="sh">cd my_crawler/</CodeBlock>
+      <CodeBlock language="sh">source .venv/bin/activate</CodeBlock>
+      <CodeBlock language="sh">python -m my_crawler</CodeBlock>
+  </TabItem>
+<TabItem value="Windows" label="Windows" default>
+      <CodeBlock language="sh">cd my_crawler/</CodeBlock>
+      <CodeBlock language="sh">venv\Scripts\activate</CodeBlock>
+      <CodeBlock language="sh">python -m my_crawler</CodeBlock>
+  </TabItem>
+</Tabs>
 
 Congratulations! You have successfully set up and executed your first Crawlee project.
 

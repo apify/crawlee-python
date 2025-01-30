@@ -36,13 +36,13 @@ In Crawlee we currently have two HTTP clients: <ApiLink to="class/HttpxHttpClien
 Since <ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink> is the default HTTP client, you don't need to install additional packages to use it. If you want to use <ApiLink to="class/CurlImpersonateHttpClient">`CurlImpersonateHttpClient`</ApiLink>, you need to install `crawlee` with the `curl-impersonate` extra.
 
 ```sh
-pip install 'crawlee[curl-impersonate]'
+python -m pip install 'crawlee[curl-impersonate]'
 ```
 
 or install all available extras:
 
 ```sh
-pip install 'crawlee[all]'
+python -m pip install 'crawlee[all]'
 ```
 
 ## How HTTP clients work

@@ -43,7 +43,7 @@ Crawlee is available as [`crawlee`](https://pypi.org/project/crawlee/) package o
 To install Crawlee with all features, run the following command:
 
 ```sh
-pip install 'crawlee[all]'
+python -m pip install 'crawlee[all]'
 ```
 
 Then, install the [Playwright](https://playwright.dev/) dependencies:
