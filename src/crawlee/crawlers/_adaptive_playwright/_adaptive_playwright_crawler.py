@@ -13,6 +13,7 @@ from parsel import Selector
 from typing_extensions import Self, TypeVar, override
 
 from crawlee._types import BasicCrawlingContext, JsonSerializable, RequestHandlerRunResult
+from crawlee._utils.docs import docs_group
 from crawlee._utils.wait import wait_for
 from crawlee.crawlers import (
     AbstractHttpCrawler,
@@ -82,6 +83,7 @@ class _NonPersistentStatistics(Statistics):
         self._active = False
 
 
+@docs_group('Classes')
 class AdaptivePlaywrightCrawler(
     Generic[TStaticCrawlingContext, TStaticParseResult],
     BasicCrawler[AdaptivePlaywrightCrawlingContext, AdaptivePlaywrightCrawlerStatisticState],

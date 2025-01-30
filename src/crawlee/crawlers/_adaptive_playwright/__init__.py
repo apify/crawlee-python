@@ -1,5 +1,5 @@
 try:
-    from ._rendering_type_predictor import RenderingTypePredictor
+    from ._rendering_type_predictor import RenderingType, RenderingTypePrediction, RenderingTypePredictor
 except ImportError as exc:
     raise ImportError(
         "To import this, you need to install the 'adaptive-playwright' extra. "
@@ -16,5 +16,7 @@ __all__ = [
     'AdaptivePlaywrightCrawler',
     'AdaptivePlaywrightCrawlingContext',
     'AdaptivePlaywrightPreNavCrawlingContext',
+    'RenderingType',
+    'RenderingTypePrediction',
     'RenderingTypePredictor',
 ]

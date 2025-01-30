@@ -18,10 +18,31 @@ with _try_import(__name__, 'ParselCrawler', 'ParselCrawlingContext'):
 with _try_import(__name__, 'PlaywrightCrawler', 'PlaywrightCrawlingContext', 'PlaywrightPreNavCrawlingContext'):
     from ._playwright import PlaywrightCrawler, PlaywrightCrawlingContext, PlaywrightPreNavCrawlingContext
 
+with _try_import(
+    __name__,
+    'AdaptivePlaywrightCrawler',
+    'AdaptivePlaywrightCrawlingContext',
+    'AdaptivePlaywrightPreNavCrawlingContext',
+    'RenderingType',
+    'RenderingTypePrediction',
+    'RenderingTypePredictor',
+):
+    from ._adaptive_playwright import (
+        AdaptivePlaywrightCrawler,
+        AdaptivePlaywrightCrawlingContext,
+        AdaptivePlaywrightPreNavCrawlingContext,
+        RenderingType,
+        RenderingTypePrediction,
+        RenderingTypePredictor,
+    )
+
 
 __all__ = [
     'AbstractHttpCrawler',
     'AbstractHttpParser',
+    'AdaptivePlaywrightCrawler',
+    'AdaptivePlaywrightCrawlingContext',
+    'AdaptivePlaywrightPreNavCrawlingContext',
     'BasicCrawler',
     'BasicCrawlerOptions',
     'BasicCrawlingContext',
@@ -39,4 +60,7 @@ __all__ = [
     'PlaywrightCrawler',
     'PlaywrightCrawlingContext',
     'PlaywrightPreNavCrawlingContext',
+    'RenderingType',
+    'RenderingTypePrediction',
+    'RenderingTypePredictor',
 ]

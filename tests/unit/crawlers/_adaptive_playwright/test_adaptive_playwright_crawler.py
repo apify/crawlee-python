@@ -14,19 +14,20 @@ from typing_extensions import override
 
 from crawlee import Request
 from crawlee.browsers import BrowserPool
-from crawlee.crawlers import BasicCrawler
-from crawlee.crawlers._adaptive_playwright import AdaptivePlaywrightCrawler, AdaptivePlaywrightCrawlingContext
+from crawlee.crawlers import (
+    AdaptivePlaywrightCrawler,
+    AdaptivePlaywrightCrawlingContext,
+    AdaptivePlaywrightPreNavCrawlingContext,
+    BasicCrawler,
+    RenderingType,
+    RenderingTypePrediction,
+    RenderingTypePredictor,
+)
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler_statistics import (
     AdaptivePlaywrightCrawlerStatisticState,
 )
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import (
     AdaptiveContextError,
-    AdaptivePlaywrightPreNavCrawlingContext,
-)
-from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import (
-    RenderingType,
-    RenderingTypePrediction,
-    RenderingTypePredictor,
 )
 from crawlee.statistics import Statistics
 

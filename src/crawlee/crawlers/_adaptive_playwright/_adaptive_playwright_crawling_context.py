@@ -100,6 +100,7 @@ class AdaptivePlaywrightCrawlingContext(Generic[TStaticParseResult], ParsedHttpC
 
 
 @dataclass(frozen=True)
+@docs_group('Data structures')
 class AdaptivePlaywrightPreNavCrawlingContext(BasicCrawlingContext):
     """This is just wrapper around BasicCrawlingContext or AdaptivePlaywrightCrawlingContext.
 

@@ -11,18 +11,21 @@ from sklearn.linear_model import LogisticRegression
 from typing_extensions import override
 
 from crawlee import Request
+from crawlee._utils.docs import docs_group
 
 UrlComponents = list[str]
 RenderingType = Literal['static', 'client only']
 FeatureVector = tuple[float, float]
 
 
+@docs_group('Data structures')
 @dataclass(frozen=True)
 class RenderingTypePrediction:
     rendering_type: RenderingType
     detection_probability_recommendation: float
 
 
+@docs_group('Classes')
 class RenderingTypePredictor(ABC):
     @abstractmethod
     def predict(self, request: Request) -> RenderingTypePrediction:
@@ -42,6 +45,7 @@ class RenderingTypePredictor(ABC):
         """
 
 
+@docs_group('Classes')
 class DefaultRenderingTypePredictor(RenderingTypePredictor):
     """Stores rendering type for previously crawled URLs and predicts the rendering type for unvisited urls.
 
