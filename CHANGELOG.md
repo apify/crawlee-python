@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.5.4 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Fix session managment with retire ([#947](https://github.com/apify/crawlee-python/pull/947)) ([caee03f](https://github.com/apify/crawlee-python/commit/caee03fe3a43cc1d7a8d3f9e19b42df1bdb1c0aa)) by [@Mantisus](https://github.com/Mantisus)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.5.3](https://github.com/apify/crawlee-python/releases/tag/v0.5.3) (2025-01-31)
 
 ### 🚀 Features
