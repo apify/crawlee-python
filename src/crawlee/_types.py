@@ -565,3 +565,7 @@ class BasicCrawlingContext:
 
     log: logging.Logger
     """Logger instance."""
+
+    def __hash__(self) -> int:
+        """Return hash of the context. Each context is considered unique."""
+        return id(self)
