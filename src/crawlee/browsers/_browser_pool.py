@@ -211,6 +211,8 @@ class BrowserPool:
 
         for browser in self._active_browsers + self._inactive_browsers:
             await browser.close(force=True)
+        self._active_browsers.clear()
+        self._inactive_browsers.clear()
 
         for plugin in self._plugins:
             await plugin.__aexit__(exc_type, exc_value, exc_traceback)

@@ -8,7 +8,7 @@ import json
 from typing import TYPE_CHECKING, Any
 from unittest import mock
 
-from crawlee import Glob, Request
+from crawlee import Glob, HttpHeaders, Request, RequestTransformAction
 from crawlee._types import EnqueueStrategy
 from crawlee.crawlers import PlaywrightCrawler
 from crawlee.fingerprint_suite import (
@@ -28,6 +28,7 @@ from crawlee.proxy_configuration import ProxyConfiguration
 if TYPE_CHECKING:
     from yarl import URL
 
+    from crawlee._request import RequestOptions
     from crawlee.crawlers import PlaywrightCrawlingContext, PlaywrightPreNavCrawlingContext
 
 
@@ -67,6 +68,33 @@ async def test_enqueue_links() -> None:
 
     assert len(visited) >= 10
     assert all(url.startswith('https://crawlee.dev/docs/examples') for url in visited)
+
+
+async def test_enqueue_links_with_transform_request_function() -> None:
+    crawler = PlaywrightCrawler()
+    visit = mock.Mock()
+    headers = []
+
+    def test_transform_request_function(request: RequestOptions) -> RequestOptions | RequestTransformAction:
+        if request['url'] == 'https://crawlee.dev/python/docs/introduction':
+            request['headers'] = HttpHeaders({'transform-header': 'my-header'})
+            return request
+        return 'skip'
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        visit(context.request.url)
+        headers.append(context.request.headers)
+        await context.enqueue_links(transform_request_function=test_transform_request_function)
+
+    await crawler.run(['https://crawlee.dev/python'])
+
+    visited = {call[0][0] for call in visit.call_args_list}
+
+    assert visited == {'https://crawlee.dev/python', 'https://crawlee.dev/python/docs/introduction'}
+
+    # all urls added to `enqueue_links` must have a custom header
+    assert headers[1]['transform-header'] == 'my-header'
 
 
 async def test_nonexistent_url_invokes_error_handler() -> None:

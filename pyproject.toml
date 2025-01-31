@@ -44,7 +44,7 @@ keywords = [
 python = "^3.9"
 apify = { version = ">=2.0.0", optional = true }
 beautifulsoup4 = { version = ">=4.12.0", optional = true }
-browserforge = { version = "*", optional = true }
+browserforge = { version = ">=1.2.3", optional = true }
 colorama = ">=0.4.0"
 cookiecutter = ">=2.6.0"
 curl-cffi = { version = ">=0.7.2", optional = true }
@@ -53,6 +53,7 @@ eval-type-backport = ">=0.2.0"
 html5lib = { version = ">=1.0", optional = true }
 httpx = {version = ">=0.27.0", extras = ["brotli", "http2", "zstd"]}
 inquirer = ">=3.3.0"
+jaro-winkler = { version = ">=2.0.3", optional = true }
 lxml = { version = ">=5.2.0", optional = true }
 more_itertools = ">=10.2.0"
 parsel = { version = ">=1.9.0", optional = true }
@@ -63,6 +64,10 @@ pydantic = ">=2.8.1, !=2.10.0, !=2.10.1, !=2.10.2"
 # https://github.com/apify/crawlee-python/issues/814
 pydantic-settings = ">=2.2.0 <2.7.0"
 pyee = ">=9.0.0"
+scikit-learn =  [
+    {version = ">=1.6.0", python = ">=3.10", optional = true},
+    {version = "==1.5.2", python = "==3.9", optional = true}
+]
 sortedcollections = ">=2.1.0"
 tldextract = ">=5.1.0"
 typer = ">=0.12.0"
@@ -93,10 +98,13 @@ types-psutil = "~5.9.5.20240205"
 types-python-dateutil = "~2.9.0.20240316"
 
 [tool.poetry.extras]
-all = ["beautifulsoup4", "curl-cffi", "lxml", "html5lib", "parsel", "playwright", "browserforge"]
+# Support for re-using groups in other groups https://peps.python.org/pep-0735/ in poetry:
+# https://github.com/python-poetry/poetry/issues/9751
+adaptive-playwright = ["jaro-winkler", "playwright", "scikit-learn"]
+all = ["beautifulsoup4", "browserforge", "curl-cffi", "html5lib", "jaro-winkler", "lxml", "parsel", "playwright", "scikit-learn"]
 beautifulsoup = ["beautifulsoup4", "lxml", "html5lib"]
 curl-impersonate = ["curl-cffi"]
-playwright = ["playwright", "browserforge"]
+playwright = ["browserforge", "playwright"]
 parsel = ["parsel"]
 
 [tool.poetry.scripts]
@@ -104,6 +112,7 @@ crawlee = "crawlee._cli:cli"
 
 [tool.ruff]
 line-length = 120
+include = ["src/**/*.py", "tests/**/*.py", "docs/**/*.py", "website/**/*.py"]
 extend-exclude = ["project_template"]
 
 [tool.ruff.lint]
@@ -208,8 +217,10 @@ warn_unused_ignores = true
 [[tool.mypy.overrides]]
 # Example codes are sometimes showing integration of crawlee with external tool, which is not dependency of crawlee.
 module = [
-    "apify",    # Example code shows integration of apify and crawlee.
-    "camoufox", # Example code shows integration of camoufox and crawlee.
+    "apify",                # Example code shows integration of apify and crawlee.
+    "camoufox",             # Example code shows integration of camoufox and crawlee.
+    "jaro",                 # Untyped and stubs not available
+    "sklearn.linear_model", # Untyped and stubs not available
 ]
 ignore_missing_imports = true
 
