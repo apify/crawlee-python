@@ -404,6 +404,24 @@ files = [
 cffi = ">=1.0.0"
 
 [[package]]
+name = "browserforge"
+version = "1.2.3"
+description = "Intelligent browser header & fingerprint generator"
+optional = true
+python-versions = "<4.0,>=3.8"
+files = [
+    {file = "browserforge-1.2.3-py3-none-any.whl", hash = "sha256:a6c71ed4688b2f1b0bee757ca82ddad0007cbba68a71eca66ca607dde382f132"},
+    {file = "browserforge-1.2.3.tar.gz", hash = "sha256:d5bec6dffd4748b30fbac9f9c1ef33b26c01a23185240bf90011843e174b7ecc"},
+]
+
+[package.dependencies]
+click = "*"
+typing_extensions = {version = "*", markers = "python_version < \"3.10\""}
+
+[package.extras]
+all = ["orjson"]
+
+[[package]]
 name = "build"
 version = "1.2.2.post1"
 description = "A simple, correct Python build frontend"
@@ -430,13 +448,13 @@ virtualenv = ["virtualenv (>=20.0.35)"]
 
 [[package]]
 name = "certifi"
-version = "2024.12.14"
+version = "2025.1.31"
 description = "Python package for providing Mozilla's CA Bundle."
 optional = false
 python-versions = ">=3.6"
 files = [
-    {file = "certifi-2024.12.14-py3-none-any.whl", hash = "sha256:1275f7a45be9464efc1173084eaa30f866fe2e47d389406136d332ed4967ec56"},
-    {file = "certifi-2024.12.14.tar.gz", hash = "sha256:b650d30f370c2b724812bee08008be0c4163b163ddaec3f2546c1caf65f191db"},
+    {file = "certifi-2025.1.31-py3-none-any.whl", hash = "sha256:ca78db4565a652026a4db2bcdf68f2fb589ea80d0be70e03929ed730746b84fe"},
+    {file = "certifi-2025.1.31.tar.gz", hash = "sha256:3d5da6925056f6f18f119200434a4780a94263f10d1c21d032a6f6b2baa20651"},
 ]
 
 [[package]]
@@ -2740,13 +2758,13 @@ dev = ["argcomplete", "attrs (>=19.2)", "hypothesis (>=3.56)", "mock", "pygments
 
 [[package]]
 name = "pytest-asyncio"
-version = "0.25.2"
+version = "0.25.3"
 description = "Pytest support for asyncio"
 optional = false
 python-versions = ">=3.9"
 files = [
-    {file = "pytest_asyncio-0.25.2-py3-none-any.whl", hash = "sha256:0d0bb693f7b99da304a0634afc0a4b19e49d5e0de2d670f38dc4bfa5727c5075"},
-    {file = "pytest_asyncio-0.25.2.tar.gz", hash = "sha256:3f8ef9a98f45948ea91a0ed3dc4268b5326c0e7bce73892acc654df4262ad45f"},
+    {file = "pytest_asyncio-0.25.3-py3-none-any.whl", hash = "sha256:9e89518e0f9bd08928f97a3482fdc4e244df17529460bc038291ccaf8f85c7c3"},
+    {file = "pytest_asyncio-0.25.3.tar.gz", hash = "sha256:fc1da2cf9f125ada7e710b4ddad05518d4cee187ae9412e9ac9271003497f07a"},
 ]
 
 [package.dependencies]
@@ -3487,13 +3505,13 @@ test = ["argcomplete (>=3.0.3)", "mypy (>=1.7.0)", "pre-commit", "pytest (>=7.0,
 
 [[package]]
 name = "typeapi"
-version = "2.2.3"
+version = "2.2.4"
 description = ""
 optional = false
-python-versions = "<4.0,>=3.8"
+python-versions = ">=3.8"
 files = [
-    {file = "typeapi-2.2.3-py3-none-any.whl", hash = "sha256:038062b473dd9bc182966469d7a37d81ba7fa5bb0c01f30b0604b5667b13a47b"},
-    {file = "typeapi-2.2.3.tar.gz", hash = "sha256:61cf8c852c05471522fcf55ec37d0c37f0de6943cc8e4d58529f796881e32c08"},
+    {file = "typeapi-2.2.4-py3-none-any.whl", hash = "sha256:bd6d5e5907fa47e0303bf254e7cc8712d4be4eb26d7ffaedb67c9e7844c53bb8"},
+    {file = "typeapi-2.2.4.tar.gz", hash = "sha256:daa80767520c0957a320577e4f729c0ba6921c708def31f4c6fd8d611908fd7b"},
 ]
 
 [package.dependencies]
@@ -4135,13 +4153,13 @@ cffi = ["cffi (>=1.11)"]
 
 [extras]
 adaptive-playwright = ["jaro-winkler", "playwright", "scikit-learn", "scikit-learn"]
-all = ["beautifulsoup4", "curl-cffi", "html5lib", "jaro-winkler", "lxml", "parsel", "playwright", "scikit-learn", "scikit-learn"]
+all = ["beautifulsoup4", "browserforge", "curl-cffi", "html5lib", "jaro-winkler", "lxml", "parsel", "playwright", "scikit-learn", "scikit-learn"]
 beautifulsoup = ["beautifulsoup4", "html5lib", "lxml"]
 curl-impersonate = ["curl-cffi"]
 parsel = ["parsel"]
-playwright = ["playwright"]
+playwright = ["browserforge", "playwright"]
 
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "b395f6bad80841f3ecacf8d310fe3f8c4aa881c8454cc7ca9007af4c28a9c9b3"
+content-hash = "25f3c7f213fda3fb691a228905a3496b1606029eb556c2b5293a42f5bc455d22"
