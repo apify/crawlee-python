@@ -183,7 +183,13 @@ async def test_handles_server_error(
     assert server['500_endpoint'].called
 
 
-async def test_stores_cookies(httpbin: URL) -> None:
+@pytest.mark.parametrize(
+    'http_client_class',
+    [CurlImpersonateHttpClient, HttpxHttpClient],
+    ids=['curl', 'httpx'],
+)
+async def test_stores_cookies(http_client_class: type[BaseHttpClient], httpbin: URL) -> None:
+    http_client = http_client_class()
     visit = Mock()
     track_session_usage = Mock()
 
@@ -192,6 +198,7 @@ async def test_stores_cookies(httpbin: URL) -> None:
             # /cookies/set might redirect us to a page that we can't access - no problem, we only care about cookies
             ignore_http_error_status_codes=[401],
             session_pool=session_pool,
+            http_client=http_client,
         )
 
         @crawler.router.default_handler
@@ -410,3 +417,71 @@ async def test_http_crawler_pre_navigation_hooks_executed_before_request() -> No
     await crawler.run([Request.from_url(url=test_url)])
 
     assert execution_order == ['pre-navigation-hook 1', 'pre-navigation-hook 2', 'request', 'final handler']
+
+
+@pytest.mark.parametrize(
+    'http_client_class',
+    [CurlImpersonateHttpClient, HttpxHttpClient],
+    ids=['curl', 'httpx'],
+)
+async def test_isolation_cookies(http_client_class: type[BaseHttpClient], httpbin: URL) -> None:
+    http_client = http_client_class()
+    sessions_id: list[str] = []
+    sessions_cookies: dict[str, dict[str, str]] = {}
+    response_cookies: dict[str, dict[str, str]] = {}
+
+    crawler = HttpCrawler(
+        session_pool=SessionPool(max_pool_size=1),
+        http_client=http_client,
+    )
+
+    @crawler.router.default_handler
+    async def handler(context: HttpCrawlingContext) -> None:
+        if context.session:
+            sessions_id.append(context.session.id)
+
+        # Add to the queue the request that will be made by the session with the cookie
+        await context.add_requests(
+            [
+                Request.from_url(str(httpbin.with_path('/cookies')), unique_key='1', label='cookies'),
+            ]
+        )
+
+    @crawler.router.handler('cookies')
+    async def cookies_handler(context: HttpCrawlingContext) -> None:
+        if context.session:
+            if context.request.unique_key == '2':
+                sessions_id.append(context.session.id)
+            sessions_cookies[context.session.id] = context.session.cookies
+            response_data = json.loads(context.http_response.read())
+            response_cookies[context.session.id] = response_data.get('cookies')
+            context.session.retire()
+
+        # The session with the cookie is retire. The next request should be made by a session without a cookie
+        if context.request.unique_key == '1':
+            await context.add_requests(
+                [
+                    Request.from_url(str(httpbin.with_path('/cookies')), unique_key='2', label='cookies'),
+                ]
+            )
+
+    await crawler.run(
+        [
+            str(httpbin.with_path('/cookies/set').extend_query(a=1)),
+        ]
+    )
+
+    assert len(sessions_cookies) == 2
+    assert len(response_cookies) == 2
+
+    cookie_session_id = sessions_id[0]
+    clean_session_id = sessions_id[1]
+
+    assert cookie_session_id != clean_session_id
+
+    # The initiated cookies must match in both the response and the session store
+    assert sessions_cookies[cookie_session_id] == response_cookies[cookie_session_id] == {'a': '1'}
+
+    # For a clean session, the cookie should not be in the sesstion store or in the response
+    # This way we can be sure that no cookies are being leaked through the http client
+    assert sessions_cookies[clean_session_id] == response_cookies[clean_session_id] == {}
