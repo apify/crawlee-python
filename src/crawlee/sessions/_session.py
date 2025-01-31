@@ -38,7 +38,7 @@ class Session:
         usage_count: int = 0,
         max_usage_count: int = 50,
         error_score: float = 0.0,
-        cookies: dict | None = None,
+        cookies: dict[str, str] | None = None,
         blocked_status_codes: list | None = None,
     ) -> None:
         """A default constructor.
@@ -94,7 +94,7 @@ class Session:
         return self._user_data
 
     @property
-    def cookies(self) -> dict:
+    def cookies(self) -> dict[str, str]:
         """Get the cookies."""
         return self._cookies
 

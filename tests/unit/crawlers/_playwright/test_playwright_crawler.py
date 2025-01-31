@@ -8,6 +8,8 @@ import json
 from typing import TYPE_CHECKING
 from unittest import mock
 
+import pytest
+
 from crawlee import Glob, HttpHeaders, Request, RequestTransformAction
 from crawlee._types import EnqueueStrategy
 from crawlee.crawlers import PlaywrightCrawler
@@ -19,6 +21,7 @@ from crawlee.fingerprint_suite._consts import (
     PW_FIREFOX_HEADLESS_DEFAULT_USER_AGENT,
 )
 from crawlee.proxy_configuration import ProxyConfiguration
+from crawlee.sessions import SessionPool
 
 if TYPE_CHECKING:
     from yarl import URL
@@ -242,3 +245,80 @@ async def test_proxy_set() -> None:
     await crawler.run(['https://test.com'])
 
     assert handler_data.get('proxy') == proxy_value
+
+
+@pytest.mark.parametrize(
+    'use_incognito_pages',
+    [False, True],
+    ids=['without use_incognito_pages', 'with use_incognito_pages'],
+)
+async def test_isolation_cookies(*, use_incognito_pages: bool, httpbin: URL) -> None:
+    sessions_id: list[str] = []
+    sessions_cookies: dict[str, dict[str, str]] = {}
+    response_cookies: dict[str, dict[str, str]] = {}
+
+    crawler = PlaywrightCrawler(
+        session_pool=SessionPool(max_pool_size=1), browser_launch_options={'use_incognito_pages': use_incognito_pages}
+    )
+
+    @crawler.router.default_handler
+    async def handler(context: PlaywrightCrawlingContext) -> None:
+        if context.session:
+            sessions_id.append(context.session.id)
+
+        # Add to the queue the request that will be made by the session with the cookie
+        await context.add_requests(
+            [
+                Request.from_url(str(httpbin.with_path('/cookies')), unique_key='1', label='cookies'),
+            ]
+        )
+
+    @crawler.router.handler('cookies')
+    async def cookies_handler(context: PlaywrightCrawlingContext) -> None:
+        if context.session:
+            if context.request.unique_key == '2':
+                sessions_id.append(context.session.id)
+            sessions_cookies[context.session.id] = context.session.cookies
+            response_data = json.loads(await context.response.text())
+            response_cookies[context.session.id] = response_data.get('cookies')
+            context.session.retire()
+
+        # The session with the cookie is retire. The next request should be made by a session without a cookie
+        if context.request.unique_key == '1':
+            await context.add_requests(
+                [
+                    Request.from_url(str(httpbin.with_path('/cookies')), unique_key='2', label='cookies'),
+                ]
+            )
+
+    await crawler.run(
+        [
+            str(httpbin.with_path('/cookies/set').extend_query(a=1)),
+        ]
+    )
+
+    assert len(sessions_cookies) == 2
+    assert len(response_cookies) == 2
+
+    cookie_session_id = sessions_id[0]
+    clean_session_id = sessions_id[1]
+
+    assert cookie_session_id != clean_session_id
+
+    # When using `use_incognito_pages` there should be full cookie isolation
+    if use_incognito_pages:
+        # The initiated cookies must match in both the response and the session store
+        assert sessions_cookies[cookie_session_id] == response_cookies[cookie_session_id] == {'a': '1'}
+
+        # For a clean session, the cookie should not be in the sesstion store or in the response
+        # This way we can be sure that no cookies are being leaked through the http client
+        assert sessions_cookies[clean_session_id] == response_cookies[clean_session_id] == {}
+    # Without `use_incognito_pages` we will have access to the session cookie,
+    # but there will be a cookie leak via PlaywrightContext
+    else:
+        # The initiated cookies must match in both the response and the session store
+        assert sessions_cookies[cookie_session_id] == response_cookies[cookie_session_id] == {'a': '1'}
+
+        # PlaywrightContext makes cookies shared by all sessions that work with it.
+        # So in this case a clean session contains the same cookies
+        assert sessions_cookies[clean_session_id] == response_cookies[clean_session_id] == {'a': '1'}
