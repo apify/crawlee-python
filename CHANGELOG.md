@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.5.3 - **not yet released**
+## [0.5.3](https://github.com/apify/crawlee-python/releases/tag/v0.5.3) (2025-01-31)
 
 ### 🚀 Features
 
@@ -21,7 +20,6 @@ All notable changes to this project will be documented in this file.
 - Fix `BrowserPool` and `PlaywrightBrowserPlugin` closure ([#932](https://github.com/apify/crawlee-python/pull/932)) ([997543d](https://github.com/apify/crawlee-python/commit/997543d2fa5afba49929f4407ee95d7a4933a50d)) by [@Mantisus](https://github.com/Mantisus)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.5.2](https://github.com/apify/crawlee-python/releases/tag/v0.5.2) (2025-01-17)
 
 ### 🐛 Bug Fixes
