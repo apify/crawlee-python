@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.5.3 - **not yet released**
+## [0.5.3](https://github.com/apify/crawlee-python/releases/tag/v0.5.3) (2025-01-31)
 
 ### 🚀 Features
 
@@ -12,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - Return request handlers from decorator methods to allow further decoration ([#934](https://github.com/apify/crawlee-python/pull/934)) ([9ec0aae](https://github.com/apify/crawlee-python/commit/9ec0aae54e2a340d29c893567ae80bf8bd4510a9)) by [@mylank](https://github.com/mylank)
 - Add `transform_request_function` for `enqueue_links` ([#923](https://github.com/apify/crawlee-python/pull/923)) ([6b15957](https://github.com/apify/crawlee-python/commit/6b159578f612251e6d2253a72b6521430f4f9b09)) by [@Mantisus](https://github.com/Mantisus), closes [#894](https://github.com/apify/crawlee-python/issues/894)
 - Add `time_remaining_secs` property to `MIGRATING` event data ([#940](https://github.com/apify/crawlee-python/pull/940)) ([b44501b](https://github.com/apify/crawlee-python/commit/b44501bcadbd12673a8f47aa92f12da8e404f60b)) by [@fnesveda](https://github.com/fnesveda)
+- Add LogisticalRegressionPredictor - rendering type predictor for adaptive crawling ([#930](https://github.com/apify/crawlee-python/pull/930)) ([8440499](https://github.com/apify/crawlee-python/commit/8440499468db115a4c478e9bcdb692554d1655c5)) by [@Pijukatel](https://github.com/Pijukatel)
 
 ### 🐛 Bug Fixes
 
@@ -20,7 +20,6 @@ All notable changes to this project will be documented in this file.
 - Fix `BrowserPool` and `PlaywrightBrowserPlugin` closure ([#932](https://github.com/apify/crawlee-python/pull/932)) ([997543d](https://github.com/apify/crawlee-python/commit/997543d2fa5afba49929f4407ee95d7a4933a50d)) by [@Mantisus](https://github.com/Mantisus)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.5.2](https://github.com/apify/crawlee-python/releases/tag/v0.5.2) (2025-01-17)
 
 ### 🐛 Bug Fixes
