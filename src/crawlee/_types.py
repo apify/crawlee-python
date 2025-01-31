@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Annotated, Any, Literal, Optional, Protocol, TypeVar, Union, cast, overload
+from typing import TYPE_CHECKING, Annotated, Any, Callable, Literal, Optional, Protocol, TypeVar, Union, cast, overload
 
 from pydantic import ConfigDict, Field, PlainValidator, RootModel
 from typing_extensions import NotRequired, TypeAlias, TypedDict, Unpack
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from collections.abc import Coroutine, Sequence
 
     from crawlee import Glob, Request
-    from crawlee._request import BaseRequestData
+    from crawlee._request import RequestOptions
     from crawlee.http_clients import HttpResponse
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions import Session
@@ -43,6 +43,8 @@ T = TypeVar('T')
 HttpMethod: TypeAlias = Literal['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH']
 
 HttpPayload: TypeAlias = bytes
+
+RequestTransformAction: TypeAlias = Literal['skip', 'unchanged']
 
 
 def _normalize_headers(headers: Mapping[str, str]) -> dict[str, str]:
@@ -182,7 +184,7 @@ class EnqueueLinksKwargs(TypedDict):
 class AddRequestsKwargs(EnqueueLinksKwargs):
     """Keyword arguments for the `add_requests` methods."""
 
-    requests: Sequence[str | BaseRequestData | Request]
+    requests: Sequence[str | Request]
     """Requests to be added to the `RequestManager`."""
 
 
@@ -264,7 +266,7 @@ class RequestHandlerRunResult:
 
     async def add_requests(
         self,
-        requests: Sequence[str | BaseRequestData],
+        requests: Sequence[str | Request],
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> None:
         """Track a call to the `add_requests` context helper."""
@@ -315,7 +317,7 @@ class AddRequestsFunction(Protocol):
 
     def __call__(
         self,
-        requests: Sequence[str | BaseRequestData | Request],
+        requests: Sequence[str | Request],
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> Coroutine[None, None, None]:
         """Call dunder method.
@@ -341,6 +343,7 @@ class EnqueueLinksFunction(Protocol):
         selector: str = 'a',
         label: str | None = None,
         user_data: dict[str, Any] | None = None,
+        transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> Coroutine[None, None, None]:
         """A call dunder method.
@@ -353,6 +356,10 @@ class EnqueueLinksFunction(Protocol):
                 - `BeautifulSoupCrawler` supports CSS selectors.
             label: Label for the newly created `Request` objects, used for request routing.
             user_data: User data to be provided to the newly created `Request` objects.
+            transform_request_function: A function that takes `RequestOptions` and returns either:
+                - Modified `RequestOptions` to update the request configuration,
+                - `'skip'` to exclude the request from being enqueued,
+                - `'unchanged'` to use the original request options without modification.
             **kwargs: Additional keyword arguments.
         """
 
@@ -558,3 +565,7 @@ class BasicCrawlingContext:
 
     log: logging.Logger
     """Logger instance."""
+
+    def __hash__(self) -> int:
+        """Return hash of the context. Each context is considered unique."""
+        return id(self)

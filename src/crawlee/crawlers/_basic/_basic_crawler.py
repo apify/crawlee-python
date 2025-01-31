@@ -14,6 +14,7 @@ from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Generic, Union, cast
 from urllib.parse import ParseResult, urlparse
+from weakref import WeakKeyDictionary
 
 from tldextract import TLDExtract
 from typing_extensions import NotRequired, TypedDict, TypeVar, Unpack, assert_never
@@ -289,6 +290,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._error_handler: ErrorHandler[TCrawlingContext | BasicCrawlingContext] | None = None
         self._failed_request_handler: FailedRequestHandler[TCrawlingContext | BasicCrawlingContext] | None = None
         self._abort_on_error = abort_on_error
+
+        # Context of each request with matching result of request handler.
+        # Inheritors can use this to override the result of individual request handler runs in `_run_request_handler`.
+        self._context_result_map = WeakKeyDictionary[BasicCrawlingContext, RequestHandlerRunResult]()
 
         # Context pipeline
         self._context_pipeline = (_context_pipeline or ContextPipeline()).compose(self._check_url_after_redirects)
@@ -908,9 +913,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         return send_request
 
-    async def _commit_request_handler_result(
-        self, context: BasicCrawlingContext, result: RequestHandlerRunResult
-    ) -> None:
+    async def _commit_request_handler_result(self, context: BasicCrawlingContext) -> None:
+        """Commit request handler result for the input `context`. Result is taken from `_context_result_map`."""
+        result = self._context_result_map[context]
+
         request_manager = await self.get_request_manager()
         origin = context.request.loaded_url or context.request.url
 
@@ -934,10 +940,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                         base_url = url if (url := add_requests_call.get('base_url')) else origin
                         absolute_url = convert_to_absolute_url(base_url, request)
                         dst_request = Request.from_url(absolute_url)
-
-                # If the request is a BaseRequestData, convert it to Request object.
-                else:
-                    dst_request = Request.from_base_request_data(request)
 
                 # Update the crawl depth of the request.
                 dst_request.crawl_depth = context.request.crawl_depth + 1
@@ -1031,6 +1033,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             use_state=self._use_state,
             log=self._logger,
         )
+        self._context_result_map[context] = result
 
         statistics_id = request.id or request.unique_key
         self._statistics.record_request_processing_start(statistics_id)
@@ -1043,8 +1046,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             except asyncio.TimeoutError as e:
                 raise RequestHandlerError(e, context) from e
 
-            await self._commit_request_handler_result(context, result)
-
+            await self._commit_request_handler_result(context)
             await wait_for(
                 lambda: request_manager.mark_request_as_handled(context.request),
                 timeout=self._internal_timeout,

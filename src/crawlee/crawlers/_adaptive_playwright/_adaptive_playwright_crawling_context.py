@@ -19,6 +19,8 @@ if TYPE_CHECKING:
     from playwright.async_api import Page, Response
     from typing_extensions import Self
 
+    from crawlee.crawlers._playwright._types import BlockRequestsFunction
+
 
 TStaticParseResult = TypeVar('TStaticParseResult')
 TStaticSelectResult = TypeVar('TStaticSelectResult')
@@ -150,6 +152,8 @@ class AdaptivePlaywrightCrawlingContext(
         http_response = await _PlaywrightHttpResponse.from_playwright_response(
             response=context.response, protocol=protocol_guess or ''
         )
+        # block_requests is useful only on pre-navigation contexts. It is useless here.
+        context_kwargs.pop('block_requests')
         return cls(
             parsed_content=await parser.parse(http_response),
             http_response=http_response,
@@ -159,6 +163,7 @@ class AdaptivePlaywrightCrawlingContext(
 
 
 @dataclass(frozen=True)
+@docs_group('Data structures')
 class AdaptivePlaywrightPreNavCrawlingContext(BasicCrawlingContext):
     """This is just wrapper around BasicCrawlingContext or AdaptivePlaywrightCrawlingContext.
 
@@ -166,6 +171,7 @@ class AdaptivePlaywrightPreNavCrawlingContext(BasicCrawlingContext):
     """
 
     _page: Page | None = None
+    block_requests: BlockRequestsFunction | None = None
 
     @property
     def page(self) -> Page:
@@ -175,13 +181,26 @@ class AdaptivePlaywrightPreNavCrawlingContext(BasicCrawlingContext):
         """
         if self._page is not None:
             return self._page
-        raise AdaptiveContextError('Page is not crawled with PlaywrightCrawler.')
+        raise AdaptiveContextError(
+            'Page was crawled with static sub crawler and not with crawled with PlaywrightCrawler. For Playwright only '
+            'hooks please use `playwright_only`=True when registering the hook. '
+            'For example: @crawler.pre_navigation_hook(playwright_only=True)'
+        )
 
     @classmethod
     def from_pre_navigation_context(cls, context: BasicCrawlingContext) -> Self:
         """Convenience constructor that creates new context from existing pre navigation contexts."""
         context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
         context_kwargs['_page'] = context_kwargs.pop('page', None)
+
+        # For static sub crawler replace block requests by function doing nothing.
+        async def dummy_block_requests(
+            url_patterns: list[str] | None = None,  # noqa:ARG001
+            extra_url_patterns: list[str] | None = None,  # noqa:ARG001
+        ) -> None:
+            return
+
+        context_kwargs['block_requests'] = context_kwargs.pop('block_requests', dummy_block_requests)
         return cls(**context_kwargs)
 
 

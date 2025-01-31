@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import logging
+from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, Generic
 
 from pydantic import ValidationError
 from typing_extensions import NotRequired, TypedDict, TypeVar
 
-from crawlee import EnqueueStrategy
-from crawlee._request import BaseRequestData
+from crawlee import EnqueueStrategy, RequestTransformAction
+from crawlee._request import Request, RequestOptions
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
@@ -18,7 +19,7 @@ from crawlee.statistics import StatisticsState
 
 from ._playwright_crawling_context import PlaywrightCrawlingContext
 from ._playwright_pre_nav_crawling_context import PlaywrightPreNavCrawlingContext
-from ._utils import infinite_scroll
+from ._utils import block_requests, infinite_scroll
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=PlaywrightCrawlingContext)
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
@@ -153,6 +154,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             get_key_value_store=context.get_key_value_store,
             log=context.log,
             page=crawlee_page.page,
+            block_requests=partial(block_requests, page=crawlee_page.page),
         )
 
         for hook in self._pre_navigation_hooks:
@@ -174,8 +176,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             SessionError: If the URL cannot be loaded by the browser.
 
         Yields:
-            The enhanced crawling context with the Playwright-specific features (page, response, enqueue_links, and
-                infinite_scroll).
+            The enhanced crawling context with the Playwright-specific features (page, response, enqueue_links,
+                infinite_scroll and block_requests).
         """
         async with context.page:
             if context.request.headers:
@@ -194,13 +196,15 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 selector: str = 'a',
                 label: str | None = None,
                 user_data: dict | None = None,
+                transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
+                | None = None,
                 **kwargs: Unpack[EnqueueLinksKwargs],
             ) -> None:
                 """The `PlaywrightCrawler` implementation of the `EnqueueLinksFunction` function."""
                 kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
 
-                requests = list[BaseRequestData]()
-                user_data = user_data or {}
+                requests = list[Request]()
+                base_user_data = user_data or {}
 
                 elements = await context.page.query_selector_all(selector)
 
@@ -213,13 +217,17 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                         if not is_url_absolute(url):
                             url = convert_to_absolute_url(context.request.url, url)
 
-                        link_user_data = user_data.copy()
+                        request_option = RequestOptions({'url': url, 'user_data': {**base_user_data}, 'label': label})
 
-                        if label is not None:
-                            link_user_data.setdefault('label', label)
+                        if transform_request_function:
+                            transform_request_option = transform_request_function(request_option)
+                            if transform_request_option == 'skip':
+                                continue
+                            if transform_request_option != 'unchanged':
+                                request_option = transform_request_option
 
                         try:
-                            request = BaseRequestData.from_url(url, user_data=link_user_data)
+                            request = Request.from_url(**request_option)
                         except ValidationError as exc:
                             context.log.debug(
                                 f'Skipping URL "{url}" due to invalid format: {exc}. '
@@ -246,6 +254,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 infinite_scroll=lambda: infinite_scroll(context.page),
                 response=response,
                 enqueue_links=enqueue_links,
+                block_requests=partial(block_requests, page=context.page),
             )
 
     async def _handle_blocked_request(
