@@ -1,6 +1,6 @@
 ---
-id: adaptive playwright-crawler
-title: Adaptive Playwright crawler
+id: adaptive-playwright-crawler
+title: AdaptivePlaywrightCrawler
 description: How to use the AdaptivePlaywrightCrawler.
 ---
 
@@ -20,7 +20,7 @@ import AdaptivePlaywrightCrawlerPreNavHooks from '!!raw-loader!./code/adaptive_p
 An <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> is a combination of <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> and some implementation of HTTP-based crawler like <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> or <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>.
 It uses more limited request handler interface so that it is able to switch to HTTP-only crawling when it detects it may be possible.
 
-Detection is done based on the <ApiLink to="class/RenderingTypePredictor">`RenderingTypePredictor`</ApiLink> with default implementation ...(add after merged to master...). It predicts which crawling method should be used and learns from already crawled pages.
+Detection is done based on the <ApiLink to="class/RenderingTypePredictor">`RenderingTypePredictor`</ApiLink> with default implementation <ApiLink to="class/DefaultRenderingTypePredictor">`DefaultRenderingTypePredictor`</ApiLink>. It predicts which crawling method should be used and learns from already crawled pages.
 
 ## When to use AdaptivePlaywrightCrawler
 
@@ -28,7 +28,7 @@ Use <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</A
 
 ## Request handler and adaptive context helpers
 
-Request handler for <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> works on special context type - <ApiLink to="class/AdaptivePlaywrightCrawlingContext">`AdaptivePlaywrightCrawlingContext`</ApiLink>. This context is sometimes created by HTTP-based sub crawler and sometimes by playwright based sub crawler. Due to its dynamic nature, you can't always access `page` object for example. To overcome this there are three helper methods on this context that can be called regardless of how the context was created.
+Request handler for <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> works on special context type - <ApiLink to="class/AdaptivePlaywrightCrawlingContext">`AdaptivePlaywrightCrawlingContext`</ApiLink>. This context is sometimes created by HTTP-based sub crawler and sometimes by playwright based sub crawler. Due to its dynamic nature, you can't always access [page](https://playwright.dev/python/docs/api/class-page) object for example. To overcome this there are three helper methods on this context that can be called regardless of how the context was created.
 
 <ApiLink to="class/AdaptivePlaywrightCrawlingContext#wait_for_selector">`wait_for_selector`</ApiLink> accepts `css` selector as first argument and timeout as second argument. The function will try to locate this selector a return once it is found(within timeout). In practice this means that if HTTP-based sub crawler was used, the function will find the selector only if it is part of the static content. If not, the adaptive crawler will fall back to the playwright sub crawler and will wait try to locate the selector within the timeout using playwright.
 
@@ -36,16 +36,17 @@ Request handler for <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlayw
 
 <ApiLink to="class/AdaptivePlaywrightCrawlingContext#parse_with_static_parser">`parse_with_static_parser`</ApiLink> will re-parse the whole page. Return value type is determined by used HTTP-based sub crawler. It has optional arguments: `selector` and `timeout`. If those optional arguments are used then the function first calls <ApiLink to="class/AdaptivePlaywrightCrawlingContext#wait_for_selector">`wait_for_selector`</ApiLink> and then do the parsing. This can be used in scenario where some specific element can signal, that page is already complete.
 
-See following example about how to create request handler and use context helpers:
+See the following example about how to create request handler and use context helpers:
 
 <CodeBlock className="language-python">
     {AdaptivePlaywrightCrawlerHandler}
 </CodeBlock>
 
 
-## Advanced configuration
+## Crawler configuration
+To use <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> it is recommended to use one of the prepared factory methods that will create the crawler with specific HTTP-based sub crawler variant: <ApiLink to="class/AdaptivePlaywrightCrawler#with_beautifulsoup_static_parser">`AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser`</ApiLink> or <ApiLink to="class/AdaptivePlaywrightCrawler#with_parsel_static_parser">`AdaptivePlaywrightCrawler.with_parsel_static_parser`</ApiLink>.
 
-<ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> is internally composed of two sub crawlers you can do a detailed configuration of both of them. For detailed configuration options of the sub crawlers, please refer to their pages: <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>, <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink>, <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>.
+<ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> is internally composed of two sub crawlers and you can do a detailed configuration of both of them. For detailed configuration options of the sub crawlers, please refer to their pages: <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>, <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink>, <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>.
 
 In the following example you can see how to create and configure <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> with two different HTTP-based sub crawlers:
 
@@ -71,9 +72,9 @@ To control which pages are crawled by which method you can use following argumen
 
 `result_checker` - Is a function that checks result created from crawling a page. By default, it always returns `True`.
 
-`result_comparator` - Is a function that compares two results (HTTP-based sub crawler result and playwright based sub crawler result) and returns `True` if they are considered the same. By default, this function compares calls of context helper `push_data` by each sub crawler. This function is used by `rendering_type_predictor` to evaluate whether HTTP-based crawler has the same results as playwright based crawler.
+`result_comparator` - Is a function that compares two results (HTTP-based sub crawler result and playwright based sub crawler result) and returns `True` if they are considered the same. By default, this function compares calls of context helper `push_data` by each sub crawler. This function is used by `rendering_type_predictor` to evaluate whether HTTP-based crawler has the same results as playwright based sub crawler.
 
-See following example about how to pass prediction related arguments:
+See the following example about how to pass prediction related arguments:
 
 <CodeBlock className="language-python">
     {AdaptivePlaywrightCrawlerInitPrediction}
@@ -82,9 +83,9 @@ See following example about how to pass prediction related arguments:
 
 
 ## Page configuration with pre-navigation hooks
-In some use cases, you may need to configure the [page](https://playwright.dev/python/docs/api/class-page) before it navigates to the target URL. For instance, you might set navigation timeouts or manipulate other page-level settings. For such cases you can use the <ApiLink to="class/AdaptivePlaywrightCrawler#pre_navigation_hook">`pre_navigation_hook`</ApiLink> method of the <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink>. This method is called before the page navigates to the target URL and allows you to configure the page instance. Due to the dynamic nature of <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> it is possible that the hook will be for HTTP-based sub crawler or playwright-based sub crawler. Using `page` object for hook that will be executed on HTTP-based sub crawler will raise an exception. To overcome this you can use optional argument `playwright_only` = `True` when registering the hook.
+In some use cases, you may need to configure the [page](https://playwright.dev/python/docs/api/class-page) before it navigates to the target URL. For instance, you might set navigation timeouts or manipulate other page-level settings. For such cases you can use the <ApiLink to="class/AdaptivePlaywrightCrawler#pre_navigation_hook">`pre_navigation_hook`</ApiLink> method of the <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink>. This method is called before the page navigates to the target URL and allows you to configure the page instance. Due to the dynamic nature of <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> it is possible that the hook will be for HTTP-based sub crawler or playwright-based sub crawler. Using [page](https://playwright.dev/python/docs/api/class-page) object for hook that will be executed on HTTP-based sub crawler will raise an exception. To overcome this you can use optional argument `playwright_only` = `True` when registering the hook.
 
-See following example about how to register the pre navigation hooks:
+See the following example about how to register the pre navigation hooks:
 
 <CodeBlock className="language-python">
     {AdaptivePlaywrightCrawlerPreNavHooks}

@@ -26,7 +26,6 @@ class RenderingTypePrediction:
 
 
 @docs_group('Classes')
-@dataclass(frozen=True)
 class RenderingTypePredictor(ABC):
     @abstractmethod
     def predict(self, request: Request) -> RenderingTypePrediction:

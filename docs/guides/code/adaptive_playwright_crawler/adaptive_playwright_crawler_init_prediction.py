@@ -5,11 +5,11 @@ from crawlee.crawlers import AdaptivePlaywrightCrawler, RenderingType, Rendering
 
 class CustomRenderingTypePredictor(RenderingTypePredictor):
     def __init__(self) -> None:
-        self._learning_data = []
+        self._learning_data = list[tuple[Request, RenderingType]]()
 
     def predict(self, request: Request) -> RenderingTypePrediction:
         # Some custom logic that produces some `RenderingTypePrediction` based on the `request` input.
-        rendering_type = 'static' if 'abc' in request.url else 'client only'
+        rendering_type: RenderingType = 'static' if 'abc' in request.url else 'client only'
 
         return RenderingTypePrediction(
             #  Recommends `static` rendering type -> HTTP-based sub crawler will be used.
@@ -24,7 +24,7 @@ class CustomRenderingTypePredictor(RenderingTypePredictor):
     def store_result(self, request: Request, rendering_type: RenderingType) -> None:
         # This function allows predictor to store new learning data and retrain itself if needed.
         # `request` is input for prediction and `rendering_type` is the correct prediction output.
-        self._learning_data.append((request.url, rendering_type))
+        self._learning_data.append((request, rendering_type))
         # retrain
 
 

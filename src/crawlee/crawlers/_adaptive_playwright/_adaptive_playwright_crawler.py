@@ -89,12 +89,36 @@ class AdaptivePlaywrightCrawler(
     Generic[TStaticCrawlingContext, TStaticParseResult, TStaticSelectResult],
     BasicCrawler[AdaptivePlaywrightCrawlingContext, AdaptivePlaywrightCrawlerStatisticState],
 ):
-    """Adaptive crawler that uses both specific implementation of `AbstractHttpCrawler` and `PlaywrightCrawler`.
+    """Adaptive crawler that uses specific implementation of `AbstractHttpCrawler` and `PlaywrightCrawler`.
 
-    It tries to detect whether it is sufficient to crawl without browser (which is faster) or if
-    `PlaywrightCrawler` should be used (in case previous method did not work as expected for specific url.).
+    It uses more limited request handler interface so that it is able to switch to HTTP-only crawling when it detects it
+    may be possible.
 
-    # TODO: Add example
+    ### Usage
+    ```python
+    from crawlee.crawlers import AdaptivePlaywrightCrawler, AdaptivePlaywrightCrawlingContext
+
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        max_requests_per_crawl=5, playwright_crawler_specific_kwargs={'headless': False}
+    )
+
+    @crawler.router.default_handler
+    async def request_handler_for_label(context: AdaptivePlaywrightCrawlingContext) -> None:
+        # Do some processing using `parsed_content`
+        context.log.info(context.parsed_content.title)
+
+        # Locate element h2 within 5 seconds
+        h2 = await context.query_selector('h2', timedelta(milliseconds=5000))
+        # Do stuff with element found by the selector
+        context.log.info(h2)
+
+        # Find more links and enqueue them.
+        await context.enqueue_links()
+        # Save some data.
+        await context.push_data({'Visited url': context.request.url})
+
+    await crawler.run(['https://crawlee.dev/'])
+    ```
     """
 
     def __init__(
