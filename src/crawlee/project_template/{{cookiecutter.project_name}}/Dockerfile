@@ -67,5 +67,10 @@ COPY . ./
 # Use compileall to ensure the runnability of the Actor Python code.
 RUN python -m compileall -q .
 
+# % if cookiecutter.crawler_type == 'playwright-camoufox'
+# Fetch camoufox files that are always needed when using camoufox.
+RUN python -m camoufox fetch
+# % endif
+
 # Specify how to launch the source code of your Actor.
 CMD ["python", "-m", "{{ cookiecutter.__package_name }}"]
