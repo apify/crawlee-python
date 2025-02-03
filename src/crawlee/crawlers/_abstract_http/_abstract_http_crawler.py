@@ -152,7 +152,8 @@ class AbstractHttpCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler[
             for link in self._parser.find_links(parsed_content, selector=selector):
                 url = link
                 if not is_url_absolute(url):
-                    url = convert_to_absolute_url(context.request.url, url)
+                    base_url = context.request.loaded_url or context.request.url
+                    url = convert_to_absolute_url(base_url, url)
 
                 request_options = RequestOptions(url=url, user_data={**base_user_data}, label=label)
 
