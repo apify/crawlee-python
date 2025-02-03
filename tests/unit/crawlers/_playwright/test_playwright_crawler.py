@@ -48,24 +48,6 @@ async def test_basic_request(httpbin: URL) -> None:
 
 
 async def test_enqueue_links() -> None:
-    requests = ['https://crawlee.dev/docs/examples']
-    crawler = PlaywrightCrawler()
-    visit = mock.Mock()
-
-    @crawler.router.default_handler
-    async def request_handler(context: PlaywrightCrawlingContext) -> None:
-        visit(context.request.url)
-        await context.enqueue_links(include=[Glob('https://crawlee.dev/docs/examples/**')])
-
-    await crawler.run(requests)
-
-    visited: set[str] = {call[0][0] for call in visit.call_args_list}
-
-    assert len(visited) >= 10
-    assert all(url.startswith('https://crawlee.dev/docs/examples') for url in visited)
-
-
-async def test_enqueue_links_with_redirect() -> None:
     # www.crawlee.dev create a redirect to crawlee.dev
     requests = ['https://www.crawlee.dev/docs/examples']
     crawler = PlaywrightCrawler(max_requests_per_crawl=11)
