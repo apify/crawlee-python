@@ -254,6 +254,7 @@ class CurlImpersonateHttpClient(BaseHttpClient):
 
         return False
 
+    @staticmethod
     def _get_cookies(self, curl: Curl) -> dict[str, str]:
         cookies = {}
         for curl_cookie in curl.getinfo(CurlInfo.COOKIELIST):  # type: ignore[union-attr]
