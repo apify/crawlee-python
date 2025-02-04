@@ -442,21 +442,27 @@ async def test_isolation_cookies(http_client_class: type[BaseHttpClient], httpbi
 
     @crawler.router.default_handler
     async def handler(context: HttpCrawlingContext) -> None:
-        if context.session:
-            sessions_ids.append(context.session.id)
-            if context.request.unique_key in {'1', '2'}:
-                sessions_cookies[context.session.id] = context.session.cookies
-                response_data = json.loads(context.http_response.read())
-                response_cookies[context.session.id] = response_data.get('cookies')
-                if context.request.unique_key == '1':
-                    context.session.retire()
+        if not context.session:
+            return
+
+        sessions_ids.append(context.session.id)
+
+        if context.request.unique_key not in {'1', '2'}:
+            return
+
+        sessions_cookies[context.session.id] = context.session.cookies
+        response_data = json.loads(context.http_response.read())
+        response_cookies[context.session.id] = response_data.get('cookies')
+
+        if context.request.user_data.get('retire_session'):
+            context.session.retire()
 
     await crawler.run(
         [
             # The first request sets the cookie in the session
             str(httpbin.with_path('/cookies/set').extend_query(a=1)),
             # With the second request, we check the cookies in the session and set retire
-            Request.from_url(str(httpbin.with_path('/cookies')), unique_key='1'),
+            Request.from_url(str(httpbin.with_path('/cookies')), unique_key='1', user_data={'retire_session': True}),
             # The third request is made with a new session to make sure it does not use another session's cookies
             Request.from_url(str(httpbin.with_path('/cookies')), unique_key='2'),
         ]
