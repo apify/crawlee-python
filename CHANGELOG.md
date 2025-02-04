@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 
 - Fix session managment with retire ([#947](https://github.com/apify/crawlee-python/pull/947)) ([caee03f](https://github.com/apify/crawlee-python/commit/caee03fe3a43cc1d7a8d3f9e19b42df1bdb1c0aa)) by [@Mantisus](https://github.com/Mantisus)
 - Fix templates - poetry-plugin-export version and camoufox template name ([#952](https://github.com/apify/crawlee-python/pull/952)) ([7addea6](https://github.com/apify/crawlee-python/commit/7addea6605359cceba208e16ec9131724bdb3e9b)) by [@Pijukatel](https://github.com/Pijukatel), closes [#951](https://github.com/apify/crawlee-python/issues/951)
+- Fix convert relative link to absolute in `enqueue_links` for response with redirect ([#956](https://github.com/apify/crawlee-python/pull/956)) ([694102e](https://github.com/apify/crawlee-python/commit/694102e163bb9021a4830d2545d153f6f8f3de90)) by [@Mantisus](https://github.com/Mantisus), closes [#955](https://github.com/apify/crawlee-python/issues/955)
 
 
 <!-- git-cliff-unreleased-end -->
