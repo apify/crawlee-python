@@ -210,7 +210,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                         url = url.strip()
 
                         if not is_url_absolute(url):
-                            url = convert_to_absolute_url(context.request.url, url)
+                            base_url = context.request.loaded_url or context.request.url
+                            url = convert_to_absolute_url(base_url, url)
 
                         request_option = RequestOptions({'url': url, 'user_data': {**base_user_data}, 'label': label})
 

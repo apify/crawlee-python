@@ -48,8 +48,9 @@ async def test_basic_request(httpbin: URL) -> None:
 
 
 async def test_enqueue_links() -> None:
-    requests = ['https://crawlee.dev/docs/examples']
-    crawler = PlaywrightCrawler()
+    # www.crawlee.dev create a redirect to crawlee.dev
+    requests = ['https://www.crawlee.dev/docs/examples']
+    crawler = PlaywrightCrawler(max_requests_per_crawl=11)
     visit = mock.Mock()
 
     @crawler.router.default_handler
@@ -59,9 +60,13 @@ async def test_enqueue_links() -> None:
 
     await crawler.run(requests)
 
-    visited: set[str] = {call[0][0] for call in visit.call_args_list}
+    first_visited = visit.call_args_list[0][0][0]
+    visited: set[str] = {call[0][0] for call in visit.call_args_list[1:]}
 
+    # The first link visited use original domain
+    assert first_visited == 'https://www.crawlee.dev/docs/examples'
     assert len(visited) >= 10
+    # All other links must have a domain name after the redirect
     assert all(url.startswith('https://crawlee.dev/docs/examples') for url in visited)
 
 
