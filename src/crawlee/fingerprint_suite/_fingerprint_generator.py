@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from browserforge.fingerprints import Fingerprint
 
 
-@docs_group('Classes')
+@docs_group('Abstract classes')
 class FingerprintGenerator(ABC):
     """A class for creating browser fingerprints that mimic browser fingerprints of real users."""
 

@@ -18,7 +18,10 @@ if TYPE_CHECKING:
 
 @docs_group('Classes')
 class BrowserforgeFingerprintGenerator(FingerprintGenerator):
-    """`FingerprintGenerator` adapter for fingerprint generator from `browserforge`."""
+    """`FingerprintGenerator` adapter for fingerprint generator from `browserforge`.
+
+    `browserforge` is a browser header and fingerprint generator: https://github.com/daijro/browserforge
+    """
 
     def __init__(
         self,
