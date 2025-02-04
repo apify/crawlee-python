@@ -10,7 +10,7 @@ from unittest import mock
 
 import pytest
 
-from crawlee import Glob, HttpHeaders, Request, RequestTransformAction
+from crawlee import ConcurrencySettings, Glob, HttpHeaders, Request, RequestTransformAction
 from crawlee._types import EnqueueStrategy
 from crawlee.crawlers import PlaywrightCrawler
 from crawlee.fingerprint_suite._consts import (
@@ -253,55 +253,44 @@ async def test_proxy_set() -> None:
     ids=['without use_incognito_pages', 'with use_incognito_pages'],
 )
 async def test_isolation_cookies(*, use_incognito_pages: bool, httpbin: URL) -> None:
-    sessions_id: list[str] = []
+    sessions_ids: list[str] = []
     sessions_cookies: dict[str, dict[str, str]] = {}
     response_cookies: dict[str, dict[str, str]] = {}
 
     crawler = PlaywrightCrawler(
-        session_pool=SessionPool(max_pool_size=1), browser_launch_options={'use_incognito_pages': use_incognito_pages}
+        session_pool=SessionPool(max_pool_size=1),
+        browser_launch_options={'use_incognito_pages': use_incognito_pages},
+        concurrency_settings=ConcurrencySettings(max_concurrency=1),
     )
 
     @crawler.router.default_handler
     async def handler(context: PlaywrightCrawlingContext) -> None:
         if context.session:
-            sessions_id.append(context.session.id)
-
-        # Add to the queue the request that will be made by the session with the cookie
-        await context.add_requests(
-            [
-                Request.from_url(str(httpbin.with_path('/cookies')), unique_key='1', label='cookies'),
-            ]
-        )
-
-    @crawler.router.handler('cookies')
-    async def cookies_handler(context: PlaywrightCrawlingContext) -> None:
-        if context.session:
-            if context.request.unique_key == '2':
-                sessions_id.append(context.session.id)
-            sessions_cookies[context.session.id] = context.session.cookies
-            response_data = json.loads(await context.response.text())
-            response_cookies[context.session.id] = response_data.get('cookies')
-            context.session.retire()
-
-        # The session with the cookie is retire. The next request should be made by a session without a cookie
-        if context.request.unique_key == '1':
-            await context.add_requests(
-                [
-                    Request.from_url(str(httpbin.with_path('/cookies')), unique_key='2', label='cookies'),
-                ]
-            )
+            sessions_ids.append(context.session.id)
+            if context.request.unique_key in {'1', '2'}:
+                sessions_cookies[context.session.id] = context.session.cookies
+                response_data = json.loads(await context.response.text())
+                response_cookies[context.session.id] = response_data.get('cookies')
+                if context.request.unique_key == '1':
+                    context.session.retire()
 
     await crawler.run(
         [
+            # The first request sets the cookie in the session
             str(httpbin.with_path('/cookies/set').extend_query(a=1)),
+            # With the second request, we check the cookies in the session and set retire
+            Request.from_url(str(httpbin.with_path('/cookies')), unique_key='1'),
+            Request.from_url(str(httpbin.with_path('/cookies')), unique_key='2'),
         ]
     )
 
     assert len(sessions_cookies) == 2
     assert len(response_cookies) == 2
 
-    cookie_session_id = sessions_id[0]
-    clean_session_id = sessions_id[1]
+    assert sessions_ids[0] == sessions_ids[1]
+
+    cookie_session_id = sessions_ids[0]
+    clean_session_id = sessions_ids[2]
 
     assert cookie_session_id != clean_session_id
 
