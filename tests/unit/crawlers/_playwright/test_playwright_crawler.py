@@ -249,8 +249,10 @@ async def test_proxy_set() -> None:
 
 @pytest.mark.parametrize(
     'use_incognito_pages',
-    [False, True],
-    ids=['without use_incognito_pages', 'with use_incognito_pages'],
+    [
+        pytest.param(False, id='without use_incognito_pages'),
+        pytest.param(True, id='with use_incognito_pages'),
+    ],
 )
 async def test_isolation_cookies(*, use_incognito_pages: bool, httpbin: URL) -> None:
     sessions_ids: list[str] = []
