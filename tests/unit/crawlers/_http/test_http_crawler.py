@@ -482,6 +482,6 @@ async def test_isolation_cookies(http_client_class: type[BaseHttpClient], httpbi
     # The initiated cookies must match in both the response and the session store
     assert sessions_cookies[cookie_session_id] == response_cookies[cookie_session_id] == {'a': '1'}
 
-    # For a clean session, the cookie should not be in the sesstion store or in the response
+    # For a clean session, the cookie should not be in the session store or in the response
     # This way we can be sure that no cookies are being leaked through the http client
     assert sessions_cookies[clean_session_id] == response_cookies[clean_session_id] == {}
