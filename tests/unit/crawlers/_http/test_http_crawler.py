@@ -185,8 +185,10 @@ async def test_handles_server_error(
 
 @pytest.mark.parametrize(
     'http_client_class',
-    [CurlImpersonateHttpClient, HttpxHttpClient],
-    ids=['curl', 'httpx'],
+    [
+        pytest.param(CurlImpersonateHttpClient, id='curl'),
+        pytest.param(HttpxHttpClient, id='httpx'),
+    ],
 )
 async def test_stores_cookies(http_client_class: type[BaseHttpClient], httpbin: URL) -> None:
     http_client = http_client_class()
@@ -421,8 +423,10 @@ async def test_http_crawler_pre_navigation_hooks_executed_before_request() -> No
 
 @pytest.mark.parametrize(
     'http_client_class',
-    [CurlImpersonateHttpClient, HttpxHttpClient],
-    ids=['curl', 'httpx'],
+    [
+        pytest.param(CurlImpersonateHttpClient, id='curl'),
+        pytest.param(HttpxHttpClient, id='httpx'),
+    ],
 )
 async def test_isolation_cookies(http_client_class: type[BaseHttpClient], httpbin: URL) -> None:
     http_client = http_client_class()
