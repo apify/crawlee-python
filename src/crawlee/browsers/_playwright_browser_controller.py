@@ -49,7 +49,8 @@ class PlaywrightBrowserController(BaseBrowserController):
         Args:
             browser: The browser instance to control.
             max_open_pages_per_browser: The maximum number of pages that can be open at the same time.
-            use_incognito_pages: Opens each page in a separate browsing context.
+            use_incognito_pages: By default pages share the same browser context. If set to True each page uses its
+                own context that is destroyed once the page is closed or crashes.
             header_generator: An optional `HeaderGenerator` instance used to generate and manage HTTP headers for
                 requests made by the browser. By default, a predefined header generator is used. Set to `None` to
                 disable automatic header modifications.
@@ -122,9 +123,13 @@ class PlaywrightBrowserController(BaseBrowserController):
             raise ValueError('Cannot open more pages in this browser.')
 
         if self._use_incognito_pages:
+            # We use https://playwright.dev/python/docs/api/class-browser#browser-new-page for create a page in
+            # a separate context.
             page_context_options = self._create_context_options(browser_new_context_options, proxy_info)
             page = await self._browser.new_page(**page_context_options)
         else:
+            # We use https://playwright.dev/python/docs/api/class-browser#browser-new-context for create context
+            # The page are then created in this context
             if not self._browser_context:
                 self._browser_context = await self._create_browser_context(browser_new_context_options, proxy_info)
             page = await self._browser_context.new_page()

@@ -78,6 +78,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
         browser_launch_options: Mapping[str, Any] | None = None,
         browser_new_context_options: Mapping[str, Any] | None = None,
         headless: bool | None = None,
+        use_incognito_pages: bool | None = None,
         **kwargs: Unpack[BasicCrawlerOptions[PlaywrightCrawlingContext]],
     ) -> None:
         """A default constructor.
@@ -96,17 +97,27 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 This option should not be used if `browser_pool` is provided.
             headless: Whether to run the browser in headless mode.
                 This option should not be used if `browser_pool` is provided.
+            use_incognito_pages: By default pages share the same browser context. If set to True each page uses its
+                own context that is destroyed once the page is closed or crashes.
+                This option should not be used if `browser_pool` is provided.
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
         """
         if browser_pool:
             # Raise an exception if browser_pool is provided together with other browser-related arguments.
             if any(
                 param is not None
-                for param in (headless, browser_type, browser_launch_options, browser_new_context_options)
+                for param in (
+                    use_incognito_pages,
+                    headless,
+                    browser_type,
+                    browser_launch_options,
+                    browser_new_context_options,
+                )
             ):
                 raise ValueError(
-                    'You cannot provide `headless`, `browser_type`, `browser_launch_options` or '
-                    '`browser_new_context_options` arguments when `browser_pool` is provided.'
+                    'You cannot provide `headless`, `browser_type`, `browser_launch_options`'
+                    '`browser_new_context_options` or `use_incognito_pages` arguments when '
+                    '`browser_pool` is provided.'
                 )
 
         # If browser_pool is not provided, create a new instance of BrowserPool with specified arguments.
@@ -116,6 +127,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 browser_type=browser_type,
                 browser_launch_options=browser_launch_options,
                 browser_new_context_options=browser_new_context_options,
+                use_incognito_pages=use_incognito_pages,
             )
 
         self._browser_pool = browser_pool
