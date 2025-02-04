@@ -49,7 +49,7 @@ class PlaywrightBrowserController(BaseBrowserController):
         Args:
             browser: The browser instance to control.
             max_open_pages_per_browser: The maximum number of pages that can be open at the same time.
-            use_incognito_pages: each page opens in its own context.
+            use_incognito_pages: Opens each page in a separate browsing context.
             header_generator: An optional `HeaderGenerator` instance used to generate and manage HTTP headers for
                 requests made by the browser. By default, a predefined header generator is used. Set to `None` to
                 disable automatic header modifications.
