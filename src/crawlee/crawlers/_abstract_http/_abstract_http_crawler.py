@@ -5,7 +5,7 @@ from abc import ABC
 from typing import TYPE_CHECKING, Any, Callable, Generic
 
 from pydantic import ValidationError
-from typing_extensions import NotRequired, TypeVar
+from typing_extensions import TypeVar
 
 from crawlee import EnqueueStrategy, RequestTransformAction
 from crawlee._request import Request, RequestOptions
@@ -18,7 +18,7 @@ from crawlee.http_clients import HttpxHttpClient
 from ._http_crawling_context import HttpCrawlingContext, ParsedHttpCrawlingContext, TParseResult
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Awaitable, Iterable
+    from collections.abc import AsyncGenerator, Awaitable
 
     from typing_extensions import Unpack
 
@@ -27,20 +27,6 @@ if TYPE_CHECKING:
     from ._abstract_http_parser import AbstractHttpParser
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=ParsedHttpCrawlingContext)
-
-
-@docs_group('Data structures')
-class HttpCrawlerOptions(Generic[TCrawlingContext], BasicCrawlerOptions[TCrawlingContext]):
-    """Arguments for the `AbstractHttpCrawler` constructor.
-
-    It is intended for typing forwarded `__init__` arguments in the subclasses.
-    """
-
-    additional_http_error_status_codes: NotRequired[Iterable[int]]
-    """Additional HTTP status codes to treat as errors, triggering automatic retries when encountered."""
-
-    ignore_http_error_status_codes: NotRequired[Iterable[int]]
-    """HTTP status codes that are typically considered errors but should be treated as successful responses."""
 
 
 @docs_group('Abstract classes')
@@ -63,18 +49,18 @@ class AbstractHttpCrawler(Generic[TCrawlingContext, TParseResult], BasicCrawler[
         self,
         *,
         parser: AbstractHttpParser[TParseResult],
-        additional_http_error_status_codes: Iterable[int] = (),
-        ignore_http_error_status_codes: Iterable[int] = (),
         **kwargs: Unpack[BasicCrawlerOptions[TCrawlingContext]],
     ) -> None:
         self._parser = parser
         self._pre_navigation_hooks: list[Callable[[BasicCrawlingContext], Awaitable[None]]] = []
+        kwargs.setdefault('additional_http_error_status_codes', ())
+        kwargs.setdefault('ignore_http_error_status_codes', ())
 
         kwargs.setdefault(
             'http_client',
             HttpxHttpClient(
-                additional_http_error_status_codes=additional_http_error_status_codes,
-                ignore_http_error_status_codes=ignore_http_error_status_codes,
+                additional_http_error_status_codes=kwargs['additional_http_error_status_codes'],
+                ignore_http_error_status_codes=kwargs['ignore_http_error_status_codes'],
             ),
         )
 

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from bs4 import BeautifulSoup
 
 from crawlee._utils.docs import docs_group
-from crawlee.crawlers._abstract_http import AbstractHttpCrawler, HttpCrawlerOptions
+from crawlee.crawlers import AbstractHttpCrawler, BasicCrawlerOptions
 
 from ._beautifulsoup_crawling_context import BeautifulSoupCrawlingContext
 from ._beautifulsoup_parser import BeautifulSoupParser, BeautifulSoupParserType
@@ -58,7 +58,7 @@ class BeautifulSoupCrawler(AbstractHttpCrawler[BeautifulSoupCrawlingContext, Bea
         self,
         *,
         parser: BeautifulSoupParserType = 'lxml',
-        **kwargs: Unpack[HttpCrawlerOptions[BeautifulSoupCrawlingContext]],
+        **kwargs: Unpack[BasicCrawlerOptions[BeautifulSoupCrawlingContext]],
     ) -> None:
         """A default constructor.
 
