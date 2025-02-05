@@ -2,8 +2,8 @@ import asyncio
 
 from playwright.async_api import Route
 
-from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler import AdaptivePlaywrightCrawler
-from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import (
+from crawlee.crawlers import (
+    AdaptivePlaywrightCrawler,
     AdaptivePlaywrightCrawlingContext,
     AdaptivePlaywrightPreNavCrawlingContext,
 )

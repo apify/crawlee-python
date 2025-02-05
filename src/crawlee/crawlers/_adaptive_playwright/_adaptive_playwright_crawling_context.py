@@ -33,6 +33,11 @@ TStaticParseResult = TypeVar('TStaticParseResult')
 @dataclass(frozen=True)
 @docs_group('Data structures')
 class AdaptivePlaywrightCrawlingContext(Generic[TStaticParseResult], ParsedHttpCrawlingContext[TStaticParseResult]):
+    """The crawling context used by `AdaptivePlaywrightCrawler`.
+
+    It provides access to key objects as well as utility functions for handling crawling tasks.
+    """
+
     _response: Response | None = None
     _infinite_scroll: Callable[[], Awaitable[None]] | None = None
     _page: Page | None = None
@@ -109,6 +114,7 @@ class AdaptivePlaywrightPreNavCrawlingContext(BasicCrawlingContext):
 
     _page: Page | None = None
     block_requests: BlockRequestsFunction | None = None
+    """Blocks network requests matching specified URL patterns."""
 
     @property
     def page(self) -> Page:
@@ -157,10 +163,7 @@ class _PlaywrightHttpResponse:
     async def from_playwright_response(cls, response: Response, protocol: str) -> Self:
         headers = HttpHeaders(response.headers)
         status_code = response.status
-        # Can't find this anywhere in PlayWright, but some headers can include information about protocol.
-        # In firefox for example: 'x-firefox-spdy'
-        # Might be also obtained by executing JS code in browser: performance.getEntries()[0].nextHopProtocol
-        # Response headers capitalization not respecting http1.1 Pascal case. Always lower case in PlayWright.
+        # Used http protocol version cannot be obtained from `Response` and has to be passed as additional argument.
         http_version = protocol
         _content = await response.body()
 

@@ -25,24 +25,25 @@ from crawlee.crawlers import (
     PlaywrightCrawlingContext,
     PlaywrightPreNavCrawlingContext,
 )
-from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler_statistics import (
-    AdaptivePlaywrightCrawlerStatisticState,
-)
-from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import (
-    AdaptivePlaywrightCrawlingContext,
-    AdaptivePlaywrightPreNavCrawlingContext,
-)
-from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import (
-    DefaultRenderingTypePredictor,
-    RenderingType,
-    RenderingTypePredictor,
-)
 from crawlee.crawlers._adaptive_playwright._result_comparator import (
     create_default_comparator,
 )
 from crawlee.crawlers._beautifulsoup._beautifulsoup_parser import BeautifulSoupParser
 from crawlee.crawlers._parsel._parsel_parser import ParselParser
 from crawlee.statistics import Statistics, StatisticsState
+
+from ._adaptive_playwright_crawler_statistics import (
+    AdaptivePlaywrightCrawlerStatisticState,
+)
+from ._adaptive_playwright_crawling_context import (
+    AdaptivePlaywrightCrawlingContext,
+    AdaptivePlaywrightPreNavCrawlingContext,
+)
+from ._rendering_type_predictor import (
+    DefaultRenderingTypePredictor,
+    RenderingType,
+    RenderingTypePredictor,
+)
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -92,8 +93,6 @@ class AdaptivePlaywrightCrawler(
 
     It tries to detect whether it is sufficient to crawl without browser (which is faster) or if
     `PlaywrightCrawler` should be used (in case previous method did not work as expected for specific url.).
-
-    # TODO: Add example
     """
 
     def __init__(
@@ -108,7 +107,9 @@ class AdaptivePlaywrightCrawler(
         statistics: Statistics[AdaptivePlaywrightCrawlerStatisticState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> None:
-        """A default constructor. Recommended way to create instance is to call factory methods `with_*_static_parser`.
+        """A default constructor. Recommended way to create instance is to call factory methods.
+
+        Recommended factory methods: `with_beautifulsoup_static_parser`, `with_parsel_static_parser`.
 
         Args:
             rendering_type_predictor: Object that implements RenderingTypePredictor and is capable of predicting which
@@ -128,7 +129,7 @@ class AdaptivePlaywrightCrawler(
 
         # Adaptive crawling related.
         self.rendering_type_predictor = rendering_type_predictor or DefaultRenderingTypePredictor()
-        self.result_checker = result_checker or (lambda result: True)  #  noqa: ARG005  # Intentionally unused argument.
+        self.result_checker = result_checker or (lambda _: True)
         self.result_comparator = result_comparator or create_default_comparator(result_checker)
 
         super().__init__(statistics=statistics, **kwargs)
