@@ -1058,7 +1058,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
             request.state = RequestState.DONE
 
-            if context.session:
+            if context.session and context.session.is_usable:
                 context.session.mark_good()
 
             self._statistics.record_request_processing_finish(statistics_id)

@@ -19,6 +19,8 @@ if TYPE_CHECKING:
 @pytest.fixture
 async def server() -> AsyncGenerator[respx.MockRouter, None]:
     with respx.mock(base_url='https://test.io', assert_all_called=False) as mock:
+        mock.get('https://www.test.io/').return_value = Response(302, headers={'Location': 'https://test.io/'})
+
         mock.get('/', name='index_endpoint').return_value = Response(
             200,
             text="""<html>
@@ -104,14 +106,15 @@ async def test_enqueue_links(server: respx.MockRouter) -> None:
         visit(context.request.url)
         await context.enqueue_links()
 
-    await crawler.run(['https://test.io/'])
+    await crawler.run(['https://www.test.io/'])
 
     assert server['index_endpoint'].called
     assert server['secondary_index_endpoint'].called
 
     visited = {call[0][0] for call in visit.call_args_list}
+
     assert visited == {
-        'https://test.io/',
+        'https://www.test.io/',
         'https://test.io/asdf',
         'https://test.io/hjkl',
         'https://test.io/qwer',
