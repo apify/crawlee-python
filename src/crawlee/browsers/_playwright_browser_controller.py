@@ -43,6 +43,7 @@ class PlaywrightBrowserController(BaseBrowserController):
         browser: Browser,
         *,
         max_open_pages_per_browser: int = 20,
+        use_incognito_pages: bool = False,
         header_generator: HeaderGenerator | None = _DEFAULT_HEADER_GENERATOR,
         fingerprint_generator: FingerprintGenerator | None = None,
     ) -> None:
@@ -51,6 +52,8 @@ class PlaywrightBrowserController(BaseBrowserController):
         Args:
             browser: The browser instance to control.
             max_open_pages_per_browser: The maximum number of pages that can be open at the same time.
+            use_incognito_pages: By default pages share the same browser context. If set to True each page uses its
+                own context that is destroyed once the page is closed or crashes.
             header_generator: An optional `HeaderGenerator` instance used to generate and manage HTTP headers for
                 requests made by the browser. By default, a predefined header generator is used. Set to `None` to
                 disable automatic header modifications.
@@ -66,6 +69,7 @@ class PlaywrightBrowserController(BaseBrowserController):
         self._max_open_pages_per_browser = max_open_pages_per_browser
         self._header_generator = header_generator
         self._fingerprint_generator = fingerprint_generator
+        self._use_incognito_pages = use_incognito_pages
 
         self._browser_context: BrowserContext | None = None
         self._pages = list[Page]()
@@ -135,7 +139,20 @@ class PlaywrightBrowserController(BaseBrowserController):
         if not self.has_free_capacity:
             raise ValueError('Cannot open more pages in this browser.')
 
-        page = await self._browser_context.new_page()
+        if self._use_incognito_pages:
+            # In incognito there is exactly one context per one page. Create new context for each new page.
+            new_context = await self._create_browser_context(
+                browser_new_context_options=browser_new_context_options,
+                proxy_info=proxy_info,
+            )
+            page = await new_context.new_page()
+        else:
+            if not self._browser_context:
+                self._browser_context = await self._create_browser_context(
+                    browser_new_context_options=browser_new_context_options,
+                    proxy_info=proxy_info,
+                )
+            page = await self._browser_context.new_page()
 
         # Handle page close event
         page.on(event='close', f=self._on_page_close)

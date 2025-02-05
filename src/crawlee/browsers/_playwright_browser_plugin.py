@@ -44,6 +44,7 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         browser_launch_options: dict[str, Any] | None = None,
         browser_new_context_options: dict[str, Any] | None = None,
         max_open_pages_per_browser: int = 20,
+        use_incognito_pages: bool = False,
         fingerprint_generator: FingerprintGenerator | None = None,
     ) -> None:
         """A default constructor.
@@ -58,6 +59,8 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
                 Playwright documentation: https://playwright.dev/python/docs/api/class-browser#browser-new-context.
             max_open_pages_per_browser: The maximum number of pages that can be opened in a single browser instance.
                 Once reached, a new browser instance will be launched to handle the excess.
+            use_incognito_pages: By default pages share the same browser context. If set to True each page uses its
+                own context that is destroyed once the page is closed or crashes.
             fingerprint_generator: An optional instance of implementation of `FingerprintGenerator` that is used
                 to generate browser fingerprints together with consistent headers.
         """
@@ -74,6 +77,7 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
         self._browser_launch_options = default_launch_browser_options | (browser_launch_options or {})
         self._browser_new_context_options = browser_new_context_options or {}
         self._max_open_pages_per_browser = max_open_pages_per_browser
+        self._use_incognito_pages = use_incognito_pages
 
         self._playwright_context_manager = async_playwright()
         self._playwright: Playwright | None = None
@@ -160,6 +164,7 @@ class PlaywrightBrowserPlugin(BaseBrowserPlugin):
 
         return PlaywrightBrowserController(
             browser,
+            use_incognito_pages=self._use_incognito_pages,
             max_open_pages_per_browser=self._max_open_pages_per_browser,
             fingerprint_generator=self._fingerprint_generator,
         )

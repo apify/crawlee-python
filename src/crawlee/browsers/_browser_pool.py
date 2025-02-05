@@ -105,6 +105,7 @@ class BrowserPool:
         browser_new_context_options: Mapping[str, Any] | None = None,
         headless: bool | None = None,
         fingerprint_generator: FingerprintGenerator | None = None,
+        use_incognito_pages: bool | None = False,
         **kwargs: Any,
     ) -> BrowserPool:
         """Create a new instance with a single `PlaywrightBrowserPlugin` configured with the provided options.
@@ -120,6 +121,8 @@ class BrowserPool:
             headless: Whether to run the browser in headless mode.
             fingerprint_generator: An optional instance of implementation of `FingerprintGenerator` that is used
                 to generate browser fingerprints together with consistent headers.
+            use_incognito_pages: By default pages share the same browser context. If set to True each page uses its
+                own context that is destroyed once the page is closed or crashes.
             kwargs: Additional arguments for default constructor.
         """
         plugin_options: dict = defaultdict(dict)
@@ -128,6 +131,9 @@ class BrowserPool:
 
         if headless is not None:
             plugin_options['browser_launch_options']['headless'] = headless
+
+        if use_incognito_pages is not None:
+            plugin_options['use_incognito_pages'] = use_incognito_pages
 
         if browser_type:
             plugin_options['browser_type'] = browser_type

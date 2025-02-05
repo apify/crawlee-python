@@ -1,4 +1,4 @@
-# % if cookiecutter.crawler_type == 'camoufox'
+# % if cookiecutter.crawler_type == 'playwright-camoufox'
 # % set extras = ['playwright']
 # % else
 # % set extras = [cookiecutter.crawler_type]
@@ -18,7 +18,7 @@ package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.9"
-# % if cookiecutter.crawler_type == 'camoufox'
+# % if cookiecutter.crawler_type == 'playwright-camoufox'
 camoufox = {version= ">=0.4.5", extras = ["geoip"]}
 # % endif
 # % if cookiecutter.enable_apify_integration
