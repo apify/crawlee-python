@@ -16,13 +16,14 @@ from crawlee.fingerprint_suite import (
     HeaderGeneratorOptions,
     ScreenOptions,
 )
+from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_values
 from crawlee.fingerprint_suite._consts import BROWSER_TYPE_HEADER_KEYWORD
 from crawlee.proxy_configuration import ProxyConfiguration
-from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_values
 
 if TYPE_CHECKING:
     from yarl import URL
 
+    from crawlee.browsers._types import BrowserType
     from crawlee.crawlers import PlaywrightCrawlingContext, PlaywrightPreNavCrawlingContext
 
 
@@ -105,7 +106,7 @@ async def test_redirect_handling(httpbin: URL) -> None:
 
 
 async def test_chromium_headless_headers(httpbin: URL, header_network: dict) -> None:
-    browser_type = 'chromium'
+    browser_type: BrowserType = 'chromium'
     crawler = PlaywrightCrawler(headless=True, browser_type=browser_type)
     headers = dict[str, str]()
 
@@ -132,7 +133,7 @@ async def test_chromium_headless_headers(httpbin: URL, header_network: dict) -> 
 
 
 async def test_firefox_headless_headers(httpbin: URL, header_network: dict) -> None:
-    browser_type = 'firefox'
+    browser_type: BrowserType = 'firefox'
     crawler = PlaywrightCrawler(headless=True, browser_type=browser_type)
     headers = dict[str, str]()
 
