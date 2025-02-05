@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, cast
 
+from browserforge.injectors.playwright import AsyncNewContext
 from playwright.async_api import BrowserContext, Page, ProxySettings
 from typing_extensions import override
 
@@ -18,6 +19,7 @@ if TYPE_CHECKING:
 
     from playwright.async_api import Browser
 
+    from crawlee.fingerprint_suite import FingerprintGenerator
     from crawlee.proxy_configuration import ProxyInfo
 
 from logging import getLogger
@@ -43,6 +45,7 @@ class PlaywrightBrowserController(BaseBrowserController):
         max_open_pages_per_browser: int = 20,
         use_incognito_pages: bool = False,
         header_generator: HeaderGenerator | None = _DEFAULT_HEADER_GENERATOR,
+        fingerprint_generator: FingerprintGenerator | None = None,
     ) -> None:
         """A default constructor.
 
@@ -54,10 +57,18 @@ class PlaywrightBrowserController(BaseBrowserController):
             header_generator: An optional `HeaderGenerator` instance used to generate and manage HTTP headers for
                 requests made by the browser. By default, a predefined header generator is used. Set to `None` to
                 disable automatic header modifications.
+            fingerprint_generator: An optional instance of implementation of `FingerprintGenerator` that is used
+                to generate browser fingerprints together with consistent headers.
         """
+        if fingerprint_generator and header_generator is not self._DEFAULT_HEADER_GENERATOR:
+            raise ValueError(
+                'Do not use `header_generator` and `fingerprint_generator` arguments at the same time. '
+                'Choose only one. `fingerprint_generator` generates headers as well.'
+            )
         self._browser = browser
         self._max_open_pages_per_browser = max_open_pages_per_browser
         self._header_generator = header_generator
+        self._fingerprint_generator = fingerprint_generator
         self._use_incognito_pages = use_incognito_pages
 
         self._browser_context: BrowserContext | None = None
@@ -119,19 +130,28 @@ class PlaywrightBrowserController(BaseBrowserController):
         Raises:
             ValueError: If the browser has reached the maximum number of open pages.
         """
+        if not self._browser_context:
+            self._browser_context = await self._create_browser_context(
+                browser_new_context_options=browser_new_context_options,
+                proxy_info=proxy_info,
+            )
+
         if not self.has_free_capacity:
             raise ValueError('Cannot open more pages in this browser.')
 
         if self._use_incognito_pages:
-            # We use https://playwright.dev/python/docs/api/class-browser#browser-new-page for create a page in
-            # a separate context.
-            page_context_options = self._create_context_options(browser_new_context_options, proxy_info)
-            page = await self._browser.new_page(**page_context_options)
+            # In incognito there is exactly one context per one page. Create new context for each new page.
+            new_context = await self._create_browser_context(
+                browser_new_context_options=browser_new_context_options,
+                proxy_info=proxy_info,
+            )
+            page = await new_context.new_page()
         else:
-            # We use https://playwright.dev/python/docs/api/class-browser#browser-new-context for create context
-            # The page are then created in this context
             if not self._browser_context:
-                self._browser_context = await self._create_browser_context(browser_new_context_options, proxy_info)
+                self._browser_context = await self._create_browser_context(
+                    browser_new_context_options=browser_new_context_options,
+                    proxy_info=proxy_info,
+                )
             page = await self._browser_context.new_page()
 
         # Handle page close event
@@ -164,22 +184,19 @@ class PlaywrightBrowserController(BaseBrowserController):
         """Handle actions after a page is closed."""
         self._pages.remove(page)
 
-    def _create_context_options(
-        self, browser_new_context_options: Mapping[str, Any] | None = None, proxy_info: ProxyInfo | None = None
-    ) -> Mapping[str, Any]:
-        """Create context options for context and single pages with the specified proxy settings."""
-        if self._header_generator:
-            common_headers = self._header_generator.get_common_headers()
-            sec_ch_ua_headers = self._header_generator.get_sec_ch_ua_headers(browser_type=self.browser_type)
-            user_agent_header = self._header_generator.get_user_agent_header(browser_type=self.browser_type)
-            extra_http_headers = dict(common_headers | sec_ch_ua_headers | user_agent_header)
-        else:
-            extra_http_headers = None
+    async def _create_browser_context(
+        self,
+        browser_new_context_options: Mapping[str, Any] | None = None,
+        proxy_info: ProxyInfo | None = None,
+    ) -> BrowserContext:
+        """Create a new browser context with the specified proxy settings.
 
+        Create context with fingerprints and headers using with `self._fingerprint_generator` if available.
+        Create context without fingerprints, but with headers based on `self._header_generator` if available.
+        Create context without headers and without fingerprints if neither `self._header_generator` nor
+        `self._fingerprint_generator` is available.
+        """
         browser_new_context_options = dict(browser_new_context_options) if browser_new_context_options else {}
-        browser_new_context_options['extra_http_headers'] = browser_new_context_options.get(
-            'extra_http_headers', extra_http_headers
-        )
 
         if proxy_info:
             if browser_new_context_options.get('proxy'):
@@ -190,11 +207,23 @@ class PlaywrightBrowserController(BaseBrowserController):
                 username=proxy_info.username,
                 password=proxy_info.password,
             )
-        return browser_new_context_options
 
-    async def _create_browser_context(
-        self, browser_new_context_options: Mapping[str, Any] | None = None, proxy_info: ProxyInfo | None = None
-    ) -> BrowserContext:
-        """Create a new browser context with the specified proxy settings."""
-        browser_new_context_options = self._create_context_options(browser_new_context_options, proxy_info)
+        if self._fingerprint_generator:
+            return await AsyncNewContext(
+                browser=self._browser, fingerprint=self._fingerprint_generator.generate(), **browser_new_context_options
+            )
+
+        if self._header_generator:
+            common_headers = self._header_generator.get_common_headers()
+            sec_ch_ua_headers = self._header_generator.get_sec_ch_ua_headers(browser_type=self.browser_type)
+            user_agent_header = self._header_generator.get_user_agent_header(browser_type=self.browser_type)
+            headers = dict(common_headers | sec_ch_ua_headers | user_agent_header)
+            extra_http_headers = headers
+        else:
+            extra_http_headers = None
+
+        browser_new_context_options['extra_http_headers'] = browser_new_context_options.get(
+            'extra_http_headers', extra_http_headers
+        )
+
         return await self._browser.new_context(**browser_new_context_options)

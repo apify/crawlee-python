@@ -18,7 +18,7 @@ from crawlee.fingerprint_suite._consts import (
 )
 
 if TYPE_CHECKING:
-    from crawlee.browsers._types import BrowserType
+    from crawlee.fingerprint_suite._types import SupportedBrowserType
 
 
 @docs_group('Classes')
@@ -45,7 +45,7 @@ class HeaderGenerator:
     def get_user_agent_header(
         self,
         *,
-        browser_type: BrowserType = 'chromium',
+        browser_type: SupportedBrowserType = 'chromium',
     ) -> HttpHeaders:
         """Get the User-Agent header based on the browser type."""
         headers = dict[str, str]()
@@ -67,7 +67,7 @@ class HeaderGenerator:
     def get_sec_ch_ua_headers(
         self,
         *,
-        browser_type: BrowserType = 'chromium',
+        browser_type: SupportedBrowserType = 'chromium',
     ) -> HttpHeaders:
         """Get the Sec-Ch-Ua headers based on the browser type."""
         headers = dict[str, str]()
