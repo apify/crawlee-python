@@ -53,6 +53,16 @@ def test_get_user_agent_header_invalid_browser_type() -> None:
         header_generator.get_user_agent_header(browser_type='invalid_browser')  # type: ignore[arg-type]
 
 
+def test_get_sec_ch_ua_headers_chromium(header_network: dict) -> None:
+    """Test that Sec-Ch-Ua headers are generated correctly for Chromium."""
+    header_generator = HeaderGenerator()
+    headers = header_generator.get_sec_ch_ua_headers(browser_type='chromium')
+
+    assert headers.get('sec-ch-ua') in get_available_header_values(header_network, 'sec-ch-ua')
+    assert headers.get('sec-ch-ua-mobile') in get_available_header_values(header_network, 'sec-ch-ua-mobile')
+    assert headers.get('sec-ch-ua-platform') in get_available_header_values(header_network, 'sec-ch-ua-platform')
+
+
 def test_get_sec_ch_ua_headers_firefox() -> None:
     """Test that sec-ch-ua headers are not generated for Firefox."""
     header_generator = HeaderGenerator()

@@ -17,15 +17,13 @@ from ._consts import BROWSER_TYPE_HEADER_KEYWORD
 from ._fingerprint_generator import FingerprintGenerator
 
 if TYPE_CHECKING:
-    from camoufox.utils import ListOrString
-
     from ._types import HeaderGeneratorOptions, ScreenOptions, SupportedBrowserType
 
 
 class PatchedHeaderGenerator(bf_HeaderGenerator):
     """Browserforge `HeaderGenerator` that contains patches not accepted in upstream repo."""
 
-    def _get_accept_language_header(self, locales: ListOrString) -> str:
+    def _get_accept_language_header(self, locales: tuple[str, ...]) -> str:
         """Generates the Accept-Language header based on the given locales.
 
         Patched version due to PR of upstream repo not being merged: https://github.com/daijro/browserforge/pull/24
@@ -140,21 +138,36 @@ class BrowserforgeHeaderGenerator:
     def generate(self, browser_type: SupportedBrowserType = 'chromium') -> dict[str, str]:
         """Generate headers.
 
-        browser_type = `chromium` is not just Google Chrome, but also other chromium based browsers!
+        browser_type = `chromium` is in general sense not just Google Chrome, but also other chromium based browsers.
         For example this Safari user agent can be generated for `chromium` input:
         `Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko)
          CriOS/130.0.6723.90 Mobile/15E148 Safari/604.1`
+        To remain consistent with previous implementation only subset of `chromium` header will be allowed.
         """
         # browserforge header generation can be flaky. Enforce basic QA on generated headers
-        max_attempts = 20
+        max_attempts = 10
+
+        if browser_type == 'chromium':
+            # `BrowserForge` header generator considers `chromium` in general sense and therefore will generate also
+            # other `Chromium` based browser headers. This adapter desires only specific subset of `chromium` headers
+            # that contain all 'sec-ch-ua', 'sec-ch-ua-mobile', 'sec-ch-ua-platform' headers.
+            # Increase max attempts as from `BrowserForge` header generator perspective even `chromium`
+            # headers without `sec-...` headers are valid.
+            max_attempts += 50
 
         bf_browser_type = 'safari' if browser_type == 'webkit' else browser_type
 
         for _attempt in range(max_attempts):
             generated_header: dict[str, str] = self._generator.generate(browser=bf_browser_type)
             if any(keyword in generated_header['User-Agent'] for keyword in BROWSER_TYPE_HEADER_KEYWORD[browser_type]):
+                if browser_type == 'chromium' and not self._contains_all_sec_headers(generated_header):
+                    continue
+
                 return generated_header
         raise RuntimeError('Failed to generate header.')
+
+    def _contains_all_sec_headers(self, headers: dict[str, str]) -> bool:
+        return all(header_name in headers for header_name in ('sec-ch-ua', 'sec-ch-ua-mobile', 'sec-ch-ua-platform'))
 
 
 def get_available_header_network() -> dict:
