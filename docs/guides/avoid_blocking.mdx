@@ -8,6 +8,7 @@ import CodeBlock from '@theme/CodeBlock';
 
 import PlaywrightDefaultFingerprintGenerator from '!!raw-loader!./code/browser_fingerprint/playwright_with_fingerprint_generator.py';
 import PlaywrightDefaultFingerprintGeneratorWithArgs from '!!raw-loader!./code/browser_fingerprint/default_fingerprint_generator_with_args.py';
+import PlaywrightWithCamoufox from '!!raw-loader!../examples/code/playwright_crawler_with_camoufox.py';
 
 
 A scraper might get blocked for numerous reasons. Let's narrow it down to the two main ones. The first is a bad or blocked IP address. You can learn about this topic in the [proxy management guide](./proxy-management). The second reason is [browser fingerprints](https://pixelprivacy.com/resources/browser-fingerprinting/) (or signatures), which we will explore more in this guide. Check the [Apify Academy anti-scraping course](https://docs.apify.com/academy/anti-scraping) to gain a deeper theoretical understanding of blocking and learn a few tips and tricks.
@@ -28,9 +29,17 @@ In certain cases we want to narrow down the fingerprints used - e.g. specify a c
     {PlaywrightDefaultFingerprintGeneratorWithArgs}
 </CodeBlock>
 
-## Disabling browser fingerprints
+### Disabling browser fingerprints
 
 By default, fingerprints are disabled.
+
+## Using Camoufox
+
+In some cases even <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> with fingerprints is not enough. You can try using <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> together with [Camoufox](https://camoufox.com/). See the example integration below:
+
+<CodeBlock className="language-python">
+    {PlaywrightWithCamoufox}
+</CodeBlock>
 
 **Related links**
 
