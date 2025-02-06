@@ -28,6 +28,7 @@ if TYPE_CHECKING:
 
     from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs
     from crawlee.browsers._types import BrowserType
+    from crawlee.fingerprint_suite import FingerprintGenerator
 
 
 @docs_group('Classes')
@@ -73,10 +74,12 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
 
     def __init__(
         self,
+        *,
         browser_pool: BrowserPool | None = None,
         browser_type: BrowserType | None = None,
         browser_launch_options: Mapping[str, Any] | None = None,
         browser_new_context_options: Mapping[str, Any] | None = None,
+        fingerprint_generator: FingerprintGenerator | None = None,
         headless: bool | None = None,
         use_incognito_pages: bool | None = None,
         **kwargs: Unpack[BasicCrawlerOptions[PlaywrightCrawlingContext]],
@@ -95,6 +98,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 are provided directly to Playwright's `browser.new_context` method. For more details, refer to the
                 [Playwright documentation](https://playwright.dev/python/docs/api/class-browser#browser-new-context).
                 This option should not be used if `browser_pool` is provided.
+            fingerprint_generator: An optional instance of implementation of `FingerprintGenerator` that is used
+                to generate browser fingerprints together with consistent headers.
             headless: Whether to run the browser in headless mode.
                 This option should not be used if `browser_pool` is provided.
             use_incognito_pages: By default pages share the same browser context. If set to True each page uses its
@@ -112,11 +117,12 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                     browser_type,
                     browser_launch_options,
                     browser_new_context_options,
+                    fingerprint_generator,
                 )
             ):
                 raise ValueError(
-                    'You cannot provide `headless`, `browser_type`, `browser_launch_options`'
-                    '`browser_new_context_options` or `use_incognito_pages` arguments when '
+                    'You cannot provide `headless`, `browser_type`, `browser_launch_options`, '
+                    '`browser_new_context_options`, `use_incognito_pages`  or `fingerprint_generator` arguments when '
                     '`browser_pool` is provided.'
                 )
 
@@ -128,6 +134,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
                 browser_launch_options=browser_launch_options,
                 browser_new_context_options=browser_new_context_options,
                 use_incognito_pages=use_incognito_pages,
+                fingerprint_generator=fingerprint_generator,
             )
 
         self._browser_pool = browser_pool

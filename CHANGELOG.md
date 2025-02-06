@@ -3,7 +3,15 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 0.5.4 - **not yet released**
+## 0.5.5 - **not yet released**
+
+### 🚀 Features
+
+- Integrate browserforge fingerprints ([#829](https://github.com/apify/crawlee-python/pull/829)) ([2b156b4](https://github.com/apify/crawlee-python/commit/2b156b4ba688f9111195422e6058dff30eb1f782)) by [@Pijukatel](https://github.com/Pijukatel), closes [#549](https://github.com/apify/crawlee-python/issues/549)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.5.4](https://github.com/apify/crawlee-python/releases/tag/v0.5.4) (2025-02-05)
 
 ### 🚀 Features
 
@@ -17,7 +25,6 @@ All notable changes to this project will be documented in this file.
 - Fix `CurlImpersonateHttpClient` cookies handler ([#946](https://github.com/apify/crawlee-python/pull/946)) ([ed415c4](https://github.com/apify/crawlee-python/commit/ed415c433da2a40b0ee62534f0730d0737e991b8)) by [@Mantisus](https://github.com/Mantisus)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.5.3](https://github.com/apify/crawlee-python/releases/tag/v0.5.3) (2025-01-31)
 
 ### 🚀 Features
