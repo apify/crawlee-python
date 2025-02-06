@@ -33,7 +33,9 @@ class Router(Generic[TCrawlingContext]):
 
         return handler
 
-    def handler(self, label: str) -> Callable[[RequestHandler[TCrawlingContext]], None]:
+    def handler(
+        self, label: str
+    ) -> Callable[[RequestHandler[TCrawlingContext]], Callable[[TCrawlingContext], Awaitable]]:
         """A decorator used to register a label-based handler.
 
         The registered will be invoked only for requests with the exact same label.
@@ -41,8 +43,9 @@ class Router(Generic[TCrawlingContext]):
         if label in self._handlers_by_label:
             raise RuntimeError(f'A handler for label `{label}` is already registered')
 
-        def wrapper(handler: Callable[[TCrawlingContext], Awaitable]) -> None:
+        def wrapper(handler: Callable[[TCrawlingContext], Awaitable]) -> Callable[[TCrawlingContext], Awaitable]:
             self._handlers_by_label[label] = handler
+            return handler
 
         return wrapper
 

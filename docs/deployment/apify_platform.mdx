@@ -6,8 +6,6 @@ description: Apify platform - large-scale and high-performance web scraping
 
 import ApiLink from '@site/src/components/ApiLink';
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 import CodeBlock from '@theme/CodeBlock';
 
 import LogWithConfigExample from '!!raw-loader!./code/apify/log_with_config_example.py';
@@ -27,7 +25,7 @@ We do not test Crawlee in other cloud environments such as Lambda or on specific
 
 ## Logging into Apify platform from Crawlee
 
-To access your [Apify account](https://console.apify.com/sign-up) from Crawlee, you must provide credentials - your [API token](https://console.apify.com/account?tab=integrations). You can do that either by utilizing [Apify CLI](https://github.com/apify/apify-cli) or with environment variables.
+To access your [Apify account](https://console.apify.com/sign-up) from Crawlee, you must provide credentials - your [API token](https://console.apify.com/account?tab=integrations). You can do that either by utilizing [Apify CLI](https://docs.apify.com/cli/) or with environment variables.
 
 Once you provide credentials to your Apify CLI installation, you will be able to use all the Apify platform features, such as calling Actors, saving to cloud storages, using Apify proxies, setting up webhooks and so on.
 
@@ -142,7 +140,7 @@ If you don't plan to force usage of the platform storages when running the Actor
 {/*
 ### Getting public url of an item in the platform storage
 
-If you need to share a link to some file stored in a [Key-Value](https://docs.apify.com/sdk/python/reference/class/KeyValueStore) Store on Apify Platform, you can use [`get_public_url()`](https://docs.apify.com/sdk/python/reference/class/KeyValueStore#get_public_url) method. It accepts only one parameter: `key` - the key of the item you want to share.
+If you need to share a link to some file stored in a [Key-Value](https://docs.apify.com/sdk/python/reference/class/KeyValueStore) Store on Apify platform, you can use [`get_public_url()`](https://docs.apify.com/sdk/python/reference/class/KeyValueStore#get_public_url) method. It accepts only one parameter: `key` - the key of the item you want to share.
 
 <CodeBlock language="python">
     {GetPublicUrlSource}

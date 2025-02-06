@@ -69,7 +69,10 @@ class PatchedFingerprintGenerator(bf_FingerprintGenerator):
 
 @docs_group('Classes')
 class BrowserforgeFingerprintGenerator(FingerprintGenerator):
-    """`FingerprintGenerator` adapter for fingerprint generator from `browserforge`."""
+    """`FingerprintGenerator` adapter for fingerprint generator from `browserforge`.
+
+    `browserforge` is a browser header and fingerprint generator: https://github.com/daijro/browserforge
+    """
 
     def __init__(
         self,
@@ -135,8 +138,15 @@ class BrowserforgeHeaderGenerator:
         self._generator = PatchedHeaderGenerator(locale=['en-US', 'en'])
 
     def generate(self, browser_type: SupportedBrowserType = 'chromium') -> dict[str, str]:
+        """Generate headers.
+
+        browser_type = `chromium` is not just Google Chrome, but also other chromium based browsers!
+        For example this Safari user agent can be generated for `chromium` input:
+        `Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko)
+         CriOS/130.0.6723.90 Mobile/15E148 Safari/604.1`
+        """
         # browserforge header generation can be flaky. Enforce basic QA on generated headers
-        max_attempts = 10
+        max_attempts = 20
 
         bf_browser_type = 'safari' if browser_type == 'webkit' else browser_type
 

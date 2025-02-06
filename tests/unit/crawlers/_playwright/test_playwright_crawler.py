@@ -8,7 +8,9 @@ import json
 from typing import TYPE_CHECKING, Any
 from unittest import mock
 
-from crawlee import Glob, Request
+import pytest
+
+from crawlee import ConcurrencySettings, Glob, HttpHeaders, Request, RequestTransformAction
 from crawlee._types import EnqueueStrategy
 from crawlee.crawlers import PlaywrightCrawler
 from crawlee.fingerprint_suite import (
@@ -19,10 +21,12 @@ from crawlee.fingerprint_suite import (
 from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_values
 from crawlee.fingerprint_suite._consts import BROWSER_TYPE_HEADER_KEYWORD
 from crawlee.proxy_configuration import ProxyConfiguration
+from crawlee.sessions import SessionPool
 
 if TYPE_CHECKING:
     from yarl import URL
 
+    from crawlee._request import RequestOptions
     from crawlee.browsers._types import BrowserType
     from crawlee.crawlers import PlaywrightCrawlingContext, PlaywrightPreNavCrawlingContext
 
@@ -48,8 +52,9 @@ async def test_basic_request(httpbin: URL) -> None:
 
 
 async def test_enqueue_links() -> None:
-    requests = ['https://crawlee.dev/docs/examples']
-    crawler = PlaywrightCrawler()
+    # www.crawlee.dev create a redirect to crawlee.dev
+    requests = ['https://www.crawlee.dev/docs/examples']
+    crawler = PlaywrightCrawler(max_requests_per_crawl=11)
     visit = mock.Mock()
 
     @crawler.router.default_handler
@@ -59,10 +64,41 @@ async def test_enqueue_links() -> None:
 
     await crawler.run(requests)
 
-    visited: set[str] = {call[0][0] for call in visit.call_args_list}
+    first_visited = visit.call_args_list[0][0][0]
+    visited: set[str] = {call[0][0] for call in visit.call_args_list[1:]}
 
+    # The first link visited use original domain
+    assert first_visited == 'https://www.crawlee.dev/docs/examples'
     assert len(visited) >= 10
+    # All other links must have a domain name after the redirect
     assert all(url.startswith('https://crawlee.dev/docs/examples') for url in visited)
+
+
+async def test_enqueue_links_with_transform_request_function() -> None:
+    crawler = PlaywrightCrawler()
+    visit = mock.Mock()
+    headers = []
+
+    def test_transform_request_function(request: RequestOptions) -> RequestOptions | RequestTransformAction:
+        if request['url'] == 'https://crawlee.dev/python/docs/introduction':
+            request['headers'] = HttpHeaders({'transform-header': 'my-header'})
+            return request
+        return 'skip'
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        visit(context.request.url)
+        headers.append(context.request.headers)
+        await context.enqueue_links(transform_request_function=test_transform_request_function)
+
+    await crawler.run(['https://crawlee.dev/python'])
+
+    visited = {call[0][0] for call in visit.call_args_list}
+
+    assert visited == {'https://crawlee.dev/python', 'https://crawlee.dev/python/docs/introduction'}
+
+    # all urls added to `enqueue_links` must have a custom header
+    assert headers[1]['transform-header'] == 'my-header'
 
 
 async def test_nonexistent_url_invokes_error_handler() -> None:
@@ -217,6 +253,80 @@ async def test_proxy_set() -> None:
     await crawler.run(['https://test.com'])
 
     assert handler_data.get('proxy') == proxy_value
+
+
+@pytest.mark.parametrize(
+    'use_incognito_pages',
+    [
+        pytest.param(False, id='without use_incognito_pages'),
+        pytest.param(True, id='with use_incognito_pages'),
+    ],
+)
+async def test_isolation_cookies(*, use_incognito_pages: bool, httpbin: URL) -> None:
+    sessions_ids: list[str] = []
+    sessions_cookies: dict[str, dict[str, str]] = {}
+    response_cookies: dict[str, dict[str, str]] = {}
+
+    crawler = PlaywrightCrawler(
+        session_pool=SessionPool(max_pool_size=1),
+        use_incognito_pages=use_incognito_pages,
+        concurrency_settings=ConcurrencySettings(max_concurrency=1),
+    )
+
+    @crawler.router.default_handler
+    async def handler(context: PlaywrightCrawlingContext) -> None:
+        if not context.session:
+            return
+
+        sessions_ids.append(context.session.id)
+
+        if context.request.unique_key not in {'1', '2'}:
+            return
+
+        sessions_cookies[context.session.id] = context.session.cookies
+        response_data = json.loads(await context.response.text())
+        response_cookies[context.session.id] = response_data.get('cookies')
+
+        if context.request.user_data.get('retire_session'):
+            context.session.retire()
+
+    await crawler.run(
+        [
+            # The first request sets the cookie in the session
+            str(httpbin.with_path('/cookies/set').extend_query(a=1)),
+            # With the second request, we check the cookies in the session and set retire
+            Request.from_url(str(httpbin.with_path('/cookies')), unique_key='1', user_data={'retire_session': True}),
+            Request.from_url(str(httpbin.with_path('/cookies')), unique_key='2'),
+        ]
+    )
+
+    assert len(sessions_cookies) == 2
+    assert len(response_cookies) == 2
+
+    assert sessions_ids[0] == sessions_ids[1]
+
+    cookie_session_id = sessions_ids[0]
+    clean_session_id = sessions_ids[2]
+
+    assert cookie_session_id != clean_session_id
+
+    # When using `use_incognito_pages` there should be full cookie isolation
+    if use_incognito_pages:
+        # The initiated cookies must match in both the response and the session store
+        assert sessions_cookies[cookie_session_id] == response_cookies[cookie_session_id] == {'a': '1'}
+
+        # For a clean session, the cookie should not be in the sesstion store or in the response
+        # This way we can be sure that no cookies are being leaked through the http client
+        assert sessions_cookies[clean_session_id] == response_cookies[clean_session_id] == {}
+    # Without `use_incognito_pages` we will have access to the session cookie,
+    # but there will be a cookie leak via PlaywrightContext
+    else:
+        # The initiated cookies must match in both the response and the session store
+        assert sessions_cookies[cookie_session_id] == response_cookies[cookie_session_id] == {'a': '1'}
+
+        # PlaywrightContext makes cookies shared by all sessions that work with it.
+        # So in this case a clean session contains the same cookies
+        assert sessions_cookies[clean_session_id] == response_cookies[clean_session_id] == {'a': '1'}
 
 
 async def test_custom_fingerprint_uses_generator_options(httpbin: URL) -> None:

@@ -3,7 +3,7 @@
 # You can also use any other image from Docker Hub.
 # % if cookiecutter.crawler_type == 'playwright'
 FROM apify/actor-python-playwright:3.13
-# % elif cookiecutter.crawler_type == 'camoufox'
+# % elif cookiecutter.crawler_type == 'playwright-camoufox'
 # Currently camoufox has issues installing on Python 3.13
 FROM apify/actor-python-playwright:3.12
 # % else
@@ -15,7 +15,7 @@ RUN apt install -yq git && rm -rf /var/lib/apt/lists/*
 # % if cookiecutter.package_manager == 'poetry'
 RUN pip install -U pip setuptools \
     && pip install 'poetry<2' \
-    && poetry self add poetry-plugin-export
+    && poetry self add 'poetry-plugin-export<1.9.0'
 
 # Second, copy just poetry.lock and pyproject.toml into the Actor image,
 # since those should be the only files that affects the dependency install in the next step,
@@ -66,6 +66,11 @@ COPY . ./
 
 # Use compileall to ensure the runnability of the Actor Python code.
 RUN python -m compileall -q .
+
+# % if cookiecutter.crawler_type == 'playwright-camoufox'
+# Fetch camoufox files that are always needed when using camoufox.
+RUN python -m camoufox fetch
+# % endif
 
 # Specify how to launch the source code of your Actor.
 CMD ["python", "-m", "{{ cookiecutter.__package_name }}"]

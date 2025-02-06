@@ -2,20 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.5.3 - **not yet released**
+## [0.5.4](https://github.com/apify/crawlee-python/releases/tag/v0.5.4) (2025-02-05)
+
+### 🚀 Features
+
+- Add support `use_incognito_pages` for `browser_launch_options` in `PlaywrightCrawler` ([#941](https://github.com/apify/crawlee-python/pull/941)) ([eae3a33](https://github.com/apify/crawlee-python/commit/eae3a33a1842ebbdac5f9c51866a4be4bcf1ae2c)) by [@Mantisus](https://github.com/Mantisus)
+
+### 🐛 Bug Fixes
+
+- Fix session managment with retire ([#947](https://github.com/apify/crawlee-python/pull/947)) ([caee03f](https://github.com/apify/crawlee-python/commit/caee03fe3a43cc1d7a8d3f9e19b42df1bdb1c0aa)) by [@Mantisus](https://github.com/Mantisus)
+- Fix templates - poetry-plugin-export version and camoufox template name ([#952](https://github.com/apify/crawlee-python/pull/952)) ([7addea6](https://github.com/apify/crawlee-python/commit/7addea6605359cceba208e16ec9131724bdb3e9b)) by [@Pijukatel](https://github.com/Pijukatel), closes [#951](https://github.com/apify/crawlee-python/issues/951)
+- Fix convert relative link to absolute in `enqueue_links` for response with redirect ([#956](https://github.com/apify/crawlee-python/pull/956)) ([694102e](https://github.com/apify/crawlee-python/commit/694102e163bb9021a4830d2545d153f6f8f3de90)) by [@Mantisus](https://github.com/Mantisus), closes [#955](https://github.com/apify/crawlee-python/issues/955)
+- Fix `CurlImpersonateHttpClient` cookies handler ([#946](https://github.com/apify/crawlee-python/pull/946)) ([ed415c4](https://github.com/apify/crawlee-python/commit/ed415c433da2a40b0ee62534f0730d0737e991b8)) by [@Mantisus](https://github.com/Mantisus)
+
+
+## [0.5.3](https://github.com/apify/crawlee-python/releases/tag/v0.5.3) (2025-01-31)
 
 ### 🚀 Features
 
 - Add keep_alive flag to `crawler.__init__` ([#921](https://github.com/apify/crawlee-python/pull/921)) ([7a82d0c](https://github.com/apify/crawlee-python/commit/7a82d0cbdbe6c8739d4bf6a9b014e31f07e5a520)) by [@Pijukatel](https://github.com/Pijukatel), closes [#891](https://github.com/apify/crawlee-python/issues/891)
+- Add `block_requests` helper for `PlaywrightCrawler` ([#919](https://github.com/apify/crawlee-python/pull/919)) ([1030459](https://github.com/apify/crawlee-python/commit/103045994908f80cffee5ccfff91a040e0042f48)) by [@Mantisus](https://github.com/Mantisus), closes [#848](https://github.com/apify/crawlee-python/issues/848)
+- Return request handlers from decorator methods to allow further decoration ([#934](https://github.com/apify/crawlee-python/pull/934)) ([9ec0aae](https://github.com/apify/crawlee-python/commit/9ec0aae54e2a340d29c893567ae80bf8bd4510a9)) by [@mylank](https://github.com/mylank)
+- Add `transform_request_function` for `enqueue_links` ([#923](https://github.com/apify/crawlee-python/pull/923)) ([6b15957](https://github.com/apify/crawlee-python/commit/6b159578f612251e6d2253a72b6521430f4f9b09)) by [@Mantisus](https://github.com/Mantisus), closes [#894](https://github.com/apify/crawlee-python/issues/894)
+- Add `time_remaining_secs` property to `MIGRATING` event data ([#940](https://github.com/apify/crawlee-python/pull/940)) ([b44501b](https://github.com/apify/crawlee-python/commit/b44501bcadbd12673a8f47aa92f12da8e404f60b)) by [@fnesveda](https://github.com/fnesveda)
+- Add LogisticalRegressionPredictor - rendering type predictor for adaptive crawling ([#930](https://github.com/apify/crawlee-python/pull/930)) ([8440499](https://github.com/apify/crawlee-python/commit/8440499468db115a4c478e9bcdb692554d1655c5)) by [@Pijukatel](https://github.com/Pijukatel)
 
 ### 🐛 Bug Fixes
 
 - Fix crawler not retrying user handler if there was timeout in the handler ([#909](https://github.com/apify/crawlee-python/pull/909)) ([f4090ef](https://github.com/apify/crawlee-python/commit/f4090ef0ea0281d53dab16a77ceea2ef6ac43d76)) by [@Pijukatel](https://github.com/Pijukatel), closes [#907](https://github.com/apify/crawlee-python/issues/907)
 - Optimize memory consumption for `HttpxHttpClient`, fix proxy handling ([#905](https://github.com/apify/crawlee-python/pull/905)) ([d7ad480](https://github.com/apify/crawlee-python/commit/d7ad480834263ae0480049cb0a8db4dfc3946d8d)) by [@Mantisus](https://github.com/Mantisus), closes [#895](https://github.com/apify/crawlee-python/issues/895)
+- Fix `BrowserPool` and `PlaywrightBrowserPlugin` closure ([#932](https://github.com/apify/crawlee-python/pull/932)) ([997543d](https://github.com/apify/crawlee-python/commit/997543d2fa5afba49929f4407ee95d7a4933a50d)) by [@Mantisus](https://github.com/Mantisus)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.5.2](https://github.com/apify/crawlee-python/releases/tag/v0.5.2) (2025-01-17)
 
 ### 🐛 Bug Fixes

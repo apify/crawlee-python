@@ -913,10 +913,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
                         absolute_url = convert_to_absolute_url(base_url, request)
                         dst_request = Request.from_url(absolute_url)
 
-                # If the request is a BaseRequestData, convert it to Request object.
-                else:
-                    dst_request = Request.from_base_request_data(request)
-
                 # Update the crawl depth of the request.
                 dst_request.crawl_depth = context.request.crawl_depth + 1
 
@@ -1033,7 +1029,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
             request.state = RequestState.DONE
 
-            if context.session:
+            if context.session and context.session.is_usable:
                 context.session.mark_good()
 
             self._statistics.record_request_processing_finish(statistics_id)

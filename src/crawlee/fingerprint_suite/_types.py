@@ -4,25 +4,36 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
+from crawlee._utils.docs import docs_group
+
 SupportedOperatingSystems = Literal['windows', 'macos', 'linux', 'android', 'ios']
 SupportedDevices = Literal['desktop', 'mobile']
 SupportedHttpVersion = Literal['1', '2']
 SupportedBrowserType = Literal['chromium', 'firefox', 'webkit', 'edge']
 
 
+@docs_group('Data structures')
 class ScreenOptions(BaseModel):
     """Defines the screen constrains for the fingerprint generator."""
 
     min_width: Annotated[float | None, Field(alias='minWidth')] = None
+    """Minimal screen width constraint for the fingerprint generator."""
+
     max_width: Annotated[float | None, Field(alias='maxWidth')] = None
+    """Maximal screen width constraint for the fingerprint generator."""
+
     min_height: Annotated[float | None, Field(alias='minHeight')] = None
+    """Minimal screen height constraint for the fingerprint generator."""
+
     max_height: Annotated[float | None, Field(alias='maxHeight')] = None
+    """Maximal screen height constraint for the fingerprint generator."""
 
     class Config:
         extra = 'forbid'
         populate_by_name = True
 
 
+@docs_group('Data structures')
 class HeaderGeneratorOptions(BaseModel):
     """Collection of header related attributes that can be used by the fingerprint generator."""
 
