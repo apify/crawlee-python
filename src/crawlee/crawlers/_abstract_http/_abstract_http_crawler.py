@@ -97,8 +97,9 @@ class AbstractHttpCrawler(
         kwargs.setdefault('_logger', logging.getLogger(__name__))
         super().__init__(**kwargs)
 
-    @staticmethod
+    @classmethod
     def create_parsed_http_crawler_class(
+        cls,
         static_parser: AbstractHttpParser[TParseResult],
     ) -> type[AbstractHttpCrawler[ParsedHttpCrawlingContext[TParseResult], TParseResult]]:
         """Convenience class factory that creates specific version of `AbstractHttpCrawler` class.

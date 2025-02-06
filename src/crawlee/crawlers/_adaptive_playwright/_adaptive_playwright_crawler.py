@@ -25,9 +25,6 @@ from crawlee.crawlers import (
     PlaywrightCrawlingContext,
     PlaywrightPreNavCrawlingContext,
 )
-from crawlee.crawlers._adaptive_playwright._result_comparator import (
-    create_default_comparator,
-)
 from crawlee.crawlers._beautifulsoup._beautifulsoup_parser import BeautifulSoupParser
 from crawlee.crawlers._parsel._parsel_parser import ParselParser
 from crawlee.statistics import Statistics, StatisticsState
@@ -43,6 +40,9 @@ from ._rendering_type_predictor import (
     DefaultRenderingTypePredictor,
     RenderingType,
     RenderingTypePredictor,
+)
+from ._result_comparator import (
+    create_default_comparator,
 )
 
 if TYPE_CHECKING:
@@ -186,8 +186,9 @@ class AdaptivePlaywrightCrawler(
         self._static_context_pipeline = static_crawler._context_pipeline  # noqa:SLF001  # Intentional access to private member.
         self._static_parser = static_parser
 
-    @staticmethod
+    @classmethod
     def with_beautifulsoup_static_parser(
+        cls,
         rendering_type_predictor: RenderingTypePredictor | None = None,
         result_checker: Callable[[RequestHandlerRunResult], bool] | None = None,
         result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,
@@ -213,8 +214,9 @@ class AdaptivePlaywrightCrawler(
             **kwargs,
         )
 
-    @staticmethod
+    @classmethod
     def with_parsel_static_parser(
+        cls,
         rendering_type_predictor: RenderingTypePredictor | None = None,
         result_checker: Callable[[RequestHandlerRunResult], bool] | None = None,
         result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,
