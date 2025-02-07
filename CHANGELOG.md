@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Integrate browserforge fingerprints ([#829](https://github.com/apify/crawlee-python/pull/829)) ([2b156b4](https://github.com/apify/crawlee-python/commit/2b156b4ba688f9111195422e6058dff30eb1f782)) by [@Pijukatel](https://github.com/Pijukatel), closes [#549](https://github.com/apify/crawlee-python/issues/549)
+- Add AdaptivePlaywrightCrawler ([#872](https://github.com/apify/crawlee-python/pull/872)) ([5ba70b6](https://github.com/apify/crawlee-python/commit/5ba70b6e846a908a55db461ab0c85e3946f2bc7c)) by [@Pijukatel](https://github.com/Pijukatel)
 
 
 <!-- git-cliff-unreleased-end -->
