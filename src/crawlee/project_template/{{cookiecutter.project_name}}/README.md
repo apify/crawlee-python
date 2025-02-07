@@ -26,7 +26,7 @@ poetry run python -m {{cookiecutter.__package_name}}
 To install dependencies, your can run the following command:
 
 ```sh
-pip install .
+python -m pip install .
 ```
 
 When the dependencies are installed, you may launch the crawler with:

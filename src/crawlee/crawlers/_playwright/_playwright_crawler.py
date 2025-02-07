@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Callable, Generic
 
 from pydantic import ValidationError
 from typing_extensions import NotRequired, TypedDict, TypeVar
+from yarl import URL
 
 from crawlee import EnqueueStrategy, RequestTransformAction
 from crawlee._request import Request, RequestOptions
@@ -27,10 +28,12 @@ TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=St
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable, Mapping
 
+    from playwright.async_api import Page
     from typing_extensions import Unpack
 
     from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs
     from crawlee.browsers._types import BrowserType
+    from crawlee.fingerprint_suite import FingerprintGenerator
 
 
 @docs_group('Classes')
@@ -76,11 +79,14 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
     def __init__(
         self,
+        *,
         browser_pool: BrowserPool | None = None,
         browser_type: BrowserType | None = None,
         browser_launch_options: Mapping[str, Any] | None = None,
         browser_new_context_options: Mapping[str, Any] | None = None,
+        fingerprint_generator: FingerprintGenerator | None = None,
         headless: bool | None = None,
+        use_incognito_pages: bool | None = None,
         **kwargs: Unpack[BasicCrawlerOptions[PlaywrightCrawlingContext, StatisticsState]],
     ) -> None:
         """A default constructor.
@@ -97,7 +103,12 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 are provided directly to Playwright's `browser.new_context` method. For more details, refer to the
                 [Playwright documentation](https://playwright.dev/python/docs/api/class-browser#browser-new-context).
                 This option should not be used if `browser_pool` is provided.
+            fingerprint_generator: An optional instance of implementation of `FingerprintGenerator` that is used
+                to generate browser fingerprints together with consistent headers.
             headless: Whether to run the browser in headless mode.
+                This option should not be used if `browser_pool` is provided.
+            use_incognito_pages: By default pages share the same browser context. If set to True each page uses its
+                own context that is destroyed once the page is closed or crashes.
                 This option should not be used if `browser_pool` is provided.
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
         """
@@ -105,11 +116,19 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             # Raise an exception if browser_pool is provided together with other browser-related arguments.
             if any(
                 param is not None
-                for param in (headless, browser_type, browser_launch_options, browser_new_context_options)
+                for param in (
+                    use_incognito_pages,
+                    headless,
+                    browser_type,
+                    browser_launch_options,
+                    browser_new_context_options,
+                    fingerprint_generator,
+                )
             ):
                 raise ValueError(
-                    'You cannot provide `headless`, `browser_type`, `browser_launch_options` or '
-                    '`browser_new_context_options` arguments when `browser_pool` is provided.'
+                    'You cannot provide `headless`, `browser_type`, `browser_launch_options`, '
+                    '`browser_new_context_options`, `use_incognito_pages`  or `fingerprint_generator` arguments when '
+                    '`browser_pool` is provided.'
                 )
 
         # If browser_pool is not provided, create a new instance of BrowserPool with specified arguments.
@@ -119,6 +138,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 browser_type=browser_type,
                 browser_launch_options=browser_launch_options,
                 browser_new_context_options=browser_new_context_options,
+                use_incognito_pages=use_incognito_pages,
+                fingerprint_generator=fingerprint_generator,
             )
 
         self._browser_pool = browser_pool
@@ -180,6 +201,9 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 infinite_scroll and block_requests).
         """
         async with context.page:
+            if context.session:
+                await self._set_cookies(context.page, context.request.url, context.session.cookies)
+
             if context.request.headers:
                 await context.page.set_extra_http_headers(context.request.headers.model_dump())
             # Navigate to the URL and get response.
@@ -190,6 +214,10 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
             # Set the loaded URL to the actual URL after redirection.
             context.request.loaded_url = context.page.url
+
+            if context.session:
+                cookies = await self._get_cookies(context.page)
+                context.session.cookies.update(cookies)
 
             async def enqueue_links(
                 *,
@@ -215,7 +243,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                         url = url.strip()
 
                         if not is_url_absolute(url):
-                            url = convert_to_absolute_url(context.request.url, url)
+                            base_url = context.request.loaded_url or context.request.url
+                            url = convert_to_absolute_url(base_url, url)
 
                         request_option = RequestOptions({'url': url, 'user_data': {**base_user_data}, 'label': label})
 
@@ -299,6 +328,18 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             hook: A coroutine function to be called before each navigation.
         """
         self._pre_navigation_hooks.append(hook)
+
+    async def _get_cookies(self, page: Page) -> dict[str, str]:
+        """Get the cookies from the page."""
+        cookies = await page.context.cookies()
+        return {cookie['name']: cookie['value'] for cookie in cookies if cookie.get('name') and cookie.get('value')}
+
+    async def _set_cookies(self, page: Page, url: str, cookies: dict[str, str]) -> None:
+        """Set the cookies to the page."""
+        parsed_url = URL(url)
+        await page.context.add_cookies(
+            [{'name': name, 'value': value, 'domain': parsed_url.host, 'path': '/'} for name, value in cookies.items()]
+        )
 
 
 class _PlaywrightCrawlerAdditionalOptions(TypedDict):

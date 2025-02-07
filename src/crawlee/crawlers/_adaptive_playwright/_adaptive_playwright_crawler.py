@@ -25,24 +25,25 @@ from crawlee.crawlers import (
     PlaywrightCrawlingContext,
     PlaywrightPreNavCrawlingContext,
 )
-from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler_statistics import (
+from crawlee.crawlers._beautifulsoup._beautifulsoup_parser import BeautifulSoupParser
+from crawlee.crawlers._parsel._parsel_parser import ParselParser
+from crawlee.statistics import Statistics, StatisticsState
+
+from ._adaptive_playwright_crawler_statistics import (
     AdaptivePlaywrightCrawlerStatisticState,
 )
-from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import (
+from ._adaptive_playwright_crawling_context import (
     AdaptivePlaywrightCrawlingContext,
     AdaptivePlaywrightPreNavCrawlingContext,
 )
-from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import (
+from ._rendering_type_predictor import (
     DefaultRenderingTypePredictor,
     RenderingType,
     RenderingTypePredictor,
 )
-from crawlee.crawlers._adaptive_playwright._result_comparator import (
+from ._result_comparator import (
     create_default_comparator,
 )
-from crawlee.crawlers._beautifulsoup._beautifulsoup_parser import BeautifulSoupParser
-from crawlee.crawlers._parsel._parsel_parser import ParselParser
-from crawlee.statistics import Statistics, StatisticsState
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -89,7 +90,7 @@ class AdaptivePlaywrightCrawler(
     Generic[TStaticCrawlingContext, TStaticParseResult, TStaticSelectResult],
     BasicCrawler[AdaptivePlaywrightCrawlingContext, AdaptivePlaywrightCrawlerStatisticState],
 ):
-    """Adaptive crawler that uses specific implementation of `AbstractHttpCrawler` and `PlaywrightCrawler`.
+    """Adaptive crawler that uses both specific implementation of `AbstractHttpCrawler` and `PlaywrightCrawler`.
 
     It uses more limited request handler interface so that it is able to switch to HTTP-only crawling when it detects it
     may be possible.
@@ -133,7 +134,9 @@ class AdaptivePlaywrightCrawler(
         statistics: Statistics[AdaptivePlaywrightCrawlerStatisticState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> None:
-        """A default constructor. Recommended way to create instance is to call factory methods `with_*_static_parser`.
+        """A default constructor. Recommended way to create instance is to call factory methods.
+
+        Recommended factory methods: `with_beautifulsoup_static_parser`, `with_parsel_static_parser`.
 
         Args:
             rendering_type_predictor: Object that implements RenderingTypePredictor and is capable of predicting which
@@ -153,7 +156,7 @@ class AdaptivePlaywrightCrawler(
 
         # Adaptive crawling related.
         self.rendering_type_predictor = rendering_type_predictor or DefaultRenderingTypePredictor()
-        self.result_checker = result_checker or (lambda result: True)  #  noqa: ARG005  # Intentionally unused argument.
+        self.result_checker = result_checker or (lambda _: True)
         self.result_comparator = result_comparator or create_default_comparator(result_checker)
 
         super().__init__(statistics=statistics, **kwargs)
@@ -210,8 +213,9 @@ class AdaptivePlaywrightCrawler(
         self._static_context_pipeline = static_crawler._context_pipeline  # noqa:SLF001  # Intentional access to private member.
         self._static_parser = static_parser
 
-    @staticmethod
+    @classmethod
     def with_beautifulsoup_static_parser(
+        cls,
         rendering_type_predictor: RenderingTypePredictor | None = None,
         result_checker: Callable[[RequestHandlerRunResult], bool] | None = None,
         result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,
@@ -237,8 +241,9 @@ class AdaptivePlaywrightCrawler(
             **kwargs,
         )
 
-    @staticmethod
+    @classmethod
     def with_parsel_static_parser(
+        cls,
         rendering_type_predictor: RenderingTypePredictor | None = None,
         result_checker: Callable[[RequestHandlerRunResult], bool] | None = None,
         result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,

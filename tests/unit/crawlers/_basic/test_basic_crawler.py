@@ -25,6 +25,7 @@ from crawlee.crawlers import BasicCrawler
 from crawlee.errors import SessionError, UserDefinedErrorHandlerError
 from crawlee.events._local_event_manager import LocalEventManager
 from crawlee.request_loaders import RequestList, RequestManagerTandem
+from crawlee.sessions import SessionPool
 from crawlee.statistics import FinalStatistics
 from crawlee.storage_clients import MemoryStorageClient
 from crawlee.storage_clients._memory import DatasetClient
@@ -1169,3 +1170,32 @@ async def test_keep_alive(
     await asyncio.gather(crawler_run_task, add_request_task)
 
     mocked_handler.assert_has_calls(expected_handler_calls)
+
+
+@pytest.mark.parametrize(
+    ('retire'),
+    [
+        pytest.param(False, id='without retire'),
+        pytest.param(True, id='with retire'),
+    ],
+)
+async def test_session_retire_in_user_handler(*, retire: bool) -> None:
+    crawler = BasicCrawler(session_pool=SessionPool(max_pool_size=1))
+    sessions = list[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        if context.session:
+            sessions.append(context.session.id)
+
+            context.session.retire() if retire else None
+
+        await context.add_requests(['http://b.com/'])
+
+    await crawler.run(['http://a.com/'])
+
+    # The session should differ if `retire` was called and match otherwise since pool size == 1
+    if retire:
+        assert sessions[1] != sessions[0]
+    else:
+        assert sessions[1] == sessions[0]

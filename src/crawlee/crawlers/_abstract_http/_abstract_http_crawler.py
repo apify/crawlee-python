@@ -97,8 +97,9 @@ class AbstractHttpCrawler(
         kwargs.setdefault('_logger', logging.getLogger(__name__))
         super().__init__(**kwargs)
 
-    @staticmethod
+    @classmethod
     def create_parsed_http_crawler_class(
+        cls,
         static_parser: AbstractHttpParser[TParseResult, TSelectResult],
     ) -> type[AbstractHttpCrawler[ParsedHttpCrawlingContext[TParseResult], TParseResult, TSelectResult]]:
         """Convenience class factory that creates specific version of `AbstractHttpCrawler` class.
@@ -189,7 +190,8 @@ class AbstractHttpCrawler(
             for link in self._parser.find_links(parsed_content, selector=selector):
                 url = link
                 if not is_url_absolute(url):
-                    url = convert_to_absolute_url(context.request.url, url)
+                    base_url = context.request.loaded_url or context.request.url
+                    url = convert_to_absolute_url(base_url, url)
 
                 request_options = RequestOptions(url=url, user_data={**base_user_data}, label=label)
 

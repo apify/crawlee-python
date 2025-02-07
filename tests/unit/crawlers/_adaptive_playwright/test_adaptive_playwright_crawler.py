@@ -695,6 +695,6 @@ async def test_adaptive_context_parse_with_static_parser_parsel(test_urls: list[
         [
             call([]),  # Static sub crawler tried and did not find h2.
             call([]),  # Playwright sub crawler tried and did not find h2 without waiting.
-            call(expected_h2_tag),
+            call(expected_h2_tag),  # Playwright waited for h2 to appear.
         ]
-    )  # Playwright waited for h2 to appear.
+    )
