@@ -79,7 +79,7 @@ class AdaptivePlaywrightCrawlingContext(
     async def wait_for_selector(self, selector: str, timeout: timedelta = timedelta(seconds=5)) -> None:
         """Locate element by css selector a return once it is found.
 
-        If element is not found within timeout, TimeoutError is raised.
+        If element is not found within timeout, `TimeoutError` is raised.
 
         Args:
             selector: css selector to be used to locate specific element on page.
@@ -92,7 +92,7 @@ class AdaptivePlaywrightCrawlingContext(
     async def query_selector(self, selector: str, timeout: timedelta = timedelta(seconds=5)) -> TStaticSelectResult:
         """Locate element by css selector a return it once it is found.
 
-        If element is not found within timeout, TimeoutError is raised.
+        If element is not found within timeout, `TimeoutError` is raised.
 
         Args:
             selector: css selector to be used to locate specific element on page.
@@ -118,7 +118,7 @@ class AdaptivePlaywrightCrawlingContext(
     async def parse_with_static_parser(
         self, selector: str | None, timeout: timedelta = timedelta(seconds=5)
     ) -> TStaticParseResult:
-        """Parse whole page with static parser. If `selector` argument is used wait for selector first.
+        """Parse whole page with static parser. If `selector` argument is used, wait for selector first.
 
         If element is not found within timeout, TimeoutError is raised.
 

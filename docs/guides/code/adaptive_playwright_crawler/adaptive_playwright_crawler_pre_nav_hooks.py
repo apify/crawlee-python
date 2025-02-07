@@ -7,9 +7,11 @@ crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser()
 
 @crawler.pre_navigation_hook
 async def hook(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
-    """Hook executed both in static sub crawler and playwright sub crawler."""
-    # Trying to access context.page in this hook would raise `AdaptiveContextError` for pages crawled
-    # without playwright.
+    """Hook executed both in static sub crawler and playwright sub crawler.
+
+    Trying to access `context.page` in this hook would raise `AdaptiveContextError` for pages crawled without
+    playwright."""
+
     context.log.info(f'pre navigation hook for: {context.request.url} ...')
 
 
