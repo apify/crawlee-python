@@ -56,3 +56,7 @@ class BaseStorageClient(ABC):
         It is primarily used to clean up residual data from previous runs to maintain a clean state.
         If the storage client does not support purging, leave it empty.
         """
+
+    def get_rate_limit_errors(self) -> dict[int, int]:
+        """Returns statistics about rate limit errors encountered by the HTTP client in storage client."""
+        return {}

@@ -307,7 +307,7 @@ class Snapshotter:
         """
         client = service_locator.get_storage_client()
 
-        rate_limit_errors: dict[int, int] = getattr(client, 'rate_limit_errors', {})
+        rate_limit_errors: dict[int, int] = client.get_rate_limit_errors()
 
         error_count = rate_limit_errors.get(self._CLIENT_RATE_LIMIT_ERROR_RETRY_COUNT, 0)
         snapshot = ClientSnapshot(error_count=error_count, max_error_count=self._max_client_errors)
