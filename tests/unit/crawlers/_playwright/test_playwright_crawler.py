@@ -271,9 +271,15 @@ async def test_isolation_cookies(*, use_incognito_pages: bool, httpbin: URL) -> 
     response_cookies: dict[str, dict[str, str]] = {}
 
     crawler = PlaywrightCrawler(
-        session_pool=SessionPool(max_pool_size=1),
+        session_pool=SessionPool(
+            max_pool_size=1,
+            create_session_settings={
+                'max_error_score': 50,
+            },
+        ),
         use_incognito_pages=use_incognito_pages,
         concurrency_settings=ConcurrencySettings(max_concurrency=1),
+        max_request_retries=10,
     )
 
     @crawler.router.default_handler

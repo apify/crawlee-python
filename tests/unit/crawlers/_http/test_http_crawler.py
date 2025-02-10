@@ -133,16 +133,14 @@ async def test_handles_redirects(
 @pytest.mark.parametrize(
     ('additional_http_error_status_codes', 'ignore_http_error_status_codes', 'expected_number_error'),
     [
-        ([], [], 1),
-        ([403], [], 3),
-        ([], [403], 0),
-        ([403], [403], 3),
-    ],
-    ids=[
-        'default_behavior',  # error without retry for all 4xx statuses
-        'additional_status_codes',  # make retry for codes in `additional_http_error_status_codes` list
-        'ignore_error_status_codes',  # take as successful status codes from the `ignore_http_error_status_codes` list
-        'additional_and_ignore',  # check precedence for `additional_http_error_status_codes`
+        # error without retry for all 4xx statuses
+        pytest.param([], [], 1, id='default_behavior'),
+        # make retry for codes in `additional_http_error_status_codes` list
+        pytest.param([403], [], 3, id='additional_status_codes'),
+        # take as successful status codes from the `ignore_http_error_status_codes` list
+        pytest.param([], [403], 0, id='ignore_error_status_codes'),
+        # check precedence for `additional_http_error_status_codes`
+        pytest.param([403], [403], 3, id='additional_and_ignore'),
     ],
 )
 async def test_handles_client_errors(
@@ -258,9 +256,7 @@ async def test_http_status_statistics(crawler: HttpCrawler, server: respx.MockRo
 
 
 @pytest.mark.parametrize(
-    'http_client_class',
-    [CurlImpersonateHttpClient, HttpxHttpClient],
-    ids=['curl', 'httpx'],
+    'http_client_class', [pytest.param(CurlImpersonateHttpClient, id='curl'), pytest.param(HttpxHttpClient, id='httpx')]
 )
 async def test_sending_payload_as_raw_data(http_client_class: type[BaseHttpClient], httpbin: URL) -> None:
     http_client = http_client_class()
@@ -295,9 +291,7 @@ async def test_sending_payload_as_raw_data(http_client_class: type[BaseHttpClien
 
 
 @pytest.mark.parametrize(
-    'http_client_class',
-    [CurlImpersonateHttpClient, HttpxHttpClient],
-    ids=['curl', 'httpx'],
+    'http_client_class', [pytest.param(CurlImpersonateHttpClient, id='curl'), pytest.param(HttpxHttpClient, id='httpx')]
 )
 async def test_sending_payload_as_form_data(http_client_class: type[BaseHttpClient], httpbin: URL) -> None:
     http_client = http_client_class()
@@ -327,9 +321,7 @@ async def test_sending_payload_as_form_data(http_client_class: type[BaseHttpClie
 
 
 @pytest.mark.parametrize(
-    'http_client_class',
-    [CurlImpersonateHttpClient, HttpxHttpClient],
-    ids=['curl', 'httpx'],
+    'http_client_class', [pytest.param(CurlImpersonateHttpClient, id='curl'), pytest.param(HttpxHttpClient, id='httpx')]
 )
 async def test_sending_payload_as_json(http_client_class: type[BaseHttpClient], httpbin: URL) -> None:
     http_client = http_client_class()
@@ -360,9 +352,7 @@ async def test_sending_payload_as_json(http_client_class: type[BaseHttpClient], 
 
 
 @pytest.mark.parametrize(
-    'http_client_class',
-    [CurlImpersonateHttpClient, HttpxHttpClient],
-    ids=['curl', 'httpx'],
+    'http_client_class', [pytest.param(CurlImpersonateHttpClient, id='curl'), pytest.param(HttpxHttpClient, id='httpx')]
 )
 async def test_sending_url_query_params(http_client_class: type[BaseHttpClient], httpbin: URL) -> None:
     http_client = http_client_class()
@@ -435,8 +425,14 @@ async def test_isolation_cookies(http_client_class: type[BaseHttpClient], httpbi
     response_cookies: dict[str, dict[str, str]] = {}
 
     crawler = HttpCrawler(
-        session_pool=SessionPool(max_pool_size=1),
+        session_pool=SessionPool(
+            max_pool_size=1,
+            create_session_settings={
+                'max_error_score': 50,
+            },
+        ),
         http_client=http_client,
+        max_request_retries=10,
         concurrency_settings=ConcurrencySettings(max_concurrency=1),
     )
 

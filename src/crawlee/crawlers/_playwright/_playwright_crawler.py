@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import logging
 from functools import partial
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, Generic
 
 from pydantic import ValidationError
+from typing_extensions import NotRequired, TypedDict, TypeVar
 from yarl import URL
 
 from crawlee import EnqueueStrategy, RequestTransformAction
@@ -15,10 +16,14 @@ from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.browsers import BrowserPool
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
+from crawlee.statistics import StatisticsState
 
 from ._playwright_crawling_context import PlaywrightCrawlingContext
 from ._playwright_pre_nav_crawling_context import PlaywrightPreNavCrawlingContext
 from ._utils import block_requests, infinite_scroll
+
+TCrawlingContext = TypeVar('TCrawlingContext', bound=PlaywrightCrawlingContext)
+TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable, Mapping
@@ -32,7 +37,7 @@ if TYPE_CHECKING:
 
 
 @docs_group('Classes')
-class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
+class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]):
     """A web crawler that leverages the `Playwright` browser automation library.
 
     The `PlaywrightCrawler` builds on top of the `BasicCrawler`, which means it inherits all of its features.
@@ -82,7 +87,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
         fingerprint_generator: FingerprintGenerator | None = None,
         headless: bool | None = None,
         use_incognito_pages: bool | None = None,
-        **kwargs: Unpack[BasicCrawlerOptions[PlaywrightCrawlingContext]],
+        **kwargs: Unpack[BasicCrawlerOptions[PlaywrightCrawlingContext, StatisticsState]],
     ) -> None:
         """A default constructor.
 
@@ -335,3 +340,45 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext]):
         await page.context.add_cookies(
             [{'name': name, 'value': value, 'domain': parsed_url.host, 'path': '/'} for name, value in cookies.items()]
         )
+
+
+class _PlaywrightCrawlerAdditionalOptions(TypedDict):
+    """Additional arguments for the `PlaywrightCrawler` constructor.
+
+    It is intended for typing forwarded `__init__` arguments in the subclasses.
+    All arguments are `BasicCrawlerOptions` + `_PlaywrightCrawlerAdditionalOptions`
+    """
+
+    browser_pool: NotRequired[BrowserPool]
+    """A `BrowserPool` instance to be used for launching the browsers and getting pages."""
+
+    browser_type: NotRequired[BrowserType]
+    """The type of browser to launch ('chromium', 'firefox', or 'webkit').
+    This option should not be used if `browser_pool` is provided."""
+
+    browser_launch_options: NotRequired[Mapping[str, Any]]
+    """Keyword arguments to pass to the browser launch method. These options are provided
+    directly to Playwright's `browser_type.launch` method. For more details, refer to the Playwright
+    documentation: https://playwright.dev/python/docs/api/class-browsertype#browser-type-launch.
+    This option should not be used if `browser_pool` is provided."""
+
+    browser_new_context_options: NotRequired[Mapping[str, Any]]
+    """Keyword arguments to pass to the browser new context method. These options are provided directly to Playwright's
+    `browser.new_context` method. For more details, refer to the Playwright documentation:
+    https://playwright.dev/python/docs/api/class-browser#browser-new-context. This option should not be used if
+    `browser_pool` is provided."""
+
+    headless: NotRequired[bool]
+    """Whether to run the browser in headless mode. This option should not be used if `browser_pool` is provided."""
+
+
+@docs_group('Data structures')
+class PlaywrightCrawlerOptions(
+    Generic[TCrawlingContext, TStatisticsState],
+    _PlaywrightCrawlerAdditionalOptions,
+    BasicCrawlerOptions[TCrawlingContext, StatisticsState],
+):
+    """Arguments for the `AbstractHttpCrawler` constructor.
+
+    It is intended for typing forwarded `__init__` arguments in the subclasses.
+    """
