@@ -283,12 +283,12 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         if self._http_client.additional_blocked_status_codes != self._additional_http_error_status_codes:
             raise ValueError(
-                'Used `additional_blocked_status_codes` argument does not match with  with '
+                'Used `additional_blocked_status_codes` argument does not match with '
                 f'{self._http_client.additional_blocked_status_codes=}. They have to be the same.'
             )
         if self._http_client.ignore_http_error_status_codes != self._ignore_http_error_status_codes:
             raise ValueError(
-                'Used `ignore_http_error_status_codes` argument does not match with  with '
+                'Used `ignore_http_error_status_codes` argument does not match with '
                 f'{self._http_client.ignore_http_error_status_codes=}. They have to be the same.'
             )
 
