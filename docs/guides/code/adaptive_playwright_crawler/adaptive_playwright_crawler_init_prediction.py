@@ -36,7 +36,6 @@ def result_checker(result: RequestHandlerRunResult) -> bool:
 def result_comparator(result_1: RequestHandlerRunResult, result_2: RequestHandlerRunResult) -> bool:
     # Some function that inspects two results and returns `True` if they are considered equivalent.
     # It is used when comparing results produced by HTTP-based sub crawler and playwright based sub crawler.
-
     return result_1.push_data_calls == result_2.push_data_calls  #  For example compare `push_data` calls.
 
 

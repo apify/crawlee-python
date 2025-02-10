@@ -90,10 +90,11 @@ class AdaptivePlaywrightCrawler(
     Generic[TStaticCrawlingContext, TStaticParseResult, TStaticSelectResult],
     BasicCrawler[AdaptivePlaywrightCrawlingContext, AdaptivePlaywrightCrawlerStatisticState],
 ):
-    """Adaptive crawler that uses both specific implementation of `AbstractHttpCrawler` and `PlaywrightCrawler`.
+    """An adaptive web crawler capable of using both static HTTP request based crawling and browser based crawling.
 
-    It uses more limited request handler interface so that it is able to switch to HTTP-only crawling when it detects it
-    may be possible.
+    It uses a more limited crawling context interface so that it is able to switch to HTTP-only crawling when it detects
+    that it may bring a performance benefit.
+    It uses specific implementation of `AbstractHttpCrawler` and `PlaywrightCrawler`.
 
     ### Usage
     ```python

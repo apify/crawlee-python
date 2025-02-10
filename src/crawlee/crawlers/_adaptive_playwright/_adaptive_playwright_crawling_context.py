@@ -77,29 +77,29 @@ class AdaptivePlaywrightCrawlingContext(
         return self._response
 
     async def wait_for_selector(self, selector: str, timeout: timedelta = timedelta(seconds=5)) -> None:
-        """Locate element by css selector a return once it is found.
+        """Locate element by css selector and return `None` once it is found.
 
         If element is not found within timeout, `TimeoutError` is raised.
 
         Args:
-            selector: css selector to be used to locate specific element on page.
-            timeout: timeout that defines how long the function wait for the selector to appear.
+            selector: Css selector to be used to locate specific element on page.
+            timeout: Timeout that defines how long the function wait for the selector to appear.
         """
         if await self._static_parser.select(self.parsed_content, selector):
             return
         await self.page.locator(selector).wait_for(timeout=timeout.total_seconds() * 1000)
 
     async def query_selector(self, selector: str, timeout: timedelta = timedelta(seconds=5)) -> TStaticSelectResult:
-        """Locate element by css selector a return it once it is found.
+        """Locate element by css selector and return the element once it is found.
 
         If element is not found within timeout, `TimeoutError` is raised.
 
         Args:
-            selector: css selector to be used to locate specific element on page.
-            timeout: timeout that defines how long the function wait for the selector to appear.
+            selector: Css selector to be used to locate specific element on page.
+            timeout: Timeout that defines how long the function wait for the selector to appear.
 
         Returns:
-            `TStaticSelectResult` which is result of used static parser `select` method.
+            Result of used static parser `select` method.
         """
         static_content = await self._static_parser.select(self.parsed_content, selector)
         if static_content is not None:
@@ -127,7 +127,7 @@ class AdaptivePlaywrightCrawlingContext(
             timeout: timeout that defines how long the function wait for the selector to appear.
 
         Returns:
-            `TStaticParseResult` which is result of used static parser `parse_text` method.
+            Result of used static parser `parse_text` method.
         """
         if selector:
             await self.wait_for_selector(selector, timeout)

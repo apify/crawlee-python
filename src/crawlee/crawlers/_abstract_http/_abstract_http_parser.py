@@ -32,7 +32,7 @@ class AbstractHttpParser(Generic[TParseResult, TSelectResult], ABC):
 
     @abstractmethod
     async def parse_text(self, text: str) -> TParseResult:
-        """Parse text.
+        """Parse text containing html.
 
         Args:
             text: String containing html.
@@ -46,8 +46,8 @@ class AbstractHttpParser(Generic[TParseResult, TSelectResult], ABC):
         """Use css selector to select page element and return it.
 
         Args:
-            parsed_content: content where the page element will be located
-            selector: css selector
+            parsed_content: Content where the page element will be located.
+            selector: Css selector used to locate desired html element.
 
         Returns:
             Selected element.
