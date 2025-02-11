@@ -4,10 +4,12 @@ from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext
 
 
 async def main() -> None:
-    # PlaywrightCrawler crawls the web using a headless browser controlled by the Playwright library.
+    # PlaywrightCrawler crawls the web using a headless browser
+    # controlled by the Playwright library.
     crawler = PlaywrightCrawler()
 
-    # Define a request handler to process each crawled page and attach it to the crawler using a decorator.
+    # Define a request handler to process each crawled page
+    # and attach it to the crawler using a decorator.
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url} ...')

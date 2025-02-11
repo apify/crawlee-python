@@ -1,7 +1,11 @@
 import asyncio
 from datetime import timedelta
 
-from crawlee.crawlers import BasicCrawlingContext, BeautifulSoupCrawler, BeautifulSoupCrawlingContext
+from crawlee.crawlers import (
+    BasicCrawlingContext,
+    BeautifulSoupCrawler,
+    BeautifulSoupCrawlingContext,
+)
 
 
 async def main() -> None:

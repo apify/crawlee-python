@@ -11,13 +11,16 @@ from crawlee.crawlers import (
 
 
 async def main() -> None:
-    # Crawler created by following factory method will use `beautifulsoup` for parsing static content.
+    # Crawler created by following factory method will use `beautifulsoup`
+    # for parsing static content.
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
         max_requests_per_crawl=5, playwright_crawler_specific_kwargs={'headless': False}
     )
 
     @crawler.router.default_handler
-    async def request_handler_for_label(context: AdaptivePlaywrightCrawlingContext) -> None:
+    async def request_handler_for_label(
+        context: AdaptivePlaywrightCrawlingContext,
+    ) -> None:
         # Do some processing using `parsed_content`
         context.log.info(context.parsed_content.title)
 
@@ -35,19 +38,24 @@ async def main() -> None:
     async def hook(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
         """Hook executed both in static sub crawler and playwright sub crawler.
 
-        Trying to access `context.page` in this hook would raise `AdaptiveContextError` for pages crawled without
-        playwright."""
+        Trying to access `context.page` in this hook would raise `AdaptiveContextError`
+        for pages crawled without  playwright."""
         context.log.info(f'pre navigation hook for: {context.request.url} ...')
 
     @crawler.pre_navigation_hook(playwright_only=True)
     async def hook_playwright(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
-        """Hook executed only in playwright sub crawler. It is safe to access `page` object."""
+        """Hook executed only in playwright sub crawler.
+
+        It is safe to access `page` object.
+        """
 
         async def some_routing_function(route: Route) -> None:
             await route.continue_()
 
         await context.page.route('*/**', some_routing_function)
-        context.log.info(f'Playwright only pre navigation hook for: {context.request.url} ...')
+        context.log.info(
+            f'Playwright only pre navigation hook for: {context.request.url} ...'
+        )
 
     # Run the crawler with the initial list of URLs.
     await crawler.run(['https://warehouse-theme-metal.myshopify.com/'])

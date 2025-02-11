@@ -305,11 +305,11 @@ class Snapshotter:
         Only errors produced by a 2nd retry of the API call are considered for snapshotting since earlier errors may
         just be caused by a random spike in the number of requests and do not necessarily signify API overloading.
         """
-        # TODO: This is just a dummy placeholder. It can be implemented once `StorageClient` is ready.
-        # Attribute `self._client_rate_limit_error_retry_count` will be used here.
-        # https://github.com/apify/crawlee-python/issues/60
+        client = service_locator.get_storage_client()
 
-        error_count = 0
+        rate_limit_errors: dict[int, int] = client.get_rate_limit_errors()
+
+        error_count = rate_limit_errors.get(self._CLIENT_RATE_LIMIT_ERROR_RETRY_COUNT, 0)
         snapshot = ClientSnapshot(error_count=error_count, max_error_count=self._max_client_errors)
 
         snapshots = cast(list[Snapshot], self._client_snapshots)
