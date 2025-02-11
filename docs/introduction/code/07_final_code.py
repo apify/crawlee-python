@@ -23,7 +23,9 @@ async def main() -> None:
             title = await context.page.locator('.product-meta h1').text_content()
 
             # Extract the SKU using its selector.
-            sku = await context.page.locator('span.product-meta__sku-number').text_content()
+            sku = await context.page.locator(
+                'span.product-meta__sku-number'
+            ).text_content()
 
             # Locate the price element that contains the '$' sign and filter out
             # the visually hidden elements.

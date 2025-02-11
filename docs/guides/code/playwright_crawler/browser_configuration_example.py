@@ -9,7 +9,8 @@ async def main() -> None:
         browser_type='chromium',
         # Browser launch options
         browser_launch_options={
-            # For support `msedge` channel you need to install it `playwright install msedge`
+            # For support `msedge` channel you need to install it
+            # `playwright install msedge`
             'channel': 'msedge',
             'slow_mo': 200,
         },

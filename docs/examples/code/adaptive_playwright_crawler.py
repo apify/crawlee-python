@@ -15,7 +15,9 @@ async def main() -> None:
     )
 
     @crawler.router.handler(label='label')
-    async def request_handler_for_label(context: AdaptivePlaywrightCrawlingContext) -> None:
+    async def request_handler_for_label(
+        context: AdaptivePlaywrightCrawlingContext,
+    ) -> None:
         # Do some processing using `page`
         some_locator = context.page.locator('div').first
         await some_locator.wait_for()
@@ -35,8 +37,8 @@ async def main() -> None:
     @crawler.pre_navigation_hook
     async def hook(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
         """Hook executed both in static sub crawler and playwright sub crawler."""
-        # Trying to access context.page in this hook would raise `AdaptiveContextError` for pages crawled
-        # without playwright.
+        # Trying to access context.page in this hook would raise `AdaptiveContextError`
+        # for pages crawled without playwright.
         context.log.info(f'pre navigation hook for: {context.request.url} ...')
 
     @crawler.pre_navigation_hook(playwright_only=True)
@@ -47,7 +49,9 @@ async def main() -> None:
             await route.continue_()
 
         await context.page.route('*/**', some_routing_function)
-        context.log.info(f'Playwright only pre navigation hook for: {context.request.url} ...')
+        context.log.info(
+            f'Playwright only pre navigation hook for: {context.request.url} ...'
+        )
 
     # Run the crawler with the initial list of URLs.
     await crawler.run(['https://warehouse-theme-metal.myshopify.com/'])
