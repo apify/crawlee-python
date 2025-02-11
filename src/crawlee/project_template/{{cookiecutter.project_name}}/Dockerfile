@@ -10,7 +10,7 @@ FROM apify/actor-python-playwright:3.12
 FROM apify/actor-python:3.13
 # % endif
 
-RUN apt install -yq git && rm -rf /var/lib/apt/lists/*
+RUN apt update && apt install -yq git && rm -rf /var/lib/apt/lists/*
 
 # % if cookiecutter.package_manager == 'poetry'
 RUN pip install -U pip setuptools \
