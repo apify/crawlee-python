@@ -11,6 +11,10 @@ All notable changes to this project will be documented in this file.
 - Add AdaptivePlaywrightCrawler ([#872](https://github.com/apify/crawlee-python/pull/872)) ([5ba70b6](https://github.com/apify/crawlee-python/commit/5ba70b6e846a908a55db461ab0c85e3946f2bc7c)) by [@Pijukatel](https://github.com/Pijukatel)
 - Implement `_snapshot_client` for `Snapshotter` ([#957](https://github.com/apify/crawlee-python/pull/957)) ([ba4d384](https://github.com/apify/crawlee-python/commit/ba4d384228d030c20c580ed01fae0e78af3a9543)) by [@Mantisus](https://github.com/Mantisus), closes [#60](https://github.com/apify/crawlee-python/issues/60)
 
+### 🐛 Bug Fixes
+
+- Fix playwright template and dockerfile ([#972](https://github.com/apify/crawlee-python/pull/972)) ([c33b34d](https://github.com/apify/crawlee-python/commit/c33b34dd6e253b1261c700857bb5c4bbec6d5c14)) by [@janbuchar](https://github.com/janbuchar), closes [#969](https://github.com/apify/crawlee-python/issues/969)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.5.4](https://github.com/apify/crawlee-python/releases/tag/v0.5.4) (2025-02-05)
