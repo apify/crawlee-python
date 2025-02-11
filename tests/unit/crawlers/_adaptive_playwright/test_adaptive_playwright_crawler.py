@@ -44,15 +44,17 @@ if TYPE_CHECKING:
 
 _H1_TEXT = 'Static'
 _H2_TEXT = 'Only in browser'
+_H3_CHANGED_TEXT = 'Changed by JS'
 _INJECTED_JS_DELAY_MS = 100
 _PAGE_CONTENT_STATIC = f"""
 <h1>{_H1_TEXT}</h1>
+<h3>Initial text</h3>
 <script>
     setTimeout(function() {{
     let h2 = document.createElement('h2');
     h2.innerText = "{_H2_TEXT}";
-    document.getElementsByTagName("body")[0].append(h2)
-
+    document.getElementsByTagName("body")[0].append(h2);
+    document.getElementsByTagName("h3")[0].textContent="{_H3_CHANGED_TEXT}";
     }}, {_INJECTED_JS_DELAY_MS});
 
 </script>
@@ -665,7 +667,6 @@ async def test_adaptive_context_parse_with_static_parser_parsel(test_urls: list[
     """Test `context.parse_with_static_parser` works regardless of the crawl type for Parsel variant.
 
     (Test covers also  `context.wait_for_selector`, which is called by `context.parse_with_static_parser`)
-    Create situation where
     """
     static_only_predictor_no_detection = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
     expected_h2_tag = f'<h2>{_H2_TEXT}</h2>'
@@ -698,3 +699,33 @@ async def test_adaptive_context_parse_with_static_parser_parsel(test_urls: list[
             call(expected_h2_tag),  # Playwright waited for h2 to appear.
         ]
     )
+
+
+async def test_adaptive_context_helpers_on_changed_selector(test_urls: list[str]) -> None:
+    """Test that context helpers work on latest version of the page.
+
+    Scenario where page is changed after a while. H2 element is added and text of H3 element is modified.
+    Test that context helpers automatically work on latest version of the page by reading H3 element and expecting it's
+    dynamically changed text instead of the original static text.
+    """
+    browser_only_predictor_no_detection = _SimpleRenderingTypePredictor(
+        rendering_types=cycle(['client only']), detection_probability_recommendation=cycle([0])
+    )
+    expected_h3_tag = f'<h3>{_H3_CHANGED_TEXT}</h3>'
+
+    crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(
+        max_request_retries=1,
+        rendering_type_predictor=browser_only_predictor_no_detection,
+        playwright_crawler_specific_kwargs={'browser_pool': _StaticRedirectBrowserPool.with_default_plugin()},
+    )
+
+    mocked_h3_handler = Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        await context.query_selector('h2')  # Wait for change that is indicated by appearance of h2 element.
+        mocked_h3_handler((await context.query_selector('h3')).get())  # Get updated h3 element.
+
+    await crawler.run(test_urls[:1])
+
+    mocked_h3_handler.assert_called_once_with(expected_h3_tag)

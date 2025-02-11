@@ -76,13 +76,11 @@ class AdaptivePlaywrightCrawlingContext(
             raise AdaptiveContextError('Page was not crawled with PlaywrightCrawler.')
         return self._response
 
-    @property
-    def _latest_parsed_content(self) -> TStaticParseResult:
-        """Return parsed page. No need to parse again for in static context. Reparse in Playwright context."""
+    async def _get_latest_parsed_content(self) -> TStaticParseResult:
+        """Return parsed page. No need to parse again in static context. Reparse in Playwright context."""
         if self._page:
-            return self.parse_with_static_parser()
+            return await self.parse_with_static_parser()
         return self.parsed_content
-
 
     async def wait_for_selector(self, selector: str, timeout: timedelta = timedelta(seconds=5)) -> None:
         """Locate element by css selector and return `None` once it is found.
@@ -93,7 +91,7 @@ class AdaptivePlaywrightCrawlingContext(
             selector: Css selector to be used to locate specific element on page.
             timeout: Timeout that defines how long the function wait for the selector to appear.
         """
-        if await self._static_parser.select(self._latest_parsed_content, selector):
+        if await self._static_parser.select(await self._get_latest_parsed_content(), selector):
             return
         await self.page.locator(selector).wait_for(timeout=timeout.total_seconds() * 1000)
 
@@ -109,7 +107,7 @@ class AdaptivePlaywrightCrawlingContext(
         Returns:
             Result of used static parser `select` method.
         """
-        static_content = await self._static_parser.select(self._latest_parsed_content, selector)
+        static_content = await self._static_parser.select(await self._get_latest_parsed_content(), selector)
         if static_content is not None:
             return static_content
 
@@ -124,7 +122,7 @@ class AdaptivePlaywrightCrawlingContext(
         raise AdaptiveContextError('Used selector is not a valid static selector')
 
     async def parse_with_static_parser(
-        self, selector: str | None, timeout: timedelta = timedelta(seconds=5)
+        self, selector: str | None = None, timeout: timedelta = timedelta(seconds=5)
     ) -> TStaticParseResult:
         """Parse whole page with static parser. If `selector` argument is used, wait for selector first.
 
