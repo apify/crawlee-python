@@ -4,8 +4,8 @@ from crawlee.crawlers import HttpCrawler, HttpCrawlingContext
 
 
 async def main() -> None:
-    # Create a new crawler (it can be any subclass of BasicCrawler). Request queue is a default
-    # request manager, it will be opened, and fully managed if not specified.
+    # Create a new crawler (it can be any subclass of BasicCrawler). Request queue is
+    # a default request manager, it will be opened, and fully managed if not specified.
     crawler = HttpCrawler()
 
     # Define the default request handler, which will be called for every request.

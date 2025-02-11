@@ -4,10 +4,12 @@ from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 
 
 async def main() -> None:
-    # BeautifulSoupCrawler crawls the web using HTTP requests and parses HTML using the BeautifulSoup library.
+    # BeautifulSoupCrawler crawls the web using HTTP requests
+    # and parses HTML using the BeautifulSoup library.
     crawler = BeautifulSoupCrawler(max_requests_per_crawl=50)
 
-    # Define a request handler to process each crawled page and attach it to the crawler using a decorator.
+    # Define a request handler to process each crawled page
+    # and attach it to the crawler using a decorator.
     @crawler.router.default_handler
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url} ...')
