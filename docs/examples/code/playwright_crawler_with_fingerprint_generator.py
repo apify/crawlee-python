@@ -1,12 +1,16 @@
 import asyncio
 
 from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext
-from crawlee.fingerprint_suite import DefaultFingerprintGenerator, HeaderGeneratorOptions, ScreenOptions
+from crawlee.fingerprint_suite import (
+    DefaultFingerprintGenerator,
+    HeaderGeneratorOptions,
+    ScreenOptions,
+)
 
 
 async def main() -> None:
     # Use default fingerprint generator with desired fingerprint options.
-    # Generator will try to generate real looking browser fingerprint based on the options.
+    # Generator will generate real looking browser fingerprint based on the options.
     # Unspecified fingerprint options will be automatically selected by the generator.
     fingerprint_generator = DefaultFingerprintGenerator(
         header_options=HeaderGeneratorOptions(browsers=['chromium']),

@@ -12,7 +12,9 @@ async def main() -> None:
     await request_queue.add_request('https://apify.com/')
 
     # Add multiple requests as a batch.
-    await request_queue.add_requests_batched(['https://crawlee.dev/', 'https://crawlee.dev/python/'])
+    await request_queue.add_requests_batched(
+        ['https://crawlee.dev/', 'https://crawlee.dev/python/']
+    )
 
     # Fetch and process requests from the queue.
     while request := await request_queue.fetch_next_request():

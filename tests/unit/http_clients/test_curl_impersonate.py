@@ -32,7 +32,7 @@ async def test_crawl_with_proxy(
     url = str(httpbin / 'status/222')
     request = Request.from_url(url)
 
-    async with Statistics() as statistics:
+    async with Statistics.with_default_state() as statistics:
         result = await http_client.crawl(request, proxy_info=proxy, statistics=statistics)
 
     assert result.http_response.status_code == 222  # 222 - authentication successful
@@ -48,7 +48,7 @@ async def test_crawl_with_proxy_disabled(
     request = Request.from_url(url)
 
     with pytest.raises(ProxyError):
-        async with Statistics() as statistics:
+        async with Statistics.with_default_state() as statistics:
             await http_client.crawl(request, proxy_info=disabled_proxy, statistics=statistics)
 
 
