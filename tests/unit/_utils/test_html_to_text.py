@@ -136,7 +136,7 @@ But,
 @pytest.mark.parametrize(
     ('source', 'expected_text'),
     [
-        (_EXAMPLE_HTML, _EXPECTED_TEXT),
+        pytest.param(_EXAMPLE_HTML, _EXPECTED_TEXT, id='Complex html'),
         ('   Plain    text     node    ', 'Plain text node'),
         ('   \nPlain    text     node  \n  ', 'Plain text node'),
         ('<h1>Header 1</h1> <h2>Header 2</h2>', 'Header 1\nHeader 2'),
@@ -163,7 +163,7 @@ But,
         ),
         ('<a>this_word</a>_should_<b></b>be_<span>one</span>', 'this_word_should_be_one'),
         ('<span attributes="should" be="ignored">some <span>text</span></span>', 'some text'),
-        (
+        pytest.param(
             (
                 """<table>
     <tr>
@@ -176,6 +176,7 @@ But,
 </table>"""
             ),
             'Cell A1\tCell A2\tCell A3 \t\nCell B1\tCell B2',
+            id='Table',
         ),
         ('<span>&aacute; &eacute;</span>', 'á é'),
     ],
