@@ -23,15 +23,13 @@ Changing browser fingerprints can be a tedious job. Luckily, Crawlee provides th
     {PlaywrightDefaultFingerprintGenerator}
 </CodeBlock>
 
-In certain cases we want to narrow down the fingerprints used - e.g. specify a certain operating system, locale or browser. This is also possible with Crawlee - the crawler can have the generation algorithm customized to reflect the particular browser version and many more. For description of fingerprint generation options please see <ApiLink to="class/HeaderGeneratorOptions">`HeaderGeneratorOptions`</ApiLink>, <ApiLink to="class/ScreenOptions">`ScreenOptions`</ApiLink> and <ApiLink to="class/BrowserforgeFingerprintGenerator#__init__">`DefaultFingerprintGenerator#__init__`</ApiLink>  See the example bellow:
+In certain cases we want to narrow down the fingerprints used - e.g. specify a certain operating system, locale or browser. This is also possible with Crawlee - the crawler can have the generation algorithm customized to reflect the particular browser version and many more. For description of fingerprint generation options please see <ApiLink to="class/HeaderGeneratorOptions">`HeaderGeneratorOptions`</ApiLink>, <ApiLink to="class/ScreenOptions">`ScreenOptions`</ApiLink> and <ApiLink to="class/BrowserforgeFingerprintGenerator#__init__">`DefaultFingerprintGenerator.__init__`</ApiLink>  See the example bellow:
 
 <CodeBlock className="language-python">
     {PlaywrightDefaultFingerprintGeneratorWithArgs}
 </CodeBlock>
 
-### Disabling browser fingerprints
-
-By default, fingerprints are disabled.
+If you do not want to use fingerprints, then do not pass `fingerprint_generator` argument to the <ApiLink to="class/PlaywrightCrawler#__init__">`PlaywrightCrawler.__init__`</ApiLink>. By default, fingerprints are disabled.
 
 ## Using Camoufox
 
