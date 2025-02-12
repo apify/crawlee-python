@@ -16,7 +16,7 @@ async def main() -> None:
 
         # Enqueue links found within elements that match the specified selector.
         # These links will be added to the crawling queue with the label CATEGORY.
-        await context.enqueue_links(
+        await context.extract_links(
             selector='.collection-block-item',
             label='CATEGORY',
         )

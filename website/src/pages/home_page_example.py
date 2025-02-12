@@ -16,7 +16,7 @@ async def main() -> None:
         context.log.info(f'Processing {context.request.url} ...')
 
         # Extract and enqueue all links found on the page.
-        await context.enqueue_links()
+        await context.extract_links()
 
         # Extract data from the page using Playwright API.
         data = {

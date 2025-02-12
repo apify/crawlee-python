@@ -18,7 +18,8 @@ async def main() -> None:
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url} ...')
 
-        await context.enqueue_links()
+        # Extract and enqueue all links found on the page.
+        await context.extract_links()
 
     # Define the hook, which will be called before every request.
     @crawler.pre_navigation_hook

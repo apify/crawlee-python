@@ -22,8 +22,8 @@ async def main() -> None:
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url} ...')
 
-        # Enqueue all links from the page.
-        await context.enqueue_links()
+        # Extract and enqueue all links found on the page.
+        await context.extract_links()
 
         # Extract data from the page.
         data = {

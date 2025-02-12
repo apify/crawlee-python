@@ -33,7 +33,7 @@ async def main() -> None:
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url} ...')
 
-        await context.enqueue_links()
+        await context.extract_links()
 
     # Run the crawler with the initial list of URLs.
     await crawler.run(['https://crawlee.dev'])

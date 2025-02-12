@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
     from playwright.async_api import Response
 
-    from crawlee._types import EnqueueLinksFunction
+    from crawlee._types import ExtractLinksFunction
 
 
 @dataclass(frozen=True)
@@ -26,8 +26,8 @@ class PlaywrightCrawlingContext(PlaywrightPreNavCrawlingContext):
     response: Response
     """The Playwright `Response` object containing the response details for the current URL."""
 
-    enqueue_links: EnqueueLinksFunction
-    """The Playwright `EnqueueLinksFunction` implementation."""
+    extract_links: ExtractLinksFunction
+    """The Playwright `ExtractLinksFunction` implementation."""
 
     infinite_scroll: Callable[[], Awaitable[None]]
     """A function to perform infinite scrolling on the page. This scrolls to the bottom, triggering

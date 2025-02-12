@@ -1,6 +1,6 @@
 import asyncio
 
-from crawlee import EnqueueStrategy
+from crawlee import ExtractStrategy
 from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 
 
@@ -15,9 +15,9 @@ async def main() -> None:
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url} ...')
 
-        # Setting the strategy to SAME_DOMAIN will enqueue all links found that
+        # Setting the strategy to SAME_DOMAIN will extract all links found that
         # are on the same hostname as request.loaded_url or request.url.
-        await context.enqueue_links(strategy=EnqueueStrategy.SAME_DOMAIN)
+        await context.extract_links(strategy=ExtractStrategy.SAME_DOMAIN)
 
     # Run the crawler with the initial list of requests.
     await crawler.run(['https://crawlee.dev'])

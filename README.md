@@ -114,8 +114,8 @@ async def main() -> None:
         # Push the extracted data to the default dataset.
         await context.push_data(data)
 
-        # Enqueue all links found on the page.
-        await context.enqueue_links()
+        # Extract and enqueue all links found on the page.
+        await context.extract_links()
 
     # Run the crawler with the initial list of URLs.
     await crawler.run(['https://crawlee.dev'])
@@ -154,8 +154,8 @@ async def main() -> None:
         # Push the extracted data to the default dataset.
         await context.push_data(data)
 
-        # Enqueue all links found on the page.
-        await context.enqueue_links()
+        # Extract and enqueue all links found on the page.
+        await context.extract_links()
 
     # Run the crawler with the initial list of requests.
     await crawler.run(['https://crawlee.dev'])

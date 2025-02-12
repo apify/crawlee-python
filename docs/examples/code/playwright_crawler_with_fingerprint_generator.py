@@ -34,7 +34,7 @@ async def main() -> None:
         context.log.info(f'Processing {context.request.url} ...')
 
         # Find a link to the next page and enqueue it if it exists.
-        await context.enqueue_links(selector='.morelink')
+        await context.extract_links(selector='.morelink')
 
     # Run the crawler with the initial list of URLs.
     await crawler.run(['https://news.ycombinator.com/'])

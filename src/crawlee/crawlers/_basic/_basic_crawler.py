@@ -19,7 +19,7 @@ from weakref import WeakKeyDictionary
 from tldextract import TLDExtract
 from typing_extensions import NotRequired, TypedDict, TypeVar, Unpack, assert_never
 
-from crawlee import EnqueueStrategy, Glob, service_locator
+from crawlee import ExtractStrategy, Glob, service_locator
 from crawlee._autoscaling import AutoscaledPool, Snapshotter, SystemStatus
 from crawlee._log_config import configure_logger, get_configured_log_level
 from crawlee._request import Request, RequestState
@@ -761,16 +761,16 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     def _check_enqueue_strategy(
         self,
-        strategy: EnqueueStrategy,
+        strategy: ExtractStrategy,
         *,
         target_url: ParseResult,
         origin_url: ParseResult,
     ) -> bool:
         """Check if a URL matches the enqueue_strategy."""
-        if strategy == EnqueueStrategy.SAME_HOSTNAME:
+        if strategy == ExtractStrategy.SAME_HOSTNAME:
             return target_url.hostname == origin_url.hostname
 
-        if strategy == EnqueueStrategy.SAME_DOMAIN:
+        if strategy == ExtractStrategy.SAME_DOMAIN:
             if origin_url.hostname is None or target_url.hostname is None:
                 raise ValueError('Both origin and target URLs must have a hostname')
 
@@ -778,10 +778,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             target_domain = self._tld_extractor.extract_str(target_url.hostname).domain
             return origin_domain == target_domain
 
-        if strategy == EnqueueStrategy.SAME_ORIGIN:
+        if strategy == ExtractStrategy.SAME_ORIGIN:
             return target_url.hostname == origin_url.hostname and target_url.scheme == origin_url.scheme
 
-        if strategy == EnqueueStrategy.ALL:
+        if strategy == ExtractStrategy.ALL:
             return True
 
         assert_never(strategy)
@@ -947,7 +947,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 if (
                     (self._max_crawl_depth is None or dst_request.crawl_depth <= self._max_crawl_depth)
                     and self._check_enqueue_strategy(
-                        add_requests_call.get('strategy', EnqueueStrategy.ALL),
+                        add_requests_call.get('strategy', ExtractStrategy.ALL),
                         target_url=urlparse(dst_request.url),
                         origin_url=urlparse(origin),
                     )

@@ -30,11 +30,11 @@ The process is simple:
 4. Visit the newly enqueued links.
 5. Repeat the process.
 
-In the following paragraphs you will learn about the <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> function which simplifies crawling to a single function call.
+In the following paragraphs you will learn about the <ApiLink to="class/ExtractLinksFunction">`extract_links`</ApiLink> function which simplifies crawling to a single function call.
 
 :::tip context awareness
 
-The <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> function is context aware. It means that it will read the information about the currently crawled page from the context, and you don't need to explicitly provide any arguments. However, you can specify filtering criteria or an enqueuing strategy if desired. It will find the links and automatically add the links to the running crawler's <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>.
+The <ApiLink to="class/ExtractLinksFunction">`extract_links`</ApiLink> function is context aware. It means that it will read the information about the currently crawled page from the context, and you don't need to explicitly provide any arguments. However, you can specify filtering criteria or an enqueuing strategy if desired. It will find the links and automatically add the links to the running crawler's <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>.
 
 :::
 
@@ -56,16 +56,16 @@ There are numerous approaches to finding links to follow when crawling the web. 
 <a href="https://crawlee.dev/docs/introduction">This is a link to Crawlee introduction</a>
 ```
 
-Since this is the most common case, it is also the <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> default.
+Since this is the most common case, it is also the <ApiLink to="class/ExtractLinksFunction">`extract_links`</ApiLink> default.
 
 <CodeBlock className="language-python">
     {FindingNewLinksExample}
 </CodeBlock>
 
-If you need to override the default selection of elements in <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink>, you can use the `selector` argument.
+If you need to override the default selection of elements in <ApiLink to="class/ExtractLinksFunction">`extract_links`</ApiLink>, you can use the `selector` argument.
 
 ```python
-await context.enqueue_links(selector='a.article-link')
+await context.extract_links(selector='a.article-link')
 ```
 
 ## Filtering links to same domain
@@ -73,12 +73,12 @@ await context.enqueue_links(selector='a.article-link')
 Websites typically contain a lot of links that lead away from the original page. This is normal, but when crawling a website, we usually want to crawl that one site and not let our crawler wander away to Google, Facebook and Twitter. Therefore, we need to filter out the off-domain links and only keep the ones that lead to the same domain.
 
 ```python
-# The default behavior of enqueue_links is to stay on the same hostname, so it does not require
+# The default behavior of extract_links is to stay on the same hostname, so it does not require
 # any parameters. This will ensure the subdomain stays the same.
-await context.enqueue_links()
+await context.extract_links()
 ```
 
-The default behavior of <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> is to stay on the same hostname. This **does not include subdomains**. To include subdomains in your crawl, use the `strategy` argument. The `strategy` argument is an instance of the <ApiLink to="enum/EnqueueStrategy">`EnqueueStrategy`</ApiLink> enum.
+The default behavior of <ApiLink to="class/ExtractLinksFunction">`extract_links`</ApiLink> is to stay on the same hostname. This **does not include subdomains**. To include subdomains in your crawl, use the `strategy` argument. The `strategy` argument is an instance of the <ApiLink to="enum/ExtractStrategy">`ExtractStrategy`</ApiLink> enum.
 
 <CodeBlock className="language-python">
     {EnqueueStrategyExample}
@@ -92,16 +92,16 @@ Skipping of duplicate URLs is critical, because visiting the same page multiple 
 
 ## Advanced filtering arguments
 
-While the defaults for <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> can be often exactly what you need, it also gives you fine-grained control over which URLs should be enqueued. One way we already mentioned above. It is using the <ApiLink to="enum/EnqueueStrategy">`EnqueueStrategy`</ApiLink>. You can use the `all` strategy if you want to follow every single link, regardless of its domain, or you can enqueue links that target the same domain name with the `same_domain` strategy.
+While the defaults for <ApiLink to="class/ExtractLinksFunction">`extract_links`</ApiLink> can be often exactly what you need, it also gives you fine-grained control over which URLs should be enqueued. One way we already mentioned above. It is using the <ApiLink to="enum/ExtractStrategy">`ExtractStrategy`</ApiLink>. You can use the `all` strategy if you want to follow every single link, regardless of its domain, or you can enqueue links that target the same domain name with the `same_domain` strategy.
 
 ```python
 # Wanders the internet.
-await context.enqueue_links(strategy=EnqueueStrategy.ALL)
+await context.extract_links(strategy=ExtractStrategy.ALL)
 ```
 
 ### Filter URLs with patterns
 
-For even more control, you can use the `include` or `exclude` parameters, either as glob patterns or regular expressions, to filter the URLs. Refer to the API documentation for <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> for detailed information on these and other available options.
+For even more control, you can use the `include` or `exclude` parameters, either as glob patterns or regular expressions, to filter the URLs. Refer to the API documentation for <ApiLink to="class/ExtractLinksFunction">`extract_links`</ApiLink> for detailed information on these and other available options.
 
 <CodeBlock className="language-python">
     {GlobsExample}

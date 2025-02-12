@@ -134,7 +134,7 @@ async def test_enqueue_links(server: respx.MockRouter) -> None:
     async def request_handler(context: ParselCrawlingContext) -> None:
         url = str(context.request.url)
         visit(url)
-        await context.enqueue_links()
+        await context.extract_links()
 
     await crawler.run(['https://www.test.io/'])
 
@@ -158,7 +158,7 @@ async def test_enqueue_links_selector(server: respx.MockRouter) -> None:
     @crawler.router.default_handler
     async def request_handler(context: ParselCrawlingContext) -> None:
         visit(context.request.url)
-        await context.enqueue_links(selector='a.foo')
+        await context.extract_links(selector='a.foo')
 
     await crawler.run(['https://test.io/'])
 
@@ -181,7 +181,7 @@ async def test_enqueue_links_with_max_crawl(server: respx.MockRouter) -> None:
 
     @crawler.router.default_handler
     async def request_handler(context: ParselCrawlingContext) -> None:
-        await context.enqueue_links()
+        await context.extract_links()
         processed_urls.append(context.request.url)
 
     stats = await crawler.run(start_urls)
@@ -211,7 +211,7 @@ async def test_enqueue_links_with_transform_request_function(server: respx.MockR
     async def request_handler(context: ParselCrawlingContext) -> None:
         visit(context.request.url)
         headers.append(context.request.headers)
-        await context.enqueue_links(transform_request_function=test_transform_request_function, label='test')
+        await context.extract_links(transform_request_function=test_transform_request_function, label='test')
 
     await crawler.run(['https://test.io/'])
 

@@ -20,8 +20,8 @@ async def main() -> None:
             'title': context.soup.title.string if context.soup.title else None,
         }
 
-        # Enqueue all links found on the page.
-        await context.enqueue_links()
+        # Extract and enqueue all links found on the page.
+        await context.extract_links()
 
         # Push the extracted data to the default dataset.
         await context.push_data(data)

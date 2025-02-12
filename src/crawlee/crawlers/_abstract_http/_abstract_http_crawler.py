@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Callable, Generic
 from pydantic import ValidationError
 from typing_extensions import NotRequired, TypedDict, TypeVar
 
-from crawlee import EnqueueStrategy, RequestTransformAction
+from crawlee import ExtractStrategy, RequestTransformAction
 from crawlee._request import Request, RequestOptions
 from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
     from typing_extensions import Unpack
 
-    from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, EnqueueLinksKwargs
+    from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, ExtractLinksFunction
 
     from ._abstract_http_parser import AbstractHttpParser
 
@@ -155,12 +155,12 @@ class AbstractHttpCrawler(
         yield ParsedHttpCrawlingContext.from_http_crawling_context(
             context=context,
             parsed_content=parsed_content,
-            enqueue_links=self._create_enqueue_links_function(context, parsed_content),
+            extract_links=self._create_extract_links_function(context, parsed_content),
         )
 
-    def _create_enqueue_links_function(
+    def _create_extract_links_function(
         self, context: HttpCrawlingContext, parsed_content: TParseResult
-    ) -> EnqueueLinksFunction:
+    ) -> ExtractLinksFunction:
         """Create a callback function for extracting links from parsed content and enqueuing them to the crawl.
 
         Args:
@@ -171,7 +171,7 @@ class AbstractHttpCrawler(
             Awaitable that is used for extracting links from parsed content and enqueuing them to the crawl.
         """
 
-        async def enqueue_links(
+        async def extract_links(
             *,
             selector: str = 'a',
             label: str | None = None,
@@ -180,7 +180,7 @@ class AbstractHttpCrawler(
             | None = None,
             **kwargs: Unpack[EnqueueLinksKwargs],
         ) -> None:
-            kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
+            kwargs.setdefault('strategy', ExtractStrategy.SAME_HOSTNAME)
 
             requests = list[Request]()
             base_user_data = user_data or {}
@@ -214,7 +214,7 @@ class AbstractHttpCrawler(
 
             await context.add_requests(requests, **kwargs)
 
-        return enqueue_links
+        return extract_links
 
     async def _make_http_request(self, context: BasicCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
         """Make http request and create context enhanced by HTTP response.
