@@ -5,6 +5,10 @@ title: Upgrading to v0.x
 
 This page summarizes the breaking changes between Crawlee for Python zero-based versions.
 
+## Upgrading to v0.6
+
+- Removed `HttpCrawlerOptions` - which contained options from `BasicCrawlerOptions` and unique options `additional_http_error_status_codes` and `ignore_http_error_status_codes`. Both of the unique options were added to `BasicCrawlerOptions` instead.
+
 ## Upgrading to v0.5
 
 This section summarizes the breaking changes between v0.4.x and v0.5.0.
