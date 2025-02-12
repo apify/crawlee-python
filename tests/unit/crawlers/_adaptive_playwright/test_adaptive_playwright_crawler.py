@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 
     import respx
 
-    from crawlee.browsers._base_browser_plugin import BaseBrowserPlugin
+    from crawlee.browsers._browser_plugin import BrowserPlugin
     from crawlee.browsers._types import CrawleePage
     from crawlee.proxy_configuration import ProxyInfo
 
@@ -63,7 +63,7 @@ class _StaticRedirectBrowserPool(BrowserPool):
         self,
         *,
         page_id: str | None = None,
-        browser_plugin: BaseBrowserPlugin | None = None,
+        browser_plugin: BrowserPlugin | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> CrawleePage:
         crawlee_page = await super().new_page(page_id=page_id, browser_plugin=browser_plugin, proxy_info=proxy_info)

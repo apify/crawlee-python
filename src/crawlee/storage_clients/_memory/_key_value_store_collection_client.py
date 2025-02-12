@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
-from crawlee.storage_clients._base import BaseKeyValueStoreCollectionClient
+from crawlee.storage_clients._base import KeyValueStoreCollectionClient as BaseKeyValueStoreCollectionClient
 from crawlee.storage_clients.models import KeyValueStoreListPage, KeyValueStoreMetadata
 
 from ._creation_management import get_or_create_inner

@@ -20,8 +20,8 @@ if TYPE_CHECKING:
 
 
 @docs_group('Abstract classes')
-class BaseRequestQueueClient(ABC):
-    """Abstract base class for request queue resource clients.
+class RequestQueueClient(ABC):
+    """An abstract class for request queue resource clients.
 
     These clients are specific to the type of resource they manage and operate under a designated storage
     client, like a memory storage client.

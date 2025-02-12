@@ -47,4 +47,4 @@ python -m pip install 'crawlee[all]'
 
 ## How HTTP clients work
 
-We provide an abstract base class, <ApiLink to="class/BaseHttpClient">`BaseHttpClient`</ApiLink>, which defines the necessary interface for all HTTP clients. HTTP clients are responsible for sending requests and receiving responses, as well as managing cookies, headers, and proxies. They provide methods that are called from crawlers. To implement your own HTTP client, inherit from the <ApiLink to="class/BaseHttpClient">`BaseHttpClient`</ApiLink> class and implement the required methods.
+We provide an abstract base class, <ApiLink to="class/HttpClient">`HttpClient`</ApiLink>, which defines the necessary interface for all HTTP clients. HTTP clients are responsible for sending requests and receiving responses, as well as managing cookies, headers, and proxies. They provide methods that are called from crawlers. To implement your own HTTP client, inherit from the <ApiLink to="class/HttpClient">`HttpClient`</ApiLink> class and implement the required methods.

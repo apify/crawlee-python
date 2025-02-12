@@ -9,11 +9,11 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
     from types import TracebackType
 
-    from crawlee.browsers._base_browser_controller import BaseBrowserController
+    from crawlee.browsers._browser_controller import BrowserController
     from crawlee.browsers._types import BrowserType
 
 
-class BaseBrowserPlugin(ABC):
+class BrowserPlugin(ABC):
     """An abstract base class for browser plugins.
 
     Browser plugins act as wrappers around browser automation tools like Playwright,
@@ -59,7 +59,7 @@ class BaseBrowserPlugin(ABC):
         """Return the maximum number of pages that can be opened in a single browser."""
 
     @abstractmethod
-    async def __aenter__(self) -> BaseBrowserPlugin:
+    async def __aenter__(self) -> BrowserPlugin:
         """Enter the context manager and initialize the browser plugin.
 
         Raises:
@@ -80,7 +80,7 @@ class BaseBrowserPlugin(ABC):
         """
 
     @abstractmethod
-    async def new_browser(self) -> BaseBrowserController:
+    async def new_browser(self) -> BrowserController:
         """Create a new browser instance.
 
         Returns:

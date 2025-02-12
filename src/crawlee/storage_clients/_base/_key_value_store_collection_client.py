@@ -10,8 +10,8 @@ if TYPE_CHECKING:
 
 
 @docs_group('Abstract classes')
-class BaseKeyValueStoreCollectionClient(ABC):
-    """Abstract base class for key-value store collection clients.
+class KeyValueStoreCollectionClient(ABC):
+    """An abstract class for key-value store collection clients.
 
     This collection client handles operations that involve multiple instances of a given resource type.
     """
