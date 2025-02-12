@@ -37,8 +37,6 @@ _LOG_MESSAGE_INDENT = ' ' * 6
 def get_configured_log_level() -> int:
     config = service_locator.get_configuration()
 
-    verbose_logging_requested = 'verbose_log' in config.model_fields_set and config.verbose_log
-
     if 'log_level' in config.model_fields_set:
         if config.log_level == 'DEBUG':
             return logging.DEBUG
@@ -53,7 +51,7 @@ def get_configured_log_level() -> int:
 
         assert_never(config.log_level)
 
-    if sys.flags.dev_mode or verbose_logging_requested:
+    if sys.flags.dev_mode:
         return logging.DEBUG
 
     return logging.INFO
