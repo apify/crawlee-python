@@ -56,12 +56,12 @@ if TYPE_CHECKING:
     from crawlee._types import ConcurrencySettings, HttpMethod, JsonSerializable
     from crawlee.configuration import Configuration
     from crawlee.events import EventManager
-    from crawlee.http_clients import BaseHttpClient, HttpResponse
+    from crawlee.http_clients import HttpClient, HttpResponse
     from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
     from crawlee.request_loaders import RequestManager
     from crawlee.sessions import Session
     from crawlee.statistics import FinalStatistics
-    from crawlee.storage_clients import BaseStorageClient
+    from crawlee.storage_clients import StorageClient
     from crawlee.storage_clients.models import DatasetItemsListPage
     from crawlee.storages._dataset import ExportDataCsvKwargs, ExportDataJsonKwargs, GetDataKwargs, PushDataKwargs
 
@@ -80,7 +80,7 @@ class _BasicCrawlerOptions(TypedDict):
     event_manager: NotRequired[EventManager]
     """The event manager for managing events for the crawler and all its components."""
 
-    storage_client: NotRequired[BaseStorageClient]
+    storage_client: NotRequired[StorageClient]
     """The storage client for managing storages for the crawler and all its components."""
 
     request_manager: NotRequired[RequestManager]
@@ -92,7 +92,7 @@ class _BasicCrawlerOptions(TypedDict):
     proxy_configuration: NotRequired[ProxyConfiguration]
     """HTTP proxy configuration used when making requests."""
 
-    http_client: NotRequired[BaseHttpClient]
+    http_client: NotRequired[HttpClient]
     """HTTP client used by `BasicCrawlingContext.send_request` method."""
 
     max_request_retries: NotRequired[int]
@@ -202,11 +202,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         *,
         configuration: Configuration | None = None,
         event_manager: EventManager | None = None,
-        storage_client: BaseStorageClient | None = None,
+        storage_client: StorageClient | None = None,
         request_manager: RequestManager | None = None,
         session_pool: SessionPool | None = None,
         proxy_configuration: ProxyConfiguration | None = None,
-        http_client: BaseHttpClient | None = None,
+        http_client: HttpClient | None = None,
         request_handler: Callable[[TCrawlingContext], Awaitable[None]] | None = None,
         max_request_retries: int = 3,
         max_requests_per_crawl: int | None = None,

@@ -52,7 +52,7 @@ class HttpCrawlingResult:
 
 
 @docs_group('Abstract classes')
-class BaseHttpClient(ABC):
+class HttpClient(ABC):
     """An abstract base class for HTTP clients used in crawlers (`BasicCrawler` subclasses).
 
     The specific HTTP client should use `_raise_for_error_status_code` method for checking the status code. This

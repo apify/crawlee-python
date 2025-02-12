@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 @docs_group('Abstract classes')
 class RequestLoader(ABC):
-    """Abstract base class defining the interface for classes that provide access to a read-only stream of requests.
+    """An abstract class defining the interface for classes that provide access to a read-only stream of requests.
 
     Request loaders are used to manage and provide access to a storage of crawling requests.
 
