@@ -48,7 +48,7 @@ RUN echo "Python version:" \
  && python --version \
  && echo "Installing dependencies:" \
  # Install everything using pip, set playwright version so that it matches whatever is pre-installed in the image
- cat requirements.txt \
+ cat requirements.txt | \
  # Replace playwright version so that it matches whatever is pre-installed in the image
     sed "s/^playwright==.*/playwright==$(playwright --version | cut -d ' ' -f 2)/" | \
  # Install everything using pip (ignore dependency checks - the lockfile is correct, period)
