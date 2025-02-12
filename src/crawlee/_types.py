@@ -93,7 +93,7 @@ class HttpHeaders(RootModel, Mapping[str, str]):
 
 
 @docs_group('Data structures')
-class EnqueueStrategy(str, Enum):
+class ExtractStrategy(str, Enum):
     """Strategy for deciding which links should be followed and which ones should be ignored."""
 
     ALL = 'all'
@@ -163,7 +163,7 @@ class StorageTypes(str, Enum):
 
 
 class EnqueueLinksKwargs(TypedDict):
-    """Keyword arguments for the `enqueue_links` methods."""
+    """Keyword arguments for the `extract_links` methods."""
 
     limit: NotRequired[int]
     """Maximum number of requests to be enqueued."""
@@ -171,8 +171,8 @@ class EnqueueLinksKwargs(TypedDict):
     base_url: NotRequired[str]
     """Base URL to be used for relative URLs."""
 
-    strategy: NotRequired[EnqueueStrategy]
-    """Enqueueing strategy, see the `EnqueueStrategy` enum for possible values and their meanings."""
+    strategy: NotRequired[ExtractStrategy]
+    """Enqueueing strategy, see the `ExtractStrategy` enum for possible values and their meanings."""
 
     include: NotRequired[list[re.Pattern | Glob]]
     """List of regular expressions or globs that URLs must match to be enqueued."""
@@ -329,12 +329,12 @@ class AddRequestsFunction(Protocol):
 
 
 @docs_group('Functions')
-class EnqueueLinksFunction(Protocol):
-    """A function for enqueueing new URLs to crawl based on elements selected by a given selector.
+class ExtractLinksFunction(Protocol):
+    """A function for extracting URLs from the current page and enqueueing them for further crawling.
 
-    It extracts URLs from the current page and enqueues them for further crawling. It allows filtering through
-    selectors and other options. You can also specify labels and user data to be associated with the newly
-    created `Request` objects.
+    This function selects elements based on a given selector, extracts their URLs, and adds them
+    to the `RequestQueue`. It supports filtering, custom labels, and user-defined metadata for
+    the generated `Request` objects.
     """
 
     def __call__(

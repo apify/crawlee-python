@@ -28,7 +28,7 @@ async def main() -> None:
         )
         context.log.info(f'Processing {context.request.url} with {browser_name} ...')
 
-        await context.enqueue_links()
+        await context.extract_links()
 
     # Run the crawler with the initial list of URLs.
     await crawler.run(['https://crawlee.dev', 'https://apify.com/'])

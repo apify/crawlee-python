@@ -13,9 +13,9 @@ async def main() -> None:
         title = context.soup.title.string if context.soup.title else ''
         context.log.info(f'The title of {url} is: {title}.')
 
-        # The enqueue_links function is available as one of the fields of the context.
+        # The extract_links function is available as one of the fields of the context.
         # It is also context aware, so it does not require any parameters.
-        await context.enqueue_links()
+        await context.extract_links()
 
     await crawler.run(['https://crawlee.dev/'])
 

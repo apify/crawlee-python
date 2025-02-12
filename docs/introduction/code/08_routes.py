@@ -11,7 +11,7 @@ async def default_handler(context: PlaywrightCrawlingContext) -> None:
 
     await context.page.wait_for_selector('.collection-block-item')
 
-    await context.enqueue_links(
+    await context.extract_links(
         selector='.collection-block-item',
         label='CATEGORY',
     )
@@ -24,7 +24,7 @@ async def category_handler(context: PlaywrightCrawlingContext) -> None:
 
     await context.page.wait_for_selector('.product-item > a')
 
-    await context.enqueue_links(
+    await context.extract_links(
         selector='.product-item > a',
         label='DETAIL',
     )
@@ -32,7 +32,7 @@ async def category_handler(context: PlaywrightCrawlingContext) -> None:
     next_button = await context.page.query_selector('a.pagination__next')
 
     if next_button:
-        await context.enqueue_links(
+        await context.extract_links(
             selector='a.pagination__next',
             label='CATEGORY',
         )

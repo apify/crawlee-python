@@ -14,8 +14,8 @@ async def main() -> None:
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url} ...')
 
-        # Enqueue all links found on the page.
-        await context.enqueue_links()
+        # Extract and enqueue all links found on the page.
+        await context.extract_links()
 
     # Run the crawler with the initial list of requests.
     await crawler.run(['https://crawlee.dev'])

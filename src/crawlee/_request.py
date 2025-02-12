@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Annotated, Any, TypedDict, cast
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, PlainSerializer, PlainValidator, TypeAdapter
 from yarl import URL
 
-from crawlee._types import EnqueueStrategy, HttpHeaders, HttpMethod, HttpPayload, JsonSerializable
+from crawlee._types import ExtractStrategy, HttpHeaders, HttpMethod, HttpPayload, JsonSerializable
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.docs import docs_group
 from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
@@ -354,16 +354,16 @@ class Request(BaseModel):
         self.crawlee_data.session_rotation_count = new_session_rotation_count
 
     @property
-    def enqueue_strategy(self) -> EnqueueStrategy:
+    def enqueue_strategy(self) -> ExtractStrategy:
         """The strategy used when enqueueing the request."""
         return (
-            EnqueueStrategy(self.crawlee_data.enqueue_strategy)
+            ExtractStrategy(self.crawlee_data.enqueue_strategy)
             if self.crawlee_data.enqueue_strategy
-            else EnqueueStrategy.ALL
+            else ExtractStrategy.ALL
         )
 
     @enqueue_strategy.setter
-    def enqueue_strategy(self, new_enqueue_strategy: EnqueueStrategy) -> None:
+    def enqueue_strategy(self, new_enqueue_strategy: ExtractStrategy) -> None:
         self.crawlee_data.enqueue_strategy = new_enqueue_strategy
 
     @property

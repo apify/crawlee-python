@@ -15,8 +15,8 @@ async def main() -> None:
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url} ...')
 
-        # Enqueue all the documentation links found on the page, except for the examples.
-        await context.enqueue_links(
+        # Extract and enqueue all links found on the page, except for the examples.
+        await context.extract_links(
             include=[Glob('https://crawlee.dev/docs/**')],
             exclude=[Glob('https://crawlee.dev/docs/examples')],
         )

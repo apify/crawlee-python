@@ -49,7 +49,7 @@ async def main() -> None:
         await context.push_data(data)
 
         # Find a link to the next page and enqueue it if it exists.
-        await context.enqueue_links(selector='.morelink')
+        await context.extract_links(selector='.morelink')
 
     # Define a hook that will be called each time before navigating to a new URL.
     # The hook receives a context parameter, providing access to the request and

@@ -12,7 +12,7 @@ async def main() -> None:
         # Enqueue links that match the 'include' glob pattern and
         # do not match the 'exclude' glob pattern.
         # highlight-next-line
-        await context.enqueue_links(
+        await context.extract_links(
             # highlight-next-line
             include=[Glob('https://someplace.com/**/cats')],
             # highlight-next-line

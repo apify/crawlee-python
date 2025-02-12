@@ -16,4 +16,4 @@ async def default_handler(context: PlaywrightCrawlingContext) -> None:
         }
     )
 
-    await context.enqueue_links()
+    await context.extract_links()

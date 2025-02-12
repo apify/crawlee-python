@@ -21,7 +21,7 @@ async def main() -> None:
         # Store the extracted data.
         await context.push_data(data)
         # Extract links from the current page and add them to the crawling queue.
-        await context.enqueue_links()
+        await context.extract_links()
 
     # Add first URL to the queue and start the crawl.
     await crawler.run(['https://crawlee.dev'])

@@ -13,7 +13,7 @@ import RqBasicExample from '!!raw-loader!./code/storages/rq_basic_example.py';
 import RqWithCrawlerExample from '!!raw-loader!./code/storages/rq_with_crawler_example.py';
 import RqWithCrawlerExplicitExample from '!!raw-loader!./code/storages/rq_with_crawler_explicit_example.py';
 import RqHelperAddRequestsExample from '!!raw-loader!./code/storages/helper_add_requests_example.py';
-import RqHelperEnqueueLinksExample from '!!raw-loader!./code/storages/helper_enqueue_links_example.py';
+import RqHelperEnqueueLinksExample from '!!raw-loader!./code/storages/helper_extract_links_example.py';
 
 import DatasetBasicExample from '!!raw-loader!./code/storages/dataset_basic_example.py';
 import DatasetWithCrawlerExample from '!!raw-loader!./code/storages/dataset_with_crawler_example.py';
@@ -96,7 +96,7 @@ The following code demonstrates the usage of the <ApiLink to="class/RequestQueue
 Crawlee provides helper functions to simplify interactions with the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>:
 
 - The <ApiLink to="class/AddRequestsFunction">`add_requests`</ApiLink> function allows you to manually add specific URLs to the configured request storage. In this case, you must explicitly provide the URLs you want to be added to the request storage. If you need to specify further details of the request, such as a `label` or `user_data`, you have to pass instances of the <ApiLink to="class/Request">`Request`</ApiLink> class to the helper.
-- The <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> function is designed to discover new URLs in the current page and add them to the request storage. It can be used with default settings, requiring no arguments, or you can customize its behavior by specifying link element selectors, choosing different enqueue strategies, or applying include/exclude filters to control which URLs are added. See [Crawl website with relative links](../examples/crawl-website-with-relative-links) example for more details.
+- The <ApiLink to="class/ExtractLinksFunction">`extract_links`</ApiLink> function is designed to discover new URLs in the current page and add them to the request storage. It can be used with default settings, requiring no arguments, or you can customize its behavior by specifying link element selectors, choosing different enqueue strategies, or applying include/exclude filters to control which URLs are added. See [Crawl website with relative links](../examples/crawl-website-with-relative-links) example for more details.
 
 <Tabs groupId="request_helpers">
     <TabItem value="request_helper_add_requests" label="Add requests" default>
@@ -104,7 +104,7 @@ Crawlee provides helper functions to simplify interactions with the <ApiLink to=
             {RqHelperAddRequestsExample}
         </CodeBlock>
     </TabItem>
-    <TabItem value="request_helper_enqueue_links" label="Enqueue links">
+    <TabItem value="request_helper_extract_links" label="Enqueue links">
         <CodeBlock className="language-python">
             {RqHelperEnqueueLinksExample}
         </CodeBlock>

@@ -30,8 +30,8 @@ async def main() -> None:
         # Do some processing using `parsed_content`
         context.log.info(context.parsed_content.title)
 
-        # Find more links and enqueue them.
-        await context.enqueue_links()
+        # Extract and enqueue all links found on the page.
+        await context.extract_links()
         await context.push_data({'Top crawler Url': context.request.url})
 
     @crawler.pre_navigation_hook

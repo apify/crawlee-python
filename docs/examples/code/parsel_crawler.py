@@ -27,8 +27,8 @@ async def main() -> None:
         # Push the extracted data to the default dataset.
         await context.push_data(data)
 
-        # Enqueue all links found on the page.
-        await context.enqueue_links()
+        # Extract and enqueue all links found on the page.
+        await context.extract_links()
 
     # Register pre navigation hook which will be called before each request.
     # This hook is optional and does not need to be defined at all.

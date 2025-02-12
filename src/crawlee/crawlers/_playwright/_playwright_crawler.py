@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from typing_extensions import NotRequired, TypedDict, TypeVar
 from yarl import URL
 
-from crawlee import EnqueueStrategy, RequestTransformAction
+from crawlee import ExtractStrategy, RequestTransformAction
 from crawlee._request import Request, RequestOptions
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.docs import docs_group
@@ -197,7 +197,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             SessionError: If the URL cannot be loaded by the browser.
 
         Yields:
-            The enhanced crawling context with the Playwright-specific features (page, response, enqueue_links,
+            The enhanced crawling context with the Playwright-specific features (page, response, extract_links,
                 infinite_scroll and block_requests).
         """
         async with context.page:
@@ -219,7 +219,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 cookies = await self._get_cookies(context.page)
                 context.session.cookies.update(cookies)
 
-            async def enqueue_links(
+            async def extract_links(
                 *,
                 selector: str = 'a',
                 label: str | None = None,
@@ -228,8 +228,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 | None = None,
                 **kwargs: Unpack[EnqueueLinksKwargs],
             ) -> None:
-                """The `PlaywrightCrawler` implementation of the `EnqueueLinksFunction` function."""
-                kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
+                """The `PlaywrightCrawler` implementation of the `ExtractLinksFunction` function."""
+                kwargs.setdefault('strategy', ExtractStrategy.SAME_HOSTNAME)
 
                 requests = list[Request]()
                 base_user_data = user_data or {}
@@ -282,7 +282,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 page=context.page,
                 infinite_scroll=lambda: infinite_scroll(context.page),
                 response=response,
-                enqueue_links=enqueue_links,
+                extract_links=extract_links,
                 block_requests=partial(block_requests, page=context.page),
             )
 

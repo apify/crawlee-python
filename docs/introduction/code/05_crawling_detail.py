@@ -22,7 +22,7 @@ async def main() -> None:
 
             # Enqueue links found within elements matching the provided selector.
             # These links will be added to the crawling queue with the label DETAIL.
-            await context.enqueue_links(
+            await context.extract_links(
                 selector='.product-item > a',
                 label='DETAIL',
             )
@@ -32,7 +32,7 @@ async def main() -> None:
 
             # If a "Next" button is found, enqueue the next page of results.
             if next_button:
-                await context.enqueue_links(
+                await context.extract_links(
                     selector='a.pagination__next',
                     label='CATEGORY',
                 )
@@ -45,7 +45,7 @@ async def main() -> None:
 
             # Enqueue links found within elements matching the provided selector.
             # These links will be added to the crawling queue with the label CATEGORY.
-            await context.enqueue_links(
+            await context.extract_links(
                 selector='.collection-block-item',
                 label='CATEGORY',
             )

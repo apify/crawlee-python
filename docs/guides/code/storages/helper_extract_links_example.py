@@ -10,7 +10,7 @@ async def main() -> None:
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url} ...')
         # highlight-next-line
-        await context.enqueue_links()
+        await context.extract_links()
 
     await crawler.run(['https://crawlee.dev/'])
 

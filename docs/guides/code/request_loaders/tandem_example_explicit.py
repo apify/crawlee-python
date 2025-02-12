@@ -20,8 +20,8 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def handler(context: ParselCrawlingContext) -> None:
-        # New links will be enqueued directly to the queue.
-        await context.enqueue_links()
+        # Extract and enqueue all links found on the page.
+        await context.extract_links()
 
     await crawler.run()
 

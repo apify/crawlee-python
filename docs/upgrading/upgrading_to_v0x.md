@@ -20,6 +20,12 @@ We decided to move away from [Hungarian notation](https://en.wikipedia.org/wiki/
 - `BaseBrowserController` -> `BrowserController`
 - `BaseBrowserPlugin` -> `BrowserPlugin`
 
+### Enqueue links
+
+The `enqueue_links` context helper function has been renamed to `extract_links`. The functionality remains the same but now the function has a more precise name. Previously, many users found the distinction between `enqueue_links` and `add_requests` unclear. This change helps reduce that confusion.
+
+The relevant `EnqueueStrategy` enum was renamed to `ExtractStrategy`.
+
 ## Upgrading to v0.5
 
 This section summarizes the breaking changes between v0.4.x and v0.5.0.
@@ -118,8 +124,8 @@ In previous versions, the majority of the package was fully public, including ma
 Here is a list of the updated public imports:
 
 ```diff
-- from crawlee.enqueue_strategy import EnqueueStrategy
-+ from crawlee import EnqueueStrategy
+- from crawlee.enqueue_strategy import ExtractStrategy
++ from crawlee import ExtractStrategy
 ```
 
 ```diff

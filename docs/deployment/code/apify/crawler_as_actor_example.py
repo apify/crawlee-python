@@ -16,6 +16,6 @@ async def main() -> None:
                 'title': context.soup.title.string if context.soup.title else None,
             }
             await context.push_data(data)
-            await context.enqueue_links()
+            await context.extract_links()
 
         await crawler.run(['https://crawlee.dev'])

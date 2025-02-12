@@ -11,7 +11,7 @@ from unittest import mock
 import pytest
 
 from crawlee import ConcurrencySettings, Glob, HttpHeaders, Request, RequestTransformAction
-from crawlee._types import EnqueueStrategy
+from crawlee._types import ExtractStrategy
 from crawlee.crawlers import PlaywrightCrawler
 from crawlee.fingerprint_suite import (
     DefaultFingerprintGenerator,
@@ -64,7 +64,7 @@ async def test_enqueue_links() -> None:
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
         visit(context.request.url)
-        await context.enqueue_links(include=[Glob('https://crawlee.dev/docs/examples/**')])
+        await context.extract_links(include=[Glob('https://crawlee.dev/docs/examples/**')])
 
     await crawler.run(requests)
 
@@ -93,7 +93,7 @@ async def test_enqueue_links_with_transform_request_function() -> None:
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
         visit(context.request.url)
         headers.append(context.request.headers)
-        await context.enqueue_links(transform_request_function=test_transform_request_function)
+        await context.extract_links(transform_request_function=test_transform_request_function)
 
     await crawler.run(['https://crawlee.dev/python'])
 
@@ -138,7 +138,7 @@ async def test_redirect_handling(httpbin: URL) -> None:
     )
 
     # Ensure that the request uses the SAME_ORIGIN strategy - apify.com will be considered out of scope
-    request.crawlee_data.enqueue_strategy = EnqueueStrategy.SAME_ORIGIN
+    request.crawlee_data.enqueue_strategy = ExtractStrategy.SAME_ORIGIN
 
     # No URLs should be visited in the run
     await crawler.run([request])
