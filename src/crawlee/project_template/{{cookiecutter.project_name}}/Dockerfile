@@ -30,7 +30,7 @@ RUN echo "Python version:" \
  # Export packages from poetry.lock
  && poetry export -f requirements.txt --without-hashes | \
  # Replace playwright version so that it matches whatever is pre-installed in the image
-    sed "s/^playwright==.*/playwright==$(playwright --version | cut -d ' ' -f 2)/" | \
+    sed $(command -v playwright && "s/^playwright==.*/playwright==$(playwright --version | cut -d ' ' -f 2)/" || "") | \
  # Install everything using pip (ignore dependency checks - the lockfile is correct, period)
     pip install -r /dev/stdin --no-dependencies \
  && echo "All installed Python packages:" \
@@ -50,7 +50,7 @@ RUN echo "Python version:" \
  # Install everything using pip, set playwright version so that it matches whatever is pre-installed in the image
  cat requirements.txt | \
  # Replace playwright version so that it matches whatever is pre-installed in the image
-    sed "s/^playwright==.*/playwright==$(playwright --version | cut -d ' ' -f 2)/" | \
+    sed $(command -v playwright && "s/^playwright==.*/playwright==$(playwright --version | cut -d ' ' -f 2)/" || "") | \
  # Install everything using pip (ignore dependency checks - the lockfile is correct, period)
     pip install -r /dev/stdin --no-dependencies \
  && echo "All installed Python packages:" \
