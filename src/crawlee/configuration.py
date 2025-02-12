@@ -32,9 +32,6 @@ class Configuration(BaseSettings):
     internal_timeout: Annotated[timedelta | None, Field(alias='crawlee_internal_timeout')] = None
     """Timeout for the internal asynchronous operations."""
 
-    verbose_log: Annotated[bool, Field(alias='crawlee_verbose_log')] = False
-    """Whether to enable verbose logging."""
-
     default_browser_path: Annotated[
         str | None,
         Field(
@@ -244,17 +241,6 @@ class Configuration(BaseSettings):
     ] = './storage'
     """The path to the storage directory. This option is utilized by the `MemoryStorageClient`."""
 
-    chrome_executable_path: Annotated[
-        str | None,
-        Field(
-            validation_alias=AliasChoices(
-                'apify_chrome_executable_path',
-                'crawlee_chrome_executable_path',
-            )
-        ),
-    ] = None
-    """This setting is currently unused."""
-
     headless: Annotated[
         bool,
         Field(
@@ -269,17 +255,6 @@ class Configuration(BaseSettings):
     refer to the Playwright documentation:
     https://playwright.dev/docs/api/class-browsertype#browser-type-launch.
     """
-
-    xvfb: Annotated[
-        bool,
-        Field(
-            validation_alias=AliasChoices(
-                'apify_xvfb',
-                'crawlee_xvfb',
-            )
-        ),
-    ] = False
-    """This setting is currently unused."""
 
     @classmethod
     def get_global_configuration(cls) -> Self:
