@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 
 @docs_group('Classes')
-class HttpCrawler(AbstractHttpCrawler[ParsedHttpCrawlingContext[bytes], bytes]):
+class HttpCrawler(AbstractHttpCrawler[ParsedHttpCrawlingContext[bytes], bytes, bytes]):
     """Specific version of generic `AbstractHttpCrawler`.
 
     It uses a dummy parser that simply returns the HTTP response body as-is. Use this only if you know what you are

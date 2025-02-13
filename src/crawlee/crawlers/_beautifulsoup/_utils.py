@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
 
-def html_to_text(source: str | BeautifulSoup) -> str:
+def html_to_text(source: str | Tag) -> str:
     """Converts markup string or `BeautifulSoup` to newline separated plain text without tags using BeautifulSoup.
 
     Args:
