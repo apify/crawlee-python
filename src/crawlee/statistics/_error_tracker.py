@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 
 
@@ -16,7 +16,15 @@ class ErrorGroup:
 class ErrorTracker:
     """Track errors and aggregates their counts by similarity."""
 
-    def __init__(self) -> None:
+    def __init__(self,
+                 show_error_code: bool = True,
+                 show_error_name: bool = True,
+                 show_stack_trace: bool = True,
+                 show_full_stack: bool = False,
+                 show_error_message: bool = True,
+                 show_full_message: bool = False,
+                 save_error_snapshots: bool = False,
+    ) -> None:
         self._errors = Counter[ErrorGroup]()
 
     def add(self, error: Exception) -> None:
