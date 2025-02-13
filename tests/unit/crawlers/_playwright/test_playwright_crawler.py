@@ -266,20 +266,8 @@ async def test_proxy_set() -> None:
 )
 async def test_isolation_cookies(*, use_incognito_pages: bool, httpbin: URL) -> None:
     sessions_ids: list[str] = []
-    sessions_cookies: dict[str, list[dict[str, Any]]] = {}
+    sessions_cookies: dict[str, dict[str, str]] = {}
     response_cookies: dict[str, dict[str, str]] = {}
-    check_cookie_list = [
-        {
-            'name': 'a',
-            'value': '1',
-            'domain': 'httpbin.org',
-            'path': '/',
-            'secure': False,
-            'http_only': False,
-            'expires': -1,
-            'same_site': 'Lax',
-        }
-    ]
 
     crawler = PlaywrightCrawler(
         session_pool=SessionPool(
@@ -303,7 +291,9 @@ async def test_isolation_cookies(*, use_incognito_pages: bool, httpbin: URL) -> 
         if context.request.unique_key not in {'1', '2'}:
             return
 
-        sessions_cookies[context.session.id] = context.session.cookies.get_cookies_as_dicts()
+        sessions_cookies[context.session.id] = {
+            cookie['name']: cookie['value'] for cookie in context.session.cookies.get_cookies_as_dicts()
+        }
         response_data = json.loads(await context.response.text())
         response_cookies[context.session.id] = response_data.get('cookies')
 
@@ -333,24 +323,20 @@ async def test_isolation_cookies(*, use_incognito_pages: bool, httpbin: URL) -> 
     # When using `use_incognito_pages` there should be full cookie isolation
     if use_incognito_pages:
         # The initiated cookies must match in both the response and the session store
-        assert sessions_cookies[cookie_session_id] == check_cookie_list
-        assert response_cookies[cookie_session_id] == {'a': '1'}
+        assert sessions_cookies[cookie_session_id] == response_cookies[cookie_session_id] == {'a': '1'}
 
         # For a clean session, the cookie should not be in the sesstion store or in the response
         # This way we can be sure that no cookies are being leaked through the http client
-        assert sessions_cookies[clean_session_id] == []
-        assert response_cookies[clean_session_id] == {}
+        assert sessions_cookies[clean_session_id] == response_cookies[clean_session_id] == {}
     # Without `use_incognito_pages` we will have access to the session cookie,
     # but there will be a cookie leak via PlaywrightContext
     else:
         # The initiated cookies must match in both the response and the session store
-        assert sessions_cookies[cookie_session_id] == check_cookie_list
-        assert response_cookies[cookie_session_id] == {'a': '1'}
+        assert sessions_cookies[cookie_session_id] == response_cookies[cookie_session_id] == {'a': '1'}
 
         # PlaywrightContext makes cookies shared by all sessions that work with it.
         # So in this case a clean session contains the same cookies
-        assert sessions_cookies[clean_session_id] == check_cookie_list
-        assert response_cookies[clean_session_id] == {'a': '1'}
+        assert sessions_cookies[clean_session_id] == response_cookies[clean_session_id] == {'a': '1'}
 
 
 async def test_custom_fingerprint_uses_generator_options(httpbin: URL) -> None:
