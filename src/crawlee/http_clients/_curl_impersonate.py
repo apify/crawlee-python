@@ -27,6 +27,7 @@ from crawlee.http_clients import BaseHttpClient, HttpCrawlingResult, HttpRespons
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+    from http.cookiejar import Cookie
 
     from curl_cffi import Curl
     from curl_cffi.requests import Request as CurlRequest
@@ -148,7 +149,7 @@ class CurlImpersonateHttpClient(BaseHttpClient):
                 method=request.method.upper(),  # type: ignore[arg-type] # curl-cffi requires uppercase method
                 headers=request.headers,
                 data=request.payload,
-                cookies=session.cookies if session else None,
+                cookies=session.cookies.jar if session else None,
                 allow_redirects=True,
             )
         except CurlRequestError as exc:
@@ -167,7 +168,7 @@ class CurlImpersonateHttpClient(BaseHttpClient):
 
         if self._persist_cookies_per_session and session and response.curl:
             response_cookies = self._get_cookies(response.curl)
-            session.cookies.update(response_cookies)
+            session.cookies.store_cookies(response_cookies)
 
         request.loaded_url = response.url
 
@@ -198,7 +199,7 @@ class CurlImpersonateHttpClient(BaseHttpClient):
                 method=method.upper(),  # type: ignore[arg-type] # curl-cffi requires uppercase method
                 headers=dict(headers) if headers else None,
                 data=payload,
-                cookies=session.cookies if session else None,
+                cookies=session.cookies.jar if session else None,
                 allow_redirects=True,
             )
         except CurlRequestError as exc:
@@ -214,7 +215,7 @@ class CurlImpersonateHttpClient(BaseHttpClient):
 
         if self._persist_cookies_per_session and session and response.curl:
             response_cookies = self._get_cookies(response.curl)
-            session.cookies.update(response_cookies)
+            session.cookies.store_cookies(response_cookies)
 
         return _CurlImpersonateResponse(response)
 
@@ -255,9 +256,10 @@ class CurlImpersonateHttpClient(BaseHttpClient):
         return False
 
     @staticmethod
-    def _get_cookies(curl: Curl) -> dict[str, str]:
-        cookies = {}
+    def _get_cookies(curl: Curl) -> list[Cookie]:
+        cookies: list[Cookie] = []
         for curl_cookie in curl.getinfo(CurlInfo.COOKIELIST):  # type: ignore[union-attr]
             curl_morsel = CurlMorsel.from_curl_format(curl_cookie)  # type: ignore[arg-type]
-            cookies[curl_morsel.name] = curl_morsel.value
+            cookie = curl_morsel.to_cookiejar_cookie()
+            cookies.append(cookie)
         return cookies

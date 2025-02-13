@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Any, Callable
 from unittest.mock import AsyncMock, Mock
 from urllib.parse import parse_qs, urlencode
 
@@ -222,7 +222,11 @@ async def test_stores_cookies(http_client_class: type[BaseHttpClient], httpbin: 
 
         session = await session_pool.get_session_by_id(session_ids.pop())
         assert session is not None
-        assert session.cookies == {'a': '1', 'b': '2', 'c': '3'}
+        assert {cookie['name']: cookie['value'] for cookie in session.cookies.get_cookies_as_browser_format()} == {
+            'a': '1',
+            'b': '2',
+            'c': '3',
+        }
 
 
 async def test_do_not_retry_on_client_errors(crawler: HttpCrawler, server: respx.MockRouter) -> None:
@@ -421,7 +425,7 @@ async def test_http_crawler_pre_navigation_hooks_executed_before_request() -> No
 async def test_isolation_cookies(http_client_class: type[BaseHttpClient], httpbin: URL) -> None:
     http_client = http_client_class()
     sessions_ids: list[str] = []
-    sessions_cookies: dict[str, dict[str, str]] = {}
+    sessions_cookies: dict[str, list[dict[str, Any]]] = {}
     response_cookies: dict[str, dict[str, str]] = {}
 
     crawler = HttpCrawler(
@@ -446,7 +450,7 @@ async def test_isolation_cookies(http_client_class: type[BaseHttpClient], httpbi
         if context.request.unique_key not in {'1', '2'}:
             return
 
-        sessions_cookies[context.session.id] = context.session.cookies
+        sessions_cookies[context.session.id] = context.session.cookies.get_cookies_as_dicts()
         response_data = json.loads(context.http_response.read())
         response_cookies[context.session.id] = response_data.get('cookies')
 
@@ -475,8 +479,12 @@ async def test_isolation_cookies(http_client_class: type[BaseHttpClient], httpbi
     assert cookie_session_id != clean_session_id
 
     # The initiated cookies must match in both the response and the session store
-    assert sessions_cookies[cookie_session_id] == response_cookies[cookie_session_id] == {'a': '1'}
+    assert sessions_cookies[cookie_session_id] == [
+        {'name': 'a', 'value': '1', 'domain': 'httpbin.org', 'path': '/', 'secure': False, 'http_only': False}
+    ]
+    assert response_cookies[cookie_session_id] == {'a': '1'}
 
     # For a clean session, the cookie should not be in the session store or in the response
     # This way we can be sure that no cookies are being leaked through the http client
-    assert sessions_cookies[clean_session_id] == response_cookies[clean_session_id] == {}
+    assert sessions_cookies[clean_session_id] == []
+    assert response_cookies[clean_session_id] == {}
