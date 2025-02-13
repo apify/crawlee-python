@@ -16,7 +16,7 @@ from crawlee.crawlers import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
+    from collections.abc import Awaitable, Callable, Sequence
 
     from playwright.async_api import Page, Response
     from typing_extensions import Self
@@ -111,7 +111,7 @@ class AdaptivePlaywrightCrawlingContext(
 
     async def query_selector_all(
         self, selector: str, timeout: timedelta = timedelta(seconds=5)
-    ) -> tuple[TStaticSelectResult, ...]:
+    ) -> Sequence[TStaticSelectResult]:
         """Locate element by css selector and return all elements found.
 
         If element is not found within timeout, `TimeoutError` is raised.

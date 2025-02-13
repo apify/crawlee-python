@@ -10,7 +10,7 @@ from crawlee.crawlers._types import BlockedInfo
 from ._http_crawling_context import TParseResult, TSelectResult
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Sequence
 
     from crawlee.http_clients import HttpResponse
 
@@ -42,7 +42,7 @@ class AbstractHttpParser(Generic[TParseResult, TSelectResult], ABC):
         """
 
     @abstractmethod
-    async def select(self, parsed_content: TParseResult, selector: str) -> tuple[TSelectResult, ...]:
+    async def select(self, parsed_content: TParseResult, selector: str) -> Sequence[TSelectResult]:
         """Use css selector to select page element and return it.
 
         Args:

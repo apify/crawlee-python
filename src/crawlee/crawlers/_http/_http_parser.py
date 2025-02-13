@@ -8,7 +8,7 @@ from crawlee.crawlers._abstract_http import AbstractHttpParser
 from crawlee.crawlers._types import BlockedInfo
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Sequence
 
     from crawlee.http_clients import HttpResponse
 
@@ -28,7 +28,7 @@ class NoParser(AbstractHttpParser[bytes, bytes]):
         raise NotImplementedError
 
     @override
-    async def select(self, parsed_content: bytes, selector: str) -> tuple[bytes, ...]:
+    async def select(self, parsed_content: bytes, selector: str) -> Sequence[bytes]:
         raise NotImplementedError
 
     @override

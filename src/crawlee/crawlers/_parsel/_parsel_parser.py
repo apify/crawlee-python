@@ -9,7 +9,7 @@ from typing_extensions import override
 from crawlee.crawlers._abstract_http import AbstractHttpParser
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Sequence
 
     from crawlee.http_clients import HttpResponse
 
@@ -26,7 +26,7 @@ class ParselParser(AbstractHttpParser[Selector, Selector]):
         return Selector(text=text)
 
     @override
-    async def select(self, parsed_content: Selector, selector: str) -> tuple[Selector, ...]:
+    async def select(self, parsed_content: Selector, selector: str) -> Sequence[Selector]:
         return tuple(match for match in parsed_content.css(selector))
 
     @override

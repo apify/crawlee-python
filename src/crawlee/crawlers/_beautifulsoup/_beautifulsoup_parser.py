@@ -8,7 +8,7 @@ from typing_extensions import override
 from crawlee.crawlers._abstract_http import AbstractHttpParser
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Sequence
 
     from crawlee.http_clients import HttpResponse
 
@@ -32,7 +32,7 @@ class BeautifulSoupParser(AbstractHttpParser[BeautifulSoup, Tag]):
         return parsed_content.select_one(selector) is not None
 
     @override
-    async def select(self, parsed_content: Tag, selector: str) -> tuple[Tag, ...]:
+    async def select(self, parsed_content: Tag, selector: str) -> Sequence[Tag]:
         return tuple(match for match in parsed_content.select(selector))
 
     @override
