@@ -582,7 +582,7 @@ async def test_adaptive_playwright_crawler_default_predictor(test_urls: list[str
 
 
 async def test_adaptive_context_query_selector_beautiful_soup(test_urls: list[str]) -> None:
-    """Test that `context.query_selector` works regardless of the crawl type for BeautifulSoup variant.
+    """Test that `context.query_selector_one` works regardless of the crawl type for BeautifulSoup variant.
 
     Handler tries to locate two elements h1 and h2.
     h1 exists immediately, h2 is created dynamically by inline JS snippet embedded in the html.
@@ -605,9 +605,9 @@ async def test_adaptive_context_query_selector_beautiful_soup(test_urls: list[st
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
-        h1 = await context.query_selector('h1', timedelta(milliseconds=_INJECTED_JS_DELAY_MS * 2))
+        h1 = await context.query_selector_one('h1', timedelta(milliseconds=_INJECTED_JS_DELAY_MS * 2))
         mocked_h1_handler(h1)
-        h2 = await context.query_selector('h2', timedelta(milliseconds=_INJECTED_JS_DELAY_MS * 2))
+        h2 = await context.query_selector_one('h2', timedelta(milliseconds=_INJECTED_JS_DELAY_MS * 2))
         mocked_h2_handler(h2)
 
     await crawler.run(test_urls[:1])
@@ -625,7 +625,7 @@ async def test_adaptive_context_query_selector_beautiful_soup(test_urls: list[st
 
 
 async def test_adaptive_context_query_selector_parsel(test_urls: list[str]) -> None:
-    """Test that `context.query_selector` works regardless of the crawl type for Parsel variant.
+    """Test that `context.query_selector_one` works regardless of the crawl type for Parsel variant.
 
     Handler tries to locate two elements h1 and h2.
     h1 exists immediately, h2 is created dynamically by inline JS snippet embedded in the html.
@@ -650,10 +650,10 @@ async def test_adaptive_context_query_selector_parsel(test_urls: list[str]) -> N
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
-        h1 = await context.query_selector('h1', timedelta(milliseconds=_INJECTED_JS_DELAY_MS * 2))
-        mocked_h1_handler(type(h1), h1.get())
-        h2 = await context.query_selector('h2', timedelta(milliseconds=_INJECTED_JS_DELAY_MS * 2))
-        mocked_h2_handler(type(h2), h2.get())
+        if h1 := await context.query_selector_one('h1', timedelta(milliseconds=_INJECTED_JS_DELAY_MS * 2)):
+            mocked_h1_handler(type(h1), h1.get())
+        if h2 := await context.query_selector_one('h2', timedelta(milliseconds=_INJECTED_JS_DELAY_MS * 2)):
+            mocked_h2_handler(type(h2), h2.get())
 
     await crawler.run(test_urls[:1])
 
@@ -723,9 +723,33 @@ async def test_adaptive_context_helpers_on_changed_selector(test_urls: list[str]
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
-        await context.query_selector('h2')  # Wait for change that is indicated by appearance of h2 element.
-        mocked_h3_handler((await context.query_selector('h3')).get())  # Get updated h3 element.
+        await context.query_selector_one('h2')  # Wait for change that is indicated by appearance of h2 element.
+        if h3 := await context.query_selector_one('h3'):
+            mocked_h3_handler(h3.get())  # Get updated h3 element.
 
     await crawler.run(test_urls[:1])
 
     mocked_h3_handler.assert_called_once_with(expected_h3_tag)
+
+
+async def test_adaptive_context_query_non_existing_element(test_urls: list[str]) -> None:
+    """Test that querying non-existing selector returns `None`"""
+    browser_only_predictor_no_detection = _SimpleRenderingTypePredictor(
+        rendering_types=cycle(['client only']), detection_probability_recommendation=cycle([0])
+    )
+
+    crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(
+        max_request_retries=1,
+        rendering_type_predictor=browser_only_predictor_no_detection,
+        playwright_crawler_specific_kwargs={'browser_pool': _StaticRedirectBrowserPool.with_default_plugin()},
+    )
+
+    mocked_h3_handler = Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        mocked_h3_handler(await context.query_selector_one('non sense selector', timeout=timedelta(milliseconds=1)))
+
+    await crawler.run(test_urls[:1])
+
+    mocked_h3_handler.assert_called_once_with(None)

@@ -42,7 +42,7 @@ class AbstractHttpParser(Generic[TParseResult, TSelectResult], ABC):
         """
 
     @abstractmethod
-    async def select(self, parsed_content: TParseResult, selector: str) -> TSelectResult | None:
+    async def select(self, parsed_content: TParseResult, selector: str) -> tuple[TSelectResult, ...]:
         """Use css selector to select page element and return it.
 
         Args:

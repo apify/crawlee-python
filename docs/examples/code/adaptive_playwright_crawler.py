@@ -25,7 +25,7 @@ async def main() -> None:
         context.log.info(context.parsed_content.title)
 
         # Locate element h2 within 5 seconds
-        h2 = await context.query_selector('h2', timedelta(milliseconds=5000))
+        h2 = await context.query_selector_one('h2', timedelta(milliseconds=5000))
         # Do stuff with element found by the selector
         context.log.info(h2)
 
@@ -39,7 +39,7 @@ async def main() -> None:
         """Hook executed both in static sub crawler and playwright sub crawler.
 
         Trying to access `context.page` in this hook would raise `AdaptiveContextError`
-        for pages crawled without  playwright."""
+        for pages crawled without playwright."""
         context.log.info(f'pre navigation hook for: {context.request.url} ...')
 
     @crawler.pre_navigation_hook(playwright_only=True)

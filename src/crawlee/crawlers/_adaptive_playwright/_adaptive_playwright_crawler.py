@@ -101,7 +101,7 @@ class AdaptivePlaywrightCrawler(
     from crawlee.crawlers import AdaptivePlaywrightCrawler, AdaptivePlaywrightCrawlingContext
 
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
-        max_requests_per_crawl=5, playwright_crawler_specific_kwargs={'headless': False}
+        max_requests_per_crawl=5, playwright_crawler_specific_kwargs={'browser_type': 'chromium'}
     )
 
     @crawler.router.default_handler
@@ -110,7 +110,7 @@ class AdaptivePlaywrightCrawler(
         context.log.info(context.parsed_content.title)
 
         # Locate element h2 within 5 seconds
-        h2 = await context.query_selector('h2', timedelta(milliseconds=5000))
+        h2 = await context.query_selector_one('h2', timedelta(milliseconds=5000))
         # Do stuff with element found by the selector
         context.log.info(h2)
 

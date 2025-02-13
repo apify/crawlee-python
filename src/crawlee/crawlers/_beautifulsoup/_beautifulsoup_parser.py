@@ -32,8 +32,8 @@ class BeautifulSoupParser(AbstractHttpParser[BeautifulSoup, Tag]):
         return parsed_content.select_one(selector) is not None
 
     @override
-    async def select(self, parsed_content: Tag, selector: str) -> Tag | None:
-        return parsed_content.select_one(selector)
+    async def select(self, parsed_content: Tag, selector: str) -> tuple[Tag, ...]:
+        return tuple(match for match in parsed_content.select(selector))
 
     @override
     def find_links(self, parsed_content: Tag, selector: str) -> Iterable[str]:

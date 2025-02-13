@@ -28,7 +28,7 @@ class NoParser(AbstractHttpParser[bytes, bytes]):
         raise NotImplementedError
 
     @override
-    async def select(self, parsed_content: bytes, selector: str) -> bytes | None:
+    async def select(self, parsed_content: bytes, selector: str) -> tuple[bytes, ...]:
         raise NotImplementedError
 
     @override

@@ -4,6 +4,8 @@ from dataclasses import dataclass, fields
 from datetime import timedelta
 from typing import TYPE_CHECKING, Generic, TypeVar
 
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+
 from crawlee import HttpHeaders
 from crawlee._types import BasicCrawlingContext
 from crawlee._utils.docs import docs_group
@@ -76,12 +78,6 @@ class AdaptivePlaywrightCrawlingContext(
             raise AdaptiveContextError('Page was not crawled with PlaywrightCrawler.')
         return self._response
 
-    async def _get_latest_parsed_content(self) -> TStaticParseResult:
-        """Return parsed page. No need to parse again in static context. Reparse in Playwright context."""
-        if self._page:
-            return await self.parse_with_static_parser()
-        return self.parsed_content
-
     async def wait_for_selector(self, selector: str, timeout: timedelta = timedelta(seconds=5)) -> None:
         """Locate element by css selector and return `None` once it is found.
 
@@ -91,12 +87,14 @@ class AdaptivePlaywrightCrawlingContext(
             selector: Css selector to be used to locate specific element on page.
             timeout: Timeout that defines how long the function wait for the selector to appear.
         """
-        if await self._static_parser.select(await self._get_latest_parsed_content(), selector):
+        if await self._static_parser.select(await self.parse_with_static_parser(), selector):
             return
         await self.page.locator(selector).wait_for(timeout=timeout.total_seconds() * 1000)
 
-    async def query_selector(self, selector: str, timeout: timedelta = timedelta(seconds=5)) -> TStaticSelectResult:
-        """Locate element by css selector and return the element once it is found.
+    async def query_selector_one(
+        self, selector: str, timeout: timedelta = timedelta(seconds=5)
+    ) -> TStaticSelectResult | None:
+        """Locate element by css selector and return first element found.
 
         If element is not found within timeout, `TimeoutError` is raised.
 
@@ -107,19 +105,47 @@ class AdaptivePlaywrightCrawlingContext(
         Returns:
             Result of used static parser `select` method.
         """
-        static_content = await self._static_parser.select(await self._get_latest_parsed_content(), selector)
-        if static_content is not None:
+        if matches := await self.query_selector_all(selector=selector, timeout=timeout):
+            return matches[0]
+        return None
+
+    async def query_selector_all(
+        self, selector: str, timeout: timedelta = timedelta(seconds=5)
+    ) -> tuple[TStaticSelectResult, ...]:
+        """Locate element by css selector and return all elements found.
+
+        If element is not found within timeout, `TimeoutError` is raised.
+
+        Args:
+            selector: Css selector to be used to locate specific element on page.
+            timeout: Timeout that defines how long the function wait for the selector to appear.
+
+        Returns:
+            List of results of used static parser `select` method.
+        """
+        if static_content := await self._static_parser.select(await self.parse_with_static_parser(), selector):
+            # Selector found in static content.
             return static_content
 
         locator = self.page.locator(selector)
-        await locator.wait_for(timeout=timeout.total_seconds() * 1000)
+        try:
+            await locator.wait_for(timeout=timeout.total_seconds() * 1000)
+        except PlaywrightTimeoutError:
+            # Selector not found at all.
+            return ()
 
         parsed_selector = await self._static_parser.select(
             await self._static_parser.parse_text(await locator.evaluate('el => el.outerHTML')), selector
         )
         if parsed_selector is not None:
+            # Selector found by browser after some wait time and selected by static parser.
             return parsed_selector
-        raise AdaptiveContextError('Used selector is not a valid static selector')
+
+        # Selector found by browser after some wait time, but could not be selected by static parser.
+        raise AdaptiveContextError(
+            'Element exists on the page and Playwright was able to locate it, but the static content parser of selected'
+            'static crawler does support such selector.'
+        )
 
     async def parse_with_static_parser(
         self, selector: str | None = None, timeout: timedelta = timedelta(seconds=5)
@@ -137,7 +163,9 @@ class AdaptivePlaywrightCrawlingContext(
         """
         if selector:
             await self.wait_for_selector(selector, timeout)
-        return await self._static_parser.parse_text(await self.page.content())
+        if self._page:
+            return await self._static_parser.parse_text(await self.page.content())
+        return self.parsed_content
 
     @classmethod
     def from_parsed_http_crawling_context(

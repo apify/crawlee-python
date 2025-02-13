@@ -26,10 +26,8 @@ class ParselParser(AbstractHttpParser[Selector, Selector]):
         return Selector(text=text)
 
     @override
-    async def select(self, parsed_content: Selector, selector: str) -> Selector | None:
-        if selector_list := parsed_content.css(selector):
-            return selector_list[0]
-        return None
+    async def select(self, parsed_content: Selector, selector: str) -> tuple[Selector, ...]:
+        return tuple(match for match in parsed_content.css(selector))
 
     @override
     def is_matching_selector(self, parsed_content: Selector, selector: str) -> bool:
