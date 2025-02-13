@@ -22,7 +22,7 @@ def session_direct() -> SessionModel:
         usage_count=0,
         max_usage_count=10,
         error_score=0.0,
-        cookies={'cookie_key': 'cookie_value'},
+        cookies=[{'name': 'cookie_key', 'value': 'cookie_value'}],
         blocked_status_codes=[401, 403, 429],
     )
 
@@ -40,7 +40,7 @@ def session_args_camel() -> dict:
         'usageCount': 0,
         'maxUsageCount': 10,
         'errorScore': 0.0,
-        'cookies': {'cookie_key': 'cookie_value'},
+        'cookies': [{'name': 'cookie_key', 'value': 'cookie_value'}],
         'blockedStatusCodes': [401, 403, 429],
     }
 
@@ -58,7 +58,7 @@ def session_args_snake() -> dict:
         'usage_count': 0,
         'max_usage_count': 10,
         'error_score': 0.0,
-        'cookies': {'cookie_key': 'cookie_value'},
+        'cookies': [{'name': 'cookie_key', 'value': 'cookie_value'}],
         'blocked_status_codes': [401, 403, 429],
     }
 

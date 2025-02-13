@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -20,7 +20,7 @@ class SessionModel(BaseModel):
     usage_count: Annotated[int, Field(alias='usageCount')]
     max_usage_count: Annotated[int, Field(alias='maxUsageCount')]
     error_score: Annotated[float, Field(alias='errorScore')]
-    cookies: Annotated[dict, Field(alias='cookies')]
+    cookies: Annotated[list[dict[str, Any]], Field(alias='cookies')]
     blocked_status_codes: Annotated[list[int], Field(alias='blockedStatusCodes')]
 
 
