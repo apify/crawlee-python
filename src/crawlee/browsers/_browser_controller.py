@@ -15,8 +15,8 @@ if TYPE_CHECKING:
     from crawlee.proxy_configuration import ProxyInfo
 
 
-class BaseBrowserController(ABC):
-    """An abstract class for managing browser instance and their pages."""
+class BrowserController(ABC):
+    """An abstract base class for managing browser instance and their pages."""
 
     AUTOMATION_LIBRARY: str | None = None
     """The name of the automation library that the controller is using."""

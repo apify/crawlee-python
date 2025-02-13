@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from crawlee.configuration import Configuration
-    from crawlee.storage_clients._base import BaseStorageClient
+    from crawlee.storage_clients._base import StorageClient
 
 
-class BaseStorage(ABC):
+class Storage(ABC):
     """Base class for storages."""
 
     @property
@@ -29,8 +29,8 @@ class BaseStorage(ABC):
         id: str | None = None,
         name: str | None = None,
         configuration: Configuration | None = None,
-        storage_client: BaseStorageClient | None = None,
-    ) -> BaseStorage:
+        storage_client: StorageClient | None = None,
+    ) -> Storage:
         """Open a storage, either restore existing or create a new one.
 
         Args:

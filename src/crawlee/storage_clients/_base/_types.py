@@ -2,21 +2,21 @@ from __future__ import annotations
 
 from typing import Union
 
-from ._base_dataset_client import BaseDatasetClient
-from ._base_dataset_collection_client import BaseDatasetCollectionClient
-from ._base_key_value_store_client import BaseKeyValueStoreClient
-from ._base_key_value_store_collection_client import BaseKeyValueStoreCollectionClient
-from ._base_request_queue_client import BaseRequestQueueClient
-from ._base_request_queue_collection_client import BaseRequestQueueCollectionClient
+from ._dataset_client import DatasetClient
+from ._dataset_collection_client import DatasetCollectionClient
+from ._key_value_store_client import KeyValueStoreClient
+from ._key_value_store_collection_client import KeyValueStoreCollectionClient
+from ._request_queue_client import RequestQueueClient
+from ._request_queue_collection_client import RequestQueueCollectionClient
 
 ResourceClient = Union[
-    BaseDatasetClient,
-    BaseKeyValueStoreClient,
-    BaseRequestQueueClient,
+    DatasetClient,
+    KeyValueStoreClient,
+    RequestQueueClient,
 ]
 
 ResourceCollectionClient = Union[
-    BaseDatasetCollectionClient,
-    BaseKeyValueStoreCollectionClient,
-    BaseRequestQueueCollectionClient,
+    DatasetCollectionClient,
+    KeyValueStoreCollectionClient,
+    RequestQueueCollectionClient,
 ]

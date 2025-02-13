@@ -14,7 +14,7 @@ from crawlee._utils.context import ensure_context
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
-from crawlee.browsers._base_browser_controller import BaseBrowserController
+from crawlee.browsers._browser_controller import BrowserController
 from crawlee.browsers._playwright_browser_plugin import PlaywrightBrowserPlugin
 from crawlee.browsers._types import BrowserType, CrawleePage
 
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
     from types import TracebackType
 
-    from crawlee.browsers._base_browser_plugin import BaseBrowserPlugin
+    from crawlee.browsers._browser_plugin import BrowserPlugin
     from crawlee.fingerprint_suite import FingerprintGenerator
     from crawlee.proxy_configuration import ProxyInfo
 
@@ -46,7 +46,7 @@ class BrowserPool:
 
     def __init__(
         self,
-        plugins: Sequence[BaseBrowserPlugin] | None = None,
+        plugins: Sequence[BrowserPlugin] | None = None,
         *,
         operation_timeout: timedelta = timedelta(seconds=15),
         browser_inactive_threshold: timedelta = timedelta(seconds=10),
@@ -72,10 +72,10 @@ class BrowserPool:
         self._operation_timeout = operation_timeout
         self._browser_inactive_threshold = browser_inactive_threshold
 
-        self._active_browsers = list[BaseBrowserController]()
+        self._active_browsers = list[BrowserController]()
         """A list of browsers currently active and being used to open pages."""
 
-        self._inactive_browsers = list[BaseBrowserController]()
+        self._inactive_browsers = list[BrowserController]()
         """A list of browsers currently inactive and not being used to open new pages,
         but may still contain open pages."""
 
@@ -145,17 +145,17 @@ class BrowserPool:
         return cls(plugins=[plugin], **kwargs)
 
     @property
-    def plugins(self) -> Sequence[BaseBrowserPlugin]:
+    def plugins(self) -> Sequence[BrowserPlugin]:
         """Return the browser plugins."""
         return self._plugins
 
     @property
-    def active_browsers(self) -> Sequence[BaseBrowserController]:
+    def active_browsers(self) -> Sequence[BrowserController]:
         """Return the active browsers in the pool."""
         return self._active_browsers
 
     @property
-    def inactive_browsers(self) -> Sequence[BaseBrowserController]:
+    def inactive_browsers(self) -> Sequence[BrowserController]:
         """Return the inactive browsers in the pool."""
         return self._inactive_browsers
 
@@ -230,7 +230,7 @@ class BrowserPool:
         self,
         *,
         page_id: str | None = None,
-        browser_plugin: BaseBrowserPlugin | None = None,
+        browser_plugin: BrowserPlugin | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> CrawleePage:
         """Open a new page in a browser using the specified or a random browser plugin.
@@ -272,7 +272,7 @@ class BrowserPool:
     async def _get_new_page(
         self,
         page_id: str,
-        plugin: BaseBrowserPlugin,
+        plugin: BrowserPlugin,
         proxy_info: ProxyInfo | None,
     ) -> CrawleePage:
         """Internal method to initialize a new page in a browser using the specified plugin."""
@@ -301,8 +301,8 @@ class BrowserPool:
 
     def _pick_browser_with_free_capacity(
         self,
-        browser_plugin: BaseBrowserPlugin,
-    ) -> BaseBrowserController | None:
+        browser_plugin: BrowserPlugin,
+    ) -> BrowserController | None:
         """Pick a browser with free capacity that matches the specified plugin."""
         for browser in self._active_browsers:
             if browser.has_free_capacity and browser.AUTOMATION_LIBRARY == browser_plugin.AUTOMATION_LIBRARY:
@@ -310,7 +310,7 @@ class BrowserPool:
 
         return None
 
-    async def _launch_new_browser(self, plugin: BaseBrowserPlugin) -> BaseBrowserController:
+    async def _launch_new_browser(self, plugin: BrowserPlugin) -> BrowserController:
         """Launch a new browser instance using the specified plugin."""
         browser = await plugin.new_browser()
         self._active_browsers.append(browser)

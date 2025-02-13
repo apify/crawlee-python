@@ -1,2 +1,2 @@
-from ._base import BaseStorageClient
+from ._base import StorageClient
 from ._memory import MemoryStorageClient

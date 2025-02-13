@@ -10,8 +10,8 @@ if TYPE_CHECKING:
 
 
 @docs_group('Abstract classes')
-class BaseRequestQueueCollectionClient(ABC):
-    """Abstract base class for request queue collection clients.
+class RequestQueueCollectionClient(ABC):
+    """An abstract class for request queue collection clients.
 
     This collection client handles operations that involve multiple instances of a given resource type.
     """

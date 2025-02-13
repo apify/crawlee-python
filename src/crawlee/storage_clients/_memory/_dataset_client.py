@@ -14,7 +14,7 @@ from crawlee._types import StorageTypes
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.data_processing import raise_on_duplicate_storage, raise_on_non_existing_storage
 from crawlee._utils.file import force_rename, json_dumps
-from crawlee.storage_clients._base import BaseDatasetClient
+from crawlee.storage_clients._base import DatasetClient as BaseDatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
 from ._creation_management import find_or_create_client_by_id_or_name_inner
