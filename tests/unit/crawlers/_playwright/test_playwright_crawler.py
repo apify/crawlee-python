@@ -217,19 +217,18 @@ async def test_custom_headers(httpbin: URL) -> None:
     assert response_headers.get('My-Test-Header') == request_headers['My-Test-Header']
 
 
-async def test_pre_navigation_hook(httpbin: URL) -> None:
-    crawler = PlaywrightCrawler()
-    mock_hook = mock.AsyncMock(return_value=None)
+async def test_pre_navigation_hook() -> None:
+    crawler = PlaywrightCrawler(request_handler=mock.AsyncMock())
+    visit = mock.Mock()
 
-    crawler.pre_navigation_hook(mock_hook)
+    @crawler.pre_navigation_hook
+    async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
+        visit()
+        await context.page.route('**/*', lambda route: route.fulfill(status=200))
 
-    @crawler.router.default_handler
-    async def request_handler(_context: PlaywrightCrawlingContext) -> None:
-        pass
+    await crawler.run(['https://a.com', 'https://b.com'])
 
-    await crawler.run(['https://example.com', str(httpbin)])
-
-    assert mock_hook.call_count == 2
+    assert visit.call_count == 2
 
 
 async def test_proxy_set() -> None:
