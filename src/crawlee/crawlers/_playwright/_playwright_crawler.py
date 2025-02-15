@@ -27,6 +27,7 @@ TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=St
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable, Mapping
+    from pathlib import Path
 
     from playwright.async_api import Page
     from typing_extensions import Unpack
@@ -82,6 +83,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         *,
         browser_pool: BrowserPool | None = None,
         browser_type: BrowserType | None = None,
+        user_data_dir: str | Path | None = None,
         browser_launch_options: Mapping[str, Any] | None = None,
         browser_new_context_options: Mapping[str, Any] | None = None,
         fingerprint_generator: FingerprintGenerator | None = None,
@@ -93,6 +95,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
         Args:
             browser_pool: A `BrowserPool` instance to be used for launching the browsers and getting pages.
+            user_data_dir: Path to a User Data Directory, which stores browser session data like cookies
+                and local storage.
             browser_type: The type of browser to launch ('chromium', 'firefox', or 'webkit').
                 This option should not be used if `browser_pool` is provided.
             browser_launch_options: Keyword arguments to pass to the browser launch method. These options are provided
@@ -117,6 +121,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             if any(
                 param is not None
                 for param in (
+                    user_data_dir,
                     use_incognito_pages,
                     headless,
                     browser_type,
@@ -127,8 +132,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             ):
                 raise ValueError(
                     'You cannot provide `headless`, `browser_type`, `browser_launch_options`, '
-                    '`browser_new_context_options`, `use_incognito_pages`  or `fingerprint_generator` arguments when '
-                    '`browser_pool` is provided.'
+                    '`browser_new_context_options`, `use_incognito_pages`, `user_data_dir`  or'
+                    '`fingerprint_generator` arguments when `browser_pool` is provided.'
                 )
 
         # If browser_pool is not provided, create a new instance of BrowserPool with specified arguments.
@@ -136,6 +141,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             browser_pool = BrowserPool.with_default_plugin(
                 headless=headless,
                 browser_type=browser_type,
+                user_data_dir=user_data_dir,
                 browser_launch_options=browser_launch_options,
                 browser_new_context_options=browser_new_context_options,
                 use_incognito_pages=use_incognito_pages,

@@ -12,11 +12,15 @@ from crawlee import service_locator
 from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 from crawlee.browsers._browser_plugin import BrowserPlugin
+from crawlee.browsers._playwright_browser import PlaywrightPersistentBrowser
 from crawlee.browsers._playwright_browser_controller import PlaywrightBrowserController
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+    from pathlib import Path
     from types import TracebackType
+
+    from playwright.async_api._generated import Browser
 
     from crawlee.browsers._types import BrowserType
     from crawlee.fingerprint_suite import FingerprintGenerator
@@ -41,6 +45,7 @@ class PlaywrightBrowserPlugin(BrowserPlugin):
         self,
         *,
         browser_type: BrowserType = 'chromium',
+        user_data_dir: str | Path | None = None,
         browser_launch_options: dict[str, Any] | None = None,
         browser_new_context_options: dict[str, Any] | None = None,
         max_open_pages_per_browser: int = 20,
@@ -51,6 +56,8 @@ class PlaywrightBrowserPlugin(BrowserPlugin):
 
         Args:
             browser_type: The type of browser to launch ('chromium', 'firefox', or 'webkit').
+            user_data_dir: Path to a User Data Directory, which stores browser session data like cookies and local
+                storage.
             browser_launch_options: Keyword arguments to pass to the browser launch method. These options are provided
                 directly to Playwright's `browser_type.launch` method. For more details, refer to the Playwright
                 documentation: https://playwright.dev/python/docs/api/class-browsertype#browser-type-launch.
@@ -67,17 +74,18 @@ class PlaywrightBrowserPlugin(BrowserPlugin):
         config = service_locator.get_configuration()
 
         # Default browser launch options are based on the configuration.
-        default_launch_browser_options = {
+        default_launch_browser_options: dict[str, Any] = {
             'headless': config.headless,
             'executable_path': config.default_browser_path,
             'chromium_sandbox': not config.disable_browser_sandbox,
         }
 
-        self._browser_type = browser_type
-        self._browser_launch_options = default_launch_browser_options | (browser_launch_options or {})
+        self._browser_type: BrowserType = browser_type
+        self._browser_launch_options: dict[str, Any] = default_launch_browser_options | (browser_launch_options or {})
         self._browser_new_context_options = browser_new_context_options or {}
         self._max_open_pages_per_browser = max_open_pages_per_browser
         self._use_incognito_pages = use_incognito_pages
+        self._user_data_dir = user_data_dir
 
         self._playwright_context_manager = async_playwright()
         self._playwright: Playwright | None = None
@@ -154,13 +162,18 @@ class PlaywrightBrowserPlugin(BrowserPlugin):
             raise RuntimeError('Playwright browser plugin is not initialized.')
 
         if self._browser_type == 'chromium':
-            browser = await self._playwright.chromium.launch(**self._browser_launch_options)
+            browser_type = self._playwright.chromium
         elif self._browser_type == 'firefox':
-            browser = await self._playwright.firefox.launch(**self._browser_launch_options)
+            browser_type = self._playwright.firefox
         elif self._browser_type == 'webkit':
-            browser = await self._playwright.webkit.launch(**self._browser_launch_options)
+            browser_type = self._playwright.webkit
         else:
             raise ValueError(f'Invalid browser type: {self._browser_type}')
+
+        if self._use_incognito_pages:
+            browser: Browser | PlaywrightPersistentBrowser = await browser_type.launch(**self._browser_launch_options)
+        else:
+            browser = PlaywrightPersistentBrowser(browser_type, self._user_data_dir, self._browser_launch_options)
 
         return PlaywrightBrowserController(
             browser,

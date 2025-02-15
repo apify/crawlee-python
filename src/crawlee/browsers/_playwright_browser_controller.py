@@ -5,13 +5,14 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, cast
 
-from browserforge.injectors.playwright import AsyncNewContext
+from browserforge.injectors.utils import InjectFunction, only_injectable_headers
 from playwright.async_api import BrowserContext, Page, ProxySettings
 from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
 from crawlee.browsers._browser_controller import BrowserController
 from crawlee.browsers._types import BrowserType
+from crawlee.browsers._utils import browserforge_dark_mode, browserforge_patch_options
 from crawlee.fingerprint_suite import HeaderGenerator
 
 if TYPE_CHECKING:
@@ -19,6 +20,7 @@ if TYPE_CHECKING:
 
     from playwright.async_api import Browser
 
+    from crawlee.browsers._playwright_browser import PlaywrightPersistentBrowser
     from crawlee.fingerprint_suite import FingerprintGenerator
     from crawlee.proxy_configuration import ProxyInfo
 
@@ -40,7 +42,7 @@ class PlaywrightBrowserController(BrowserController):
 
     def __init__(
         self,
-        browser: Browser,
+        browser: Browser | PlaywrightPersistentBrowser,
         *,
         max_open_pages_per_browser: int = 20,
         use_incognito_pages: bool = False,
@@ -209,9 +211,16 @@ class PlaywrightBrowserController(BrowserController):
             )
 
         if self._fingerprint_generator:
-            return await AsyncNewContext(
-                browser=self._browser, fingerprint=self._fingerprint_generator.generate(), **browser_new_context_options
+            fingerprint = self._fingerprint_generator.generate()
+            inject_function = InjectFunction(fingerprint)
+            patched_options = browserforge_patch_options(fingerprint, browser_new_context_options)
+            context = await self._browser.new_context(**patched_options)
+            await context.set_extra_http_headers(
+                only_injectable_headers(fingerprint.headers, self._browser.browser_type.name)
             )
+            context.on('page', browserforge_dark_mode)
+            await context.add_init_script(inject_function)
+            return context
 
         if self._header_generator:
             common_headers = self._header_generator.get_common_headers()
