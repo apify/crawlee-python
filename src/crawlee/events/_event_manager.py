@@ -52,10 +52,11 @@ class EventManagerOptions(TypedDict):
 
 @docs_group('Classes')
 class EventManager:
-    """Event manager for registering, emitting, and managing event listeners.
+    """Manage events and their listeners, enabling registration, emission, and execution control.
 
-    Event manager allows you to register event listeners, emit events, and wait for event listeners to complete
-    their execution. It is built on top of the `pyee.asyncio.AsyncIOEventEmitter` class.
+    It allows for registering event listeners, emitting events, and ensuring all listeners complete their execution.
+    Built on top of `pyee.asyncio.AsyncIOEventEmitter`. It implements additional features such as waiting for all
+    listeners to complete and emitting `PersistState` events at regular intervals.
     """
 
     def __init__(
@@ -96,7 +97,7 @@ class EventManager:
 
     @property
     def active(self) -> bool:
-        """Indicates whether the context is active."""
+        """Indicate whether the context is active."""
         return self._active
 
     async def __aenter__(self) -> EventManager:
@@ -149,7 +150,7 @@ class EventManager:
     def on(self, *, event: Event, listener: EventListener[None]) -> None: ...
 
     def on(self, *, event: Event, listener: EventListener[Any]) -> None:
-        """Add an event listener to the event manager.
+        """Register an event listener for a specific event.
 
         Args:
             event: The event for which to listen to.
@@ -195,7 +196,7 @@ class EventManager:
         self._event_emitter.add_listener(event.value, listener_wrapper)
 
     def off(self, *, event: Event, listener: EventListener[Any] | None = None) -> None:
-        """Remove a listener, or all listeners, from an Actor event.
+        """Remove a specific listener or all listeners for an event.
 
         Args:
             event: The Actor event for which to remove listeners.
@@ -225,7 +226,7 @@ class EventManager:
 
     @ensure_context
     def emit(self, *, event: Event, event_data: EventData) -> None:
-        """Emit an event.
+        """Emit an event with the associated data to all registered listeners.
 
         Args:
             event: The event which will be emitted.

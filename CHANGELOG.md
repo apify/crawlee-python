@@ -3,7 +3,75 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 0.5.0 - **not yet released**
+## 0.6.0 - **not yet released**
+
+### 🚀 Features
+
+- Integrate browserforge fingerprints ([#829](https://github.com/apify/crawlee-python/pull/829)) ([2b156b4](https://github.com/apify/crawlee-python/commit/2b156b4ba688f9111195422e6058dff30eb1f782)) by [@Pijukatel](https://github.com/Pijukatel), closes [#549](https://github.com/apify/crawlee-python/issues/549)
+- Add AdaptivePlaywrightCrawler ([#872](https://github.com/apify/crawlee-python/pull/872)) ([5ba70b6](https://github.com/apify/crawlee-python/commit/5ba70b6e846a908a55db461ab0c85e3946f2bc7c)) by [@Pijukatel](https://github.com/Pijukatel)
+- Implement `_snapshot_client` for `Snapshotter` ([#957](https://github.com/apify/crawlee-python/pull/957)) ([ba4d384](https://github.com/apify/crawlee-python/commit/ba4d384228d030c20c580ed01fae0e78af3a9543)) by [@Mantisus](https://github.com/Mantisus), closes [#60](https://github.com/apify/crawlee-python/issues/60)
+
+### 🐛 Bug Fixes
+
+- Fix playwright template and dockerfile ([#972](https://github.com/apify/crawlee-python/pull/972)) ([c33b34d](https://github.com/apify/crawlee-python/commit/c33b34dd6e253b1261c700857bb5c4bbec6d5c14)) by [@janbuchar](https://github.com/janbuchar), closes [#969](https://github.com/apify/crawlee-python/issues/969)
+- Fix installing dependencies via pip in project template ([#977](https://github.com/apify/crawlee-python/pull/977)) ([1e3b8eb](https://github.com/apify/crawlee-python/commit/1e3b8eb1cdb57bf2f7256e8ae5f0706b0afc3ba9)) by [@janbuchar](https://github.com/janbuchar), closes [#975](https://github.com/apify/crawlee-python/issues/975)
+
+### Refactor
+
+- [**breaking**] Remove unused config properties ([#978](https://github.com/apify/crawlee-python/pull/978)) ([4b7fe29](https://github.com/apify/crawlee-python/commit/4b7fe2930540a5fbd753135e3ce29dc80f80c543)) by [@vdusek](https://github.com/vdusek)
+- [**breaking**] Remove Base prefix from abstract class names ([#980](https://github.com/apify/crawlee-python/pull/980)) ([8ccb5d4](https://github.com/apify/crawlee-python/commit/8ccb5d41a1dae9b02088b433266ac89bd089561a)) by [@vdusek](https://github.com/vdusek)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.5.4](https://github.com/apify/crawlee-python/releases/tag/v0.5.4) (2025-02-05)
+
+### 🚀 Features
+
+- Add support `use_incognito_pages` for `browser_launch_options` in `PlaywrightCrawler` ([#941](https://github.com/apify/crawlee-python/pull/941)) ([eae3a33](https://github.com/apify/crawlee-python/commit/eae3a33a1842ebbdac5f9c51866a4be4bcf1ae2c)) by [@Mantisus](https://github.com/Mantisus)
+
+### 🐛 Bug Fixes
+
+- Fix session managment with retire ([#947](https://github.com/apify/crawlee-python/pull/947)) ([caee03f](https://github.com/apify/crawlee-python/commit/caee03fe3a43cc1d7a8d3f9e19b42df1bdb1c0aa)) by [@Mantisus](https://github.com/Mantisus)
+- Fix templates - poetry-plugin-export version and camoufox template name ([#952](https://github.com/apify/crawlee-python/pull/952)) ([7addea6](https://github.com/apify/crawlee-python/commit/7addea6605359cceba208e16ec9131724bdb3e9b)) by [@Pijukatel](https://github.com/Pijukatel), closes [#951](https://github.com/apify/crawlee-python/issues/951)
+- Fix convert relative link to absolute in `enqueue_links` for response with redirect ([#956](https://github.com/apify/crawlee-python/pull/956)) ([694102e](https://github.com/apify/crawlee-python/commit/694102e163bb9021a4830d2545d153f6f8f3de90)) by [@Mantisus](https://github.com/Mantisus), closes [#955](https://github.com/apify/crawlee-python/issues/955)
+- Fix `CurlImpersonateHttpClient` cookies handler ([#946](https://github.com/apify/crawlee-python/pull/946)) ([ed415c4](https://github.com/apify/crawlee-python/commit/ed415c433da2a40b0ee62534f0730d0737e991b8)) by [@Mantisus](https://github.com/Mantisus)
+
+
+## [0.5.3](https://github.com/apify/crawlee-python/releases/tag/v0.5.3) (2025-01-31)
+
+### 🚀 Features
+
+- Add keep_alive flag to `crawler.__init__` ([#921](https://github.com/apify/crawlee-python/pull/921)) ([7a82d0c](https://github.com/apify/crawlee-python/commit/7a82d0cbdbe6c8739d4bf6a9b014e31f07e5a520)) by [@Pijukatel](https://github.com/Pijukatel), closes [#891](https://github.com/apify/crawlee-python/issues/891)
+- Add `block_requests` helper for `PlaywrightCrawler` ([#919](https://github.com/apify/crawlee-python/pull/919)) ([1030459](https://github.com/apify/crawlee-python/commit/103045994908f80cffee5ccfff91a040e0042f48)) by [@Mantisus](https://github.com/Mantisus), closes [#848](https://github.com/apify/crawlee-python/issues/848)
+- Return request handlers from decorator methods to allow further decoration ([#934](https://github.com/apify/crawlee-python/pull/934)) ([9ec0aae](https://github.com/apify/crawlee-python/commit/9ec0aae54e2a340d29c893567ae80bf8bd4510a9)) by [@mylank](https://github.com/mylank)
+- Add `transform_request_function` for `enqueue_links` ([#923](https://github.com/apify/crawlee-python/pull/923)) ([6b15957](https://github.com/apify/crawlee-python/commit/6b159578f612251e6d2253a72b6521430f4f9b09)) by [@Mantisus](https://github.com/Mantisus), closes [#894](https://github.com/apify/crawlee-python/issues/894)
+- Add `time_remaining_secs` property to `MIGRATING` event data ([#940](https://github.com/apify/crawlee-python/pull/940)) ([b44501b](https://github.com/apify/crawlee-python/commit/b44501bcadbd12673a8f47aa92f12da8e404f60b)) by [@fnesveda](https://github.com/fnesveda)
+- Add LogisticalRegressionPredictor - rendering type predictor for adaptive crawling ([#930](https://github.com/apify/crawlee-python/pull/930)) ([8440499](https://github.com/apify/crawlee-python/commit/8440499468db115a4c478e9bcdb692554d1655c5)) by [@Pijukatel](https://github.com/Pijukatel)
+
+### 🐛 Bug Fixes
+
+- Fix crawler not retrying user handler if there was timeout in the handler ([#909](https://github.com/apify/crawlee-python/pull/909)) ([f4090ef](https://github.com/apify/crawlee-python/commit/f4090ef0ea0281d53dab16a77ceea2ef6ac43d76)) by [@Pijukatel](https://github.com/Pijukatel), closes [#907](https://github.com/apify/crawlee-python/issues/907)
+- Optimize memory consumption for `HttpxHttpClient`, fix proxy handling ([#905](https://github.com/apify/crawlee-python/pull/905)) ([d7ad480](https://github.com/apify/crawlee-python/commit/d7ad480834263ae0480049cb0a8db4dfc3946d8d)) by [@Mantisus](https://github.com/Mantisus), closes [#895](https://github.com/apify/crawlee-python/issues/895)
+- Fix `BrowserPool` and `PlaywrightBrowserPlugin` closure ([#932](https://github.com/apify/crawlee-python/pull/932)) ([997543d](https://github.com/apify/crawlee-python/commit/997543d2fa5afba49929f4407ee95d7a4933a50d)) by [@Mantisus](https://github.com/Mantisus)
+
+
+## [0.5.2](https://github.com/apify/crawlee-python/releases/tag/v0.5.2) (2025-01-17)
+
+### 🐛 Bug Fixes
+
+- Avoid `use_state` race conditions. Remove key argument to `use_state` ([#868](https://github.com/apify/crawlee-python/pull/868)) ([000b976](https://github.com/apify/crawlee-python/commit/000b9761211502d86a893a31e3ca21998a6e3b99)) by [@Pijukatel](https://github.com/Pijukatel), closes [#856](https://github.com/apify/crawlee-python/issues/856)
+- Restore proxy functionality for PlaywrightCrawler broken in v0.5 ([#889](https://github.com/apify/crawlee-python/pull/889)) ([908c944](https://github.com/apify/crawlee-python/commit/908c944ff9b1fc8ed7eb35f0078a1de71e34d5c5)) by [@Mantisus](https://github.com/Mantisus), closes [#887](https://github.com/apify/crawlee-python/issues/887)
+- Fix the usage of Configuration ([#899](https://github.com/apify/crawlee-python/pull/899)) ([0f1cf6f](https://github.com/apify/crawlee-python/commit/0f1cf6f0b52c92ca4e465a2a01f8111cd9ab42ec)) by [@vdusek](https://github.com/vdusek), closes [#670](https://github.com/apify/crawlee-python/issues/670)
+
+
+## [0.5.1](https://github.com/apify/crawlee-python/releases/tag/v0.5.1) (2025-01-07)
+
+### 🐛 Bug Fixes
+
+- Make result of RequestList.is_empty independent of fetch_next_request calls ([#876](https://github.com/apify/crawlee-python/pull/876)) ([d50249e](https://github.com/apify/crawlee-python/commit/d50249ecbfe2a04f508fcdc3261e050349bd0da2)) by [@janbuchar](https://github.com/janbuchar)
+
+
+## [0.5.0](https://github.com/apify/crawlee-python/releases/tag/v0.5.0) (2025-01-02)
 
 ### 🚀 Features
 
@@ -37,7 +105,6 @@ All notable changes to this project will be documented in this file.
 - [**breaking**] Update the crawlers &amp; storage clients structure ([#828](https://github.com/apify/crawlee-python/pull/828)) ([0ba04d1](https://github.com/apify/crawlee-python/commit/0ba04d1633881043928a408678932c46fb90e21f)) by [@vdusek](https://github.com/vdusek), closes [#764](https://github.com/apify/crawlee-python/issues/764)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.4.5](https://github.com/apify/crawlee-python/releases/tag/v0.4.5) (2024-12-06)
 
 ### 🚀 Features

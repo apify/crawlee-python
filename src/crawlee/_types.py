@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Annotated, Any, Literal, Optional, Protocol, TypeVar, Union, cast, overload
+from typing import TYPE_CHECKING, Annotated, Any, Callable, Literal, Optional, Protocol, TypeVar, Union, cast, overload
 
 from pydantic import ConfigDict, Field, PlainValidator, RootModel
 from typing_extensions import NotRequired, TypeAlias, TypedDict, Unpack
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from collections.abc import Coroutine, Sequence
 
     from crawlee import Glob, Request
-    from crawlee._request import BaseRequestData
+    from crawlee._request import RequestOptions
     from crawlee.http_clients import HttpResponse
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions import Session
@@ -38,10 +38,13 @@ if TYPE_CHECKING:
 else:
     from pydantic import JsonValue as JsonSerializable
 
+T = TypeVar('T')
 
 HttpMethod: TypeAlias = Literal['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH']
 
 HttpPayload: TypeAlias = bytes
+
+RequestTransformAction: TypeAlias = Literal['skip', 'unchanged']
 
 
 def _normalize_headers(headers: Mapping[str, str]) -> dict[str, str]:
@@ -51,6 +54,7 @@ def _normalize_headers(headers: Mapping[str, str]) -> dict[str, str]:
     return dict(sorted_headers)
 
 
+@docs_group('Data structures')
 class HttpHeaders(RootModel, Mapping[str, str]):
     """A dictionary-like object representing HTTP headers."""
 
@@ -149,6 +153,7 @@ class ConcurrencySettings:
         self.max_tasks_per_minute = max_tasks_per_minute
 
 
+@docs_group('Data structures')
 class StorageTypes(str, Enum):
     """Possible Crawlee storage types."""
 
@@ -179,131 +184,18 @@ class EnqueueLinksKwargs(TypedDict):
 class AddRequestsKwargs(EnqueueLinksKwargs):
     """Keyword arguments for the `add_requests` methods."""
 
-    requests: Sequence[str | BaseRequestData | Request]
-    """Requests to be added to the request provider."""
-
-
-class AddRequestsFunction(Protocol):
-    """Type of a function for adding URLs to the request queue with optional filtering.
-
-    This helper method simplifies the process of adding requests to the request provider.
-    It opens the specified request provider and adds the requests to it.
-    """
-
-    def __call__(
-        self,
-        requests: Sequence[str | BaseRequestData | Request],
-        **kwargs: Unpack[EnqueueLinksKwargs],
-    ) -> Coroutine[None, None, None]: ...
-
-
-class GetDataFunction(Protocol):
-    """Type of a function for getting data from the dataset.
-
-    This helper method simplifies the process of retrieving data from a dataset. It opens the specified
-    dataset and then retrieves the data based on the provided parameters.
-    """
-
-    def __call__(
-        self,
-        dataset_id: str | None = None,
-        dataset_name: str | None = None,
-        **kwargs: Unpack[GetDataKwargs],
-    ) -> Coroutine[None, None, DatasetItemsListPage]: ...
+    requests: Sequence[str | Request]
+    """Requests to be added to the `RequestManager`."""
 
 
 class PushDataKwargs(TypedDict):
     """Keyword arguments for dataset's `push_data` method."""
 
 
-class PushDataFunction(Protocol):
-    """Type of a function for pushing data to the dataset.
-
-    This helper method simplifies the process of pushing data to a dataset. It opens the specified
-    dataset and then pushes the provided data to it.
-    """
-
-    def __call__(
-        self,
-        data: JsonSerializable,
-        dataset_id: str | None = None,
-        dataset_name: str | None = None,
-        **kwargs: Unpack[PushDataKwargs],
-    ) -> Coroutine[None, None, None]: ...
-
-
 class PushDataFunctionCall(PushDataKwargs):
     data: JsonSerializable
     dataset_id: str | None
     dataset_name: str | None
-
-
-class ExportToFunction(Protocol):
-    """Type of a function for exporting data from a dataset.
-
-    This helper method simplifies the process of exporting data from a dataset. It opens the specified
-    dataset and then exports its content to the key-value store.
-    """
-
-    def __call__(
-        self,
-        dataset_id: str | None = None,
-        dataset_name: str | None = None,
-        **kwargs: Unpack[ExportToKwargs],
-    ) -> Coroutine[None, None, None]: ...
-
-
-class EnqueueLinksFunction(Protocol):
-    """A function type for enqueueing new URLs to crawl, based on elements selected by a CSS selector.
-
-    This function is used to extract and enqueue new URLs from the current page for further crawling.
-    """
-
-    def __call__(
-        self,
-        *,
-        selector: str = 'a',
-        label: str | None = None,
-        user_data: dict[str, Any] | None = None,
-        **kwargs: Unpack[EnqueueLinksKwargs],
-    ) -> Coroutine[None, None, None]:
-        """A call dunder method.
-
-        Args:
-            selector: CSS selector used to find the elements containing the links.
-            label: Label for the newly created `Request` objects, used for request routing.
-            user_data: User data to be provided to the newly created `Request` objects.
-            **kwargs: Additional arguments for the `add_requests` method.
-        """
-
-
-class SendRequestFunction(Protocol):
-    """Type of a function for performing an HTTP request."""
-
-    def __call__(
-        self,
-        url: str,
-        *,
-        method: HttpMethod = 'GET',
-        headers: HttpHeaders | dict[str, str] | None = None,
-    ) -> Coroutine[None, None, HttpResponse]: ...
-
-
-class UseStateFunction(Protocol):
-    """Type of a function for performing use state.
-
-    Warning:
-        This is an experimental feature. The behavior and interface may change in future versions.
-    """
-
-    def __call__(
-        self,
-        key: str,
-        default_value: dict[str, JsonSerializable] | None = None,
-    ) -> Coroutine[None, None, dict[str, JsonSerializable]]: ...
-
-
-T = TypeVar('T')
 
 
 class KeyValueStoreInterface(Protocol):
@@ -326,33 +218,6 @@ class KeyValueStoreInterface(Protocol):
         value: Any,
         content_type: str | None = None,
     ) -> None: ...
-
-
-class GetKeyValueStoreFromRequestHandlerFunction(Protocol):
-    """Type of a function for accessing a key-value store from within a request handler."""
-
-    def __call__(
-        self,
-        *,
-        id: str | None = None,
-        name: str | None = None,
-    ) -> Coroutine[None, None, KeyValueStoreInterface]: ...
-
-
-@dataclass(frozen=True)
-@docs_group('Data structures')
-class BasicCrawlingContext:
-    """Basic crawling context intended to be extended by crawlers."""
-
-    request: Request
-    session: Session | None
-    proxy_info: ProxyInfo | None
-    send_request: SendRequestFunction
-    add_requests: AddRequestsFunction
-    push_data: PushDataFunction
-    use_state: UseStateFunction
-    get_key_value_store: GetKeyValueStoreFromRequestHandlerFunction
-    log: logging.Logger
 
 
 @dataclass()
@@ -390,17 +255,6 @@ class KeyValueStoreChangeRecords:
         return await self._actual_key_value_store.get_value(key, default_value)
 
 
-class GetKeyValueStoreFunction(Protocol):
-    """Type of a function for accessing the live implementation of a key-value store."""
-
-    def __call__(
-        self,
-        *,
-        id: str | None = None,
-        name: str | None = None,
-    ) -> Coroutine[None, None, KeyValueStore]: ...
-
-
 class RequestHandlerRunResult:
     """Record of calls to storage-related context helpers."""
 
@@ -412,7 +266,7 @@ class RequestHandlerRunResult:
 
     async def add_requests(
         self,
-        requests: Sequence[str | BaseRequestData],
+        requests: Sequence[str | Request],
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> None:
         """Track a call to the `add_requests` context helper."""
@@ -451,3 +305,267 @@ class RequestHandlerRunResult:
             )
 
         return self.key_value_store_changes[id, name]
+
+
+@docs_group('Functions')
+class AddRequestsFunction(Protocol):
+    """Function for adding requests to the `RequestManager`, with optional filtering.
+
+    It simplifies the process of adding requests to the `RequestManager`. It automatically opens
+    the specified one and adds the provided requests.
+    """
+
+    def __call__(
+        self,
+        requests: Sequence[str | Request],
+        **kwargs: Unpack[EnqueueLinksKwargs],
+    ) -> Coroutine[None, None, None]:
+        """Call dunder method.
+
+        Args:
+            requests: Requests to be added to the `RequestManager`.
+            **kwargs: Additional keyword arguments.
+        """
+
+
+@docs_group('Functions')
+class EnqueueLinksFunction(Protocol):
+    """A function for enqueueing new URLs to crawl based on elements selected by a given selector.
+
+    It extracts URLs from the current page and enqueues them for further crawling. It allows filtering through
+    selectors and other options. You can also specify labels and user data to be associated with the newly
+    created `Request` objects.
+    """
+
+    def __call__(
+        self,
+        *,
+        selector: str = 'a',
+        label: str | None = None,
+        user_data: dict[str, Any] | None = None,
+        transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
+        **kwargs: Unpack[EnqueueLinksKwargs],
+    ) -> Coroutine[None, None, None]:
+        """A call dunder method.
+
+        Args:
+            selector: A selector used to find the elements containing the links. The behaviour differs based
+                on the crawler used:
+                - `PlaywrightCrawler` supports CSS and XPath selectors.
+                - `ParselCrawler` supports CSS selectors.
+                - `BeautifulSoupCrawler` supports CSS selectors.
+            label: Label for the newly created `Request` objects, used for request routing.
+            user_data: User data to be provided to the newly created `Request` objects.
+            transform_request_function: A function that takes `RequestOptions` and returns either:
+                - Modified `RequestOptions` to update the request configuration,
+                - `'skip'` to exclude the request from being enqueued,
+                - `'unchanged'` to use the original request options without modification.
+            **kwargs: Additional keyword arguments.
+        """
+
+
+@docs_group('Functions')
+class ExportToFunction(Protocol):
+    """A function for exporting data from a `Dataset`.
+
+    It simplifies the process of exporting data from a `Dataset`. It opens the specified one and exports
+    its content to a `KeyValueStore`.
+    """
+
+    def __call__(
+        self,
+        dataset_id: str | None = None,
+        dataset_name: str | None = None,
+        **kwargs: Unpack[ExportToKwargs],
+    ) -> Coroutine[None, None, None]:
+        """Call dunder method.
+
+        Args:
+            dataset_id: The ID of the `Dataset` to export data from.
+            dataset_name: The name of the `Dataset` to export data from.
+            **kwargs: Additional keyword arguments.
+        """
+
+
+@docs_group('Functions')
+class GetDataFunction(Protocol):
+    """A function for retrieving data from a `Dataset`.
+
+    It simplifies the process of accessing data from a `Dataset`. It opens the specified one and retrieves
+    data based on the provided parameters. It allows filtering and pagination.
+    """
+
+    def __call__(
+        self,
+        dataset_id: str | None = None,
+        dataset_name: str | None = None,
+        **kwargs: Unpack[GetDataKwargs],
+    ) -> Coroutine[None, None, DatasetItemsListPage]:
+        """Call dunder method.
+
+        Args:
+            dataset_id: ID of the `Dataset` to get data from.
+            dataset_name: Name of the `Dataset` to get data from.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            A page of retrieved items.
+        """
+
+
+@docs_group('Functions')
+class GetKeyValueStoreFunction(Protocol):
+    """A function for accessing a `KeyValueStore`.
+
+    It retrieves an instance of a `KeyValueStore` based on its ID or name.
+    """
+
+    def __call__(
+        self,
+        *,
+        id: str | None = None,
+        name: str | None = None,
+    ) -> Coroutine[None, None, KeyValueStore]:
+        """Call dunder method.
+
+        Args:
+            id: The ID of the `KeyValueStore` to get.
+            name: The name of the `KeyValueStore` to get.
+        """
+
+
+class GetKeyValueStoreFromRequestHandlerFunction(Protocol):
+    """A function for accessing a `KeyValueStore`.
+
+    It retrieves an instance of a `KeyValueStore` based on its ID or name.
+    """
+
+    def __call__(
+        self,
+        *,
+        id: str | None = None,
+        name: str | None = None,
+    ) -> Coroutine[None, None, KeyValueStoreInterface]:
+        """Call dunder method.
+
+        Args:
+            id: The ID of the `KeyValueStore` to get.
+            name: The name of the `KeyValueStore` to get.
+        """
+
+
+@docs_group('Functions')
+class PushDataFunction(Protocol):
+    """A function for pushing data to a `Dataset`.
+
+    It simplifies the process of adding data to a `Dataset`. It opens the specified one and pushes
+    the provided data to it.
+    """
+
+    def __call__(
+        self,
+        data: JsonSerializable,
+        dataset_id: str | None = None,
+        dataset_name: str | None = None,
+        **kwargs: Unpack[PushDataKwargs],
+    ) -> Coroutine[None, None, None]:
+        """Call dunder method.
+
+        Args:
+            data: The data to push to the `Dataset`.
+            dataset_id: The ID of the `Dataset` to push the data to.
+            dataset_name: The name of the `Dataset` to push the data to.
+            **kwargs: Additional keyword arguments.
+        """
+
+
+@docs_group('Functions')
+class SendRequestFunction(Protocol):
+    """A function for sending HTTP requests.
+
+    It simplifies the process of sending HTTP requests. It is implemented by the crawling context and is used
+    within request handlers to send additional HTTP requests to target URLs.
+    """
+
+    def __call__(
+        self,
+        url: str,
+        *,
+        method: HttpMethod = 'GET',
+        headers: HttpHeaders | dict[str, str] | None = None,
+    ) -> Coroutine[None, None, HttpResponse]:
+        """A call dunder method.
+
+        Args:
+            url: The URL to send the request to.
+            method: The HTTP method to use.
+            headers: The headers to include in the request.
+
+        Returns:
+            The HTTP response received from the server.
+        """
+
+
+@docs_group('Functions')
+class UseStateFunction(Protocol):
+    """A function for managing state within the crawling context.
+
+    It allows the use of persistent state across multiple crawls.
+
+    Warning:
+        This is an experimental feature. The behavior and interface may change in future versions.
+    """
+
+    def __call__(
+        self,
+        default_value: dict[str, JsonSerializable] | None = None,
+    ) -> Coroutine[None, None, dict[str, JsonSerializable]]:
+        """Call dunder method.
+
+        Args:
+            default_value: The default value to initialize the state if it is not already set.
+
+        Returns:
+            The current state.
+        """
+
+
+@dataclass(frozen=True)
+@docs_group('Data structures')
+class BasicCrawlingContext:
+    """Basic crawling context.
+
+    It represents the fundamental crawling context used by the `BasicCrawler`. It is extended by more
+    specific crawlers to provide additional functionality.
+    """
+
+    request: Request
+    """Request object for the current page being processed."""
+
+    session: Session | None
+    """Session object for the current page being processed."""
+
+    proxy_info: ProxyInfo | None
+    """Proxy information for the current page being processed."""
+
+    send_request: SendRequestFunction
+    """Send request crawling context helper function."""
+
+    add_requests: AddRequestsFunction
+    """Add requests crawling context helper function."""
+
+    push_data: PushDataFunction
+    """Push data crawling context helper function."""
+
+    use_state: UseStateFunction
+    """Use state crawling context helper function."""
+
+    get_key_value_store: GetKeyValueStoreFromRequestHandlerFunction
+    """Get key-value store crawling context helper function."""
+
+    log: logging.Logger
+    """Logger instance."""
+
+    def __hash__(self) -> int:
+        """Return hash of the context. Each context is considered unique."""
+        return id(self)

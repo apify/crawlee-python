@@ -32,7 +32,7 @@ class ParselCrawler(AbstractHttpCrawler[ParselCrawlingContext, Selector]):
     ### Usage
 
     ```python
-    from crawlee.parsel_crawler import ParselCrawler, ParselCrawlingContext
+    from crawlee.crawlers import ParselCrawler, ParselCrawlingContext
 
     crawler = ParselCrawler()
 

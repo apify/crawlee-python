@@ -1,4 +1,4 @@
-# % if cookiecutter.crawler_type == 'camoufox'
+# % if cookiecutter.crawler_type == 'playwright-camoufox'
 camoufox
 # % set extras = ['playwright']
 # % else

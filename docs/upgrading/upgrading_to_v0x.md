@@ -5,6 +5,21 @@ title: Upgrading to v0.x
 
 This page summarizes the breaking changes between Crawlee for Python zero-based versions.
 
+## Upgrading to v0.6
+
+This section summarizes the breaking changes between v0.5.x and v0.6.0.
+
+### Configuration
+
+The `Configuration` fields `chrome_executable_path`, `xvfb`, and `verbose_log` have been removed. The `chrome_executable_path` and `xvfb` fields were unused, while `verbose_log` can be replaced by setting `log_level` to `DEBUG`.
+
+### Abstract base classes
+
+We decided to move away from [Hungarian notation](https://en.wikipedia.org/wiki/Hungarian_notation) and remove all the `Base` prefixes from the abstract classes. It includes the following public classes:
+- `BaseStorageClient` -> `StorageClient`
+- `BaseBrowserController` -> `BrowserController`
+- `BaseBrowserPlugin` -> `BrowserPlugin`
+
 ## Upgrading to v0.5
 
 This section summarizes the breaking changes between v0.4.x and v0.5.0.
@@ -49,14 +64,16 @@ Example update:
 ### Service locator
 
 - The `crawlee.service_container` was completely refactored and renamed to `crawlee.service_locator`.
+- You can use it to set the configuration, event manager or storage client globally. Or you can pass them to your crawler instance directly and it will use the service locator under the hood.
 
 ### Statistics
 
 - The `crawlee.statistics.Statistics` class do not accept an event manager as an input argument anymore. It uses the default, global one.
+- If you want to set your custom event manager, do it either via the service locator or pass it to the crawler.
 
 ### Request
 
-- Removed properties `json_` and `order_no`.
+- The properties `json_` and `order_no` were removed. They were there only for the internal purpose of the memory storage client, you should not need them.
 
 ### Request storages and loaders
 

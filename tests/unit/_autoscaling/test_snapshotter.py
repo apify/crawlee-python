@@ -12,12 +12,14 @@ from crawlee._autoscaling import Snapshotter
 from crawlee._autoscaling.types import CpuSnapshot, EventLoopSnapshot, Snapshot
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.system import CpuInfo, MemoryInfo
+from crawlee.configuration import Configuration
 from crawlee.events._types import Event, EventSystemInfoData
 
 
 @pytest.fixture
 def snapshotter() -> Snapshotter:
-    return Snapshotter(available_memory_ratio=0.25)
+    config = Configuration(available_memory_ratio=0.25)
+    return Snapshotter.from_config(config)
 
 
 @pytest.fixture
@@ -32,7 +34,9 @@ def event_system_data_info() -> EventSystemInfoData:
 
 
 async def test_start_stop_lifecycle() -> None:
-    async with Snapshotter(available_memory_ratio=0.25):
+    config = Configuration(available_memory_ratio=0.25)
+
+    async with Snapshotter.from_config(config):
         pass
 
 
@@ -92,9 +96,7 @@ async def test_get_cpu_sample(snapshotter: Snapshotter) -> None:
         assert len(samples) == len(cpu_snapshots)
 
 
-async def test_methods_raise_error_when_not_active() -> None:
-    snapshotter = Snapshotter(available_memory_ratio=0.25)
-
+async def test_methods_raise_error_when_not_active(snapshotter: Snapshotter) -> None:
     assert snapshotter.active is False
 
     with pytest.raises(RuntimeError, match='Snapshotter is not active.'):
@@ -124,7 +126,7 @@ async def test_methods_raise_error_when_not_active() -> None:
 
 def test_snapshot_pruning_removes_outdated_records(snapshotter: Snapshotter) -> None:
     # Set the snapshot history to 2 hours
-    snapshotter._snapshot_history = timedelta(hours=2)
+    snapshotter._SNAPSHOT_HISTORY = timedelta(hours=2)
 
     # Create timestamps for testing
     now = datetime.now(timezone.utc)
@@ -164,7 +166,7 @@ def test_pruning_empty_snapshot_list_remains_empty(snapshotter: Snapshotter) -> 
 
 
 def test_snapshot_pruning_keeps_recent_records_unaffected(snapshotter: Snapshotter) -> None:
-    snapshotter._snapshot_history = timedelta(hours=2)
+    snapshotter._SNAPSHOT_HISTORY = timedelta(hours=2)
 
     # Create timestamps for testing
     now = datetime.now(timezone.utc)
@@ -192,7 +194,9 @@ def test_snapshot_pruning_keeps_recent_records_unaffected(snapshotter: Snapshott
 
 
 def test_memory_load_evaluation_logs_warning_on_high_usage(caplog: pytest.LogCaptureFixture) -> None:
-    snapshotter = Snapshotter(max_memory_size=ByteSize.from_gb(8))
+    config = Configuration(memory_mbytes=ByteSize.from_gb(8).bytes)
+
+    snapshotter = Snapshotter.from_config(config)
 
     high_memory_usage = ByteSize.from_gb(8) * 0.95  # 95% of 8 GB
 
@@ -232,7 +236,7 @@ def test_memory_load_evaluation_silent_on_acceptable_usage(
     assert mock_logger_warn.call_count == 0
 
 
-async def test_snapshots_time_ordered() -> None:
+async def test_snapshots_time_ordered(snapshotter: Snapshotter) -> None:
     # All internal snapshot list should be ordered by creation time in ascending order.
     # Scenario where older emitted event arrives after newer event.
     # Snapshotter should not trust the event order and check events' times.
@@ -249,7 +253,7 @@ async def test_snapshots_time_ordered() -> None:
 
     async with (
         service_locator.get_event_manager() as event_manager,
-        Snapshotter(available_memory_ratio=0.25) as snapshotter,
+        snapshotter,
     ):
         event_manager.emit(event=Event.SYSTEM_INFO, event_data=create_event_data(time_new))
         await event_manager.wait_for_all_listeners_to_complete()

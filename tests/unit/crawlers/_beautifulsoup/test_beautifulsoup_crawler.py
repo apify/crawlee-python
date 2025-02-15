@@ -7,16 +7,20 @@ import pytest
 import respx
 from httpx import Response
 
-from crawlee import ConcurrencySettings
+from crawlee import ConcurrencySettings, HttpHeaders, RequestTransformAction
 from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
+    from crawlee._request import RequestOptions
+
 
 @pytest.fixture
 async def server() -> AsyncGenerator[respx.MockRouter, None]:
     with respx.mock(base_url='https://test.io', assert_all_called=False) as mock:
+        mock.get('https://www.test.io/').return_value = Response(302, headers={'Location': 'https://test.io/'})
+
         mock.get('/', name='index_endpoint').return_value = Response(
             200,
             text="""<html>
@@ -102,14 +106,15 @@ async def test_enqueue_links(server: respx.MockRouter) -> None:
         visit(context.request.url)
         await context.enqueue_links()
 
-    await crawler.run(['https://test.io/'])
+    await crawler.run(['https://www.test.io/'])
 
     assert server['index_endpoint'].called
     assert server['secondary_index_endpoint'].called
 
     visited = {call[0][0] for call in visit.call_args_list}
+
     assert visited == {
-        'https://test.io/',
+        'https://www.test.io/',
         'https://test.io/asdf',
         'https://test.io/hjkl',
         'https://test.io/qwer',
@@ -157,6 +162,43 @@ async def test_enqueue_links_with_max_crawl(server: respx.MockRouter) -> None:
     assert len(processed_urls) == 3
     assert stats.requests_total == 3
     assert stats.requests_finished == 3
+
+
+async def test_enqueue_links_with_transform_request_function(server: respx.MockRouter) -> None:
+    crawler = BeautifulSoupCrawler()
+    visit = mock.Mock()
+    headers = []
+
+    def test_transform_request_function(
+        request_options: RequestOptions,
+    ) -> RequestOptions | RequestTransformAction:
+        if 'uiop' in request_options['url']:
+            return 'skip'
+
+        request_options['headers'] = HttpHeaders({'transform-header': 'my-header'})
+        return request_options
+
+    @crawler.router.default_handler
+    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
+        visit(context.request.url)
+        headers.append(context.request.headers)
+
+        await context.enqueue_links(transform_request_function=test_transform_request_function)
+
+    await crawler.run(['https://test.io/'])
+
+    assert server['index_endpoint'].called
+    assert server['secondary_index_endpoint'].called
+
+    visited = {call[0][0] for call in visit.call_args_list}
+
+    # url https://test.io/uiop should not be visited
+    assert visited == {'https://test.io/', 'https://test.io/asdf', 'https://test.io/hjkl', 'https://test.io/qwer'}
+
+    # # all urls added to `enqueue_links` must have a custom header
+    assert headers[1]['transform-header'] == 'my-header'
+    assert headers[2]['transform-header'] == 'my-header'
+    assert headers[3]['transform-header'] == 'my-header'
 
 
 async def test_handle_blocked_request(server: respx.MockRouter) -> None:

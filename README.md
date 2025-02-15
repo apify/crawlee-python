@@ -38,10 +38,12 @@ We also have a TypeScript implementation of the Crawlee, which you can explore a
 
 We recommend visiting the [Introduction tutorial](https://crawlee.dev/python/docs/introduction) in Crawlee documentation for more information.
 
-Crawlee is available as the [`crawlee`](https://pypi.org/project/crawlee/) PyPI package. The core functionality is included in the base package, with additional features available as optional extras to minimize package size and dependencies. To install Crawlee with all features, run the following command:
+Crawlee is available as [`crawlee`](https://pypi.org/project/crawlee/) package on PyPI. This package includes the core functionality, while additional features are available as optional extras to keep dependencies and package size minimal.
+
+To install Crawlee with all features, run the following command:
 
 ```sh
-pip install 'crawlee[all]'
+python -m pip install 'crawlee[all]'
 ```
 
 Then, install the [Playwright](https://playwright.dev/) dependencies:
@@ -89,7 +91,7 @@ The [`BeautifulSoupCrawler`](https://crawlee.dev/python/api/class/BeautifulSoupC
 ```python
 import asyncio
 
-from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
+from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 
 
 async def main() -> None:
@@ -129,7 +131,7 @@ The [`PlaywrightCrawler`](https://crawlee.dev/python/api/class/PlaywrightCrawler
 ```python
 import asyncio
 
-from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
+from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext
 
 
 async def main() -> None:

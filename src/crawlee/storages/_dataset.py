@@ -14,7 +14,7 @@ from crawlee._utils.docs import docs_group
 from crawlee._utils.file import json_dumps
 from crawlee.storage_clients.models import DatasetMetadata
 
-from ._base_storage import BaseStorage
+from ._base import Storage
 from ._key_value_store import KeyValueStore
 
 if TYPE_CHECKING:
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
     from crawlee._types import JsonSerializable, PushDataKwargs
     from crawlee.configuration import Configuration
-    from crawlee.storage_clients import BaseStorageClient
+    from crawlee.storage_clients import StorageClient
     from crawlee.storage_clients.models import DatasetItemsListPage
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ class GetDataKwargs(TypedDict):
     """The maximum number of items to retrieve. Unlimited if None."""
 
     clean: NotRequired[bool]
-    """Returns only non-empty items and excludes hidden fields. Shortcut for skip_hidden and skip_empty."""
+    """Return only non-empty items and excludes hidden fields. Shortcut for skip_hidden and skip_empty."""
 
     desc: NotRequired[bool]
     """Set to True to sort results in descending order."""
@@ -153,7 +153,7 @@ class ExportDataCsvKwargs(TypedDict):
 
 
 @docs_group('Classes')
-class Dataset(BaseStorage):
+class Dataset(Storage):
     """Represents an append-only structured storage, ideal for tabular data similar to database tables.
 
     The `Dataset` class is designed to store structured data, where each entry (row) maintains consistent attributes
@@ -194,7 +194,7 @@ class Dataset(BaseStorage):
     _EFFECTIVE_LIMIT_SIZE = _MAX_PAYLOAD_SIZE - (_MAX_PAYLOAD_SIZE * _SAFETY_BUFFER_PERCENT)
     """Calculated payload limit considering safety buffer."""
 
-    def __init__(self, id: str, name: str | None, storage_client: BaseStorageClient) -> None:
+    def __init__(self, id: str, name: str | None, storage_client: StorageClient) -> None:
         self._id = id
         self._name = name
 
@@ -220,7 +220,7 @@ class Dataset(BaseStorage):
         id: str | None = None,
         name: str | None = None,
         configuration: Configuration | None = None,
-        storage_client: BaseStorageClient | None = None,
+        storage_client: StorageClient | None = None,
     ) -> Dataset:
         from crawlee.storages._creation_management import open_storage
 

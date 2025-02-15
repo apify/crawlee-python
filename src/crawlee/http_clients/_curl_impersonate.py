@@ -2,30 +2,26 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Optional
 
-from crawlee._utils.docs import docs_group
-
-try:
-    from curl_cffi.requests import AsyncSession
-    from curl_cffi.requests.exceptions import ProxyError as CurlProxyError
-    from curl_cffi.requests.exceptions import RequestException as CurlRequestError
-    from curl_cffi.requests.impersonate import DEFAULT_CHROME as CURL_DEFAULT_CHROME
-except ImportError as exc:
-    raise ImportError(
-        "To import anything from this subpackage, you need to install the 'curl-impersonate' extra. "
-        "For example, if you use pip, run `pip install 'crawlee[curl-impersonate]'`.",
-    ) from exc
-
+from curl_cffi import CurlInfo
 from curl_cffi.const import CurlHttpVersion
+from curl_cffi.requests import AsyncSession
+from curl_cffi.requests.cookies import Cookies, CurlMorsel
+from curl_cffi.requests.exceptions import ProxyError as CurlProxyError
+from curl_cffi.requests.exceptions import RequestException as CurlRequestError
+from curl_cffi.requests.impersonate import DEFAULT_CHROME as CURL_DEFAULT_CHROME
 from typing_extensions import override
 
 from crawlee._types import HttpHeaders, HttpPayload
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
+from crawlee._utils.docs import docs_group
 from crawlee.errors import ProxyError
-from crawlee.http_clients import BaseHttpClient, HttpCrawlingResult, HttpResponse
+from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from curl_cffi import Curl
+    from curl_cffi.requests import Request as CurlRequest
     from curl_cffi.requests import Response
 
     from crawlee import Request
@@ -33,6 +29,16 @@ if TYPE_CHECKING:
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions import Session
     from crawlee.statistics import Statistics
+
+
+class _EmptyCookies(Cookies):
+    @override
+    def get_cookies_for_curl(self, request: CurlRequest) -> list[CurlMorsel]:
+        return []
+
+    @override
+    def update_cookies_from_curl(self, morsels: list[CurlMorsel]) -> None:
+        return None
 
 
 class _CurlImpersonateResponse:
@@ -73,19 +79,19 @@ class _CurlImpersonateResponse:
 
 
 @docs_group('Classes')
-class CurlImpersonateHttpClient(BaseHttpClient):
+class CurlImpersonateHttpClient(HttpClient):
     """HTTP client based on the `curl-cffi` library.
 
     This client uses the `curl-cffi` library to perform HTTP requests in crawlers (`BasicCrawler` subclasses)
     and to manage sessions, proxies, and error handling.
 
-    See the `BaseHttpClient` class for more common information about HTTP clients.
+    See the `HttpClient` class for more common information about HTTP clients.
 
     ### Usage
 
     ```python
-    from crawlee.http_clients.curl_impersonate import CurlImpersonateHttpClient
-    from crawlee.http_crawler import HttpCrawler  # or any other HTTP client-based crawler
+    from crawlee.crawlers import HttpCrawler  # or any other HTTP client-based crawler
+    from crawlee.http_clients import CurlImpersonateHttpClient
 
     http_client = CurlImpersonateHttpClient()
     crawler = HttpCrawler(http_client=http_client)
@@ -151,6 +157,10 @@ class CurlImpersonateHttpClient(BaseHttpClient):
             self._ignore_http_error_status_codes,
         )
 
+        if self._persist_cookies_per_session and session and response.curl:
+            response_cookies = self._get_cookies(response.curl)
+            session.cookies.update(response_cookies)
+
         request.loaded_url = response.url
 
         return HttpCrawlingResult(
@@ -194,6 +204,10 @@ class CurlImpersonateHttpClient(BaseHttpClient):
             self._ignore_http_error_status_codes,
         )
 
+        if self._persist_cookies_per_session and session and response.curl:
+            response_cookies = self._get_cookies(response.curl)
+            session.cookies.update(response_cookies)
+
         return _CurlImpersonateResponse(response)
 
     def _get_client(self, proxy_url: str | None) -> AsyncSession:
@@ -217,6 +231,7 @@ class CurlImpersonateHttpClient(BaseHttpClient):
 
             # Create and store the new session with the specified kwargs.
             self._client_by_proxy_url[proxy_url] = AsyncSession(**kwargs)
+            self._client_by_proxy_url[proxy_url].cookies = _EmptyCookies()
 
         return self._client_by_proxy_url[proxy_url]
 
@@ -230,3 +245,11 @@ class CurlImpersonateHttpClient(BaseHttpClient):
             return True
 
         return False
+
+    @staticmethod
+    def _get_cookies(curl: Curl) -> dict[str, str]:
+        cookies = {}
+        for curl_cookie in curl.getinfo(CurlInfo.COOKIELIST):  # type: ignore[union-attr]
+            curl_morsel = CurlMorsel.from_curl_format(curl_cookie)  # type: ignore[arg-type]
+            cookies[curl_morsel.name] = curl_morsel.value
+        return cookies

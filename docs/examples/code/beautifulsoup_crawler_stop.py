@@ -20,7 +20,9 @@ async def main() -> None:
 
         # Create custom condition to stop crawler once it finds what it is looking for.
         if 'crawlee' in context.request.url:
-            crawler.stop(reason='Manual stop of crawler after finding `crawlee` in the url.')
+            crawler.stop(
+                reason='Manual stop of crawler after finding `crawlee` in the url.'
+            )
 
         # Extract data from the page.
         data = {

@@ -58,6 +58,12 @@ module.exports = {
         gaGtag: true,
         repoUrl: 'https://github.com/apify/crawlee-python',
     },
+    markdown: {
+        mermaid: true,
+    },
+    themes: [
+        '@docusaurus/theme-mermaid',
+    ],
     onBrokenLinks:
     /** @type {import('@docusaurus/types').ReportingSeverity} */ ('throw'),
     onBrokenMarkdownLinks:
@@ -337,7 +343,7 @@ module.exports = {
                     title: 'More',
                     items: [
                         {
-                            label: 'Apify Platform',
+                            label: 'Apify platform',
                             href: 'https://apify.com',
                         },
                         {

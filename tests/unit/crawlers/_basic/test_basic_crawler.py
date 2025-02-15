@@ -5,24 +5,27 @@ import asyncio
 import json
 import logging
 import os
+import sys
+import time
 from collections import Counter
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, call
 
 import httpx
 import pytest
 
 from crawlee import ConcurrencySettings, EnqueueStrategy, Glob, service_locator
-from crawlee._request import BaseRequestData, Request
+from crawlee._request import Request
 from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpHeaders
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
 from crawlee.errors import SessionError, UserDefinedErrorHandlerError
 from crawlee.events._local_event_manager import LocalEventManager
 from crawlee.request_loaders import RequestList, RequestManagerTandem
+from crawlee.sessions import SessionPool
 from crawlee.statistics import FinalStatistics
 from crawlee.storage_clients import MemoryStorageClient
 from crawlee.storage_clients._memory import DatasetClient
@@ -339,7 +342,7 @@ async def test_send_request_works(respx_mock: respx.MockRouter) -> None:
 @dataclass
 class AddRequestsTestInput:
     start_url: str
-    requests: Sequence[str | BaseRequestData]
+    requests: Sequence[str | Request]
     expected_urls: Sequence[str]
     kwargs: EnqueueLinksKwargs
 
@@ -369,7 +372,7 @@ INCLUDE_TEST_URLS = (
                 start_url='https://a.com/',
                 requests=[
                     'https://a.com/',
-                    BaseRequestData.from_url('http://b.com/'),
+                    Request.from_url('http://b.com/'),
                     'http://c.com/',
                 ],
                 kwargs={},
@@ -710,13 +713,13 @@ async def test_context_use_state(key_value_store: KeyValueStore) -> None:
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        await context.use_state('state', {'hello': 'world'})
+        await context.use_state({'hello': 'world'})
 
     await crawler.run(['https://hello.world'])
 
     store = await crawler.get_key_value_store()
 
-    assert (await store.get_value('state')) == {'hello': 'world'}
+    assert (await store.get_value(BasicCrawler._CRAWLEE_STATE_KEY)) == {'hello': 'world'}
 
 
 async def test_context_handlers_use_state(key_value_store: KeyValueStore) -> None:
@@ -728,20 +731,20 @@ async def test_context_handlers_use_state(key_value_store: KeyValueStore) -> Non
 
     @crawler.router.handler('one')
     async def handler_one(context: BasicCrawlingContext) -> None:
-        state = await context.use_state('state', {'hello': 'world'})
+        state = await context.use_state({'hello': 'world'})
         state_in_handler_one.update(state)
         state['hello'] = 'new_world'
         await context.add_requests([Request.from_url('https://crawlee.dev/docs/quick-start', label='two')])
 
     @crawler.router.handler('two')
     async def handler_two(context: BasicCrawlingContext) -> None:
-        state = await context.use_state('state', {'hello': 'world'})
+        state = await context.use_state({'hello': 'world'})
         state_in_handler_two.update(state)
         state['hello'] = 'last_world'
 
     @crawler.router.handler('three')
     async def handler_three(context: BasicCrawlingContext) -> None:
-        state = await context.use_state('state', {'hello': 'world'})
+        state = await context.use_state({'hello': 'world'})
         state_in_handler_three.update(state)
 
     await crawler.run([Request.from_url('https://crawlee.dev/', label='one')])
@@ -759,7 +762,7 @@ async def test_context_handlers_use_state(key_value_store: KeyValueStore) -> Non
     store = await crawler.get_key_value_store()
 
     # The state in the KVS must match with the last set state
-    assert (await store.get_value('state')) == {'hello': 'last_world'}
+    assert (await store.get_value(BasicCrawler._CRAWLEE_STATE_KEY)) == {'hello': 'last_world'}
 
 
 async def test_max_requests_per_crawl(httpbin: URL) -> None:
@@ -970,8 +973,10 @@ async def test_crawler_manual_stop(httpbin: URL) -> None:
     assert stats.requests_finished == 2
 
 
+@pytest.mark.skipif(sys.version_info[:3] < (3, 11), reason='asyncio.Barrier was introduced in Python 3.11.')
 async def test_crawler_multiple_stops_in_parallel(httpbin: URL) -> None:
     """Test that no new requests are handled after crawler.stop() is called, but ongoing requests can still finish."""
+
     start_urls = [
         str(httpbin / '1'),
         str(httpbin / '2'),
@@ -982,17 +987,17 @@ async def test_crawler_multiple_stops_in_parallel(httpbin: URL) -> None:
     # Set max_concurrency to 2 to ensure two urls are being visited in parallel.
     crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(max_concurrency=2))
 
-    sleep_time_generator = iter([0, 0.1])
+    both_handlers_started = asyncio.Barrier(2)  # type:ignore[attr-defined]  # Test is skipped in older Python versions.
+    only_one_handler_at_a_time = asyncio.Semaphore(1)
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        processed_urls.append(context.request.url)
+        await both_handlers_started.wait()  # Block until both handlers are started.
 
-        # This sleep ensures that first request is processed quickly and triggers stop() almost immediately.
-        # Second request will have some sleep time to make sure it is still being processed after crawler.stop() was
-        # called from the first request and so the crawler is already shutting down.
-        await asyncio.sleep(next(sleep_time_generator))
-        crawler.stop(reason=f'Stop called on {context.request.url}')
+        async with only_one_handler_at_a_time:
+            # Reliably create situation where one handler called `crawler.stop()`, while other handler is still running.
+            crawler.stop(reason=f'Stop called on {context.request.url}')
+            processed_urls.append(context.request.url)
 
     stats = await crawler.run(start_urls)
 
@@ -1004,7 +1009,7 @@ async def test_crawler_multiple_stops_in_parallel(httpbin: URL) -> None:
 
 async def test_sets_services() -> None:
     custom_configuration = Configuration()
-    custom_event_manager = LocalEventManager()
+    custom_event_manager = LocalEventManager.from_config(custom_configuration)
     custom_storage_client = MemoryStorageClient.from_config(custom_configuration)
 
     crawler = BasicCrawler(
@@ -1046,3 +1051,153 @@ async def test_allows_storage_client_overwrite_before_run(monkeypatch: pytest.Mo
 
     data = await dataset.get_data()
     assert data.items == [{'foo': 'bar'}]
+
+
+@pytest.mark.skipif(sys.version_info[:3] < (3, 11), reason='asyncio.Barrier was introduced in Python 3.11.')
+async def test_context_use_state_race_condition_in_handlers(key_value_store: KeyValueStore) -> None:
+    """Two parallel handlers increment global variable obtained by `use_state` method.
+
+    Result should be incremented by 2.
+    Method `use_state` must be implemented in a way that prevents race conditions in such scenario."""
+    from asyncio import Barrier  # type:ignore[attr-defined]  # Test is skipped in older Python versions.
+
+    crawler = BasicCrawler()
+    store = await crawler.get_key_value_store()
+    await store.set_value(BasicCrawler._CRAWLEE_STATE_KEY, {'counter': 0})
+    handler_barrier = Barrier(2)
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        state = cast(dict[str, int], await context.use_state())
+        await handler_barrier.wait()  # Block until both handlers get the state.
+        state['counter'] += 1
+        await handler_barrier.wait()  # Block until both handlers increment the state.
+
+    await crawler.run(['https://crawlee.dev/', 'https://crawlee.dev/docs/quick-start'])
+
+    store = await crawler.get_key_value_store()
+    # Ensure that local state is pushed back to kvs.
+    await store.persist_autosaved_values()
+    assert (await store.get_value(BasicCrawler._CRAWLEE_STATE_KEY))['counter'] == 2
+
+
+@pytest.mark.skipif(sys.version_info[:3] < (3, 11), reason='asyncio.timeout was introduced in Python 3.11.')
+@pytest.mark.parametrize(
+    'sleep_type',
+    [
+        pytest.param('async_sleep'),
+        pytest.param('sync_sleep', marks=pytest.mark.skip(reason='https://github.com/apify/crawlee-python/issues/908')),
+    ],
+)
+async def test_timeout_in_handler(sleep_type: str) -> None:
+    """Test that timeout from request handler is treated the same way as exception thrown in request handler.
+
+    Handler should be able to time out even if the code causing the timeout is blocking sync code.
+    Crawler should attempt to retry it.
+    This test creates situation where the request handler times out twice, on third retry it does not time out."""
+    from asyncio import timeout  # type:ignore[attr-defined]  # Test is skipped in older Python versions.
+
+    handler_timeout = timedelta(seconds=1)
+    max_request_retries = 3
+    double_handler_timeout_s = handler_timeout.total_seconds() * 2
+    handler_sleep = iter([double_handler_timeout_s, double_handler_timeout_s, 0])
+
+    crawler = BasicCrawler(request_handler_timeout=handler_timeout, max_request_retries=max_request_retries)
+
+    mocked_handler_before_sleep = Mock()
+    mocked_handler_after_sleep = Mock()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        mocked_handler_before_sleep()
+
+        if sleep_type == 'async_sleep':
+            await asyncio.sleep(next(handler_sleep))
+        else:
+            time.sleep(next(handler_sleep))  # noqa:ASYNC251  # Using blocking sleep in async function is the test.
+
+        # This will not execute if timeout happens.
+        mocked_handler_after_sleep()
+
+    # Timeout in pytest, because previous implementation would run crawler until following:
+    # "The request queue seems to be stuck for 300.0s, resetting internal state."
+    async with timeout(max_request_retries * double_handler_timeout_s):
+        await crawler.run(['http://a.com/'])
+
+    assert crawler.statistics.state.requests_finished == 1
+    assert mocked_handler_before_sleep.call_count == max_request_retries
+    assert mocked_handler_after_sleep.call_count == 1
+
+
+@pytest.mark.parametrize(
+    ('keep_alive', 'max_requests_per_crawl', 'expected_handled_requests_count'),
+    [
+        pytest.param(True, 2, 2, id='keep_alive, 2 requests'),
+        pytest.param(True, 1, 1, id='keep_alive, but max_requests_per_crawl achieved after 1 request'),
+        pytest.param(False, 2, 0, id='Crawler without keep_alive (default), crawler finished before adding requests'),
+    ],
+)
+async def test_keep_alive(
+    *, keep_alive: bool, max_requests_per_crawl: int, expected_handled_requests_count: int
+) -> None:
+    """Test that crawler can be kept alive without any requests and stopped with `crawler.stop()`.
+
+    Crawler should stop if `max_requests_per_crawl` is reached regardless of the `keep_alive` flag."""
+    additional_urls = ['http://a.com/', 'http://b.com/']
+    expected_handler_calls = [call(url) for url in additional_urls[:expected_handled_requests_count]]
+
+    crawler = BasicCrawler(
+        keep_alive=keep_alive,
+        max_requests_per_crawl=max_requests_per_crawl,
+        # If more request can run in parallel, then max_requests_per_crawl is not deterministic.
+        concurrency_settings=ConcurrencySettings(max_concurrency=1),
+    )
+    mocked_handler = Mock()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        mocked_handler(context.request.url)
+        if context.request == additional_urls[-1]:
+            crawler.stop()
+
+    crawler_run_task = asyncio.create_task(crawler.run())
+
+    # Give some time to crawler to finish(or be in keep_alive state) and add new request.
+    # TODO: Replace sleep time by waiting for specific crawler state.
+    # https://github.com/apify/crawlee-python/issues/925
+    await asyncio.sleep(1)
+    assert crawler_run_task.done() != keep_alive
+    add_request_task = asyncio.create_task(crawler.add_requests(additional_urls))
+
+    await asyncio.gather(crawler_run_task, add_request_task)
+
+    mocked_handler.assert_has_calls(expected_handler_calls)
+
+
+@pytest.mark.parametrize(
+    ('retire'),
+    [
+        pytest.param(False, id='without retire'),
+        pytest.param(True, id='with retire'),
+    ],
+)
+async def test_session_retire_in_user_handler(*, retire: bool) -> None:
+    crawler = BasicCrawler(session_pool=SessionPool(max_pool_size=1))
+    sessions = list[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        if context.session:
+            sessions.append(context.session.id)
+
+            context.session.retire() if retire else None
+
+        await context.add_requests(['http://b.com/'])
+
+    await crawler.run(['http://a.com/'])
+
+    # The session should differ if `retire` was called and match otherwise since pool size == 1
+    if retire:
+        assert sessions[1] != sessions[0]
+    else:
+        assert sessions[1] == sessions[0]

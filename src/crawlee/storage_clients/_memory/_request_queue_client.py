@@ -13,13 +13,10 @@ from typing_extensions import override
 
 from crawlee._types import StorageTypes
 from crawlee._utils.crypto import crypto_random_object_id
-from crawlee._utils.data_processing import (
-    raise_on_duplicate_storage,
-    raise_on_non_existing_storage,
-)
+from crawlee._utils.data_processing import raise_on_duplicate_storage, raise_on_non_existing_storage
 from crawlee._utils.file import force_remove, force_rename, json_dumps
 from crawlee._utils.requests import unique_key_to_request_id
-from crawlee.storage_clients._base import BaseRequestQueueClient
+from crawlee.storage_clients._base import RequestQueueClient as BaseRequestQueueClient
 from crawlee.storage_clients.models import (
     BatchRequestsOperationResponse,
     InternalRequest,

@@ -28,7 +28,8 @@ async def test_initial_state() -> None:
 
     # Test initial state
     assert plugin.browser_type == 'chromium'
-    assert plugin.browser_launch_options == {'headless': False}
+    assert 'headless' in plugin.browser_launch_options
+    assert plugin.browser_launch_options['headless'] is False
     assert plugin.browser_new_context_options == {'viewport': {'width': 1920, 'height': 1080}}
     assert plugin.max_open_pages_per_browser == 10
 

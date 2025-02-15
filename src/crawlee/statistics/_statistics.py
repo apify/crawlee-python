@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from types import TracebackType
 
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
-
+TNewStatisticsState = TypeVar('TNewStatisticsState', bound=StatisticsState, default=StatisticsState)
 logger = getLogger(__name__)
 
 
@@ -55,9 +55,12 @@ class RequestProcessingRecord:
 
 @docs_group('Classes')
 class Statistics(Generic[TStatisticsState]):
-    """An interface to collecting and logging runtime statistics for requests.
+    """A class for collecting, tracking, and logging runtime statistics for requests.
 
-    All information is saved to the key value store so that it persists between migrations, abortions and resurrections.
+    It is designed to record information such as request durations, retries, successes, and failures, enabling
+    analysis of crawler performance. The collected statistics are persisted to a `KeyValueStore`, ensuring they
+    remain available across crawler migrations, abortions, and restarts. This persistence allows for tracking
+    and evaluation of crawler behavior over its lifecycle.
     """
 
     __next_id = 0
@@ -72,13 +75,13 @@ class Statistics(Generic[TStatisticsState]):
         log_message: str = 'Statistics',
         periodic_message_logger: Logger | None = None,
         log_interval: timedelta = timedelta(minutes=1),
-        state_model: type[TStatisticsState] = cast(Any, StatisticsState),  # noqa: B008 - in an ideal world, TStatisticsState would be inferred from this argument, but I haven't managed to do that
+        state_model: type[TStatisticsState],
     ) -> None:
         self._id = Statistics.__next_id
         Statistics.__next_id += 1
 
         self._state_model = state_model
-        self.state: StatisticsState = self._state_model()
+        self.state = self._state_model()
         self._instance_start: datetime | None = None
         self._retry_histogram = dict[int, int]()
 
@@ -102,9 +105,46 @@ class Statistics(Generic[TStatisticsState]):
         # Flag to indicate the context state.
         self._active = False
 
+    def replace_state_model(self, state_model: type[TNewStatisticsState]) -> Statistics[TNewStatisticsState]:
+        """Create near copy of the `Statistics` with replaced `state_model`."""
+        new_statistics: Statistics[TNewStatisticsState] = Statistics(
+            persistence_enabled=self._persistence_enabled,
+            persist_state_kvs_name=self._persist_state_kvs_name,
+            persist_state_key=self._persist_state_key,
+            key_value_store=self._key_value_store,
+            log_message=self._log_message,
+            periodic_message_logger=self._periodic_message_logger,
+            state_model=state_model,
+        )
+        new_statistics._periodic_logger = self._periodic_logger  # noqa:SLF001  # Accessing private member to create copy like-object.
+        return new_statistics
+
+    @staticmethod
+    def with_default_state(
+        *,
+        persistence_enabled: bool = False,
+        persist_state_kvs_name: str = 'default',
+        persist_state_key: str | None = None,
+        key_value_store: KeyValueStore | None = None,
+        log_message: str = 'Statistics',
+        periodic_message_logger: Logger | None = None,
+        log_interval: timedelta = timedelta(minutes=1),
+    ) -> Statistics[StatisticsState]:
+        """Convenience constructor for creating a `Statistics` with default state model `StatisticsState`."""
+        return Statistics[StatisticsState](
+            persistence_enabled=persistence_enabled,
+            persist_state_kvs_name=persist_state_kvs_name,
+            persist_state_key=persist_state_key,
+            key_value_store=key_value_store,
+            log_message=log_message,
+            periodic_message_logger=periodic_message_logger,
+            log_interval=log_interval,
+            state_model=StatisticsState,
+        )
+
     @property
     def active(self) -> bool:
-        """Indicates whether the context is active."""
+        """Indicate whether the context is active."""
         return self._active
 
     async def __aenter__(self) -> Self:

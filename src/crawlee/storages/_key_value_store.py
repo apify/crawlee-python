@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, overload
 
@@ -10,20 +11,20 @@ from crawlee._utils.docs import docs_group
 from crawlee.events._types import Event, EventPersistStateData
 from crawlee.storage_clients.models import KeyValueStoreKeyInfo, KeyValueStoreMetadata
 
-from ._base_storage import BaseStorage
+from ._base import Storage
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
     from crawlee._types import JsonSerializable
     from crawlee.configuration import Configuration
-    from crawlee.storage_clients import BaseStorageClient
+    from crawlee.storage_clients import StorageClient
 
 T = TypeVar('T')
 
 
 @docs_group('Classes')
-class KeyValueStore(BaseStorage):
+class KeyValueStore(Storage):
     """Represents a key-value based storage for reading and writing data records or files.
 
     Each data record is identified by a unique key and associated with a specific MIME content type. This class is
@@ -61,12 +62,13 @@ class KeyValueStore(BaseStorage):
     _general_cache: ClassVar[dict[str, dict[str, dict[str, JsonSerializable]]]] = {}
     _persist_state_event_started = False
 
-    def __init__(self, id: str, name: str | None, storage_client: BaseStorageClient) -> None:
+    def __init__(self, id: str, name: str | None, storage_client: StorageClient) -> None:
         self._id = id
         self._name = name
 
         # Get resource clients from storage client
         self._resource_client = storage_client.key_value_store(self._id)
+        self._autosave_lock = asyncio.Lock()
 
     @property
     @override
@@ -90,7 +92,7 @@ class KeyValueStore(BaseStorage):
         id: str | None = None,
         name: str | None = None,
         configuration: Configuration | None = None,
-        storage_client: BaseStorageClient | None = None,
+        storage_client: StorageClient | None = None,
     ) -> KeyValueStore:
         from crawlee.storages._creation_management import open_storage
 
@@ -198,17 +200,18 @@ class KeyValueStore(BaseStorage):
         """
         default_value = {} if default_value is None else default_value
 
-        if key in self._cache:
-            return self._cache[key]
+        async with self._autosave_lock:
+            if key in self._cache:
+                return self._cache[key]
 
-        value = await self.get_value(key, default_value)
+            value = await self.get_value(key, default_value)
 
-        if not isinstance(value, dict):
-            raise TypeError(
-                f'Expected dictionary for persist state value at key "{key}, but got {type(value).__name__}'
-            )
+            if not isinstance(value, dict):
+                raise TypeError(
+                    f'Expected dictionary for persist state value at key "{key}, but got {type(value).__name__}'
+                )
 
-        self._cache[key] = value
+            self._cache[key] = value
 
         self._ensure_persist_event()
 

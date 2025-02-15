@@ -4,7 +4,7 @@ from crawlee._utils.docs import docs_group
 from crawlee.configuration import Configuration
 from crawlee.errors import ServiceConflictError
 from crawlee.events import EventManager
-from crawlee.storage_clients import BaseStorageClient
+from crawlee.storage_clients import StorageClient
 
 
 @docs_group('Classes')
@@ -17,7 +17,7 @@ class ServiceLocator:
     def __init__(self) -> None:
         self._configuration: Configuration | None = None
         self._event_manager: EventManager | None = None
-        self._storage_client: BaseStorageClient | None = None
+        self._storage_client: StorageClient | None = None
 
         # Flags to check if the services were already set.
         self._configuration_was_retrieved = False
@@ -51,7 +51,11 @@ class ServiceLocator:
         if self._event_manager is None:
             from crawlee.events import LocalEventManager
 
-            self._event_manager = LocalEventManager()
+            self._event_manager = (
+                LocalEventManager().from_config(config=self._configuration)
+                if self._configuration
+                else LocalEventManager.from_config()
+            )
 
         self._event_manager_was_retrieved = True
         return self._event_manager
@@ -70,17 +74,21 @@ class ServiceLocator:
 
         self._event_manager = event_manager
 
-    def get_storage_client(self) -> BaseStorageClient:
+    def get_storage_client(self) -> StorageClient:
         """Get the storage client."""
         if self._storage_client is None:
             from crawlee.storage_clients import MemoryStorageClient
 
-            self._storage_client = MemoryStorageClient.from_config()
+            self._storage_client = (
+                MemoryStorageClient.from_config(config=self._configuration)
+                if self._configuration
+                else MemoryStorageClient.from_config()
+            )
 
         self._storage_client_was_retrieved = True
         return self._storage_client
 
-    def set_storage_client(self, storage_client: BaseStorageClient) -> None:
+    def set_storage_client(self, storage_client: StorageClient) -> None:
         """Set the storage client.
 
         Args:
@@ -90,7 +98,7 @@ class ServiceLocator:
             ServiceConflictError: If the storage client has already been retrieved before.
         """
         if self._storage_client_was_retrieved:
-            raise ServiceConflictError(BaseStorageClient, storage_client, self._storage_client)
+            raise ServiceConflictError(StorageClient, storage_client, self._storage_client)
 
         self._storage_client = storage_client
 

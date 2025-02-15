@@ -9,7 +9,7 @@ import pytest
 import respx
 from httpx import Response
 
-from crawlee._request import Request
+from crawlee import ConcurrencySettings, Request
 from crawlee.crawlers import HttpCrawler
 from crawlee.http_clients import CurlImpersonateHttpClient, HttpxHttpClient
 from crawlee.sessions import SessionPool
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
     from crawlee._types import BasicCrawlingContext
     from crawlee.crawlers import HttpCrawlingContext
-    from crawlee.http_clients._base import BaseHttpClient
+    from crawlee.http_clients._base import HttpClient
 
 # Payload, e.g. data for a form submission.
 PAYLOAD = {
@@ -133,16 +133,14 @@ async def test_handles_redirects(
 @pytest.mark.parametrize(
     ('additional_http_error_status_codes', 'ignore_http_error_status_codes', 'expected_number_error'),
     [
-        ([], [], 1),
-        ([403], [], 3),
-        ([], [403], 0),
-        ([403], [403], 3),
-    ],
-    ids=[
-        'default_behavior',  # error without retry for all 4xx statuses
-        'additional_status_codes',  # make retry for codes in `additional_http_error_status_codes` list
-        'ignore_error_status_codes',  # take as successful status codes from the `ignore_http_error_status_codes` list
-        'additional_and_ignore',  # check precedence for `additional_http_error_status_codes`
+        # error without retry for all 4xx statuses
+        pytest.param([], [], 1, id='default_behavior'),
+        # make retry for codes in `additional_http_error_status_codes` list
+        pytest.param([403], [], 3, id='additional_status_codes'),
+        # take as successful status codes from the `ignore_http_error_status_codes` list
+        pytest.param([], [403], 0, id='ignore_error_status_codes'),
+        # check precedence for `additional_http_error_status_codes`
+        pytest.param([403], [403], 3, id='additional_and_ignore'),
     ],
 )
 async def test_handles_client_errors(
@@ -183,7 +181,15 @@ async def test_handles_server_error(
     assert server['500_endpoint'].called
 
 
-async def test_stores_cookies(httpbin: URL) -> None:
+@pytest.mark.parametrize(
+    'http_client_class',
+    [
+        pytest.param(CurlImpersonateHttpClient, id='curl'),
+        pytest.param(HttpxHttpClient, id='httpx'),
+    ],
+)
+async def test_stores_cookies(http_client_class: type[HttpClient], httpbin: URL) -> None:
+    http_client = http_client_class()
     visit = Mock()
     track_session_usage = Mock()
 
@@ -192,6 +198,7 @@ async def test_stores_cookies(httpbin: URL) -> None:
             # /cookies/set might redirect us to a page that we can't access - no problem, we only care about cookies
             ignore_http_error_status_codes=[401],
             session_pool=session_pool,
+            http_client=http_client,
         )
 
         @crawler.router.default_handler
@@ -249,11 +256,9 @@ async def test_http_status_statistics(crawler: HttpCrawler, server: respx.MockRo
 
 
 @pytest.mark.parametrize(
-    'http_client_class',
-    [CurlImpersonateHttpClient, HttpxHttpClient],
-    ids=['curl', 'httpx'],
+    'http_client_class', [pytest.param(CurlImpersonateHttpClient, id='curl'), pytest.param(HttpxHttpClient, id='httpx')]
 )
-async def test_sending_payload_as_raw_data(http_client_class: type[BaseHttpClient], httpbin: URL) -> None:
+async def test_sending_payload_as_raw_data(http_client_class: type[HttpClient], httpbin: URL) -> None:
     http_client = http_client_class()
     crawler = HttpCrawler(http_client=http_client)
     responses = []
@@ -286,11 +291,9 @@ async def test_sending_payload_as_raw_data(http_client_class: type[BaseHttpClien
 
 
 @pytest.mark.parametrize(
-    'http_client_class',
-    [CurlImpersonateHttpClient, HttpxHttpClient],
-    ids=['curl', 'httpx'],
+    'http_client_class', [pytest.param(CurlImpersonateHttpClient, id='curl'), pytest.param(HttpxHttpClient, id='httpx')]
 )
-async def test_sending_payload_as_form_data(http_client_class: type[BaseHttpClient], httpbin: URL) -> None:
+async def test_sending_payload_as_form_data(http_client_class: type[HttpClient], httpbin: URL) -> None:
     http_client = http_client_class()
     crawler = HttpCrawler(http_client=http_client)
     responses = []
@@ -318,11 +321,9 @@ async def test_sending_payload_as_form_data(http_client_class: type[BaseHttpClie
 
 
 @pytest.mark.parametrize(
-    'http_client_class',
-    [CurlImpersonateHttpClient, HttpxHttpClient],
-    ids=['curl', 'httpx'],
+    'http_client_class', [pytest.param(CurlImpersonateHttpClient, id='curl'), pytest.param(HttpxHttpClient, id='httpx')]
 )
-async def test_sending_payload_as_json(http_client_class: type[BaseHttpClient], httpbin: URL) -> None:
+async def test_sending_payload_as_json(http_client_class: type[HttpClient], httpbin: URL) -> None:
     http_client = http_client_class()
     crawler = HttpCrawler(http_client=http_client)
     responses = []
@@ -351,11 +352,9 @@ async def test_sending_payload_as_json(http_client_class: type[BaseHttpClient], 
 
 
 @pytest.mark.parametrize(
-    'http_client_class',
-    [CurlImpersonateHttpClient, HttpxHttpClient],
-    ids=['curl', 'httpx'],
+    'http_client_class', [pytest.param(CurlImpersonateHttpClient, id='curl'), pytest.param(HttpxHttpClient, id='httpx')]
 )
-async def test_sending_url_query_params(http_client_class: type[BaseHttpClient], httpbin: URL) -> None:
+async def test_sending_url_query_params(http_client_class: type[HttpClient], httpbin: URL) -> None:
     http_client = http_client_class()
     crawler = HttpCrawler(http_client=http_client)
     responses = []
@@ -410,3 +409,74 @@ async def test_http_crawler_pre_navigation_hooks_executed_before_request() -> No
     await crawler.run([Request.from_url(url=test_url)])
 
     assert execution_order == ['pre-navigation-hook 1', 'pre-navigation-hook 2', 'request', 'final handler']
+
+
+@pytest.mark.parametrize(
+    'http_client_class',
+    [
+        pytest.param(CurlImpersonateHttpClient, id='curl'),
+        pytest.param(HttpxHttpClient, id='httpx'),
+    ],
+)
+async def test_isolation_cookies(http_client_class: type[HttpClient], httpbin: URL) -> None:
+    http_client = http_client_class()
+    sessions_ids: list[str] = []
+    sessions_cookies: dict[str, dict[str, str]] = {}
+    response_cookies: dict[str, dict[str, str]] = {}
+
+    crawler = HttpCrawler(
+        session_pool=SessionPool(
+            max_pool_size=1,
+            create_session_settings={
+                'max_error_score': 50,
+            },
+        ),
+        http_client=http_client,
+        max_request_retries=10,
+        concurrency_settings=ConcurrencySettings(max_concurrency=1),
+    )
+
+    @crawler.router.default_handler
+    async def handler(context: HttpCrawlingContext) -> None:
+        if not context.session:
+            return
+
+        sessions_ids.append(context.session.id)
+
+        if context.request.unique_key not in {'1', '2'}:
+            return
+
+        sessions_cookies[context.session.id] = context.session.cookies
+        response_data = json.loads(context.http_response.read())
+        response_cookies[context.session.id] = response_data.get('cookies')
+
+        if context.request.user_data.get('retire_session'):
+            context.session.retire()
+
+    await crawler.run(
+        [
+            # The first request sets the cookie in the session
+            str(httpbin.with_path('/cookies/set').extend_query(a=1)),
+            # With the second request, we check the cookies in the session and set retire
+            Request.from_url(str(httpbin.with_path('/cookies')), unique_key='1', user_data={'retire_session': True}),
+            # The third request is made with a new session to make sure it does not use another session's cookies
+            Request.from_url(str(httpbin.with_path('/cookies')), unique_key='2'),
+        ]
+    )
+
+    assert len(sessions_cookies) == 2
+    assert len(response_cookies) == 2
+
+    assert sessions_ids[0] == sessions_ids[1]
+
+    cookie_session_id = sessions_ids[0]
+    clean_session_id = sessions_ids[2]
+
+    assert cookie_session_id != clean_session_id
+
+    # The initiated cookies must match in both the response and the session store
+    assert sessions_cookies[cookie_session_id] == response_cookies[cookie_session_id] == {'a': '1'}
+
+    # For a clean session, the cookie should not be in the session store or in the response
+    # This way we can be sure that no cookies are being leaked through the http client
+    assert sessions_cookies[clean_session_id] == response_cookies[clean_session_id] == {}

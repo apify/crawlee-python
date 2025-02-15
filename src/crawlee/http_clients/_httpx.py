@@ -11,7 +11,7 @@ from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
 from crawlee._utils.docs import docs_group
 from crawlee.errors import ProxyError
 from crawlee.fingerprint_suite import HeaderGenerator
-from crawlee.http_clients import BaseHttpClient, HttpCrawlingResult, HttpResponse
+from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
 from crawlee.sessions import Session
 
 if TYPE_CHECKING:
@@ -73,19 +73,19 @@ class _HttpxTransport(httpx.AsyncHTTPTransport):
 
 
 @docs_group('Classes')
-class HttpxHttpClient(BaseHttpClient):
+class HttpxHttpClient(HttpClient):
     """HTTP client based on the `HTTPX` library.
 
     This client uses the `HTTPX` library to perform HTTP requests in crawlers (`BasicCrawler` subclasses)
     and to manage sessions, proxies, and error handling.
 
-    See the `BaseHttpClient` class for more common information about HTTP clients.
+    See the `HttpClient` class for more common information about HTTP clients.
 
     ### Usage
 
     ```python
+    from crawlee.crawlers import HttpCrawler  # or any other HTTP client-based crawler
     from crawlee.http_clients import HttpxHttpClient
-    from crawlee.http_crawler import HttpCrawler  # or any other HTTP client-based crawler
 
     http_client = HttpxHttpClient()
     crawler = HttpCrawler(http_client=http_client)
@@ -125,9 +125,21 @@ class HttpxHttpClient(BaseHttpClient):
         )
         self._http1 = http1
         self._http2 = http2
-        self._verify = verify
+
         self._async_client_kwargs = async_client_kwargs
         self._header_generator = header_generator
+
+        self._ssl_context = httpx.create_ssl_context(verify=verify)
+
+        # Configure connection pool limits and keep-alive connections for transport
+        limits = async_client_kwargs.get('limits', httpx.Limits(max_connections=1000, max_keepalive_connections=200))
+
+        self._transport = _HttpxTransport(
+            http1=http1,
+            http2=http2,
+            verify=self._ssl_context,
+            limits=limits,
+        )
 
         self._client_by_proxy_url = dict[Optional[str], httpx.AsyncClient]()
 
@@ -222,17 +234,20 @@ class HttpxHttpClient(BaseHttpClient):
         if proxy_url not in self._client_by_proxy_url:
             # Prepare a default kwargs for the new client.
             kwargs: dict[str, Any] = {
-                'transport': _HttpxTransport(
-                    proxy=proxy_url, http1=self._http1, http2=self._http2, verify=self._verify
-                ),
                 'proxy': proxy_url,
                 'http1': self._http1,
                 'http2': self._http2,
-                'verify': self._verify,
             }
 
             # Update the default kwargs with any additional user-provided kwargs.
             kwargs.update(self._async_client_kwargs)
+
+            kwargs.update(
+                {
+                    'transport': self._transport,
+                    'verify': self._ssl_context,
+                }
+            )
 
             client = httpx.AsyncClient(**kwargs)
             self._client_by_proxy_url[proxy_url] = client
