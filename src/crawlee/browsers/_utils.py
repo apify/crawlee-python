@@ -29,4 +29,5 @@ def browserforge_patch_options(fingerprint: Fingerprint, options: dict[str, Any]
 
 
 async def browserforge_dark_mode(page: Page) -> None:
+    """Set dark color scheme emulation for a Playwright page."""
     await page.emulate_media(color_scheme='dark')
