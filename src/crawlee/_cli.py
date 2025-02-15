@@ -1,11 +1,3 @@
-# /// script
-# dependencies = [
-#   "cookiecutter>=2.6.0",
-#   "typer>=0.12.0",
-#   "inquirer>=3.3.0",
-# ]
-# ///
-
 # ruff: noqa: TRY301, FBT002, UP007
 from __future__ import annotations
 
