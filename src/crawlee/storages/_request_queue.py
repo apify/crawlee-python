@@ -94,6 +94,7 @@ class RequestQueue(Storage, RequestManager):
 
         self._request_lock_time = timedelta(minutes=3)
         self._queue_paused_for_migration = False
+        self._queue_has_locked_requests: bool | None = None
 
         event_manager.on(event=Event.MIGRATING, listener=lambda _: setattr(self, '_queue_paused_for_migration', True))
         event_manager.on(event=Event.MIGRATING, listener=self._clear_possible_locks)
@@ -447,6 +448,8 @@ class RequestQueue(Storage, RequestManager):
         response = await self._resource_client.list_and_lock_head(
             limit=25, lock_secs=int(self._request_lock_time.total_seconds())
         )
+
+        self._queue_has_locked_requests = response.queue_has_locked_requests
 
         for request in response.items:
             # Queue head index might be behind the main table, so ensure we don't recycle requests
