@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections import OrderedDict
+from collections import deque
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
@@ -38,6 +38,7 @@ class CachedRequest(TypedDict):
     was_already_handled: bool
     hydrated: Request | None
     lock_expires_at: datetime | None
+    forefront: bool
 
 
 @docs_group('Classes')
@@ -95,6 +96,7 @@ class RequestQueue(Storage, RequestManager):
         self._request_lock_time = timedelta(minutes=3)
         self._queue_paused_for_migration = False
         self._queue_has_locked_requests: bool | None = None
+        self._should_check_for_forefront_requests = False
 
         self._is_finished_log_throttle_counter = 0
         self._dequeued_request_count = 0
@@ -109,7 +111,7 @@ class RequestQueue(Storage, RequestManager):
         self._internal_timeout = config.internal_timeout or timedelta(minutes=5)
         self._assumed_total_count = 0
         self._assumed_handled_count = 0
-        self._queue_head_dict: OrderedDict[str, str] = OrderedDict()
+        self._queue_head = deque[str]()
         self._list_head_and_lock_task: asyncio.Task | None = None
         self._last_activity = datetime.now(timezone.utc)
         self._requests_cache: LRUCache[CachedRequest] = LRUCache(max_length=self._MAX_CACHED_REQUESTS)
@@ -185,7 +187,10 @@ class RequestQueue(Storage, RequestManager):
         processed_request = await self._resource_client.add_request(request, forefront=forefront)
         processed_request.unique_key = request.unique_key
 
-        self._cache_request(cache_key, processed_request)
+        self._cache_request(cache_key, processed_request, forefront=forefront)
+
+        if not processed_request.was_already_present and forefront:
+            self._should_check_for_forefront_requests = True
 
         if request.handled_at is None and not processed_request.was_already_present:
             self._assumed_total_count += 1
@@ -269,10 +274,10 @@ class RequestQueue(Storage, RequestManager):
         await self._ensure_head_is_non_empty()
 
         # We are likely done at this point.
-        if len(self._queue_head_dict) == 0:
+        if len(self._queue_head) == 0:
             return None
 
-        next_request_id, _ = self._queue_head_dict.popitem(last=False)  # ~removeFirst()
+        next_request_id = self._queue_head.pop()
         request = await self._get_or_hydrate_request(next_request_id)
 
         # NOTE: It can happen that the queue head index is inconsistent with the main queue table.
@@ -329,7 +334,7 @@ class RequestQueue(Storage, RequestManager):
         if not processed_request.was_already_handled:
             self._assumed_handled_count += 1
 
-        self._cache_request(unique_key_to_request_id(request.unique_key), processed_request)
+        self._cache_request(unique_key_to_request_id(request.unique_key), processed_request, forefront=False)
         return processed_request
 
     async def reclaim_request(
@@ -356,7 +361,10 @@ class RequestQueue(Storage, RequestManager):
         # https://github.com/apify/apify-sdk-python/issues/143
         processed_request = await self._resource_client.update_request(request, forefront=forefront)
         processed_request.unique_key = request.unique_key
-        self._cache_request(unique_key_to_request_id(request.unique_key), processed_request)
+        self._cache_request(unique_key_to_request_id(request.unique_key), processed_request, forefront=forefront)
+
+        if forefront:
+            self._should_check_for_forefront_requests = True
 
         if processed_request:
             # Try to delete the request lock if possible
@@ -374,7 +382,7 @@ class RequestQueue(Storage, RequestManager):
             bool: `True` if the next call to `RequestQueue.fetch_next_request` would return `None`, otherwise `False`.
         """
         await self._ensure_head_is_non_empty()
-        return len(self._queue_head_dict) == 0
+        return len(self._queue_head) == 0
 
     async def is_finished(self) -> bool:
         """Check whether the queue is finished.
@@ -388,11 +396,11 @@ class RequestQueue(Storage, RequestManager):
         if self._tasks:
             return False
 
-        if self._queue_head_dict:
+        if self._queue_head:
             logger.debug(
                 'There are still ids in the queue head that are pending processing',
                 extra={
-                    'queue_head_ids_pending': len(self._queue_head_dict),
+                    'queue_head_ids_pending': len(self._queue_head),
                 },
             )
 
@@ -400,7 +408,7 @@ class RequestQueue(Storage, RequestManager):
 
         await self._ensure_head_is_non_empty()
 
-        if self._queue_head_dict:
+        if self._queue_head:
             logger.debug('Queue head still returned requests that need to be processed')
 
             return False
@@ -417,7 +425,7 @@ class RequestQueue(Storage, RequestManager):
             return self._queue_has_locked_requests
 
         metadata = await self._resource_client.get()
-        if metadata is not None and not metadata.had_multiple_clients and not self._queue_head_dict:
+        if metadata is not None and not metadata.had_multiple_clients and not self._queue_head:
             logger.debug('Queue head is empty and there are no other clients - we are finished')
 
             return True
@@ -449,7 +457,7 @@ class RequestQueue(Storage, RequestManager):
             return
 
         # We want to fetch ahead of time to minimize dead time
-        if len(self._queue_head_dict) > 1:
+        if len(self._queue_head) > 1 and not self._should_check_for_forefront_requests:
             return
 
         if self._list_head_and_lock_task is None:
@@ -464,11 +472,20 @@ class RequestQueue(Storage, RequestManager):
         await self._list_head_and_lock_task
 
     async def _list_head_and_lock(self) -> None:
+        # Make a copy so that we can clear the flag only if the whole method executes after the flag was set
+        # (i.e, it was not set in the middle of the execution of the method)
+        should_check_for_forefront_requests = self._should_check_for_forefront_requests
+
+        limit = 25
+
         response = await self._resource_client.list_and_lock_head(
-            limit=25, lock_secs=int(self._request_lock_time.total_seconds())
+            limit=limit, lock_secs=int(self._request_lock_time.total_seconds())
         )
 
         self._queue_has_locked_requests = response.queue_has_locked_requests
+
+        head_id_buffer = list[str]()
+        forefront_head_id_buffer = list[str]()
 
         for request in response.items:
             # Queue head index might be behind the main table, so ensure we don't recycle requests
@@ -488,7 +505,17 @@ class RequestQueue(Storage, RequestManager):
 
                 continue
 
-            self._queue_head_dict[request.id] = request.id
+            # If we remember that we added the request ourselves and we added it to the forefront,
+            # we will put it to the beginning of the local queue head to preserve the expected order.
+            # If we do not remember that, we will enqueue it normally.
+            cached_request = self._requests_cache.get(unique_key_to_request_id(request.unique_key))
+            forefront = cached_request['forefront'] if cached_request else False
+
+            if forefront:
+                forefront_head_id_buffer.insert(0, request.id)
+            else:
+                head_id_buffer.append(request.id)
+
             self._cache_request(
                 unique_key_to_request_id(request.unique_key),
                 ProcessedRequest(
@@ -497,22 +524,45 @@ class RequestQueue(Storage, RequestManager):
                     was_already_present=True,
                     was_already_handled=False,
                 ),
+                forefront=forefront,
             )
 
+        for request_id in head_id_buffer:
+            self._queue_head.append(request_id)
+
+        for request_id in forefront_head_id_buffer:
+            self._queue_head.appendleft(request_id)
+
+        # If the queue head became too big, unlock the excess requests
+        to_unlock = list[str]()
+        while len(self._queue_head) > limit:
+            to_unlock.append(self._queue_head.pop())
+
+        if to_unlock:
+            await asyncio.gather(
+                *[self._resource_client.delete_request_lock(request_id) for request_id in to_unlock],
+                return_exceptions=True,  # Just ignore the exceptions
+            )
+
+        # Unset the should_check_for_forefront_requests flag - the check is finished
+        if should_check_for_forefront_requests:
+            self._should_check_for_forefront_requests = False
+
     def _reset(self) -> None:
-        self._queue_head_dict.clear()
+        self._queue_head.clear()
         self._list_head_and_lock_task = None
         self._assumed_total_count = 0
         self._assumed_handled_count = 0
         self._requests_cache.clear()
         self._last_activity = datetime.now(timezone.utc)
 
-    def _cache_request(self, cache_key: str, processed_request: ProcessedRequest) -> None:
+    def _cache_request(self, cache_key: str, processed_request: ProcessedRequest, *, forefront: bool) -> None:
         self._requests_cache[cache_key] = {
             'id': processed_request.id,
             'was_already_handled': processed_request.was_already_handled,
             'hydrated': None,
             'lock_expires_at': None,
+            'forefront': forefront,
         }
 
     async def _get_or_hydrate_request(self, request_id: str) -> Request | None:
@@ -543,6 +593,7 @@ class RequestQueue(Storage, RequestManager):
                 'hydrated': hydrated_request,
                 'was_already_handled': hydrated_request.handled_at is not None,
                 'lock_expires_at': prolong_result,
+                'forefront': False,
             }
 
             return hydrated_request
@@ -606,8 +657,8 @@ class RequestQueue(Storage, RequestManager):
 
         while True:
             try:
-                request_id, _ = self._queue_head_dict.popitem()
-            except KeyError:
+                request_id = self._queue_head.pop()
+            except LookupError:
                 break
 
             with suppress(Exception):
