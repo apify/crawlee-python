@@ -4,25 +4,26 @@ import csv
 import io
 import json
 import logging
-from typing import TYPE_CHECKING, AsyncIterator, Literal, TextIO, TypedDict, cast
+from typing import TYPE_CHECKING, Literal, TextIO, TypedDict, cast
 
 from typing_extensions import NotRequired, Required, Unpack, override
 
+from crawlee import service_locator
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.docs import docs_group
 from crawlee._utils.file import json_dumps
-from crawlee.base_storage_client._models import DatasetMetadata
-from crawlee.storages._base_storage import BaseStorage
-from crawlee.storages._key_value_store import KeyValueStore
+from crawlee.storage_clients.models import DatasetMetadata
+
+from ._base import Storage
+from ._key_value_store import KeyValueStore
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import AsyncIterator, Callable
 
     from crawlee._types import JsonSerializable, PushDataKwargs
-    from crawlee.base_storage_client import BaseStorageClient
-    from crawlee.base_storage_client._models import DatasetItemsListPage
     from crawlee.configuration import Configuration
-
+    from crawlee.storage_clients import StorageClient
+    from crawlee.storage_clients.models import DatasetItemsListPage
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,7 @@ class GetDataKwargs(TypedDict):
     """The maximum number of items to retrieve. Unlimited if None."""
 
     clean: NotRequired[bool]
-    """Returns only non-empty items and excludes hidden fields. Shortcut for skip_hidden and skip_empty."""
+    """Return only non-empty items and excludes hidden fields. Shortcut for skip_hidden and skip_empty."""
 
     desc: NotRequired[bool]
     """Set to True to sort results in descending order."""
@@ -152,7 +153,7 @@ class ExportDataCsvKwargs(TypedDict):
 
 
 @docs_group('Classes')
-class Dataset(BaseStorage):
+class Dataset(Storage):
     """Represents an append-only structured storage, ideal for tabular data similar to database tables.
 
     The `Dataset` class is designed to store structured data, where each entry (row) maintains consistent attributes
@@ -193,28 +194,21 @@ class Dataset(BaseStorage):
     _EFFECTIVE_LIMIT_SIZE = _MAX_PAYLOAD_SIZE - (_MAX_PAYLOAD_SIZE * _SAFETY_BUFFER_PERCENT)
     """Calculated payload limit considering safety buffer."""
 
-    def __init__(
-        self,
-        id: str,
-        name: str | None,
-        configuration: Configuration,
-        client: BaseStorageClient,
-    ) -> None:
+    def __init__(self, id: str, name: str | None, storage_client: StorageClient) -> None:
         self._id = id
         self._name = name
-        self._configuration = configuration
 
-        # Get resource clients from storage client
-        self._resource_client = client.dataset(self._id)
-        self._resource_collection_client = client.datasets()
+        # Get resource clients from the storage client.
+        self._resource_client = storage_client.dataset(self._id)
+        self._resource_collection_client = storage_client.datasets()
 
-    @override
     @property
+    @override
     def id(self) -> str:
         return self._id
 
-    @override
     @property
+    @override
     def name(self) -> str | None:
         return self._name
 
@@ -226,9 +220,12 @@ class Dataset(BaseStorage):
         id: str | None = None,
         name: str | None = None,
         configuration: Configuration | None = None,
-        storage_client: BaseStorageClient | None = None,
+        storage_client: StorageClient | None = None,
     ) -> Dataset:
         from crawlee.storages._creation_management import open_storage
+
+        configuration = configuration or service_locator.get_configuration()
+        storage_client = storage_client or service_locator.get_storage_client()
 
         return await open_storage(
             storage_class=cls,

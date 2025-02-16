@@ -5,6 +5,95 @@ title: Upgrading to v0.x
 
 This page summarizes the breaking changes between Crawlee for Python zero-based versions.
 
+## Upgrading to v0.6
+
+This section summarizes the breaking changes between v0.5.x and v0.6.0.
+
+### Configuration
+
+The `Configuration` fields `chrome_executable_path`, `xvfb`, and `verbose_log` have been removed. The `chrome_executable_path` and `xvfb` fields were unused, while `verbose_log` can be replaced by setting `log_level` to `DEBUG`.
+
+### Abstract base classes
+
+We decided to move away from [Hungarian notation](https://en.wikipedia.org/wiki/Hungarian_notation) and remove all the `Base` prefixes from the abstract classes. It includes the following public classes:
+- `BaseStorageClient` -> `StorageClient`
+- `BaseBrowserController` -> `BrowserController`
+- `BaseBrowserPlugin` -> `BrowserPlugin`
+
+## Upgrading to v0.5
+
+This section summarizes the breaking changes between v0.4.x and v0.5.0.
+
+### Crawlers & CrawlingContexts
+
+- All crawler and crawling context classes have been consolidated into a single sub-package called `crawlers`.
+- The affected classes include: `AbstractHttpCrawler`, `AbstractHttpParser`, `BasicCrawler`, `BasicCrawlerOptions`, `BasicCrawlingContext`, `BeautifulSoupCrawler`, `BeautifulSoupCrawlingContext`, `BeautifulSoupParserType`, `ContextPipeline`, `HttpCrawler`, `HttpCrawlerOptions`, `HttpCrawlingContext`, `HttpCrawlingResult`, `ParsedHttpCrawlingContext`, `ParselCrawler`, `ParselCrawlingContext`, `PlaywrightCrawler`, `PlaywrightCrawlingContext`, `PlaywrightPreNavCrawlingContext`.
+
+Example update:
+```diff
+- from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
++ from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
+```
+
+### Storage clients
+
+- All storage client classes have been moved into a single sub-package called `storage_clients`.
+- The affected classes include: `MemoryStorageClient`, `BaseStorageClient`.
+
+Example update:
+```diff
+- from crawlee.memory_storage_client import MemoryStorageClient
++ from crawlee.storage_clients import MemoryStorageClient
+```
+
+### CurlImpersonateHttpClient
+
+- The `CurlImpersonateHttpClient` changed its import location.
+
+Example update:
+```diff
+- from crawlee.http_clients.curl_impersonate import CurlImpersonateHttpClient
++ from crawlee.http_clients import CurlImpersonateHttpClient
+```
+
+### BeautifulSoupParser
+
+- Renamed `BeautifulSoupParser` to `BeautifulSoupParserType`. Probably used only in type hints. Please replace previous usages of `BeautifulSoupParser` by `BeautifulSoupParserType`.
+- `BeautifulSoupParser` is now a new class that is used in refactored class `BeautifulSoupCrawler`.
+
+### Service locator
+
+- The `crawlee.service_container` was completely refactored and renamed to `crawlee.service_locator`.
+- You can use it to set the configuration, event manager or storage client globally. Or you can pass them to your crawler instance directly and it will use the service locator under the hood.
+
+### Statistics
+
+- The `crawlee.statistics.Statistics` class do not accept an event manager as an input argument anymore. It uses the default, global one.
+- If you want to set your custom event manager, do it either via the service locator or pass it to the crawler.
+
+### Request
+
+- The properties `json_` and `order_no` were removed. They were there only for the internal purpose of the memory storage client, you should not need them.
+
+### Request storages and loaders
+
+- The `request_provider` parameter of `BasicCrawler.__init__` has been renamed to `request_manager`
+- The `BasicCrawler.get_request_provider` method has been renamed to `BasicCrawler.get_request_manager` and it does not accept the `id` and `name` arguments anymore
+    - If using a specific request queue is desired, pass it as the `request_manager` on `BasicCrawler` creation
+- The `RequestProvider` interface has been renamed to `RequestManager` and moved to the `crawlee.request_loaders` package
+- `RequestList` has been moved to the `crawlee.request_loaders` package
+- `RequestList` does not support `.drop()`, `.reclaim_request()`, `.add_request()` and `add_requests_batched()` anymore
+    - It implements the new `RequestLoader` interface instead of `RequestManager`
+    - `RequestManagerTandem` with a `RequestQueue` should be used to enable passing a `RequestList` (or any other `RequestLoader` implementation) as a `request_manager`, `await list.to_tandem()` can be used as a shortcut
+
+### PlaywrightCrawler
+
+- The `PlaywrightPreNavigationContext` was renamed to `PlaywrightPreNavCrawlingContext`.
+- The input arguments in `PlaywrightCrawler.__init__` have been renamed:
+    - `browser_options` is now `browser_launch_options`,
+    - `page_options` is now `browser_new_context_options`.
+- These argument renaming changes have also been applied to `BrowserPool`, `PlaywrightBrowserPlugin`, and `PlaywrightBrowserController`.
+
 ## Upgrading to v0.4
 
 This section summarizes the breaking changes between v0.3.x and v0.4.0.

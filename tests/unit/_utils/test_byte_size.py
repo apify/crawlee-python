@@ -52,11 +52,11 @@ def test_additions() -> None:
 
     # Addition of ByteSize instance and an int
     with pytest.raises(TypeError):
-        size1 + 1024
+        _ = size1 + 1024
 
     # Addition of ByteSize instance and an float
     with pytest.raises(TypeError):
-        size2 + 123.45
+        _ = size2 + 123.45
 
 
 def test_subtractions() -> None:
@@ -71,11 +71,11 @@ def test_subtractions() -> None:
 
     # Subtraction of ByteSize instance and an int
     with pytest.raises(TypeError):
-        size1 - 1024
+        _ = size1 - 1024
 
     # Subtraction of ByteSize instance and an float
     with pytest.raises(TypeError):
-        size2 - 123.45
+        _ = size2 - 123.45
 
 
 def test_multiplication() -> None:

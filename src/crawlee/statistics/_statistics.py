@@ -8,7 +8,8 @@ from typing import TYPE_CHECKING, Any, Generic, cast
 
 from typing_extensions import Self, TypeVar
 
-import crawlee.service_container
+from crawlee import service_locator
+from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee.events._types import Event, EventPersistStateData
@@ -19,10 +20,8 @@ from crawlee.storages import KeyValueStore
 if TYPE_CHECKING:
     from types import TracebackType
 
-    from crawlee.events import EventManager
-
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
-
+TNewStatisticsState = TypeVar('TNewStatisticsState', bound=StatisticsState, default=StatisticsState)
 logger = getLogger(__name__)
 
 
@@ -56,9 +55,12 @@ class RequestProcessingRecord:
 
 @docs_group('Classes')
 class Statistics(Generic[TStatisticsState]):
-    """An interface to collecting and logging runtime statistics for requests.
+    """A class for collecting, tracking, and logging runtime statistics for requests.
 
-    All information is saved to the key value store so that it persists between migrations, abortions and resurrections.
+    It is designed to record information such as request durations, retries, successes, and failures, enabling
+    analysis of crawler performance. The collected statistics are persisted to a `KeyValueStore`, ensuring they
+    remain available across crawler migrations, abortions, and restarts. This persistence allows for tracking
+    and evaluation of crawler behavior over its lifecycle.
     """
 
     __next_id = 0
@@ -66,7 +68,6 @@ class Statistics(Generic[TStatisticsState]):
     def __init__(
         self,
         *,
-        event_manager: EventManager | None = None,
         persistence_enabled: bool = False,
         persist_state_kvs_name: str = 'default',
         persist_state_key: str | None = None,
@@ -74,20 +75,18 @@ class Statistics(Generic[TStatisticsState]):
         log_message: str = 'Statistics',
         periodic_message_logger: Logger | None = None,
         log_interval: timedelta = timedelta(minutes=1),
-        state_model: type[TStatisticsState] = cast(Any, StatisticsState),  # noqa: B008 - in an ideal world, TStatisticsState would be inferred from this argument, but I haven't managed to do that
+        state_model: type[TStatisticsState],
     ) -> None:
         self._id = Statistics.__next_id
         Statistics.__next_id += 1
 
         self._state_model = state_model
-        self.state: StatisticsState = self._state_model()
+        self.state = self._state_model()
         self._instance_start: datetime | None = None
         self._retry_histogram = dict[int, int]()
 
         self.error_tracker = ErrorTracker()
         self.error_tracker_retry = ErrorTracker()
-
-        self._events = event_manager or crawlee.service_container.get_event_manager()
 
         self._requests_in_progress = dict[str, RequestProcessingRecord]()
 
@@ -103,8 +102,61 @@ class Statistics(Generic[TStatisticsState]):
         self._periodic_message_logger = periodic_message_logger or logger
         self._periodic_logger = RecurringTask(self._log, log_interval)
 
+        # Flag to indicate the context state.
+        self._active = False
+
+    def replace_state_model(self, state_model: type[TNewStatisticsState]) -> Statistics[TNewStatisticsState]:
+        """Create near copy of the `Statistics` with replaced `state_model`."""
+        new_statistics: Statistics[TNewStatisticsState] = Statistics(
+            persistence_enabled=self._persistence_enabled,
+            persist_state_kvs_name=self._persist_state_kvs_name,
+            persist_state_key=self._persist_state_key,
+            key_value_store=self._key_value_store,
+            log_message=self._log_message,
+            periodic_message_logger=self._periodic_message_logger,
+            state_model=state_model,
+        )
+        new_statistics._periodic_logger = self._periodic_logger  # noqa:SLF001  # Accessing private member to create copy like-object.
+        return new_statistics
+
+    @staticmethod
+    def with_default_state(
+        *,
+        persistence_enabled: bool = False,
+        persist_state_kvs_name: str = 'default',
+        persist_state_key: str | None = None,
+        key_value_store: KeyValueStore | None = None,
+        log_message: str = 'Statistics',
+        periodic_message_logger: Logger | None = None,
+        log_interval: timedelta = timedelta(minutes=1),
+    ) -> Statistics[StatisticsState]:
+        """Convenience constructor for creating a `Statistics` with default state model `StatisticsState`."""
+        return Statistics[StatisticsState](
+            persistence_enabled=persistence_enabled,
+            persist_state_kvs_name=persist_state_kvs_name,
+            persist_state_key=persist_state_key,
+            key_value_store=key_value_store,
+            log_message=log_message,
+            periodic_message_logger=periodic_message_logger,
+            log_interval=log_interval,
+            state_model=StatisticsState,
+        )
+
+    @property
+    def active(self) -> bool:
+        """Indicate whether the context is active."""
+        return self._active
+
     async def __aenter__(self) -> Self:
-        """Subscribe to events and start collecting statistics."""
+        """Subscribe to events and start collecting statistics.
+
+        Raises:
+            RuntimeError: If the context manager is already active.
+        """
+        if self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is already active.')
+
+        self._active = True
         self._instance_start = datetime.now(timezone.utc)
 
         if self.state.crawler_started_at is None:
@@ -114,8 +166,8 @@ class Statistics(Generic[TStatisticsState]):
             self._key_value_store = await KeyValueStore.open(name=self._persist_state_kvs_name)
 
         await self._maybe_load_statistics()
-        self._events.on(event=Event.PERSIST_STATE, listener=self._persist_state)
-
+        event_manager = service_locator.get_event_manager()
+        event_manager.on(event=Event.PERSIST_STATE, listener=self._persist_state)
         self._periodic_logger.start()
 
         return self
@@ -126,23 +178,35 @@ class Statistics(Generic[TStatisticsState]):
         exc_value: BaseException | None,
         exc_traceback: TracebackType | None,
     ) -> None:
-        """Stop collecting statistics."""
+        """Stop collecting statistics.
+
+        Raises:
+            RuntimeError: If the context manager is not active.
+        """
+        if not self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is not active.')
+
         self.state.crawler_finished_at = datetime.now(timezone.utc)
-        self._events.off(event=Event.PERSIST_STATE, listener=self._persist_state)
+        event_manager = service_locator.get_event_manager()
+        event_manager.off(event=Event.PERSIST_STATE, listener=self._persist_state)
         await self._periodic_logger.stop()
         await self._persist_state(event_data=EventPersistStateData(is_migrating=False))
+        self._active = False
 
+    @ensure_context
     def register_status_code(self, code: int) -> None:
         """Increment the number of times a status code has been received."""
         self.state.requests_with_status_code.setdefault(str(code), 0)
         self.state.requests_with_status_code[str(code)] += 1
 
+    @ensure_context
     def record_request_processing_start(self, request_id_or_key: str) -> None:
         """Mark a request as started."""
         record = self._requests_in_progress.get(request_id_or_key, RequestProcessingRecord())
         record.run()
         self._requests_in_progress[request_id_or_key] = record
 
+    @ensure_context
     def record_request_processing_finish(self, request_id_or_key: str) -> None:
         """Mark a request as finished."""
         record = self._requests_in_progress.get(request_id_or_key)
@@ -162,6 +226,7 @@ class Statistics(Generic[TStatisticsState]):
 
         del self._requests_in_progress[request_id_or_key]
 
+    @ensure_context
     def record_request_processing_failure(self, request_id_or_key: str) -> None:
         """Mark a request as failed."""
         record = self._requests_in_progress.get(request_id_or_key)

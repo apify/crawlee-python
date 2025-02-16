@@ -1,18 +1,19 @@
-# TODO: type ignores and crawlee_storage_dir
+# TODO: Update crawlee_storage_dir args once the Pydantic bug is fixed
 # https://github.com/apify/crawlee-python/issues/146
 
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING, Callable, cast
+from typing import TYPE_CHECKING, Any, Callable, cast
 
 import pytest
 from proxy import Proxy
+from yarl import URL
 
-from crawlee import service_container
+from crawlee import service_locator
 from crawlee.configuration import Configuration
-from crawlee.memory_storage_client import MemoryStorageClient
 from crawlee.proxy_configuration import ProxyInfo
+from crawlee.storage_clients import MemoryStorageClient
 from crawlee.storages import _creation_management
 
 if TYPE_CHECKING:
@@ -21,15 +22,40 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture
-def reset_globals(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callable[[], None]:
-    def reset() -> None:
-        # Set the environment variable for the local storage directory to the temporary path
+def prepare_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callable[[], None]:
+    """Prepare the testing environment by resetting the global state before each test.
+
+    This fixture ensures that the global state of the package is reset to a known baseline before each test runs.
+    It also configures a temporary storage directory for test isolation.
+
+    Args:
+        monkeypatch: Test utility provided by pytest for patching.
+        tmp_path: A unique temporary directory path provided by pytest for test isolation.
+
+    Returns:
+        A callable that prepares the test environment.
+    """
+
+    def _prepare_test_env() -> None:
+        # Disable the browser sandbox by setting the environment variable. This is required for running
+        # Playwright tests in the CI environment, where the sandbox is not supported.
+        monkeypatch.setenv('CRAWLEE_DISABLE_BROWSER_SANDBOX', 'true')
+
+        # Set the environment variable for the local storage directory to the temporary path.
         monkeypatch.setenv('CRAWLEE_STORAGE_DIR', str(tmp_path))
 
-        # Reset services in crawlee.service_container
-        cast(dict, service_container._services).clear()
+        # Reset the flags in the service locator to indicate that no services are explicitly set. This ensures
+        # a clean state, as services might have been set during a previous test and not reset properly.
+        service_locator._configuration_was_retrieved = False
+        service_locator._storage_client_was_retrieved = False
+        service_locator._event_manager_was_retrieved = False
 
-        # Clear creation-related caches to ensure no state is carried over between tests
+        # Reset the services in the service locator.
+        service_locator._configuration = None
+        service_locator._event_manager = None
+        service_locator._storage_client = None
+
+        # Clear creation-related caches to ensure no state is carried over between tests.
         monkeypatch.setattr(_creation_management, '_cache_dataset_by_id', {})
         monkeypatch.setattr(_creation_management, '_cache_dataset_by_name', {})
         monkeypatch.setattr(_creation_management, '_cache_kvs_by_id', {})
@@ -37,39 +63,61 @@ def reset_globals(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callable[[
         monkeypatch.setattr(_creation_management, '_cache_rq_by_id', {})
         monkeypatch.setattr(_creation_management, '_cache_rq_by_name', {})
 
-        # Verify that the environment variable is set correctly
+        # Verify that the test environment was set up correctly.
         assert os.environ.get('CRAWLEE_STORAGE_DIR') == str(tmp_path)
+        assert service_locator._configuration_was_retrieved is False
+        assert service_locator._storage_client_was_retrieved is False
+        assert service_locator._event_manager_was_retrieved is False
 
-    return reset
+    return _prepare_test_env
 
 
 @pytest.fixture(autouse=True)
-def _isolate_test_environment(reset_globals: Callable[[], None]) -> None:
-    """Isolate tests by resetting the storage clients, clearing caches, and setting the environment variables.
+def _isolate_test_environment(prepare_test_env: Callable[[], None]) -> None:
+    """Isolate the testing environment by resetting global state before and after each test.
 
-    The fixture is applied automatically to all test cases.
+    This fixture ensures that each test starts with a clean slate and that any modifications during the test
+    do not affect subsequent tests. It runs automatically for all tests.
 
     Args:
-        monkeypatch: Test utility provided by pytest.
-        tmp_path: A unique temporary directory path provided by pytest for test isolation.
+        prepare_test_env: Fixture to prepare the environment before each test.
     """
-
-    reset_globals()
-
-
-@pytest.fixture
-def memory_storage_client(tmp_path: Path) -> MemoryStorageClient:
-    cfg = Configuration(
-        write_metadata=True,
-        persist_storage=True,
-        crawlee_storage_dir=str(tmp_path),  # type: ignore
-    )
-    return MemoryStorageClient(cfg)
+    prepare_test_env()
 
 
 @pytest.fixture
-def httpbin() -> str:
-    return os.environ.get('HTTPBIN_URL', 'https://httpbin.org')
+def httpbin() -> URL:
+    class URLWrapper:
+        def __init__(self, url: URL) -> None:
+            self.url = url
+
+        def __getattr__(self, name: str) -> Any:
+            result = getattr(self.url, name)
+            return_type = getattr(result, '__annotations__', {}).get('return', None)
+
+            if return_type == 'URL':
+
+                def wrapper(*args: Any, **kwargs: Any) -> URLWrapper:
+                    return URLWrapper(result(*args, **kwargs))
+
+                return wrapper
+
+            return result
+
+        def with_path(
+            self, path: str, *, keep_query: bool = True, keep_fragment: bool = True, encoded: bool = False
+        ) -> URLWrapper:
+            return URLWrapper(
+                URL.with_path(self.url, path, keep_query=keep_query, keep_fragment=keep_fragment, encoded=encoded)
+            )
+
+        def __truediv__(self, other: Any) -> URLWrapper:
+            return self.with_path(other)
+
+        def __str__(self) -> str:
+            return str(self.url)
+
+    return cast(URL, URLWrapper(URL(os.environ.get('HTTPBIN_URL', 'https://httpbin.org'))))
 
 
 @pytest.fixture
@@ -116,3 +164,15 @@ async def disabled_proxy(proxy_info: ProxyInfo) -> AsyncGenerator[ProxyInfo, Non
         ]
     ):
         yield proxy_info
+
+
+@pytest.fixture
+def memory_storage_client(tmp_path: Path) -> MemoryStorageClient:
+    """A fixture for testing the memory storage client and its resource clients."""
+    config = Configuration(
+        persist_storage=True,
+        write_metadata=True,
+        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
+    )
+
+    return MemoryStorageClient.from_config(config)

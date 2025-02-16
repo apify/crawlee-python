@@ -8,6 +8,9 @@ import CodeBlock from '@theme/CodeBlock';
 
 import OriginalCodeExample from '!!raw-loader!./code/03_original_code.py';
 import FindingNewLinksExample from '!!raw-loader!./code/03_finding_new_links.py';
+import EnqueueStrategyExample from '!!raw-loader!./code/03_enqueue_strategy.py';
+import GlobsExample from '!!raw-loader!./code/03_globs.py';
+import TransformExample from '!!raw-loader!./code/03_transform_request.py';
 
 Previously you've built a very simple crawler that downloads HTML of a single page, reads its title and prints it to the console. This is the original source code:
 
@@ -77,12 +80,9 @@ await context.enqueue_links()
 
 The default behavior of <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> is to stay on the same hostname. This **does not include subdomains**. To include subdomains in your crawl, use the `strategy` argument. The `strategy` argument is an instance of the <ApiLink to="enum/EnqueueStrategy">`EnqueueStrategy`</ApiLink> enum.
 
-```python
-from crawlee.enqueue_strategy import EnqueueStrategy
-
-# See the EnqueueStrategy object for more strategy options.
-await enqueue_links(strategy=EnqueueStrategy.SAME_DOMAIN)
-```
+<CodeBlock className="language-python">
+    {EnqueueStrategyExample}
+</CodeBlock>
 
 When you run the code, you will see the crawler log the **title** of the first page, then the **enqueueing** message showing number of URLs, followed by the **title** of the first enqueued page and so on and so on.
 
@@ -95,30 +95,25 @@ Skipping of duplicate URLs is critical, because visiting the same page multiple 
 While the defaults for <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> can be often exactly what you need, it also gives you fine-grained control over which URLs should be enqueued. One way we already mentioned above. It is using the <ApiLink to="enum/EnqueueStrategy">`EnqueueStrategy`</ApiLink>. You can use the `all` strategy if you want to follow every single link, regardless of its domain, or you can enqueue links that target the same domain name with the `same_domain` strategy.
 
 ```python
-from crawlee.enqueue_strategy import EnqueueStrategy
-
 # Wanders the internet.
-await enqueue_links(strategy=EnqueueStrategy.ALL)
+await context.enqueue_links(strategy=EnqueueStrategy.ALL)
 ```
 
 ### Filter URLs with patterns
 
 For even more control, you can use the `include` or `exclude` parameters, either as glob patterns or regular expressions, to filter the URLs. Refer to the API documentation for <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> for detailed information on these and other available options.
 
-```python
-from crawlee import Glob
+<CodeBlock className="language-python">
+    {GlobsExample}
+</CodeBlock>
 
-await enqueue_links(
-    include=[Glob('https://someplace.com/**/cats')],
-    exclude=[Glob('https://**/archive/**')],
-)
-```
+### Transform requests before enqueuing
 
-{/* TODO:
-### Transform requests
+For cases where you need to modify or filter requests before they are enqueued, you can use the `transform_request_function` parameter. This function takes a <ApiLink to="class/Request">`Request`</ApiLink> object as input and should return either a modified <ApiLink to="class/Request">`Request`</ApiLink>` object or `None`. If the function returns `None`, the request will be skipped.
 
-...
-*/}
+<CodeBlock className="language-python">
+    {TransformExample}
+</CodeBlock>
 
 ## Next steps
 

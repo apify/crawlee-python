@@ -1,23 +1,28 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 
 from crawlee.browsers import BrowserPool, PlaywrightBrowserPlugin
 
+if TYPE_CHECKING:
+    from yarl import URL
 
-async def test_default_plugin_new_page_creation(httpbin: str) -> None:
+
+async def test_default_plugin_new_page_creation(httpbin: URL) -> None:
     async with BrowserPool() as browser_pool:
         page_1 = await browser_pool.new_page()
-        await page_1.page.goto(f'{httpbin}/get')
+        await page_1.page.goto(str(httpbin / 'get'))
         assert page_1.browser_type == 'chromium'
-        assert page_1.page.url == f'{httpbin}/get'
+        assert page_1.page.url == str(httpbin / 'get')
         assert '<html' in await page_1.page.content()  # there is some HTML content
         assert browser_pool.total_pages_count == 1
 
         page_2 = await browser_pool.new_page()
-        await page_2.page.goto(f'{httpbin}/status/200')
+        await page_2.page.goto(str(httpbin / 'status/200'))
         assert page_2.browser_type == 'chromium'
-        assert page_2.page.url == f'{httpbin}/status/200'
+        assert page_2.page.url == str(httpbin / 'status/200')
         assert '<html' in await page_1.page.content()  # there is some HTML content
         assert browser_pool.total_pages_count == 2
 
@@ -25,7 +30,7 @@ async def test_default_plugin_new_page_creation(httpbin: str) -> None:
         await page_2.page.close()
 
 
-async def test_multiple_plugins_new_page_creation(httpbin: str) -> None:
+async def test_multiple_plugins_new_page_creation(httpbin: URL) -> None:
     plugin_chromium = PlaywrightBrowserPlugin(browser_type='chromium')
     plugin_firefox = PlaywrightBrowserPlugin(browser_type='firefox')
 
@@ -33,21 +38,21 @@ async def test_multiple_plugins_new_page_creation(httpbin: str) -> None:
         assert browser_pool.plugins == [plugin_chromium, plugin_firefox]
 
         page_1 = await browser_pool.new_page()
-        await page_1.page.goto(f'{httpbin}/get')
+        await page_1.page.goto(str(httpbin / 'get'))
         assert page_1.browser_type == 'chromium'
-        assert page_1.page.url == f'{httpbin}/get'
+        assert page_1.page.url == str(httpbin / 'get')
         assert '<html' in await page_1.page.content()  # there is some HTML content
 
         page_2 = await browser_pool.new_page()
-        await page_2.page.goto(f'{httpbin}/headers')
+        await page_2.page.goto(str(httpbin / 'headers'))
         assert page_2.browser_type == 'firefox'
-        assert page_2.page.url == f'{httpbin}/headers'
+        assert page_2.page.url == str(httpbin / 'headers')
         assert '<html' in await page_2.page.content()  # there is some HTML content
 
         page_3 = await browser_pool.new_page()
-        await page_3.page.goto(f'{httpbin}/user-agent')
+        await page_3.page.goto(str(httpbin / 'user-agent'))
         assert page_3.browser_type == 'chromium'
-        assert page_3.page.url == f'{httpbin}/user-agent'
+        assert page_3.page.url == str(httpbin / 'user-agent')
         assert '<html' in await page_3.page.content()  # there is some HTML content
 
         await page_1.page.close()
@@ -57,7 +62,7 @@ async def test_multiple_plugins_new_page_creation(httpbin: str) -> None:
         assert browser_pool.total_pages_count == 3
 
 
-async def test_new_page_with_each_plugin(httpbin: str) -> None:
+async def test_new_page_with_each_plugin(httpbin: URL) -> None:
     plugin_chromium = PlaywrightBrowserPlugin(browser_type='chromium')
     plugin_firefox = PlaywrightBrowserPlugin(browser_type='firefox')
 
@@ -69,12 +74,12 @@ async def test_new_page_with_each_plugin(httpbin: str) -> None:
         assert pages[0].browser_type == 'chromium'
         assert pages[1].browser_type == 'firefox'
 
-        await pages[0].page.goto(f'{httpbin}/get')
-        assert pages[0].page.url == f'{httpbin}/get'
+        await pages[0].page.goto(str(httpbin / 'get'))
+        assert pages[0].page.url == str(httpbin / 'get')
         assert '<html' in await pages[0].page.content()  # there is some HTML content
 
-        await pages[1].page.goto(f'{httpbin}/headers')
-        assert pages[1].page.url == f'{httpbin}/headers'
+        await pages[1].page.goto(str(httpbin / 'headers'))
+        assert pages[1].page.url == str(httpbin / 'headers')
         assert '<html' in await pages[1].page.content()
 
         for page in pages:
@@ -83,7 +88,7 @@ async def test_new_page_with_each_plugin(httpbin: str) -> None:
         assert browser_pool.total_pages_count == 2
 
 
-async def test_with_default_plugin_constructor(httpbin: str) -> None:
+async def test_with_default_plugin_constructor(httpbin: URL) -> None:
     async with BrowserPool.with_default_plugin(headless=True, browser_type='firefox') as browser_pool:
         assert len(browser_pool.plugins) == 1
         assert isinstance(browser_pool.plugins[0], PlaywrightBrowserPlugin)
@@ -91,8 +96,8 @@ async def test_with_default_plugin_constructor(httpbin: str) -> None:
         page = await browser_pool.new_page()
         assert page.browser_type == 'firefox'
 
-        await page.page.goto(f'{httpbin}/get')
-        assert page.page.url == f'{httpbin}/get'
+        await page.page.goto(str(httpbin / 'get'))
+        assert page.page.url == str(httpbin / 'get')
         assert '<html' in await page.page.content()  # there is some HTML content
 
         await page.page.close()
@@ -114,13 +119,13 @@ async def test_new_page_with_invalid_plugin() -> None:
             await browser_pool.new_page(browser_plugin=plugin_2)
 
 
-async def test_resource_management(httpbin: str) -> None:
+async def test_resource_management(httpbin: URL) -> None:
     playwright_plugin = PlaywrightBrowserPlugin(browser_type='chromium')
 
     async with BrowserPool([playwright_plugin]) as browser_pool:
         page = await browser_pool.new_page()
-        await page.page.goto(f'{httpbin}/get')
-        assert page.page.url == f'{httpbin}/get'
+        await page.page.goto(str(httpbin / 'get'))
+        assert page.page.url == str(httpbin / 'get')
         assert '<html' in await page.page.content()  # there is some HTML content
         assert browser_pool.total_pages_count == 1
 
@@ -128,8 +133,30 @@ async def test_resource_management(httpbin: str) -> None:
     assert page.page.is_closed()
 
 
-async def test_raises_error_when_not_initialized() -> None:
+async def test_methods_raise_error_when_not_active() -> None:
     plugin = PlaywrightBrowserPlugin()
     browser_pool = BrowserPool([plugin])
-    with pytest.raises(RuntimeError, match='Browser pool is not initialized.'):
+
+    assert browser_pool.active is False
+
+    with pytest.raises(RuntimeError, match='BrowserPool is not active.'):
         await browser_pool.new_page()
+
+    with pytest.raises(RuntimeError, match='BrowserPool is not active.'):
+        await browser_pool.new_page_with_each_plugin()
+
+    with pytest.raises(RuntimeError, match='BrowserPool is already active.'):
+        async with browser_pool, browser_pool:
+            pass
+
+    async with browser_pool:
+        assert browser_pool.active is True
+
+
+async def test_with_plugin_contains_page_options(httpbin: URL) -> None:
+    plugin = PlaywrightBrowserPlugin(browser_new_context_options={'user_agent': 'My Best User-Agent'})
+    async with BrowserPool(plugins=[plugin]) as browser_pool:
+        test_page = await browser_pool.new_page()
+        await test_page.page.goto(str(httpbin / 'user-agent'))
+        assert 'My Best User-Agent' in await test_page.page.content()
+        await test_page.page.close()

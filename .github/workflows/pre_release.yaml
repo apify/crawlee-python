@@ -8,9 +8,15 @@ on:
     tags-ignore:
       - "**" # Ignore all tags to prevent duplicate builds when tags are pushed.
 
+  # Or it can be triggered manually.
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release_metadata:
-    if: "!startsWith(github.event.head_commit.message, 'docs') && !startsWith(github.event.head_commit.message, 'ci') && startsWith(github.repository, 'apify/')"
     name: Prepare release metadata
     runs-on: ubuntu-latest
     outputs:
@@ -23,22 +29,24 @@ jobs:
         name: Prepare release metadata
         with:
           release_type: prerelease
+          existing_changelog_path: CHANGELOG.md
 
-  lint_check:
-    name: Lint check
-    uses: apify/workflows/.github/workflows/python_lint_check.yaml@main
-
-  type_check:
-    name: Type check
-    uses: apify/workflows/.github/workflows/python_type_check.yaml@main
-
-  unit_tests:
-    name: Unit tests
-    uses: apify/workflows/.github/workflows/python_unit_tests.yaml@main
+  # If github.ref points to a [ci skip] commit, this workflow won't run.
+  # Otherwise, these checks will be launched from the `run_code_checks` workflow.
+  wait_for_checks:
+    name: Wait for code checks to pass
+    runs-on: ubuntu-latest
+    steps:
+      - uses: lewagon/wait-on-check-action@v1.3.4
+        with:
+          ref: ${{ github.ref }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          check-regexp: "( check| tests)$"
+          wait-interval: 5
 
   update_changelog:
     name: Update changelog
-    needs: [release_metadata, lint_check, type_check, unit_tests]
+    needs: [release_metadata, wait_for_checks]
     uses: apify/workflows/.github/workflows/python_bump_and_update_changelog.yaml@main
     with:
       version_number: ${{ needs.release_metadata.outputs.version_number }}
@@ -46,7 +54,15 @@ jobs:
     secrets:
       APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
 
+  build_and_deploy_docs:
+    needs: [update_changelog]
+    uses: ./.github/workflows/build_and_deploy_docs.yaml
+    with:
+      ref: ${{ needs.update_changelog.outputs.changelog_commitish }}
+    secrets: inherit
+
   publish_to_pypi:
+    if: "!startsWith(github.event.head_commit.message, 'ci') && !startsWith(github.event.head_commit.message, 'docs')"
     name: Publish to PyPI
     needs: [release_metadata, update_changelog]
     runs-on: ubuntu-latest
@@ -59,7 +75,7 @@ jobs:
     steps:
       - name: Prepare distribution
         uses: apify/workflows/prepare-pypi-distribution@main
-        with: 
+        with:
           package_name: crawlee
           is_prerelease: "yes"
           version_number: ${{ needs.release_metadata.outputs.version_number }}

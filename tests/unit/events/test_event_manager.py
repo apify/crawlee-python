@@ -3,13 +3,16 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import timedelta
-from typing import Any, AsyncGenerator
+from functools import update_wrapper
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from crawlee.events import EventManager
-from crawlee.events._types import Event, EventSystemInfoData
+from crawlee.events import Event, EventManager, EventSystemInfoData
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 
 @pytest.fixture
@@ -25,15 +28,21 @@ def event_system_info_data() -> EventSystemInfoData:
 
 @pytest.fixture
 def async_listener() -> AsyncMock:
+    async def async_listener(payload: Any) -> None:
+        pass
+
     al = AsyncMock()
-    al.__name__ = 'async_listener'  # To avoid issues with the function name
+    update_wrapper(al, async_listener)
     return al
 
 
 @pytest.fixture
 def sync_listener() -> MagicMock:
+    def sync_listener(payload: Any) -> None:
+        pass
+
     sl = MagicMock()
-    sl.__name__ = 'sync_listener'  # To avoid issues with the function name
+    update_wrapper(sl, sync_listener)
     return sl
 
 
@@ -80,9 +89,34 @@ async def test_emit_event_with_no_listeners(
 
     # Attempt to emit an event for which no listeners are registered, it should not fail
     event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_system_info_data)
+    await asyncio.sleep(0.1)  # Allow some time for the event to be processed
 
     # Ensure the listener for the other event was not called
     assert async_listener.call_count == 0
+
+
+async def test_emit_invokes_parameterless_listener(
+    event_manager: EventManager,
+    event_system_info_data: EventSystemInfoData,
+) -> None:
+    sync_mock = MagicMock()
+
+    def sync_listener() -> None:
+        sync_mock()
+
+    async_mock = MagicMock()
+
+    async def async_listener() -> None:
+        async_mock()
+
+    event_manager.on(event=Event.SYSTEM_INFO, listener=sync_listener)
+    event_manager.on(event=Event.SYSTEM_INFO, listener=async_listener)
+
+    event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_system_info_data)
+    await asyncio.sleep(0.1)  # Allow some time for the event to be processed
+
+    assert sync_mock.call_count == 1
+    assert async_mock.call_count == 1
 
 
 async def test_remove_nonexistent_listener_does_not_fail(
@@ -151,3 +185,25 @@ async def test_wait_for_all_listeners_cancelled_error(
 
             # Use monkeypatch to replace asyncio.wait with mock_async_wait
             monkeypatch.setattr('asyncio.wait', mock_async_wait)
+
+
+async def test_methods_raise_error_when_not_active(event_system_info_data: EventSystemInfoData) -> None:
+    event_manager = EventManager()
+
+    assert event_manager.active is False
+
+    with pytest.raises(RuntimeError, match='EventManager is not active.'):
+        event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_system_info_data)
+
+    with pytest.raises(RuntimeError, match='EventManager is not active.'):
+        await event_manager.wait_for_all_listeners_to_complete()
+
+    with pytest.raises(RuntimeError, match='EventManager is already active.'):
+        async with event_manager, event_manager:
+            pass
+
+    async with event_manager:
+        event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_system_info_data)
+        await event_manager.wait_for_all_listeners_to_complete()
+
+        assert event_manager.active is True

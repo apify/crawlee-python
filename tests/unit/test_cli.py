@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from unittest.mock import Mock
+from unittest.mock import ANY, Mock
 
 import pytest
 import readchar
@@ -26,6 +26,10 @@ def test_create_interactive(mock_cookiecutter: Mock, monkeypatch: pytest.MonkeyP
             *'my_project',
             readchar.key.ENTER,
             readchar.key.ENTER,
+            readchar.key.ENTER,
+            readchar.key.ENTER,
+            readchar.key.ENTER,
+            readchar.key.ENTER,
         ]
     )
     monkeypatch.setattr(target=readchar, name='readkey', value=lambda: next(mock_input))
@@ -34,10 +38,16 @@ def test_create_interactive(mock_cookiecutter: Mock, monkeypatch: pytest.MonkeyP
     assert 'Your project "my_project" was created.' in result.output
 
     mock_cookiecutter.assert_called_with(
-        template='gh:apify/crawlee-python',
-        directory='templates/beautifulsoup',
+        template=ANY,
         no_input=True,
-        extra_context={'project_name': 'my_project'},
+        extra_context={
+            'project_name': 'my_project',
+            'package_manager': 'poetry',
+            'crawler_type': 'beautifulsoup',
+            'http_client': 'httpx',
+            'enable_apify_integration': False,
+            'start_url': 'https://crawlee.dev',
+        },
     )
 
 
@@ -48,6 +58,10 @@ def test_create_interactive_non_default_template(mock_cookiecutter: Mock, monkey
             readchar.key.ENTER,
             readchar.key.DOWN,
             readchar.key.ENTER,
+            readchar.key.ENTER,
+            readchar.key.ENTER,
+            readchar.key.ENTER,
+            readchar.key.ENTER,
         ]
     )
     monkeypatch.setattr(target=readchar, name='readkey', value=lambda: next(mock_input))
@@ -56,21 +70,48 @@ def test_create_interactive_non_default_template(mock_cookiecutter: Mock, monkey
     assert 'Your project "my_project" was created.' in result.output
 
     mock_cookiecutter.assert_called_with(
-        template='gh:apify/crawlee-python',
-        directory='templates/playwright',
+        template=ANY,
         no_input=True,
-        extra_context={'project_name': 'my_project'},
+        extra_context={
+            'project_name': 'my_project',
+            'package_manager': 'poetry',
+            'crawler_type': 'parsel',
+            'http_client': 'httpx',
+            'enable_apify_integration': False,
+            'start_url': 'https://crawlee.dev',
+        },
     )
 
 
 def test_create_non_interactive(mock_cookiecutter: Mock) -> None:
-    runner.invoke(crawlee._cli.cli, ['create', 'my_project', '--template', 'playwright'])
+    runner.invoke(
+        crawlee._cli.cli,
+        [
+            'create',
+            'my_project',
+            '--crawler-type',
+            'playwright',
+            '--http-client',
+            'curl-impersonate',
+            '--package-manager',
+            'pip',
+            '--start-url',
+            'https://yr.no',
+            '--no-apify',
+        ],
+    )
 
     mock_cookiecutter.assert_called_with(
-        template='gh:apify/crawlee-python',
-        directory='templates/playwright',
+        template=ANY,
         no_input=True,
-        extra_context={'project_name': 'my_project'},
+        extra_context={
+            'project_name': 'my_project',
+            'package_manager': 'pip',
+            'crawler_type': 'playwright',
+            'http_client': 'curl-impersonate',
+            'start_url': 'https://yr.no',
+            'enable_apify_integration': False,
+        },
     )
 
 
@@ -89,14 +130,35 @@ def test_create_existing_folder(
     os.chdir(tmp)
     (tmp / 'existing_project').mkdir()
 
-    result = runner.invoke(crawlee._cli.cli, ['create', 'existing_project', '--template', 'playwright'])
+    result = runner.invoke(
+        crawlee._cli.cli,
+        [
+            'create',
+            'existing_project',
+            '--crawler-type',
+            'playwright',
+            '--http-client',
+            'curl-impersonate',
+            '--package-manager',
+            'pip',
+            '--start-url',
+            'https://yr.no',
+            '--no-apify',
+        ],
+    )
     assert 'existing_project already exists' in result.output
 
     mock_cookiecutter.assert_called_with(
-        template='gh:apify/crawlee-python',
-        directory='templates/playwright',
+        template=ANY,
         no_input=True,
-        extra_context={'project_name': 'my_project'},
+        extra_context={
+            'project_name': 'my_project',
+            'package_manager': 'pip',
+            'crawler_type': 'playwright',
+            'http_client': 'curl-impersonate',
+            'start_url': 'https://yr.no',
+            'enable_apify_integration': False,
+        },
     )
 
 
@@ -108,6 +170,10 @@ def test_create_existing_folder_interactive(
             *'existing_project',
             readchar.key.ENTER,
             *'my_project',
+            readchar.key.ENTER,
+            readchar.key.ENTER,
+            readchar.key.ENTER,
+            readchar.key.ENTER,
             readchar.key.ENTER,
         ]
     )
@@ -121,10 +187,16 @@ def test_create_existing_folder_interactive(
     assert 'existing_project already exists' in result.output
 
     mock_cookiecutter.assert_called_with(
-        template='gh:apify/crawlee-python',
-        directory='templates/playwright',
+        template=ANY,
         no_input=True,
-        extra_context={'project_name': 'my_project'},
+        extra_context={
+            'project_name': 'my_project',
+            'package_manager': 'poetry',
+            'crawler_type': 'playwright',
+            'http_client': 'httpx',
+            'start_url': 'https://crawlee.dev',
+            'enable_apify_integration': False,
+        },
     )
 
 
@@ -139,6 +211,10 @@ def test_create_existing_folder_interactive_multiple_attempts(
             readchar.key.ENTER,
             *'my_project',
             readchar.key.ENTER,
+            readchar.key.ENTER,
+            readchar.key.ENTER,
+            readchar.key.ENTER,
+            readchar.key.ENTER,
         ]
     )
     monkeypatch.setattr(target=readchar, name='readkey', value=lambda: next(mock_input))
@@ -148,12 +224,18 @@ def test_create_existing_folder_interactive_multiple_attempts(
     (tmp / 'existing_project').mkdir()
     (tmp / 'existing_project_2').mkdir()
 
-    result = runner.invoke(crawlee._cli.cli, ['create', '--template', 'playwright'])
+    result = runner.invoke(crawlee._cli.cli, ['create', '--crawler-type', 'playwright'])
     assert 'existing_project already exists' in result.output
 
     mock_cookiecutter.assert_called_with(
-        template='gh:apify/crawlee-python',
-        directory='templates/playwright',
+        template=ANY,
         no_input=True,
-        extra_context={'project_name': 'my_project'},
+        extra_context={
+            'project_name': 'my_project',
+            'package_manager': 'poetry',
+            'crawler_type': 'playwright',
+            'http_client': 'httpx',
+            'start_url': 'https://crawlee.dev',
+            'enable_apify_integration': False,
+        },
     )

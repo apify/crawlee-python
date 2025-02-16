@@ -6,6 +6,8 @@ import random
 from logging import getLogger
 from typing import TYPE_CHECKING, Callable, Literal, overload
 
+from crawlee import service_locator
+from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 from crawlee.events._types import Event, EventPersistStateData
 from crawlee.sessions import Session
@@ -24,7 +26,12 @@ CreateSessionFunctionType = Callable[[], Session]
 
 @docs_group('Classes')
 class SessionPool:
-    """Session pool is a pool of sessions that are rotated based on the usage count or age."""
+    """A pool of sessions that are managed, rotated, and persisted based on usage and age.
+
+    It ensures effective session management by maintaining a pool of sessions and rotating them based on
+    usage count, expiration time, or custom rules. It provides methods to retrieve sessions, manage their
+    lifecycle, and optionally persist the state to enable recovery.
+    """
 
     def __init__(
         self,
@@ -52,10 +59,12 @@ class SessionPool:
             persist_state_kvs_name: The name of the `KeyValueStore` used for state persistence.
             persist_state_key: The key under which the session pool's state is stored in the `KeyValueStore`.
         """
+        if event_manager:
+            service_locator.set_event_manager(event_manager)
+
         self._max_pool_size = max_pool_size
         self._session_settings = create_session_settings or {}
         self._create_session_function = create_session_function
-        self._event_manager = event_manager
         self._persistence_enabled = persistence_enabled
         self._persist_state_kvs_name = persist_state_kvs_name
         self._persist_state_key = persist_state_key
@@ -63,12 +72,12 @@ class SessionPool:
         if self._create_session_function and self._session_settings:
             raise ValueError('Both `create_session_settings` and `create_session_function` cannot be provided.')
 
-        if self._persistence_enabled and not self._event_manager:
-            raise ValueError('Persistence is enabled, but no event manager was provided.')
-
         # Internal non-configurable attributes
         self._kvs: KeyValueStore | None = None
         self._sessions: dict[str, Session] = {}
+
+        # Flag to indicate the context state.
+        self._active = False
 
     def __repr__(self) -> str:
         """Get a string representation."""
@@ -89,9 +98,24 @@ class SessionPool:
         """Get the number of sessions that are no longer usable."""
         return self.session_count - self.usable_session_count
 
+    @property
+    def active(self) -> bool:
+        """Indicate whether the context is active."""
+        return self._active
+
     async def __aenter__(self) -> SessionPool:
-        """Initialize the pool upon entering the context manager."""
-        if self._persistence_enabled and self._event_manager:
+        """Initialize the pool upon entering the context manager.
+
+        Raises:
+            RuntimeError: If the context manager is already active.
+        """
+        if self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is already active.')
+
+        self._active = True
+
+        if self._persistence_enabled:
+            event_manager = service_locator.get_event_manager()
             self._kvs = await KeyValueStore.open(name=self._persist_state_kvs_name)
 
             # Attempt to restore the previously persisted state.
@@ -102,7 +126,7 @@ class SessionPool:
                 await self._fill_sessions_to_max()
 
             # Register an event listener for persisting the session pool state.
-            self._event_manager.on(event=Event.PERSIST_STATE, listener=self._persist_state)
+            event_manager.on(event=Event.PERSIST_STATE, listener=self._persist_state)
         # If persistence is disabled, just fill the pool with sessions.
         else:
             await self._fill_sessions_to_max()
@@ -115,13 +139,23 @@ class SessionPool:
         exc_value: BaseException | None,
         exc_traceback: TracebackType | None,
     ) -> None:
-        """Deinitialize the pool upon exiting the context manager."""
-        if self._persistence_enabled and self._event_manager:
+        """Deinitialize the pool upon exiting the context manager.
+
+        Raises:
+            RuntimeError: If the context manager is not active.
+        """
+        if not self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is not active.')
+
+        if self._persistence_enabled:
+            event_manager = service_locator.get_event_manager()
             # Remove the event listener for state persistence.
-            self._event_manager.off(event=Event.PERSIST_STATE, listener=self._persist_state)
+            event_manager.off(event=Event.PERSIST_STATE, listener=self._persist_state)
 
             # Persist the final state of the session pool.
             await self._persist_state(event_data=EventPersistStateData(is_migrating=False))
+
+        self._active = False
 
     @overload
     def get_state(self, *, as_dict: Literal[True]) -> dict: ...
@@ -129,6 +163,7 @@ class SessionPool:
     @overload
     def get_state(self, *, as_dict: Literal[False]) -> SessionPoolModel: ...
 
+    @ensure_context
     def get_state(self, *, as_dict: bool = False) -> SessionPoolModel | dict:
         """Retrieve the current state of the pool either as a model or as a dictionary."""
         model = SessionPoolModel(
@@ -145,17 +180,22 @@ class SessionPool:
             return model.model_dump()
         return model
 
+    @ensure_context
     def add_session(self, session: Session) -> None:
-        """Add a specific session to the pool.
+        """Add an externally created session to the pool.
 
         This is intened only for the cases when you want to add a session that was created outside of the pool.
         Otherwise, the pool will create new sessions automatically.
+
+        Args:
+            session: The session to add to the pool.
         """
         if session.id in self._sessions:
             logger.warning(f'Session with ID {session.id} already exists in the pool.')
             return
         self._sessions[session.id] = session
 
+    @ensure_context
     async def get_session(self) -> Session:
         """Retrieve a random session from the pool.
 
@@ -175,6 +215,7 @@ class SessionPool:
         self._remove_retired_sessions()
         return await self._create_new_session()
 
+    @ensure_context
     async def get_session_by_id(self, session_id: str) -> Session | None:
         """Retrieve a session by ID from the pool.
 

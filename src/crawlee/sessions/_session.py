@@ -15,15 +15,16 @@ logger = getLogger(__name__)
 
 @docs_group('Data structures')
 class Session:
-    """Session object represents a single user session.
+    """Represent a single user session, managing cookies, error states, and usage limits.
 
-    Sessions are used to store information such as cookies and can be used for generating fingerprints and proxy
-    sessions. You can imagine each session as a specific user, with its own cookies, IP (via proxy) and potentially
-    a unique browser fingerprint. Session internal state can be enriched with custom user data for example some
-    authorization tokens and specific headers in general.
+    A `Session` simulates a specific user with attributes like cookies, IP (via proxy), and potentially
+    a unique browser fingerprint. It maintains its internal state, which can include custom user data
+    (e.g., authorization tokens or headers) and tracks its usability through metrics such as error score,
+    usage count, and expiration.
     """
 
     _DEFAULT_BLOCKED_STATUS_CODES: ClassVar = [401, 403, 429]
+    """Default status codes that indicate a session is blocked."""
 
     def __init__(
         self,
@@ -37,7 +38,7 @@ class Session:
         usage_count: int = 0,
         max_usage_count: int = 50,
         error_score: float = 0.0,
-        cookies: dict | None = None,
+        cookies: dict[str, str] | None = None,
         blocked_status_codes: list | None = None,
     ) -> None:
         """A default constructor.
@@ -65,11 +66,11 @@ class Session:
         self._max_usage_count = max_usage_count
         self._error_score = error_score
         self._cookies = cookies or {}
-        self._blocked_status_codes = blocked_status_codes or self._DEFAULT_BLOCKED_STATUS_CODES
+        self._blocked_status_codes = set(blocked_status_codes or self._DEFAULT_BLOCKED_STATUS_CODES)
 
     @classmethod
     def from_model(cls, model: SessionModel) -> Session:
-        """Create a new instance from a SessionModel."""
+        """Create a new instance from a `SessionModel`."""
         return cls(**model.model_dump())
 
     def __repr__(self) -> str:
@@ -93,7 +94,7 @@ class Session:
         return self._user_data
 
     @property
-    def cookies(self) -> dict:
+    def cookies(self) -> dict[str, str]:
         """Get the cookies."""
         return self._cookies
 
@@ -193,17 +194,21 @@ class Session:
         self,
         *,
         status_code: int,
-        additional_blocked_status_codes: list[int] | None = None,
+        additional_blocked_status_codes: set[int] | None = None,
+        ignore_http_error_status_codes: set[int] | None = None,
     ) -> bool:
         """Evaluate whether a session should be retired based on the received HTTP status code.
 
         Args:
             status_code: The HTTP status code received from a server response.
             additional_blocked_status_codes: Optional additional status codes that should trigger session retirement.
+            ignore_http_error_status_codes: Optional status codes to allow suppression of
+            codes from `blocked_status_codes`.
 
         Returns:
             True if the session should be retired, False otherwise.
         """
-        blocked_status_codes = self._blocked_status_codes + (additional_blocked_status_codes or [])
+        if additional_blocked_status_codes and status_code in additional_blocked_status_codes:
+            return True
 
-        return status_code in blocked_status_codes
+        return status_code in (self._blocked_status_codes - (ignore_http_error_status_codes or set()))

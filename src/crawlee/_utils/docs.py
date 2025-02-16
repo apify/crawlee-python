@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Callable, Literal
 
-GroupName = Literal['Classes', 'Abstract classes', 'Data structures', 'Errors', 'Functions']
+GroupName = Literal['Classes', 'Abstract classes', 'Data structures', 'Event payloads', 'Errors', 'Functions']
 
 
 def docs_group(group_name: GroupName) -> Callable:  # noqa: ARG001

@@ -1,0 +1,14 @@
+{
+    "project_name": "crawlee-python-project",
+    "__package_name": "{{ cookiecutter.project_name|lower|replace('-', '_') }}",
+    "crawler_type": ["beautifulsoup", "parsel", "playwright", "playwright-camoufox"],
+    "__crawler_type": "{{ cookiecutter.crawler_type|lower|replace('-', '_') }}",
+    "http_client": ["httpx", "curl-impersonate"],
+    "package_manager": ["poetry", "pip", "manual"],
+    "enable_apify_integration": false,
+    "start_url": "https://crawlee.dev",
+    "_jinja2_env_vars": {
+        "line_statement_prefix": "# %"
+    },
+    "_extensions": ["jinja2.ext.do"]
+}

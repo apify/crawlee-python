@@ -1,22 +1,30 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, AsyncIterator, TypeVar, overload
+import asyncio
+from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, overload
 
 from typing_extensions import override
 
+from crawlee import service_locator
 from crawlee._utils.docs import docs_group
-from crawlee.base_storage_client._models import KeyValueStoreKeyInfo, KeyValueStoreMetadata
-from crawlee.storages._base_storage import BaseStorage
+from crawlee.events._types import Event, EventPersistStateData
+from crawlee.storage_clients.models import KeyValueStoreKeyInfo, KeyValueStoreMetadata
+
+from ._base import Storage
 
 if TYPE_CHECKING:
-    from crawlee.base_storage_client import BaseStorageClient
+    from collections.abc import AsyncIterator
+
+    from crawlee._types import JsonSerializable
     from crawlee.configuration import Configuration
+    from crawlee.storage_clients import StorageClient
 
 T = TypeVar('T')
 
 
 @docs_group('Classes')
-class KeyValueStore(BaseStorage):
+class KeyValueStore(Storage):
     """Represents a key-value based storage for reading and writing data records or files.
 
     Each data record is identified by a unique key and associated with a specific MIME content type. This class is
@@ -50,27 +58,25 @@ class KeyValueStore(BaseStorage):
     ```
     """
 
-    def __init__(
-        self,
-        id: str,
-        name: str | None,
-        configuration: Configuration,
-        client: BaseStorageClient,
-    ) -> None:
+    # Cache for persistent (auto-saved) values
+    _general_cache: ClassVar[dict[str, dict[str, dict[str, JsonSerializable]]]] = {}
+    _persist_state_event_started = False
+
+    def __init__(self, id: str, name: str | None, storage_client: StorageClient) -> None:
         self._id = id
         self._name = name
-        self._configuration = configuration
 
         # Get resource clients from storage client
-        self._resource_client = client.key_value_store(self._id)
+        self._resource_client = storage_client.key_value_store(self._id)
+        self._autosave_lock = asyncio.Lock()
 
-    @override
     @property
+    @override
     def id(self) -> str:
         return self._id
 
-    @override
     @property
+    @override
     def name(self) -> str | None:
         return self._name
 
@@ -86,9 +92,12 @@ class KeyValueStore(BaseStorage):
         id: str | None = None,
         name: str | None = None,
         configuration: Configuration | None = None,
-        storage_client: BaseStorageClient | None = None,
+        storage_client: StorageClient | None = None,
     ) -> KeyValueStore:
         from crawlee.storages._creation_management import open_storage
+
+        configuration = configuration or service_locator.get_configuration()
+        storage_client = storage_client or service_locator.get_storage_client()
 
         return await open_storage(
             storage_class=cls,
@@ -103,6 +112,7 @@ class KeyValueStore(BaseStorage):
         from crawlee.storages._creation_management import remove_storage_from_cache
 
         await self._resource_client.delete()
+        self._clear_cache()
         remove_storage_from_cache(storage_class=self.__class__, id=self._id, name=self._name)
 
     @overload
@@ -173,3 +183,73 @@ class KeyValueStore(BaseStorage):
             The public URL for the given key.
         """
         return await self._resource_client.get_public_url(key)
+
+    async def get_auto_saved_value(
+        self,
+        key: str,
+        default_value: dict[str, JsonSerializable] | None = None,
+    ) -> dict[str, JsonSerializable]:
+        """Gets a value from KVS that will be automatically saved on changes.
+
+        Args:
+            key: Key of the record, to store the value.
+            default_value: Value to be used if the record does not exist yet. Should be a dictionary.
+
+        Returns:
+            Returns the value of the key.
+        """
+        default_value = {} if default_value is None else default_value
+
+        async with self._autosave_lock:
+            if key in self._cache:
+                return self._cache[key]
+
+            value = await self.get_value(key, default_value)
+
+            if not isinstance(value, dict):
+                raise TypeError(
+                    f'Expected dictionary for persist state value at key "{key}, but got {type(value).__name__}'
+                )
+
+            self._cache[key] = value
+
+        self._ensure_persist_event()
+
+        return value
+
+    @property
+    def _cache(self) -> dict[str, dict[str, JsonSerializable]]:
+        """Cache dictionary for storing auto-saved values indexed by store ID."""
+        if self._id not in self._general_cache:
+            self._general_cache[self._id] = {}
+        return self._general_cache[self._id]
+
+    async def _persist_save(self, _event_data: EventPersistStateData | None = None) -> None:
+        """Save cache with persistent values. Can be used in Event Manager."""
+        for key, value in self._cache.items():
+            await self.set_value(key, value)
+
+    def _ensure_persist_event(self) -> None:
+        """Setup persist state event handling if not already done."""
+        if self._persist_state_event_started:
+            return
+
+        event_manager = service_locator.get_event_manager()
+        event_manager.on(event=Event.PERSIST_STATE, listener=self._persist_save)
+        self._persist_state_event_started = True
+
+    def _clear_cache(self) -> None:
+        """Clear cache with persistent values."""
+        self._cache.clear()
+
+    def _drop_persist_state_event(self) -> None:
+        """Off event_manager listener and drop event status."""
+        if self._persist_state_event_started:
+            event_manager = service_locator.get_event_manager()
+            event_manager.off(event=Event.PERSIST_STATE, listener=self._persist_save)
+        self._persist_state_event_started = False
+
+    async def persist_autosaved_values(self) -> None:
+        """Force persistent values to be saved without waiting for an event in Event Manager."""
+        if self._persist_state_event_started:
+            await self._persist_save()

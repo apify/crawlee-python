@@ -9,23 +9,24 @@ from typing import TYPE_CHECKING, Any, TypedDict, TypeVar
 
 from typing_extensions import override
 
+from crawlee import service_locator
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.docs import docs_group
 from crawlee._utils.lru_cache import LRUCache
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee._utils.wait import wait_for_all_tasks_for_finish
-from crawlee.base_storage_client._models import ProcessedRequest, RequestQueueMetadata
-from crawlee.events._types import Event
-from crawlee.storages._base_storage import BaseStorage
-from crawlee.storages._request_provider import RequestProvider
+from crawlee.events import Event
+from crawlee.request_loaders import RequestManager
+from crawlee.storage_clients.models import ProcessedRequest, RequestQueueMetadata
+
+from ._base import Storage
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from crawlee._request import Request
-    from crawlee.base_storage_client import BaseStorageClient
+    from crawlee import Request
     from crawlee.configuration import Configuration
-    from crawlee.events import EventManager
+    from crawlee.storage_clients import StorageClient
 
 logger = getLogger(__name__)
 
@@ -40,7 +41,7 @@ class CachedRequest(TypedDict):
 
 
 @docs_group('Classes')
-class RequestQueue(BaseStorage, RequestProvider):
+class RequestQueue(Storage, RequestManager):
     """Represents a queue storage for managing HTTP requests in web crawling operations.
 
     The `RequestQueue` class handles a queue of HTTP requests, each identified by a unique URL, to facilitate structured
@@ -79,28 +80,29 @@ class RequestQueue(BaseStorage, RequestProvider):
         self,
         id: str,
         name: str | None,
-        configuration: Configuration,
-        client: BaseStorageClient,
-        event_manager: EventManager,
+        storage_client: StorageClient,
     ) -> None:
+        config = service_locator.get_configuration()
+        event_manager = service_locator.get_event_manager()
+
         self._id = id
         self._name = name
-        self._configuration = configuration
 
         # Get resource clients from storage client
-        self._resource_client = client.request_queue(self._id)
+        self._resource_client = storage_client.request_queue(self._id)
+        self._resource_collection_client = storage_client.request_queues()
 
         self._request_lock_time = timedelta(minutes=3)
         self._queue_paused_for_migration = False
 
         event_manager.on(event=Event.MIGRATING, listener=lambda _: setattr(self, '_queue_paused_for_migration', True))
-        event_manager.on(event=Event.MIGRATING, listener=lambda _: self._clear_possible_locks())
-        event_manager.on(event=Event.ABORTING, listener=lambda _: self._clear_possible_locks())
+        event_manager.on(event=Event.MIGRATING, listener=self._clear_possible_locks)
+        event_manager.on(event=Event.ABORTING, listener=self._clear_possible_locks)
 
         # Other internal attributes
         self._tasks = list[asyncio.Task]()
         self._client_key = crypto_random_object_id()
-        self._internal_timeout = configuration.internal_timeout or timedelta(minutes=5)
+        self._internal_timeout = config.internal_timeout or timedelta(minutes=5)
         self._assumed_total_count = 0
         self._assumed_handled_count = 0
         self._queue_head_dict: OrderedDict[str, str] = OrderedDict()
@@ -108,13 +110,13 @@ class RequestQueue(BaseStorage, RequestProvider):
         self._last_activity = datetime.now(timezone.utc)
         self._requests_cache: LRUCache[CachedRequest] = LRUCache(max_length=self._MAX_CACHED_REQUESTS)
 
-    @override
     @property
+    @override
     def id(self) -> str:
         return self._id
 
-    @override
     @property
+    @override
     def name(self) -> str | None:
         return self._name
 
@@ -126,9 +128,12 @@ class RequestQueue(BaseStorage, RequestProvider):
         id: str | None = None,
         name: str | None = None,
         configuration: Configuration | None = None,
-        storage_client: BaseStorageClient | None = None,
+        storage_client: StorageClient | None = None,
     ) -> RequestQueue:
         from crawlee.storages._creation_management import open_storage
+
+        configuration = configuration or service_locator.get_configuration()
+        storage_client = storage_client or service_locator.get_storage_client()
 
         return await open_storage(
             storage_class=cls,
@@ -215,7 +220,9 @@ class RequestQueue(BaseStorage, RequestProvider):
                     await asyncio.sleep(wait_time_secs)
 
         # Create and start the task to process remaining batches in the background
-        remaining_batches_task = asyncio.create_task(_process_remaining_batches())
+        remaining_batches_task = asyncio.create_task(
+            _process_remaining_batches(), name='request_queue_process_remaining_batches_task'
+        )
         self._tasks.append(remaining_batches_task)
 
         # Wait for all tasks to finish if requested
@@ -402,7 +409,7 @@ class RequestQueue(BaseStorage, RequestProvider):
             await asyncio.sleep(5)  # TODO not sure how long we should sleep
             current_head = await self._resource_client.list_head(limit=2)
 
-        return len(current_head.items) == 0
+        return len(current_head.items) == 0 or self._queue_paused_for_migration
 
     async def get_info(self) -> RequestQueueMetadata | None:
         """Get an object containing general information about the request queue."""
@@ -426,7 +433,7 @@ class RequestQueue(BaseStorage, RequestProvider):
             return
 
         if self._list_head_and_lock_task is None:
-            task = asyncio.create_task(self._list_head_and_lock())
+            task = asyncio.create_task(self._list_head_and_lock(), name='request_queue_list_head_and_lock_task')
 
             def callback(_: Any) -> None:
                 self._list_head_and_lock_task = None

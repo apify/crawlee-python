@@ -3,24 +3,36 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 from collections import defaultdict
+from collections.abc import Awaitable, Callable
 from datetime import timedelta
 from functools import wraps
 from logging import getLogger
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, TypedDict, Union, cast, overload
 
 from pyee.asyncio import AsyncIOEventEmitter
-from typing_extensions import NotRequired
 
+from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.wait import wait_for_all_tasks_for_finish
-from crawlee.events._types import Event, EventPersistStateData
+from crawlee.events._types import (
+    Event,
+    EventAbortingData,
+    EventExitData,
+    EventListener,
+    EventMigratingData,
+    EventPersistStateData,
+    EventSystemInfoData,
+)
 
 if TYPE_CHECKING:
     from types import TracebackType
 
-    from crawlee.events._types import EventData, Listener, WrappedListener
+    from typing_extensions import NotRequired
+
+    from crawlee.events._types import EventData, WrappedListener
 
 logger = getLogger(__name__)
 
@@ -40,10 +52,11 @@ class EventManagerOptions(TypedDict):
 
 @docs_group('Classes')
 class EventManager:
-    """Event manager for registering, emitting, and managing event listeners.
+    """Manage events and their listeners, enabling registration, emission, and execution control.
 
-    Event manager allows you to register event listeners, emit events, and wait for event listeners to complete
-    their execution. It is built on top of the `pyee.asyncio.AsyncIOEventEmitter` class.
+    It allows for registering event listeners, emitting events, and ensuring all listeners complete their execution.
+    Built on top of `pyee.asyncio.AsyncIOEventEmitter`. It implements additional features such as waiting for all
+    listeners to complete and emitting `PersistState` events at regular intervals.
     """
 
     def __init__(
@@ -69,7 +82,7 @@ class EventManager:
 
         # Store the mapping between events, listeners and their wrappers in the following way:
         #   event -> listener -> [wrapped_listener_1, wrapped_listener_2, ...]
-        self._listeners_to_wrappers: dict[Event, dict[Listener, list[WrappedListener]]] = defaultdict(
+        self._listeners_to_wrappers: dict[Event, dict[EventListener[Any], list[WrappedListener]]] = defaultdict(
             lambda: defaultdict(list),
         )
 
@@ -79,8 +92,24 @@ class EventManager:
             delay=self._persist_state_interval,
         )
 
+        # Flag to indicate the context state.
+        self._active = False
+
+    @property
+    def active(self) -> bool:
+        """Indicate whether the context is active."""
+        return self._active
+
     async def __aenter__(self) -> EventManager:
-        """Initializes the event manager upon entering the async context."""
+        """Initializes the event manager upon entering the async context.
+
+        Raises:
+            RuntimeError: If the context manager is already active.
+        """
+        if self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is already active.')
+
+        self._active = True
         self._emit_persist_state_event_rec_task.start()
         return self
 
@@ -93,29 +122,55 @@ class EventManager:
         """Closes the local event manager upon exiting the async context.
 
         This will stop listening for the events, and it will wait for all the event listeners to finish.
+
+        Raises:
+            RuntimeError: If the context manager is not active.
         """
+        if not self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is not active.')
+
         await self.wait_for_all_listeners_to_complete(timeout=self._close_timeout)
         self._event_emitter.remove_all_listeners()
         self._listener_tasks.clear()
         self._listeners_to_wrappers.clear()
         await self._emit_persist_state_event_rec_task.stop()
+        self._active = False
 
-    def on(self, *, event: Event, listener: Listener) -> None:
-        """Add an event listener to the event manager.
+    @overload
+    def on(self, *, event: Literal[Event.PERSIST_STATE], listener: EventListener[EventPersistStateData]) -> None: ...
+    @overload
+    def on(self, *, event: Literal[Event.SYSTEM_INFO], listener: EventListener[EventSystemInfoData]) -> None: ...
+    @overload
+    def on(self, *, event: Literal[Event.MIGRATING], listener: EventListener[EventMigratingData]) -> None: ...
+    @overload
+    def on(self, *, event: Literal[Event.ABORTING], listener: EventListener[EventAbortingData]) -> None: ...
+    @overload
+    def on(self, *, event: Literal[Event.EXIT], listener: EventListener[EventExitData]) -> None: ...
+    @overload
+    def on(self, *, event: Event, listener: EventListener[None]) -> None: ...
+
+    def on(self, *, event: Event, listener: EventListener[Any]) -> None:
+        """Register an event listener for a specific event.
 
         Args:
-            event: The Actor event for which to listen to.
+            event: The event for which to listen to.
             listener: The function (sync or async) which is to be called when the event is emitted.
         """
+        signature = inspect.signature(listener)
 
-        @wraps(listener)
+        @wraps(cast(Callable[..., Union[None, Awaitable[None]]], listener))
         async def listener_wrapper(event_data: EventData) -> None:
+            try:
+                bound_args = signature.bind(event_data)
+            except TypeError:  # Parameterless listener
+                bound_args = signature.bind()
+
             # If the listener is a coroutine function, just call it, otherwise, run it in a separate thread
             # to avoid blocking the event loop
             coro = (
-                listener(event_data)
+                listener(*bound_args.args, **bound_args.kwargs)
                 if asyncio.iscoroutinefunction(listener)
-                else asyncio.to_thread(listener, event_data)
+                else asyncio.to_thread(cast(Callable[..., None], listener), *bound_args.args, **bound_args.kwargs)
             )
             # Note: use `asyncio.iscoroutinefunction` rather then `inspect.iscoroutinefunction` since it works with
             # unittests.mock.AsyncMock. See https://github.com/python/cpython/issues/84753.
@@ -124,9 +179,9 @@ class EventManager:
             self._listener_tasks.add(listener_task)
 
             try:
-                logger.debug('LocalEventManager.on.listener_wrapper(): Awaiting listener task...')
+                logger.debug('EventManager.on.listener_wrapper(): Awaiting listener task...')
                 await listener_task
-                logger.debug('LocalEventManager.on.listener_wrapper(): Listener task completed.')
+                logger.debug('EventManager.on.listener_wrapper(): Listener task completed.')
             except Exception:
                 # We need to swallow the exception and just log it here, otherwise it could break the event emitter
                 logger.exception(
@@ -134,14 +189,14 @@ class EventManager:
                     extra={'event_name': event.value, 'listener_name': listener.__name__},
                 )
             finally:
-                logger.debug('LocalEventManager.on.listener_wrapper(): Removing listener task from the set...')
+                logger.debug('EventManager.on.listener_wrapper(): Removing listener task from the set...')
                 self._listener_tasks.remove(listener_task)
 
         self._listeners_to_wrappers[event][listener].append(listener_wrapper)
         self._event_emitter.add_listener(event.value, listener_wrapper)
 
-    def off(self, *, event: Event, listener: Listener | None = None) -> None:
-        """Remove a listener, or all listeners, from an Actor event.
+    def off(self, *, event: Event, listener: EventListener[Any] | None = None) -> None:
+        """Remove a specific listener or all listeners for an event.
 
         Args:
             event: The Actor event for which to remove listeners.
@@ -156,8 +211,22 @@ class EventManager:
             self._listeners_to_wrappers[event] = defaultdict(list)
             self._event_emitter.remove_all_listeners(event.value)
 
+    @overload
+    def emit(self, *, event: Literal[Event.PERSIST_STATE], event_data: EventPersistStateData) -> None: ...
+    @overload
+    def emit(self, *, event: Literal[Event.SYSTEM_INFO], event_data: EventSystemInfoData) -> None: ...
+    @overload
+    def emit(self, *, event: Literal[Event.MIGRATING], event_data: EventMigratingData) -> None: ...
+    @overload
+    def emit(self, *, event: Literal[Event.ABORTING], event_data: EventAbortingData) -> None: ...
+    @overload
+    def emit(self, *, event: Literal[Event.EXIT], event_data: EventExitData) -> None: ...
+    @overload
+    def emit(self, *, event: Event, event_data: Any) -> None: ...
+
+    @ensure_context
     def emit(self, *, event: Event, event_data: EventData) -> None:
-        """Emit an event.
+        """Emit an event with the associated data to all registered listeners.
 
         Args:
             event: The event which will be emitted.
@@ -165,6 +234,7 @@ class EventManager:
         """
         self._event_emitter.emit(event.value, event_data)
 
+    @ensure_context
     async def wait_for_all_listeners_to_complete(self, *, timeout: timedelta | None = None) -> None:
         """Wait for all currently executing event listeners to complete.
 

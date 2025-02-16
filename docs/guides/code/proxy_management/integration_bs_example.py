@@ -1,6 +1,6 @@
 import asyncio
 
-from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
+from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 from crawlee.proxy_configuration import ProxyConfiguration
 
 

@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "crawlee"
-version = "0.4.1"
+version = "0.6.0"
 description = "Crawlee for Python"
 authors = ["Apify Technologies s.r.o. <support@apify.com>"]
 license = "Apache-2.0"
@@ -40,63 +40,70 @@ keywords = [
 "Issue Tracker" = "https://github.com/apify/crawlee-python/issues"
 "Repository" = "https://github.com/apify/crawlee-python"
 
-# We use inclusive ordered comparison clauses for external packages intentionally in order to enhance Crawlee's
-# compatibility with external packages. This decision was discussed in detail in the following PR:
-# https://github.com/apify/apify-sdk-python/pull/154.
 [tool.poetry.dependencies]
 python = "^3.9"
-apify = { version = ">=2.0.0", optional = true }
 beautifulsoup4 = { version = ">=4.12.0", optional = true }
+browserforge = { version = ">=1.2.3", optional = true }
 colorama = ">=0.4.0"
 cookiecutter = ">=2.6.0"
 curl-cffi = { version = ">=0.7.2", optional = true }
 docutils = ">=0.21.0"
 eval-type-backport = ">=0.2.0"
 html5lib = { version = ">=1.0", optional = true }
-httpx = { version = ">=0.27.0", extras = ["brotli", "http2"] }
+httpx = {version = ">=0.27.0", extras = ["brotli", "http2", "zstd"]}
 inquirer = ">=3.3.0"
+jaro-winkler = { version = ">=2.0.3", optional = true }
 lxml = { version = ">=5.2.0", optional = true }
 more_itertools = ">=10.2.0"
 parsel = { version = ">=1.9.0", optional = true }
 playwright = { version = ">=1.27.0", optional = true }
 psutil = ">=6.0.0"
-pydantic = ">=2.6.0"
-pydantic-settings = ">=2.2.0"
+pydantic = ">=2.8.1, !=2.10.0, !=2.10.1, !=2.10.2"
+# TODO: relax the upper bound once the issue is resolved:
+# https://github.com/apify/crawlee-python/issues/814
+pydantic-settings = ">=2.2.0 <2.7.0"
 pyee = ">=9.0.0"
-python-dateutil = ">=2.9.0"
+scikit-learn =  [
+    {version = ">=1.6.0", python = ">=3.10", optional = true},
+    {version = "==1.5.2", python = "==3.9", optional = true}
+]
 sortedcollections = ">=2.1.0"
 tldextract = ">=5.1.0"
 typer = ">=0.12.0"
 typing-extensions = ">=4.1.0"
+yarl = ">=1.18.0"
 
 [tool.poetry.group.dev.dependencies]
 build = "~1.2.0"
-filelock = "~3.16.0"
+filelock = "~3.17.0"
 ipdb = "~0.13.0"
-mypy = "~1.13.0"
-pre-commit = "~4.0.0"
+mypy = "~1.15.0"
+pre-commit = "~4.1.0"
 proxy-py = "~2.4.0"
 pydoc-markdown = "~4.8.0"
 pytest = "~8.3.0"
-pytest-asyncio = "~0.24.0"
-pytest-cov = "~5.0.0"
+pytest-asyncio = "~0.25.0"
+pytest-cov = "~6.0.0"
 pytest-only = "~2.1.0"
 pytest-timeout = "~2.3.0"
 pytest-xdist = "~3.6.0"
-respx = "~0.21.0"
-ruff = "~0.7.0"
-setuptools = "~75.3.0"                    # setuptools are used by pytest, but not explicitly required
+respx = "~0.22.0"
+ruff = "~0.8.0"
+setuptools = "~75.8.0"                    # setuptools are used by pytest, but not explicitly required
+sortedcontainers-stubs = "^2.4.2"
 types-beautifulsoup4 = "~4.12.0.20240229"
 types-colorama = "~0.4.15.20240106"
 types-psutil = "~5.9.5.20240205"
 types-python-dateutil = "~2.9.0.20240316"
 
 [tool.poetry.extras]
-all = ["apify", "beautifulsoup4", "lxml", "html5lib", "curl-cffi", "playwright"]
-apify = ["apify"]
+# Support for re-using groups in other groups https://peps.python.org/pep-0735/ in poetry:
+# https://github.com/python-poetry/poetry/issues/9751
+adaptive-playwright = ["jaro-winkler", "playwright", "scikit-learn"]
+all = ["beautifulsoup4", "browserforge", "curl-cffi", "html5lib", "jaro-winkler", "lxml", "parsel", "playwright", "scikit-learn"]
 beautifulsoup = ["beautifulsoup4", "lxml", "html5lib"]
 curl-impersonate = ["curl-cffi"]
-playwright = ["playwright"]
+playwright = ["browserforge", "playwright"]
 parsel = ["parsel"]
 
 [tool.poetry.scripts]
@@ -104,12 +111,12 @@ crawlee = "crawlee._cli:cli"
 
 [tool.ruff]
 line-length = 120
+include = ["src/**/*.py", "tests/**/*.py", "docs/**/*.py", "website/**/*.py"]
+extend-exclude = ["project_template"]
 
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
-    "ANN101",   # Missing type annotation for `self` in method
-    "ANN102",   # Missing type annotation for `{name}` in classmethod
     "ANN401",   # Dynamically typed expressions (typing.Any) are disallowed in {filename}
     "ASYNC109", # Async function definition with a `timeout` parameter
     "BLE001",   # Do not catch blind exception
@@ -122,7 +129,6 @@ ignore = [
     "G004",     # Logging statement uses f-string
     "ISC001",   # This rule may cause conflicts when used with the formatter
     "FIX",      # flake8-fixme
-    "PGH003",   # Use specific rule codes when ignoring type issues
     "PLR0911",  # Too many return statements
     "PLR0913",  # Too many arguments in function definition
     "PLR0915",  # Too many statements
@@ -156,16 +162,22 @@ indent-style = "space"
     "T20",     # flake8-print
     "TRY301",  # Abstract `raise` to an inner function
 ]
-"**/{docs}/**" = [
-    "D",       # Everything from the pydocstyle
-    "INP001",  # File {filename} is part of an implicit namespace package, add an __init__.py
-    "F841",    # Local variable {variable} is assigned to but never used
-    "N999",    # Invalid module name
+"**/{docs,website}/**" = [
+    "D",      # Everything from the pydocstyle
+    "INP001", # File {filename} is part of an implicit namespace package, add an __init__.py
+    "F841",   # Local variable {variable} is assigned to but never used
+    "N999",   # Invalid module name
 ]
 
 [tool.ruff.lint.flake8-quotes]
 docstring-quotes = "double"
 inline-quotes = "single"
+
+[tool.ruff.lint.flake8-type-checking]
+runtime-evaluated-base-classes = [
+    "pydantic.BaseModel",
+    "pydantic_settings.BaseSettings",
+]
 
 [tool.ruff.lint.flake8-builtins]
 builtins-ignorelist = ["id"]
@@ -188,7 +200,8 @@ timeout = 1200
 [tool.mypy]
 python_version = "3.9"
 plugins = ["pydantic.mypy"]
-files = ["src", "tests"]
+exclude = ["project_template"]
+files = ["src", "tests", "docs", "website"]
 check_untyped_defs = true
 disallow_incomplete_defs = true
 disallow_untyped_calls = true
@@ -199,25 +212,28 @@ warn_redundant_casts = true
 warn_return_any = true
 warn_unreachable = true
 warn_unused_ignores = true
-exclude = [
-    "docs/introduction/code/08_main.py",
+
+[[tool.mypy.overrides]]
+# Example codes are sometimes showing integration of crawlee with external tool, which is not dependency of crawlee.
+module = [
+    "apify",                # Example code shows integration of apify and crawlee.
+    "camoufox",             # Example code shows integration of camoufox and crawlee.
+    "jaro",                 # Untyped and stubs not available
+    "sklearn.linear_model", # Untyped and stubs not available
 ]
-
-[tool.mypy-scrapy]
 ignore_missing_imports = true
 
-[tool.mypy-sortedcollections]
-ignore_missing_imports = true
+[tool.basedpyright]
+pythonVersion = "3.9"
+typeCheckingMode = "standard"
+include = ["src", "tests", "docs", "website"]
 
 [tool.coverage.report]
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",
-    "assert_never()"
+    "assert_never()",
 ]
-
-[tool.basedpyright]
-typeCheckingMode = "standard"
 
 [tool.ipdb]
 context = 7
