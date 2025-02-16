@@ -356,9 +356,6 @@ class RequestQueue(Storage, RequestManager):
         """
         self._last_activity = datetime.now(timezone.utc)
 
-        # TODO: If request hasn't been changed since the last get_request(), we don't need to call update_request()
-        # and thus improve performance.
-        # https://github.com/apify/apify-sdk-python/issues/143
         processed_request = await self._resource_client.update_request(request, forefront=forefront)
         processed_request.unique_key = request.unique_key
         self._cache_request(unique_key_to_request_id(request.unique_key), processed_request, forefront=forefront)
