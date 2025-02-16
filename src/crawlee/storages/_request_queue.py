@@ -96,6 +96,9 @@ class RequestQueue(Storage, RequestManager):
         self._queue_paused_for_migration = False
         self._queue_has_locked_requests: bool | None = None
 
+        self._is_finished_log_throttle_counter = 0
+        self._dequeued_request_count = 0
+
         event_manager.on(event=Event.MIGRATING, listener=lambda _: setattr(self, '_queue_paused_for_migration', True))
         event_manager.on(event=Event.MIGRATING, listener=self._clear_possible_locks)
         event_manager.on(event=Event.ABORTING, listener=self._clear_possible_locks)
@@ -225,6 +228,7 @@ class RequestQueue(Storage, RequestManager):
             _process_remaining_batches(), name='request_queue_process_remaining_batches_task'
         )
         self._tasks.append(remaining_batches_task)
+        remaining_batches_task.add_done_callback(lambda _: self._tasks.remove(remaining_batches_task))
 
         # Wait for all tasks to finish if requested
         if wait_for_all_requests_to_be_added:
@@ -299,6 +303,7 @@ class RequestQueue(Storage, RequestManager):
             )
             return None
 
+        self._dequeued_request_count += 1
         return request
 
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
@@ -319,6 +324,7 @@ class RequestQueue(Storage, RequestManager):
 
         processed_request = await self._resource_client.update_request(request)
         processed_request.unique_key = request.unique_key
+        self._dequeued_request_count -= 1
 
         if not processed_request.was_already_handled:
             self._assumed_handled_count += 1
@@ -379,6 +385,9 @@ class RequestQueue(Storage, RequestManager):
         Returns:
             bool: `True` if all requests were already handled and there are no more left. `False` otherwise.
         """
+        if self._tasks:
+            return False
+
         if self._queue_head_dict:
             logger.debug(
                 'There are still ids in the queue head that are pending processing',
@@ -392,11 +401,20 @@ class RequestQueue(Storage, RequestManager):
         await self._ensure_head_is_non_empty()
 
         if self._queue_head_dict:
-            logger.debug(
-                'Queue head still returned requests that need to be processed (or that are locked by other clients)'
-            )
+            logger.debug('Queue head still returned requests that need to be processed')
 
             return False
+
+        # Could not lock any new requests - decide based on whether the queue contains requests locked by another client
+        if self._queue_has_locked_requests is not None:
+            if self._queue_has_locked_requests and self._dequeued_request_count == 0:
+                self._is_finished_log_throttle_counter += 1
+
+                # The `% 25` was absolutely arbitrarily picked. It's just to not spam the logs too much.
+                if self._is_finished_log_throttle_counter % 25 == 0:
+                    logger.info('The queue still contains requests locked by another client')
+
+            return self._queue_has_locked_requests
 
         metadata = await self._resource_client.get()
         if metadata is not None and not metadata.had_multiple_clients and not self._queue_head_dict:
@@ -404,13 +422,14 @@ class RequestQueue(Storage, RequestManager):
 
             return True
 
+        # The following is a legacy algorithm for checking if the queue is finished.
+        # It is used only for request queue clients that do not provide the `queue_has_locked_requests` flag.
         current_head = await self._resource_client.list_head(limit=2)
 
-        if not current_head.items:
-            await asyncio.sleep(5)  # TODO not sure how long we should sleep
-            current_head = await self._resource_client.list_head(limit=2)
+        if current_head.items:
+            logger.debug('The queue still contains unfinished requests or requests locked by another client')
 
-        return len(current_head.items) == 0 or self._queue_paused_for_migration
+        return len(current_head.items) == 0
 
     async def get_info(self) -> RequestQueueMetadata | None:
         """Get an object containing general information about the request queue."""
