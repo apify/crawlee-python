@@ -277,7 +277,7 @@ class RequestQueue(Storage, RequestManager):
         if len(self._queue_head) == 0:
             return None
 
-        next_request_id = self._queue_head.pop()
+        next_request_id = self._queue_head.popleft()
         request = await self._get_or_hydrate_request(next_request_id)
 
         # NOTE: It can happen that the queue head index is inconsistent with the main queue table.
@@ -391,6 +391,7 @@ class RequestQueue(Storage, RequestManager):
             bool: `True` if all requests were already handled and there are no more left. `False` otherwise.
         """
         if self._tasks:
+            logger.debug('Background tasks are still in progress')
             return False
 
         if self._queue_head:
@@ -413,13 +414,13 @@ class RequestQueue(Storage, RequestManager):
         # Could not lock any new requests - decide based on whether the queue contains requests locked by another client
         if self._queue_has_locked_requests is not None:
             if self._queue_has_locked_requests and self._dequeued_request_count == 0:
-                self._is_finished_log_throttle_counter += 1
-
                 # The `% 25` was absolutely arbitrarily picked. It's just to not spam the logs too much.
                 if self._is_finished_log_throttle_counter % 25 == 0:
                     logger.info('The queue still contains requests locked by another client')
 
-            return self._queue_has_locked_requests
+                self._is_finished_log_throttle_counter += 1
+
+            return not self._queue_has_locked_requests
 
         metadata = await self._resource_client.get()
         if metadata is not None and not metadata.had_multiple_clients and not self._queue_head:
