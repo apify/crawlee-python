@@ -4102,4 +4102,4 @@ playwright = ["browserforge", "playwright"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.9"
-content-hash = "9171934414d06c2604c5897b4740711ab70a6bc7a74c320fd114ef37c82e7a5a"
+content-hash = "051d0b0ef3a867881e3fc3339cf7fa723d77ff950859c66b5983477c9e52e5f7"
