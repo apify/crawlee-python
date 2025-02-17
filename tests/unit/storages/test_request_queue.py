@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import pytest
 from pydantic import ValidationError
@@ -10,7 +10,6 @@ from pydantic import ValidationError
 from crawlee import Request
 from crawlee._request import RequestState
 from crawlee.storages import RequestQueue
-from crawlee.storages._request_queue import CachedRequest
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Sequence
@@ -251,13 +250,19 @@ async def test_deduplication_of_requests_with_valid_custom_unique_key() -> None:
 
 async def test_cache_requests() -> None:
     rq = await RequestQueue.open(name='my-rq')
-    lru_cache = rq._requests_cache
-    lru_cache['a'] = cast(CachedRequest, 1)
-    lru_cache['b'] = cast(CachedRequest, 2)
-    lru_cache['c'] = cast(CachedRequest, 3)
+    request_1 = Request.from_url('https://apify.com')
+    request_2 = Request.from_url('https://crawlee.dev')
 
-    assert lru_cache['b'] == 2
+    await rq.add_request(request_1)
+    await rq.add_request(request_2)
 
-    # Check rule LRU, the oldest used key is deleted first.
-    get_cached_data = [lru_cache.popitem()[0] for _ in range(3)]
-    assert get_cached_data == ['a', 'c', 'b']
+    assert rq._requests_cache.currsize == 2
+
+    fetched_request = await rq.fetch_next_request()
+
+    assert fetched_request is not None
+    assert fetched_request.id == request_1.id
+
+    # After calling fetch_next_request request_1 moved to the end of the cache.
+    cached_items = [rq._requests_cache.popitem()[0] for _ in range(2)]
+    assert cached_items == [request_2.id, request_1.id]
