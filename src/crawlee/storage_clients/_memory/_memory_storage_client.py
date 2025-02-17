@@ -12,7 +12,7 @@ from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
 from crawlee.configuration import Configuration
-from crawlee.storage_clients import BaseStorageClient
+from crawlee.storage_clients import StorageClient
 
 from ._dataset_client import DatasetClient
 from ._dataset_collection_client import DatasetCollectionClient
@@ -31,7 +31,7 @@ logger = getLogger(__name__)
 
 
 @docs_group('Classes')
-class MemoryStorageClient(BaseStorageClient):
+class MemoryStorageClient(StorageClient):
     """Represents an in-memory storage client for managing datasets, key-value stores, and request queues.
 
     It emulates in-memory storage similar to the Apify platform, supporting both in-memory and local file system-based

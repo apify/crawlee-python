@@ -14,8 +14,8 @@ if TYPE_CHECKING:
 
 
 @docs_group('Abstract classes')
-class BaseKeyValueStoreClient(ABC):
-    """Abstract base class for key-value store resource clients.
+class KeyValueStoreClient(ABC):
+    """An abstract class for key-value store resource clients.
 
     These clients are specific to the type of resource they manage and operate under a designated storage
     client, like a memory storage client.

@@ -8,11 +8,7 @@ from typing_extensions import TypeVar
 from crawlee import HttpHeaders
 from crawlee._types import BasicCrawlingContext
 from crawlee._utils.docs import docs_group
-from crawlee.crawlers import (
-    AbstractHttpParser,
-    ParsedHttpCrawlingContext,
-    PlaywrightCrawlingContext,
-)
+from crawlee.crawlers import AbstractHttpParser, ParsedHttpCrawlingContext, PlaywrightCrawlingContext
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable

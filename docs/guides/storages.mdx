@@ -30,7 +30,7 @@ Crawlee offers multiple storage types for managing and persisting your crawling 
 
 ## Storage clients
 
-Storage clients in Crawlee are subclasses of <ApiLink to="class/BaseStorageClient">`BaseStorageClient`</ApiLink>. They handle interactions with different storage backends. For instance:
+Storage clients in Crawlee are subclasses of <ApiLink to="class/StorageClient">`StorageClient`</ApiLink>. They handle interactions with different storage backends. For instance:
 
 - <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink>: Stores data in memory and persists it to the local file system.
 - [`ApifyStorageClient`](https://docs.apify.com/sdk/python/reference/class/ApifyStorageClient): Manages storage on the [Apify platform](https://apify.com). Apify storage client is implemented in the [Apify SDK](https://github.com/apify/apify-sdk-python).
@@ -52,7 +52,7 @@ where:
 - `{STORAGE_ID}`: The ID of the specific storage instance (default: `default`).
 
 :::info NOTE
-The current <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink> and its interface is quite old and not great. We plan to refactor it, together with the whole <ApiLink to="class/BaseStorageClient">`BaseStorageClient`</ApiLink> interface in the near future and it better and and easier to use. We also plan to introduce new storage clients for different storage backends - e.g. for [SQLLite](https://sqlite.org/).
+The current <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink> and its interface is quite old and not great. We plan to refactor it, together with the whole <ApiLink to="class/StorageClient">`StorageClient`</ApiLink> interface in the near future and it better and and easier to use. We also plan to introduce new storage clients for different storage backends - e.g. for [SQLite](https://sqlite.org/).
 :::
 
 You can override default storage IDs using these environment variables: `CRAWLEE_DEFAULT_DATASET_ID`, `CRAWLEE_DEFAULT_KEY_VALUE_STORE_ID`, or `CRAWLEE_DEFAULT_REQUEST_QUEUE_ID`.

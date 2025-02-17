@@ -59,7 +59,7 @@ class AbstractHttpCrawler(
 
     The `AbstractHttpCrawler` builds on top of the `BasicCrawler`, inheriting all its features. Additionally,
     it implements HTTP communication using HTTP clients. The class allows integration with any HTTP client
-    that implements the `BaseHttpClient` interface, provided as an input parameter to the constructor.
+    that implements the `HttpClient` interface, provided as an input parameter to the constructor.
 
     `AbstractHttpCrawler` is a generic class intended to be used with a specific parser for parsing HTTP responses
     and the expected type of `TCrawlingContext` available to the user function. Examples of specific versions include

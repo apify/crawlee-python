@@ -2,28 +2,20 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Optional
 
-from crawlee._utils.docs import docs_group
-
-try:
-    from curl_cffi import CurlInfo
-    from curl_cffi.requests import AsyncSession
-    from curl_cffi.requests.cookies import Cookies, CurlMorsel
-    from curl_cffi.requests.exceptions import ProxyError as CurlProxyError
-    from curl_cffi.requests.exceptions import RequestException as CurlRequestError
-    from curl_cffi.requests.impersonate import DEFAULT_CHROME as CURL_DEFAULT_CHROME
-except ImportError as exc:
-    raise ImportError(
-        "To import this, you need to install the 'curl-impersonate' extra. "
-        "For example, if you use pip, run `pip install 'crawlee[curl-impersonate]'`.",
-    ) from exc
-
+from curl_cffi import CurlInfo
 from curl_cffi.const import CurlHttpVersion
+from curl_cffi.requests import AsyncSession
+from curl_cffi.requests.cookies import Cookies, CurlMorsel
+from curl_cffi.requests.exceptions import ProxyError as CurlProxyError
+from curl_cffi.requests.exceptions import RequestException as CurlRequestError
+from curl_cffi.requests.impersonate import DEFAULT_CHROME as CURL_DEFAULT_CHROME
 from typing_extensions import override
 
 from crawlee._types import HttpHeaders, HttpPayload
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
+from crawlee._utils.docs import docs_group
 from crawlee.errors import ProxyError
-from crawlee.http_clients import BaseHttpClient, HttpCrawlingResult, HttpResponse
+from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -87,13 +79,13 @@ class _CurlImpersonateResponse:
 
 
 @docs_group('Classes')
-class CurlImpersonateHttpClient(BaseHttpClient):
+class CurlImpersonateHttpClient(HttpClient):
     """HTTP client based on the `curl-cffi` library.
 
     This client uses the `curl-cffi` library to perform HTTP requests in crawlers (`BasicCrawler` subclasses)
     and to manage sessions, proxies, and error handling.
 
-    See the `BaseHttpClient` class for more common information about HTTP clients.
+    See the `HttpClient` class for more common information about HTTP clients.
 
     ### Usage
 
