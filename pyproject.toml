@@ -63,6 +63,7 @@ pydantic = ">=2.8.1, !=2.10.0, !=2.10.1, !=2.10.2"
 # https://github.com/apify/crawlee-python/issues/814
 pydantic-settings = ">=2.2.0 <2.7.0"
 pyee = ">=9.0.0"
+rich = ">=13.9.4"
 scikit-learn =  [
     {version = ">=1.6.0", python = ">=3.10", optional = true},
     {version = "==1.5.2", python = "==3.9", optional = true}
@@ -72,7 +73,6 @@ tldextract = ">=5.1.0"
 typer = ">=0.12.0"
 typing-extensions = ">=4.1.0"
 yarl = ">=1.18.0"
-rich = "^13.9.4"
 
 [tool.poetry.group.dev.dependencies]
 build = "~1.2.0"
