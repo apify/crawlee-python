@@ -7,6 +7,8 @@ clean:
 	rm -rf .mypy_cache .pytest_cache .ruff_cache build dist htmlcov .coverage
 
 install-dev:
+	which poetry
+	poetry env use 3.9
 	poetry install --all-extras
 	poetry run pre-commit install
 	poetry run playwright install
