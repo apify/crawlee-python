@@ -44,6 +44,7 @@ keywords = [
 python = "^3.9"
 beautifulsoup4 = { version = ">=4.12.0", optional = true }
 browserforge = { version = ">=1.2.3", optional = true }
+cachetools = ">=5.5.1"
 colorama = ">=0.4.0"
 cookiecutter = ">=2.6.0"
 curl-cffi = { version = ">=0.7.2", optional = true }
@@ -63,6 +64,7 @@ pydantic = ">=2.8.1, !=2.10.0, !=2.10.1, !=2.10.2"
 # https://github.com/apify/crawlee-python/issues/814
 pydantic-settings = ">=2.2.0 <2.7.0"
 pyee = ">=9.0.0"
+rich = ">=13.9.0"
 scikit-learn =  [
     {version = ">=1.6.0", python = ">=3.10", optional = true},
     {version = "==1.5.2", python = "==3.9", optional = true}
@@ -72,7 +74,6 @@ tldextract = ">=5.1.0"
 typer = ">=0.12.0"
 typing-extensions = ">=4.1.0"
 yarl = ">=1.18.0"
-cachetools = "^5.5.1"
 
 [tool.poetry.group.dev.dependencies]
 build = "~1.2.0"
@@ -91,12 +92,12 @@ pytest-xdist = "~3.6.0"
 respx = "~0.22.0"
 ruff = "~0.8.0"
 setuptools = "~75.8.0"                    # setuptools are used by pytest, but not explicitly required
-sortedcontainers-stubs = "^2.4.2"
+sortedcontainers-stubs = "~2.4.0"
 types-beautifulsoup4 = "~4.12.0.20240229"
+types-cachetools = "~=5.5.0.20240820"
 types-colorama = "~0.4.15.20240106"
 types-psutil = "~5.9.5.20240205"
 types-python-dateutil = "~2.9.0.20240316"
-types-cachetools = "^5.5.0.20240820"
 
 [tool.poetry.extras]
 # Support for re-using groups in other groups https://peps.python.org/pep-0735/ in poetry:
