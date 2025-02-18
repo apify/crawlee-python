@@ -8,12 +8,12 @@ from crawlee.crawlers._abstract_http import AbstractHttpParser
 from crawlee.crawlers._types import BlockedInfo
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Sequence
 
     from crawlee.http_clients import HttpResponse
 
 
-class NoParser(AbstractHttpParser[bytes]):
+class NoParser(AbstractHttpParser[bytes, bytes]):
     """Dummy parser for backwards compatibility.
 
     To enable using `HttpCrawler` without need for additional specific parser.
@@ -22,6 +22,14 @@ class NoParser(AbstractHttpParser[bytes]):
     @override
     async def parse(self, response: HttpResponse) -> bytes:
         return response.read()
+
+    @override
+    async def parse_text(self, text: str) -> bytes:
+        raise NotImplementedError
+
+    @override
+    async def select(self, parsed_content: bytes, selector: str) -> Sequence[bytes]:
+        raise NotImplementedError
 
     @override
     def is_blocked(self, parsed_content: bytes) -> BlockedInfo:  # Intentional unused argument.

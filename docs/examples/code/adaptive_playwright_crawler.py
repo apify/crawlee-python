@@ -1,4 +1,5 @@
 import asyncio
+from datetime import timedelta
 
 from playwright.async_api import Route
 
@@ -10,40 +11,43 @@ from crawlee.crawlers import (
 
 
 async def main() -> None:
+    # Crawler created by following factory method will use `beautifulsoup`
+    # for parsing static content.
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
         max_requests_per_crawl=5, playwright_crawler_specific_kwargs={'headless': False}
     )
 
-    @crawler.router.handler(label='label')
+    @crawler.router.default_handler
     async def request_handler_for_label(
         context: AdaptivePlaywrightCrawlingContext,
     ) -> None:
-        # Do some processing using `page`
-        some_locator = context.page.locator('div').first
-        await some_locator.wait_for()
-        # Do stuff with locator...
-        context.log.info(f'Playwright processing of: {context.request.url} ...')
-
-    @crawler.router.default_handler
-    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
-        context.log.info(f'User handler processing: {context.request.url} ...')
         # Do some processing using `parsed_content`
         context.log.info(context.parsed_content.title)
 
+        # Locate element h2 within 5 seconds
+        h2 = await context.query_selector_one('h2', timedelta(milliseconds=5000))
+        # Do stuff with element found by the selector
+        context.log.info(h2)
+
         # Find more links and enqueue them.
         await context.enqueue_links()
-        await context.push_data({'Top crawler Url': context.request.url})
+        # Save some data.
+        await context.push_data({'Visited url': context.request.url})
 
     @crawler.pre_navigation_hook
     async def hook(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
-        """Hook executed both in static sub crawler and playwright sub crawler."""
-        # Trying to access context.page in this hook would raise `AdaptiveContextError`
-        # for pages crawled without playwright.
+        """Hook executed both in static sub crawler and playwright sub crawler.
+
+        Trying to access `context.page` in this hook would raise `AdaptiveContextError`
+        for pages crawled without playwright."""
         context.log.info(f'pre navigation hook for: {context.request.url} ...')
 
     @crawler.pre_navigation_hook(playwright_only=True)
     async def hook_playwright(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
-        """Hook executed only in playwright sub crawler."""
+        """Hook executed only in playwright sub crawler.
+
+        It is safe to access `page` object.
+        """
 
         async def some_routing_function(route: Route) -> None:
             await route.continue_()
