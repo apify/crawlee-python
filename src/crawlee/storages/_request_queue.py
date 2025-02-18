@@ -7,12 +7,12 @@ from datetime import datetime, timedelta, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, Generic, TypedDict, TypeVar
 
+from cachetools import LRUCache
 from typing_extensions import override
 
 from crawlee import service_locator
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.docs import docs_group
-from crawlee._utils.lru_cache import LRUCache
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee._utils.wait import wait_for_all_tasks_for_finish
 from crawlee.events import Event
@@ -135,7 +135,7 @@ class RequestQueue(Storage, RequestManager):
         self._in_progress: set[str] = set()
         self._last_activity = datetime.now(timezone.utc)
         self._recently_handled: BoundedSet[str] = BoundedSet(max_length=self._RECENTLY_HANDLED_CACHE_SIZE)
-        self._requests_cache: LRUCache[CachedRequest] = LRUCache(max_length=self._MAX_CACHED_REQUESTS)
+        self._requests_cache: LRUCache[str, CachedRequest] = LRUCache(maxsize=self._MAX_CACHED_REQUESTS)
 
     @property
     @override
