@@ -248,21 +248,20 @@ async def test_deduplication_of_requests_with_valid_custom_unique_key() -> None:
     assert await rq.fetch_next_request() == request_1
 
 
-async def test_cache_requests() -> None:
-    rq = await RequestQueue.open(name='my-rq')
+async def test_cache_requests(request_queue: RequestQueue) -> None:
     request_1 = Request.from_url('https://apify.com')
     request_2 = Request.from_url('https://crawlee.dev')
 
-    await rq.add_request(request_1)
-    await rq.add_request(request_2)
+    await request_queue.add_request(request_1)
+    await request_queue.add_request(request_2)
 
-    assert rq._requests_cache.currsize == 2
+    assert request_queue._requests_cache.currsize == 2
 
-    fetched_request = await rq.fetch_next_request()
+    fetched_request = await request_queue.fetch_next_request()
 
     assert fetched_request is not None
     assert fetched_request.id == request_1.id
 
-    # After calling fetch_next_request request_1 moved to the end of the cache.
-    cached_items = [rq._requests_cache.popitem()[0] for _ in range(2)]
+    # After calling fetch_next_request request_1 moved to the end of the cache store.
+    cached_items = [request_queue._requests_cache.popitem()[0] for _ in range(2)]
     assert cached_items == [request_2.id, request_1.id]
