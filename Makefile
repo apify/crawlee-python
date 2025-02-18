@@ -7,48 +7,47 @@ clean:
 	rm -rf .mypy_cache .pytest_cache .ruff_cache build dist htmlcov .coverage
 
 install-dev:
-	poetry install --all-extras
-	poetry run pre-commit install
-	poetry run playwright install
-	poetry run python -m browserforge update
+	uv sync --all-extras
+	uv run pre-commit install
+	uv run playwright install
+	uv run python -m browserforge update
 
 build:
-	poetry build --no-interaction -vv
+	uv build --no-cache
 
 # APIFY_PYPI_TOKEN_CRAWLEE is expected to be set in the environment
 publish-to-pypi:
-	poetry config pypi-token.pypi "${APIFY_PYPI_TOKEN_CRAWLEE}"
-	poetry publish --no-interaction -vv
+	uv publish --token "${APIFY_PYPI_TOKEN_CRAWLEE}"
 
 lint:
-	poetry run ruff format --check
-	poetry run ruff check
+	uv run ruff format --check
+	uv run ruff check
 
 type-check:
-	poetry run mypy
+	uv run mypy
 
 unit-tests:
-	poetry run pytest --numprocesses=auto --verbose --cov=src/crawlee tests/unit
+	uv run pytest --numprocesses=auto --verbose --cov=src/crawlee tests/unit
 
 unit-tests-cov:
-	poetry run pytest --numprocesses=auto --verbose --cov=src/crawlee --cov-report=html tests/unit
+	uv run pytest --numprocesses=auto --verbose --cov=src/crawlee --cov-report=html tests/unit
 
 integration-tests:
-	poetry run pytest --numprocesses=$(INTEGRATION_TESTS_CONCURRENCY) tests/integration
+	uv run pytest --numprocesses=$(INTEGRATION_TESTS_CONCURRENCY) tests/integration
 
 format:
-	poetry run ruff check --fix
-	poetry run ruff format
+	uv run ruff check --fix
+	uv run ruff format
 
 # The check-code target runs a series of checks equivalent to those performed by pre-commit hooks
 # and the run_checks.yaml GitHub Actions workflow.
 check-code: lint type-check unit-tests
 
 build-api-reference:
-	cd website && poetry run ./build_api_reference.sh
+	cd website && uv run ./build_api_reference.sh
 
 build-docs:
-	cd website && corepack enable && yarn && poetry run yarn build
+	cd website && corepack enable && yarn && uv run yarn build
 
 run-docs: build-api-reference
-	cd website && corepack enable && yarn && poetry run yarn start
+	cd website && corepack enable && yarn && uv run yarn start

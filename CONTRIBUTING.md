@@ -6,7 +6,7 @@ Here you'll find a contributing guide to get started with development.
 
 For local development, it is required to have Python 3.9 (or a later version) installed.
 
-We use [Poetry](https://python-poetry.org/) for project management. Install it and set up your IDE accordingly.
+We use [uv](https://docs.astral.sh/uv/) for project management. Install it and set up your IDE accordingly.
 
 ## Dependencies
 
@@ -138,10 +138,10 @@ Publishing new versions to [PyPI](https://pypi.org/project/crawlee) is automated
 
 3. Update the version number:
 
-- Modify the `version` field under `tool.poetry` in `pyproject.toml`.
+- Modify the `version` field under `project` in `pyproject.toml`.
 
 ```toml
-[tool.poetry]
+[project]
 name = "crawlee"
 version = "x.z.y"
 ```
@@ -149,17 +149,17 @@ version = "x.z.y"
 4. Generate the distribution archives for the package:
 
 ```shell
-poetry build
+uv build
 ```
 
 5. Set up the PyPI API token for authentication:
 
 ```shell
-poetry config pypi-token.pypi YOUR_API_TOKEN
+uv config pypi-token.pypi YOUR_API_TOKEN
 ```
 
 6. Upload the package to PyPI:
 
 ```shell
-poetry publish
+uv publish
 ```
