@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from crawlee.configuration import Configuration
     from crawlee.storage_clients._base import StorageClient
+    from crawlee.storage_clients.models import _StorageMetadata
 
 
 class Storage(ABC):
@@ -20,6 +21,11 @@ class Storage(ABC):
     @abstractmethod
     def name(self) -> str | None:
         """Get the storage name."""
+
+    @property
+    @abstractmethod
+    def storage_object(self) -> _StorageMetadata:
+        """Get the full storage info object."""
 
     @classmethod
     @abstractmethod

@@ -17,7 +17,7 @@ from crawlee._utils.requests import unique_key_to_request_id
 from crawlee._utils.wait import wait_for_all_tasks_for_finish
 from crawlee.events import Event
 from crawlee.request_loaders import RequestManager
-from crawlee.storage_clients.models import ProcessedRequest, RequestQueueMetadata
+from crawlee.storage_clients.models import ProcessedRequest, RequestQueueMetadata, _StorageMetadata
 
 from ._base import Storage
 
@@ -106,12 +106,15 @@ class RequestQueue(Storage, RequestManager):
     _STORAGE_CONSISTENCY_DELAY = timedelta(seconds=3)
     """Expected delay for storage to achieve consistency, guiding the timing of subsequent read operations."""
 
-    def __init__(self, id: str, name: str | None, storage_client: StorageClient) -> None:
+    def __init__(
+        self, id: str, name: str | None, storage_client: StorageClient, storage_object: _StorageMetadata
+    ) -> None:
         config = service_locator.get_configuration()
         event_manager = service_locator.get_event_manager()
 
         self._id = id
         self._name = name
+        self._storage_object = storage_object
 
         # Get resource clients from storage client
         self._resource_client = storage_client.request_queue(self._id)
@@ -146,6 +149,11 @@ class RequestQueue(Storage, RequestManager):
     @override
     def name(self) -> str | None:
         return self._name
+
+    @property
+    @override
+    def storage_object(self) -> _StorageMetadata:
+        return self._storage_object
 
     @override
     @classmethod

@@ -9,7 +9,7 @@ from typing_extensions import override
 from crawlee import service_locator
 from crawlee._utils.docs import docs_group
 from crawlee.events._types import Event, EventPersistStateData
-from crawlee.storage_clients.models import KeyValueStoreKeyInfo, KeyValueStoreMetadata
+from crawlee.storage_clients.models import KeyValueStoreKeyInfo, KeyValueStoreMetadata, _StorageMetadata
 
 from ._base import Storage
 
@@ -62,9 +62,12 @@ class KeyValueStore(Storage):
     _general_cache: ClassVar[dict[str, dict[str, dict[str, JsonSerializable]]]] = {}
     _persist_state_event_started = False
 
-    def __init__(self, id: str, name: str | None, storage_client: StorageClient) -> None:
+    def __init__(
+        self, id: str, name: str | None, storage_client: StorageClient, storage_object: _StorageMetadata
+    ) -> None:
         self._id = id
         self._name = name
+        self._storage_object = storage_object
 
         # Get resource clients from storage client
         self._resource_client = storage_client.key_value_store(self._id)
@@ -79,6 +82,11 @@ class KeyValueStore(Storage):
     @override
     def name(self) -> str | None:
         return self._name
+
+    @property
+    @override
+    def storage_object(self) -> _StorageMetadata:
+        return self._storage_object
 
     async def get_info(self) -> KeyValueStoreMetadata | None:
         """Get an object containing general information about the key value store."""
