@@ -14,11 +14,11 @@ install-dev:
 	uv run python -m browserforge update
 
 build:
-	uv build --no-cache --verbose
+	uv build --verbose
 
 # APIFY_PYPI_TOKEN_CRAWLEE is expected to be set in the environment
 publish-to-pypi:
-	uv publish --token "${APIFY_PYPI_TOKEN_CRAWLEE}"
+	uv publish --verbose --token "${APIFY_PYPI_TOKEN_CRAWLEE}"
 
 lint:
 	uv run ruff format --check
