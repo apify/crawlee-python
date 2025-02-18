@@ -10,6 +10,7 @@ from crawlee._utils.docs import docs_group
 from crawlee.http_clients import HttpCrawlingResult, HttpResponse
 
 TParseResult = TypeVar('TParseResult')
+TSelectResult = TypeVar('TSelectResult')
 
 
 @dataclass(frozen=True)
