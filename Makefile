@@ -1,4 +1,5 @@
-.PHONY: clean install-dev build publish-to-pypi lint type-check unit-tests unit-tests-cov integration-tests format check-code build-api-reference run-docs
+.PHONY: clean install-dev build publish-to-pypi lint type-check unit-tests unit-tests-cov \
+	integration-tests format check-code build-api-reference run-docs
 
 # This is default for local testing, but GitHub workflows override it to a higher value in CI
 INTEGRATION_TESTS_CONCURRENCY = 1
@@ -13,7 +14,7 @@ install-dev:
 	uv run python -m browserforge update
 
 build:
-	uv build --no-cache
+	uv build --no-cache --verbose
 
 # APIFY_PYPI_TOKEN_CRAWLEE is expected to be set in the environment
 publish-to-pypi:
@@ -33,7 +34,7 @@ unit-tests-cov:
 	uv run pytest --numprocesses=auto --verbose --cov=src/crawlee --cov-report=html tests/unit
 
 integration-tests:
-	uv run pytest --numprocesses=$(INTEGRATION_TESTS_CONCURRENCY) tests/integration
+	uv run pytest --numprocesses=$(INTEGRATION_TESTS_CONCURRENCY) --verbose tests/integration
 
 format:
 	uv run ruff check --fix
