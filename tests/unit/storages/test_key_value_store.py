@@ -51,6 +51,13 @@ async def test_open() -> None:
         await KeyValueStore.open(id='dummy-name')
 
 
+async def test_open_save_storage_object() -> None:
+    default_key_value_store = await KeyValueStore.open()
+
+    assert default_key_value_store.storage_object is not None
+    assert default_key_value_store.storage_object.id == default_key_value_store.id
+
+
 async def test_consistency_accross_two_clients() -> None:
     kvs = await KeyValueStore.open(name='my-kvs')
     await kvs.set_value('key', 'value')
