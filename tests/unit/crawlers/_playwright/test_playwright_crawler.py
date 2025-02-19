@@ -454,6 +454,7 @@ async def test_additional_http_error_status_codes() -> None:
 
 
 async def test_launch_with_user_data_dir(user_folder: Path) -> None:
+    """Check that the persist context is created in the specified folder in `user_data_dir`."""
     check_path = user_folder / 'Default'
     crawler = PlaywrightCrawler(
         headless=True, user_data_dir=user_folder, request_handler=mock.AsyncMock(return_value=None)
@@ -468,3 +469,29 @@ async def test_launch_with_user_data_dir(user_folder: Path) -> None:
     await crawler.run(['https://test.io'])
 
     assert check_path.exists()
+
+
+async def test_launch_with_user_data_dir_and_fingerprint(user_folder: Path) -> None:
+    """Check that the persist context works with fingerprints."""
+    check_path = user_folder / 'Default'
+    fingerprints = dict[str, str]()
+
+    crawler = PlaywrightCrawler(
+        headless=True,
+        user_data_dir=user_folder,
+        request_handler=mock.AsyncMock(return_value=None),
+        fingerprint_generator=DefaultFingerprintGenerator(),
+    )
+
+    @crawler.pre_navigation_hook
+    async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
+        fingerprints['window.navigator.userAgent'] = await context.page.evaluate('()=>window.navigator.userAgent')
+        await context.page.route('**/*', lambda route: route.fulfill(status=200))
+
+    assert not check_path.exists()
+
+    await crawler.run(['https://test.io'])
+
+    assert check_path.exists()
+
+    assert 'headless' not in fingerprints['window.navigator.userAgent'].lower()
