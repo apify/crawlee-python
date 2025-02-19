@@ -24,7 +24,7 @@ jobs:
       tag_name: ${{ steps.release_metadata.outputs.tag_name }}
       changelog: ${{ steps.release_metadata.outputs.changelog }}
     steps:
-      - uses: apify/workflows/git-cliff-release@switch-to-uv
+      - uses: apify/workflows/git-cliff-release@main
         id: release_metadata
         name: Prepare release metadata
         with:
@@ -47,7 +47,7 @@ jobs:
   update_changelog:
     name: Update changelog
     needs: [release_metadata, wait_for_checks]
-    uses: apify/workflows/.github/workflows/python_bump_and_update_changelog.yaml@switch-to-uv
+    uses: apify/workflows/.github/workflows/python_bump_and_update_changelog.yaml@main
     with:
       version_number: ${{ needs.release_metadata.outputs.version_number }}
       changelog: ${{ needs.release_metadata.outputs.changelog }}
@@ -74,7 +74,7 @@ jobs:
       url: https://pypi.org/project/crawlee
     steps:
       - name: Prepare distribution
-        uses: apify/workflows/prepare-pypi-distribution@switch-to-uv
+        uses: apify/workflows/prepare-pypi-distribution@main
         with:
           package_name: crawlee
           is_prerelease: "yes"
