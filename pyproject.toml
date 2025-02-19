@@ -1,7 +1,3 @@
-#########################
-# PEP 621 configuration #
-#########################
-
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -101,16 +97,8 @@ documentation = "https://crawlee.dev/python/docs/"
 issue_tracker = "https://github.com/apify/crawlee-python/issues"
 repository = "https://github.com/apify/crawlee-python"
 
-#######################
-# Hatch configuration #
-#######################
-
 [tool.hatch.build.targets.wheel]
 packages = ["src/crawlee"]
-
-######################
-# Ruff configuration #
-######################
 
 [tool.ruff]
 line-length = 120
@@ -194,19 +182,11 @@ known-first-party = ["crawlee"]
 [tool.ruff.lint.pylint]
 max-branches = 18
 
-########################
-# Pytest configuration #
-########################
-
 [tool.pytest.ini_options]
 addopts = "-ra"
 asyncio_default_fixture_loop_scope = "function"
 asyncio_mode = "auto"
 timeout = 1200
-
-######################
-# Mypy configuration #
-######################
 
 [tool.mypy]
 python_version = "3.9"
@@ -234,25 +214,13 @@ module = [
 ]
 ignore_missing_imports = true
 
-##############################
-# BasedPyright configuration #
-##############################
-
 [tool.basedpyright]
 pythonVersion = "3.9"
 typeCheckingMode = "standard"
 include = ["src", "tests", "docs", "website"]
 
-##########################
-# Coverage configuration #
-##########################
-
 [tool.coverage.report]
 exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "assert_never()"]
-
-######################
-# Ipdb configuration #
-######################
 
 [tool.ipdb]
 context = 7
