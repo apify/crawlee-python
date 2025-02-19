@@ -54,6 +54,39 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# TODO: automate the generation of all extra
+# https://github.com/apify/crawlee-python/issues/995
+all = [
+    "beautifulsoup4[lxml]>=4.12.0",
+    "browserforge>=1.2.3",
+    "curl-cffi>=0.9.0",
+    "html5lib>=1.0",
+    "jaro-winkler>=2.0.3",
+    "parsel>=1.10.0",
+    "playwright>=1.27.0",
+    "scikit-learn==1.5.2; python_version == '3.9'",
+    "scikit-learn>=1.6.0; python_version >= '3.10'",
+]
+adaptive-crawler = [
+    "jaro-winkler>=2.0.3",
+    "playwright>=1.27.0",
+    "scikit-learn==1.5.2; python_version == '3.9'",
+    "scikit-learn>=1.6.0; python_version >= '3.10'",
+]
+beautifulsoup = ["beautifulsoup4[lxml]>=4.12.0", "html5lib>=1.0"]
+curl-impersonate = ["curl-cffi>=0.9.0"]
+parsel = ["parsel>=1.10.0"]
+playwright = ["browserforge>=1.2.3", "playwright>=1.27.0"]
+
+[project.urls]
+"Homepage" = "https://crawlee.dev/python"
+"Apify homepage" = "https://apify.com"
+"Changelog" = "https://crawlee.dev/python/docs/changelog"
+"Documentation" = "https://crawlee.dev/python/docs/"
+"Issue tracker" = "https://github.com/apify/crawlee-python/issues"
+"Repository" = "https://github.com/apify/crawlee-python"
+
+[dependency-groups]
 dev = [
     "build~=1.2.0",
     "filelock~=3.16.0",
@@ -78,24 +111,6 @@ dev = [
     "types-psutil~=5.9.5.20240205",
     "types-python-dateutil~=2.9.0.20240316",
 ]
-adaptive-crawler = [
-    "jaro-winkler>=2.0.3",
-    "playwright>=1.27.0",
-    "scikit-learn==1.5.2; python_version == '3.9'",
-    "scikit-learn>=1.6.0; python_version >= '3.10'",
-]
-beautifulsoup = ["beautifulsoup4[lxml]>=4.12.0", "html5lib>=1.0"]
-curl-impersonate = ["curl-cffi>=0.9.0"]
-parsel = ["parsel>=1.10.0"]
-playwright = ["browserforge>=1.2.3", "playwright>=1.27.0"]
-
-[project.urls]
-homepage = "https://crawlee.dev/python"
-apify_homepage = "https://apify.com"
-changelog = "https://crawlee.dev/python/docs/changelog"
-documentation = "https://crawlee.dev/python/docs/"
-issue_tracker = "https://github.com/apify/crawlee-python/issues"
-repository = "https://github.com/apify/crawlee-python"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/crawlee"]
