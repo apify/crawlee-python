@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
     from crawlee._types import BasicCrawlingContext
     from crawlee.crawlers import HttpCrawlingContext
-    from crawlee.http_clients._base import BaseHttpClient
+    from crawlee.http_clients._base import HttpClient
 
 # Payload, e.g. data for a form submission.
 PAYLOAD = {
@@ -188,7 +188,7 @@ async def test_handles_server_error(
         pytest.param(HttpxHttpClient, id='httpx'),
     ],
 )
-async def test_stores_cookies(http_client_class: type[BaseHttpClient], httpbin: URL) -> None:
+async def test_stores_cookies(http_client_class: type[HttpClient], httpbin: URL) -> None:
     http_client = http_client_class(ignore_http_error_status_codes=[401])
     visit = Mock()
     track_session_usage = Mock()
@@ -258,7 +258,7 @@ async def test_http_status_statistics(crawler: HttpCrawler, server: respx.MockRo
 @pytest.mark.parametrize(
     'http_client_class', [pytest.param(CurlImpersonateHttpClient, id='curl'), pytest.param(HttpxHttpClient, id='httpx')]
 )
-async def test_sending_payload_as_raw_data(http_client_class: type[BaseHttpClient], httpbin: URL) -> None:
+async def test_sending_payload_as_raw_data(http_client_class: type[HttpClient], httpbin: URL) -> None:
     http_client = http_client_class()
     crawler = HttpCrawler(http_client=http_client)
     responses = []
@@ -293,7 +293,7 @@ async def test_sending_payload_as_raw_data(http_client_class: type[BaseHttpClien
 @pytest.mark.parametrize(
     'http_client_class', [pytest.param(CurlImpersonateHttpClient, id='curl'), pytest.param(HttpxHttpClient, id='httpx')]
 )
-async def test_sending_payload_as_form_data(http_client_class: type[BaseHttpClient], httpbin: URL) -> None:
+async def test_sending_payload_as_form_data(http_client_class: type[HttpClient], httpbin: URL) -> None:
     http_client = http_client_class()
     crawler = HttpCrawler(http_client=http_client)
     responses = []
@@ -323,7 +323,7 @@ async def test_sending_payload_as_form_data(http_client_class: type[BaseHttpClie
 @pytest.mark.parametrize(
     'http_client_class', [pytest.param(CurlImpersonateHttpClient, id='curl'), pytest.param(HttpxHttpClient, id='httpx')]
 )
-async def test_sending_payload_as_json(http_client_class: type[BaseHttpClient], httpbin: URL) -> None:
+async def test_sending_payload_as_json(http_client_class: type[HttpClient], httpbin: URL) -> None:
     http_client = http_client_class()
     crawler = HttpCrawler(http_client=http_client)
     responses = []
@@ -354,7 +354,7 @@ async def test_sending_payload_as_json(http_client_class: type[BaseHttpClient], 
 @pytest.mark.parametrize(
     'http_client_class', [pytest.param(CurlImpersonateHttpClient, id='curl'), pytest.param(HttpxHttpClient, id='httpx')]
 )
-async def test_sending_url_query_params(http_client_class: type[BaseHttpClient], httpbin: URL) -> None:
+async def test_sending_url_query_params(http_client_class: type[HttpClient], httpbin: URL) -> None:
     http_client = http_client_class()
     crawler = HttpCrawler(http_client=http_client)
     responses = []
@@ -418,7 +418,7 @@ async def test_http_crawler_pre_navigation_hooks_executed_before_request() -> No
         pytest.param(HttpxHttpClient, id='httpx'),
     ],
 )
-async def test_isolation_cookies(http_client_class: type[BaseHttpClient], httpbin: URL) -> None:
+async def test_isolation_cookies(http_client_class: type[HttpClient], httpbin: URL) -> None:
     http_client = http_client_class()
     sessions_ids: list[str] = []
     sessions_cookies: dict[str, dict[str, str]] = {}

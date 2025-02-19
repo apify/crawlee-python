@@ -4,10 +4,12 @@ from crawlee.crawlers import ParselCrawler, ParselCrawlingContext
 
 
 async def main() -> None:
-    # ParselCrawler crawls the web using HTTP requests and parses HTML using the Parsel library.
+    # ParselCrawler crawls the web using HTTP requests
+    # and parses HTML using the Parsel library.
     crawler = ParselCrawler(max_requests_per_crawl=50)
 
-    # Define a request handler to process each crawled page and attach it to the crawler using a decorator.
+    # Define a request handler to process each crawled page
+    # and attach it to the crawler using a decorator.
     @crawler.router.default_handler
     async def request_handler(context: ParselCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url} ...')

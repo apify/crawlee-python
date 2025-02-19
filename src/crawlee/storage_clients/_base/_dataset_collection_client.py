@@ -10,8 +10,8 @@ if TYPE_CHECKING:
 
 
 @docs_group('Abstract classes')
-class BaseDatasetCollectionClient(ABC):
-    """Abstract base class for dataset collection clients.
+class DatasetCollectionClient(ABC):
+    """An abstract class for dataset collection clients.
 
     This collection client handles operations that involve multiple instances of a given resource type.
     """

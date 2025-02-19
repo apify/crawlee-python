@@ -6,8 +6,12 @@ from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext
 
 async def main() -> None:
     # Create a plugin for each required browser.
-    plugin_chromium = PlaywrightBrowserPlugin(browser_type='chromium', max_open_pages_per_browser=1)
-    plugin_firefox = PlaywrightBrowserPlugin(browser_type='firefox', max_open_pages_per_browser=1)
+    plugin_chromium = PlaywrightBrowserPlugin(
+        browser_type='chromium', max_open_pages_per_browser=1
+    )
+    plugin_firefox = PlaywrightBrowserPlugin(
+        browser_type='firefox', max_open_pages_per_browser=1
+    )
 
     crawler = PlaywrightCrawler(
         browser_pool=BrowserPool(plugins=[plugin_chromium, plugin_firefox]),
@@ -17,7 +21,11 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
-        browser_name = context.page.context.browser.browser_type.name if context.page.context.browser else 'undefined'
+        browser_name = (
+            context.page.context.browser.browser_type.name
+            if context.page.context.browser
+            else 'undefined'
+        )
         context.log.info(f'Processing {context.request.url} with {browser_name} ...')
 
         await context.enqueue_links()

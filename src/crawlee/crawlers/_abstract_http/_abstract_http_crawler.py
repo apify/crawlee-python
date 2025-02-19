@@ -16,7 +16,7 @@ from crawlee.errors import SessionError
 from crawlee.http_clients import HttpxHttpClient
 from crawlee.statistics import StatisticsState
 
-from ._http_crawling_context import HttpCrawlingContext, ParsedHttpCrawlingContext, TParseResult
+from ._http_crawling_context import HttpCrawlingContext, ParsedHttpCrawlingContext, TParseResult, TSelectResult
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable
@@ -33,13 +33,13 @@ TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=St
 
 @docs_group('Abstract classes')
 class AbstractHttpCrawler(
-    Generic[TCrawlingContext, TParseResult], BasicCrawler[TCrawlingContext, StatisticsState], ABC
+    Generic[TCrawlingContext, TParseResult, TSelectResult], BasicCrawler[TCrawlingContext, StatisticsState], ABC
 ):
     """A web crawler for performing HTTP requests.
 
     The `AbstractHttpCrawler` builds on top of the `BasicCrawler`, inheriting all its features. Additionally,
     it implements HTTP communication using HTTP clients. The class allows integration with any HTTP client
-    that implements the `BaseHttpClient` interface, provided as an input parameter to the constructor.
+    that implements the `HttpClient` interface, provided as an input parameter to the constructor.
 
     `AbstractHttpCrawler` is a generic class intended to be used with a specific parser for parsing HTTP responses
     and the expected type of `TCrawlingContext` available to the user function. Examples of specific versions include
@@ -52,7 +52,7 @@ class AbstractHttpCrawler(
     def __init__(
         self,
         *,
-        parser: AbstractHttpParser[TParseResult],
+        parser: AbstractHttpParser[TParseResult, TSelectResult],
         **kwargs: Unpack[BasicCrawlerOptions[TCrawlingContext, StatisticsState]],
     ) -> None:
         self._parser = parser
@@ -80,8 +80,8 @@ class AbstractHttpCrawler(
     @classmethod
     def create_parsed_http_crawler_class(
         cls,
-        static_parser: AbstractHttpParser[TParseResult],
-    ) -> type[AbstractHttpCrawler[ParsedHttpCrawlingContext[TParseResult], TParseResult]]:
+        static_parser: AbstractHttpParser[TParseResult, TSelectResult],
+    ) -> type[AbstractHttpCrawler[ParsedHttpCrawlingContext[TParseResult], TParseResult, TSelectResult]]:
         """Convenience class factory that creates specific version of `AbstractHttpCrawler` class.
 
         In general typing sense two generic types of `AbstractHttpCrawler` do not have to be dependent on each other.
@@ -89,10 +89,12 @@ class AbstractHttpCrawler(
         parameters in `AbstractHttpCrawler`.
         """
 
-        class _ParsedHttpCrawler(AbstractHttpCrawler[ParsedHttpCrawlingContext[TParseResult], TParseResult]):
+        class _ParsedHttpCrawler(
+            AbstractHttpCrawler[ParsedHttpCrawlingContext[TParseResult], TParseResult, TSelectResult]
+        ):
             def __init__(
                 self,
-                parser: AbstractHttpParser[TParseResult] = static_parser,
+                parser: AbstractHttpParser[TParseResult, TSelectResult] = static_parser,
                 **kwargs: Unpack[BasicCrawlerOptions[ParsedHttpCrawlingContext[TParseResult]]],
             ) -> None:
                 kwargs['_context_pipeline'] = self._create_static_content_crawler_pipeline()
