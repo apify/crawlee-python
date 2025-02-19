@@ -152,14 +152,8 @@ version = "x.z.y"
 uv build
 ```
 
-5. Set up the PyPI API token for authentication:
+5. Set up the PyPI API token for authentication and upload the package to PyPI:
 
 ```shell
-uv config pypi-token.pypi YOUR_API_TOKEN
-```
-
-6. Upload the package to PyPI:
-
-```shell
-uv publish
+uv publish --token YOUR_API_TOKEN
 ```
