@@ -608,6 +608,17 @@ adaptive-crawler = [
     { name = "scikit-learn", version = "1.5.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "scikit-learn", version = "1.6.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
 ]
+all = [
+    { name = "beautifulsoup4", extra = ["lxml"] },
+    { name = "browserforge" },
+    { name = "curl-cffi" },
+    { name = "html5lib" },
+    { name = "jaro-winkler" },
+    { name = "parsel" },
+    { name = "playwright" },
+    { name = "scikit-learn", version = "1.5.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "scikit-learn", version = "1.6.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+]
 beautifulsoup = [
     { name = "beautifulsoup4", extra = ["lxml"] },
     { name = "html5lib" },
@@ -615,6 +626,15 @@ beautifulsoup = [
 curl-impersonate = [
     { name = "curl-cffi" },
 ]
+parsel = [
+    { name = "parsel" },
+]
+playwright = [
+    { name = "browserforge" },
+    { name = "playwright" },
+]
+
+[package.dev-dependencies]
 dev = [
     { name = "build" },
     { name = "filelock" },
@@ -639,68 +659,74 @@ dev = [
     { name = "types-psutil" },
     { name = "types-python-dateutil" },
 ]
-parsel = [
-    { name = "parsel" },
-]
-playwright = [
-    { name = "browserforge" },
-    { name = "playwright" },
-]
 
 [package.metadata]
 requires-dist = [
+    { name = "beautifulsoup4", extras = ["lxml"], marker = "extra == 'all'", specifier = ">=4.12.0" },
     { name = "beautifulsoup4", extras = ["lxml"], marker = "extra == 'beautifulsoup'", specifier = ">=4.12.0" },
+    { name = "browserforge", marker = "extra == 'all'", specifier = ">=1.2.3" },
     { name = "browserforge", marker = "extra == 'playwright'", specifier = ">=1.2.3" },
-    { name = "build", marker = "extra == 'dev'", specifier = "~=1.2.0" },
     { name = "cachetools", specifier = ">=5.5.0" },
     { name = "colorama", specifier = ">=0.4.0" },
     { name = "cookiecutter", specifier = ">=2.6.0" },
+    { name = "curl-cffi", marker = "extra == 'all'", specifier = ">=0.9.0" },
     { name = "curl-cffi", marker = "extra == 'curl-impersonate'", specifier = ">=0.9.0" },
     { name = "docutils", specifier = ">=0.21.0" },
     { name = "eval-type-backport", specifier = ">=0.2.0" },
-    { name = "filelock", marker = "extra == 'dev'", specifier = "~=3.16.0" },
+    { name = "html5lib", marker = "extra == 'all'", specifier = ">=1.0" },
     { name = "html5lib", marker = "extra == 'beautifulsoup'", specifier = ">=1.0" },
     { name = "httpx", extras = ["brotli", "http2", "zstd"], specifier = ">=0.27.0" },
     { name = "inquirer", specifier = ">=3.3.0" },
-    { name = "ipdb", marker = "extra == 'dev'", specifier = "~=0.13.0" },
     { name = "jaro-winkler", marker = "extra == 'adaptive-crawler'", specifier = ">=2.0.3" },
+    { name = "jaro-winkler", marker = "extra == 'all'", specifier = ">=2.0.3" },
     { name = "more-itertools", specifier = ">=10.2.0" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = "~=1.13.0" },
+    { name = "parsel", marker = "extra == 'all'", specifier = ">=1.10.0" },
     { name = "parsel", marker = "extra == 'parsel'", specifier = ">=1.10.0" },
     { name = "playwright", marker = "extra == 'adaptive-crawler'", specifier = ">=1.27.0" },
+    { name = "playwright", marker = "extra == 'all'", specifier = ">=1.27.0" },
     { name = "playwright", marker = "extra == 'playwright'", specifier = ">=1.27.0" },
-    { name = "pre-commit", marker = "extra == 'dev'", specifier = "~=4.0.0" },
-    { name = "proxy-py", marker = "extra == 'dev'", specifier = "~=2.4.0" },
     { name = "psutil", specifier = ">=6.0.0" },
     { name = "pydantic", specifier = ">=2.8.0,!=2.10.0,!=2.10.1,!=2.10.2" },
     { name = "pydantic-settings", specifier = ">=2.2.0,<2.7.0" },
-    { name = "pydoc-markdown", marker = "extra == 'dev'", specifier = "~=4.8.0" },
     { name = "pyee", specifier = ">=9.0.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = "~=8.3.0" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = "~=0.25.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = "~=6.0.0" },
-    { name = "pytest-only", marker = "extra == 'dev'", specifier = "~=2.1.0" },
-    { name = "pytest-timeout", marker = "extra == 'dev'", specifier = "~=2.3.0" },
-    { name = "pytest-xdist", marker = "extra == 'dev'", specifier = "~=3.6.0" },
-    { name = "respx", marker = "extra == 'dev'", specifier = "~=0.22.0" },
     { name = "rich", specifier = ">=13.9.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = "~=0.8.0" },
     { name = "scikit-learn", marker = "python_full_version == '3.9.*' and extra == 'adaptive-crawler'", specifier = "==1.5.2" },
+    { name = "scikit-learn", marker = "python_full_version == '3.9.*' and extra == 'all'", specifier = "==1.5.2" },
     { name = "scikit-learn", marker = "python_full_version >= '3.10' and extra == 'adaptive-crawler'", specifier = ">=1.6.0" },
-    { name = "setuptools", marker = "extra == 'dev'", specifier = "~=75.6.0" },
+    { name = "scikit-learn", marker = "python_full_version >= '3.10' and extra == 'all'", specifier = ">=1.6.0" },
     { name = "sortedcollections", specifier = ">=2.1.0" },
-    { name = "sortedcontainers-stubs", marker = "extra == 'dev'", specifier = "~=2.4.0" },
     { name = "tldextract", specifier = ">=5.1.0" },
     { name = "typer", specifier = ">=0.12.0" },
-    { name = "types-beautifulsoup4", marker = "extra == 'dev'", specifier = "~=4.12.0.20240229" },
-    { name = "types-cachetools", marker = "extra == 'dev'", specifier = "~=5.5.0.20240820" },
-    { name = "types-colorama", marker = "extra == 'dev'", specifier = "~=0.4.15.20240106" },
-    { name = "types-psutil", marker = "extra == 'dev'", specifier = "~=5.9.5.20240205" },
-    { name = "types-python-dateutil", marker = "extra == 'dev'", specifier = "~=2.9.0.20240316" },
     { name = "typing-extensions", specifier = ">=4.1.0" },
     { name = "yarl", specifier = ">=1.18.0" },
 ]
-provides-extras = ["dev", "adaptive-crawler", "beautifulsoup", "curl-impersonate", "parsel", "playwright"]
+provides-extras = ["all", "adaptive-crawler", "beautifulsoup", "curl-impersonate", "parsel", "playwright"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "build", specifier = "~=1.2.0" },
+    { name = "filelock", specifier = "~=3.16.0" },
+    { name = "ipdb", specifier = "~=0.13.0" },
+    { name = "mypy", specifier = "~=1.13.0" },
+    { name = "pre-commit", specifier = "~=4.0.0" },
+    { name = "proxy-py", specifier = "~=2.4.0" },
+    { name = "pydoc-markdown", specifier = "~=4.8.0" },
+    { name = "pytest", specifier = "~=8.3.0" },
+    { name = "pytest-asyncio", specifier = "~=0.25.0" },
+    { name = "pytest-cov", specifier = "~=6.0.0" },
+    { name = "pytest-only", specifier = "~=2.1.0" },
+    { name = "pytest-timeout", specifier = "~=2.3.0" },
+    { name = "pytest-xdist", specifier = "~=3.6.0" },
+    { name = "respx", specifier = "~=0.22.0" },
+    { name = "ruff", specifier = "~=0.8.0" },
+    { name = "setuptools", specifier = "~=75.6.0" },
+    { name = "sortedcontainers-stubs", specifier = "~=2.4.0" },
+    { name = "types-beautifulsoup4", specifier = "~=4.12.0.20240229" },
+    { name = "types-cachetools", specifier = "~=5.5.0.20240820" },
+    { name = "types-colorama", specifier = "~=0.4.15.20240106" },
+    { name = "types-psutil", specifier = "~=5.9.5.20240205" },
+    { name = "types-python-dateutil", specifier = "~=2.9.0.20240316" },
+]
 
 [[package]]
 name = "cssselect"
