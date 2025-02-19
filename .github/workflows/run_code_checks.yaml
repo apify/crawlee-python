@@ -19,18 +19,18 @@ on:
 jobs:
   lint_check:
     name: Lint check
-    uses: apify/workflows/.github/workflows/python_lint_check.yaml@switch-to-uv
+    uses: apify/workflows/.github/workflows/python_lint_check.yaml@main
 
   type_check:
     name: Type check
-    uses: apify/workflows/.github/workflows/python_type_check.yaml@switch-to-uv
+    uses: apify/workflows/.github/workflows/python_type_check.yaml@main
 
   unit_tests:
     name: Unit tests
-    uses: apify/workflows/.github/workflows/python_unit_tests.yaml@switch-to-uv
+    uses: apify/workflows/.github/workflows/python_unit_tests.yaml@main
     secrets:
       httpbin_url: ${{ secrets.APIFY_HTTPBIN_TOKEN && format('https://httpbin.apify.actor?token={0}', secrets.APIFY_HTTPBIN_TOKEN) || 'https://httpbin.org'}}
 
   docs_check:
     name: Docs check
-    uses: apify/workflows/.github/workflows/python_docs_check.yaml@switch-to-uv
+    uses: apify/workflows/.github/workflows/python_docs_check.yaml@main
