@@ -5,7 +5,7 @@ from abc import ABC
 from typing import TYPE_CHECKING, Any, Callable, Generic
 
 from pydantic import ValidationError
-from typing_extensions import NotRequired, TypedDict, TypeVar
+from typing_extensions import TypeVar
 
 from crawlee import EnqueueStrategy, RequestTransformAction
 from crawlee._request import Request, RequestOptions
@@ -19,7 +19,7 @@ from crawlee.statistics import StatisticsState
 from ._http_crawling_context import HttpCrawlingContext, ParsedHttpCrawlingContext, TParseResult, TSelectResult
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Awaitable, Iterable
+    from collections.abc import AsyncGenerator, Awaitable
 
     from typing_extensions import Unpack
 
@@ -29,26 +29,6 @@ if TYPE_CHECKING:
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=ParsedHttpCrawlingContext)
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
-
-
-class _HttpCrawlerAdditionalOptions(TypedDict):
-    additional_http_error_status_codes: NotRequired[Iterable[int]]
-    """Additional HTTP status codes to treat as errors, triggering automatic retries when encountered."""
-
-    ignore_http_error_status_codes: NotRequired[Iterable[int]]
-    """HTTP status codes that are typically considered errors but should be treated as successful responses."""
-
-
-@docs_group('Data structures')
-class HttpCrawlerOptions(
-    Generic[TCrawlingContext, TStatisticsState],
-    _HttpCrawlerAdditionalOptions,
-    BasicCrawlerOptions[TCrawlingContext, StatisticsState],
-):
-    """Arguments for the `AbstractHttpCrawler` constructor.
-
-    It is intended for typing forwarded `__init__` arguments in the subclasses.
-    """
 
 
 @docs_group('Abstract classes')
@@ -73,18 +53,18 @@ class AbstractHttpCrawler(
         self,
         *,
         parser: AbstractHttpParser[TParseResult, TSelectResult],
-        additional_http_error_status_codes: Iterable[int] = (),
-        ignore_http_error_status_codes: Iterable[int] = (),
         **kwargs: Unpack[BasicCrawlerOptions[TCrawlingContext, StatisticsState]],
     ) -> None:
         self._parser = parser
         self._pre_navigation_hooks: list[Callable[[BasicCrawlingContext], Awaitable[None]]] = []
+        kwargs.setdefault('additional_http_error_status_codes', ())
+        kwargs.setdefault('ignore_http_error_status_codes', ())
 
         kwargs.setdefault(
             'http_client',
             HttpxHttpClient(
-                additional_http_error_status_codes=additional_http_error_status_codes,
-                ignore_http_error_status_codes=ignore_http_error_status_codes,
+                additional_http_error_status_codes=kwargs['additional_http_error_status_codes'],
+                ignore_http_error_status_codes=kwargs['ignore_http_error_status_codes'],
             ),
         )
 
@@ -115,7 +95,7 @@ class AbstractHttpCrawler(
             def __init__(
                 self,
                 parser: AbstractHttpParser[TParseResult, TSelectResult] = static_parser,
-                **kwargs: Unpack[HttpCrawlerOptions[ParsedHttpCrawlingContext[TParseResult]]],
+                **kwargs: Unpack[BasicCrawlerOptions[ParsedHttpCrawlingContext[TParseResult]]],
             ) -> None:
                 kwargs['_context_pipeline'] = self._create_static_content_crawler_pipeline()
                 super().__init__(

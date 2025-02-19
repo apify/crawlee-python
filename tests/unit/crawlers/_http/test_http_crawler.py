@@ -189,7 +189,7 @@ async def test_handles_server_error(
     ],
 )
 async def test_stores_cookies(http_client_class: type[HttpClient], httpbin: URL) -> None:
-    http_client = http_client_class()
+    http_client = http_client_class(ignore_http_error_status_codes=[401])
     visit = Mock()
     track_session_usage = Mock()
 
