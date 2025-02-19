@@ -95,7 +95,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
         Args:
             browser_pool: A `BrowserPool` instance to be used for launching the browsers and getting pages.
-            user_data_dir: Path to a User Data Directory, which stores browser session data like cookies
+            user_data_dir: Path to a user data directory, which stores browser session data like cookies
                 and local storage.
             browser_type: The type of browser to launch ('chromium', 'firefox', or 'webkit').
                 This option should not be used if `browser_pool` is provided.
