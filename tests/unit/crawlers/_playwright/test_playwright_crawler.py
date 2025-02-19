@@ -10,6 +10,7 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest import mock
+from unittest.mock import Mock
 
 import pytest
 
@@ -410,6 +411,46 @@ async def test_custom_fingerprint_matches_header_user_agent(httpbin: URL) -> Non
     await crawler.run([Request.from_url(str(httpbin / 'get'))])
 
     assert response_headers['User-Agent'] == fingerprints['window.navigator.userAgent']
+
+
+async def test_ignore_http_error_status_codes() -> None:
+    """Test that error codes that would normally trigger session error can be ignored."""
+    crawler = PlaywrightCrawler(ignore_http_error_status_codes={403})
+
+    mocked_handler = Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        mocked_handler(context.request.url)
+
+    @crawler.pre_navigation_hook
+    async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
+        # Emulate server response to prevent Playwright from making real requests
+        await context.page.route('**/*', lambda route: route.fulfill(status=403))
+
+    await crawler.run(['https://test.com'])
+
+    mocked_handler.assert_called_once_with('https://test.com')
+
+
+async def test_additional_http_error_status_codes() -> None:
+    """Test that use of `additional_http_error_status_codes` can raise error on common status code."""
+    crawler = PlaywrightCrawler(additional_http_error_status_codes={200})
+
+    mocked_handler = Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        mocked_handler(context.request.url)
+
+    @crawler.pre_navigation_hook
+    async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
+        # Emulate server response to prevent Playwright from making real requests
+        await context.page.route('**/*', lambda route: route.fulfill(status=200))
+
+    await crawler.run(['https://test.com'])
+
+    mocked_handler.assert_not_called()
 
 
 async def test_launch_with_user_data_dir(user_folder: Path) -> None:

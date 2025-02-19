@@ -50,9 +50,6 @@ if TYPE_CHECKING:
 
     from typing_extensions import Unpack
 
-    from crawlee.crawlers._abstract_http._abstract_http_crawler import (
-        _HttpCrawlerAdditionalOptions,
-    )
     from crawlee.crawlers._basic._basic_crawler import _BasicCrawlerOptions
     from crawlee.crawlers._playwright._playwright_crawler import _PlaywrightCrawlerAdditionalOptions
 
@@ -130,7 +127,6 @@ class AdaptivePlaywrightCrawler(
         rendering_type_predictor: RenderingTypePredictor | None = None,
         result_checker: Callable[[RequestHandlerRunResult], bool] | None = None,
         result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,
-        static_crawler_specific_kwargs: _HttpCrawlerAdditionalOptions | None = None,
         playwright_crawler_specific_kwargs: _PlaywrightCrawlerAdditionalOptions | None = None,
         statistics: Statistics[AdaptivePlaywrightCrawlerStatisticState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
@@ -164,7 +160,6 @@ class AdaptivePlaywrightCrawler(
 
         # Sub crawlers related.
         playwright_crawler_specific_kwargs = playwright_crawler_specific_kwargs or {}
-        static_crawler_specific_kwargs = static_crawler_specific_kwargs or {}
 
         # Each sub crawler will use custom logger .
         static_logger = getLogger('Subcrawler_static')
@@ -181,7 +176,6 @@ class AdaptivePlaywrightCrawler(
         static_crawler = static_crawler_class(
             parser=static_parser,
             statistics=_NonPersistentStatistics(),
-            **static_crawler_specific_kwargs,
             **basic_crawler_kwargs_for_static_crawler,
         )
         playwright_crawler = PlaywrightCrawler(
@@ -221,7 +215,6 @@ class AdaptivePlaywrightCrawler(
         result_checker: Callable[[RequestHandlerRunResult], bool] | None = None,
         result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,
         parser_type: BeautifulSoupParserType = 'lxml',
-        static_crawler_specific_kwargs: _HttpCrawlerAdditionalOptions | None = None,
         playwright_crawler_specific_kwargs: _PlaywrightCrawlerAdditionalOptions | None = None,
         statistics: Statistics[StatisticsState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
@@ -236,7 +229,6 @@ class AdaptivePlaywrightCrawler(
             result_checker=result_checker,
             result_comparator=result_comparator,
             static_parser=BeautifulSoupParser(parser=parser_type),
-            static_crawler_specific_kwargs=static_crawler_specific_kwargs,
             playwright_crawler_specific_kwargs=playwright_crawler_specific_kwargs,
             statistics=adaptive_statistics,
             **kwargs,
@@ -248,7 +240,6 @@ class AdaptivePlaywrightCrawler(
         rendering_type_predictor: RenderingTypePredictor | None = None,
         result_checker: Callable[[RequestHandlerRunResult], bool] | None = None,
         result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,
-        static_crawler_specific_kwargs: _HttpCrawlerAdditionalOptions | None = None,
         playwright_crawler_specific_kwargs: _PlaywrightCrawlerAdditionalOptions | None = None,
         statistics: Statistics[StatisticsState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
@@ -263,7 +254,6 @@ class AdaptivePlaywrightCrawler(
             result_checker=result_checker,
             result_comparator=result_comparator,
             static_parser=ParselParser(),
-            static_crawler_specific_kwargs=static_crawler_specific_kwargs,
             playwright_crawler_specific_kwargs=playwright_crawler_specific_kwargs,
             statistics=adaptive_statistics,
             **kwargs,
