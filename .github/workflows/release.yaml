@@ -21,7 +21,7 @@ on:
         type: string
         default: ""
 
-concurrency: 
+concurrency:
   group: release
   cancel-in-progress: false
 
@@ -114,7 +114,7 @@ jobs:
     steps:
       - name: Prepare distribution
         uses: apify/workflows/prepare-pypi-distribution@main
-        with: 
+        with:
           package_name: crawlee
           is_prerelease: ""
           version_number: ${{ needs.release_metadata.outputs.version_number }}

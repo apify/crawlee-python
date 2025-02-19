@@ -5,7 +5,7 @@ from abc import ABC
 from typing import TYPE_CHECKING, Any, Callable, Generic
 
 from pydantic import ValidationError
-from typing_extensions import NotRequired, TypedDict, TypeVar
+from typing_extensions import TypeVar
 
 from crawlee import EnqueueStrategy, RequestTransformAction
 from crawlee._request import Request, RequestOptions
@@ -16,10 +16,10 @@ from crawlee.errors import SessionError
 from crawlee.http_clients import HttpxHttpClient
 from crawlee.statistics import StatisticsState
 
-from ._http_crawling_context import HttpCrawlingContext, ParsedHttpCrawlingContext, TParseResult
+from ._http_crawling_context import HttpCrawlingContext, ParsedHttpCrawlingContext, TParseResult, TSelectResult
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Awaitable, Iterable
+    from collections.abc import AsyncGenerator, Awaitable
 
     from typing_extensions import Unpack
 
@@ -31,29 +31,9 @@ TCrawlingContext = TypeVar('TCrawlingContext', bound=ParsedHttpCrawlingContext)
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
 
 
-class _HttpCrawlerAdditionalOptions(TypedDict):
-    additional_http_error_status_codes: NotRequired[Iterable[int]]
-    """Additional HTTP status codes to treat as errors, triggering automatic retries when encountered."""
-
-    ignore_http_error_status_codes: NotRequired[Iterable[int]]
-    """HTTP status codes that are typically considered errors but should be treated as successful responses."""
-
-
-@docs_group('Data structures')
-class HttpCrawlerOptions(
-    Generic[TCrawlingContext, TStatisticsState],
-    _HttpCrawlerAdditionalOptions,
-    BasicCrawlerOptions[TCrawlingContext, StatisticsState],
-):
-    """Arguments for the `AbstractHttpCrawler` constructor.
-
-    It is intended for typing forwarded `__init__` arguments in the subclasses.
-    """
-
-
 @docs_group('Abstract classes')
 class AbstractHttpCrawler(
-    Generic[TCrawlingContext, TParseResult], BasicCrawler[TCrawlingContext, StatisticsState], ABC
+    Generic[TCrawlingContext, TParseResult, TSelectResult], BasicCrawler[TCrawlingContext, StatisticsState], ABC
 ):
     """A web crawler for performing HTTP requests.
 
@@ -72,19 +52,19 @@ class AbstractHttpCrawler(
     def __init__(
         self,
         *,
-        parser: AbstractHttpParser[TParseResult],
-        additional_http_error_status_codes: Iterable[int] = (),
-        ignore_http_error_status_codes: Iterable[int] = (),
+        parser: AbstractHttpParser[TParseResult, TSelectResult],
         **kwargs: Unpack[BasicCrawlerOptions[TCrawlingContext, StatisticsState]],
     ) -> None:
         self._parser = parser
         self._pre_navigation_hooks: list[Callable[[BasicCrawlingContext], Awaitable[None]]] = []
+        kwargs.setdefault('additional_http_error_status_codes', ())
+        kwargs.setdefault('ignore_http_error_status_codes', ())
 
         kwargs.setdefault(
             'http_client',
             HttpxHttpClient(
-                additional_http_error_status_codes=additional_http_error_status_codes,
-                ignore_http_error_status_codes=ignore_http_error_status_codes,
+                additional_http_error_status_codes=kwargs['additional_http_error_status_codes'],
+                ignore_http_error_status_codes=kwargs['ignore_http_error_status_codes'],
             ),
         )
 
@@ -100,8 +80,8 @@ class AbstractHttpCrawler(
     @classmethod
     def create_parsed_http_crawler_class(
         cls,
-        static_parser: AbstractHttpParser[TParseResult],
-    ) -> type[AbstractHttpCrawler[ParsedHttpCrawlingContext[TParseResult], TParseResult]]:
+        static_parser: AbstractHttpParser[TParseResult, TSelectResult],
+    ) -> type[AbstractHttpCrawler[ParsedHttpCrawlingContext[TParseResult], TParseResult, TSelectResult]]:
         """Convenience class factory that creates specific version of `AbstractHttpCrawler` class.
 
         In general typing sense two generic types of `AbstractHttpCrawler` do not have to be dependent on each other.
@@ -109,11 +89,13 @@ class AbstractHttpCrawler(
         parameters in `AbstractHttpCrawler`.
         """
 
-        class _ParsedHttpCrawler(AbstractHttpCrawler[ParsedHttpCrawlingContext[TParseResult], TParseResult]):
+        class _ParsedHttpCrawler(
+            AbstractHttpCrawler[ParsedHttpCrawlingContext[TParseResult], TParseResult, TSelectResult]
+        ):
             def __init__(
                 self,
-                parser: AbstractHttpParser[TParseResult] = static_parser,
-                **kwargs: Unpack[HttpCrawlerOptions[ParsedHttpCrawlingContext[TParseResult]]],
+                parser: AbstractHttpParser[TParseResult, TSelectResult] = static_parser,
+                **kwargs: Unpack[BasicCrawlerOptions[ParsedHttpCrawlingContext[TParseResult]]],
             ) -> None:
                 kwargs['_context_pipeline'] = self._create_static_content_crawler_pipeline()
                 super().__init__(

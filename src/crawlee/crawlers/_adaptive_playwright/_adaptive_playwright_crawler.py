@@ -8,7 +8,7 @@ from logging import getLogger
 from random import random
 from typing import TYPE_CHECKING, Any, Generic, get_args
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from parsel import Selector
 from typing_extensions import Self, TypeVar, override
 
@@ -50,14 +50,12 @@ if TYPE_CHECKING:
 
     from typing_extensions import Unpack
 
-    from crawlee.crawlers._abstract_http._abstract_http_crawler import (
-        _HttpCrawlerAdditionalOptions,
-    )
     from crawlee.crawlers._basic._basic_crawler import _BasicCrawlerOptions
     from crawlee.crawlers._playwright._playwright_crawler import _PlaywrightCrawlerAdditionalOptions
 
 
 TStaticParseResult = TypeVar('TStaticParseResult')
+TStaticSelectResult = TypeVar('TStaticSelectResult')
 TStaticCrawlingContext = TypeVar('TStaticCrawlingContext', bound=ParsedHttpCrawlingContext)
 
 
@@ -86,23 +84,49 @@ class _NonPersistentStatistics(Statistics):
 
 @docs_group('Classes')
 class AdaptivePlaywrightCrawler(
-    Generic[TStaticCrawlingContext, TStaticParseResult],
+    Generic[TStaticCrawlingContext, TStaticParseResult, TStaticSelectResult],
     BasicCrawler[AdaptivePlaywrightCrawlingContext, AdaptivePlaywrightCrawlerStatisticState],
 ):
-    """Adaptive crawler that uses both specific implementation of `AbstractHttpCrawler` and `PlaywrightCrawler`.
+    """An adaptive web crawler capable of using both static HTTP request based crawling and browser based crawling.
 
-    It tries to detect whether it is sufficient to crawl without browser (which is faster) or if
-    `PlaywrightCrawler` should be used (in case previous method did not work as expected for specific url.).
+    It uses a more limited crawling context interface so that it is able to switch to HTTP-only crawling when it detects
+    that it may bring a performance benefit.
+    It uses specific implementation of `AbstractHttpCrawler` and `PlaywrightCrawler`.
+
+    ### Usage
+    ```python
+    from crawlee.crawlers import AdaptivePlaywrightCrawler, AdaptivePlaywrightCrawlingContext
+
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        max_requests_per_crawl=5, playwright_crawler_specific_kwargs={'browser_type': 'chromium'}
+    )
+
+    @crawler.router.default_handler
+    async def request_handler_for_label(context: AdaptivePlaywrightCrawlingContext) -> None:
+        # Do some processing using `parsed_content`
+        context.log.info(context.parsed_content.title)
+
+        # Locate element h2 within 5 seconds
+        h2 = await context.query_selector_one('h2', timedelta(milliseconds=5000))
+        # Do stuff with element found by the selector
+        context.log.info(h2)
+
+        # Find more links and enqueue them.
+        await context.enqueue_links()
+        # Save some data.
+        await context.push_data({'Visited url': context.request.url})
+
+    await crawler.run(['https://crawlee.dev/'])
+    ```
     """
 
     def __init__(
         self,
         *,
-        static_parser: AbstractHttpParser[TStaticParseResult],
+        static_parser: AbstractHttpParser[TStaticParseResult, TStaticSelectResult],
         rendering_type_predictor: RenderingTypePredictor | None = None,
         result_checker: Callable[[RequestHandlerRunResult], bool] | None = None,
         result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,
-        static_crawler_specific_kwargs: _HttpCrawlerAdditionalOptions | None = None,
         playwright_crawler_specific_kwargs: _PlaywrightCrawlerAdditionalOptions | None = None,
         statistics: Statistics[AdaptivePlaywrightCrawlerStatisticState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
@@ -136,7 +160,6 @@ class AdaptivePlaywrightCrawler(
 
         # Sub crawlers related.
         playwright_crawler_specific_kwargs = playwright_crawler_specific_kwargs or {}
-        static_crawler_specific_kwargs = static_crawler_specific_kwargs or {}
 
         # Each sub crawler will use custom logger .
         static_logger = getLogger('Subcrawler_static')
@@ -153,7 +176,6 @@ class AdaptivePlaywrightCrawler(
         static_crawler = static_crawler_class(
             parser=static_parser,
             statistics=_NonPersistentStatistics(),
-            **static_crawler_specific_kwargs,
             **basic_crawler_kwargs_for_static_crawler,
         )
         playwright_crawler = PlaywrightCrawler(
@@ -193,22 +215,20 @@ class AdaptivePlaywrightCrawler(
         result_checker: Callable[[RequestHandlerRunResult], bool] | None = None,
         result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,
         parser_type: BeautifulSoupParserType = 'lxml',
-        static_crawler_specific_kwargs: _HttpCrawlerAdditionalOptions | None = None,
         playwright_crawler_specific_kwargs: _PlaywrightCrawlerAdditionalOptions | None = None,
         statistics: Statistics[StatisticsState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
-    ) -> AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[BeautifulSoup], BeautifulSoup]:
+    ) -> AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[BeautifulSoup], BeautifulSoup, Tag]:
         """Creates `AdaptivePlaywrightCrawler` that uses `BeautifulSoup` for parsing static content."""
         if statistics is not None:
             adaptive_statistics = statistics.replace_state_model(AdaptivePlaywrightCrawlerStatisticState)
         else:
             adaptive_statistics = Statistics(state_model=AdaptivePlaywrightCrawlerStatisticState)
-        return AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[BeautifulSoup], BeautifulSoup](
+        return AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[BeautifulSoup], BeautifulSoup, Tag](
             rendering_type_predictor=rendering_type_predictor,
             result_checker=result_checker,
             result_comparator=result_comparator,
             static_parser=BeautifulSoupParser(parser=parser_type),
-            static_crawler_specific_kwargs=static_crawler_specific_kwargs,
             playwright_crawler_specific_kwargs=playwright_crawler_specific_kwargs,
             statistics=adaptive_statistics,
             **kwargs,
@@ -220,22 +240,20 @@ class AdaptivePlaywrightCrawler(
         rendering_type_predictor: RenderingTypePredictor | None = None,
         result_checker: Callable[[RequestHandlerRunResult], bool] | None = None,
         result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,
-        static_crawler_specific_kwargs: _HttpCrawlerAdditionalOptions | None = None,
         playwright_crawler_specific_kwargs: _PlaywrightCrawlerAdditionalOptions | None = None,
         statistics: Statistics[StatisticsState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
-    ) -> AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[Selector], Selector]:
+    ) -> AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[Selector], Selector, Selector]:
         """Creates `AdaptivePlaywrightCrawler` that uses `Parcel` for parsing static content."""
         if statistics is not None:
             adaptive_statistics = statistics.replace_state_model(AdaptivePlaywrightCrawlerStatisticState)
         else:
             adaptive_statistics = Statistics(state_model=AdaptivePlaywrightCrawlerStatisticState)
-        return AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[Selector], Selector](
+        return AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[Selector], Selector, Selector](
             rendering_type_predictor=rendering_type_predictor,
             result_checker=result_checker,
             result_comparator=result_comparator,
             static_parser=ParselParser(),
-            static_crawler_specific_kwargs=static_crawler_specific_kwargs,
             playwright_crawler_specific_kwargs=playwright_crawler_specific_kwargs,
             statistics=adaptive_statistics,
             **kwargs,
@@ -302,7 +320,9 @@ class AdaptivePlaywrightCrawler(
             async def from_static_pipeline_to_top_router(
                 context: ParsedHttpCrawlingContext[TStaticParseResult],
             ) -> None:
-                adaptive_crawling_context = AdaptivePlaywrightCrawlingContext.from_parsed_http_crawling_context(context)
+                adaptive_crawling_context = AdaptivePlaywrightCrawlingContext.from_parsed_http_crawling_context(
+                    context=context, parser=self._static_parser
+                )
                 await self.router(adaptive_crawling_context)
 
             return self._static_context_pipeline(context_linked_to_result, from_static_pipeline_to_top_router)

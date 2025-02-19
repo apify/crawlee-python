@@ -42,6 +42,13 @@ class _EmptyCookies(Cookies):
         return None
 
 
+class _AsyncSession(AsyncSession):
+    @override
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._cookies = _EmptyCookies()
+
+
 class _CurlImpersonateResponse:
     """Adapter class for `curl_cffi.requests.Response` to conform to the `HttpResponse` protocol."""
 
@@ -73,7 +80,7 @@ class _CurlImpersonateResponse:
 
     @property
     def headers(self) -> HttpHeaders:
-        return HttpHeaders(dict(self._response.headers))
+        return HttpHeaders({key: value for key, value in self._response.headers if value})
 
     def read(self) -> bytes:
         return self._response.content
@@ -231,8 +238,7 @@ class CurlImpersonateHttpClient(HttpClient):
             kwargs.update(self._async_session_kwargs)
 
             # Create and store the new session with the specified kwargs.
-            self._client_by_proxy_url[proxy_url] = AsyncSession(**kwargs)
-            self._client_by_proxy_url[proxy_url].cookies = _EmptyCookies()
+            self._client_by_proxy_url[proxy_url] = _AsyncSession(**kwargs)
 
         return self._client_by_proxy_url[proxy_url]
 
