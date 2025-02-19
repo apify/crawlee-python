@@ -10,9 +10,6 @@ __pycache__
 .envrc
 .python-version
 
-# Poetry
-poetry.toml
-
 # Other Python tools
 .ropeproject
 
