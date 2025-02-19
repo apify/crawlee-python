@@ -5,6 +5,9 @@
 from __future__ import annotations
 
 import json
+import shutil
+import tempfile
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest import mock
 
@@ -29,10 +32,21 @@ from crawlee.proxy_configuration import ProxyConfiguration
 from crawlee.sessions import SessionPool
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+
     from yarl import URL
 
     from crawlee._request import RequestOptions
     from crawlee.crawlers import PlaywrightCrawlingContext, PlaywrightPreNavCrawlingContext
+
+
+@pytest.fixture
+def user_folder() -> Generator[Path]:
+    temp_path = Path(tempfile.mkdtemp(prefix='apify-crawlee'))
+
+    yield temp_path
+
+    shutil.rmtree(temp_path)
 
 
 async def test_basic_request(httpbin: URL) -> None:
@@ -396,3 +410,20 @@ async def test_custom_fingerprint_matches_header_user_agent(httpbin: URL) -> Non
     await crawler.run([Request.from_url(str(httpbin / 'get'))])
 
     assert response_headers['User-Agent'] == fingerprints['window.navigator.userAgent']
+
+
+async def test_launch_with_user_data_dir(user_folder: Path) -> None:
+    check_path = user_folder / 'Default'
+    crawler = PlaywrightCrawler(
+        headless=True, user_data_dir=user_folder, request_handler=mock.AsyncMock(return_value=None)
+    )
+
+    @crawler.pre_navigation_hook
+    async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
+        await context.page.route('**/*', lambda route: route.fulfill(status=200))
+
+    assert not check_path.exists()
+
+    await crawler.run(['https://test.io'])
+
+    assert check_path.exists()
