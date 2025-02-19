@@ -15,7 +15,7 @@ logger = getLogger(__name__)
 
 
 class PlaywrightPersistentBrowser:
-    """Wrapper for Browser that uses persistent context under the hood."""
+    """Wrapper for browser that uses persistent context under the hood."""
 
     def __init__(
         self,
