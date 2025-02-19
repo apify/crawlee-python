@@ -5,8 +5,7 @@ from __future__ import annotations
 import traceback
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-
-
+from itertools import zip_longest
 
 # Errors are internally tracked in deeply nested dict where individual error groups count can be accessed like this:
 # count = ErrorStackTraceGroups["some_stack_trace"]["some_error_code"]["some_error_name"]["some_error_message"]
@@ -36,7 +35,6 @@ class ErrorTracker:
         self.show_full_stack = show_full_stack
         self.show_error_message = show_error_message
         self.show_full_message = show_full_message
-
         self._errors: ErrorStackTraceGroups = defaultdict(lambda: defaultdict(Counter))
 
     def add(self, error: Exception) -> None:
@@ -54,20 +52,66 @@ class ErrorTracker:
         # TODO perform special message grouping
         # First just exact match
 
-        self._errors[error_group_stack_trace][error_group_name].update([error_group_message])
+        # All groups, except the lowest level is matched.
+        specific_groups = self._errors[error_group_stack_trace][error_group_name]
+
+        if error_group_message in specific_groups:
+            # Exact match
+            specific_groups.update([error_group_message])
+        else:
+            for known_error_group_message in specific_groups:
+                if new_group_name:=self._create_generic_message(known_error_group_message, error_group_message):
+                    # Replace old name
+                    specific_groups[new_group_name]=specific_groups.pop(known_error_group_message)
+                    # Increment
+                    specific_groups.update([new_group_name])
+                    break
+            else:
+                # No similar message found. Create new group.
+                self._errors[error_group_stack_trace][error_group_name].update([error_group_message])
+
 
     @property
     def unique_error_count(self) -> int:
         """Number of distinct kinds of errors."""
-        return len(self._errors)
+        unique_error_count = 0
+        for stack_group in self._errors.values():
+            for name_group in stack_group.values():
+                unique_error_count+=len(name_group)
+        return unique_error_count
 
     @property
     def total(self) -> int:
         """Total number of errors."""
-        return sum(self._errors.values())
+        error_count = 0
+        for stack_group in self._errors.values():
+            for name_group in stack_group.values():
+                error_count+=sum(name_group.values())
+        return error_count
 
-    def _add_to_existing_similar_error_group(self):
+    def get_most_popular_errors(self, n=3) -> str:
+
+    def _add_to_existing_similar_message_group(self):
+        # Check to if exactly same error group already exists
+        # If not, try to assign to similar group. Iterate one by one and try to merge if possible
         pass
 
-    def _are_errors_similar(self) -> bool:
-        pass
+    def _create_generic_message(self, message_1: str, message_2: str) -> str:
+        replacement_symbol = "_"
+        replacement_count = 0
+        message_1_parts = message_1.split(" ")
+        message_2_parts = message_2.split(" ")
+        generic_message_parts = []
+        parts_count = max(len(message_1_parts), len(message_2_parts))
+
+        for message_1_part, message_2_part in zip_longest(message_1_parts, message_2_parts, fillvalue=""):
+            if message_1_part != message_2_part:
+                generic_message_parts.append(replacement_symbol)
+                replacement_count+=1
+                if replacement_count >= parts_count/2:
+                    # Messages are too different.
+                    return ""
+            else:
+                generic_message_parts.append(message_1_part)
+        return " ".join(generic_message_parts)
+
