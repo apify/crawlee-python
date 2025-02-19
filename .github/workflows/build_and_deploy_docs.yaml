@@ -43,7 +43,7 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-    
+
       - name: Install Python dependencies
         run: make install-dev
 
