@@ -5,6 +5,9 @@
 from __future__ import annotations
 
 import json
+import shutil
+import tempfile
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest import mock
 from unittest.mock import Mock
@@ -30,10 +33,21 @@ from crawlee.proxy_configuration import ProxyConfiguration
 from crawlee.sessions import SessionPool
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+
     from yarl import URL
 
     from crawlee._request import RequestOptions
     from crawlee.crawlers import PlaywrightCrawlingContext, PlaywrightPreNavCrawlingContext
+
+
+@pytest.fixture
+def user_folder() -> Generator[Path]:
+    temp_path = Path(tempfile.mkdtemp(prefix='apify-crawlee'))
+
+    yield temp_path
+
+    shutil.rmtree(temp_path)
 
 
 async def test_basic_request(httpbin: URL) -> None:
@@ -218,19 +232,18 @@ async def test_custom_headers(httpbin: URL) -> None:
     assert response_headers.get('My-Test-Header') == request_headers['My-Test-Header']
 
 
-async def test_pre_navigation_hook(httpbin: URL) -> None:
-    crawler = PlaywrightCrawler()
-    mock_hook = mock.AsyncMock(return_value=None)
+async def test_pre_navigation_hook() -> None:
+    crawler = PlaywrightCrawler(request_handler=mock.AsyncMock())
+    visit = mock.Mock()
 
-    crawler.pre_navigation_hook(mock_hook)
+    @crawler.pre_navigation_hook
+    async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
+        visit()
+        await context.page.route('**/*', lambda route: route.fulfill(status=200))
 
-    @crawler.router.default_handler
-    async def request_handler(_context: PlaywrightCrawlingContext) -> None:
-        pass
+    await crawler.run(['https://a.com', 'https://b.com'])
 
-    await crawler.run(['https://example.com', str(httpbin)])
-
-    assert mock_hook.call_count == 2
+    assert visit.call_count == 2
 
 
 async def test_proxy_set() -> None:
@@ -438,3 +451,47 @@ async def test_additional_http_error_status_codes() -> None:
     await crawler.run(['https://test.com'])
 
     mocked_handler.assert_not_called()
+
+
+async def test_launch_with_user_data_dir(user_folder: Path) -> None:
+    """Check that the persist context is created in the specified folder in `user_data_dir`."""
+    check_path = user_folder / 'Default'
+    crawler = PlaywrightCrawler(
+        headless=True, user_data_dir=user_folder, request_handler=mock.AsyncMock(return_value=None)
+    )
+
+    @crawler.pre_navigation_hook
+    async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
+        await context.page.route('**/*', lambda route: route.fulfill(status=200))
+
+    assert not check_path.exists()
+
+    await crawler.run(['https://test.io'])
+
+    assert check_path.exists()
+
+
+async def test_launch_with_user_data_dir_and_fingerprint(user_folder: Path) -> None:
+    """Check that the persist context works with fingerprints."""
+    check_path = user_folder / 'Default'
+    fingerprints = dict[str, str]()
+
+    crawler = PlaywrightCrawler(
+        headless=True,
+        user_data_dir=user_folder,
+        request_handler=mock.AsyncMock(return_value=None),
+        fingerprint_generator=DefaultFingerprintGenerator(),
+    )
+
+    @crawler.pre_navigation_hook
+    async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
+        fingerprints['window.navigator.userAgent'] = await context.page.evaluate('()=>window.navigator.userAgent')
+        await context.page.route('**/*', lambda route: route.fulfill(status=200))
+
+    assert not check_path.exists()
+
+    await crawler.run(['https://test.io'])
+
+    assert check_path.exists()
+
+    assert 'headless' not in fingerprints['window.navigator.userAgent'].lower()
