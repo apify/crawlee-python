@@ -17,6 +17,11 @@ This section summarizes the breaking changes between v0.5.x and v0.6.0.
 
 The `Configuration` fields `chrome_executable_path`, `xvfb`, and `verbose_log` have been removed. The `chrome_executable_path` and `xvfb` fields were unused, while `verbose_log` can be replaced by setting `log_level` to `DEBUG`.
 
+### PlaywrightCrawler and PlaywrightBrowserPlugin
+
+- `PlaywrightCrawler` now use a persistent browser context instead of the standard browser context
+- Added `user_data_dir` parameter for `PlaywrightCrawler` and `PlaywrightBrowserPlugin` to specify the directory for the persistent context. If not provided, a temporary directory will be created automatically.
+
 ### Abstract base classes
 
 We decided to move away from [Hungarian notation](https://en.wikipedia.org/wiki/Hungarian_notation) and remove all the `Base` prefixes from the abstract classes. It includes the following public classes:
