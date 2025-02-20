@@ -13,6 +13,10 @@ This section summarizes the breaking changes between v0.5.x and v0.6.0.
 
 - Removed `HttpCrawlerOptions` - which contained options from `BasicCrawlerOptions` and unique options `additional_http_error_status_codes` and `ignore_http_error_status_codes`. Both of the unique options were added to `BasicCrawlerOptions` instead.
 
+### SessionCookies
+
+- Replaces the `dict` used for cookie storage in `Session` with a new `SessionCookies` class. `SessionCookies` uses `CookieJar`, which enables support for multiple domains.
+
 ### Configuration
 
 The `Configuration` fields `chrome_executable_path`, `xvfb`, and `verbose_log` have been removed. The `chrome_executable_path` and `xvfb` fields were unused, while `verbose_log` can be replaced by setting `log_level` to `DEBUG`.
