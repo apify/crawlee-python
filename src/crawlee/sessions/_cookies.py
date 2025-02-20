@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from copy import deepcopy
 from http.cookiejar import Cookie
-from typing import Any, ClassVar, Literal, TypedDict, cast
+from typing import Any, ClassVar, Literal, cast
 
 from httpx import Cookies
-from typing_extensions import NotRequired, Required, override
+from typing_extensions import NotRequired, Required, TypedDict, override
 
 
 class BaseCookieParam(TypedDict, total=False):
