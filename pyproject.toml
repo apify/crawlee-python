@@ -89,7 +89,7 @@ playwright = ["browserforge>=1.2.3", "playwright>=1.27.0"]
 [dependency-groups]
 dev = [
     "build~=1.2.0",
-    "filelock~=3.16.0",
+    "filelock~=3.17.0",
     "ipdb~=0.13.0",
     "mypy~=1.15.0",
     "pre-commit~=4.0.0",
