@@ -83,7 +83,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         *,
         browser_pool: BrowserPool | None = None,
         browser_type: BrowserType | None = None,
-        user_data_dir: str | Path | None = None,
+        nouser_data_dir: str | Path | None = None,
         browser_launch_options: Mapping[str, Any] | None = None,
         browser_new_context_options: Mapping[str, Any] | None = None,
         fingerprint_generator: FingerprintGenerator | None = None,
@@ -95,7 +95,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
         Args:
             browser_pool: A `BrowserPool` instance to be used for launching the browsers and getting pages.
-            user_data_dir: Path to a user data directory, which stores browser session data like cookies
+            nouser_data_dir: Path to a user data directory, which stores browser session data like cookies
                 and local storage.
             browser_type: The type of browser to launch ('chromium', 'firefox', or 'webkit').
                 This option should not be used if `browser_pool` is provided.
@@ -121,7 +121,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             if any(
                 param is not None
                 for param in (
-                    user_data_dir,
+                    nouser_data_dir,
                     use_incognito_pages,
                     headless,
                     browser_type,
@@ -141,7 +141,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             browser_pool = BrowserPool.with_default_plugin(
                 headless=headless,
                 browser_type=browser_type,
-                user_data_dir=user_data_dir,
+                user_data_dir=nouser_data_dir,
                 browser_launch_options=browser_launch_options,
                 browser_new_context_options=browser_new_context_options,
                 use_incognito_pages=use_incognito_pages,
