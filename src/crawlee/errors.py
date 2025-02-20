@@ -94,6 +94,7 @@ class ContextPipelineInitializationError(Exception):
 class ContextPipelineFinalizationError(Exception):
     """Wraps an exception thrown in the finalization step of a context pipeline middleware.
 
+    Test
     We may not have the complete context at this point, so only `BasicCrawlingContext` is provided.
     """
 
