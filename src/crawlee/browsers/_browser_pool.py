@@ -20,6 +20,7 @@ from crawlee.browsers._types import BrowserType, CrawleePage
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
+    from pathlib import Path
     from types import TracebackType
 
     from crawlee.browsers._browser_plugin import BrowserPlugin
@@ -101,6 +102,7 @@ class BrowserPool:
         cls,
         *,
         browser_type: BrowserType | None = None,
+        user_data_dir: str | Path | None = None,
         browser_launch_options: Mapping[str, Any] | None = None,
         browser_new_context_options: Mapping[str, Any] | None = None,
         headless: bool | None = None,
@@ -112,6 +114,8 @@ class BrowserPool:
 
         Args:
             browser_type: The type of browser to launch ('chromium', 'firefox', or 'webkit').
+            user_data_dir: Path to a user data directory, which stores browser session data like cookies
+                and local storage.
             browser_launch_options: Keyword arguments to pass to the browser launch method. These options are provided
                 directly to Playwright's `browser_type.launch` method. For more details, refer to the Playwright
                 documentation: https://playwright.dev/python/docs/api/class-browsertype#browser-type-launch.
@@ -137,6 +141,9 @@ class BrowserPool:
 
         if browser_type:
             plugin_options['browser_type'] = browser_type
+
+        if user_data_dir:
+            plugin_options['user_data_dir'] = user_data_dir
 
         plugin = PlaywrightBrowserPlugin(
             **plugin_options,
