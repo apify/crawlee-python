@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from functools import partial
-from typing import TYPE_CHECKING, Any, Callable, Generic
+from typing import TYPE_CHECKING, Any, Callable, Generic, cast
 
 from pydantic import ValidationError
 from typing_extensions import NotRequired, TypedDict, TypeVar
@@ -15,6 +15,7 @@ from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.browsers import BrowserPool
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
+from crawlee.sessions._cookies import PWCookieParam
 from crawlee.statistics import StatisticsState
 
 from ._playwright_crawling_context import PlaywrightCrawlingContext
@@ -201,8 +202,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         """
         async with context.page:
             if context.session:
-                cookies = context.session.cookies.get_cookies_as_browser_format()
-                await self._set_cookies(context.page, cookies)
+                session_cookies = context.session.cookies.get_cookies_as_playwright_format()
+                await self._update_cookies(context.page, session_cookies)
 
             if context.request.headers:
                 await context.page.set_extra_http_headers(context.request.headers.model_dump())
@@ -216,8 +217,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             context.request.loaded_url = context.page.url
 
             if context.session:
-                cookies = await self._get_cookies(context.page)
-                context.session.cookies.set_cookies(cookies)
+                pw_cookies = await self._get_cookies(context.page)
+                context.session.cookies.set_cookies_from_playwright_format(pw_cookies)
 
             async def enqueue_links(
                 *,
@@ -329,13 +330,13 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         """
         self._pre_navigation_hooks.append(hook)
 
-    async def _get_cookies(self, page: Page) -> list[dict[str, Any]]:
+    async def _get_cookies(self, page: Page) -> list[PWCookieParam]:
         """Get the cookies from the page."""
         cookies = await page.context.cookies()
-        return [{**cookie} for cookie in cookies]
+        return [cast(PWCookieParam, cookie) for cookie in cookies]
 
-    async def _set_cookies(self, page: Page, cookies: list[dict[str, Any]]) -> None:
-        """Set the cookies to the page."""
+    async def _update_cookies(self, page: Page, cookies: list[PWCookieParam]) -> None:
+        """Update the cookies in the page context."""
         await page.context.add_cookies(cookies)  # type: ignore[arg-type]
 
 

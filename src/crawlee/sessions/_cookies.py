@@ -2,10 +2,30 @@ from __future__ import annotations
 
 from copy import deepcopy
 from http.cookiejar import Cookie
-from typing import Any, ClassVar, Literal
+from typing import Any, ClassVar, Literal, TypedDict, cast
 
 from httpx import Cookies
-from typing_extensions import override
+from typing_extensions import NotRequired, Required, override
+
+
+class BaseCookieParam(TypedDict, total=False):
+    name: Required[str]
+    value: Required[str]
+    domain: NotRequired[str]
+    path: NotRequired[str]
+    secure: NotRequired[bool]
+
+
+class CookieParam(BaseCookieParam, total=False):
+    http_only: NotRequired[bool]
+    expires: NotRequired[int]
+    same_site: NotRequired[Literal['Lax', 'None', 'Strict']]
+
+
+class PWCookieParam(BaseCookieParam, total=False):
+    httpOnly: NotRequired[bool]
+    expires: NotRequired[float]
+    sameSite: NotRequired[Literal['Lax', 'None', 'Strict']]
 
 
 class SessionCookies(Cookies):
@@ -67,58 +87,61 @@ class SessionCookies(Cookies):
 
         self.jar.set_cookie(cookie)
 
-    def _convert_cookie_to_dict(self, cookie: Cookie) -> dict[str, Any]:
+    def _convert_cookie_to_dict(self, cookie: Cookie) -> CookieParam:
         """Convert Cookie object to dictionary format.
 
         Args:
             cookie: Cookie object to convert.
         """
-        cookie_dict: dict[str, Any] = {
-            'name': cookie.name,
-            'value': cookie.value if cookie.value else '',
-            'domain': cookie.domain,
-            'path': cookie.path,
-            'secure': cookie.secure,
-            'http_only': cookie.has_nonstandard_attr('HttpOnly'),
-        }
+        cookie_dict = CookieParam(
+            name=cookie.name,
+            value=cookie.value if cookie.value else '',
+            domain=cookie.domain,
+            path=cookie.path,
+            secure=cookie.secure,
+            http_only=cookie.has_nonstandard_attr('HttpOnly'),
+        )
 
         if cookie.expires:
             cookie_dict['expires'] = cookie.expires
 
-        if cookie.has_nonstandard_attr('SameSite'):
-            cookie_dict['same_site'] = cookie.get_nonstandard_attr('SameSite')
+        if (same_site := cookie.get_nonstandard_attr('SameSite')) and same_site in {'Lax', 'None', 'Strict'}:
+            cookie_dict['same_site'] = same_site  # type: ignore[typeddict-item]
 
         return cookie_dict
 
-    def _normalize_cookie_attributes(self, cookie_dict: dict[str, Any], *, reverse: bool = False) -> dict[str, Any]:
-        """Convert cookie attribute keys between internal and browser formats.
+    def _to_playwright(self, cookie_dict: CookieParam) -> PWCookieParam:
+        """Convert internal cookie to Playwright format."""
+        result: dict = dict(cookie_dict)
 
-        Args:
-            cookie_dict: Dictionary with cookie attributes.
-            reverse: If True, converts from internal to browser format.
-        """
-        new_cookie_dict: dict[str, Any] = cookie_dict.copy()
+        if 'http_only' in result:
+            result['httpOnly'] = result.pop('http_only')
+        if 'same_site' in result:
+            result['sameSite'] = result.pop('same_site')
+        if 'expires' in result:
+            result['expires'] = float(result['expires'])
 
-        for key_pair in self._ATTRIBUTE_MAPPING.items():
-            new_key, old_key = key_pair
-            if reverse:
-                old_key, new_key = new_key, old_key
+        return cast(PWCookieParam, result)
 
-            if old_key in new_cookie_dict:
-                new_cookie_dict[new_key] = new_cookie_dict.pop(old_key)
+    def _from_playwright(self, cookie_dict: PWCookieParam) -> CookieParam:
+        """Convert Playwright cookie to internal format."""
+        result: dict = dict(cookie_dict)
 
-        return new_cookie_dict
+        if 'httpOnly' in result:
+            result['http_only'] = result.pop('httpOnly')
+        if 'sameSite' in result:
+            result['same_site'] = result.pop('sameSite')
+        if 'expires' in result:
+            result['expires'] = int(result['expires'])
 
-    def get_cookies_as_dicts(self) -> list[dict[str, Any]]:
+        return cast(CookieParam, result)
+
+    def get_cookies_as_dicts(self) -> list[CookieParam]:
         """Convert cookies to a list format for persistence."""
         return [self._convert_cookie_to_dict(cookie) for cookie in self.jar]
 
-    def get_cookies_as_browser_format(self) -> list[dict[str, Any]]:
-        """Get cookies in browser-compatible format."""
-        return [self._normalize_cookie_attributes(cookie, reverse=True) for cookie in self.get_cookies_as_dicts()]
-
     @classmethod
-    def from_dict_list(cls, data: list[dict[str, Any]]) -> SessionCookies:
+    def from_dict_list(cls, data: list[CookieParam]) -> SessionCookies:
         """Create a new SessionCookies instance from dictionary representations.
 
         Args:
@@ -145,15 +168,24 @@ class SessionCookies(Cookies):
         for cookie in cookies:
             self.store_cookie(cookie)
 
-    def set_cookies(self, cookie_dicts: list[dict[str, Any]]) -> None:
+    def set_cookies(self, cookie_dicts: list[CookieParam]) -> None:
         """Create and store cookies from their dictionary representations.
 
         Args:
             cookie_dicts: List of dictionaries where each dict represents cookie parameters.
         """
         for cookie_dict in cookie_dicts:
-            normalized_cookie_dict = self._normalize_cookie_attributes(cookie_dict)
-            self.set(**normalized_cookie_dict)
+            self.set(**cookie_dict)
+
+    def get_cookies_as_playwright_format(self) -> list[PWCookieParam]:
+        """Get cookies in playwright format."""
+        return [self._to_playwright(cookie) for cookie in self.get_cookies_as_dicts()]
+
+    def set_cookies_from_playwright_format(self, pw_cookies: list[PWCookieParam]) -> None:
+        """Set cookies from playwright format."""
+        for pw_cookie in pw_cookies:
+            cookie_param = self._from_playwright(pw_cookie)
+            self.set(**cookie_param)
 
     def __deepcopy__(self, memo: dict[int, Any] | None) -> SessionCookies:
         # This is necessary because cookijars use `RLock`, which prevents `deepcopy`.

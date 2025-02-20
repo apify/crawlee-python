@@ -232,7 +232,7 @@ async def test_stores_cookies(http_client_class: type[HttpClient], httpbin: URL)
 
         session = await session_pool.get_session_by_id(session_ids.pop())
         assert session is not None
-        assert {cookie['name']: cookie['value'] for cookie in session.cookies.get_cookies_as_browser_format()} == {
+        assert {cookie['name']: cookie['value'] for cookie in session.cookies.get_cookies_as_playwright_format()} == {
             'a': '1',
             'b': '2',
             'c': '3',
@@ -522,7 +522,7 @@ async def test_store_complex_cookies(server: respx.MockRouter) -> None:
         session = await session_pool.get_session_by_id(session_ids.pop())
         assert session is not None
 
-        session_cookies_dict = {cookie['name']: cookie for cookie in session.cookies.get_cookies_as_browser_format()}
+        session_cookies_dict = {cookie['name']: cookie for cookie in session.cookies.get_cookies_as_playwright_format()}
 
         assert len(session_cookies_dict) == 6
 
@@ -616,7 +616,7 @@ async def test_store_multidomain_cookies(server: respx.MockRouter) -> None:
             session = await session_pool.get_session_by_id(session_ids.pop())
             assert session is not None
 
-            session_cookies_dict = {cookie['domain'] for cookie in session.cookies.get_cookies_as_browser_format()}
+            session_cookies_dict = {cookie['domain'] for cookie in session.cookies.get_cookies_as_playwright_format()}
 
             assert len(session_cookies_dict) == 3
 
