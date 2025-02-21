@@ -32,15 +32,17 @@ from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context
     AdaptiveContextError,
 )
 from crawlee.statistics import Statistics
+from crawlee.storages import KeyValueStore
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import AsyncGenerator, Iterator
 
     import respx
 
     from crawlee.browsers._browser_plugin import BrowserPlugin
     from crawlee.browsers._types import CrawleePage
     from crawlee.proxy_configuration import ProxyInfo
+
 
 _H1_TEXT = 'Static'
 _H2_TEXT = 'Only in browser'
@@ -72,6 +74,13 @@ def test_urls(respx_mock: respx.MockRouter) -> list[str]:
     for url in urls:
         respx_mock.get(url).return_value = httpx.Response(status_code=200, content=_PAGE_CONTENT_STATIC.encode())
     return urls
+
+
+@pytest.fixture
+async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
+    kvs = await KeyValueStore.open()
+    yield kvs
+    await kvs.drop()
 
 
 class _StaticRedirectBrowserPool(BrowserPool):
@@ -384,7 +393,9 @@ async def test_adaptive_crawling_predictor_calls(
     mocked_store_result.assert_called_once_with(requests[0], expected_result_rendering_type)
 
 
-async def test_adaptive_crawling_result_use_state_isolation(test_urls: list[str]) -> None:
+async def test_adaptive_crawling_result_use_state_isolation(
+    key_value_store: KeyValueStore, test_urls: list[str]
+) -> None:
     """Tests that global state accessed through `use_state` is changed only by one sub crawler.
 
     Enforced rendering type detection to run both sub crawlers."""
@@ -393,8 +404,7 @@ async def test_adaptive_crawling_result_use_state_isolation(test_urls: list[str]
         rendering_type_predictor=static_only_predictor_enforce_detection,
         playwright_crawler_specific_kwargs={'browser_pool': _StaticRedirectBrowserPool.with_default_plugin()},
     )
-    store = await crawler.get_key_value_store()
-    await store.set_value(BasicCrawler._CRAWLEE_STATE_KEY, {'counter': 0})
+    await key_value_store.set_value(BasicCrawler._CRAWLEE_STATE_KEY, {'counter': 0})
     request_handler_calls = 0
 
     @crawler.router.default_handler
@@ -406,12 +416,12 @@ async def test_adaptive_crawling_result_use_state_isolation(test_urls: list[str]
 
     await crawler.run(test_urls[:1])
 
-    await store.persist_autosaved_values()
+    await key_value_store.persist_autosaved_values()
 
     # Request handler was called twice
     assert request_handler_calls == 2
     # Increment of global state happened only once
-    assert (await store.get_value(BasicCrawler._CRAWLEE_STATE_KEY))['counter'] == 1
+    assert (await key_value_store.get_value(BasicCrawler._CRAWLEE_STATE_KEY))['counter'] == 1
 
 
 async def test_adaptive_crawling_statistics(test_urls: list[str]) -> None:

@@ -100,6 +100,14 @@ async def server() -> AsyncGenerator[respx.MockRouter, None]:
             </html>""",
         )
 
+        mock.get('/simple_set_cookies', name='simple_set_cookies').return_value = Response(
+            200, headers={'set-cookie': 'a=1; Path=/'}
+        )
+
+        mock.get('/get_cookies', name='get_cookies').side_effect = lambda request: Response(
+            200, json={'cookies': request.headers.get('cookie', '')}, headers={'Content-Type': 'application/json'}
+        )
+
         yield mock
 
 
@@ -411,15 +419,9 @@ async def test_http_crawler_pre_navigation_hooks_executed_before_request() -> No
     assert execution_order == ['pre-navigation-hook 1', 'pre-navigation-hook 2', 'request', 'final handler']
 
 
-@pytest.mark.parametrize(
-    'http_client_class',
-    [
-        pytest.param(CurlImpersonateHttpClient, id='curl'),
-        pytest.param(HttpxHttpClient, id='httpx'),
-    ],
-)
-async def test_isolation_cookies(http_client_class: type[HttpClient], httpbin: URL) -> None:
-    http_client = http_client_class()
+async def test_isolation_cookies_curl(httpbin: URL) -> None:
+    """Test isolation cookies for Session with curl and httpbin"""
+    http_client = CurlImpersonateHttpClient()
     sessions_ids: list[str] = []
     sessions_cookies: dict[str, dict[str, str]] = {}
     response_cookies: dict[str, dict[str, str]] = {}
@@ -480,3 +482,68 @@ async def test_isolation_cookies(http_client_class: type[HttpClient], httpbin: U
     # For a clean session, the cookie should not be in the session store or in the response
     # This way we can be sure that no cookies are being leaked through the http client
     assert sessions_cookies[clean_session_id] == response_cookies[clean_session_id] == {}
+
+
+async def test_isolation_cookies_httpx(server: respx.MockRouter) -> None:
+    """Test isolation cookies for Session with httpx and respx"""
+    http_client = HttpxHttpClient()
+    sessions_ids: list[str] = []
+    sessions_cookies: dict[str, dict[str, str]] = {}
+    response_cookies: dict[str, dict[str, str]] = {}
+
+    crawler = HttpCrawler(
+        session_pool=SessionPool(max_pool_size=1),
+        http_client=http_client,
+        concurrency_settings=ConcurrencySettings(max_concurrency=1),
+    )
+
+    @crawler.router.default_handler
+    async def handler(context: HttpCrawlingContext) -> None:
+        if not context.session:
+            return
+
+        sessions_ids.append(context.session.id)
+
+        if context.request.unique_key not in {'1', '2'}:
+            return
+
+        sessions_cookies[context.session.id] = context.session.cookies
+        response_data = json.loads(context.http_response.read())
+        print(response_data)
+        response_cookies[context.session.id] = response_data.get('cookies')
+
+        if context.request.user_data.get('retire_session'):
+            context.session.retire()
+
+    await crawler.run(
+        [
+            # The first request sets the cookie in the session
+            'https://test.io/simple_set_cookies',
+            # With the second request, we check the cookies in the session and set retire
+            Request.from_url('https://test.io/get_cookies', unique_key='1', user_data={'retire_session': True}),
+            # The third request is made with a new session to make sure it does not use another session's cookies
+            Request.from_url('https://test.io/get_cookies', unique_key='2'),
+        ]
+    )
+
+    assert server['simple_set_cookies'].called
+    assert server['get_cookies'].called
+
+    assert len(sessions_cookies) == 2
+    assert len(response_cookies) == 2
+
+    assert sessions_ids[0] == sessions_ids[1]
+
+    cookie_session_id = sessions_ids[0]
+    clean_session_id = sessions_ids[2]
+
+    assert cookie_session_id != clean_session_id
+
+    # The initiated cookies must match in both the response and the session store
+    assert sessions_cookies[cookie_session_id] == {'a': '1'}
+    assert response_cookies[cookie_session_id] == 'a=1'
+
+    # For a clean session, the cookie should not be in the session store or in the response
+    # This way we can be sure that no cookies are being leaked through the http client
+    assert sessions_cookies[clean_session_id] == {}
+    assert response_cookies[clean_session_id] == ''
