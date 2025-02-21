@@ -110,6 +110,15 @@ async def server() -> AsyncGenerator[respx.MockRouter, None]:
                 ('set-cookie', 'domain=6; Path=/; Domain=.test.io;'),
             ],
         )
+
+        mock.get('/simple_set_cookies', name='simple_set_cookies').return_value = Response(
+            200, headers={'set-cookie': 'a=1; Path=/'}
+        )
+
+        mock.get('/get_cookies', name='get_cookies').side_effect = lambda request: Response(
+            200, json={'cookies': request.headers.get('cookie', '')}, headers={'Content-Type': 'application/json'}
+        )
+
         yield mock
 
 
@@ -425,15 +434,9 @@ async def test_http_crawler_pre_navigation_hooks_executed_before_request() -> No
     assert execution_order == ['pre-navigation-hook 1', 'pre-navigation-hook 2', 'request', 'final handler']
 
 
-@pytest.mark.parametrize(
-    'http_client_class',
-    [
-        pytest.param(CurlImpersonateHttpClient, id='curl'),
-        pytest.param(HttpxHttpClient, id='httpx'),
-    ],
-)
-async def test_isolation_cookies(http_client_class: type[HttpClient], httpbin: URL) -> None:
-    http_client = http_client_class()
+async def test_isolation_cookies_curl(httpbin: URL) -> None:
+    """Test isolation cookies for Session with curl and httpbin"""
+    http_client = CurlImpersonateHttpClient()
     sessions_ids: list[str] = []
     sessions_cookies: dict[str, dict[str, str]] = {}
     response_cookies: dict[str, dict[str, str]] = {}
