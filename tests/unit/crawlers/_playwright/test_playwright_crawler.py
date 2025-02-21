@@ -5,9 +5,6 @@
 from __future__ import annotations
 
 import json
-import shutil
-import tempfile
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest import mock
 from unittest.mock import Mock
@@ -33,21 +30,12 @@ from crawlee.proxy_configuration import ProxyConfiguration
 from crawlee.sessions import SessionPool
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from pathlib import Path
 
     from yarl import URL
 
     from crawlee._request import RequestOptions
     from crawlee.crawlers import PlaywrightCrawlingContext, PlaywrightPreNavCrawlingContext
-
-
-@pytest.fixture
-def user_folder() -> Generator[Path]:
-    temp_path = Path(tempfile.mkdtemp(prefix='apify-crawlee'))
-
-    yield temp_path
-
-    shutil.rmtree(temp_path)
 
 
 async def test_basic_request(httpbin: URL) -> None:
@@ -454,11 +442,11 @@ async def test_additional_http_error_status_codes() -> None:
     mocked_handler.assert_not_called()
 
 
-async def test_launch_with_user_data_dir(user_folder: Path) -> None:
+async def test_launch_with_user_data_dir(tmp_path: Path) -> None:
     """Check that the persist context is created in the specified folder in `user_data_dir`."""
-    check_path = user_folder / 'Default'
+    check_path = tmp_path / 'Default'
     crawler = PlaywrightCrawler(
-        headless=True, user_data_dir=user_folder, request_handler=mock.AsyncMock(return_value=None)
+        headless=True, user_data_dir=tmp_path, request_handler=mock.AsyncMock(return_value=None)
     )
 
     @crawler.pre_navigation_hook
@@ -472,14 +460,14 @@ async def test_launch_with_user_data_dir(user_folder: Path) -> None:
     assert check_path.exists()
 
 
-async def test_launch_with_user_data_dir_and_fingerprint(user_folder: Path) -> None:
+async def test_launch_with_user_data_dir_and_fingerprint(tmp_path: Path) -> None:
     """Check that the persist context works with fingerprints."""
-    check_path = user_folder / 'Default'
+    check_path = tmp_path / 'Default'
     fingerprints = dict[str, str]()
 
     crawler = PlaywrightCrawler(
         headless=True,
-        user_data_dir=user_folder,
+        user_data_dir=tmp_path,
         request_handler=mock.AsyncMock(return_value=None),
         fingerprint_generator=DefaultFingerprintGenerator(),
     )
@@ -495,4 +483,5 @@ async def test_launch_with_user_data_dir_and_fingerprint(user_folder: Path) -> N
 
     assert check_path.exists()
 
+    assert fingerprints['window.navigator.userAgent']
     assert 'headless' not in fingerprints['window.navigator.userAgent'].lower()
