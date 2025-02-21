@@ -32,19 +32,12 @@ from crawlee.storage_clients._memory import DatasetClient
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Sequence
+    from collections.abc import Sequence
 
     import respx
     from yarl import URL
 
     from crawlee._types import JsonSerializable
-
-
-@pytest.fixture
-async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
-    kvs = await KeyValueStore.open()
-    yield kvs
-    await kvs.drop()
 
 
 async def test_processes_requests_from_explicit_queue() -> None:
