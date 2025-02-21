@@ -14,7 +14,7 @@ from crawlee import service_locator
 from crawlee.configuration import Configuration
 from crawlee.proxy_configuration import ProxyInfo
 from crawlee.storage_clients import MemoryStorageClient
-from crawlee.storages import _creation_management
+from crawlee.storages import KeyValueStore, _creation_management
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -176,3 +176,10 @@ def memory_storage_client(tmp_path: Path) -> MemoryStorageClient:
     )
 
     return MemoryStorageClient.from_config(config)
+
+
+@pytest.fixture
+async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
+    kvs = await KeyValueStore.open()
+    yield kvs
+    await kvs.drop()
