@@ -724,7 +724,7 @@ dev = [
     { name = "types-beautifulsoup4", specifier = "~=4.12.0.20240229" },
     { name = "types-cachetools", specifier = "~=5.5.0.20240820" },
     { name = "types-colorama", specifier = "~=0.4.15.20240106" },
-    { name = "types-psutil", specifier = "~=5.9.5.20240205" },
+    { name = "types-psutil", specifier = "~=7.0.0.20250218" },
     { name = "types-python-dateutil", specifier = "~=2.9.0.20240316" },
 ]
 
@@ -2921,11 +2921,11 @@ wheels = [
 
 [[package]]
 name = "types-psutil"
-version = "5.9.5.20240516"
+version = "7.0.0.20250218"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/af/41/5d3d2f7b7e819e85820eadececc121ab805c0cb4cab5d88defb0a37eabed/types-psutil-5.9.5.20240516.tar.gz", hash = "sha256:bb296f59fc56458891d0feb1994717e548a1bcf89936a2877df8792b822b4696", size = 14771 }
+sdist = { url = "https://files.pythonhosted.org/packages/b5/7c/145600d30456e7ccbb499abcf718aab2bd830e604a0ae8eb32b67cd346a6/types_psutil-7.0.0.20250218.tar.gz", hash = "sha256:1e642cdafe837b240295b23b1cbd4691d80b08a07d29932143cbbae30eb0db9c", size = 19828 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3c/b0/872fd0f7b3998f18447a49b0ebae95994c9f589c79443551030caa8f94f0/types_psutil-5.9.5.20240516-py3-none-any.whl", hash = "sha256:83146ded949a10167d9895e567b3b71e53ebc5e23fd8363eab62b3c76cce7b89", size = 18356 },
+    { url = "https://files.pythonhosted.org/packages/50/c8/f4365293408da4a9bcb1849d3efd8c60427cffff68cbb98ab1b81851d8bb/types_psutil-7.0.0.20250218-py3-none-any.whl", hash = "sha256:1447a30c282aafefcf8941ece854e1100eee7b0296a9d9be9977292f0269b121", size = 22763 },
 ]
 
 [[package]]
