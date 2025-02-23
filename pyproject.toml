@@ -78,6 +78,9 @@ curl-impersonate = ["curl-cffi>=0.9.0"]
 parsel = ["parsel>=1.10.0"]
 playwright = ["browserforge>=1.2.3", "playwright>=1.27.0"]
 
+[project.scripts]
+crawlee = "crawlee._cli:cli"
+
 [project.urls]
 "Homepage" = "https://crawlee.dev/python"
 "Apify homepage" = "https://apify.com"
