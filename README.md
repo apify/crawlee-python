@@ -71,7 +71,7 @@ pipx --help
 Then, run the CLI and choose from the available templates:
 
 ```sh
-pipx run crawlee create my-crawler
+pipx run crawlee[cli] create my-crawler
 ```
 
 If you already have `crawlee` installed, you can spin it up by running:

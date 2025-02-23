@@ -17,6 +17,10 @@ This section summarizes the breaking changes between v0.5.x and v0.6.0.
 
 The `Configuration` fields `chrome_executable_path`, `xvfb`, and `verbose_log` have been removed. The `chrome_executable_path` and `xvfb` fields were unused, while `verbose_log` can be replaced by setting `log_level` to `DEBUG`.
 
+### CLI dependencies
+
+CLI dependencies have been moved to optional dependencies. If you need the CLI, install `crawlee[cli]`
+
 ### Abstract base classes
 
 We decided to move away from [Hungarian notation](https://en.wikipedia.org/wiki/Hungarian_notation) and remove all the `Base` prefixes from the abstract classes. It includes the following public classes:

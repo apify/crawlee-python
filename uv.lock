@@ -583,11 +583,9 @@ source = { editable = "." }
 dependencies = [
     { name = "cachetools" },
     { name = "colorama" },
-    { name = "cookiecutter" },
     { name = "docutils" },
     { name = "eval-type-backport" },
     { name = "httpx", extra = ["brotli", "http2", "zstd"] },
-    { name = "inquirer" },
     { name = "more-itertools" },
     { name = "psutil" },
     { name = "pydantic" },
@@ -596,7 +594,6 @@ dependencies = [
     { name = "rich" },
     { name = "sortedcollections" },
     { name = "tldextract" },
-    { name = "typer" },
     { name = "typing-extensions" },
     { name = "yarl" },
 ]
@@ -622,6 +619,11 @@ all = [
 beautifulsoup = [
     { name = "beautifulsoup4", extra = ["lxml"] },
     { name = "html5lib" },
+]
+cli = [
+    { name = "cookiecutter" },
+    { name = "inquirer" },
+    { name = "typer" },
 ]
 curl-impersonate = [
     { name = "curl-cffi" },
@@ -668,7 +670,7 @@ requires-dist = [
     { name = "browserforge", marker = "extra == 'playwright'", specifier = ">=1.2.3" },
     { name = "cachetools", specifier = ">=5.5.0" },
     { name = "colorama", specifier = ">=0.4.0" },
-    { name = "cookiecutter", specifier = ">=2.6.0" },
+    { name = "cookiecutter", marker = "extra == 'cli'", specifier = ">=2.6.0" },
     { name = "curl-cffi", marker = "extra == 'all'", specifier = ">=0.9.0" },
     { name = "curl-cffi", marker = "extra == 'curl-impersonate'", specifier = ">=0.9.0" },
     { name = "docutils", specifier = ">=0.21.0" },
@@ -676,7 +678,7 @@ requires-dist = [
     { name = "html5lib", marker = "extra == 'all'", specifier = ">=1.0" },
     { name = "html5lib", marker = "extra == 'beautifulsoup'", specifier = ">=1.0" },
     { name = "httpx", extras = ["brotli", "http2", "zstd"], specifier = ">=0.27.0" },
-    { name = "inquirer", specifier = ">=3.3.0" },
+    { name = "inquirer", marker = "extra == 'cli'", specifier = ">=3.3.0" },
     { name = "jaro-winkler", marker = "extra == 'adaptive-crawler'", specifier = ">=2.0.3" },
     { name = "jaro-winkler", marker = "extra == 'all'", specifier = ">=2.0.3" },
     { name = "more-itertools", specifier = ">=10.2.0" },
@@ -696,11 +698,11 @@ requires-dist = [
     { name = "scikit-learn", marker = "python_full_version >= '3.10' and extra == 'all'", specifier = ">=1.6.0" },
     { name = "sortedcollections", specifier = ">=2.1.0" },
     { name = "tldextract", specifier = ">=5.1.0" },
-    { name = "typer", specifier = ">=0.12.0" },
+    { name = "typer", marker = "extra == 'cli'", specifier = ">=0.12.0" },
     { name = "typing-extensions", specifier = ">=4.1.0" },
     { name = "yarl", specifier = ">=1.18.0" },
 ]
-provides-extras = ["all", "adaptive-crawler", "beautifulsoup", "curl-impersonate", "parsel", "playwright"]
+provides-extras = ["all", "adaptive-crawler", "beautifulsoup", "curl-impersonate", "parsel", "playwright", "cli"]
 
 [package.metadata.requires-dev]
 dev = [
