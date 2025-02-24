@@ -56,7 +56,7 @@ function Hero() {
                     </div>
                     <div className={styles.codeBlock}>
                         <CodeBlock className="language-bash">
-                            pipx run crawlee[cli] create my-crawler
+                            pipx run 'crawlee[cli]' create my-crawler
                         </CodeBlock>
                     </div>
                 </div>
@@ -116,7 +116,7 @@ function ActorExample() {
                     The fastest way to try Crawlee out is to use the <b>Crawlee CLI</b> and choose one of the provided templates. The CLI will prepare a new project for you, and add boilerplate code for you to play with.
                 </p>
                 <CodeBlock className="language-bash">
-                    pipx run crawlee[cli] create my-crawler
+                    pipx run 'crawlee[cli]' create my-crawler
                 </CodeBlock>
                 <p>
                     If you prefer to integrate Crawlee <b>into your own project</b>, you can follow the example below. Crawlee is available on  <a href="https://pypi.org/project/crawlee/">PyPI</a>, so you can install it using <code>pip</code>. Since it uses <code>PlaywrightCrawler</code>, you will also need to install <code>crawlee</code> package with <code>playwright</code> extra. It is not not included with Crawlee by default to keep the installation size minimal.
