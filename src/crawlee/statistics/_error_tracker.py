@@ -38,12 +38,12 @@ class ErrorTracker:
         error_group_message = self._get_error_message(error)
         error_group_stack_trace = self._get_traceback_text(error)
 
-        # All groups, except the lowest level is matched exactly.
+        # First two levels are grouped only in case of exact match.
         specific_groups = self._errors[error_group_stack_trace][error_group_name]
 
-        # Lowest level is matched by similarity
+        # Lowest level group is matched by similarity.
         if error_group_message in specific_groups:
-            # Exact match
+            # Exact match.
             specific_groups.update([error_group_message])
         else:
             for existing_error_group_message in specific_groups:
@@ -51,9 +51,9 @@ class ErrorTracker:
                 if new_error_group_message := self._create_generic_message(
                     existing_error_group_message, error_group_message
                 ):
-                    # Replace old name
+                    # Replace old name.
                     specific_groups[new_error_group_message] = specific_groups.pop(existing_error_group_message)
-                    # Increment
+                    # Increment.
                     specific_groups.update([new_error_group_message])
                     break
             else:
