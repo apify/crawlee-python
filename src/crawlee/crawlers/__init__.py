@@ -1,7 +1,7 @@
 from crawlee._utils.try_import import install_import_hook as _install_import_hook
 from crawlee._utils.try_import import try_import as _try_import
 
-from ._abstract_http import AbstractHttpCrawler, AbstractHttpParser, HttpCrawlerOptions, ParsedHttpCrawlingContext
+from ._abstract_http import AbstractHttpCrawler, AbstractHttpParser, ParsedHttpCrawlingContext
 from ._basic import BasicCrawler, BasicCrawlerOptions, BasicCrawlingContext, ContextPipeline
 from ._http import HttpCrawler, HttpCrawlingContext, HttpCrawlingResult
 
@@ -18,10 +18,31 @@ with _try_import(__name__, 'ParselCrawler', 'ParselCrawlingContext'):
 with _try_import(__name__, 'PlaywrightCrawler', 'PlaywrightCrawlingContext', 'PlaywrightPreNavCrawlingContext'):
     from ._playwright import PlaywrightCrawler, PlaywrightCrawlingContext, PlaywrightPreNavCrawlingContext
 
+with _try_import(
+    __name__,
+    'AdaptivePlaywrightCrawler',
+    'AdaptivePlaywrightCrawlingContext',
+    'AdaptivePlaywrightPreNavCrawlingContext',
+    'RenderingType',
+    'RenderingTypePrediction',
+    'RenderingTypePredictor',
+):
+    from ._adaptive_playwright import (
+        AdaptivePlaywrightCrawler,
+        AdaptivePlaywrightCrawlingContext,
+        AdaptivePlaywrightPreNavCrawlingContext,
+        RenderingType,
+        RenderingTypePrediction,
+        RenderingTypePredictor,
+    )
+
 
 __all__ = [
     'AbstractHttpCrawler',
     'AbstractHttpParser',
+    'AdaptivePlaywrightCrawler',
+    'AdaptivePlaywrightCrawlingContext',
+    'AdaptivePlaywrightPreNavCrawlingContext',
     'BasicCrawler',
     'BasicCrawlerOptions',
     'BasicCrawlingContext',
@@ -30,7 +51,6 @@ __all__ = [
     'BeautifulSoupParserType',
     'ContextPipeline',
     'HttpCrawler',
-    'HttpCrawlerOptions',
     'HttpCrawlingContext',
     'HttpCrawlingResult',
     'ParsedHttpCrawlingContext',
@@ -39,4 +59,7 @@ __all__ = [
     'PlaywrightCrawler',
     'PlaywrightCrawlingContext',
     'PlaywrightPreNavCrawlingContext',
+    'RenderingType',
+    'RenderingTypePrediction',
+    'RenderingTypePredictor',
 ]

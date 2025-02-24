@@ -32,19 +32,12 @@ from crawlee.storage_clients._memory import DatasetClient
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Sequence
+    from collections.abc import Sequence
 
     import respx
     from yarl import URL
 
     from crawlee._types import JsonSerializable
-
-
-@pytest.fixture
-async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
-    kvs = await KeyValueStore.open()
-    yield kvs
-    await kvs.drop()
 
 
 async def test_processes_requests_from_explicit_queue() -> None:
@@ -973,8 +966,10 @@ async def test_crawler_manual_stop(httpbin: URL) -> None:
     assert stats.requests_finished == 2
 
 
+@pytest.mark.skipif(sys.version_info[:3] < (3, 11), reason='asyncio.Barrier was introduced in Python 3.11.')
 async def test_crawler_multiple_stops_in_parallel(httpbin: URL) -> None:
     """Test that no new requests are handled after crawler.stop() is called, but ongoing requests can still finish."""
+
     start_urls = [
         str(httpbin / '1'),
         str(httpbin / '2'),
@@ -985,17 +980,17 @@ async def test_crawler_multiple_stops_in_parallel(httpbin: URL) -> None:
     # Set max_concurrency to 2 to ensure two urls are being visited in parallel.
     crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(max_concurrency=2))
 
-    sleep_time_generator = iter([0, 0.1])
+    both_handlers_started = asyncio.Barrier(2)  # type:ignore[attr-defined]  # Test is skipped in older Python versions.
+    only_one_handler_at_a_time = asyncio.Semaphore(1)
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        processed_urls.append(context.request.url)
+        await both_handlers_started.wait()  # Block until both handlers are started.
 
-        # This sleep ensures that first request is processed quickly and triggers stop() almost immediately.
-        # Second request will have some sleep time to make sure it is still being processed after crawler.stop() was
-        # called from the first request and so the crawler is already shutting down.
-        await asyncio.sleep(next(sleep_time_generator))
-        crawler.stop(reason=f'Stop called on {context.request.url}')
+        async with only_one_handler_at_a_time:
+            # Reliably create situation where one handler called `crawler.stop()`, while other handler is still running.
+            crawler.stop(reason=f'Stop called on {context.request.url}')
+            processed_urls.append(context.request.url)
 
     stats = await crawler.run(start_urls)
 

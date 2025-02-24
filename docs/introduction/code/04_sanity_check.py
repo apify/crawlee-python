@@ -13,8 +13,9 @@ async def main() -> None:
         # the elements we want to interact with are present in the DOM.
         await context.page.wait_for_selector('.collection-block-item')
 
-        # Execute a function within the browser context to target the collection card elements
-        # and extract their text content, trimming any leading or trailing whitespace.
+        # Execute a function within the browser context to target the collection
+        # card elements and extract their text content, trimming any leading or
+        # trailing whitespace.
         category_texts = await context.page.eval_on_selector_all(
             '.collection-block-item',
             '(els) => els.map(el => el.textContent.trim())',

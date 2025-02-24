@@ -7,13 +7,14 @@ import signal
 import sys
 import tempfile
 from asyncio import CancelledError
-from collections.abc import AsyncGenerator, Awaitable, Sequence
+from collections.abc import AsyncGenerator, Awaitable, Iterable, Sequence
 from contextlib import AsyncExitStack, suppress
 from datetime import timedelta
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Generic, Union, cast
 from urllib.parse import ParseResult, urlparse
+from weakref import WeakKeyDictionary
 
 from tldextract import TLDExtract
 from typing_extensions import NotRequired, TypedDict, TypeVar, Unpack, assert_never
@@ -22,7 +23,13 @@ from crawlee import EnqueueStrategy, Glob, service_locator
 from crawlee._autoscaling import AutoscaledPool, Snapshotter, SystemStatus
 from crawlee._log_config import configure_logger, get_configured_log_level
 from crawlee._request import Request, RequestState
-from crawlee._types import BasicCrawlingContext, HttpHeaders, RequestHandlerRunResult, SendRequestFunction
+from crawlee._types import (
+    BasicCrawlingContext,
+    GetKeyValueStoreFromRequestHandlerFunction,
+    HttpHeaders,
+    RequestHandlerRunResult,
+    SendRequestFunction,
+)
 from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
@@ -37,7 +44,7 @@ from crawlee.errors import (
 from crawlee.http_clients import HttpxHttpClient
 from crawlee.router import Router
 from crawlee.sessions import SessionPool
-from crawlee.statistics import Statistics
+from crawlee.statistics import Statistics, StatisticsState
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 from ._context_pipeline import ContextPipeline
@@ -49,26 +56,23 @@ if TYPE_CHECKING:
     from crawlee._types import ConcurrencySettings, HttpMethod, JsonSerializable
     from crawlee.configuration import Configuration
     from crawlee.events import EventManager
-    from crawlee.http_clients import BaseHttpClient, HttpResponse
+    from crawlee.http_clients import HttpClient, HttpResponse
     from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
     from crawlee.request_loaders import RequestManager
     from crawlee.sessions import Session
-    from crawlee.statistics import FinalStatistics, StatisticsState
-    from crawlee.storage_clients import BaseStorageClient
+    from crawlee.statistics import FinalStatistics
+    from crawlee.storage_clients import StorageClient
     from crawlee.storage_clients.models import DatasetItemsListPage
     from crawlee.storages._dataset import ExportDataCsvKwargs, ExportDataJsonKwargs, GetDataKwargs, PushDataKwargs
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
+TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
 ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Union[Request, None]]]
 FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
 
 
-@docs_group('Data structures')
-class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
-    """Arguments for the `BasicCrawler` constructor.
-
-    It is intended for typing forwarded `__init__` arguments in the subclasses.
-    """
+class _BasicCrawlerOptions(TypedDict):
+    """Non-generic options the `BasicCrawler` constructor."""
 
     configuration: NotRequired[Configuration]
     """The `Configuration` instance. Some of its properties are used as defaults for the crawler."""
@@ -76,7 +80,7 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     event_manager: NotRequired[EventManager]
     """The event manager for managing events for the crawler and all its components."""
 
-    storage_client: NotRequired[BaseStorageClient]
+    storage_client: NotRequired[StorageClient]
     """The storage client for managing storages for the crawler and all its components."""
 
     request_manager: NotRequired[RequestManager]
@@ -88,11 +92,8 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     proxy_configuration: NotRequired[ProxyConfiguration]
     """HTTP proxy configuration used when making requests."""
 
-    http_client: NotRequired[BaseHttpClient]
+    http_client: NotRequired[HttpClient]
     """HTTP client used by `BasicCrawlingContext.send_request` method."""
-
-    request_handler: NotRequired[Callable[[TCrawlingContext], Awaitable[None]]]
-    """A callable responsible for handling requests."""
 
     max_request_retries: NotRequired[int]
     """Maximum number of attempts to process a single request."""
@@ -125,9 +126,6 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     request_handler_timeout: NotRequired[timedelta]
     """Maximum duration allowed for a single request handler to run."""
 
-    statistics: NotRequired[Statistics[StatisticsState]]
-    """A custom `Statistics` instance, allowing the use of non-default configuration."""
-
     abort_on_error: NotRequired[bool]
     """If True, the crawler stops immediately when any request handler error occurs."""
 
@@ -137,9 +135,11 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     keep_alive: NotRequired[bool]
     """Flag that can keep crawler running even when there are no requests in queue."""
 
-    _context_pipeline: NotRequired[ContextPipeline[TCrawlingContext]]
-    """Enables extending the request lifecycle and modifying the crawling context. Intended for use by
-    subclasses rather than direct instantiation of `BasicCrawler`."""
+    additional_http_error_status_codes: NotRequired[Iterable[int]]
+    """Additional HTTP status codes to treat as errors, triggering automatic retries when encountered."""
+
+    ignore_http_error_status_codes: NotRequired[Iterable[int]]
+    """HTTP status codes that are typically considered errors but should be treated as successful responses."""
 
     _additional_context_managers: NotRequired[Sequence[AbstractAsyncContextManager]]
     """Additional context managers used throughout the crawler lifecycle. Intended for use by
@@ -150,8 +150,34 @@ class BasicCrawlerOptions(TypedDict, Generic[TCrawlingContext]):
     subclasses rather than direct instantiation of `BasicCrawler`."""
 
 
+class _BasicCrawlerOptionsGeneric(Generic[TCrawlingContext, TStatisticsState], TypedDict):
+    """Generic options the `BasicCrawler` constructor."""
+
+    request_handler: NotRequired[Callable[[TCrawlingContext], Awaitable[None]]]
+    """A callable responsible for handling requests."""
+
+    _context_pipeline: NotRequired[ContextPipeline[TCrawlingContext]]
+    """Enables extending the request lifecycle and modifying the crawling context. Intended for use by
+    subclasses rather than direct instantiation of `BasicCrawler`."""
+
+    statistics: NotRequired[Statistics[TStatisticsState]]
+    """A custom `Statistics` instance, allowing the use of non-default configuration."""
+
+
+@docs_group('Data structures')
+class BasicCrawlerOptions(
+    Generic[TCrawlingContext, TStatisticsState],
+    _BasicCrawlerOptions,
+    _BasicCrawlerOptionsGeneric[TCrawlingContext, TStatisticsState],
+):
+    """Arguments for the `BasicCrawler` constructor.
+
+    It is intended for typing forwarded `__init__` arguments in the subclasses.
+    """
+
+
 @docs_group('Classes')
-class BasicCrawler(Generic[TCrawlingContext]):
+class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     """A basic web crawler providing a framework for crawling websites.
 
     The `BasicCrawler` provides a low-level functionality for crawling websites, allowing users to define their
@@ -182,11 +208,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
         *,
         configuration: Configuration | None = None,
         event_manager: EventManager | None = None,
-        storage_client: BaseStorageClient | None = None,
+        storage_client: StorageClient | None = None,
         request_manager: RequestManager | None = None,
         session_pool: SessionPool | None = None,
         proxy_configuration: ProxyConfiguration | None = None,
-        http_client: BaseHttpClient | None = None,
+        http_client: HttpClient | None = None,
         request_handler: Callable[[TCrawlingContext], Awaitable[None]] | None = None,
         max_request_retries: int = 3,
         max_requests_per_crawl: int | None = None,
@@ -194,9 +220,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
         max_crawl_depth: int | None = None,
         use_session_pool: bool = True,
         retry_on_blocked: bool = True,
+        additional_http_error_status_codes: Iterable[int] | None = None,
+        ignore_http_error_status_codes: Iterable[int] | None = None,
         concurrency_settings: ConcurrencySettings | None = None,
         request_handler_timeout: timedelta = timedelta(minutes=1),
-        statistics: Statistics | None = None,
+        statistics: Statistics[TStatisticsState] | None = None,
         abort_on_error: bool = False,
         keep_alive: bool = False,
         configure_logging: bool = True,
@@ -229,6 +257,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
                 from those requests. If not set, crawling continues without depth restrictions.
             use_session_pool: Enable the use of a session pool for managing sessions during crawling.
             retry_on_blocked: If True, the crawler attempts to bypass bot protections automatically.
+            additional_http_error_status_codes: Additional HTTP status codes to treat as errors,
+                triggering automatic retries when encountered.
+            ignore_http_error_status_codes: HTTP status codes that are typically considered errors but should be treated
+                as successful responses.
             concurrency_settings: Settings to fine-tune concurrency levels.
             request_handler_timeout: Maximum duration allowed for a single request handler to run.
             statistics: A custom `Statistics` instance, allowing the use of non-default configuration.
@@ -256,7 +288,29 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._request_manager = request_manager
         self._session_pool = session_pool or SessionPool()
         self._proxy_configuration = proxy_configuration
-        self._http_client = http_client or HttpxHttpClient()
+
+        self._additional_http_error_status_codes = (
+            set(additional_http_error_status_codes) if additional_http_error_status_codes else set()
+        )
+        self._ignore_http_error_status_codes = (
+            set(ignore_http_error_status_codes) if ignore_http_error_status_codes else set()
+        )
+
+        self._http_client = http_client or HttpxHttpClient(
+            additional_http_error_status_codes=self._additional_http_error_status_codes,
+            ignore_http_error_status_codes=self._ignore_http_error_status_codes,
+        )
+
+        if self._http_client.additional_blocked_status_codes != self._additional_http_error_status_codes:
+            raise ValueError(
+                'Used `additional_blocked_status_codes` argument does not match with '
+                f'{self._http_client.additional_blocked_status_codes=}. They have to be the same.'
+            )
+        if self._http_client.ignore_http_error_status_codes != self._ignore_http_error_status_codes:
+            raise ValueError(
+                'Used `ignore_http_error_status_codes` argument does not match with '
+                f'{self._http_client.ignore_http_error_status_codes=}. They have to be the same.'
+            )
 
         # Request router setup
         self._router: Router[TCrawlingContext] | None = None
@@ -270,6 +324,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._error_handler: ErrorHandler[TCrawlingContext | BasicCrawlingContext] | None = None
         self._failed_request_handler: FailedRequestHandler[TCrawlingContext | BasicCrawlingContext] | None = None
         self._abort_on_error = abort_on_error
+
+        # Context of each request with matching result of request handler.
+        # Inheritors can use this to override the result of individual request handler runs in `_run_request_handler`.
+        self._context_result_map = WeakKeyDictionary[BasicCrawlingContext, RequestHandlerRunResult]()
 
         # Context pipeline
         self._context_pipeline = (_context_pipeline or ContextPipeline()).compose(self._check_url_after_redirects)
@@ -301,9 +359,12 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._logger = _logger or logging.getLogger(__name__)
 
         # Statistics
-        self._statistics = statistics or Statistics(
-            periodic_message_logger=self._logger,
-            log_message='Current request statistics:',
+        self._statistics = statistics or cast(
+            Statistics[TStatisticsState],
+            Statistics.with_default_state(
+                periodic_message_logger=self._logger,
+                log_message='Current request statistics:',
+            ),
         )
 
         # Additional context managers to enter and exit
@@ -350,7 +411,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
         self._router = router
 
     @property
-    def statistics(self) -> Statistics[StatisticsState]:
+    def statistics(self) -> Statistics[TStatisticsState]:
         """Statistics about the current (or last) crawler run."""
         return self._statistics
 
@@ -886,9 +947,10 @@ class BasicCrawler(Generic[TCrawlingContext]):
 
         return send_request
 
-    async def _commit_request_handler_result(
-        self, context: BasicCrawlingContext, result: RequestHandlerRunResult
-    ) -> None:
+    async def _commit_request_handler_result(self, context: BasicCrawlingContext) -> None:
+        """Commit request handler result for the input `context`. Result is taken from `_context_result_map`."""
+        result = self._context_result_map[context]
+
         request_manager = await self.get_request_manager()
         origin = context.request.loaded_url or context.request.url
 
@@ -936,8 +998,15 @@ class BasicCrawler(Generic[TCrawlingContext]):
         for push_data_call in result.push_data_calls:
             await self._push_data(**push_data_call)
 
+        await self._commit_key_value_store_changes(result, get_kvs=self.get_key_value_store)
+
+    @staticmethod
+    async def _commit_key_value_store_changes(
+        result: RequestHandlerRunResult, get_kvs: GetKeyValueStoreFromRequestHandlerFunction
+    ) -> None:
+        """Store key value store changes recorded in result."""
         for (id, name), changes in result.key_value_store_changes.items():
-            store = await self.get_key_value_store(id=id, name=name)
+            store = await get_kvs(id=id, name=name)
             for key, value in changes.updates.items():
                 await store.set_value(key, value.content, value.content_type)
 
@@ -998,6 +1067,7 @@ class BasicCrawler(Generic[TCrawlingContext]):
             use_state=self._use_state,
             log=self._logger,
         )
+        self._context_result_map[context] = result
 
         statistics_id = request.id or request.unique_key
         self._statistics.record_request_processing_start(statistics_id)
@@ -1006,18 +1076,11 @@ class BasicCrawler(Generic[TCrawlingContext]):
             request.state = RequestState.REQUEST_HANDLER
 
             try:
-                await wait_for(
-                    lambda: self.__run_request_handler(context),
-                    timeout=self._request_handler_timeout,
-                    timeout_message='Request handler timed out after '
-                    f'{self._request_handler_timeout.total_seconds()} seconds',
-                    logger=self._logger,
-                )
+                await self._run_request_handler(context=context)
             except asyncio.TimeoutError as e:
                 raise RequestHandlerError(e, context) from e
 
-            await self._commit_request_handler_result(context, result)
-
+            await self._commit_request_handler_result(context)
             await wait_for(
                 lambda: request_manager.mark_request_as_handled(context.request),
                 timeout=self._internal_timeout,
@@ -1105,8 +1168,14 @@ class BasicCrawler(Generic[TCrawlingContext]):
             )
             raise
 
-    async def __run_request_handler(self, context: BasicCrawlingContext) -> None:
-        await self._context_pipeline(context, self.router)
+    async def _run_request_handler(self, context: BasicCrawlingContext) -> None:
+        await wait_for(
+            lambda: self._context_pipeline(context, self.router),
+            timeout=self._request_handler_timeout,
+            timeout_message='Request handler timed out after '
+            f'{self._request_handler_timeout.total_seconds()} seconds',
+            logger=self._logger,
+        )
 
     def _is_session_blocked_status_code(self, session: Session | None, status_code: int) -> bool:
         """Check if the HTTP status code indicates that the session was blocked by the target website.
@@ -1120,6 +1189,6 @@ class BasicCrawler(Generic[TCrawlingContext]):
         """
         return session is not None and session.is_blocked_status_code(
             status_code=status_code,
-            additional_blocked_status_codes=self._http_client.additional_blocked_status_codes,
-            ignore_http_error_status_codes=self._http_client.ignore_http_error_status_codes,
+            additional_blocked_status_codes=self._additional_http_error_status_codes,
+            ignore_http_error_status_codes=self._ignore_http_error_status_codes,
         )

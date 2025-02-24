@@ -24,4 +24,4 @@ class PlaywrightPreNavCrawlingContext(BasicCrawlingContext):
     """The Playwright `Page` object for the current page."""
 
     block_requests: BlockRequestsFunction
-    """Blocks network requests matching specified URL patterns. Works only for Chromium browser."""
+    """Blocks network requests matching specified URL patterns."""

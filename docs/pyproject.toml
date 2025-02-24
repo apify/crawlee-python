@@ -1,0 +1,9 @@
+# Line lenght different from the rest of the code to make sure that the example codes visualised on the generated
+# documentation webpages are shown without vertical slider to make them more readable.
+
+[tool.ruff]
+# Inherit all from project top configuration file.
+extend = "../pyproject.toml"
+
+# Override just line length
+line-length = 90 # Maximum possible fit to the doc webpage. Longer lines need slider.

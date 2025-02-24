@@ -11,7 +11,7 @@ from ._request_queue import RequestQueue
 
 if TYPE_CHECKING:
     from crawlee.configuration import Configuration
-    from crawlee.storage_clients._base import BaseStorageClient, ResourceClient, ResourceCollectionClient
+    from crawlee.storage_clients._base import ResourceClient, ResourceCollectionClient, StorageClient
 
 TResource = TypeVar('TResource', Dataset, KeyValueStore, RequestQueue)
 
@@ -126,7 +126,7 @@ async def open_storage(
     id: str | None,
     name: str | None,
     configuration: Configuration,
-    storage_client: BaseStorageClient,
+    storage_client: StorageClient,
 ) -> TResource:
     """Open either a new storage or restore an existing one and return it."""
     # Try to restore the storage from cache by name
@@ -195,7 +195,7 @@ def remove_storage_from_cache(
 
 def _get_resource_client(
     storage_class: type[TResource],
-    storage_client: BaseStorageClient,
+    storage_client: StorageClient,
     id: str,
 ) -> ResourceClient:
     if issubclass(storage_class, Dataset):
@@ -212,7 +212,7 @@ def _get_resource_client(
 
 def _get_resource_collection_client(
     storage_class: type,
-    storage_client: BaseStorageClient,
+    storage_client: StorageClient,
 ) -> ResourceCollectionClient:
     if issubclass(storage_class, Dataset):
         return storage_client.datasets()

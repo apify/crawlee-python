@@ -9,7 +9,7 @@ import pytest
 from crawlee import Request
 from crawlee.errors import ProxyError
 from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_values
-from crawlee.fingerprint_suite._consts import COMMON_ACCEPT, COMMON_ACCEPT_LANGUAGE
+from crawlee.fingerprint_suite._consts import COMMON_ACCEPT_LANGUAGE
 from crawlee.http_clients import HttpxHttpClient
 from crawlee.statistics import Statistics
 
@@ -45,7 +45,7 @@ async def test_proxy(
     url = str(httpbin / 'status/222')
     request = Request.from_url(url)
 
-    async with Statistics() as statistics:
+    async with Statistics.with_default_state() as statistics:
         result = await http_client.crawl(request, proxy_info=proxy, statistics=statistics)
 
     assert result.http_response.status_code == 222
@@ -61,7 +61,7 @@ async def test_proxy_disabled(
     request = Request.from_url(url)
 
     with pytest.raises(ProxyError):
-        async with Statistics() as statistics:
+        async with Statistics.with_default_state() as statistics:
             await http_client.crawl(request, proxy_info=disabled_proxy, statistics=statistics)
 
 
@@ -97,7 +97,7 @@ async def test_common_headers_and_user_agent(httpbin: URL, header_network: dict)
     response_headers = response_dict.get('headers', {})
 
     assert 'Accept' in response_headers
-    assert response_headers['Accept'] == COMMON_ACCEPT
+    assert response_headers['Accept'] in get_available_header_values(header_network, 'Accept')
 
     assert 'Accept-Language' in response_headers
     assert response_headers['Accept-Language'] == COMMON_ACCEPT_LANGUAGE

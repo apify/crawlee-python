@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.6.0 - **not yet released**
+
+### 🚀 Features
+
+- Integrate browserforge fingerprints ([#829](https://github.com/apify/crawlee-python/pull/829)) ([2b156b4](https://github.com/apify/crawlee-python/commit/2b156b4ba688f9111195422e6058dff30eb1f782)) by [@Pijukatel](https://github.com/Pijukatel), closes [#549](https://github.com/apify/crawlee-python/issues/549)
+- Add AdaptivePlaywrightCrawler ([#872](https://github.com/apify/crawlee-python/pull/872)) ([5ba70b6](https://github.com/apify/crawlee-python/commit/5ba70b6e846a908a55db461ab0c85e3946f2bc7c)) by [@Pijukatel](https://github.com/Pijukatel)
+- Implement `_snapshot_client` for `Snapshotter` ([#957](https://github.com/apify/crawlee-python/pull/957)) ([ba4d384](https://github.com/apify/crawlee-python/commit/ba4d384228d030c20c580ed01fae0e78af3a9543)) by [@Mantisus](https://github.com/Mantisus), closes [#60](https://github.com/apify/crawlee-python/issues/60)
+- Add adaptive context helpers ([#964](https://github.com/apify/crawlee-python/pull/964)) ([e248f17](https://github.com/apify/crawlee-python/commit/e248f17fad7b6d1fc5e23a0a1e961db66068a411)) by [@Pijukatel](https://github.com/Pijukatel), closes [#249](https://github.com/apify/crawlee-python/issues/249)
+- [**breaking**] Enable additional status codes arguments to PlaywrightCrawler ([#959](https://github.com/apify/crawlee-python/pull/959)) ([87cf446](https://github.com/apify/crawlee-python/commit/87cf446a7cbaa900e28abd93d4c8a2e0d1747059)) by [@Pijukatel](https://github.com/Pijukatel), closes [#953](https://github.com/apify/crawlee-python/issues/953)
+
+### 🐛 Bug Fixes
+
+- Fix playwright template and dockerfile ([#972](https://github.com/apify/crawlee-python/pull/972)) ([c33b34d](https://github.com/apify/crawlee-python/commit/c33b34dd6e253b1261c700857bb5c4bbec6d5c14)) by [@janbuchar](https://github.com/janbuchar), closes [#969](https://github.com/apify/crawlee-python/issues/969)
+- Fix installing dependencies via pip in project template ([#977](https://github.com/apify/crawlee-python/pull/977)) ([1e3b8eb](https://github.com/apify/crawlee-python/commit/1e3b8eb1cdb57bf2f7256e8ae5f0706b0afc3ba9)) by [@janbuchar](https://github.com/janbuchar), closes [#975](https://github.com/apify/crawlee-python/issues/975)
+
+### Refactor
+
+- [**breaking**] Remove unused config properties ([#978](https://github.com/apify/crawlee-python/pull/978)) ([4b7fe29](https://github.com/apify/crawlee-python/commit/4b7fe2930540a5fbd753135e3ce29dc80f80c543)) by [@vdusek](https://github.com/vdusek)
+- [**breaking**] Remove Base prefix from abstract class names ([#980](https://github.com/apify/crawlee-python/pull/980)) ([8ccb5d4](https://github.com/apify/crawlee-python/commit/8ccb5d41a1dae9b02088b433266ac89bd089561a)) by [@vdusek](https://github.com/vdusek)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.5.4](https://github.com/apify/crawlee-python/releases/tag/v0.5.4) (2025-02-05)
 
 ### 🚀 Features

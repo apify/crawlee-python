@@ -10,7 +10,7 @@ FROM apify/actor-python-playwright:3.12
 FROM apify/actor-python:3.13
 # % endif
 
-RUN apt install -yq git && rm -rf /var/lib/apt/lists/*
+RUN apt update && apt install -yq git && rm -rf /var/lib/apt/lists/*
 
 # % if cookiecutter.package_manager == 'poetry'
 RUN pip install -U pip setuptools \
@@ -29,8 +29,8 @@ RUN echo "Python version:" \
  && echo "Installing dependencies:" \
  # Export packages from poetry.lock
  && poetry export -f requirements.txt --without-hashes | \
- # Replace playwright version so that it matches whatever is pre-installed in the image
-    sed "s/^playwright==.*/playwright==$(playwright --version | cut -d ' ' -f 2)/" | \
+ # Replace playwright version so that it matches whatever is pre-installed in the image (the `hash` checks if playwright is installed)
+    sed "s/^playwright==\(.*\)/playwright==$(hash playwright 2>/dev/null && (playwright --version | cut -d ' ' -f 2) || echo '\1')/" | \
  # Install everything using pip (ignore dependency checks - the lockfile is correct, period)
     pip install -r /dev/stdin --no-dependencies \
  && echo "All installed Python packages:" \
@@ -48,9 +48,9 @@ RUN echo "Python version:" \
  && python --version \
  && echo "Installing dependencies:" \
  # Install everything using pip, set playwright version so that it matches whatever is pre-installed in the image
- cat requirements.txt \
- # Replace playwright version so that it matches whatever is pre-installed in the image
-    sed "s/^playwright==.*/playwright==$(playwright --version | cut -d ' ' -f 2)/" | \
+ && cat requirements.txt | \
+ # Replace playwright version so that it matches whatever is pre-installed in the image (the `hash` checks if playwright is installed)
+    sed "s/^playwright==\(.*\)/playwright==$(hash playwright 2>/dev/null && (playwright --version | cut -d ' ' -f 2) || echo '\1')/" | \
  # Install everything using pip (ignore dependency checks - the lockfile is correct, period)
     pip install -r /dev/stdin --no-dependencies \
  && echo "All installed Python packages:" \
