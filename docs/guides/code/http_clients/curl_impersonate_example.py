@@ -8,7 +8,7 @@ async def main() -> None:
     http_client = CurlImpersonateHttpClient(
         # Optional additional keyword arguments for `curl_cffi.requests.AsyncSession`.
         timeout=10,
-        impersonate='chrome124',
+        impersonate='chrome131',
     )
 
     crawler = BeautifulSoupCrawler(

@@ -11,7 +11,7 @@ from typing_extensions import override
 from crawlee import service_locator
 from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
-from crawlee.browsers._base_browser_plugin import BaseBrowserPlugin
+from crawlee.browsers._browser_plugin import BrowserPlugin
 from crawlee.browsers._playwright_browser_controller import PlaywrightBrowserController
 
 if TYPE_CHECKING:
@@ -25,7 +25,7 @@ logger = getLogger(__name__)
 
 
 @docs_group('Classes')
-class PlaywrightBrowserPlugin(BaseBrowserPlugin):
+class PlaywrightBrowserPlugin(BrowserPlugin):
     """A plugin for managing Playwright automation library.
 
     It is a plugin designed to manage browser instances using the Playwright automation library. It acts as a factory

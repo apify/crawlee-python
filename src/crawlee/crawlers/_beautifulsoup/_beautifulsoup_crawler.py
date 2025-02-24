@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 from crawlee._utils.docs import docs_group
-from crawlee.crawlers._abstract_http import AbstractHttpCrawler, HttpCrawlerOptions
+from crawlee.crawlers import AbstractHttpCrawler, BasicCrawlerOptions
 
 from ._beautifulsoup_crawling_context import BeautifulSoupCrawlingContext
 from ._beautifulsoup_parser import BeautifulSoupParser, BeautifulSoupParserType
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 
 @docs_group('Classes')
-class BeautifulSoupCrawler(AbstractHttpCrawler[BeautifulSoupCrawlingContext, BeautifulSoup]):
+class BeautifulSoupCrawler(AbstractHttpCrawler[BeautifulSoupCrawlingContext, BeautifulSoup, Tag]):
     """A web crawler for performing HTTP requests and parsing HTML/XML content.
 
     The `BeautifulSoupCrawler` builds on top of the `AbstractHttpCrawler`, which means it inherits all of its features.
@@ -58,7 +58,7 @@ class BeautifulSoupCrawler(AbstractHttpCrawler[BeautifulSoupCrawlingContext, Bea
         self,
         *,
         parser: BeautifulSoupParserType = 'lxml',
-        **kwargs: Unpack[HttpCrawlerOptions[BeautifulSoupCrawlingContext]],
+        **kwargs: Unpack[BasicCrawlerOptions[BeautifulSoupCrawlingContext]],
     ) -> None:
         """A default constructor.
 

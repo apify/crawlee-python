@@ -11,7 +11,7 @@ from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
 from crawlee._utils.docs import docs_group
 from crawlee.errors import ProxyError
 from crawlee.fingerprint_suite import HeaderGenerator
-from crawlee.http_clients import BaseHttpClient, HttpCrawlingResult, HttpResponse
+from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
 from crawlee.sessions import Session
 
 if TYPE_CHECKING:
@@ -73,13 +73,13 @@ class _HttpxTransport(httpx.AsyncHTTPTransport):
 
 
 @docs_group('Classes')
-class HttpxHttpClient(BaseHttpClient):
+class HttpxHttpClient(HttpClient):
     """HTTP client based on the `HTTPX` library.
 
     This client uses the `HTTPX` library to perform HTTP requests in crawlers (`BasicCrawler` subclasses)
     and to manage sessions, proxies, and error handling.
 
-    See the `BaseHttpClient` class for more common information about HTTP clients.
+    See the `HttpClient` class for more common information about HTTP clients.
 
     ### Usage
 

@@ -7,26 +7,26 @@ from datetime import datetime, timedelta, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, Generic, TypedDict, TypeVar
 
+from cachetools import LRUCache
 from typing_extensions import override
 
 from crawlee import service_locator
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.docs import docs_group
-from crawlee._utils.lru_cache import LRUCache
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee._utils.wait import wait_for_all_tasks_for_finish
 from crawlee.events import Event
 from crawlee.request_loaders import RequestManager
 from crawlee.storage_clients.models import ProcessedRequest, RequestQueueMetadata
 
-from ._base_storage import BaseStorage
+from ._base import Storage
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from crawlee import Request
     from crawlee.configuration import Configuration
-    from crawlee.storage_clients import BaseStorageClient
+    from crawlee.storage_clients import StorageClient
 
 logger = getLogger(__name__)
 
@@ -65,7 +65,7 @@ class CachedRequest(TypedDict):
 
 
 @docs_group('Classes')
-class RequestQueue(BaseStorage, RequestManager):
+class RequestQueue(Storage, RequestManager):
     """Represents a queue storage for managing HTTP requests in web crawling operations.
 
     The `RequestQueue` class handles a queue of HTTP requests, each identified by a unique URL, to facilitate structured
@@ -106,7 +106,7 @@ class RequestQueue(BaseStorage, RequestManager):
     _STORAGE_CONSISTENCY_DELAY = timedelta(seconds=3)
     """Expected delay for storage to achieve consistency, guiding the timing of subsequent read operations."""
 
-    def __init__(self, id: str, name: str | None, storage_client: BaseStorageClient) -> None:
+    def __init__(self, id: str, name: str | None, storage_client: StorageClient) -> None:
         config = service_locator.get_configuration()
         event_manager = service_locator.get_event_manager()
 
@@ -135,7 +135,7 @@ class RequestQueue(BaseStorage, RequestManager):
         self._in_progress: set[str] = set()
         self._last_activity = datetime.now(timezone.utc)
         self._recently_handled: BoundedSet[str] = BoundedSet(max_length=self._RECENTLY_HANDLED_CACHE_SIZE)
-        self._requests_cache: LRUCache[CachedRequest] = LRUCache(max_length=self._MAX_CACHED_REQUESTS)
+        self._requests_cache: LRUCache[str, CachedRequest] = LRUCache(maxsize=self._MAX_CACHED_REQUESTS)
 
     @property
     @override
@@ -155,7 +155,7 @@ class RequestQueue(BaseStorage, RequestManager):
         id: str | None = None,
         name: str | None = None,
         configuration: Configuration | None = None,
-        storage_client: BaseStorageClient | None = None,
+        storage_client: StorageClient | None = None,
     ) -> RequestQueue:
         from crawlee.storages._creation_management import open_storage
 

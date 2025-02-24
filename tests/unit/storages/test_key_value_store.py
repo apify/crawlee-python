@@ -19,13 +19,6 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture
-async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
-    kvs = await KeyValueStore.open()
-    yield kvs
-    await kvs.drop()
-
-
-@pytest.fixture
 async def mock_event_manager() -> AsyncGenerator[EventManager, None]:
     async with EventManager(persist_state_interval=timedelta(milliseconds=50)) as event_manager:
         with patch('crawlee.service_locator.get_event_manager', return_value=event_manager):

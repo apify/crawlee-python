@@ -7,7 +7,7 @@ import signal
 import sys
 import tempfile
 from asyncio import CancelledError
-from collections.abc import AsyncGenerator, Awaitable, Sequence
+from collections.abc import AsyncGenerator, Awaitable, Iterable, Sequence
 from contextlib import AsyncExitStack, suppress
 from datetime import timedelta
 from functools import partial
@@ -56,12 +56,12 @@ if TYPE_CHECKING:
     from crawlee._types import ConcurrencySettings, HttpMethod, JsonSerializable
     from crawlee.configuration import Configuration
     from crawlee.events import EventManager
-    from crawlee.http_clients import BaseHttpClient, HttpResponse
+    from crawlee.http_clients import HttpClient, HttpResponse
     from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
     from crawlee.request_loaders import RequestManager
     from crawlee.sessions import Session
     from crawlee.statistics import FinalStatistics
-    from crawlee.storage_clients import BaseStorageClient
+    from crawlee.storage_clients import StorageClient
     from crawlee.storage_clients.models import DatasetItemsListPage
     from crawlee.storages._dataset import ExportDataCsvKwargs, ExportDataJsonKwargs, GetDataKwargs, PushDataKwargs
 
@@ -80,7 +80,7 @@ class _BasicCrawlerOptions(TypedDict):
     event_manager: NotRequired[EventManager]
     """The event manager for managing events for the crawler and all its components."""
 
-    storage_client: NotRequired[BaseStorageClient]
+    storage_client: NotRequired[StorageClient]
     """The storage client for managing storages for the crawler and all its components."""
 
     request_manager: NotRequired[RequestManager]
@@ -92,7 +92,7 @@ class _BasicCrawlerOptions(TypedDict):
     proxy_configuration: NotRequired[ProxyConfiguration]
     """HTTP proxy configuration used when making requests."""
 
-    http_client: NotRequired[BaseHttpClient]
+    http_client: NotRequired[HttpClient]
     """HTTP client used by `BasicCrawlingContext.send_request` method."""
 
     max_request_retries: NotRequired[int]
@@ -134,6 +134,12 @@ class _BasicCrawlerOptions(TypedDict):
 
     keep_alive: NotRequired[bool]
     """Flag that can keep crawler running even when there are no requests in queue."""
+
+    additional_http_error_status_codes: NotRequired[Iterable[int]]
+    """Additional HTTP status codes to treat as errors, triggering automatic retries when encountered."""
+
+    ignore_http_error_status_codes: NotRequired[Iterable[int]]
+    """HTTP status codes that are typically considered errors but should be treated as successful responses."""
 
     _additional_context_managers: NotRequired[Sequence[AbstractAsyncContextManager]]
     """Additional context managers used throughout the crawler lifecycle. Intended for use by
@@ -202,11 +208,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         *,
         configuration: Configuration | None = None,
         event_manager: EventManager | None = None,
-        storage_client: BaseStorageClient | None = None,
+        storage_client: StorageClient | None = None,
         request_manager: RequestManager | None = None,
         session_pool: SessionPool | None = None,
         proxy_configuration: ProxyConfiguration | None = None,
-        http_client: BaseHttpClient | None = None,
+        http_client: HttpClient | None = None,
         request_handler: Callable[[TCrawlingContext], Awaitable[None]] | None = None,
         max_request_retries: int = 3,
         max_requests_per_crawl: int | None = None,
@@ -214,6 +220,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         max_crawl_depth: int | None = None,
         use_session_pool: bool = True,
         retry_on_blocked: bool = True,
+        additional_http_error_status_codes: Iterable[int] | None = None,
+        ignore_http_error_status_codes: Iterable[int] | None = None,
         concurrency_settings: ConcurrencySettings | None = None,
         request_handler_timeout: timedelta = timedelta(minutes=1),
         statistics: Statistics[TStatisticsState] | None = None,
@@ -249,6 +257,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 from those requests. If not set, crawling continues without depth restrictions.
             use_session_pool: Enable the use of a session pool for managing sessions during crawling.
             retry_on_blocked: If True, the crawler attempts to bypass bot protections automatically.
+            additional_http_error_status_codes: Additional HTTP status codes to treat as errors,
+                triggering automatic retries when encountered.
+            ignore_http_error_status_codes: HTTP status codes that are typically considered errors but should be treated
+                as successful responses.
             concurrency_settings: Settings to fine-tune concurrency levels.
             request_handler_timeout: Maximum duration allowed for a single request handler to run.
             statistics: A custom `Statistics` instance, allowing the use of non-default configuration.
@@ -276,7 +288,29 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._request_manager = request_manager
         self._session_pool = session_pool or SessionPool()
         self._proxy_configuration = proxy_configuration
-        self._http_client = http_client or HttpxHttpClient()
+
+        self._additional_http_error_status_codes = (
+            set(additional_http_error_status_codes) if additional_http_error_status_codes else set()
+        )
+        self._ignore_http_error_status_codes = (
+            set(ignore_http_error_status_codes) if ignore_http_error_status_codes else set()
+        )
+
+        self._http_client = http_client or HttpxHttpClient(
+            additional_http_error_status_codes=self._additional_http_error_status_codes,
+            ignore_http_error_status_codes=self._ignore_http_error_status_codes,
+        )
+
+        if self._http_client.additional_blocked_status_codes != self._additional_http_error_status_codes:
+            raise ValueError(
+                'Used `additional_blocked_status_codes` argument does not match with '
+                f'{self._http_client.additional_blocked_status_codes=}. They have to be the same.'
+            )
+        if self._http_client.ignore_http_error_status_codes != self._ignore_http_error_status_codes:
+            raise ValueError(
+                'Used `ignore_http_error_status_codes` argument does not match with '
+                f'{self._http_client.ignore_http_error_status_codes=}. They have to be the same.'
+            )
 
         # Request router setup
         self._router: Router[TCrawlingContext] | None = None
@@ -1155,6 +1189,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         """
         return session is not None and session.is_blocked_status_code(
             status_code=status_code,
-            additional_blocked_status_codes=self._http_client.additional_blocked_status_codes,
-            ignore_http_error_status_codes=self._http_client.ignore_http_error_status_codes,
+            additional_blocked_status_codes=self._additional_http_error_status_codes,
+            ignore_http_error_status_codes=self._ignore_http_error_status_codes,
         )
