@@ -15,7 +15,7 @@ This section summarizes the breaking changes between v0.5.x and v0.6.0.
 
 ### SessionCookies
 
-- Replaces the `dict` used for cookie storage in `Session` with a new `SessionCookies` class. `SessionCookies` uses `CookieJar`, which enables support for multiple domains.
+- Replaces the `dict` used for cookie storage in `Session.cookies` with a new `SessionCookies` class. `SessionCookies` uses `CookieJar`, which enables support for multiple domains.
 
 ### Configuration
 

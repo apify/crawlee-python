@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from functools import partial
-from typing import TYPE_CHECKING, Any, Callable, Generic, cast
+from typing import TYPE_CHECKING, Any, Callable, Generic
 
 from pydantic import ValidationError
 from typing_extensions import NotRequired, TypedDict, TypeVar
@@ -15,7 +15,7 @@ from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.browsers import BrowserPool
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
-from crawlee.sessions._cookies import PWCookieParam
+from crawlee.sessions._cookies import PlaywrightCookieParam
 from crawlee.statistics import StatisticsState
 
 from ._playwright_crawling_context import PlaywrightCrawlingContext
@@ -330,14 +330,14 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         """
         self._pre_navigation_hooks.append(hook)
 
-    async def _get_cookies(self, page: Page) -> list[PWCookieParam]:
+    async def _get_cookies(self, page: Page) -> list[PlaywrightCookieParam]:
         """Get the cookies from the page."""
         cookies = await page.context.cookies()
-        return [cast(PWCookieParam, cookie) for cookie in cookies]
+        return [PlaywrightCookieParam(**cookie) for cookie in cookies]
 
-    async def _update_cookies(self, page: Page, cookies: list[PWCookieParam]) -> None:
+    async def _update_cookies(self, page: Page, cookies: list[PlaywrightCookieParam]) -> None:
         """Update the cookies in the page context."""
-        await page.context.add_cookies(cookies)  # type: ignore[arg-type]
+        await page.context.add_cookies([{**cookie} for cookie in cookies])
 
 
 class _PlaywrightCrawlerAdditionalOptions(TypedDict):

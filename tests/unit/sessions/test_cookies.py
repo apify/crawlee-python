@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from crawlee.sessions._cookies import CookieParam, PWCookieParam, SessionCookies
+from crawlee.sessions._cookies import CookieParam, PlaywrightCookieParam, SessionCookies
 
 
 @pytest.fixture
@@ -50,11 +50,11 @@ def test_set_cookie_with_all_attributes(session_cookies: SessionCookies, cookie_
     assert len(cookies) == 1
     cookie = cookies[0]
 
-    assert cookie.name == cookie_dict['name']
-    assert cookie.value == cookie_dict['value']
-    assert cookie.path == cookie_dict['path']
-    assert cookie.domain == cookie_dict['domain']
-    assert cookie.expires == cookie_dict['expires']
+    assert cookie.name == cookie_dict.get('name')
+    assert cookie.value == cookie_dict.get('value')
+    assert cookie.path == cookie_dict.get('path')
+    assert cookie.domain == cookie_dict.get('domain')
+    assert cookie.expires == cookie_dict.get('expires')
     assert cookie.has_nonstandard_attr('HttpOnly')
     assert cookie.secure
     assert cookie.get_nonstandard_attr('SameSite') == 'Strict'
@@ -83,7 +83,7 @@ def test_convert_dict_format(session_cookies: SessionCookies) -> None:
     assert 'same_site' not in browser_format
 
     # Test browser to internal format
-    browser_format = PWCookieParam({'name': 'test', 'value': 'value', 'httpOnly': True, 'sameSite': 'Lax'})
+    browser_format = PlaywrightCookieParam({'name': 'test', 'value': 'value', 'httpOnly': True, 'sameSite': 'Lax'})
     internal_format = session_cookies._from_playwright(browser_format)
     assert 'http_only' in internal_format
     assert 'same_site' in internal_format
@@ -99,8 +99,8 @@ def test_get_cookies_as_browser_format(session_cookies: SessionCookies, cookie_d
     cookie = browser_cookies[0]
     assert 'httpOnly' in cookie
     assert 'sameSite' in cookie
-    assert cookie['httpOnly'] == cookie_dict['http_only']
-    assert cookie['sameSite'] == cookie_dict['same_site']
+    assert cookie['httpOnly'] == cookie_dict.get('http_only')
+    assert cookie['sameSite'] == cookie_dict.get('same_site')
 
 
 def test_get_cookies_as_dicts(session_cookies: SessionCookies, cookie_dict: CookieParam) -> None:
@@ -108,13 +108,6 @@ def test_get_cookies_as_dicts(session_cookies: SessionCookies, cookie_dict: Cook
     test_session_cookies = session_cookies.get_cookies_as_dicts()
 
     assert [cookie_dict] == test_session_cookies
-
-
-def test_from_dict_list(session_cookies: SessionCookies, cookie_dict: CookieParam) -> None:
-    """Test creating SessionCookies from a list of dictionary representations."""
-    test_session_cookies = SessionCookies.from_dict_list([cookie_dict])
-
-    assert session_cookies == test_session_cookies
 
 
 def test_store_cookie(session_cookies: SessionCookies) -> None:

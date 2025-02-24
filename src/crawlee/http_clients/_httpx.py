@@ -62,7 +62,7 @@ class _HttpxTransport(httpx.AsyncHTTPTransport):
         response.request = request
 
         if session := cast(Session, request.extensions.get('crawlee_session')):
-            session.cookies.extract_cookies(response)
+            session.cookies.store_cookies(list(response.cookies.jar))
 
         if 'Set-Cookie' in response.headers:
             del response.headers['Set-Cookie']

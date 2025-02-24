@@ -5,7 +5,8 @@ from typing import TYPE_CHECKING, Any, Optional
 from curl_cffi import CurlInfo
 from curl_cffi.const import CurlHttpVersion
 from curl_cffi.requests import AsyncSession
-from curl_cffi.requests.cookies import Cookies, CurlMorsel
+from curl_cffi.requests.cookies import Cookies as CurlCookies
+from curl_cffi.requests.cookies import CurlMorsel
 from curl_cffi.requests.exceptions import ProxyError as CurlProxyError
 from curl_cffi.requests.exceptions import RequestException as CurlRequestError
 from curl_cffi.requests.impersonate import DEFAULT_CHROME as CURL_DEFAULT_CHROME
@@ -32,7 +33,7 @@ if TYPE_CHECKING:
     from crawlee.statistics import Statistics
 
 
-class _EmptyCookies(Cookies):
+class _EmptyCookies(CurlCookies):
     @override
     def get_cookies_for_curl(self, request: CurlRequest) -> list[CurlMorsel]:
         return []

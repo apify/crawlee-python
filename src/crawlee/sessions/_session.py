@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, ClassVar, Literal, overload
 
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.docs import docs_group
-from crawlee.sessions._cookies import SessionCookies
+from crawlee.sessions._cookies import CookieParam, SessionCookies
 from crawlee.sessions._models import SessionModel
 
 if TYPE_CHECKING:
@@ -42,7 +42,7 @@ class Session:
         usage_count: int = 0,
         max_usage_count: int = 50,
         error_score: float = 0.0,
-        cookies: SessionCookies | CookieJar | dict[str, str] | list[tuple[str, str]] | None = None,
+        cookies: SessionCookies | CookieJar | dict[str, str] | list[CookieParam] | None = None,
         blocked_status_codes: list | None = None,
     ) -> None:
         """A default constructor.
@@ -75,7 +75,7 @@ class Session:
     @classmethod
     def from_model(cls, model: SessionModel) -> Session:
         """Create a new instance from a `SessionModel`."""
-        cookies = SessionCookies.from_dict_list(model.cookies)
+        cookies = SessionCookies(model.cookies)
         return cls(**model.model_dump(exclude={'cookies'}), cookies=cookies)
 
     def __repr__(self) -> str:
