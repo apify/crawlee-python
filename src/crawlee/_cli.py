@@ -13,7 +13,7 @@ try:
     from inquirer.render.console import ConsoleRender  # type: ignore[import-untyped]
     from rich.progress import Progress, SpinnerColumn, TextColumn
 except ModuleNotFoundError as exc:
-    raise UserWarning("Looks like you're running just 'crawlee', try using 'crawlee[cli]'") from exc
+    raise ImportError("Looks like you're running just 'crawlee', try using 'crawlee[cli]'") from exc
 
 cli = typer.Typer(no_args_is_help=True)
 
