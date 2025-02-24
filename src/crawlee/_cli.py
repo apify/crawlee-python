@@ -6,11 +6,14 @@ import json
 from pathlib import Path
 from typing import Annotated, Optional, cast
 
-import inquirer  # type: ignore[import-untyped]
-import typer
-from cookiecutter.main import cookiecutter  # type: ignore[import-untyped]
-from inquirer.render.console import ConsoleRender  # type: ignore[import-untyped]
-from rich.progress import Progress, SpinnerColumn, TextColumn
+try:
+    import inquirer  # type: ignore[import-untyped]
+    import typer
+    from cookiecutter.main import cookiecutter  # type: ignore[import-untyped]
+    from inquirer.render.console import ConsoleRender  # type: ignore[import-untyped]
+    from rich.progress import Progress, SpinnerColumn, TextColumn
+except ModuleNotFoundError as exc:
+    raise UserWarning("Looks like you're running just 'crawlee', try using 'crawlee[cli]'") from exc
 
 cli = typer.Typer(no_args_is_help=True)
 
