@@ -15,7 +15,7 @@ This section summarizes the breaking changes between v0.5.x and v0.6.0.
 
 ### PlaywrightCrawler and PlaywrightBrowserPlugin
 
-- `PlaywrightCrawler` now use a persistent browser context instead of the standard browser context
+- `PlaywrightCrawler` now use a persistent browser context instead of the standard browser context.
 - Added `user_data_dir` parameter for `PlaywrightCrawler` and `PlaywrightBrowserPlugin` to specify the directory for the persistent context. If not provided, a temporary directory will be created automatically.
 
 ### Configuration
