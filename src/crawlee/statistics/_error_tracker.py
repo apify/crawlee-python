@@ -122,7 +122,7 @@ class ErrorTracker:
         generic_message_parts = []
         message_1_parts = message_1.split(' ')
         message_2_parts = message_2.split(' ')
-        parts_count = max(len(message_1_parts), len(message_2_parts))
+        parts_count = min(len(message_1_parts), len(message_2_parts))
 
         for message_1_part, message_2_part in zip_longest(message_1_parts, message_2_parts, fillvalue=''):
             if message_1_part != message_2_part:
