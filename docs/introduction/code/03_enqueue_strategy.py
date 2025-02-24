@@ -1,4 +1,3 @@
-from crawlee import EnqueueStrategy
 from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 
 
@@ -9,11 +8,11 @@ async def main() -> None:
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url}.')
 
-        # See the EnqueueStrategy object for more strategy options.
+        # See the `EnqueueStrategy` type alias for more strategy options.
         # highlight-next-line
         await context.enqueue_links(
             # highlight-next-line
-            strategy=EnqueueStrategy.SAME_DOMAIN,
+            strategy='same_domain',
             # highlight-next-line
         )
 

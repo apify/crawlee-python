@@ -46,6 +46,20 @@ HttpPayload: TypeAlias = bytes
 
 RequestTransformAction: TypeAlias = Literal['skip', 'unchanged']
 
+EnqueueStrategy: TypeAlias = Literal['all', 'same_domain', 'same_hostname', 'same_origin']
+"""Specify the strategy for determining which links to extract and enqueue.
+
+Strategies:
+    all: Enqueue every link encountered, regardless of the target domain. Use this option to ensure that all links,
+        including those leading to external websites, are followed.
+    same-domain: Enqueue links that share the same domain name as the current page, including any subdomains. This
+        strategy is ideal for crawling within the same top-level domain while still allowing for subdomain exploration.
+    same-hostname: Enqueue links only if they match the exact hostname of the current page. This is the default
+        behavior and restricts the crawl to the current hostname, excluding subdomains.
+    same-origin: Enqueue links that share the same origin as the current page. The origin is defined by the
+        combination of protocol, domain, and port, ensuring a strict scope for the crawl.
+"""
+
 
 def _normalize_headers(headers: Mapping[str, str]) -> dict[str, str]:
     """Converts all header keys to lowercase, strips whitespace, and returns them sorted by key."""
@@ -90,27 +104,6 @@ class HttpHeaders(RootModel, Mapping[str, str]):
 
     def __len__(self) -> int:
         return len(self.root)
-
-
-@docs_group('Data structures')
-class EnqueueStrategy(str, Enum):
-    """Strategy for deciding which links should be followed and which ones should be ignored."""
-
-    ALL = 'all'
-    """Enqueues all links found, regardless of the domain they point to. This strategy is useful when you
-    want to follow every link, including those that navigate to external websites."""
-
-    SAME_DOMAIN = 'same-domain'
-    """Enqueues all links found that share the same domain name, including any possible subdomains.
-    This strategy ensures that all links within the same top-level and base domain are included."""
-
-    SAME_HOSTNAME = 'same-hostname'
-    """Enqueues all links found for the exact same hostname. This is the default strategy, and it restricts
-    the crawl to links that have the same hostname as the current page, excluding subdomains."""
-
-    SAME_ORIGIN = 'same-origin'
-    """Enqueues all links found that share the same origin. The same origin refers to URLs that share
-    the same protocol, domain, and port, ensuring a strict scope for the crawl."""
 
 
 @docs_group('Data structures')
@@ -172,7 +165,7 @@ class EnqueueLinksKwargs(TypedDict):
     """Base URL to be used for relative URLs."""
 
     strategy: NotRequired[EnqueueStrategy]
-    """Enqueueing strategy, see the `EnqueueStrategy` enum for possible values and their meanings."""
+    """Enqueueing strategy, see the `EnqueueStrategy` type alias for possible values and their meanings."""
 
     include: NotRequired[list[re.Pattern | Glob]]
     """List of regular expressions or globs that URLs must match to be enqueued."""

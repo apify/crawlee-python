@@ -1,6 +1,5 @@
 import asyncio
 
-from crawlee import EnqueueStrategy
 from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 
 
@@ -15,9 +14,9 @@ async def main() -> None:
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url} ...')
 
-        # Setting the strategy to SAME_ORIGIN will enqueue all links found that are on
+        # Setting the strategy to same origin will enqueue all links found that are on
         # the same origin as request.loaded_url or request.url.
-        await context.enqueue_links(strategy=EnqueueStrategy.SAME_ORIGIN)
+        await context.enqueue_links(strategy='same_origin')
 
     # Run the crawler with the initial list of requests.
     await crawler.run(['https://crawlee.dev'])

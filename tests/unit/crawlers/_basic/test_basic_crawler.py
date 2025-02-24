@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, Mock, call
 import httpx
 import pytest
 
-from crawlee import ConcurrencySettings, EnqueueStrategy, Glob, service_locator
+from crawlee import ConcurrencySettings, Glob, service_locator
 from crawlee._request import Request
 from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpHeaders
 from crawlee.configuration import Configuration
@@ -387,7 +387,7 @@ INCLUDE_TEST_URLS = (
             AddRequestsTestInput(
                 start_url=STRATEGY_TEST_URLS[0],
                 requests=STRATEGY_TEST_URLS,
-                kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.ALL),
+                kwargs=EnqueueLinksKwargs(strategy='all'),
                 expected_urls=STRATEGY_TEST_URLS[1:],
             ),
             id='enqueue_strategy_2',
@@ -396,7 +396,7 @@ INCLUDE_TEST_URLS = (
             AddRequestsTestInput(
                 start_url=STRATEGY_TEST_URLS[0],
                 requests=STRATEGY_TEST_URLS,
-                kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.SAME_DOMAIN),
+                kwargs=EnqueueLinksKwargs(strategy='same_domain'),
                 expected_urls=STRATEGY_TEST_URLS[1:3],
             ),
             id='enqueue_strategy_3',
@@ -405,7 +405,7 @@ INCLUDE_TEST_URLS = (
             AddRequestsTestInput(
                 start_url=STRATEGY_TEST_URLS[0],
                 requests=STRATEGY_TEST_URLS,
-                kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.SAME_HOSTNAME),
+                kwargs=EnqueueLinksKwargs(strategy='same_hostname'),
                 expected_urls=[STRATEGY_TEST_URLS[1]],
             ),
             id='enqueue_strategy_4',
@@ -414,7 +414,7 @@ INCLUDE_TEST_URLS = (
             AddRequestsTestInput(
                 start_url=STRATEGY_TEST_URLS[0],
                 requests=STRATEGY_TEST_URLS,
-                kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.SAME_ORIGIN),
+                kwargs=EnqueueLinksKwargs(strategy='same_origin'),
                 expected_urls=[],
             ),
             id='enqueue_strategy_5',

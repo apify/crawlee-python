@@ -8,7 +8,6 @@ from pydantic import ValidationError
 from typing_extensions import NotRequired, TypedDict, TypeVar
 from yarl import URL
 
-from crawlee import EnqueueStrategy, RequestTransformAction
 from crawlee._request import Request, RequestOptions
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.docs import docs_group
@@ -32,6 +31,7 @@ if TYPE_CHECKING:
     from playwright.async_api import Page
     from typing_extensions import Unpack
 
+    from crawlee import RequestTransformAction
     from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs
     from crawlee.browsers._types import BrowserType
     from crawlee.fingerprint_suite import FingerprintGenerator
@@ -235,7 +235,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 **kwargs: Unpack[EnqueueLinksKwargs],
             ) -> None:
                 """The `PlaywrightCrawler` implementation of the `EnqueueLinksFunction` function."""
-                kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
+                kwargs.setdefault('strategy', 'same_hostname')
 
                 requests = list[Request]()
                 base_user_data = user_data or {}
