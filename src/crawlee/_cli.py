@@ -14,8 +14,8 @@ try:
     from rich.progress import Progress, SpinnerColumn, TextColumn
 except ModuleNotFoundError as exc:
     raise ImportError(
-        "Missing required dependencies for the Crawlee CLI. It looks like you're running 'crawlee'"
-        "without the CLI extra. Try using 'crawlee[cli]' instead.'"
+        "Missing required dependencies for the Crawlee CLI. It looks like you're running 'crawlee' "
+        "without the CLI extra. Try using 'crawlee[cli]' instead."
     ) from exc
 
 cli = typer.Typer(no_args_is_help=True)
