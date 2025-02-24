@@ -148,7 +148,6 @@ class CurlImpersonateHttpClient(HttpClient):
                 headers=request.headers,
                 data=request.payload,
                 cookies=session.cookies if session else None,
-                allow_redirects=True,
             )
         except CurlRequestError as exc:
             if self._is_proxy_error(exc):
@@ -198,7 +197,6 @@ class CurlImpersonateHttpClient(HttpClient):
                 headers=dict(headers) if headers else None,
                 data=payload,
                 cookies=session.cookies if session else None,
-                allow_redirects=True,
             )
         except CurlRequestError as exc:
             if self._is_proxy_error(exc):
