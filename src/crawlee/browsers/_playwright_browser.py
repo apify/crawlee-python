@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import shutil
 import tempfile
-from functools import partial
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
@@ -26,6 +26,7 @@ class PlaywrightPersistentBrowser:
         self._browser_type = browser_type
         self._browser_launch_options = browser_launch_options
         self._user_data_dir = user_data_dir
+        self._temp_dir: str | None = None
 
         self._context: BrowserContext | None = None
         self._is_connected = True
@@ -46,17 +47,16 @@ class PlaywrightPersistentBrowser:
 
         if self._user_data_dir:
             user_data_dir = self._user_data_dir
-            temp_dir = False
         else:
             user_data_dir = tempfile.mkdtemp(prefix='apify-playwright-firefox-taac-')
-            temp_dir = True
+            self._temp_dir = user_data_dir
 
         self._context = await self._browser_type.launch_persistent_context(
             user_data_dir=user_data_dir, **launch_options
         )
 
-        if temp_dir:
-            self._context.on('close', partial(shutil.rmtree, user_data_dir))
+        if self._temp_dir:
+            self._context.on('close', self._delete_temp_dir)
 
         return self._context
 
@@ -66,3 +66,7 @@ class PlaywrightPersistentBrowser:
             await self._context.close()
             self._context = None
         self._is_connected = False
+
+    async def _delete_temp_dir(self, _: BrowserContext) -> None:
+        if self._temp_dir:
+            await asyncio.to_thread(shutil.rmtree, self._temp_dir)
