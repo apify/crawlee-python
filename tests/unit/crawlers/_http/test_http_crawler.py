@@ -547,3 +547,7 @@ async def test_isolation_cookies_httpx(server: respx.MockRouter) -> None:
     # This way we can be sure that no cookies are being leaked through the http client
     assert sessions_cookies[clean_session_id] == {}
     assert response_cookies[clean_session_id] == ''
+
+
+def test_default_logger() -> None:
+    assert HttpCrawler().log.name == 'HttpCrawler'
