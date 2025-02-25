@@ -116,6 +116,7 @@ async def test_crawl_follow_redirects_by_default(http_client: HttpxHttpClient, h
     crawling_result = await http_client.crawl(request)
 
     assert crawling_result.http_response.status_code == 200
+    assert request.loaded_url == final_url
 
 
 async def test_crawl_follow_redirects_false(httpbin: URL) -> None:
@@ -129,3 +130,4 @@ async def test_crawl_follow_redirects_false(httpbin: URL) -> None:
 
     assert crawling_result.http_response.status_code == 302
     assert crawling_result.http_response.headers['Location'] == final_url
+    assert request.loaded_url == redirect_url
