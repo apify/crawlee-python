@@ -27,6 +27,7 @@ All notable changes to this project will be documented in this file.
 - [**breaking**] Remove Base prefix from abstract class names ([#980](https://github.com/apify/crawlee-python/pull/980)) ([8ccb5d4](https://github.com/apify/crawlee-python/commit/8ccb5d41a1dae9b02088b433266ac89bd089561a)) by [@vdusek](https://github.com/vdusek)
 - [**breaking**] Сhange default `incognito context` to `persistent context` for `Playwright` ([#985](https://github.com/apify/crawlee-python/pull/985)) ([f01520d](https://github.com/apify/crawlee-python/commit/f01520d22b31af9f0f13ca162cc47e6aa9744c6d)) by [@Mantisus](https://github.com/Mantisus), closes [#721](https://github.com/apify/crawlee-python/issues/721), [#963](https://github.com/apify/crawlee-python/issues/963)
 - [**breaking**] Change `Session` cookies from `dict` to `SessionCookies` with `CookieJar` ([#984](https://github.com/apify/crawlee-python/pull/984)) ([6523b3a](https://github.com/apify/crawlee-python/commit/6523b3ade0eed53b0363ddce250c557024339b5e)) by [@Mantisus](https://github.com/Mantisus), closes [#710](https://github.com/apify/crawlee-python/issues/710), [#933](https://github.com/apify/crawlee-python/issues/933)
+- [**breaking**] Replace enum with literal for `EnqueueStrategy` ([#1019](https://github.com/apify/crawlee-python/pull/1019)) ([d2481ef](https://github.com/apify/crawlee-python/commit/d2481ef71d3539979c5b1129387e72b4126fe366)) by [@vdusek](https://github.com/vdusek)
 
 
 <!-- git-cliff-unreleased-end -->
