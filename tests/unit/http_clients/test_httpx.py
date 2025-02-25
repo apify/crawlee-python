@@ -106,3 +106,28 @@ async def test_common_headers_and_user_agent(httpbin: URL, header_network: dict)
     assert 'User-Agent' in response_headers
     assert 'python-httpx' not in response_headers['User-Agent']
     assert response_headers['User-Agent'] in get_available_header_values(header_network, {'User-Agent', 'user-agent'})
+
+
+async def test_crawl_follow_redirects_by_default(http_client: HttpxHttpClient, httpbin: URL) -> None:
+    final_url = str(httpbin / 'get')
+    redirect_url = str((httpbin / 'redirect-to').with_query(url=final_url))
+    request = Request.from_url(redirect_url)
+
+    crawling_result = await http_client.crawl(request)
+
+    assert crawling_result.http_response.status_code == 200
+    assert request.loaded_url == final_url
+
+
+async def test_crawl_follow_redirects_false(httpbin: URL) -> None:
+    http_client = HttpxHttpClient(follow_redirects=False)
+
+    final_url = str(httpbin / 'get')
+    redirect_url = str((httpbin / 'redirect-to').with_query(url=final_url))
+    request = Request.from_url(redirect_url)
+
+    crawling_result = await http_client.crawl(request)
+
+    assert crawling_result.http_response.status_code == 302
+    assert crawling_result.http_response.headers['Location'] == final_url
+    assert request.loaded_url == redirect_url
