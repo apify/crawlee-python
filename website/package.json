@@ -34,9 +34,10 @@
         "typescript": "5.7.3"
     },
     "dependencies": {
-        "@apify/docusaurus-plugin-typedoc-api": "^4.3.12",
+        "@apify/docusaurus-plugin-typedoc-api": "^4.4.2",
         "@apify/utilities": "^2.8.0",
         "@docusaurus/core": "^3.7.0",
+        "@docusaurus/faster": "^3.7.0",
         "@docusaurus/mdx-loader": "^3.7.0",
         "@docusaurus/plugin-client-redirects": "^3.7.0",
         "@docusaurus/preset-classic": "^3.7.0",
