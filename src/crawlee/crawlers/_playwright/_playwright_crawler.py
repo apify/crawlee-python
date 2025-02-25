@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, Callable, Generic
 
 from pydantic import ValidationError
 from typing_extensions import NotRequired, TypedDict, TypeVar
-from yarl import URL
 
 from crawlee import EnqueueStrategy, RequestTransformAction
 from crawlee._request import Request, RequestOptions
@@ -16,6 +15,7 @@ from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.browsers import BrowserPool
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
+from crawlee.sessions._cookies import PlaywrightCookieParam
 from crawlee.statistics import StatisticsState
 
 from ._playwright_crawling_context import PlaywrightCrawlingContext
@@ -208,7 +208,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         """
         async with context.page:
             if context.session:
-                await self._set_cookies(context.page, context.request.url, context.session.cookies)
+                session_cookies = context.session.cookies.get_cookies_as_playwright_format()
+                await self._update_cookies(context.page, session_cookies)
 
             if context.request.headers:
                 await context.page.set_extra_http_headers(context.request.headers.model_dump())
@@ -222,8 +223,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             context.request.loaded_url = context.page.url
 
             if context.session:
-                cookies = await self._get_cookies(context.page)
-                context.session.cookies.update(cookies)
+                pw_cookies = await self._get_cookies(context.page)
+                context.session.cookies.set_cookies_from_playwright_format(pw_cookies)
 
             async def enqueue_links(
                 *,
@@ -335,17 +336,14 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         """
         self._pre_navigation_hooks.append(hook)
 
-    async def _get_cookies(self, page: Page) -> dict[str, str]:
+    async def _get_cookies(self, page: Page) -> list[PlaywrightCookieParam]:
         """Get the cookies from the page."""
         cookies = await page.context.cookies()
-        return {cookie['name']: cookie['value'] for cookie in cookies if cookie.get('name') and cookie.get('value')}
+        return [PlaywrightCookieParam(**cookie) for cookie in cookies]
 
-    async def _set_cookies(self, page: Page, url: str, cookies: dict[str, str]) -> None:
-        """Set the cookies to the page."""
-        parsed_url = URL(url)
-        await page.context.add_cookies(
-            [{'name': name, 'value': value, 'domain': parsed_url.host, 'path': '/'} for name, value in cookies.items()]
-        )
+    async def _update_cookies(self, page: Page, cookies: list[PlaywrightCookieParam]) -> None:
+        """Update the cookies in the page context."""
+        await page.context.add_cookies([{**cookie} for cookie in cookies])
 
 
 class _PlaywrightCrawlerAdditionalOptions(TypedDict):

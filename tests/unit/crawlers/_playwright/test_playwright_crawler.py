@@ -315,7 +315,9 @@ async def test_isolation_cookies(*, use_incognito_pages: bool) -> None:
         if context.request.unique_key not in {'1', '2'}:
             return
 
-        sessions_cookies[context.session.id] = context.session.cookies
+        sessions_cookies[context.session.id] = {
+            cookie['name']: cookie['value'] for cookie in context.session.cookies.get_cookies_as_dicts()
+        }
         response_data = json.loads(await context.response.text())
         response_cookies[context.session.id] = response_data.get('cookies')
 

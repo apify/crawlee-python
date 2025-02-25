@@ -5,6 +5,8 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ._cookies import CookieParam
+
 
 class SessionModel(BaseModel):
     """Model for a Session object."""
@@ -20,7 +22,7 @@ class SessionModel(BaseModel):
     usage_count: Annotated[int, Field(alias='usageCount')]
     max_usage_count: Annotated[int, Field(alias='maxUsageCount')]
     error_score: Annotated[float, Field(alias='errorScore')]
-    cookies: Annotated[dict, Field(alias='cookies')]
+    cookies: Annotated[list[CookieParam], Field(alias='cookies')]
     blocked_status_codes: Annotated[list[int], Field(alias='blockedStatusCodes')]
 
 

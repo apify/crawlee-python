@@ -5,7 +5,8 @@ from typing import TYPE_CHECKING, Any, Optional
 from curl_cffi import CurlInfo
 from curl_cffi.const import CurlHttpVersion
 from curl_cffi.requests import AsyncSession
-from curl_cffi.requests.cookies import Cookies, CurlMorsel
+from curl_cffi.requests.cookies import Cookies as CurlCookies
+from curl_cffi.requests.cookies import CurlMorsel
 from curl_cffi.requests.exceptions import ProxyError as CurlProxyError
 from curl_cffi.requests.exceptions import RequestException as CurlRequestError
 from curl_cffi.requests.impersonate import DEFAULT_CHROME as CURL_DEFAULT_CHROME
@@ -19,6 +20,7 @@ from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+    from http.cookiejar import Cookie
 
     from curl_cffi import Curl
     from curl_cffi.requests import Request as CurlRequest
@@ -31,7 +33,7 @@ if TYPE_CHECKING:
     from crawlee.statistics import Statistics
 
 
-class _EmptyCookies(Cookies):
+class _EmptyCookies(CurlCookies):
     @override
     def get_cookies_for_curl(self, request: CurlRequest) -> list[CurlMorsel]:
         return []
@@ -147,7 +149,7 @@ class CurlImpersonateHttpClient(HttpClient):
                 method=request.method.upper(),  # type: ignore[arg-type] # curl-cffi requires uppercase method
                 headers=request.headers,
                 data=request.payload,
-                cookies=session.cookies if session else None,
+                cookies=session.cookies.jar if session else None,
                 allow_redirects=True,
             )
         except CurlRequestError as exc:
@@ -166,7 +168,7 @@ class CurlImpersonateHttpClient(HttpClient):
 
         if self._persist_cookies_per_session and session and response.curl:
             response_cookies = self._get_cookies(response.curl)
-            session.cookies.update(response_cookies)
+            session.cookies.store_cookies(response_cookies)
 
         request.loaded_url = response.url
 
@@ -197,7 +199,7 @@ class CurlImpersonateHttpClient(HttpClient):
                 method=method.upper(),  # type: ignore[arg-type] # curl-cffi requires uppercase method
                 headers=dict(headers) if headers else None,
                 data=payload,
-                cookies=session.cookies if session else None,
+                cookies=session.cookies.jar if session else None,
                 allow_redirects=True,
             )
         except CurlRequestError as exc:
@@ -213,7 +215,7 @@ class CurlImpersonateHttpClient(HttpClient):
 
         if self._persist_cookies_per_session and session and response.curl:
             response_cookies = self._get_cookies(response.curl)
-            session.cookies.update(response_cookies)
+            session.cookies.store_cookies(response_cookies)
 
         return _CurlImpersonateResponse(response)
 
@@ -253,9 +255,10 @@ class CurlImpersonateHttpClient(HttpClient):
         return False
 
     @staticmethod
-    def _get_cookies(curl: Curl) -> dict[str, str]:
-        cookies = {}
+    def _get_cookies(curl: Curl) -> list[Cookie]:
+        cookies: list[Cookie] = []
         for curl_cookie in curl.getinfo(CurlInfo.COOKIELIST):  # type: ignore[union-attr]
             curl_morsel = CurlMorsel.from_curl_format(curl_cookie)  # type: ignore[arg-type]
-            cookies[curl_morsel.name] = curl_morsel.value
+            cookie = curl_morsel.to_cookiejar_cookie()
+            cookies.append(cookie)
         return cookies
