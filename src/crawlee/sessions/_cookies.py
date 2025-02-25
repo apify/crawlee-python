@@ -197,7 +197,7 @@ class SessionCookies:
         """Store multiple Cookie objects in the session cookie jar.
 
         Args:
-            cookies: A list of Cookie objects to store in the jar.
+            cookies: A list of cookie objects to store in the jar.
         """
         for cookie in cookies:
             self.store_cookie(cookie)
