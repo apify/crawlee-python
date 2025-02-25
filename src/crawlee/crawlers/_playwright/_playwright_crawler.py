@@ -6,9 +6,7 @@ from typing import TYPE_CHECKING, Any, Callable, Generic
 
 from pydantic import ValidationError
 from typing_extensions import NotRequired, TypedDict, TypeVar
-from yarl import URL
 
-from crawlee import EnqueueStrategy, RequestTransformAction
 from crawlee._request import Request, RequestOptions
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.docs import docs_group
@@ -16,6 +14,7 @@ from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.browsers import BrowserPool
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
+from crawlee.sessions._cookies import PlaywrightCookieParam
 from crawlee.statistics import StatisticsState
 
 from ._playwright_crawling_context import PlaywrightCrawlingContext
@@ -27,10 +26,12 @@ TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=St
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable, Mapping
+    from pathlib import Path
 
     from playwright.async_api import Page
     from typing_extensions import Unpack
 
+    from crawlee import RequestTransformAction
     from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs
     from crawlee.browsers._types import BrowserType
     from crawlee.fingerprint_suite import FingerprintGenerator
@@ -82,6 +83,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         *,
         browser_pool: BrowserPool | None = None,
         browser_type: BrowserType | None = None,
+        user_data_dir: str | Path | None = None,
         browser_launch_options: Mapping[str, Any] | None = None,
         browser_new_context_options: Mapping[str, Any] | None = None,
         fingerprint_generator: FingerprintGenerator | None = None,
@@ -93,6 +95,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
         Args:
             browser_pool: A `BrowserPool` instance to be used for launching the browsers and getting pages.
+            user_data_dir: Path to a user data directory, which stores browser session data like cookies
+                and local storage.
             browser_type: The type of browser to launch ('chromium', 'firefox', or 'webkit').
                 This option should not be used if `browser_pool` is provided.
             browser_launch_options: Keyword arguments to pass to the browser launch method. These options are provided
@@ -117,6 +121,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             if any(
                 param is not None
                 for param in (
+                    user_data_dir,
                     use_incognito_pages,
                     headless,
                     browser_type,
@@ -127,8 +132,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             ):
                 raise ValueError(
                     'You cannot provide `headless`, `browser_type`, `browser_launch_options`, '
-                    '`browser_new_context_options`, `use_incognito_pages`  or `fingerprint_generator` arguments when '
-                    '`browser_pool` is provided.'
+                    '`browser_new_context_options`, `use_incognito_pages`, `user_data_dir`  or'
+                    '`fingerprint_generator` arguments when `browser_pool` is provided.'
                 )
 
         # If browser_pool is not provided, create a new instance of BrowserPool with specified arguments.
@@ -136,6 +141,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             browser_pool = BrowserPool.with_default_plugin(
                 headless=headless,
                 browser_type=browser_type,
+                user_data_dir=user_data_dir,
                 browser_launch_options=browser_launch_options,
                 browser_new_context_options=browser_new_context_options,
                 use_incognito_pages=use_incognito_pages,
@@ -202,7 +208,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         """
         async with context.page:
             if context.session:
-                await self._set_cookies(context.page, context.request.url, context.session.cookies)
+                session_cookies = context.session.cookies.get_cookies_as_playwright_format()
+                await self._update_cookies(context.page, session_cookies)
 
             if context.request.headers:
                 await context.page.set_extra_http_headers(context.request.headers.model_dump())
@@ -216,8 +223,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             context.request.loaded_url = context.page.url
 
             if context.session:
-                cookies = await self._get_cookies(context.page)
-                context.session.cookies.update(cookies)
+                pw_cookies = await self._get_cookies(context.page)
+                context.session.cookies.set_cookies_from_playwright_format(pw_cookies)
 
             async def enqueue_links(
                 *,
@@ -229,7 +236,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 **kwargs: Unpack[EnqueueLinksKwargs],
             ) -> None:
                 """The `PlaywrightCrawler` implementation of the `EnqueueLinksFunction` function."""
-                kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
+                kwargs.setdefault('strategy', 'same-hostname')
 
                 requests = list[Request]()
                 base_user_data = user_data or {}
@@ -329,17 +336,14 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         """
         self._pre_navigation_hooks.append(hook)
 
-    async def _get_cookies(self, page: Page) -> dict[str, str]:
+    async def _get_cookies(self, page: Page) -> list[PlaywrightCookieParam]:
         """Get the cookies from the page."""
         cookies = await page.context.cookies()
-        return {cookie['name']: cookie['value'] for cookie in cookies if cookie.get('name') and cookie.get('value')}
+        return [PlaywrightCookieParam(**cookie) for cookie in cookies]
 
-    async def _set_cookies(self, page: Page, url: str, cookies: dict[str, str]) -> None:
-        """Set the cookies to the page."""
-        parsed_url = URL(url)
-        await page.context.add_cookies(
-            [{'name': name, 'value': value, 'domain': parsed_url.host, 'path': '/'} for name, value in cookies.items()]
-        )
+    async def _update_cookies(self, page: Page, cookies: list[PlaywrightCookieParam]) -> None:
+        """Update the cookies in the page context."""
+        await page.context.add_cookies([{**cookie} for cookie in cookies])
 
 
 class _PlaywrightCrawlerAdditionalOptions(TypedDict):

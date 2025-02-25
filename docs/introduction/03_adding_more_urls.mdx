@@ -78,7 +78,7 @@ Websites typically contain a lot of links that lead away from the original page.
 await context.enqueue_links()
 ```
 
-The default behavior of <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> is to stay on the same hostname. This **does not include subdomains**. To include subdomains in your crawl, use the `strategy` argument. The `strategy` argument is an instance of the <ApiLink to="enum/EnqueueStrategy">`EnqueueStrategy`</ApiLink> enum.
+The default behavior of <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> is to stay on the same hostname. This **does not include subdomains**. To include subdomains in your crawl, use the `strategy` argument. The `strategy` argument is an instance of the `EnqueueStrategy` type alias.
 
 <CodeBlock className="language-python">
     {EnqueueStrategyExample}
@@ -92,11 +92,11 @@ Skipping of duplicate URLs is critical, because visiting the same page multiple 
 
 ## Advanced filtering arguments
 
-While the defaults for <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> can be often exactly what you need, it also gives you fine-grained control over which URLs should be enqueued. One way we already mentioned above. It is using the <ApiLink to="enum/EnqueueStrategy">`EnqueueStrategy`</ApiLink>. You can use the `all` strategy if you want to follow every single link, regardless of its domain, or you can enqueue links that target the same domain name with the `same_domain` strategy.
+While the defaults for <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> can be often exactly what you need, it also gives you fine-grained control over which URLs should be enqueued. One way we already mentioned above. It is using the `EnqueueStrategy` type alias. You can use the `all` strategy if you want to follow every single link, regardless of its domain, or you can enqueue links that target the same domain name with the `same-domain` strategy.
 
 ```python
 # Wanders the internet.
-await context.enqueue_links(strategy=EnqueueStrategy.ALL)
+await context.enqueue_links(strategy='all')
 ```
 
 ### Filter URLs with patterns

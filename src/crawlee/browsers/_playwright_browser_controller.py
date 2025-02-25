@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, cast
 
 from browserforge.injectors.playwright import AsyncNewContext
-from playwright.async_api import BrowserContext, Page, ProxySettings
+from playwright.async_api import Browser, BrowserContext, Page, ProxySettings
 from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
@@ -17,8 +17,7 @@ from crawlee.fingerprint_suite import HeaderGenerator
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from playwright.async_api import Browser
-
+    from crawlee.browsers._playwright_browser import PlaywrightPersistentBrowser
     from crawlee.fingerprint_suite import FingerprintGenerator
     from crawlee.proxy_configuration import ProxyInfo
 
@@ -40,7 +39,7 @@ class PlaywrightBrowserController(BrowserController):
 
     def __init__(
         self,
-        browser: Browser,
+        browser: Browser | PlaywrightPersistentBrowser,
         *,
         max_open_pages_per_browser: int = 20,
         use_incognito_pages: bool = False,
@@ -210,15 +209,25 @@ class PlaywrightBrowserController(BrowserController):
 
         if self._fingerprint_generator:
             return await AsyncNewContext(
-                browser=self._browser, fingerprint=self._fingerprint_generator.generate(), **browser_new_context_options
+                browser=self._browser,
+                fingerprint=self._fingerprint_generator.generate(),
+                **browser_new_context_options,
             )
 
         if self._header_generator:
-            common_headers = self._header_generator.get_common_headers()
-            sec_ch_ua_headers = self._header_generator.get_sec_ch_ua_headers(browser_type=self.browser_type)
-            user_agent_header = self._header_generator.get_user_agent_header(browser_type=self.browser_type)
-            headers = dict(common_headers | sec_ch_ua_headers | user_agent_header)
-            extra_http_headers = headers
+            extra_http_headers = dict(
+                self._header_generator.get_specific_headers(
+                    header_names={
+                        'Accept',
+                        'Accept-Language',
+                        'User-Agent',
+                        'sec-ch-ua',
+                        'sec-ch-ua-mobile',
+                        'sec-ch-ua-platform',
+                    },
+                    browser_type=self.browser_type,
+                )
+            )
         else:
             extra_http_headers = None
 
