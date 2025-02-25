@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file.
 - Fix playwright template and dockerfile ([#972](https://github.com/apify/crawlee-python/pull/972)) ([c33b34d](https://github.com/apify/crawlee-python/commit/c33b34dd6e253b1261c700857bb5c4bbec6d5c14)) by [@janbuchar](https://github.com/janbuchar), closes [#969](https://github.com/apify/crawlee-python/issues/969)
 - Fix installing dependencies via pip in project template ([#977](https://github.com/apify/crawlee-python/pull/977)) ([1e3b8eb](https://github.com/apify/crawlee-python/commit/1e3b8eb1cdb57bf2f7256e8ae5f0706b0afc3ba9)) by [@janbuchar](https://github.com/janbuchar), closes [#975](https://github.com/apify/crawlee-python/issues/975)
 - Fix default migration storage ([#1018](https://github.com/apify/crawlee-python/pull/1018)) ([6a0c4d9](https://github.com/apify/crawlee-python/commit/6a0c4d94593f7e94f24eee8a97fc7bc83c4d02e1)) by [@Pijukatel](https://github.com/Pijukatel), closes [#991](https://github.com/apify/crawlee-python/issues/991)
+- Fix logger name for http based loggers ([#1023](https://github.com/apify/crawlee-python/pull/1023)) ([bfb3944](https://github.com/apify/crawlee-python/commit/bfb394446351c8f3b9879a9905607f7c929f2542)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1021](https://github.com/apify/crawlee-python/issues/1021)
 
 ### Refactor
 
