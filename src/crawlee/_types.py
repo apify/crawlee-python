@@ -47,18 +47,7 @@ HttpPayload: TypeAlias = bytes
 RequestTransformAction: TypeAlias = Literal['skip', 'unchanged']
 
 EnqueueStrategy: TypeAlias = Literal['all', 'same_domain', 'same_hostname', 'same_origin']
-"""Specify the strategy for determining which links to extract and enqueue.
-
-Strategies:
-    all: Enqueue every link encountered, regardless of the target domain. Use this option to ensure that all links,
-        including those leading to external websites, are followed.
-    same_domain: Enqueue links that share the same domain name as the current page, including any subdomains. This
-        strategy is ideal for crawling within the same top-level domain while still allowing for subdomain exploration.
-    same_hostname: Enqueue links only if they match the exact hostname of the current page. This is the default
-        behavior and restricts the crawl to the current hostname, excluding subdomains.
-    same_origin: Enqueue links that share the same origin as the current page. The origin is defined by the
-        combination of protocol, domain, and port, ensuring a strict scope for the crawl.
-"""
+"""Enqueue strategy to be used for determining which links to extract and enqueue."""
 
 
 def _normalize_headers(headers: Mapping[str, str]) -> dict[str, str]:
@@ -165,7 +154,19 @@ class EnqueueLinksKwargs(TypedDict):
     """Base URL to be used for relative URLs."""
 
     strategy: NotRequired[EnqueueStrategy]
-    """Enqueueing strategy, see the `EnqueueStrategy` type alias for possible values and their meanings."""
+    """Enqueue strategy to be used for determining which links to extract and enqueue.
+
+    Options:
+        all: Enqueue every link encountered, regardless of the target domain. Use this option to ensure that all
+            links, including those leading to external websites, are followed.
+        same_domain: Enqueue links that share the same domain name as the current page, including any subdomains.
+            This strategy is ideal for crawling within the same top-level domain while still allowing for subdomain
+            exploration.
+        same_hostname: Enqueue links only if they match the exact hostname of the current page. This is the default
+            behavior and restricts the crawl to the current hostname, excluding subdomains.
+        same_origin: Enqueue links that share the same origin as the current page. The origin is defined by the
+            combination of protocol, domain, and port, ensuring a strict scope for the crawl.
+    """
 
     include: NotRequired[list[re.Pattern | Glob]]
     """List of regular expressions or globs that URLs must match to be enqueued."""
