@@ -12,7 +12,7 @@ async def main() -> None:
         # highlight-next-line
         await context.enqueue_links(
             # highlight-next-line
-            strategy='same_domain',
+            strategy='same-domain',
             # highlight-next-line
         )
 

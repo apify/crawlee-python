@@ -46,7 +46,7 @@ HttpPayload: TypeAlias = bytes
 
 RequestTransformAction: TypeAlias = Literal['skip', 'unchanged']
 
-EnqueueStrategy: TypeAlias = Literal['all', 'same_domain', 'same_hostname', 'same_origin']
+EnqueueStrategy: TypeAlias = Literal['all', 'same-domain', 'same-hostname', 'same-origin']
 """Enqueue strategy to be used for determining which links to extract and enqueue."""
 
 

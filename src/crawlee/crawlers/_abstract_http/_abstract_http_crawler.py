@@ -162,7 +162,7 @@ class AbstractHttpCrawler(
             | None = None,
             **kwargs: Unpack[EnqueueLinksKwargs],
         ) -> None:
-            kwargs.setdefault('strategy', 'same_hostname')
+            kwargs.setdefault('strategy', 'same-hostname')
 
             requests = list[Request]()
             base_user_data = user_data or {}

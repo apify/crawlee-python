@@ -16,7 +16,7 @@ async def main() -> None:
 
         # Setting the strategy to same_domain will enqueue all links found that
         # are on the same hostname as request.loaded_url or request.url.
-        await context.enqueue_links(strategy='same_domain')
+        await context.enqueue_links(strategy='same-domain')
 
     # Run the crawler with the initial list of requests.
     await crawler.run(['https://crawlee.dev'])

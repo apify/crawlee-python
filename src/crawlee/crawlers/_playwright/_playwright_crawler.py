@@ -235,7 +235,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 **kwargs: Unpack[EnqueueLinksKwargs],
             ) -> None:
                 """The `PlaywrightCrawler` implementation of the `EnqueueLinksFunction` function."""
-                kwargs.setdefault('strategy', 'same_hostname')
+                kwargs.setdefault('strategy', 'same-hostname')
 
                 requests = list[Request]()
                 base_user_data = user_data or {}

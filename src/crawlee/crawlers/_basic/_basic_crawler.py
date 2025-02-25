@@ -801,10 +801,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         origin_url: ParseResult,
     ) -> bool:
         """Check if a URL matches the enqueue_strategy."""
-        if strategy == 'same_hostname':
+        if strategy == 'same-hostname':
             return target_url.hostname == origin_url.hostname
 
-        if strategy == 'same_domain':
+        if strategy == 'same-domain':
             if origin_url.hostname is None or target_url.hostname is None:
                 raise ValueError('Both origin and target URLs must have a hostname')
 
@@ -812,7 +812,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             target_domain = self._tld_extractor.extract_str(target_url.hostname).domain
             return origin_domain == target_domain
 
-        if strategy == 'same_origin':
+        if strategy == 'same-origin':
             return target_url.hostname == origin_url.hostname and target_url.scheme == origin_url.scheme
 
         if strategy == 'all':

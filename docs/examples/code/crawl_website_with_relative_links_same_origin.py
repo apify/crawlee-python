@@ -16,7 +16,7 @@ async def main() -> None:
 
         # Setting the strategy to same origin will enqueue all links found that are on
         # the same origin as request.loaded_url or request.url.
-        await context.enqueue_links(strategy='same_origin')
+        await context.enqueue_links(strategy='same-origin')
 
     # Run the crawler with the initial list of requests.
     await crawler.run(['https://crawlee.dev'])

@@ -396,7 +396,7 @@ INCLUDE_TEST_URLS = (
             AddRequestsTestInput(
                 start_url=STRATEGY_TEST_URLS[0],
                 requests=STRATEGY_TEST_URLS,
-                kwargs=EnqueueLinksKwargs(strategy='same_domain'),
+                kwargs=EnqueueLinksKwargs(strategy='same-domain'),
                 expected_urls=STRATEGY_TEST_URLS[1:3],
             ),
             id='enqueue_strategy_3',
@@ -405,7 +405,7 @@ INCLUDE_TEST_URLS = (
             AddRequestsTestInput(
                 start_url=STRATEGY_TEST_URLS[0],
                 requests=STRATEGY_TEST_URLS,
-                kwargs=EnqueueLinksKwargs(strategy='same_hostname'),
+                kwargs=EnqueueLinksKwargs(strategy='same-hostname'),
                 expected_urls=[STRATEGY_TEST_URLS[1]],
             ),
             id='enqueue_strategy_4',
@@ -414,7 +414,7 @@ INCLUDE_TEST_URLS = (
             AddRequestsTestInput(
                 start_url=STRATEGY_TEST_URLS[0],
                 requests=STRATEGY_TEST_URLS,
-                kwargs=EnqueueLinksKwargs(strategy='same_origin'),
+                kwargs=EnqueueLinksKwargs(strategy='same-origin'),
                 expected_urls=[],
             ),
             id='enqueue_strategy_5',
