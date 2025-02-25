@@ -194,7 +194,7 @@ class SessionCookies:
         self.jar.set_cookie(cookie)
 
     def store_cookies(self, cookies: list[Cookie]) -> None:
-        """Store multiple Cookie objects in the session cookie jar.
+        """Store multiple cookie objects in the session cookie jar.
 
         Args:
             cookies: A list of cookie objects to store in the jar.
