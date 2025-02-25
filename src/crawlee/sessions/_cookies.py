@@ -132,7 +132,7 @@ class SessionCookies:
         self.jar.set_cookie(cookie)
 
     def _convert_cookie_to_dict(self, cookie: Cookie) -> CookieParam:
-        """Convert Cookie object to dictionary format.
+        """Convert `http.cookiejar.Cookie` to dictionary format.
 
         Args:
             cookie: Cookie object to convert.
