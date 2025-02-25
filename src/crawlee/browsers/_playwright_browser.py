@@ -18,7 +18,14 @@ logger = getLogger(__name__)
 
 
 class PlaywrightPersistentBrowser(Browser):
-    """Wrapper for browser that uses persistent context under the hood."""
+    """A wrapper for Playwright's `Browser` that operates with a persistent context.
+
+    It utilizes Playwright's persistent browser context feature, maintaining user data across sessions.
+    While it follows the same interface as Playwright's `Browser` class, there is no abstract base class
+    enforcing this. There is a limitation that only a single persistent context is allowed.
+    """
+
+    _TMP_DIR_PREFIX = 'apify-playwright-firefox-taac-'
 
     def __init__(
         self,
@@ -46,7 +53,7 @@ class PlaywrightPersistentBrowser(Browser):
         return self._is_connected
 
     async def new_context(self, **context_options: Any) -> BrowserContext:
-        """Creates persistent context instead of regular one. Merges launch options with context options."""
+        """Create persistent context instead of regular one. Merge launch options with context options."""
         if self._context:
             raise RuntimeError('Persistent browser can have only one context')
 
@@ -55,7 +62,7 @@ class PlaywrightPersistentBrowser(Browser):
         if self._user_data_dir:
             user_data_dir = self._user_data_dir
         else:
-            user_data_dir = tempfile.mkdtemp(prefix='apify-playwright-firefox-taac-')
+            user_data_dir = tempfile.mkdtemp(prefix=self._TMP_DIR_PREFIX)
             self._temp_dir = user_data_dir
 
         self._context = await self._browser_type.launch_persistent_context(
@@ -82,17 +89,17 @@ class PlaywrightPersistentBrowser(Browser):
     @property
     @override
     def version(self) -> str:
-        raise NotImplementedError('Persistent browser does not support version')
+        raise NotImplementedError('Persistent browser does not support version.')
 
     async def new_page(self, **kwargs: Any) -> Page:
-        raise NotImplementedError('Persistent browser does not support new page')
+        raise NotImplementedError('Persistent browser does not support new page.')
 
     @override
     async def new_browser_cdp_session(self) -> CDPSession:
-        raise NotImplementedError('Persistent browser does not support new browser CDP session')
+        raise NotImplementedError('Persistent browser does not support new browser CDP session.')
 
     async def start_tracing(self, **kwargs: Any) -> None:
-        raise NotImplementedError('Persistent browser does not support tracing')
+        raise NotImplementedError('Persistent browser does not support tracing.')
 
     async def stop_tracing(self, **kwargs: Any) -> bytes:
-        raise NotImplementedError('Persistent browser does not support tracing')
+        raise NotImplementedError('Persistent browser does not support tracing.')
