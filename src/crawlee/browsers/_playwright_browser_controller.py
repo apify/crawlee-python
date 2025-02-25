@@ -215,11 +215,19 @@ class PlaywrightBrowserController(BrowserController):
             )
 
         if self._header_generator:
-            common_headers = self._header_generator.get_common_headers()
-            sec_ch_ua_headers = self._header_generator.get_sec_ch_ua_headers(browser_type=self.browser_type)
-            user_agent_header = self._header_generator.get_user_agent_header(browser_type=self.browser_type)
-            headers = dict(common_headers | sec_ch_ua_headers | user_agent_header)
-            extra_http_headers = headers
+            extra_http_headers = dict(
+                self._header_generator.get_specific_headers(
+                    header_names={
+                        'Accept',
+                        'Accept-Language',
+                        'User-Agent',
+                        'sec-ch-ua',
+                        'sec-ch-ua-mobile',
+                        'sec-ch-ua-platform',
+                    },
+                    browser_type=self.browser_type,
+                )
+            )
         else:
             extra_http_headers = None
 
