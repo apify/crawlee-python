@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from more_itertools import pairwise
 
-from crawlee._autoscaling.types import LoadRatioInfo, Snapshot, SystemInfo
+from crawlee._autoscaling._types import LoadRatioInfo, Snapshot, SystemInfo
 from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:

@@ -338,7 +338,7 @@ class AdaptivePlaywrightCrawler(
             return self._pw_context_pipeline(context_linked_to_result, from_pw_pipeline_to_top_router)
 
         raise RuntimeError(
-            f"Not a valid rendering type. Must be one of the following: {', '.join(get_args(RenderingType))}"
+            f'Not a valid rendering type. Must be one of the following: {", ".join(get_args(RenderingType))}'
         )
 
     @override

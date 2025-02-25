@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
 from crawlee._utils.docs import docs_group
-from crawlee._utils.http import is_status_code_client_error, is_status_code_server_error
+from crawlee._utils.web import is_status_code_client_error, is_status_code_server_error
 from crawlee.errors import HttpClientStatusCodeError, HttpStatusCodeError
 
 if TYPE_CHECKING:

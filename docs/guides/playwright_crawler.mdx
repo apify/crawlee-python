@@ -7,10 +7,10 @@ description: How to use the PlaywrightCrawler and its related components.
 import ApiLink from '@site/src/components/ApiLink';
 import CodeBlock from '@theme/CodeBlock';
 
-import MultipleLaunchExample from '!!raw-loader!./code/playwright_crawler/multiple_launch_example.py';
-import BrowserConfigurationExample from '!!raw-loader!./code/playwright_crawler/browser_configuration_example.py';
-import PluginBrowserConfigExample from '!!raw-loader!./code/playwright_crawler/plugin_browser_configuration_example.py';
-import PreNavigationExample from '!!raw-loader!./code/playwright_crawler/pre_navigation_hook_example.py';
+import MultipleLaunchExample from '!!raw-loader!./code_examples/playwright_crawler/multiple_launch_example.py';
+import BrowserConfigurationExample from '!!raw-loader!./code_examples/playwright_crawler/browser_configuration_example.py';
+import PluginBrowserConfigExample from '!!raw-loader!./code_examples/playwright_crawler/plugin_browser_configuration_example.py';
+import PreNavigationExample from '!!raw-loader!./code_examples/playwright_crawler/pre_navigation_hook_example.py';
 
 A <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> is a browser-based crawler. In contrast to HTTP-based crawlers like <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> or <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, it uses a real browser to render pages and extract data. It is built on top of the [Playwright](https://playwright.dev/python/) browser automation library. While browser-based crawlers are typically slower and less efficient than HTTP-based crawlers, they can handle dynamic, client-side rendered sites that standard HTTP-based crawlers cannot manage.
 
