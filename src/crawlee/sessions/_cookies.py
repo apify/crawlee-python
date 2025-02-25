@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from http.cookiejar import Cookie, CookieJar
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal
 
 from typing_extensions import NotRequired, Required, TypedDict
 
@@ -12,24 +12,43 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 
-class BaseCookieParam(TypedDict, total=False):
+@docs_group('Data structures')
+class CookieParam(TypedDict, total=False):
+    """Dictionary representation of cookies for SessionCookies.set() method."""
+
+    name: Required[str]
+    """Cookie name."""
+
+    value: Required[str]
+    """Cookie value."""
+
+    domain: NotRequired[str]
+    """Domain for which the cookie is set."""
+
+    path: NotRequired[str]
+    """Path on the specified domain for which the cookie is set."""
+
+    secure: NotRequired[bool]
+    """Set the `Secure` flag for the cookie."""
+
+    http_only: NotRequired[bool]
+    """Set the `HttpOnly` flag for the cookie."""
+
+    expires: NotRequired[int]
+    """Expiration date for the cookie, None for a session cookie."""
+
+    same_site: NotRequired[Literal['Lax', 'None', 'Strict']]
+    """Set the `SameSite` attribute for the cookie."""
+
+
+class PlaywrightCookieParam(TypedDict, total=False):
+    """Cookie parameters in Playwright format with camelCase naming."""
+
+    name: NotRequired[str]
+    value: NotRequired[str]
     domain: NotRequired[str]
     path: NotRequired[str]
     secure: NotRequired[bool]
-
-
-@docs_group('Data structures')
-class CookieParam(BaseCookieParam, total=False):
-    name: Required[str]
-    value: Required[str]
-    http_only: NotRequired[bool]
-    expires: NotRequired[int]
-    same_site: NotRequired[Literal['Lax', 'None', 'Strict']]
-
-
-class PlaywrightCookieParam(BaseCookieParam, total=False):
-    name: NotRequired[str]
-    value: NotRequired[str]
     httpOnly: NotRequired[bool]
     expires: NotRequired[float]
     sameSite: NotRequired[Literal['Lax', 'None', 'Strict']]
@@ -146,7 +165,7 @@ class SessionCookies:
         if 'expires' in result:
             result['expires'] = float(result['expires'])
 
-        return cast(PlaywrightCookieParam, result)
+        return PlaywrightCookieParam(**result)
 
     def _from_playwright(self, cookie_dict: PlaywrightCookieParam) -> CookieParam:
         """Convert Playwright cookie to internal format."""
@@ -157,13 +176,10 @@ class SessionCookies:
         if 'sameSite' in result:
             result['same_site'] = result.pop('sameSite')
         if 'expires' in result:
-            result['expires'] = int(result['expires'])
-        if 'name' not in result:
-            result['name'] = ''
-        if 'value' not in result:
-            result['value'] = ''
+            expires = int(result['expires'])
+            result['expires'] = None if expires == -1 else expires
 
-        return cast(CookieParam, result)
+        return CookieParam(name=result.pop('name', ''), value=result.pop('value', ''), **result)
 
     def get_cookies_as_dicts(self) -> list[CookieParam]:
         """Convert cookies to a list with `CookieParam` dicts."""
@@ -185,6 +201,7 @@ class SessionCookies:
         """
         for cookie in cookies:
             self.store_cookie(cookie)
+        self._jar.clear_expired_cookies()
 
     def set_cookies(self, cookie_dicts: list[CookieParam]) -> None:
         """Create and store cookies from their dictionary representations.
@@ -194,6 +211,7 @@ class SessionCookies:
         """
         for cookie_dict in cookie_dicts:
             self.set(**cookie_dict)
+        self._jar.clear_expired_cookies()
 
     def get_cookies_as_playwright_format(self) -> list[PlaywrightCookieParam]:
         """Get cookies in playwright format."""
@@ -204,6 +222,7 @@ class SessionCookies:
         for pw_cookie in pw_cookies:
             cookie_param = self._from_playwright(pw_cookie)
             self.set(**cookie_param)
+        self._jar.clear_expired_cookies()
 
     def __deepcopy__(self, memo: dict[int, Any] | None) -> SessionCookies:
         # This is necessary because `CookieJar` use `RLock`, which prevents `deepcopy`.
@@ -213,8 +232,14 @@ class SessionCookies:
     def __len__(self) -> int:
         return len(self._jar)
 
-    def __set__(self, name: str, value: str) -> None:
+    def __setitem__(self, name: str, value: str) -> None:
         self.set(name, value)
+
+    def __getitem__(self, name: str) -> str | None:
+        for cookie in self._jar:
+            if cookie.name == name:
+                return cookie.value
+        raise KeyError(f"Cookie '{name}' not found")
 
     def __iter__(self) -> Iterator[CookieParam]:
         return (self._convert_cookie_to_dict(cookie) for cookie in self._jar)
@@ -237,17 +262,7 @@ class SessionCookies:
         if len(self) != len(other):
             return False
 
-        self_cookies = {
-            (cookie.name, cookie.value, cookie.domain, cookie.path): self._convert_cookie_to_dict(cookie)
-            for cookie in self._jar
-        }
+        self_keys = {(cookie.name, cookie.value, cookie.domain, cookie.path) for cookie in self._jar}
+        other_keys = {(cookie.name, cookie.value, cookie.domain, cookie.path) for cookie in other.jar}
 
-        for cookie in other.jar:
-            key = (cookie.name, cookie.value, cookie.domain, cookie.path)
-            if key not in self_cookies:
-                return False
-
-            if self_cookies[key] != self._convert_cookie_to_dict(cookie):
-                return False
-
-        return True
+        return self_keys == other_keys
