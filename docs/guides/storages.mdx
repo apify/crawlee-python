@@ -9,22 +9,22 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import CodeBlock from '@theme/CodeBlock';
 
-import RqBasicExample from '!!raw-loader!./code/storages/rq_basic_example.py';
-import RqWithCrawlerExample from '!!raw-loader!./code/storages/rq_with_crawler_example.py';
-import RqWithCrawlerExplicitExample from '!!raw-loader!./code/storages/rq_with_crawler_explicit_example.py';
-import RqHelperAddRequestsExample from '!!raw-loader!./code/storages/helper_add_requests_example.py';
-import RqHelperEnqueueLinksExample from '!!raw-loader!./code/storages/helper_enqueue_links_example.py';
+import RqBasicExample from '!!raw-loader!./code_examples/storages/rq_basic_example.py';
+import RqWithCrawlerExample from '!!raw-loader!./code_examples/storages/rq_with_crawler_example.py';
+import RqWithCrawlerExplicitExample from '!!raw-loader!./code_examples/storages/rq_with_crawler_explicit_example.py';
+import RqHelperAddRequestsExample from '!!raw-loader!./code_examples/storages/helper_add_requests_example.py';
+import RqHelperEnqueueLinksExample from '!!raw-loader!./code_examples/storages/helper_enqueue_links_example.py';
 
-import DatasetBasicExample from '!!raw-loader!./code/storages/dataset_basic_example.py';
-import DatasetWithCrawlerExample from '!!raw-loader!./code/storages/dataset_with_crawler_example.py';
-import DatasetWithCrawerExplicitExample from '!!raw-loader!./code/storages/dataset_with_crawler_explicit_example.py';
+import DatasetBasicExample from '!!raw-loader!./code_examples/storages/dataset_basic_example.py';
+import DatasetWithCrawlerExample from '!!raw-loader!./code_examples/storages/dataset_with_crawler_example.py';
+import DatasetWithCrawerExplicitExample from '!!raw-loader!./code_examples/storages/dataset_with_crawler_explicit_example.py';
 
-import KvsBasicExample from '!!raw-loader!./code/storages/kvs_basic_example.py';
-import KvsWithCrawlerExample from '!!raw-loader!./code/storages/kvs_with_crawler_example.py';
-import KvsWithCrawlerExplicitExample from '!!raw-loader!./code/storages/kvs_with_crawler_explicit_example.py';
+import KvsBasicExample from '!!raw-loader!./code_examples/storages/kvs_basic_example.py';
+import KvsWithCrawlerExample from '!!raw-loader!./code_examples/storages/kvs_with_crawler_example.py';
+import KvsWithCrawlerExplicitExample from '!!raw-loader!./code_examples/storages/kvs_with_crawler_explicit_example.py';
 
-import CleaningDoNotPurgeExample from '!!raw-loader!./code/storages/cleaning_do_not_purge_example.py';
-import CleaningPurgeExplicitlyExample from '!!raw-loader!./code/storages/cleaning_purge_explicitly_example.py';
+import CleaningDoNotPurgeExample from '!!raw-loader!./code_examples/storages/cleaning_do_not_purge_example.py';
+import CleaningPurgeExplicitlyExample from '!!raw-loader!./code_examples/storages/cleaning_purge_explicitly_example.py';
 
 Crawlee offers multiple storage types for managing and persisting your crawling data. Request-oriented storages, such as the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, help you store and deduplicate URLs, while result-oriented storages, like <ApiLink to="class/Dataset">`Dataset`</ApiLink> and <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, focus on storing and retrieving scraping results. This guide helps you choose the storage type that suits your needs.
 

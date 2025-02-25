@@ -6,7 +6,7 @@ title: AdaptivePlaywrightCrawler
 import ApiLink from '@site/src/components/ApiLink';
 import CodeBlock from '@theme/CodeBlock';
 
-import AdaptivePlaywrightCrawlerExample from '!!raw-loader!./code/adaptive_playwright_crawler.py';
+import AdaptivePlaywrightCrawlerExample from '!!raw-loader!./code_examples/adaptive_playwright_crawler.py';
 
 This example demonstrates how to use <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink>. An <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> is a combination of <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> and some implementation of HTTP-based crawler such as <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> or <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>.
 It uses a more limited crawling context interface so that it is able to switch to HTTP-only crawling when it detects that it may bring a performance benefit.
