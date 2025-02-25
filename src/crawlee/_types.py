@@ -330,8 +330,9 @@ class AddRequestsFunction(Protocol):
 
 @docs_group('Functions')
 class EnqueueLinksFunction(Protocol):
-    """A function for enqueueing new URLs to crawl based on elements selected by a given selector.
+    """A function for enqueueing new URLs to crawl based on elements selected by a given selector and explicit requests.
 
+    It adds explicitly passed requests to the `RequestManager`.
     It extracts URLs from the current page and enqueues them for further crawling. It allows filtering through
     selectors and other options. You can also specify labels and user data to be associated with the newly
     created `Request` objects.
