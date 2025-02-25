@@ -276,7 +276,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
             async def enqueue_links(
                 *,
-                selector: str = 'a',
+                selector: str | None = None,
                 label: str | None = None,
                 user_data: dict | None = None,
                 transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
@@ -287,18 +287,25 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 """The `PlaywrightCrawler` implementation of the `EnqueueLinksFunction` function."""
                 kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
 
-                # Add directly passed requests.
-                await context.add_requests(requests or list[Union[str, Request]](), **kwargs)
-                # Add requests from extracted links.
-                await context.add_requests(
-                    await extract_links(
-                        selector=selector,
-                        label=label,
-                        user_data=user_data,
-                        transform_request_function=transform_request_function,
-                    ),
-                    **kwargs,
-                )
+                if requests:
+                    if any((selector, label, user_data, transform_request_function)):
+                        raise ValueError(
+                            'You cannot provide `selector`, `label`, `user_data` or `transform_request_function` '
+                            'arguments when `requests` is provided.'
+                        )
+                    # Add directly passed requests.
+                    await context.add_requests(requests or list[Union[str, Request]](), **kwargs)
+                else:
+                    # Add requests from extracted links.
+                    await context.add_requests(
+                        await extract_links(
+                            selector=selector or 'a',
+                            label=label,
+                            user_data=user_data,
+                            transform_request_function=transform_request_function,
+                        ),
+                        **kwargs,
+                    )
 
             yield PlaywrightCrawlingContext(
                 request=context.request,

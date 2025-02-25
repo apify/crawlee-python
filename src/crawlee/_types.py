@@ -330,18 +330,36 @@ class AddRequestsFunction(Protocol):
 
 @docs_group('Functions')
 class EnqueueLinksFunction(Protocol):
-    """A function for enqueueing new URLs to crawl based on elements selected by a given selector and explicit requests.
+    """A function for enqueueing new URLs to crawl based on elements selected by a given selector or explicit requests.
 
-    It adds explicitly passed requests to the `RequestManager`.
-    It extracts URLs from the current page and enqueues them for further crawling. It allows filtering through
-    selectors and other options. You can also specify labels and user data to be associated with the newly
-    created `Request` objects.
+    It adds explicitly passed `requests` to the `RequestManager` or it extracts URLs from the current page and enqueues
+    them for further crawling. It allows filtering through selectors and other options. You can also specify labels and
+    user data to be associated with the newly created `Request` objects.
+
+    It should not be called with `selector`, `label`, `user_data` or `transform_request_function` arguments together
+    with `requests` argument.
     """
+
+    @overload
+    def __call__(
+        self,
+        *,
+        selector: str | None = None,
+        label: str | None = None,
+        user_data: dict[str, Any] | None = None,
+        transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
+        **kwargs: Unpack[EnqueueLinksKwargs],
+    ) -> Coroutine[None, None, None]: ...
+
+    @overload
+    def __call__(
+        self, *, requests: Sequence[str | Request] | None = None, **kwargs: Unpack[EnqueueLinksKwargs]
+    ) -> Coroutine[None, None, None]: ...
 
     def __call__(
         self,
         *,
-        selector: str = 'a',
+        selector: str | None = None,
         label: str | None = None,
         user_data: dict[str, Any] | None = None,
         transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,

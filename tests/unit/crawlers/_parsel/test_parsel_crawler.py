@@ -8,7 +8,7 @@ import pytest
 import respx
 from httpx import Response
 
-from crawlee import ConcurrencySettings, HttpHeaders, RequestTransformAction
+from crawlee import ConcurrencySettings, HttpHeaders, Request, RequestTransformAction
 from crawlee.crawlers import ParselCrawler
 
 if TYPE_CHECKING:
@@ -149,6 +149,26 @@ async def test_enqueue_links(server: respx.MockRouter) -> None:
         'https://test.io/qwer',
         'https://test.io/uiop',
     }
+
+
+async def test_enqueue_links_with_incompatible_kwargs_raises_error(server: respx.MockRouter) -> None:
+    """Call `enqueue_links` with arguments that can't be used together."""
+    requests = ['https://www.test.io/']
+    crawler = ParselCrawler(max_request_retries=1)
+    exceptions = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        try:
+            await context.enqueue_links(requests=[Request.from_url('https://test.io/asdf')], selector='a')  # type:ignore[call-overload]  # Testing runtime enforcement of the overloads.
+        except Exception as e:
+            exceptions.append(e)
+
+    await crawler.run(requests)
+
+    assert server['index_endpoint'].called
+    assert len(exceptions) == 1
+    assert type(exceptions[0]) is ValueError
 
 
 async def test_enqueue_links_selector(server: respx.MockRouter) -> None:
