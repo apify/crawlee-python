@@ -69,7 +69,7 @@ class Statistics(Generic[TStatisticsState]):
         self,
         *,
         persistence_enabled: bool = False,
-        persist_state_kvs_name: str = 'default',
+        persist_state_kvs_name: str | None = None,
         persist_state_key: str | None = None,
         key_value_store: KeyValueStore | None = None,
         log_message: str = 'Statistics',
@@ -123,7 +123,7 @@ class Statistics(Generic[TStatisticsState]):
     def with_default_state(
         *,
         persistence_enabled: bool = False,
-        persist_state_kvs_name: str = 'default',
+        persist_state_kvs_name: str | None = None,
         persist_state_key: str | None = None,
         key_value_store: KeyValueStore | None = None,
         log_message: str = 'Statistics',

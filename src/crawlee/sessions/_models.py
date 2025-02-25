@@ -35,7 +35,7 @@ class SessionPoolModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     persistence_enabled: Annotated[bool, Field(alias='persistenceEnabled')]
-    persist_state_kvs_name: Annotated[str, Field(alias='persistStateKvsName')]
+    persist_state_kvs_name: Annotated[str | None, Field(alias='persistStateKvsName')]
     persist_state_key: Annotated[str, Field(alias='persistStateKey')]
     max_pool_size: Annotated[int, Field(alias='maxPoolSize')]
     session_count: Annotated[int, Field(alias='sessionCount')]

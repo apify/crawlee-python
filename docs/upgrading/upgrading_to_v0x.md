@@ -17,6 +17,11 @@ This section summarizes the breaking changes between v0.5.x and v0.6.0.
 
 - Replaces the `dict` used for cookie storage in `Session.cookies` with a new `SessionCookies` class. `SessionCookies` uses `CookieJar`, which enables support for multiple domains.
 
+### PlaywrightCrawler and PlaywrightBrowserPlugin
+
+- `PlaywrightCrawler` now use a persistent browser context instead of the standard browser context.
+- Added `user_data_dir` parameter for `PlaywrightCrawler` and `PlaywrightBrowserPlugin` to specify the directory for the persistent context. If not provided, a temporary directory will be created automatically.
+
 ### Configuration
 
 The `Configuration` fields `chrome_executable_path`, `xvfb`, and `verbose_log` have been removed. The `chrome_executable_path` and `xvfb` fields were unused, while `verbose_log` can be replaced by setting `log_level` to `DEBUG`.
