@@ -28,7 +28,7 @@ class PatchedHeaderGenerator(bf_HeaderGenerator):
 
         Patched version due to PR of upstream repo not being merged: https://github.com/daijro/browserforge/pull/24
 
-        Parameters:
+        Args:
             locales: Locale(s).
 
         Returns:
@@ -53,11 +53,11 @@ class PatchedFingerprintGenerator(bf_FingerprintGenerator):
     ) -> None:
         """A default constructor.
 
-        Parameters:
-            screen (Screen, optional): Screen constraints for the generated fingerprint.
-            strict (bool, optional): Whether to raise an exception if the constraints are too strict. Default is False.
-            mock_webrtc (bool, optional): Whether to mock WebRTC when injecting the fingerprint. Default is False.
-            slim (bool, optional): Disables performance-heavy evasions when injecting the fingerprint. Default is False.
+        Args:
+            screen: Screen constraints for the generated fingerprint.
+            strict: Whether to raise an exception if the constraints are too strict. Default is False.
+            mock_webrtc: Whether to mock WebRTC when injecting the fingerprint. Default is False.
+            slim: Disables performance-heavy evasions when injecting the fingerprint. Default is False.
             **header_kwargs: Header generation options for HeaderGenerator
         """
         super().__init__(screen=screen, strict=strict, mock_webrtc=mock_webrtc, slim=slim)
