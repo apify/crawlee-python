@@ -79,7 +79,7 @@ class _CurlImpersonateResponse:
 
     @property
     def headers(self) -> HttpHeaders:
-        return HttpHeaders({key: value for key, value in self._response.headers if value})
+        return HttpHeaders({key: value for key, value in self._response.headers.items() if value})
 
     def read(self) -> bytes:
         return self._response.content

@@ -74,3 +74,28 @@ async def test_send_request_with_proxy_disabled(
 
     with pytest.raises(ProxyError):
         await http_client.send_request(url, proxy_info=disabled_proxy)
+
+
+async def test_crawl_allow_redirects_by_default(http_client: CurlImpersonateHttpClient, httpbin: URL) -> None:
+    final_url = str(httpbin / 'get')
+    redirect_url = str((httpbin / 'redirect-to').with_query(url=final_url))
+    request = Request.from_url(redirect_url)
+
+    crawling_result = await http_client.crawl(request)
+
+    assert crawling_result.http_response.status_code == 200
+    assert request.loaded_url == final_url
+
+
+async def test_crawl_allow_redirects_false(httpbin: URL) -> None:
+    http_client = CurlImpersonateHttpClient(allow_redirects=False)
+
+    final_url = str(httpbin / 'get')
+    redirect_url = str((httpbin / 'redirect-to').with_query(url=final_url))
+    request = Request.from_url(redirect_url)
+
+    crawling_result = await http_client.crawl(request)
+
+    assert crawling_result.http_response.status_code == 302
+    assert crawling_result.http_response.headers['Location'] == final_url
+    assert request.loaded_url == redirect_url
