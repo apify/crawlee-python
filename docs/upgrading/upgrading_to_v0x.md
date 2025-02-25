@@ -33,6 +33,10 @@ We decided to move away from [Hungarian notation](https://en.wikipedia.org/wiki/
 - `BaseBrowserController` -> `BrowserController`
 - `BaseBrowserPlugin` -> `BrowserPlugin`
 
+### EnqueueStrategy
+
+The `EnqueueStrategy` has been changed from an enum to a string literal type. All its values and their meaning remain unchanged.
+
 ## Upgrading to v0.5
 
 This section summarizes the breaking changes between v0.4.x and v0.5.0.
