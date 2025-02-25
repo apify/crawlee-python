@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from functools import partial
-from typing import TYPE_CHECKING, Any, Callable, Generic
+from typing import TYPE_CHECKING, Any, Callable, Generic, Union
 
 from pydantic import ValidationError
 from typing_extensions import NotRequired, TypedDict, TypeVar
@@ -26,7 +26,7 @@ TCrawlingContext = TypeVar('TCrawlingContext', bound=PlaywrightCrawlingContext)
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Awaitable, Mapping
+    from collections.abc import AsyncGenerator, Awaitable, Mapping, Sequence
     from pathlib import Path
 
     from playwright.async_api import Page
@@ -225,7 +225,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 cookies = await self._get_cookies(context.page)
                 context.session.cookies.update(cookies)
 
-            async def enqueue_links(
+            async def extract_links(
                 *,
                 selector: str = 'a',
                 label: str | None = None,
@@ -233,11 +233,10 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
                 | None = None,
                 **kwargs: Unpack[EnqueueLinksKwargs],
-            ) -> None:
-                """The `PlaywrightCrawler` implementation of the `EnqueueLinksFunction` function."""
+            ) -> list[str | Request]:
                 kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
 
-                requests = list[Request]()
+                requests = list[Union[str, Request]]()
                 base_user_data = user_data or {}
 
                 elements = await context.page.query_selector_all(selector)
@@ -273,7 +272,33 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
                         requests.append(request)
 
-                await context.add_requests(requests, **kwargs)
+                return requests
+
+            async def enqueue_links(
+                *,
+                selector: str = 'a',
+                label: str | None = None,
+                user_data: dict | None = None,
+                transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
+                | None = None,
+                requests: Sequence[str | Request] | None = None,
+                **kwargs: Unpack[EnqueueLinksKwargs],
+            ) -> None:
+                """The `PlaywrightCrawler` implementation of the `EnqueueLinksFunction` function."""
+                kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
+
+                # Add directly passed requests.
+                await context.add_requests(requests or list[Union[str, Request]](), **kwargs)
+                # Add requests from extracted links.
+                await context.add_requests(
+                    await extract_links(
+                        selector=selector,
+                        label=label,
+                        user_data=user_data,
+                        transform_request_function=transform_request_function,
+                    ),
+                    **kwargs,
+                )
 
             yield PlaywrightCrawlingContext(
                 request=context.request,

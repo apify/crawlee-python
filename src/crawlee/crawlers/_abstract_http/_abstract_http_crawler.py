@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC
-from typing import TYPE_CHECKING, Any, Callable, Generic
+from typing import TYPE_CHECKING, Any, Callable, Generic, Union
 
 from pydantic import ValidationError
 from typing_extensions import TypeVar
@@ -19,7 +19,7 @@ from crawlee.statistics import StatisticsState
 from ._http_crawling_context import HttpCrawlingContext, ParsedHttpCrawlingContext, TParseResult, TSelectResult
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Awaitable
+    from collections.abc import AsyncGenerator, Awaitable, Sequence
 
     from typing_extensions import Unpack
 
@@ -153,7 +153,7 @@ class AbstractHttpCrawler(
             Awaitable that is used for extracting links from parsed content and enqueuing them to the crawl.
         """
 
-        async def enqueue_links(
+        async def extract_links(
             *,
             selector: str = 'a',
             label: str | None = None,
@@ -161,10 +161,10 @@ class AbstractHttpCrawler(
             transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
             | None = None,
             **kwargs: Unpack[EnqueueLinksKwargs],
-        ) -> None:
+        ) -> list[str | Request]:
             kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
 
-            requests = list[Request]()
+            requests = list[Union[str, Request]]()
             base_user_data = user_data or {}
 
             for link in self._parser.find_links(parsed_content, selector=selector):
@@ -193,8 +193,32 @@ class AbstractHttpCrawler(
                     continue
 
                 requests.append(request)
+            return requests
 
-            await context.add_requests(requests, **kwargs)
+        async def enqueue_links(
+            *,
+            selector: str = 'a',
+            label: str | None = None,
+            user_data: dict[str, Any] | None = None,
+            transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
+            | None = None,
+            requests: Sequence[str | Request] | None = None,
+            **kwargs: Unpack[EnqueueLinksKwargs],
+        ) -> None:
+            kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
+
+            # Add directly passed requests.
+            await context.add_requests(requests or list[Union[str, Request]](), **kwargs)
+            # Add requests from extracted links.
+            await context.add_requests(
+                await extract_links(
+                    selector=selector,
+                    label=label,
+                    user_data=user_data,
+                    transform_request_function=transform_request_function,
+                ),
+                **kwargs,
+            )
 
         return enqueue_links
 

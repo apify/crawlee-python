@@ -344,6 +344,7 @@ class EnqueueLinksFunction(Protocol):
         label: str | None = None,
         user_data: dict[str, Any] | None = None,
         transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
+        requests: Sequence[str | Request] | None = None,
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> Coroutine[None, None, None]:
         """A call dunder method.
@@ -360,6 +361,7 @@ class EnqueueLinksFunction(Protocol):
                 - Modified `RequestOptions` to update the request configuration,
                 - `'skip'` to exclude the request from being enqueued,
                 - `'unchanged'` to use the original request options without modification.
+            requests: Requests to be added to the `RequestManager`.
             **kwargs: Additional keyword arguments.
         """
 
