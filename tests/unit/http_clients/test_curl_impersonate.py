@@ -99,3 +99,24 @@ async def test_crawl_allow_redirects_false(httpbin: URL) -> None:
     assert crawling_result.http_response.status_code == 302
     assert crawling_result.http_response.headers['Location'] == final_url
     assert request.loaded_url == redirect_url
+
+
+async def test_send_request_allow_redirects_by_default(http_client: CurlImpersonateHttpClient, httpbin: URL) -> None:
+    final_url = str(httpbin / 'get')
+    redirect_url = str((httpbin / 'redirect-to').with_query(url=final_url))
+
+    response = await http_client.send_request(redirect_url)
+
+    assert response.status_code == 200
+
+
+async def test_send_request_allow_redirects_false(httpbin: URL) -> None:
+    http_client = CurlImpersonateHttpClient(allow_redirects=False)
+
+    final_url = str(httpbin / 'get')
+    redirect_url = str((httpbin / 'redirect-to').with_query(url=final_url))
+
+    response = await http_client.send_request(redirect_url)
+
+    assert response.status_code == 302
+    assert response.headers['Location'] == final_url
