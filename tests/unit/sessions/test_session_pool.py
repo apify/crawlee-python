@@ -112,14 +112,15 @@ async def test_create_session_function() -> None:
         assert session.user_data == user_data
 
 
-async def test_session_pool_persist(event_manager: EventManager, kvs: KeyValueStore) -> None:
+@pytest.mark.parametrize('kvs_name', [KVS_NAME, None])
+async def test_session_pool_persist(event_manager: EventManager, kvs_name: str | None) -> None:
     """Test persistence of session pool state to KVS and validate stored data integrity."""
     service_locator.set_event_manager(event_manager)
 
     async with SessionPool(
         max_pool_size=MAX_POOL_SIZE,
         persistence_enabled=True,
-        persist_state_kvs_name=KVS_NAME,
+        persist_state_kvs_name=kvs_name,
         persist_state_key=PERSIST_STATE_KEY,
     ) as sp:
         # Emit persist state event and wait for the persistence to complete
@@ -127,6 +128,7 @@ async def test_session_pool_persist(event_manager: EventManager, kvs: KeyValueSt
         await event_manager.wait_for_all_listeners_to_complete()
 
         # Get the persisted state from the key-value store
+        kvs = await KeyValueStore.open(name=kvs_name)
         previous_state = await kvs.get_value(key=PERSIST_STATE_KEY)
         assert isinstance(previous_state, dict)
         sp_model = SessionPoolModel(**previous_state)

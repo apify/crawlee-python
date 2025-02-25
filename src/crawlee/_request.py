@@ -38,8 +38,8 @@ class CrawleeRequestData(BaseModel):
     """Maximum number of retries for this request. Allows to override the global `max_request_retries` option of
     `BasicCrawler`."""
 
-    enqueue_strategy: Annotated[str | None, Field(alias='enqueueStrategy')] = None
-    """The strategy used when enqueueing the request."""
+    enqueue_strategy: Annotated[EnqueueStrategy | None, Field(alias='enqueueStrategy')] = None
+    """The strategy that was used for enqueuing the request."""
 
     state: RequestState | None = None
     """Describes the request's current lifecycle state."""
@@ -355,12 +355,8 @@ class Request(BaseModel):
 
     @property
     def enqueue_strategy(self) -> EnqueueStrategy:
-        """The strategy used when enqueueing the request."""
-        return (
-            EnqueueStrategy(self.crawlee_data.enqueue_strategy)
-            if self.crawlee_data.enqueue_strategy
-            else EnqueueStrategy.ALL
-        )
+        """The strategy that was used for enqueuing the request."""
+        return self.crawlee_data.enqueue_strategy or 'all'
 
     @enqueue_strategy.setter
     def enqueue_strategy(self, new_enqueue_strategy: EnqueueStrategy) -> None:

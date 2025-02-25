@@ -1,6 +1,5 @@
 import asyncio
 
-from crawlee import EnqueueStrategy
 from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 
 
@@ -17,7 +16,7 @@ async def main() -> None:
 
         # Enqueue all links found on the page. Any URLs found will be matched by
         # this strategy, even if they go off the site you are currently crawling.
-        await context.enqueue_links(strategy=EnqueueStrategy.ALL)
+        await context.enqueue_links(strategy='all')
 
     # Run the crawler with the initial list of requests.
     await crawler.run(['https://crawlee.dev'])

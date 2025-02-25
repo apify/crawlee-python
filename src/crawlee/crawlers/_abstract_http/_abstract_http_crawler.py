@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any, Callable, Generic
 from pydantic import ValidationError
 from typing_extensions import TypeVar
 
-from crawlee import EnqueueStrategy, RequestTransformAction
 from crawlee._request import Request, RequestOptions
 from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
@@ -23,6 +22,7 @@ if TYPE_CHECKING:
 
     from typing_extensions import Unpack
 
+    from crawlee import RequestTransformAction
     from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, EnqueueLinksKwargs
 
     from ._abstract_http_parser import AbstractHttpParser
@@ -74,7 +74,7 @@ class AbstractHttpCrawler(
                 'AbstractHttpCrawler._create_static_content_crawler_pipeline() method to initialize it.'
             )
 
-        kwargs.setdefault('_logger', logging.getLogger(__name__))
+        kwargs.setdefault('_logger', logging.getLogger(self.__class__.__name__))
         super().__init__(**kwargs)
 
     @classmethod
@@ -162,7 +162,7 @@ class AbstractHttpCrawler(
             | None = None,
             **kwargs: Unpack[EnqueueLinksKwargs],
         ) -> None:
-            kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
+            kwargs.setdefault('strategy', 'same-hostname')
 
             requests = list[Request]()
             base_user_data = user_data or {}

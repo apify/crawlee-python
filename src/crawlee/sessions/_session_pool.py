@@ -41,7 +41,7 @@ class SessionPool:
         create_session_function: CreateSessionFunctionType | None = None,
         event_manager: EventManager | None = None,
         persistence_enabled: bool = False,
-        persist_state_kvs_name: str = 'default',
+        persist_state_kvs_name: str | None = None,
         persist_state_key: str = 'CRAWLEE_SESSION_POOL_STATE',
     ) -> None:
         """A default constructor.

@@ -13,6 +13,15 @@ This section summarizes the breaking changes between v0.5.x and v0.6.0.
 
 - Removed `HttpCrawlerOptions` - which contained options from `BasicCrawlerOptions` and unique options `additional_http_error_status_codes` and `ignore_http_error_status_codes`. Both of the unique options were added to `BasicCrawlerOptions` instead.
 
+### SessionCookies
+
+- Replaces the `dict` used for cookie storage in `Session.cookies` with a new `SessionCookies` class. `SessionCookies` uses `CookieJar`, which enables support for multiple domains.
+
+### PlaywrightCrawler and PlaywrightBrowserPlugin
+
+- `PlaywrightCrawler` now use a persistent browser context instead of the standard browser context.
+- Added `user_data_dir` parameter for `PlaywrightCrawler` and `PlaywrightBrowserPlugin` to specify the directory for the persistent context. If not provided, a temporary directory will be created automatically.
+
 ### Configuration
 
 The `Configuration` fields `chrome_executable_path`, `xvfb`, and `verbose_log` have been removed. The `chrome_executable_path` and `xvfb` fields were unused, while `verbose_log` can be replaced by setting `log_level` to `DEBUG`.
@@ -23,6 +32,10 @@ We decided to move away from [Hungarian notation](https://en.wikipedia.org/wiki/
 - `BaseStorageClient` -> `StorageClient`
 - `BaseBrowserController` -> `BrowserController`
 - `BaseBrowserPlugin` -> `BrowserPlugin`
+
+### EnqueueStrategy
+
+The `EnqueueStrategy` has been changed from an enum to a string literal type. All its values and their meaning remain unchanged.
 
 ## Upgrading to v0.5
 
