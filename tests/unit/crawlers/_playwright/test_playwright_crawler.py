@@ -30,6 +30,8 @@ from crawlee.proxy_configuration import ProxyConfiguration
 from crawlee.sessions import SessionPool
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from yarl import URL
 
     from crawlee._request import RequestOptions
@@ -465,3 +467,48 @@ async def test_additional_http_error_status_codes() -> None:
     await crawler.run(['https://test.com'])
 
     mocked_handler.assert_not_called()
+
+
+async def test_launch_with_user_data_dir(tmp_path: Path) -> None:
+    """Check that the persist context is created in the specified folder in `user_data_dir`."""
+    check_path = tmp_path / 'Default'
+    crawler = PlaywrightCrawler(
+        headless=True, user_data_dir=tmp_path, request_handler=mock.AsyncMock(return_value=None)
+    )
+
+    @crawler.pre_navigation_hook
+    async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
+        await context.page.route('**/*', lambda route: route.fulfill(status=200))
+
+    assert not check_path.exists()
+
+    await crawler.run(['https://test.io'])
+
+    assert check_path.exists()
+
+
+async def test_launch_with_user_data_dir_and_fingerprint(tmp_path: Path) -> None:
+    """Check that the persist context works with fingerprints."""
+    check_path = tmp_path / 'Default'
+    fingerprints = dict[str, str]()
+
+    crawler = PlaywrightCrawler(
+        headless=True,
+        user_data_dir=tmp_path,
+        request_handler=mock.AsyncMock(return_value=None),
+        fingerprint_generator=DefaultFingerprintGenerator(),
+    )
+
+    @crawler.pre_navigation_hook
+    async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
+        fingerprints['window.navigator.userAgent'] = await context.page.evaluate('()=>window.navigator.userAgent')
+        await context.page.route('**/*', lambda route: route.fulfill(status=200))
+
+    assert not check_path.exists()
+
+    await crawler.run(['https://test.io'])
+
+    assert check_path.exists()
+
+    assert fingerprints['window.navigator.userAgent']
+    assert 'headless' not in fingerprints['window.navigator.userAgent'].lower()
