@@ -56,7 +56,7 @@ class PlaywrightCookieParam(TypedDict, total=False):
 
 @docs_group('Data structures')
 class SessionCookies:
-    """Storage Cookies for Session with browser-compatible serialization and deserialization."""
+    """Storage cookies for session with browser-compatible serialization and deserialization."""
 
     def __init__(self, cookies: SessionCookies | CookieJar | dict[str, str] | list[CookieParam] | None = None) -> None:
         if isinstance(cookies, CookieJar):
