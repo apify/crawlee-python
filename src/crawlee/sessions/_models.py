@@ -26,9 +26,6 @@ class SessionModel(BaseModel):
     blocked_status_codes: Annotated[list[int], Field(alias='blockedStatusCodes')]
 
 
-SessionModel.model_rebuild()
-
-
 class SessionPoolModel(BaseModel):
     """Model for a SessionPool object."""
 
