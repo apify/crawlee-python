@@ -29,10 +29,10 @@ class PatchedHeaderGenerator(bf_HeaderGenerator):
         Patched version due to PR of upstream repo not being merged: https://github.com/daijro/browserforge/pull/24
 
         Parameters:
-            locales (ListOrString): Locale(s).
+            locales: Locale(s).
 
         Returns:
-            str: Accept-Language header string.
+            Accept-Language header string.
         """
         # First locale does not include quality factor, q=1 is considered as implicit.
         additional_locales = [f'{locale};q={0.9 - index * 0.1:.1f}' for index, locale in enumerate(locales[1:])]
@@ -51,7 +51,7 @@ class PatchedFingerprintGenerator(bf_FingerprintGenerator):
         slim: bool = False,
         **header_kwargs,  # noqa:ANN003 # Upstream repo types missing.
     ) -> None:
-        """Initializes the FingerprintGenerator with the given options.
+        """A default constructor.
 
         Parameters:
             screen (Screen, optional): Screen constraints for the generated fingerprint.
