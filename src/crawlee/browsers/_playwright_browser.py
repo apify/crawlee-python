@@ -6,15 +6,18 @@ import tempfile
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
+from playwright.async_api import Browser
+from typing_extensions import override
+
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from playwright.async_api import BrowserContext, BrowserType
+    from playwright.async_api import BrowserContext, BrowserType, CDPSession, Page
 
 logger = getLogger(__name__)
 
 
-class PlaywrightPersistentBrowser:
+class PlaywrightPersistentBrowser(Browser):
     """Wrapper for browser that uses persistent context under the hood."""
 
     def __init__(
@@ -34,6 +37,10 @@ class PlaywrightPersistentBrowser:
     @property
     def browser_type(self) -> BrowserType:
         return self._browser_type
+
+    @property
+    def contexts(self) -> list[BrowserContext]:
+        return [self._context] if self._context else []
 
     def is_connected(self) -> bool:
         return self._is_connected
@@ -60,13 +67,32 @@ class PlaywrightPersistentBrowser:
 
         return self._context
 
-    async def close(self) -> None:
+    async def _delete_temp_dir(self, _: BrowserContext) -> None:
+        if self._temp_dir:
+            await asyncio.to_thread(shutil.rmtree, self._temp_dir)
+
+    @override
+    async def close(self, **kwargs: Any) -> None:
         """Close browser by closing its context."""
         if self._context:
             await self._context.close()
             self._context = None
         self._is_connected = False
 
-    async def _delete_temp_dir(self, _: BrowserContext) -> None:
-        if self._temp_dir:
-            await asyncio.to_thread(shutil.rmtree, self._temp_dir)
+    @property
+    @override
+    def version(self) -> str:
+        raise NotImplementedError('Persistent browser does not support version')
+
+    async def new_page(self, **kwargs: Any) -> Page:
+        raise NotImplementedError('Persistent browser does not support new page')
+
+    @override
+    async def new_browser_cdp_session(self) -> CDPSession:
+        raise NotImplementedError('Persistent browser does not support new browser CDP session')
+
+    async def start_tracing(self, **kwargs: Any) -> None:
+        raise NotImplementedError('Persistent browser does not support tracing')
+
+    async def stop_tracing(self, **kwargs: Any) -> bytes:
+        raise NotImplementedError('Persistent browser does not support tracing')

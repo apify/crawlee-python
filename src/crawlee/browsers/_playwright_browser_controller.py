@@ -209,7 +209,7 @@ class PlaywrightBrowserController(BrowserController):
 
         if self._fingerprint_generator:
             return await AsyncNewContext(
-                browser=cast(Browser, self._browser),
+                browser=self._browser,
                 fingerprint=self._fingerprint_generator.generate(),
                 **browser_new_context_options,
             )
