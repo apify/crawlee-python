@@ -1160,8 +1160,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         await wait_for(
             lambda: self._context_pipeline(context, self.router),
             timeout=self._request_handler_timeout,
-            timeout_message='Request handler timed out after '
-            f'{self._request_handler_timeout.total_seconds()} seconds',
+            timeout_message=f'Request handler timed out after {self._request_handler_timeout.total_seconds()} seconds',
             logger=self._logger,
         )
 

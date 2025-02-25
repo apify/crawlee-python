@@ -150,7 +150,7 @@ async def test_none_proxy_retrying_request_makes_tier_go_up() -> None:
     # Proxy should go up one tier for same request that was already sent before.
     info = await config.new_proxy_info(None, request_1, None)
     assert info is not None, (
-        'config.new_proxy_info is expected to generate non-none proxy info from non-none ' 'tiered_proxy_urls.'
+        'config.new_proxy_info is expected to generate non-none proxy info from non-none tiered_proxy_urls.'
     )
     assert info.url == tiered_proxy_urls[1][0]
 
@@ -169,7 +169,7 @@ async def test_none_proxy_rotates_proxies_uniformly_with_no_request() -> None:
     # Proxy should be rotated on the same proxy tier for a new request.
     info = await config.new_proxy_info(None, None, None)
     assert info is not None, (
-        'config.new_proxy_info is expected to generate non-none proxy info from non-none ' 'tiered_proxy_urls.'
+        'config.new_proxy_info is expected to generate non-none proxy info from non-none tiered_proxy_urls.'
     )
     assert info.url == tiered_proxy_urls[0][1]
 
