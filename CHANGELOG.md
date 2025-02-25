@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - Implement `_snapshot_client` for `Snapshotter` ([#957](https://github.com/apify/crawlee-python/pull/957)) ([ba4d384](https://github.com/apify/crawlee-python/commit/ba4d384228d030c20c580ed01fae0e78af3a9543)) by [@Mantisus](https://github.com/Mantisus), closes [#60](https://github.com/apify/crawlee-python/issues/60)
 - Add adaptive context helpers ([#964](https://github.com/apify/crawlee-python/pull/964)) ([e248f17](https://github.com/apify/crawlee-python/commit/e248f17fad7b6d1fc5e23a0a1e961db66068a411)) by [@Pijukatel](https://github.com/Pijukatel), closes [#249](https://github.com/apify/crawlee-python/issues/249)
 - [**breaking**] Enable additional status codes arguments to PlaywrightCrawler ([#959](https://github.com/apify/crawlee-python/pull/959)) ([87cf446](https://github.com/apify/crawlee-python/commit/87cf446a7cbaa900e28abd93d4c8a2e0d1747059)) by [@Pijukatel](https://github.com/Pijukatel), closes [#953](https://github.com/apify/crawlee-python/issues/953)
+- Replace `HeaderGenerator` implementation by `browserforge` implementation ([#960](https://github.com/apify/crawlee-python/pull/960)) ([c2f8c93](https://github.com/apify/crawlee-python/commit/c2f8c93a4ad57c4ede354545bf925bf3707899c9)) by [@Pijukatel](https://github.com/Pijukatel), closes [#937](https://github.com/apify/crawlee-python/issues/937)
 
 ### 🐛 Bug Fixes
 
