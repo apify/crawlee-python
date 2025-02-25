@@ -92,7 +92,7 @@ Skipping of duplicate URLs is critical, because visiting the same page multiple 
 
 ## Advanced filtering arguments
 
-While the defaults for <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> can be often exactly what you need, it also gives you fine-grained control over which URLs should be enqueued. One way we already mentioned above. It is using the `EnqueueStrategy` type alias. You can use the `all` strategy if you want to follow every single link, regardless of its domain, or you can enqueue links that target the same domain name with the `same_domain` strategy.
+While the defaults for <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> can be often exactly what you need, it also gives you fine-grained control over which URLs should be enqueued. One way we already mentioned above. It is using the `EnqueueStrategy` type alias. You can use the `all` strategy if you want to follow every single link, regardless of its domain, or you can enqueue links that target the same domain name with the `same-domain` strategy.
 
 ```python
 # Wanders the internet.

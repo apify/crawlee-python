@@ -14,7 +14,7 @@ async def main() -> None:
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url} ...')
 
-        # Setting the strategy to same_hostname will enqueue all links found that are on
+        # Setting the strategy to same hostname will enqueue all links found that are on
         # the same hostname (including subdomains) as request.loaded_url or request.url.
         await context.enqueue_links(strategy='same-hostname')
 

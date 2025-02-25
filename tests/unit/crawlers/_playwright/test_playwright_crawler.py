@@ -137,7 +137,7 @@ async def test_redirect_handling() -> None:
     # Request with redirects to apify.com
     request = Request.from_url(url='https://test.com/redirect')
 
-    # Ensure that the request uses the same_origin strategy - apify.com will be considered out of scope
+    # Ensure that the request uses the same origin strategy - apify.com will be considered out of scope
     request.crawlee_data.enqueue_strategy = 'same-origin'
 
     # No URLs should be visited in the run

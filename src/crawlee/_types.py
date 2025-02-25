@@ -159,12 +159,12 @@ class EnqueueLinksKwargs(TypedDict):
     Options:
         all: Enqueue every link encountered, regardless of the target domain. Use this option to ensure that all
             links, including those leading to external websites, are followed.
-        same_domain: Enqueue links that share the same domain name as the current page, including any subdomains.
+        same-domain: Enqueue links that share the same domain name as the current page, including any subdomains.
             This strategy is ideal for crawling within the same top-level domain while still allowing for subdomain
             exploration.
-        same_hostname: Enqueue links only if they match the exact hostname of the current page. This is the default
+        same-hostname: Enqueue links only if they match the exact hostname of the current page. This is the default
             behavior and restricts the crawl to the current hostname, excluding subdomains.
-        same_origin: Enqueue links that share the same origin as the current page. The origin is defined by the
+        same-origin: Enqueue links that share the same origin as the current page. The origin is defined by the
             combination of protocol, domain, and port, ensuring a strict scope for the crawl.
     """
 
