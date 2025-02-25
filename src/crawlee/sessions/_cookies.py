@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 @docs_group('Data structures')
 class CookieParam(TypedDict, total=False):
-    """Dictionary representation of cookies for SessionCookies.set() method."""
+    """Dictionary representation of cookies for `SessionCookies.set` method."""
 
     name: Required[str]
     """Cookie name."""
