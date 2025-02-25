@@ -23,6 +23,7 @@ All notable changes to this project will be documented in this file.
 
 - [**breaking**] Remove unused config properties ([#978](https://github.com/apify/crawlee-python/pull/978)) ([4b7fe29](https://github.com/apify/crawlee-python/commit/4b7fe2930540a5fbd753135e3ce29dc80f80c543)) by [@vdusek](https://github.com/vdusek)
 - [**breaking**] Remove Base prefix from abstract class names ([#980](https://github.com/apify/crawlee-python/pull/980)) ([8ccb5d4](https://github.com/apify/crawlee-python/commit/8ccb5d41a1dae9b02088b433266ac89bd089561a)) by [@vdusek](https://github.com/vdusek)
+- [**breaking**] Сhange default `incognito context` to `persistent context` for `Playwright` ([#985](https://github.com/apify/crawlee-python/pull/985)) ([f01520d](https://github.com/apify/crawlee-python/commit/f01520d22b31af9f0f13ca162cc47e6aa9744c6d)) by [@Mantisus](https://github.com/Mantisus), closes [#721](https://github.com/apify/crawlee-python/issues/721), [#963](https://github.com/apify/crawlee-python/issues/963)
 
 
 <!-- git-cliff-unreleased-end -->
