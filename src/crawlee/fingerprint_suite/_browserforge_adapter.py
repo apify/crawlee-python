@@ -55,10 +55,10 @@ class PatchedFingerprintGenerator(bf_FingerprintGenerator):
 
         Args:
             screen: Screen constraints for the generated fingerprint.
-            strict: Whether to raise an exception if the constraints are too strict. Default is False.
-            mock_webrtc: Whether to mock WebRTC when injecting the fingerprint. Default is False.
-            slim: Disables performance-heavy evasions when injecting the fingerprint. Default is False.
-            **header_kwargs: Header generation options for HeaderGenerator
+            strict: Whether to raise an exception if the constraints are too strict.
+            mock_webrtc: Whether to mock WebRTC when injecting the fingerprint.
+            slim: Disables performance-heavy evasions when injecting the fingerprint.
+            **header_kwargs: Header generation options for `HeaderGenerator`.
         """
         super().__init__(screen=screen, strict=strict, mock_webrtc=mock_webrtc, slim=slim)
         # Replace `self.header_generator` To make sure that we consistently use `PatchedHeaderGenerator`
