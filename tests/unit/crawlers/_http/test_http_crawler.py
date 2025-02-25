@@ -626,3 +626,7 @@ async def test_store_multidomain_cookies(server: respx.MockRouter) -> None:
             assert 'test.io' in session_cookies_dict
             assert '.test.io' in session_cookies_dict
             assert 'notest.io' in session_cookies_dict
+
+
+def test_default_logger() -> None:
+    assert HttpCrawler().log.name == 'HttpCrawler'

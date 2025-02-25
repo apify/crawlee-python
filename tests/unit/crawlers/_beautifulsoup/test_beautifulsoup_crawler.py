@@ -206,3 +206,7 @@ async def test_handle_blocked_request(server: respx.MockRouter) -> None:
     stats = await crawler.run(['https://test.io/fdyr'])
     assert server['incapsula_endpoint'].called
     assert stats.requests_failed == 1
+
+
+def test_default_logger() -> None:
+    assert BeautifulSoupCrawler().log.name == 'BeautifulSoupCrawler'
