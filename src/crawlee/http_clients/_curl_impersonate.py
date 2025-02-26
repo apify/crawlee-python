@@ -19,7 +19,6 @@ from crawlee.errors import ProxyError
 from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
     from http.cookiejar import Cookie
 
     from curl_cffi import Curl
@@ -111,22 +110,16 @@ class CurlImpersonateHttpClient(HttpClient):
         self,
         *,
         persist_cookies_per_session: bool = True,
-        additional_http_error_status_codes: Iterable[int] = (),
-        ignore_http_error_status_codes: Iterable[int] = (),
         **async_session_kwargs: Any,
     ) -> None:
         """A default constructor.
 
         Args:
             persist_cookies_per_session: Whether to persist cookies per HTTP session.
-            additional_http_error_status_codes: Additional HTTP status codes to treat as errors.
-            ignore_http_error_status_codes: HTTP status codes to ignore as errors.
             async_session_kwargs: Additional keyword arguments for `curl_cffi.requests.AsyncSession`.
         """
         super().__init__(
             persist_cookies_per_session=persist_cookies_per_session,
-            additional_http_error_status_codes=additional_http_error_status_codes,
-            ignore_http_error_status_codes=ignore_http_error_status_codes,
         )
         self._async_session_kwargs = async_session_kwargs
 
@@ -158,12 +151,6 @@ class CurlImpersonateHttpClient(HttpClient):
 
         if statistics:
             statistics.register_status_code(response.status_code)
-
-        self._raise_for_error_status_code(
-            response.status_code,
-            self._additional_http_error_status_codes,
-            self._ignore_http_error_status_codes,
-        )
 
         if self._persist_cookies_per_session and session and response.curl:
             response_cookies = self._get_cookies(response.curl)
@@ -204,12 +191,6 @@ class CurlImpersonateHttpClient(HttpClient):
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
             raise
-
-        self._raise_for_error_status_code(
-            response.status_code,
-            self._additional_http_error_status_codes,
-            self._ignore_http_error_status_codes,
-        )
 
         if self._persist_cookies_per_session and session and response.curl:
             response_cookies = self._get_cookies(response.curl)
