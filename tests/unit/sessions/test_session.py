@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from crawlee.sessions._cookies import SessionCookies
 from crawlee.sessions._session import Session
 
 
@@ -28,7 +29,7 @@ def test_session_init(session: Session) -> None:
     """Verify that the session initializes correctly with the expected properties."""
     assert session.id == 'test_session'
     assert session.user_data == {'user_key': 'user_value'}
-    assert session.cookies == {'cookie_key': 'cookie_value'}
+    assert session.cookies == SessionCookies({'cookie_key': 'cookie_value'})
     assert session.expires_at >= datetime.now(timezone.utc)
     assert not session.is_blocked
     assert not session.is_expired
