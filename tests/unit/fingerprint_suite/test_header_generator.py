@@ -14,11 +14,12 @@ if TYPE_CHECKING:
     from crawlee.fingerprint_suite._types import SupportedBrowserType
 
 
-def test_get_common_headers() -> None:
+def test_get_common_headers(header_network: dict) -> None:
     header_generator = HeaderGenerator()
     headers = header_generator.get_common_headers()
 
     assert 'Accept' in headers
+    assert headers['Accept'] in get_available_header_values(header_network, {'Accept', 'accept'})
     assert 'Accept-Language' in headers
 
 
