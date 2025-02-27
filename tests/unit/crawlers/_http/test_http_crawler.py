@@ -216,8 +216,9 @@ async def test_handles_client_errors(
     ],
 )
 async def test_handles_session_block_errors(
+    *,
     ignore_http_error_status_codes: list[int],
-    use_session_pool: bool,  # noqa: FBT001
+    use_session_pool: bool,
     expected_session_rotate: int,
     expected_number_error: int,
     mock_request_handler: AsyncMock,
