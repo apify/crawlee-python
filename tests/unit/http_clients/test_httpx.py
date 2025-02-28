@@ -97,7 +97,7 @@ async def test_common_headers_and_user_agent(httpbin: URL, header_network: dict)
     response_headers = response_dict.get('headers', {})
 
     assert 'Accept' in response_headers
-    assert response_headers['Accept'] in get_available_header_values(header_network, 'Accept')
+    assert response_headers['Accept'] in get_available_header_values(header_network, {'Accept', 'accept'})
 
     assert 'Accept-Language' in response_headers
     assert response_headers['Accept-Language'] == COMMON_ACCEPT_LANGUAGE
