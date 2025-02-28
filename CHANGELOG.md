@@ -22,6 +22,7 @@ All notable changes to this project will be documented in this file.
 - Fix logger name for http based loggers ([#1023](https://github.com/apify/crawlee-python/pull/1023)) ([bfb3944](https://github.com/apify/crawlee-python/commit/bfb394446351c8f3b9879a9905607f7c929f2542)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1021](https://github.com/apify/crawlee-python/issues/1021)
 - Remove allow_redirects override in CurlImpersonateHttpClient ([#1017](https://github.com/apify/crawlee-python/pull/1017)) ([01d855a](https://github.com/apify/crawlee-python/commit/01d855a43389a6b4b16ec74767624fa7eb13151f)) by [@2tunnels](https://github.com/2tunnels), closes [#1016](https://github.com/apify/crawlee-python/issues/1016)
 - Remove follow_redirects override in HttpxHttpClient ([#1015](https://github.com/apify/crawlee-python/pull/1015)) ([88afda3](https://github.com/apify/crawlee-python/commit/88afda33e77be84bc91ad1239740b8e661bef2a2)) by [@2tunnels](https://github.com/2tunnels), closes [#1013](https://github.com/apify/crawlee-python/issues/1013)
+- Fix flaky test_common_headers_and_user_agent ([#1030](https://github.com/apify/crawlee-python/pull/1030)) ([58aa70e](https://github.com/apify/crawlee-python/commit/58aa70e9600d313b823a1376ab9b36fb416c1c4a)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1027](https://github.com/apify/crawlee-python/issues/1027)
 
 ### Refactor
 
