@@ -82,6 +82,7 @@ async def server() -> AsyncGenerator[respx.MockRouter, None]:
             </html>""",
         )
 
+        # Endpoint with Session Blocked status code
         mock.get('/403', name='403_endpoint').return_value = Response(
             403,
             text="""<html>
@@ -91,6 +92,17 @@ async def server() -> AsyncGenerator[respx.MockRouter, None]:
             </html>""",
         )
 
+        # Endpoint with Client Error status code
+        mock.get('/402', name='402_endpoint').return_value = Response(
+            402,
+            text="""<html>
+                <head>
+                    <title>Not found</title>
+                </head>
+            </html>""",
+        )
+
+        # Endpoint with Server Error status code
         mock.get('/500', name='500_endpoint').return_value = Response(
             500,
             text="""<html>
@@ -155,11 +167,11 @@ async def test_handles_redirects(
         # error without retry for all 4xx statuses
         pytest.param([], [], 1, id='default_behavior'),
         # make retry for codes in `additional_http_error_status_codes` list
-        pytest.param([403], [], 3, id='additional_status_codes'),
+        pytest.param([402], [], 3, id='additional_status_codes'),
         # take as successful status codes from the `ignore_http_error_status_codes` list
-        pytest.param([], [403], 0, id='ignore_error_status_codes'),
+        pytest.param([], [402], 0, id='ignore_error_status_codes'),
         # check precedence for `additional_http_error_status_codes`
-        pytest.param([403], [403], 3, id='additional_and_ignore'),
+        pytest.param([402], [402], 3, id='additional_and_ignore'),
     ],
 )
 async def test_handles_client_errors(
@@ -176,10 +188,55 @@ async def test_handles_client_errors(
         max_request_retries=3,
     )
 
+    await crawler.add_requests(['https://test.io/402'])
+    await crawler.run()
+
+    assert crawler.statistics.error_tracker.total == expected_number_error
+
+    # Request handler should not be called for error status codes.
+    if expected_number_error:
+        mock_request_handler.assert_not_called()
+    else:
+        mock_request_handler.assert_called()
+
+    assert server['402_endpoint'].called
+
+
+@pytest.mark.parametrize(
+    ('ignore_http_error_status_codes', 'use_session_pool', 'expected_session_rotate', 'expected_number_error'),
+    [
+        # change session and retry for no block 4xx statuses
+        pytest.param([], True, 4, 1, id='default_behavior'),
+        # error without retry for all 4xx statuses
+        pytest.param([], False, 0, 1, id='default_behavior_without_session_pool'),
+        # take as successful status codes from the `ignore_http_error_status_codes` list with Sessoion Pool
+        pytest.param([403], True, 0, 0, id='ignore_error_status_codes'),
+        # take as successful status codes from the `ignore_http_error_status_codes` list without Sessoion Pool
+        pytest.param([403], False, 0, 0, id='ignore_error_status_codes_without_session_pool'),
+    ],
+)
+async def test_handles_session_block_errors(
+    *,
+    ignore_http_error_status_codes: list[int],
+    use_session_pool: bool,
+    expected_session_rotate: int,
+    expected_number_error: int,
+    mock_request_handler: AsyncMock,
+    server: respx.MockRouter,
+) -> None:
+    crawler = HttpCrawler(
+        request_handler=mock_request_handler,
+        ignore_http_error_status_codes=ignore_http_error_status_codes,
+        max_request_retries=3,
+        max_session_rotations=5,
+        use_session_pool=use_session_pool,
+    )
+
     await crawler.add_requests(['https://test.io/403'])
     await crawler.run()
 
     assert crawler.statistics.error_tracker.total == expected_number_error
+    assert crawler.statistics.error_tracker_retry.total == expected_session_rotate
 
     # Request handler should not be called for error status codes.
     if expected_number_error:
@@ -208,7 +265,7 @@ async def test_handles_server_error(
     ],
 )
 async def test_stores_cookies(http_client_class: type[HttpClient], httpbin: URL) -> None:
-    http_client = http_client_class(ignore_http_error_status_codes=[401])
+    http_client = http_client_class()
     visit = Mock()
     track_session_usage = Mock()
 
@@ -262,19 +319,21 @@ async def test_do_not_retry_on_client_errors(crawler: HttpCrawler, server: respx
 
 async def test_http_status_statistics(crawler: HttpCrawler, server: respx.MockRouter) -> None:
     await crawler.add_requests([f'https://test.io/500?id={i}' for i in range(10)])
+    await crawler.add_requests([f'https://test.io/402?id={i}' for i in range(10)])
     await crawler.add_requests([f'https://test.io/403?id={i}' for i in range(10)])
     await crawler.add_requests([f'https://test.io/html?id={i}' for i in range(10)])
 
     await crawler.run()
-
     assert crawler.statistics.state.requests_with_status_code == {
         '200': 10,
-        '403': 10,  # client errors are not retried by default
+        '403': 100,  # block errors change session and retry
+        '402': 10,  # client errors are not retried by default
         '500': 30,  # server errors are retried by default
     }
 
     assert len(server['html_endpoint'].calls) == 10
-    assert len(server['403_endpoint'].calls) == 10
+    assert len(server['403_endpoint'].calls) == 100
+    assert len(server['402_endpoint'].calls) == 10
     assert len(server['500_endpoint'].calls) == 30
 
 
