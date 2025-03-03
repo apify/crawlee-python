@@ -202,12 +202,10 @@ module.exports = {
                     activeBaseRegex: 'api/(?!.*/changelog)',
                 },
                 {
-                    type: 'custom-api',
-                    to: 'docs/changelog',
+                    type: 'doc',
                     label: 'Changelog',
-                    position: 'left',
+                    docId: 'changelog',
                     className: 'changelog',
-                    activeBaseRegex: 'changelog',
                 },
                 {
                     href: 'https://crawlee.dev/blog',
