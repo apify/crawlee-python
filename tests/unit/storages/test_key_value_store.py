@@ -9,7 +9,9 @@ from urllib.parse import urlparse
 
 import pytest
 
+from crawlee import service_locator
 from crawlee.events import EventManager
+from crawlee.storage_clients.models import StorageMetadata
 from crawlee.storages import KeyValueStore
 
 if TYPE_CHECKING:
@@ -212,3 +214,21 @@ async def test_get_auto_saved_value_auto_save_race_conditions(key_value_store: K
         await asyncio.gather(*tasks)
 
     assert (await key_value_store.get_auto_saved_value('state'))['counter'] == 2
+
+
+async def test_from_storage_object() -> None:
+    storage_client = service_locator.get_storage_client()
+
+    storage_object = StorageMetadata(
+        id='dummy-id',
+        name='dummy-name',
+        accessed_at=datetime.now(timezone.utc),
+        created_at=datetime.now(timezone.utc),
+        modified_at=datetime.now(timezone.utc),
+    )
+
+    key_value_store = KeyValueStore.from_storage_object(storage_client, storage_object)
+
+    assert key_value_store.id == storage_object.id
+    assert key_value_store.name == storage_object.name
+    assert key_value_store.storage_object == storage_object
