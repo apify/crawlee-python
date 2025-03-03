@@ -514,7 +514,7 @@ class RequestQueueClient(BaseRequestQueueClient):
             return None
 
         # Get the current timestamp in milliseconds
-        timestamp = Decimal(str(datetime.now(tz=timezone.utc).timestamp())) * Decimal('1000')
+        timestamp = Decimal(str(datetime.now(tz=timezone.utc).timestamp())) * Decimal(1000)
         timestamp = round(timestamp, 6)
 
         # Make sure that this timestamp was not used yet, so that we have unique order_nos
