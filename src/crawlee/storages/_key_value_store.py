@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, overload
 
 from typing_extensions import override
@@ -9,7 +10,7 @@ from typing_extensions import override
 from crawlee import service_locator
 from crawlee._utils.docs import docs_group
 from crawlee.events._types import Event, EventPersistStateData
-from crawlee.storage_clients.models import KeyValueStoreKeyInfo, KeyValueStoreMetadata, _StorageMetadata
+from crawlee.storage_clients.models import KeyValueStoreKeyInfo, KeyValueStoreMetadata, StorageMetadata
 
 from ._base import Storage
 
@@ -62,16 +63,29 @@ class KeyValueStore(Storage):
     _general_cache: ClassVar[dict[str, dict[str, dict[str, JsonSerializable]]]] = {}
     _persist_state_event_started = False
 
-    def __init__(
-        self, id: str, name: str | None, storage_client: StorageClient, storage_object: _StorageMetadata
-    ) -> None:
+    def __init__(self, id: str, name: str | None, storage_client: StorageClient) -> None:
         self._id = id
         self._name = name
-        self._storage_object = storage_object
+        datetime_now = datetime.now(timezone.utc)
+        self._storage_object: StorageMetadata = StorageMetadata(
+            id=id, name=name, accessed_at=datetime_now, created_at=datetime_now, modified_at=datetime_now
+        )
 
         # Get resource clients from storage client
         self._resource_client = storage_client.key_value_store(self._id)
         self._autosave_lock = asyncio.Lock()
+
+    @classmethod
+    def from_storage_object(cls, storage_client: StorageClient, storage_object: StorageMetadata) -> KeyValueStore:
+        """Create a new instance of KeyValueStore from a storage metadata object."""
+        key_value_store = KeyValueStore(
+            id=storage_object.id,
+            name=storage_object.name,
+            storage_client=storage_client,
+        )
+
+        key_value_store.set_storage_object(storage_object)
+        return key_value_store
 
     @property
     @override
@@ -85,8 +99,13 @@ class KeyValueStore(Storage):
 
     @property
     @override
-    def storage_object(self) -> _StorageMetadata:
+    def storage_object(self) -> StorageMetadata:
         return self._storage_object
+
+    @classmethod
+    @override
+    def set_storage_object(cls, storage_object: StorageMetadata) -> None:
+        cls._storage_object = storage_object
 
     async def get_info(self) -> KeyValueStoreMetadata | None:
         """Get an object containing general information about the key value store."""

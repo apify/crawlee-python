@@ -17,7 +17,7 @@ from crawlee._utils.requests import unique_key_to_request_id
 from crawlee._utils.wait import wait_for_all_tasks_for_finish
 from crawlee.events import Event
 from crawlee.request_loaders import RequestManager
-from crawlee.storage_clients.models import ProcessedRequest, RequestQueueMetadata, _StorageMetadata
+from crawlee.storage_clients.models import ProcessedRequest, RequestQueueMetadata, StorageMetadata
 
 from ._base import Storage
 
@@ -106,15 +106,17 @@ class RequestQueue(Storage, RequestManager):
     _STORAGE_CONSISTENCY_DELAY = timedelta(seconds=3)
     """Expected delay for storage to achieve consistency, guiding the timing of subsequent read operations."""
 
-    def __init__(
-        self, id: str, name: str | None, storage_client: StorageClient, storage_object: _StorageMetadata
-    ) -> None:
+    def __init__(self, id: str, name: str | None, storage_client: StorageClient) -> None:
         config = service_locator.get_configuration()
         event_manager = service_locator.get_event_manager()
 
         self._id = id
         self._name = name
-        self._storage_object = storage_object
+
+        datetime_now = datetime.now(timezone.utc)
+        self._storage_object: StorageMetadata = StorageMetadata(
+            id=id, name=name, accessed_at=datetime_now, created_at=datetime_now, modified_at=datetime_now
+        )
 
         # Get resource clients from storage client
         self._resource_client = storage_client.request_queue(self._id)
@@ -140,6 +142,18 @@ class RequestQueue(Storage, RequestManager):
         self._recently_handled: BoundedSet[str] = BoundedSet(max_length=self._RECENTLY_HANDLED_CACHE_SIZE)
         self._requests_cache: LRUCache[str, CachedRequest] = LRUCache(maxsize=self._MAX_CACHED_REQUESTS)
 
+    @classmethod
+    def from_storage_object(cls, storage_client: StorageClient, storage_object: StorageMetadata) -> RequestQueue:
+        """Create a new instance of RequestQueue from a storage metadata object."""
+        request_queue = RequestQueue(
+            id=storage_object.id,
+            name=storage_object.name,
+            storage_client=storage_client,
+        )
+
+        request_queue.set_storage_object(storage_object)
+        return request_queue
+
     @property
     @override
     def id(self) -> str:
@@ -152,8 +166,13 @@ class RequestQueue(Storage, RequestManager):
 
     @property
     @override
-    def storage_object(self) -> _StorageMetadata:
+    def storage_object(self) -> StorageMetadata:
         return self._storage_object
+
+    @classmethod
+    @override
+    def set_storage_object(cls, storage_object: StorageMetadata) -> None:
+        cls._storage_object = storage_object
 
     @override
     @classmethod
