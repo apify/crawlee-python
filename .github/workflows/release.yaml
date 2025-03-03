@@ -1,25 +1,115 @@
 name: Create a release
 
 on:
- pull_request:
-#    types: ['opened', 'reopened', 'synchronize', 'labeled', 'unlabeled', 'edited', 'ready_for_review'] # The first 3 are default.
+  # Trigger a stable version release via GitHub's UI, with the ability to specify the type of release.
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: Release type
+        required: true
+        type: choice
+        default: auto
+        options:
+          - auto
+          - custom
+          - patch
+          - minor
+          - major
+      custom_version:
+        description: The custom version to bump to (only for "custom" type)
+        required: false
+        type: string
+        default: ""
 
 concurrency:
   group: release
   cancel-in-progress: false
 
 jobs:
-  lint_check_release:
+  release_metadata:
+    name: Prepare release metadata
+    runs-on: ubuntu-latest
+    outputs:
+      version_number: ${{ steps.release_metadata.outputs.version_number }}
+      tag_name: ${{ steps.release_metadata.outputs.tag_name }}
+      changelog: ${{ steps.release_metadata.outputs.changelog }}
+      release_notes: ${{ steps.release_metadata.outputs.release_notes }}
+    steps:
+      - uses: apify/workflows/git-cliff-release@main
+        name: Prepare release metadata
+        id: release_metadata
+        with:
+          release_type: ${{ inputs.release_type }}
+          custom_version: ${{ inputs.custom_version }}
+          existing_changelog_path: CHANGELOG.md
+
+  lint_check:
     name: Lint check
     uses: apify/workflows/.github/workflows/python_lint_check.yaml@main
 
-  type_check_release:
+  type_check:
     name: Type check
     uses: apify/workflows/.github/workflows/python_type_check.yaml@main
 
-  unit_tests_release:
+  unit_tests:
     name: Unit tests
     uses: apify/workflows/.github/workflows/python_unit_tests.yaml@main
     secrets:
       httpbin_url: ${{ secrets.APIFY_HTTPBIN_TOKEN && format('https://httpbin.apify.actor?token={0}', secrets.APIFY_HTTPBIN_TOKEN) || 'https://httpbin.org'}}
 
+  update_changelog:
+    name: Update changelog
+    needs: [release_metadata, lint_check, type_check, unit_tests]
+    uses: apify/workflows/.github/workflows/python_bump_and_update_changelog.yaml@main
+    with:
+      version_number: ${{ needs.release_metadata.outputs.version_number }}
+      changelog: ${{ needs.release_metadata.outputs.changelog }}
+    secrets:
+      APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
+
+  build_and_deploy_docs:
+    needs: [update_changelog]
+    uses: ./.github/workflows/build_and_deploy_docs.yaml
+    with:
+      ref: ${{ needs.update_changelog.outputs.changelog_commitish }}
+    secrets: inherit
+
+  create_github_release:
+    name: Create github release
+    needs: [release_metadata, update_changelog]
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.release_metadata.outputs.tag_name }}
+          name: ${{ needs.release_metadata.outputs.version_number }}
+          target_commitish: ${{ needs.update_changelog.outputs.changelog_commitish }}
+          body: ${{ needs.release_metadata.outputs.release_notes }}
+
+  publish_to_pypi:
+    name: Publish to PyPI
+    needs: [release_metadata, update_changelog]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write # Required for OIDC authentication.
+    environment:
+      name: pypi
+      url: https://pypi.org/project/crawlee
+    steps:
+      - name: Prepare distribution
+        uses: apify/workflows/prepare-pypi-distribution@main
+        with:
+          package_name: crawlee
+          is_prerelease: ""
+          version_number: ${{ needs.release_metadata.outputs.version_number }}
+          ref: ${{ needs.update_changelog.outputs.changelog_commitish }}
+      # Publishes the package to PyPI using PyPA official GitHub action with OIDC authentication.
+      - name: Publish package to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+      # TODO: add job for publish package to Conda
+      # https://github.com/apify/crawlee-python/issues/104
