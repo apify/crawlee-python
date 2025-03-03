@@ -182,6 +182,7 @@ module.exports = {
                 src: 'img/crawlee-python-light.svg',
                 srcDark: 'img/crawlee-python-dark.svg',
             },
+            title: 'Crawlee Python',
             items: [
                 {
                     type: 'doc',

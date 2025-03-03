@@ -26,7 +26,7 @@ export default function LogoWrapper(props) {
     return (
         <div className={styles.navbarLogo}>
             <div className={styles.logoWithArrows}>
-                <Logo />
+                <Logo titleClassName="navbar__title" />
                 <ArrowsIcon />
             </div>
             <div className={styles.menuWrapper}>
