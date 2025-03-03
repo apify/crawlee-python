@@ -684,13 +684,14 @@ div[class^=announcementBar_] button {
         a {
             background: transparent !important;
             padding: 0;
+            box-shadow: none;
         }
         a:hover {
             background: var(--color-hover) !important;
         }
     }
 
-    .DocSearch-Hit[aria-selected="true"] a {
+    .DocSearch-Hit[aria-selected='true'] a {
         background: var(--color-hover) !important;
     }
 
@@ -721,6 +722,31 @@ div[class^=announcementBar_] button {
         }
     }
 
+    .DocSearch-Hit[aria-selected='true'] .DocSearch-Hit-title,
+    .DocSearch-Hit-title {
+        color: var(--color-text) !important;
+        font-size: 16px;
+        font-style: normal;
+        font-weight: 500;
+        line-height: 24px; /* 150% */
+    }
+
+    .DocSearch-Hit[aria-selected='true'] .DocSearch-Hit-path,
+    .DocSearch-Hit-path,
+    .DocSearch-Hit[aria-selected='true'] .DocSearch-Hit-action,
+    .DocSearch-Hit-action,
+    .DocSearch-Hit[aria-selected='true'] .DocSearch-Hit-icon,
+    .DocSearch-Hit-icon,
+    .DocSearch-Hit[aria-selected='true'] .DocSearch-Hit-Tree,
+    .DocSearch-Hit-Tree {
+        color: var(--color-text-muted) !important;
+    }
+
+    .DocSearch-Hit[aria-selected='true'] mark,
+    .DocSearch-Hit mark {
+        color: var(--color-text-subtle) !important;
+    }
+
     .DocSearch-Help {
         color: var(--color-text-subtle);
         font-size: 14px;
@@ -732,7 +758,7 @@ div[class^=announcementBar_] button {
         padding: 0;
         li {
             list-style-type: none;
-            margin-top: 8px;
+            margin-top: 4px;
         }
     }
 
@@ -772,7 +798,7 @@ div[class^=announcementBar_] button {
         }
     }
 
-    li[id*="recentSearches"] {
+    li[id*='recentSearches'] {
         .DocSearch-Hit-icon {
             display: none;
         }
