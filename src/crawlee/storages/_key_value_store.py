@@ -67,7 +67,7 @@ class KeyValueStore(Storage):
         self._id = id
         self._name = name
         datetime_now = datetime.now(timezone.utc)
-        self._storage_object: StorageMetadata = StorageMetadata(
+        self._storage_object = StorageMetadata(
             id=id, name=name, accessed_at=datetime_now, created_at=datetime_now, modified_at=datetime_now
         )
 
@@ -84,7 +84,7 @@ class KeyValueStore(Storage):
             storage_client=storage_client,
         )
 
-        key_value_store.set_storage_object(storage_object)
+        key_value_store.storage_object = storage_object
         return key_value_store
 
     @property
@@ -102,10 +102,10 @@ class KeyValueStore(Storage):
     def storage_object(self) -> StorageMetadata:
         return self._storage_object
 
-    @classmethod
+    @storage_object.setter
     @override
-    def set_storage_object(cls, storage_object: StorageMetadata) -> None:
-        cls._storage_object = storage_object
+    def storage_object(self, storage_object: StorageMetadata) -> None:
+        self._storage_object = storage_object
 
     async def get_info(self) -> KeyValueStoreMetadata | None:
         """Get an object containing general information about the key value store."""

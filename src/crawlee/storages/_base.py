@@ -27,9 +27,9 @@ class Storage(ABC):
     def storage_object(self) -> StorageMetadata:
         """Get the full storage object."""
 
-    @classmethod
+    @storage_object.setter
     @abstractmethod
-    def set_storage_object(cls, storage_object: StorageMetadata) -> None:
+    def storage_object(self, storage_object: StorageMetadata) -> None:
         """Set the full storage object."""
 
     @classmethod
