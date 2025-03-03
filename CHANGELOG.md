@@ -32,6 +32,7 @@ All notable changes to this project will be documented in this file.
 - [**breaking**] Change `Session` cookies from `dict` to `SessionCookies` with `CookieJar` ([#984](https://github.com/apify/crawlee-python/pull/984)) ([6523b3a](https://github.com/apify/crawlee-python/commit/6523b3ade0eed53b0363ddce250c557024339b5e)) by [@Mantisus](https://github.com/Mantisus), closes [#710](https://github.com/apify/crawlee-python/issues/710), [#933](https://github.com/apify/crawlee-python/issues/933)
 - [**breaking**] Replace enum with literal for `EnqueueStrategy` ([#1019](https://github.com/apify/crawlee-python/pull/1019)) ([d2481ef](https://github.com/apify/crawlee-python/commit/d2481ef71d3539979c5b1129387e72b4126fe366)) by [@vdusek](https://github.com/vdusek)
 - [**breaking**] Update status code handling ([#1028](https://github.com/apify/crawlee-python/pull/1028)) ([6b59471](https://github.com/apify/crawlee-python/commit/6b5947125e63abdfff481b0669398fc9a7293e55)) by [@Mantisus](https://github.com/Mantisus), closes [#830](https://github.com/apify/crawlee-python/issues/830), [#998](https://github.com/apify/crawlee-python/issues/998)
+- [**breaking**] Move `cli` dependencies to optional dependencies ([#1011](https://github.com/apify/crawlee-python/pull/1011)) ([4382959](https://github.com/apify/crawlee-python/commit/43829590c6b4efd1dc9b833373f82a842a0a1a8e)) by [@Mantisus](https://github.com/Mantisus), closes [#703](https://github.com/apify/crawlee-python/issues/703), [#1010](https://github.com/apify/crawlee-python/issues/1010)
 
 
 <!-- git-cliff-unreleased-end -->
