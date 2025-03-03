@@ -22,6 +22,7 @@ All notable changes to this project will be documented in this file.
 - Fix logger name for http based loggers ([#1023](https://github.com/apify/crawlee-python/pull/1023)) ([bfb3944](https://github.com/apify/crawlee-python/commit/bfb394446351c8f3b9879a9905607f7c929f2542)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1021](https://github.com/apify/crawlee-python/issues/1021)
 - Remove allow_redirects override in CurlImpersonateHttpClient ([#1017](https://github.com/apify/crawlee-python/pull/1017)) ([01d855a](https://github.com/apify/crawlee-python/commit/01d855a43389a6b4b16ec74767624fa7eb13151f)) by [@2tunnels](https://github.com/2tunnels), closes [#1016](https://github.com/apify/crawlee-python/issues/1016)
 - Remove follow_redirects override in HttpxHttpClient ([#1015](https://github.com/apify/crawlee-python/pull/1015)) ([88afda3](https://github.com/apify/crawlee-python/commit/88afda33e77be84bc91ad1239740b8e661bef2a2)) by [@2tunnels](https://github.com/2tunnels), closes [#1013](https://github.com/apify/crawlee-python/issues/1013)
+- Fix flaky test_common_headers_and_user_agent ([#1030](https://github.com/apify/crawlee-python/pull/1030)) ([58aa70e](https://github.com/apify/crawlee-python/commit/58aa70e9600d313b823a1376ab9b36fb416c1c4a)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1027](https://github.com/apify/crawlee-python/issues/1027)
 
 ### Refactor
 
@@ -30,6 +31,7 @@ All notable changes to this project will be documented in this file.
 - [**breaking**] Сhange default `incognito context` to `persistent context` for `Playwright` ([#985](https://github.com/apify/crawlee-python/pull/985)) ([f01520d](https://github.com/apify/crawlee-python/commit/f01520d22b31af9f0f13ca162cc47e6aa9744c6d)) by [@Mantisus](https://github.com/Mantisus), closes [#721](https://github.com/apify/crawlee-python/issues/721), [#963](https://github.com/apify/crawlee-python/issues/963)
 - [**breaking**] Change `Session` cookies from `dict` to `SessionCookies` with `CookieJar` ([#984](https://github.com/apify/crawlee-python/pull/984)) ([6523b3a](https://github.com/apify/crawlee-python/commit/6523b3ade0eed53b0363ddce250c557024339b5e)) by [@Mantisus](https://github.com/Mantisus), closes [#710](https://github.com/apify/crawlee-python/issues/710), [#933](https://github.com/apify/crawlee-python/issues/933)
 - [**breaking**] Replace enum with literal for `EnqueueStrategy` ([#1019](https://github.com/apify/crawlee-python/pull/1019)) ([d2481ef](https://github.com/apify/crawlee-python/commit/d2481ef71d3539979c5b1129387e72b4126fe366)) by [@vdusek](https://github.com/vdusek)
+- [**breaking**] Update status code handling ([#1028](https://github.com/apify/crawlee-python/pull/1028)) ([6b59471](https://github.com/apify/crawlee-python/commit/6b5947125e63abdfff481b0669398fc9a7293e55)) by [@Mantisus](https://github.com/Mantisus), closes [#830](https://github.com/apify/crawlee-python/issues/830), [#998](https://github.com/apify/crawlee-python/issues/998)
 
 
 <!-- git-cliff-unreleased-end -->

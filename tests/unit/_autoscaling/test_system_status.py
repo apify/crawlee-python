@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from crawlee._autoscaling import Snapshotter, SystemStatus
-from crawlee._autoscaling.types import (
+from crawlee._autoscaling._types import (
     ClientSnapshot,
     CpuSnapshot,
     EventLoopSnapshot,

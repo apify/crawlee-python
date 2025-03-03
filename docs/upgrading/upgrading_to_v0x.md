@@ -13,6 +13,11 @@ This section summarizes the breaking changes between v0.5.x and v0.6.0.
 
 - Removed `HttpCrawlerOptions` - which contained options from `BasicCrawlerOptions` and unique options `additional_http_error_status_codes` and `ignore_http_error_status_codes`. Both of the unique options were added to `BasicCrawlerOptions` instead.
 
+### HttpClient
+
+- The signature of the `HttpClient` class has been updated. The constructor parameters `additional_http_error_status_codes` and `ignore_http_error_status_codes` have been removed and are now only available in `BasicCrawlerOptions`.
+- The method `_raise_for_error_status_code` has been removed from `HttpClient`. Its logic has been moved to the `BasicCrawler` class.
+
 ### SessionCookies
 
 - Replaces the `dict` used for cookie storage in `Session.cookies` with a new `SessionCookies` class. `SessionCookies` uses `CookieJar`, which enables support for multiple domains.

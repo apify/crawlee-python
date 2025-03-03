@@ -15,7 +15,6 @@ from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
 from crawlee.sessions import Session
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
     from ssl import SSLContext
 
     from crawlee import Request
@@ -96,8 +95,6 @@ class HttpxHttpClient(HttpClient):
         self,
         *,
         persist_cookies_per_session: bool = True,
-        additional_http_error_status_codes: Iterable[int] = (),
-        ignore_http_error_status_codes: Iterable[int] = (),
         http1: bool = True,
         http2: bool = True,
         verify: str | bool | SSLContext = True,
@@ -108,8 +105,6 @@ class HttpxHttpClient(HttpClient):
 
         Args:
             persist_cookies_per_session: Whether to persist cookies per HTTP session.
-            additional_http_error_status_codes: Additional HTTP status codes to treat as errors.
-            ignore_http_error_status_codes: HTTP status codes to ignore as errors.
             http1: Whether to enable HTTP/1.1 support.
             http2: Whether to enable HTTP/2 support.
             verify: SSL certificates used to verify the identity of requested hosts.
@@ -118,8 +113,6 @@ class HttpxHttpClient(HttpClient):
         """
         super().__init__(
             persist_cookies_per_session=persist_cookies_per_session,
-            additional_http_error_status_codes=additional_http_error_status_codes,
-            ignore_http_error_status_codes=ignore_http_error_status_codes,
         )
         self._http1 = http1
         self._http2 = http2
@@ -172,12 +165,6 @@ class HttpxHttpClient(HttpClient):
         if statistics:
             statistics.register_status_code(response.status_code)
 
-        self._raise_for_error_status_code(
-            response.status_code,
-            self._additional_http_error_status_codes,
-            self._ignore_http_error_status_codes,
-        )
-
         request.loaded_url = str(response.url)
 
         return HttpCrawlingResult(
@@ -215,12 +202,6 @@ class HttpxHttpClient(HttpClient):
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
             raise
-
-        self._raise_for_error_status_code(
-            response.status_code,
-            self._additional_http_error_status_codes,
-            self._ignore_http_error_status_codes,
-        )
 
         return _HttpxResponse(response)
 

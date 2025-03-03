@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, TypeVar, cast
 from sortedcontainers import SortedList
 
 from crawlee import service_locator
-from crawlee._autoscaling.types import ClientSnapshot, CpuSnapshot, EventLoopSnapshot, MemorySnapshot, Snapshot
+from crawlee._autoscaling._types import ClientSnapshot, CpuSnapshot, EventLoopSnapshot, MemorySnapshot, Snapshot
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group

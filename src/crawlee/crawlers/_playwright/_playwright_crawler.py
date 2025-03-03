@@ -152,7 +152,11 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
         # Compose the context pipeline with the Playwright-specific context enhancer.
         kwargs['_context_pipeline'] = (
-            ContextPipeline().compose(self._open_page).compose(self._navigate).compose(self._handle_blocked_request)
+            ContextPipeline()
+            .compose(self._open_page)
+            .compose(self._navigate)
+            .compose(self._handle_status_code_response)
+            .compose(self._handle_blocked_request_by_content)
         )
         kwargs['_additional_context_managers'] = [self._browser_pool]
         kwargs.setdefault('_logger', logging.getLogger(__name__))
@@ -325,11 +329,33 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 block_requests=partial(block_requests, page=context.page),
             )
 
-    async def _handle_blocked_request(
+    async def _handle_status_code_response(
+        self, context: PlaywrightCrawlingContext
+    ) -> AsyncGenerator[PlaywrightCrawlingContext, None]:
+        """Validate the HTTP status code and raise appropriate exceptions if needed.
+
+        Args:
+            context: The current crawling context containing the response.
+
+        Raises:
+            SessionError: If the status code indicates the session is blocked.
+            HttpStatusCodeError: If the status code represents a server error or is explicitly configured as an error.
+            HttpClientStatusCodeError: If the status code represents a client error.
+
+        Yields:
+            The original crawling context if no errors are detected.
+        """
+        status_code = context.response.status
+        if self._retry_on_blocked:
+            self._raise_for_session_blocked_status_code(context.session, status_code)
+        self._raise_for_error_status_code(status_code)
+        yield context
+
+    async def _handle_blocked_request_by_content(
         self,
         context: PlaywrightCrawlingContext,
     ) -> AsyncGenerator[PlaywrightCrawlingContext, None]:
-        """Try to detect if the request is blocked based on the HTTP status code or the response content.
+        """Try to detect if the request is blocked based on the response content.
 
         Args:
             context: The current crawling context.
@@ -341,12 +367,6 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             The original crawling context if no errors are detected.
         """
         if self._retry_on_blocked:
-            status_code = context.response.status
-
-            # Check if the session is blocked based on the HTTP status code.
-            if self._is_session_blocked_status_code(context.session, status_code):
-                raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
-
             matched_selectors = [
                 selector for selector in RETRY_CSS_SELECTORS if (await context.page.query_selector(selector))
             ]
@@ -355,7 +375,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             if matched_selectors:
                 raise SessionError(
                     'Assuming the session is blocked - '
-                    f"HTTP response matched the following selectors: {'; '.join(matched_selectors)}"
+                    f'HTTP response matched the following selectors: {"; ".join(matched_selectors)}'
                 )
 
         yield context
