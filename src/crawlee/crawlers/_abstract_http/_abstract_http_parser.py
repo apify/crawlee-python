@@ -74,8 +74,8 @@ class AbstractHttpParser(Generic[TParseResult, TSelectResult], ABC):
 
             if matched_selectors:
                 reason = (
-                    f"Assuming the session is blocked - HTTP response matched the following selectors: "
-                    f"{'; '.join(matched_selectors)}"
+                    f'Assuming the session is blocked - HTTP response matched the following selectors: '
+                    f'{"; ".join(matched_selectors)}'
                 )
 
         return BlockedInfo(reason=reason)
