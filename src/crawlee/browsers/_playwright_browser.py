@@ -4,14 +4,13 @@ import asyncio
 import shutil
 import tempfile
 from logging import getLogger
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from playwright.async_api import Browser
 from typing_extensions import override
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from playwright.async_api import BrowserContext, BrowserType, CDPSession, Page
 
 logger = getLogger(__name__)
@@ -36,7 +35,7 @@ class PlaywrightPersistentBrowser(Browser):
         self._browser_type = browser_type
         self._browser_launch_options = browser_launch_options
         self._user_data_dir = user_data_dir
-        self._temp_dir: str | None = None
+        self._temp_dir: Path | None = None
 
         self._context: BrowserContext | None = None
         self._is_connected = True
@@ -63,7 +62,7 @@ class PlaywrightPersistentBrowser(Browser):
             user_data_dir = self._user_data_dir
         else:
             user_data_dir = tempfile.mkdtemp(prefix=self._TMP_DIR_PREFIX)
-            self._temp_dir = user_data_dir
+            self._temp_dir = Path(user_data_dir)
 
         self._context = await self._browser_type.launch_persistent_context(
             user_data_dir=user_data_dir, **launch_options
@@ -75,14 +74,15 @@ class PlaywrightPersistentBrowser(Browser):
         return self._context
 
     async def _delete_temp_dir(self, _: BrowserContext) -> None:
-        if self._temp_dir:
-            await asyncio.to_thread(shutil.rmtree, self._temp_dir)
+        if self._temp_dir and self._temp_dir.exists():
+            await asyncio.to_thread(shutil.rmtree, self._temp_dir, ignore_errors=True)
 
     @override
     async def close(self, **kwargs: Any) -> None:
         """Close browser by closing its context."""
         if self._context:
             await self._context.close()
+            await self._delete_temp_dir(self._context)
             self._context = None
         self._is_connected = False
 
