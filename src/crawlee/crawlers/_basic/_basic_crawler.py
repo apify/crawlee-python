@@ -31,9 +31,9 @@ from crawlee._types import (
     SendRequestFunction,
 )
 from crawlee._utils.docs import docs_group
-from crawlee._utils.http import is_status_code_client_error, is_status_code_server_error
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
+from crawlee._utils.web import is_status_code_client_error, is_status_code_server_error
 from crawlee.errors import (
     ContextPipelineInitializationError,
     ContextPipelineInterruptedError,
