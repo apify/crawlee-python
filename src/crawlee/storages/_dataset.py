@@ -4,6 +4,7 @@ import csv
 import io
 import json
 import logging
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Literal, TextIO, TypedDict, cast
 
 from typing_extensions import NotRequired, Required, Unpack, override
@@ -12,7 +13,7 @@ from crawlee import service_locator
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.docs import docs_group
 from crawlee._utils.file import json_dumps
-from crawlee.storage_clients.models import DatasetMetadata
+from crawlee.storage_clients.models import DatasetMetadata, StorageMetadata
 
 from ._base import Storage
 from ._key_value_store import KeyValueStore
@@ -197,10 +198,26 @@ class Dataset(Storage):
     def __init__(self, id: str, name: str | None, storage_client: StorageClient) -> None:
         self._id = id
         self._name = name
+        datetime_now = datetime.now(timezone.utc)
+        self._storage_object = StorageMetadata(
+            id=id, name=name, accessed_at=datetime_now, created_at=datetime_now, modified_at=datetime_now
+        )
 
         # Get resource clients from the storage client.
         self._resource_client = storage_client.dataset(self._id)
         self._resource_collection_client = storage_client.datasets()
+
+    @classmethod
+    def from_storage_object(cls, storage_client: StorageClient, storage_object: StorageMetadata) -> Dataset:
+        """Create a new instance of Dataset from a storage metadata object."""
+        dataset = Dataset(
+            id=storage_object.id,
+            name=storage_object.name,
+            storage_client=storage_client,
+        )
+
+        dataset.storage_object = storage_object
+        return dataset
 
     @property
     @override
@@ -211,6 +228,16 @@ class Dataset(Storage):
     @override
     def name(self) -> str | None:
         return self._name
+
+    @property
+    @override
+    def storage_object(self) -> StorageMetadata:
+        return self._storage_object
+
+    @storage_object.setter
+    @override
+    def storage_object(self, storage_object: StorageMetadata) -> None:
+        self._storage_object = storage_object
 
     @override
     @classmethod
