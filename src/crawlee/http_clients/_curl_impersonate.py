@@ -5,7 +5,8 @@ from typing import TYPE_CHECKING, Any, Optional
 from curl_cffi import CurlInfo
 from curl_cffi.const import CurlHttpVersion
 from curl_cffi.requests import AsyncSession
-from curl_cffi.requests.cookies import Cookies, CurlMorsel
+from curl_cffi.requests.cookies import Cookies as CurlCookies
+from curl_cffi.requests.cookies import CurlMorsel
 from curl_cffi.requests.exceptions import ProxyError as CurlProxyError
 from curl_cffi.requests.exceptions import RequestException as CurlRequestError
 from curl_cffi.requests.impersonate import DEFAULT_CHROME as CURL_DEFAULT_CHROME
@@ -18,7 +19,7 @@ from crawlee.errors import ProxyError
 from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from http.cookiejar import Cookie
 
     from curl_cffi import Curl
     from curl_cffi.requests import Request as CurlRequest
@@ -31,7 +32,7 @@ if TYPE_CHECKING:
     from crawlee.statistics import Statistics
 
 
-class _EmptyCookies(Cookies):
+class _EmptyCookies(CurlCookies):
     @override
     def get_cookies_for_curl(self, request: CurlRequest) -> list[CurlMorsel]:
         return []
@@ -39,6 +40,13 @@ class _EmptyCookies(Cookies):
     @override
     def update_cookies_from_curl(self, morsels: list[CurlMorsel]) -> None:
         return None
+
+
+class _AsyncSession(AsyncSession):
+    @override
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._cookies = _EmptyCookies()
 
 
 class _CurlImpersonateResponse:
@@ -72,7 +80,7 @@ class _CurlImpersonateResponse:
 
     @property
     def headers(self) -> HttpHeaders:
-        return HttpHeaders(dict(self._response.headers))
+        return HttpHeaders({key: value for key, value in self._response.headers.items() if value})
 
     def read(self) -> bytes:
         return self._response.content
@@ -102,22 +110,16 @@ class CurlImpersonateHttpClient(HttpClient):
         self,
         *,
         persist_cookies_per_session: bool = True,
-        additional_http_error_status_codes: Iterable[int] = (),
-        ignore_http_error_status_codes: Iterable[int] = (),
         **async_session_kwargs: Any,
     ) -> None:
         """A default constructor.
 
         Args:
             persist_cookies_per_session: Whether to persist cookies per HTTP session.
-            additional_http_error_status_codes: Additional HTTP status codes to treat as errors.
-            ignore_http_error_status_codes: HTTP status codes to ignore as errors.
             async_session_kwargs: Additional keyword arguments for `curl_cffi.requests.AsyncSession`.
         """
         super().__init__(
             persist_cookies_per_session=persist_cookies_per_session,
-            additional_http_error_status_codes=additional_http_error_status_codes,
-            ignore_http_error_status_codes=ignore_http_error_status_codes,
         )
         self._async_session_kwargs = async_session_kwargs
 
@@ -140,8 +142,7 @@ class CurlImpersonateHttpClient(HttpClient):
                 method=request.method.upper(),  # type: ignore[arg-type] # curl-cffi requires uppercase method
                 headers=request.headers,
                 data=request.payload,
-                cookies=session.cookies if session else None,
-                allow_redirects=True,
+                cookies=session.cookies.jar if session else None,
             )
         except CurlRequestError as exc:
             if self._is_proxy_error(exc):
@@ -151,15 +152,9 @@ class CurlImpersonateHttpClient(HttpClient):
         if statistics:
             statistics.register_status_code(response.status_code)
 
-        self._raise_for_error_status_code(
-            response.status_code,
-            self._additional_http_error_status_codes,
-            self._ignore_http_error_status_codes,
-        )
-
         if self._persist_cookies_per_session and session and response.curl:
             response_cookies = self._get_cookies(response.curl)
-            session.cookies.update(response_cookies)
+            session.cookies.store_cookies(response_cookies)
 
         request.loaded_url = response.url
 
@@ -190,23 +185,16 @@ class CurlImpersonateHttpClient(HttpClient):
                 method=method.upper(),  # type: ignore[arg-type] # curl-cffi requires uppercase method
                 headers=dict(headers) if headers else None,
                 data=payload,
-                cookies=session.cookies if session else None,
-                allow_redirects=True,
+                cookies=session.cookies.jar if session else None,
             )
         except CurlRequestError as exc:
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
             raise
 
-        self._raise_for_error_status_code(
-            response.status_code,
-            self._additional_http_error_status_codes,
-            self._ignore_http_error_status_codes,
-        )
-
         if self._persist_cookies_per_session and session and response.curl:
             response_cookies = self._get_cookies(response.curl)
-            session.cookies.update(response_cookies)
+            session.cookies.store_cookies(response_cookies)
 
         return _CurlImpersonateResponse(response)
 
@@ -230,8 +218,7 @@ class CurlImpersonateHttpClient(HttpClient):
             kwargs.update(self._async_session_kwargs)
 
             # Create and store the new session with the specified kwargs.
-            self._client_by_proxy_url[proxy_url] = AsyncSession(**kwargs)
-            self._client_by_proxy_url[proxy_url].cookies = _EmptyCookies()
+            self._client_by_proxy_url[proxy_url] = _AsyncSession(**kwargs)
 
         return self._client_by_proxy_url[proxy_url]
 
@@ -247,9 +234,10 @@ class CurlImpersonateHttpClient(HttpClient):
         return False
 
     @staticmethod
-    def _get_cookies(curl: Curl) -> dict[str, str]:
-        cookies = {}
+    def _get_cookies(curl: Curl) -> list[Cookie]:
+        cookies: list[Cookie] = []
         for curl_cookie in curl.getinfo(CurlInfo.COOKIELIST):  # type: ignore[union-attr]
             curl_morsel = CurlMorsel.from_curl_format(curl_cookie)  # type: ignore[arg-type]
-            cookies[curl_morsel.name] = curl_morsel.value
+            cookie = curl_morsel.to_cookiejar_cookie()
+            cookies.append(cookie)
         return cookies

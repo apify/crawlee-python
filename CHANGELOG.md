@@ -2,27 +2,45 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.6.0 - **not yet released**
+## [0.6.1](https://github.com/apify/crawlee-python/releases/tag/v0.6.1) (2025-03-03)
+
+### 🐛 Bug Fixes
+
+- Add `browserforge` to mandatory dependencies ([#1044](https://github.com/apify/crawlee-python/pull/1044)) ([ddfbde8](https://github.com/apify/crawlee-python/commit/ddfbde89dd3e3cbef0f3954936f4a41c3d6df909)) by [@Pijukatel](https://github.com/Pijukatel)
+
+
+## [0.6.0](https://github.com/apify/crawlee-python/releases/tag/v0.6.0) (2025-03-03)
 
 ### 🚀 Features
 
 - Integrate browserforge fingerprints ([#829](https://github.com/apify/crawlee-python/pull/829)) ([2b156b4](https://github.com/apify/crawlee-python/commit/2b156b4ba688f9111195422e6058dff30eb1f782)) by [@Pijukatel](https://github.com/Pijukatel), closes [#549](https://github.com/apify/crawlee-python/issues/549)
 - Add AdaptivePlaywrightCrawler ([#872](https://github.com/apify/crawlee-python/pull/872)) ([5ba70b6](https://github.com/apify/crawlee-python/commit/5ba70b6e846a908a55db461ab0c85e3946f2bc7c)) by [@Pijukatel](https://github.com/Pijukatel)
 - Implement `_snapshot_client` for `Snapshotter` ([#957](https://github.com/apify/crawlee-python/pull/957)) ([ba4d384](https://github.com/apify/crawlee-python/commit/ba4d384228d030c20c580ed01fae0e78af3a9543)) by [@Mantisus](https://github.com/Mantisus), closes [#60](https://github.com/apify/crawlee-python/issues/60)
+- Add adaptive context helpers ([#964](https://github.com/apify/crawlee-python/pull/964)) ([e248f17](https://github.com/apify/crawlee-python/commit/e248f17fad7b6d1fc5e23a0a1e961db66068a411)) by [@Pijukatel](https://github.com/Pijukatel), closes [#249](https://github.com/apify/crawlee-python/issues/249)
+- [**breaking**] Enable additional status codes arguments to PlaywrightCrawler ([#959](https://github.com/apify/crawlee-python/pull/959)) ([87cf446](https://github.com/apify/crawlee-python/commit/87cf446a7cbaa900e28abd93d4c8a2e0d1747059)) by [@Pijukatel](https://github.com/Pijukatel), closes [#953](https://github.com/apify/crawlee-python/issues/953)
+- Replace `HeaderGenerator` implementation by `browserforge` implementation ([#960](https://github.com/apify/crawlee-python/pull/960)) ([c2f8c93](https://github.com/apify/crawlee-python/commit/c2f8c93a4ad57c4ede354545bf925bf3707899c9)) by [@Pijukatel](https://github.com/Pijukatel), closes [#937](https://github.com/apify/crawlee-python/issues/937)
 
 ### 🐛 Bug Fixes
 
 - Fix playwright template and dockerfile ([#972](https://github.com/apify/crawlee-python/pull/972)) ([c33b34d](https://github.com/apify/crawlee-python/commit/c33b34dd6e253b1261c700857bb5c4bbec6d5c14)) by [@janbuchar](https://github.com/janbuchar), closes [#969](https://github.com/apify/crawlee-python/issues/969)
 - Fix installing dependencies via pip in project template ([#977](https://github.com/apify/crawlee-python/pull/977)) ([1e3b8eb](https://github.com/apify/crawlee-python/commit/1e3b8eb1cdb57bf2f7256e8ae5f0706b0afc3ba9)) by [@janbuchar](https://github.com/janbuchar), closes [#975](https://github.com/apify/crawlee-python/issues/975)
+- Fix default migration storage ([#1018](https://github.com/apify/crawlee-python/pull/1018)) ([6a0c4d9](https://github.com/apify/crawlee-python/commit/6a0c4d94593f7e94f24eee8a97fc7bc83c4d02e1)) by [@Pijukatel](https://github.com/Pijukatel), closes [#991](https://github.com/apify/crawlee-python/issues/991)
+- Fix logger name for http based loggers ([#1023](https://github.com/apify/crawlee-python/pull/1023)) ([bfb3944](https://github.com/apify/crawlee-python/commit/bfb394446351c8f3b9879a9905607f7c929f2542)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1021](https://github.com/apify/crawlee-python/issues/1021)
+- Remove allow_redirects override in CurlImpersonateHttpClient ([#1017](https://github.com/apify/crawlee-python/pull/1017)) ([01d855a](https://github.com/apify/crawlee-python/commit/01d855a43389a6b4b16ec74767624fa7eb13151f)) by [@2tunnels](https://github.com/2tunnels), closes [#1016](https://github.com/apify/crawlee-python/issues/1016)
+- Remove follow_redirects override in HttpxHttpClient ([#1015](https://github.com/apify/crawlee-python/pull/1015)) ([88afda3](https://github.com/apify/crawlee-python/commit/88afda33e77be84bc91ad1239740b8e661bef2a2)) by [@2tunnels](https://github.com/2tunnels), closes [#1013](https://github.com/apify/crawlee-python/issues/1013)
+- Fix flaky test_common_headers_and_user_agent ([#1030](https://github.com/apify/crawlee-python/pull/1030)) ([58aa70e](https://github.com/apify/crawlee-python/commit/58aa70e9600d313b823a1376ab9b36fb416c1c4a)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1027](https://github.com/apify/crawlee-python/issues/1027)
 
 ### Refactor
 
 - [**breaking**] Remove unused config properties ([#978](https://github.com/apify/crawlee-python/pull/978)) ([4b7fe29](https://github.com/apify/crawlee-python/commit/4b7fe2930540a5fbd753135e3ce29dc80f80c543)) by [@vdusek](https://github.com/vdusek)
 - [**breaking**] Remove Base prefix from abstract class names ([#980](https://github.com/apify/crawlee-python/pull/980)) ([8ccb5d4](https://github.com/apify/crawlee-python/commit/8ccb5d41a1dae9b02088b433266ac89bd089561a)) by [@vdusek](https://github.com/vdusek)
+- [**breaking**] Сhange default `incognito context` to `persistent context` for `Playwright` ([#985](https://github.com/apify/crawlee-python/pull/985)) ([f01520d](https://github.com/apify/crawlee-python/commit/f01520d22b31af9f0f13ca162cc47e6aa9744c6d)) by [@Mantisus](https://github.com/Mantisus), closes [#721](https://github.com/apify/crawlee-python/issues/721), [#963](https://github.com/apify/crawlee-python/issues/963)
+- [**breaking**] Change `Session` cookies from `dict` to `SessionCookies` with `CookieJar` ([#984](https://github.com/apify/crawlee-python/pull/984)) ([6523b3a](https://github.com/apify/crawlee-python/commit/6523b3ade0eed53b0363ddce250c557024339b5e)) by [@Mantisus](https://github.com/Mantisus), closes [#710](https://github.com/apify/crawlee-python/issues/710), [#933](https://github.com/apify/crawlee-python/issues/933)
+- [**breaking**] Replace enum with literal for `EnqueueStrategy` ([#1019](https://github.com/apify/crawlee-python/pull/1019)) ([d2481ef](https://github.com/apify/crawlee-python/commit/d2481ef71d3539979c5b1129387e72b4126fe366)) by [@vdusek](https://github.com/vdusek)
+- [**breaking**] Update status code handling ([#1028](https://github.com/apify/crawlee-python/pull/1028)) ([6b59471](https://github.com/apify/crawlee-python/commit/6b5947125e63abdfff481b0669398fc9a7293e55)) by [@Mantisus](https://github.com/Mantisus), closes [#830](https://github.com/apify/crawlee-python/issues/830), [#998](https://github.com/apify/crawlee-python/issues/998)
+- [**breaking**] Move `cli` dependencies to optional dependencies ([#1011](https://github.com/apify/crawlee-python/pull/1011)) ([4382959](https://github.com/apify/crawlee-python/commit/43829590c6b4efd1dc9b833373f82a842a0a1a8e)) by [@Mantisus](https://github.com/Mantisus), closes [#703](https://github.com/apify/crawlee-python/issues/703), [#1010](https://github.com/apify/crawlee-python/issues/1010)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.5.4](https://github.com/apify/crawlee-python/releases/tag/v0.5.4) (2025-02-05)
 
 ### 🚀 Features

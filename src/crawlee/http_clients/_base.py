@@ -5,12 +5,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
 from crawlee._utils.docs import docs_group
-from crawlee._utils.http import is_status_code_client_error, is_status_code_server_error
-from crawlee.errors import HttpClientStatusCodeError, HttpStatusCodeError
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
-
     from crawlee import Request
     from crawlee._types import HttpHeaders, HttpMethod, HttpPayload
     from crawlee.proxy_configuration import ProxyInfo
@@ -53,34 +49,20 @@ class HttpCrawlingResult:
 
 @docs_group('Abstract classes')
 class HttpClient(ABC):
-    """An abstract base class for HTTP clients used in crawlers (`BasicCrawler` subclasses).
-
-    The specific HTTP client should use `_raise_for_error_status_code` method for checking the status code. This
-    way the consistent behaviour accross different HTTP clients can be maintained. It raises an `HttpStatusCodeError`
-    when it encounters an error response, defined by default as any HTTP status code in the range of 400 to 599.
-    The error handling behavior is customizable, allowing the user to specify additional status codes to treat as
-    errors or to exclude specific status codes from being considered errors. See `additional_http_error_status_codes`
-    and `ignore_http_error_status_codes` arguments in the constructor.
-    """
+    """An abstract base class for HTTP clients used in crawlers (`BasicCrawler` subclasses)."""
 
     @abstractmethod
     def __init__(
         self,
         *,
         persist_cookies_per_session: bool = True,
-        additional_http_error_status_codes: Iterable[int] = (),
-        ignore_http_error_status_codes: Iterable[int] = (),
     ) -> None:
         """A default constructor.
 
         Args:
             persist_cookies_per_session: Whether to persist cookies per HTTP session.
-            additional_http_error_status_codes: Additional HTTP status codes to treat as errors.
-            ignore_http_error_status_codes: HTTP status codes to ignore as errors.
         """
         self._persist_cookies_per_session = persist_cookies_per_session
-        self._additional_http_error_status_codes = set(additional_http_error_status_codes)
-        self._ignore_http_error_status_codes = set(ignore_http_error_status_codes)
 
     @abstractmethod
     async def crawl(
@@ -103,7 +85,6 @@ class HttpClient(ABC):
 
         Raises:
             ProxyError: Raised if a proxy-related error occurs.
-            HttpStatusError: Raised if the response status code indicates an error.
 
         Returns:
             The result of the crawling.
@@ -134,35 +115,7 @@ class HttpClient(ABC):
 
         Raises:
             ProxyError: Raised if a proxy-related error occurs.
-            HttpStatusError: Raised if the response status code indicates an error.
 
         Returns:
             The HTTP response received from the server.
         """
-
-    def _raise_for_error_status_code(
-        self,
-        status_code: int,
-        additional_http_error_status_codes: set[int],
-        ignore_http_error_status_codes: set[int],
-    ) -> None:
-        """Raise an exception if the given status code is considered as an error."""
-        is_ignored_status = status_code in ignore_http_error_status_codes
-        is_explicit_error = status_code in additional_http_error_status_codes
-
-        if is_explicit_error:
-            raise HttpStatusCodeError('Error status code (user-configured) returned.', status_code)
-
-        if is_status_code_client_error(status_code) and not is_ignored_status:
-            raise HttpClientStatusCodeError('Client error status code returned', status_code)
-
-        if is_status_code_server_error(status_code) and not is_ignored_status:
-            raise HttpStatusCodeError('Error status code returned', status_code)
-
-    @property
-    def additional_blocked_status_codes(self) -> set[int]:
-        return self._additional_http_error_status_codes
-
-    @property
-    def ignore_http_error_status_codes(self) -> set[int]:
-        return self._ignore_http_error_status_codes

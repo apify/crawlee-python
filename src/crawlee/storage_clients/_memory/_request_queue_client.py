@@ -70,7 +70,7 @@ class RequestQueueClient(BaseRequestQueueClient):
             lambda request: request.order_no or -float('inf')
         )
         self.file_operation_lock = asyncio.Lock()
-        self._last_used_timestamp = Decimal(0.0)
+        self._last_used_timestamp = Decimal(0)
 
         self._in_progress = set[str]()
 
@@ -546,12 +546,12 @@ class RequestQueueClient(BaseRequestQueueClient):
             return None
 
         # Get the current timestamp in milliseconds
-        timestamp = Decimal(datetime.now(timezone.utc).timestamp()) * 1000
+        timestamp = Decimal(str(datetime.now(tz=timezone.utc).timestamp())) * Decimal(1000)
         timestamp = round(timestamp, 6)
 
         # Make sure that this timestamp was not used yet, so that we have unique order_nos
         if timestamp <= self._last_used_timestamp:
-            timestamp = self._last_used_timestamp + Decimal(0.000001)
+            timestamp = self._last_used_timestamp + Decimal('0.000001')
 
         self._last_used_timestamp = timestamp
 

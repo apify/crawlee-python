@@ -82,6 +82,7 @@ async def server() -> AsyncGenerator[respx.MockRouter, None]:
             </html>""",
         )
 
+        # Endpoint with Session Blocked status code
         mock.get('/403', name='403_endpoint').return_value = Response(
             403,
             text="""<html>
@@ -91,6 +92,17 @@ async def server() -> AsyncGenerator[respx.MockRouter, None]:
             </html>""",
         )
 
+        # Endpoint with Client Error status code
+        mock.get('/402', name='402_endpoint').return_value = Response(
+            402,
+            text="""<html>
+                <head>
+                    <title>Not found</title>
+                </head>
+            </html>""",
+        )
+
+        # Endpoint with Server Error status code
         mock.get('/500', name='500_endpoint').return_value = Response(
             500,
             text="""<html>
@@ -98,6 +110,25 @@ async def server() -> AsyncGenerator[respx.MockRouter, None]:
                     <title>Internal server error</title>
                 </head>
             </html>""",
+        )
+        mock.get('/set-cookie', name='set_cookie_endpoint').return_value = Response(
+            200,
+            headers=[
+                ('set-cookie', 'basic=1; Path=/; HttpOnly; SameSite=Lax'),
+                ('set-cookie', 'withpath=2; Path=/html; SameSite=None'),
+                ('set-cookie', 'strict=3; Path=/; SameSite=Strict'),
+                ('set-cookie', 'secure=4; Path=/; HttpOnly; Secure; SameSite=Strict'),
+                ('set-cookie', 'short=5; Path=/;'),
+                ('set-cookie', 'domain=6; Path=/; Domain=.test.io;'),
+            ],
+        )
+
+        mock.get('/simple_set_cookies', name='simple_set_cookies').return_value = Response(
+            200, headers={'set-cookie': 'a=1; Path=/'}
+        )
+
+        mock.get('/get_cookies', name='get_cookies').side_effect = lambda request: Response(
+            200, json={'cookies': request.headers.get('cookie', '')}, headers={'Content-Type': 'application/json'}
         )
 
         yield mock
@@ -136,11 +167,11 @@ async def test_handles_redirects(
         # error without retry for all 4xx statuses
         pytest.param([], [], 1, id='default_behavior'),
         # make retry for codes in `additional_http_error_status_codes` list
-        pytest.param([403], [], 3, id='additional_status_codes'),
+        pytest.param([402], [], 3, id='additional_status_codes'),
         # take as successful status codes from the `ignore_http_error_status_codes` list
-        pytest.param([], [403], 0, id='ignore_error_status_codes'),
+        pytest.param([], [402], 0, id='ignore_error_status_codes'),
         # check precedence for `additional_http_error_status_codes`
-        pytest.param([403], [403], 3, id='additional_and_ignore'),
+        pytest.param([402], [402], 3, id='additional_and_ignore'),
     ],
 )
 async def test_handles_client_errors(
@@ -157,10 +188,55 @@ async def test_handles_client_errors(
         max_request_retries=3,
     )
 
+    await crawler.add_requests(['https://test.io/402'])
+    await crawler.run()
+
+    assert crawler.statistics.error_tracker.total == expected_number_error
+
+    # Request handler should not be called for error status codes.
+    if expected_number_error:
+        mock_request_handler.assert_not_called()
+    else:
+        mock_request_handler.assert_called()
+
+    assert server['402_endpoint'].called
+
+
+@pytest.mark.parametrize(
+    ('ignore_http_error_status_codes', 'use_session_pool', 'expected_session_rotate', 'expected_number_error'),
+    [
+        # change session and retry for no block 4xx statuses
+        pytest.param([], True, 4, 1, id='default_behavior'),
+        # error without retry for all 4xx statuses
+        pytest.param([], False, 0, 1, id='default_behavior_without_session_pool'),
+        # take as successful status codes from the `ignore_http_error_status_codes` list with Sessoion Pool
+        pytest.param([403], True, 0, 0, id='ignore_error_status_codes'),
+        # take as successful status codes from the `ignore_http_error_status_codes` list without Sessoion Pool
+        pytest.param([403], False, 0, 0, id='ignore_error_status_codes_without_session_pool'),
+    ],
+)
+async def test_handles_session_block_errors(
+    *,
+    ignore_http_error_status_codes: list[int],
+    use_session_pool: bool,
+    expected_session_rotate: int,
+    expected_number_error: int,
+    mock_request_handler: AsyncMock,
+    server: respx.MockRouter,
+) -> None:
+    crawler = HttpCrawler(
+        request_handler=mock_request_handler,
+        ignore_http_error_status_codes=ignore_http_error_status_codes,
+        max_request_retries=3,
+        max_session_rotations=5,
+        use_session_pool=use_session_pool,
+    )
+
     await crawler.add_requests(['https://test.io/403'])
     await crawler.run()
 
     assert crawler.statistics.error_tracker.total == expected_number_error
+    assert crawler.statistics.error_tracker_retry.total == expected_session_rotate
 
     # Request handler should not be called for error status codes.
     if expected_number_error:
@@ -222,7 +298,11 @@ async def test_stores_cookies(http_client_class: type[HttpClient], httpbin: URL)
 
         session = await session_pool.get_session_by_id(session_ids.pop())
         assert session is not None
-        assert session.cookies == {'a': '1', 'b': '2', 'c': '3'}
+        assert {cookie['name']: cookie['value'] for cookie in session.cookies.get_cookies_as_playwright_format()} == {
+            'a': '1',
+            'b': '2',
+            'c': '3',
+        }
 
 
 async def test_do_not_retry_on_client_errors(crawler: HttpCrawler, server: respx.MockRouter) -> None:
@@ -239,19 +319,21 @@ async def test_do_not_retry_on_client_errors(crawler: HttpCrawler, server: respx
 
 async def test_http_status_statistics(crawler: HttpCrawler, server: respx.MockRouter) -> None:
     await crawler.add_requests([f'https://test.io/500?id={i}' for i in range(10)])
+    await crawler.add_requests([f'https://test.io/402?id={i}' for i in range(10)])
     await crawler.add_requests([f'https://test.io/403?id={i}' for i in range(10)])
     await crawler.add_requests([f'https://test.io/html?id={i}' for i in range(10)])
 
     await crawler.run()
-
     assert crawler.statistics.state.requests_with_status_code == {
         '200': 10,
-        '403': 10,  # client errors are not retried by default
+        '403': 100,  # block errors change session and retry
+        '402': 10,  # client errors are not retried by default
         '500': 30,  # server errors are retried by default
     }
 
     assert len(server['html_endpoint'].calls) == 10
-    assert len(server['403_endpoint'].calls) == 10
+    assert len(server['403_endpoint'].calls) == 100
+    assert len(server['402_endpoint'].calls) == 10
     assert len(server['500_endpoint'].calls) == 30
 
 
@@ -411,15 +493,9 @@ async def test_http_crawler_pre_navigation_hooks_executed_before_request() -> No
     assert execution_order == ['pre-navigation-hook 1', 'pre-navigation-hook 2', 'request', 'final handler']
 
 
-@pytest.mark.parametrize(
-    'http_client_class',
-    [
-        pytest.param(CurlImpersonateHttpClient, id='curl'),
-        pytest.param(HttpxHttpClient, id='httpx'),
-    ],
-)
-async def test_isolation_cookies(http_client_class: type[HttpClient], httpbin: URL) -> None:
-    http_client = http_client_class()
+async def test_isolation_cookies_curl(httpbin: URL) -> None:
+    """Test isolation cookies for Session with curl and httpbin"""
+    http_client = CurlImpersonateHttpClient()
     sessions_ids: list[str] = []
     sessions_cookies: dict[str, dict[str, str]] = {}
     response_cookies: dict[str, dict[str, str]] = {}
@@ -446,7 +522,9 @@ async def test_isolation_cookies(http_client_class: type[HttpClient], httpbin: U
         if context.request.unique_key not in {'1', '2'}:
             return
 
-        sessions_cookies[context.session.id] = context.session.cookies
+        sessions_cookies[context.session.id] = {
+            cookie['name']: cookie['value'] for cookie in context.session.cookies.get_cookies_as_dicts()
+        }
         response_data = json.loads(context.http_response.read())
         response_cookies[context.session.id] = response_data.get('cookies')
 
@@ -480,3 +558,134 @@ async def test_isolation_cookies(http_client_class: type[HttpClient], httpbin: U
     # For a clean session, the cookie should not be in the session store or in the response
     # This way we can be sure that no cookies are being leaked through the http client
     assert sessions_cookies[clean_session_id] == response_cookies[clean_session_id] == {}
+
+
+async def test_store_complex_cookies(server: respx.MockRouter) -> None:
+    visit = Mock()
+    track_session_usage = Mock()
+    async with SessionPool(max_pool_size=1) as session_pool:
+        crawler = HttpCrawler(session_pool=session_pool)
+
+        @crawler.router.default_handler
+        async def handler(context: HttpCrawlingContext) -> None:
+            visit(context.request.url)
+            track_session_usage(context.session.id if context.session else None)
+
+        await crawler.run(['https://test.io/set-cookie'])
+
+        assert server['set_cookie_endpoint'].called
+
+        visited = {call[0][0] for call in visit.call_args_list}
+        assert len(visited) == 1
+
+        session_ids = {call[0][0] for call in track_session_usage.call_args_list}
+        assert len(session_ids) == 1
+
+        session = await session_pool.get_session_by_id(session_ids.pop())
+        assert session is not None
+
+        session_cookies_dict = {cookie['name']: cookie for cookie in session.cookies.get_cookies_as_playwright_format()}
+
+        assert len(session_cookies_dict) == 6
+
+        # cookie string: 'basic=1; Path=/; HttpOnly; SameSite=Lax'
+        assert session_cookies_dict['basic'] == {
+            'name': 'basic',
+            'value': '1',
+            'domain': 'test.io',
+            'path': '/',
+            'secure': False,
+            'httpOnly': True,
+            'sameSite': 'Lax',
+        }
+
+        # cookie string: 'withpath=2; Path=/html; SameSite=None'
+        assert session_cookies_dict['withpath'] == {
+            'name': 'withpath',
+            'value': '2',
+            'domain': 'test.io',
+            'path': '/html',
+            'secure': False,
+            'httpOnly': False,
+            'sameSite': 'None',
+        }
+
+        # cookie string: 'strict=3; Path=/; SameSite=Strict'
+        assert session_cookies_dict['strict'] == {
+            'name': 'strict',
+            'value': '3',
+            'domain': 'test.io',
+            'path': '/',
+            'secure': False,
+            'httpOnly': False,
+            'sameSite': 'Strict',
+        }
+
+        # cookie string: 'secure=4; Path=/; HttpOnly; Secure; SameSite=Strict'
+        assert session_cookies_dict['secure'] == {
+            'name': 'secure',
+            'value': '4',
+            'domain': 'test.io',
+            'path': '/',
+            'secure': True,
+            'httpOnly': True,
+            'sameSite': 'Strict',
+        }
+
+        # cookie string: 'short=5; Path=/;'
+        assert session_cookies_dict['short'] == {
+            'name': 'short',
+            'value': '5',
+            'domain': 'test.io',
+            'path': '/',
+            'secure': False,
+            'httpOnly': False,
+        }
+
+        assert session_cookies_dict['domain'] == {
+            'name': 'domain',
+            'value': '6',
+            'domain': '.test.io',
+            'path': '/',
+            'secure': False,
+            'httpOnly': False,
+        }
+
+
+async def test_store_multidomain_cookies(server: respx.MockRouter) -> None:
+    visit = Mock()
+    track_session_usage = Mock()
+    with respx.mock(base_url='https://notest.io') as another_server:
+        another_server.get('/').return_value = Response(200, headers=[('set-cookie', 'basic=1; Path=/;')])
+        async with SessionPool(max_pool_size=1) as session_pool:
+            crawler = HttpCrawler(session_pool=session_pool)
+
+            @crawler.router.default_handler
+            async def handler(context: HttpCrawlingContext) -> None:
+                visit(context.request.url)
+                track_session_usage(context.session.id if context.session else None)
+
+            await crawler.run(['https://test.io/set-cookie', 'https://notest.io/'])
+
+            assert server['set_cookie_endpoint'].called
+
+            visited = {call[0][0] for call in visit.call_args_list}
+            assert len(visited) == 2
+
+            session_ids = {call[0][0] for call in track_session_usage.call_args_list}
+            assert len(session_ids) == 1
+
+            session = await session_pool.get_session_by_id(session_ids.pop())
+            assert session is not None
+
+            session_cookies_dict = {cookie['domain'] for cookie in session.cookies.get_cookies_as_playwright_format()}
+
+            assert len(session_cookies_dict) == 3
+
+            assert 'test.io' in session_cookies_dict
+            assert '.test.io' in session_cookies_dict
+            assert 'notest.io' in session_cookies_dict
+
+
+def test_default_logger() -> None:
+    assert HttpCrawler().log.name == 'HttpCrawler'

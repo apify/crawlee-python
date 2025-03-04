@@ -3,16 +3,18 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from crawlee._utils.docs import docs_group
-from crawlee.crawlers._abstract_http import AbstractHttpCrawler, HttpCrawlerOptions, ParsedHttpCrawlingContext
+from crawlee.crawlers._abstract_http import AbstractHttpCrawler, ParsedHttpCrawlingContext
 
 from ._http_parser import NoParser
 
 if TYPE_CHECKING:
     from typing_extensions import Unpack
 
+    from crawlee.crawlers import BasicCrawlerOptions
+
 
 @docs_group('Classes')
-class HttpCrawler(AbstractHttpCrawler[ParsedHttpCrawlingContext[bytes], bytes]):
+class HttpCrawler(AbstractHttpCrawler[ParsedHttpCrawlingContext[bytes], bytes, bytes]):
     """Specific version of generic `AbstractHttpCrawler`.
 
     It uses a dummy parser that simply returns the HTTP response body as-is. Use this only if you know what you are
@@ -46,7 +48,7 @@ class HttpCrawler(AbstractHttpCrawler[ParsedHttpCrawlingContext[bytes], bytes]):
 
     def __init__(
         self,
-        **kwargs: Unpack[HttpCrawlerOptions[ParsedHttpCrawlingContext[bytes]]],
+        **kwargs: Unpack[BasicCrawlerOptions[ParsedHttpCrawlingContext[bytes]]],
     ) -> None:
         """A default constructor.
 

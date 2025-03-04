@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, Mock, call
 import httpx
 import pytest
 
-from crawlee import ConcurrencySettings, EnqueueStrategy, Glob, service_locator
+from crawlee import ConcurrencySettings, Glob, service_locator
 from crawlee._request import Request
 from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpHeaders
 from crawlee.configuration import Configuration
@@ -32,19 +32,12 @@ from crawlee.storage_clients._memory import DatasetClient
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Sequence
+    from collections.abc import Sequence
 
     import respx
     from yarl import URL
 
     from crawlee._types import JsonSerializable
-
-
-@pytest.fixture
-async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
-    kvs = await KeyValueStore.open()
-    yield kvs
-    await kvs.drop()
 
 
 async def test_processes_requests_from_explicit_queue() -> None:
@@ -394,7 +387,7 @@ INCLUDE_TEST_URLS = (
             AddRequestsTestInput(
                 start_url=STRATEGY_TEST_URLS[0],
                 requests=STRATEGY_TEST_URLS,
-                kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.ALL),
+                kwargs=EnqueueLinksKwargs(strategy='all'),
                 expected_urls=STRATEGY_TEST_URLS[1:],
             ),
             id='enqueue_strategy_2',
@@ -403,7 +396,7 @@ INCLUDE_TEST_URLS = (
             AddRequestsTestInput(
                 start_url=STRATEGY_TEST_URLS[0],
                 requests=STRATEGY_TEST_URLS,
-                kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.SAME_DOMAIN),
+                kwargs=EnqueueLinksKwargs(strategy='same-domain'),
                 expected_urls=STRATEGY_TEST_URLS[1:3],
             ),
             id='enqueue_strategy_3',
@@ -412,7 +405,7 @@ INCLUDE_TEST_URLS = (
             AddRequestsTestInput(
                 start_url=STRATEGY_TEST_URLS[0],
                 requests=STRATEGY_TEST_URLS,
-                kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.SAME_HOSTNAME),
+                kwargs=EnqueueLinksKwargs(strategy='same-hostname'),
                 expected_urls=[STRATEGY_TEST_URLS[1]],
             ),
             id='enqueue_strategy_4',
@@ -421,7 +414,7 @@ INCLUDE_TEST_URLS = (
             AddRequestsTestInput(
                 start_url=STRATEGY_TEST_URLS[0],
                 requests=STRATEGY_TEST_URLS,
-                kwargs=EnqueueLinksKwargs(strategy=EnqueueStrategy.SAME_ORIGIN),
+                kwargs=EnqueueLinksKwargs(strategy='same-origin'),
                 expected_urls=[],
             ),
             id='enqueue_strategy_5',

@@ -104,7 +104,7 @@ async def block_requests(
         specific_files = [pattern for pattern in url_patterns if not pattern.startswith(('*.', '.'))]
 
         if extensions:
-            await page.route(f"**/*.{{{','.join(extensions)}}}*", lambda route, _: route.abort())
+            await page.route(f'**/*.{{{",".join(extensions)}}}*', lambda route, _: route.abort())
 
         if specific_files:
-            await page.route(f"**/{{{','.join(specific_files)}}}*", lambda route, _: route.abort())
+            await page.route(f'**/{{{",".join(specific_files)}}}*', lambda route, _: route.abort())

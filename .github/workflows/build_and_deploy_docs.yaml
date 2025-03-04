@@ -10,7 +10,7 @@ on:
 
 env:
   NODE_VERSION: 20
-  PYTHON_VERSION: 3.12
+  PYTHON_VERSION: 3.13
 
 jobs:
   build_and_deploy_docs:
@@ -39,10 +39,13 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      - name: Set up uv package manager
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
       - name: Install Python dependencies
-        run: |
-          pipx install --python ${{ env.PYTHON_VERSION }} poetry
-          make install-dev
+        run: make install-dev
 
       - name: Build generated API reference
         run: make build-api-reference

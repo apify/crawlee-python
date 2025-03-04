@@ -1,0 +1,20 @@
+---
+id: adaptive-playwright-crawler
+title: AdaptivePlaywrightCrawler
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import CodeBlock from '@theme/CodeBlock';
+
+import AdaptivePlaywrightCrawlerExample from '!!raw-loader!./code_examples/adaptive_playwright_crawler.py';
+
+This example demonstrates how to use <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink>. An <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> is a combination of <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> and some implementation of HTTP-based crawler such as <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> or <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>.
+It uses a more limited crawling context interface so that it is able to switch to HTTP-only crawling when it detects that it may bring a performance benefit.
+
+A [pre-navigation hook](/python/docs/guides/adaptive-playwright-crawler#page-configuration-with-pre-navigation-hooks) can be used to perform actions before navigating to the URL. This hook provides further flexibility in controlling environment and preparing for navigation. Hooks will be executed both for the pages crawled by HTTP-bases sub crawler and playwright based sub crawler. Use `playwright_only=True` to mark hooks that should be executed only for playwright sub crawler.
+
+For more detailed description please see [AdaptivePlaywrightCrawler guide](/python/docs/guides/adaptive-playwright-crawler 'AdaptivePlaywrightCrawler guide')
+
+<CodeBlock className="language-python">
+    {AdaptivePlaywrightCrawlerExample}
+</CodeBlock>

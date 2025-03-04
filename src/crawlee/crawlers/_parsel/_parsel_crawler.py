@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from parsel import Selector
 
 from crawlee._utils.docs import docs_group
-from crawlee.crawlers._abstract_http import AbstractHttpCrawler, HttpCrawlerOptions
+from crawlee.crawlers import AbstractHttpCrawler, BasicCrawlerOptions
 
 from ._parsel_crawling_context import ParselCrawlingContext
 from ._parsel_parser import ParselParser
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 
 @docs_group('Classes')
-class ParselCrawler(AbstractHttpCrawler[ParselCrawlingContext, Selector]):
+class ParselCrawler(AbstractHttpCrawler[ParselCrawlingContext, Selector, Selector]):
     """A web crawler for performing HTTP requests and parsing HTML/XML content.
 
     The `ParselCrawler` builds on top of the `AbstractHttpCrawler`, which means it inherits all of its features.
@@ -56,7 +56,7 @@ class ParselCrawler(AbstractHttpCrawler[ParselCrawlingContext, Selector]):
 
     def __init__(
         self,
-        **kwargs: Unpack[HttpCrawlerOptions[ParselCrawlingContext]],
+        **kwargs: Unpack[BasicCrawlerOptions[ParselCrawlingContext]],
     ) -> None:
         """A default constructor.
 
