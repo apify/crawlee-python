@@ -81,7 +81,7 @@ class PlaywrightPersistentBrowser(Browser):
             await self._context.close()
             self._context = None
         self._is_connected = False
-        await asyncio.sleep(0)
+        await asyncio.sleep(0.1)
         await self._delete_temp_dir()
 
     @property
