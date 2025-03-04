@@ -34,7 +34,7 @@ async def test_init(playwright: Playwright) -> None:
 
 async def test_delete_temp_folder_with_close_browser(playwright: Playwright) -> None:
     persist_browser = PlaywrightPersistentBrowser(
-        playwright.chromium, user_data_dir=None, browser_launch_options={'headless': False}
+        playwright.chromium, user_data_dir=None, browser_launch_options={'headless': True}
     )
     await persist_browser.new_context()
     assert isinstance(persist_browser._temp_dir, Path)
