@@ -218,6 +218,8 @@ async def test_adaptive_crawling(
 
     await crawler.run(test_urls)
 
+    await asyncio.sleep(0)
+
     assert pw_handler_count == test_input.expected_pw_count
     assert pw_hook_count == test_input.expected_pw_count
 
