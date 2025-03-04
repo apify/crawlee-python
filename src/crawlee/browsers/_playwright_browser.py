@@ -68,23 +68,20 @@ class PlaywrightPersistentBrowser(Browser):
             user_data_dir=user_data_dir, **launch_options
         )
 
-        if self._temp_dir:
-            self._context.on('close', self._delete_temp_dir)
-
         return self._context
 
-    async def _delete_temp_dir(self, _: BrowserContext) -> None:
+    async def _delete_temp_dir(self) -> None:
         if self._temp_dir and self._temp_dir.exists():
-            await asyncio.to_thread(shutil.rmtree, self._temp_dir, ignore_errors=True)
+            await asyncio.to_thread(shutil.rmtree, self._temp_dir)
 
     @override
     async def close(self, **kwargs: Any) -> None:
         """Close browser by closing its context."""
         if self._context:
             await self._context.close()
-            await self._delete_temp_dir(self._context)
             self._context = None
         self._is_connected = False
+        await self._delete_temp_dir()
 
     @property
     @override
