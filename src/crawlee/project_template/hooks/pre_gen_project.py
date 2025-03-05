@@ -7,6 +7,6 @@ try:
 except OSError as exc:
     raise RuntimeError('You chose to use the Poetry package manager, but it does not seem to be installed') from exc
 
-if not re.match(r'Poetry \(version 1\..*\)', version):
-    raise RuntimeError(f'Poetry below 3.x is required, but "{version}" is installed')
+if not re.match(r'Poetry \(version 2\..*\)', version):
+    raise RuntimeError(f'Poetry 2.x is required, but "{version}" is installed')
 # % endif
