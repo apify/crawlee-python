@@ -34,10 +34,10 @@ class ErrorTracker:
         """Include an error in the statistics."""
         error_group_name = error.__class__.__name__ if self.show_error_name else None
         error_group_message = self._get_error_message(error)
-        error_group_stack_trace = self._get_file_and_line(error)
+        error_group_file_and_line = self._get_file_and_line(error)
 
         # First two levels are grouped only in case of exact match.
-        specific_groups = self._errors[error_group_stack_trace][error_group_name]
+        specific_groups = self._errors[error_group_file_and_line][error_group_name]
 
         # Lowest level group is matched by similarity.
         if error_group_message in specific_groups:
@@ -56,7 +56,7 @@ class ErrorTracker:
                     break
             else:
                 # No similar message found. Create new group.
-                self._errors[error_group_stack_trace][error_group_name].update([error_group_message])
+                self._errors[error_group_file_and_line][error_group_name].update([error_group_message])
 
     def _get_file_and_line(self, error: Exception) -> str | None:
         if self.show_file_and_line_number:
@@ -75,8 +75,8 @@ class ErrorTracker:
     def unique_error_count(self) -> int:
         """Number of distinct kinds of errors."""
         unique_error_count = 0
-        for stack_group in self._errors.values():
-            for name_group in stack_group.values():
+        for file_and_line_group in self._errors.values():
+            for name_group in file_and_line_group.values():
                 unique_error_count += len(name_group)
         return unique_error_count
 
@@ -84,26 +84,28 @@ class ErrorTracker:
     def total(self) -> int:
         """Total number of errors."""
         error_count = 0
-        for stack_group in self._errors.values():
-            for name_group in stack_group.values():
+        for file_and_line_group in self._errors.values():
+            for name_group in file_and_line_group.values():
                 error_count += sum(name_group.values())
         return error_count
 
     def get_most_common_errors(self, n: int = 3) -> list[tuple[str | None, int]]:
         """Return n most common errors."""
         all_errors: Counter[GroupName] = Counter()
-        for stack_group_name, stack_group in self._errors.items():
-            for name_group_name, name_group in stack_group.items():
+        for file_and_line_group_name, file_and_line_group in self._errors.items():
+            for name_group_name, name_group in file_and_line_group.items():
                 for message_group_name, count in name_group.items():
-                    all_errors[self._get_error_repr(stack_group_name, name_group_name, message_group_name)] = count
+                    all_errors[self._get_error_repr(file_and_line_group_name, name_group_name, message_group_name)] = (
+                        count
+                    )
         return all_errors.most_common(n)
 
-    def _get_error_repr(self, stack: str | None, name: str | None, message: str | None) -> str:
+    def _get_error_repr(self, file_and_line: str | None, name: str | None, message: str | None) -> str:
         """Get the most specific error representation."""
-        stack_part = f'{stack}:' if stack else ''
+        file_and_line_part = f'{file_and_line}:' if file_and_line else ''
         name_part = f'{name}:' if name else ''
         message_part = f'{message}' if message else ''
-        return f'{stack_part}{name_part}{message_part}'
+        return f'{file_and_line_part}{name_part}{message_part}'
 
     @staticmethod
     def _create_generic_message(message_1: str | None, message_2: str | None) -> str | None:
