@@ -334,13 +334,13 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
             await asyncio.to_thread(f.close)
 
         if self._memory_storage_client.write_metadata:
-            f = await asyncio.to_thread(open, record_metadata_path, mode='wb')
+            metadata_f = await asyncio.to_thread(open, record_metadata_path, mode='wb')
 
             try:
                 record_metadata = KeyValueStoreRecordMetadata(key=record.key, content_type=record.content_type)
-                await asyncio.to_thread(f.write, record_metadata.model_dump_json(indent=2).encode('utf-8'))
+                await asyncio.to_thread(metadata_f.write, record_metadata.model_dump_json(indent=2).encode('utf-8'))
             finally:
-                await asyncio.to_thread(f.close)
+                await asyncio.to_thread(metadata_f.close)
 
     async def delete_persisted_record(self, record: KeyValueStoreRecord) -> None:
         """Delete the specified record from the key-value store."""
