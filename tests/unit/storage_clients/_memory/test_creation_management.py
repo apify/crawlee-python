@@ -56,4 +56,4 @@ async def test_persist_metadata_rewrites_data_with_error(tmp_path: Path) -> None
         await persist_metadata_if_enabled(data=error_data, entity_directory=str(entity_directory), write_metadata=True)
     with open(metadata_path) as f:  # noqa: ASYNC230
         content = f.read()
-    assert content == ''
+    assert content == ''  # The file is empty after an error
