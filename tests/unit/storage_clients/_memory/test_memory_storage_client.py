@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
@@ -33,11 +32,8 @@ async def test_write_metadata(tmp_path: Path) -> None:
     datasets_no_metadata_client = ms_no_metadata.datasets()
     await datasets_client.get_or_create(name=dataset_name)
     await datasets_no_metadata_client.get_or_create(name=dataset_no_metadata_name)
-    assert os.path.exists(os.path.join(ms.datasets_directory, dataset_name, METADATA_FILENAME)) is True
-    assert (
-        os.path.exists(os.path.join(ms_no_metadata.datasets_directory, dataset_no_metadata_name, METADATA_FILENAME))
-        is False
-    )
+    assert Path(ms.datasets_directory, dataset_name, METADATA_FILENAME).exists() is True
+    assert Path(ms_no_metadata.datasets_directory, dataset_no_metadata_name, METADATA_FILENAME).exists() is False
 
 
 @pytest.mark.parametrize(
@@ -61,7 +57,7 @@ async def test_persist_storage(persist_storage: bool, tmp_path: Path) -> None:  
     await ms.key_value_store(kvs_info.id).set_record('test', {'x': 1}, 'application/json')
 
     path = Path(ms.key_value_stores_directory) / (kvs_info.name or '') / 'test.json'
-    assert os.path.exists(path) is persist_storage
+    assert path.exists() is persist_storage
 
     # Request queues
     rq_client = ms.request_queues()
@@ -145,14 +141,19 @@ async def test_purge_datasets(tmp_path: Path) -> None:
     non_default_dataset_info = await datasets_client.get_or_create(name='non-default')
 
     # Check all folders inside datasets directory before and after purge
-    folders_before_purge = os.listdir(ms.datasets_directory)
-    assert default_dataset_info.name in folders_before_purge
-    assert non_default_dataset_info.name in folders_before_purge
+    assert default_dataset_info.name is not None
+    assert non_default_dataset_info.name is not None
+
+    default_path = Path(ms.datasets_directory, default_dataset_info.name)
+    non_default_path = Path(ms.datasets_directory, non_default_dataset_info.name)
+
+    assert default_path.exists() is True
+    assert non_default_path.exists() is True
 
     await ms._purge_default_storages()
-    folders_after_purge = os.listdir(ms.datasets_directory)
-    assert default_dataset_info.name not in folders_after_purge
-    assert non_default_dataset_info.name in folders_after_purge
+
+    assert default_path.exists() is False
+    assert non_default_path.exists() is True
 
 
 async def test_purge_key_value_stores(tmp_path: Path) -> None:
@@ -174,20 +175,26 @@ async def test_purge_key_value_stores(tmp_path: Path) -> None:
     await default_kvs_client.set_record('test', {'abc': 123}, 'application/json')
 
     # Check all folders and files inside kvs directory before and after purge
-    folders_before_purge = os.listdir(ms.key_value_stores_directory)
-    assert default_kvs_info.name in folders_before_purge
-    assert non_default_kvs_info.name in folders_before_purge
-    default_folder_files_before_purge = os.listdir(os.path.join(ms.key_value_stores_directory, 'default'))
-    assert 'INPUT.json' in default_folder_files_before_purge
-    assert 'test.json' in default_folder_files_before_purge
+    assert default_kvs_info.name is not None
+    assert non_default_kvs_info.name is not None
+
+    default_kvs_path = Path(ms.key_value_stores_directory, default_kvs_info.name)
+    non_default_kvs_path = Path(ms.key_value_stores_directory, non_default_kvs_info.name)
+    kvs_directory = Path(ms.key_value_stores_directory, 'default')
+
+    assert default_kvs_path.exists() is True
+    assert non_default_kvs_path.exists() is True
+
+    assert (kvs_directory / 'INPUT.json').exists() is True
+    assert (kvs_directory / 'test.json').exists() is True
 
     await ms._purge_default_storages()
-    folders_after_purge = os.listdir(ms.key_value_stores_directory)
-    assert default_kvs_info.name in folders_after_purge
-    assert non_default_kvs_info.name in folders_after_purge
-    default_folder_files_after_purge = os.listdir(os.path.join(ms.key_value_stores_directory, 'default'))
-    assert 'INPUT.json' in default_folder_files_after_purge
-    assert 'test.json' not in default_folder_files_after_purge
+
+    assert default_kvs_path.exists() is True
+    assert non_default_kvs_path.exists() is True
+
+    assert (kvs_directory / 'INPUT.json').exists() is True
+    assert (kvs_directory / 'test.json').exists() is False
 
 
 async def test_purge_request_queues(tmp_path: Path) -> None:
@@ -203,13 +210,19 @@ async def test_purge_request_queues(tmp_path: Path) -> None:
     non_default_rq_info = await rq_client.get_or_create(name='non-default')
 
     # Check all folders inside rq directory before and after purge
-    folders_before_purge = os.listdir(ms.request_queues_directory)
-    assert default_rq_info.name in folders_before_purge
-    assert non_default_rq_info.name in folders_before_purge
+    assert default_rq_info.name
+    assert non_default_rq_info.name
+
+    default_rq_path = Path(ms.request_queues_directory, default_rq_info.name)
+    non_default_rq_path = Path(ms.request_queues_directory, non_default_rq_info.name)
+
+    assert default_rq_path.exists() is True
+    assert non_default_rq_path.exists() is True
+
     await ms._purge_default_storages()
-    folders_after_purge = os.listdir(ms.request_queues_directory)
-    assert default_rq_info.name not in folders_after_purge
-    assert non_default_rq_info.name in folders_after_purge
+
+    assert default_rq_path.exists() is False
+    assert non_default_rq_path.exists() is True
 
 
 async def test_not_implemented_method(tmp_path: Path) -> None:
