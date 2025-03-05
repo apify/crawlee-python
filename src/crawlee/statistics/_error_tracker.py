@@ -8,9 +8,7 @@ from itertools import zip_longest
 from typing import Union
 
 GroupName = Union[str, None]
-ErrorMessageGroups = Counter[GroupName]
-ErrorTypeGroups = dict[GroupName, ErrorMessageGroups]
-ErrorStackTraceGroups = dict[GroupName, ErrorTypeGroups]
+ErrorFilenameGroups = dict[GroupName, dict[GroupName, Counter[GroupName]]]
 
 
 class ErrorTracker:
@@ -20,23 +18,23 @@ class ErrorTracker:
         self,
         *,
         show_error_name: bool = True,
-        show_stack_trace: bool = True,
+        show_file_and_line_number: bool = True,
         show_error_message: bool = True,
         show_full_message: bool = False,
     ) -> None:
         self.show_error_name = show_error_name
-        self.show_stack_trace = show_stack_trace
+        self.show_file_and_line_number = show_file_and_line_number
         self.show_error_message = show_error_message
         if show_full_message and not show_error_message:
             raise ValueError('`show_error_message` must be `True` if `show_full_message` is set to `True`')
         self.show_full_message = show_full_message
-        self._errors: ErrorStackTraceGroups = defaultdict(lambda: defaultdict(Counter))
+        self._errors: ErrorFilenameGroups = defaultdict(lambda: defaultdict(Counter))
 
     def add(self, error: Exception) -> None:
         """Include an error in the statistics."""
         error_group_name = error.__class__.__name__ if self.show_error_name else None
         error_group_message = self._get_error_message(error)
-        error_group_stack_trace = self._get_traceback_text(error)
+        error_group_stack_trace = self._get_file_and_line(error)
 
         # First two levels are grouped only in case of exact match.
         specific_groups = self._errors[error_group_stack_trace][error_group_name]
@@ -60,8 +58,8 @@ class ErrorTracker:
                 # No similar message found. Create new group.
                 self._errors[error_group_stack_trace][error_group_name].update([error_group_message])
 
-    def _get_traceback_text(self, error: Exception) -> str | None:
-        if self.show_stack_trace:
+    def _get_file_and_line(self, error: Exception) -> str | None:
+        if self.show_file_and_line_number:
             error_traceback = traceback.extract_tb(error.__traceback__)
             return f'{error_traceback[0].filename.split("/")[-1]}:{error_traceback[0].lineno}'
         return None
@@ -93,7 +91,7 @@ class ErrorTracker:
 
     def get_most_common_errors(self, n: int = 3) -> list[tuple[str | None, int]]:
         """Return n most common errors."""
-        all_errors: ErrorMessageGroups = Counter()
+        all_errors: Counter[GroupName] = Counter()
         for stack_group_name, stack_group in self._errors.items():
             for name_group_name, name_group in stack_group.items():
                 for message_group_name, count in name_group.items():
@@ -116,7 +114,7 @@ class ErrorTracker:
         if message_1 is None or message_2 is None:
             return None
 
-        replacement_symbol = '_'
+        replacement_string = '***'
         replacement_count = 0
 
         generic_message_parts = []
@@ -126,7 +124,7 @@ class ErrorTracker:
 
         for message_1_part, message_2_part in zip_longest(message_1_parts, message_2_parts, fillvalue=''):
             if message_1_part != message_2_part:
-                generic_message_parts.append(replacement_symbol)
+                generic_message_parts.append(replacement_string)
                 replacement_count += 1
                 if replacement_count >= parts_count / 2:
                     # Messages are too different.

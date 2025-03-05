@@ -9,12 +9,12 @@ from crawlee.statistics._error_tracker import ErrorTracker
     ('error_tracker', 'expected_unique_errors'),
     [
         (ErrorTracker(), 4),
-        (ErrorTracker(show_stack_trace=False), 3),
+        (ErrorTracker(show_file_and_line_number=False), 3),
         (ErrorTracker(show_error_name=False), 3),
         (ErrorTracker(show_error_message=False), 3),
-        (ErrorTracker(show_stack_trace=False, show_error_name=False), 2),
-        (ErrorTracker(show_stack_trace=False, show_error_message=False), 2),
-        (ErrorTracker(show_stack_trace=False, show_error_name=False, show_error_message=False), 1),
+        (ErrorTracker(show_error_name=False, show_file_and_line_number=False), 2),
+        (ErrorTracker(show_file_and_line_number=False, show_error_message=False), 2),
+        (ErrorTracker(show_error_name=False, show_file_and_line_number=False, show_error_message=False), 1),
     ],
 )
 def test_error_tracker_counts(error_tracker: ErrorTracker, expected_unique_errors: int) -> None:
@@ -45,9 +45,9 @@ def test_error_tracker_counts(error_tracker: ErrorTracker, expected_unique_error
 @pytest.mark.parametrize(
     ('message_1', 'message_2', 'expected_generic_message'),
     [
-        ('Some error number 123', 'Some error number 456', 'Some error number _'),
-        ('Some error number 123 456', 'Some error number 123 456 789', 'Some error number 123 456 _'),
-        ('Some error number 0 0 0', 'Some error number 1 0 1', 'Some error number _ 0 _'),
+        ('Some error number 123', 'Some error number 456', 'Some error number ***'),
+        ('Some error number 123 456', 'Some error number 123 456 789', 'Some error number 123 456 ***'),
+        ('Some error number 0 0 0', 'Some error number 1 0 1', 'Some error number *** 0 ***'),
     ],
 )
 def test_error_tracker_similar_messages_full_stack(
@@ -88,7 +88,9 @@ def test_error_tracker_similar_messages_full_stack(
 )
 def test_show_full_message(*, show_full_message: bool, expected_message: str) -> None:
     """Test error message settings with both options of `show_full_message`."""
-    error_tracker = ErrorTracker(show_stack_trace=False, show_error_name=False, show_full_message=show_full_message)
+    error_tracker = ErrorTracker(
+        show_error_name=False, show_file_and_line_number=False, show_full_message=show_full_message
+    )
 
     try:
         raise RuntimeError('Error line 1\n Error line 2')  # Errors raised on the same line
