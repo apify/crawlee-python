@@ -334,8 +334,7 @@ class KeyValueStoreClient(BaseKeyValueStoreClient):
             await asyncio.to_thread(f.close)
 
         if self._memory_storage_client.write_metadata:
-            mode = 'r+b' if os.path.exists(record_metadata_path) else 'wb'
-            metadata_f = await asyncio.to_thread(open, record_metadata_path, mode=mode)
+            metadata_f = await asyncio.to_thread(open, record_metadata_path, mode='wb')
 
             try:
                 record_metadata = KeyValueStoreRecordMetadata(key=record.key, content_type=record.content_type)
