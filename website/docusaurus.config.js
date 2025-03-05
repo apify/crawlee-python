@@ -176,17 +176,13 @@ module.exports = {
                 hideable: true,
             },
         },
-        announcementBar: {
-            id: 'announcement-bar-',
-            content: `🎉️ <b>If you like Crawlee for Python, <a href="https://github.com/apify/crawlee-python/">star us on GitHub!</a></b> 🥳️`,
-        },
         navbar: {
             hideOnScroll: true,
-            title: 'Crawlee for Python',
             logo: {
-                src: 'img/crawlee-light-new.svg',
-                srcDark: 'img/crawlee-dark-new.svg',
+                src: 'img/crawlee-python-light.svg',
+                srcDark: 'img/crawlee-python-dark.svg',
             },
+            title: 'Crawlee Python',
             items: [
                 {
                     type: 'doc',
@@ -206,14 +202,6 @@ module.exports = {
                     position: 'left',
                     activeBaseRegex: 'api/(?!.*/changelog)',
                 },
-                // {
-                //     type: 'custom-api',
-                //     to: 'core/changelog',
-                //     label: 'Changelog',
-                //     position: 'left',
-                //     className: 'changelog',
-                //     activeBaseRegex: 'changelog',
-                // },
                 {
                     type: 'doc',
                     label: 'Changelog',
@@ -226,53 +214,6 @@ module.exports = {
                     rel: 'dofollow',
                     label: 'Blog',
                     position: 'left',
-                },
-                {
-                    type: 'dropdown',
-                    label: 'Python',
-                    position: 'left',
-                    items: [
-                        {
-                            label: 'Node.js',
-                            href: 'https://crawlee.dev',
-                            target: '_self',
-                            rel: 'dofollow',
-                        },
-                        {
-                            label: 'Python',
-                            href: '#',
-                            target: '_self',
-                            rel: 'dofollow',
-                        },
-                    ],
-                },
-                // {
-                //     type: 'docsVersionDropdown',
-                //     position: 'left',
-                //     dropdownItemsAfter: [
-                //         {
-                //             href: 'https://sdk.apify.com/docs/guides/getting-started',
-                //             label: '2.2',
-                //         },
-                //         {
-                //             href: 'https://sdk.apify.com/docs/1.3.1/guides/getting-started',
-                //             label: '1.3',
-                //         },
-                //     ],
-                // },
-                {
-                    href: 'https://github.com/apify/crawlee-python',
-                    label: 'GitHub',
-                    title: 'View on GitHub',
-                    position: 'right',
-                    className: 'icon',
-                },
-                {
-                    href: 'https://discord.com/invite/jyEM2PRvMU',
-                    label: 'Discord',
-                    title: 'Chat on Discord',
-                    position: 'right',
-                    className: 'icon',
                 },
             ],
         },
@@ -299,10 +240,10 @@ module.exports = {
                 {
                     title: 'Docs',
                     items: [
-                        // {
-                        //     label: 'Guides',
-                        //     to: 'docs/guides',
-                        // },
+                        {
+                            label: 'Guides',
+                            to: 'docs/guides',
+                        },
                         {
                             label: 'Examples',
                             to: 'docs/examples',
@@ -311,20 +252,15 @@ module.exports = {
                             label: 'API reference',
                             to: 'api',
                         },
-                        // {
-                        //     label: 'Upgrading to v3',
-                        //     to: 'docs/upgrading/upgrading-to-v3',
-                        // },
+                        {
+                            label: 'Changelog',
+                            to: 'docs/changelog',
+                        },
                     ],
                 },
                 {
-                    title: 'Community',
+                    title: 'Product',
                     items: [
-                        {
-                            label: 'Blog',
-                            href: 'https://crawlee.dev/blog',
-                            // to: 'blog',
-                        },
                         {
                             label: 'Discord',
                             href: 'https://discord.com/invite/jyEM2PRvMU',
@@ -337,13 +273,17 @@ module.exports = {
                             label: 'Twitter',
                             href: 'https://twitter.com/apify',
                         },
+                        {
+                            label: 'YouTube',
+                            href: 'https://www.youtube.com/apify',
+                        },
                     ],
                 },
                 {
                     title: 'More',
                     items: [
                         {
-                            label: 'Apify platform',
+                            label: 'Apify Platform',
                             href: 'https://apify.com',
                         },
                         {
@@ -354,15 +294,10 @@ module.exports = {
                             label: 'GitHub',
                             href: 'https://github.com/apify/crawlee-python',
                         },
+
                     ],
                 },
             ],
-            logo: {
-                src: 'img/apify_logo.svg',
-                href: '/',
-                width: '60px',
-                height: '60px',
-            },
         },
         algolia: {
             appId: '5JC94MPMLY',
@@ -371,6 +306,11 @@ module.exports = {
             placeholder: 'Search documentation',
             algoliaOptions: {
                 facetFilters: ['version:VERSION'],
+            },
+            translations: {
+                button: {
+                    buttonText: 'Search documentation...',
+                },
             },
         },
     }),
