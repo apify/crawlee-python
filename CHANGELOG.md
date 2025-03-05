@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.6.2 - **not yet released**
+
+### 🚀 Features
+
+- Extend ErrorTracker with error grouping ([#1014](https://github.com/apify/crawlee-python/pull/1014)) ([561de5c](https://github.com/apify/crawlee-python/commit/561de5c6b76af386cad5ac804a22fb7af227e460)) by [@Pijukatel](https://github.com/Pijukatel)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.6.1](https://github.com/apify/crawlee-python/releases/tag/v0.6.1) (2025-03-03)
 
 ### 🐛 Bug Fixes
