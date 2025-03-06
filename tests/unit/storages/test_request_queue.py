@@ -7,8 +7,9 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import ValidationError
 
-from crawlee import Request
+from crawlee import Request, service_locator
 from crawlee._request import RequestState
+from crawlee.storage_clients.models import StorageMetadata
 from crawlee.storages import RequestQueue
 
 if TYPE_CHECKING:
@@ -265,3 +266,21 @@ async def test_cache_requests(request_queue: RequestQueue) -> None:
     # After calling fetch_next_request request_1 moved to the end of the cache store.
     cached_items = [request_queue._requests_cache.popitem()[0] for _ in range(2)]
     assert cached_items == [request_2.id, request_1.id]
+
+
+async def test_from_storage_object() -> None:
+    storage_client = service_locator.get_storage_client()
+
+    storage_object = StorageMetadata(
+        id='dummy-id',
+        name='dummy-name',
+        accessed_at=datetime.now(timezone.utc),
+        created_at=datetime.now(timezone.utc),
+        modified_at=datetime.now(timezone.utc),
+    )
+
+    request_queue = RequestQueue.from_storage_object(storage_client, storage_object)
+
+    assert request_queue.id == storage_object.id
+    assert request_queue.name == storage_object.name
+    assert request_queue.storage_object == storage_object

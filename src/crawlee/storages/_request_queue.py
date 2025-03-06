@@ -17,7 +17,7 @@ from crawlee._utils.requests import unique_key_to_request_id
 from crawlee._utils.wait import wait_for_all_tasks_for_finish
 from crawlee.events import Event
 from crawlee.request_loaders import RequestManager
-from crawlee.storage_clients.models import ProcessedRequest, RequestQueueMetadata
+from crawlee.storage_clients.models import ProcessedRequest, RequestQueueMetadata, StorageMetadata
 
 from ._base import Storage
 
@@ -89,6 +89,11 @@ class RequestQueue(Storage, RequestManager):
         self._id = id
         self._name = name
 
+        datetime_now = datetime.now(timezone.utc)
+        self._storage_object = StorageMetadata(
+            id=id, name=name, accessed_at=datetime_now, created_at=datetime_now, modified_at=datetime_now
+        )
+
         # Get resource clients from storage client
         self._resource_client = storage_client.request_queue(self._id)
         self._resource_collection_client = storage_client.request_queues()
@@ -116,6 +121,18 @@ class RequestQueue(Storage, RequestManager):
         self._last_activity = datetime.now(timezone.utc)
         self._requests_cache: LRUCache[str, CachedRequest] = LRUCache(maxsize=self._MAX_CACHED_REQUESTS)
 
+    @classmethod
+    def from_storage_object(cls, storage_client: StorageClient, storage_object: StorageMetadata) -> RequestQueue:
+        """Create a new instance of RequestQueue from a storage metadata object."""
+        request_queue = RequestQueue(
+            id=storage_object.id,
+            name=storage_object.name,
+            storage_client=storage_client,
+        )
+
+        request_queue.storage_object = storage_object
+        return request_queue
+
     @property
     @override
     def id(self) -> str:
@@ -125,6 +142,16 @@ class RequestQueue(Storage, RequestManager):
     @override
     def name(self) -> str | None:
         return self._name
+
+    @property
+    @override
+    def storage_object(self) -> StorageMetadata:
+        return self._storage_object
+
+    @storage_object.setter
+    @override
+    def storage_object(self, storage_object: StorageMetadata) -> None:
+        self._storage_object = storage_object
 
     @override
     @classmethod
