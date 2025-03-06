@@ -226,10 +226,10 @@ def create(
                     f'activate the virtual environment in ".venv" ("source .venv/bin/activate") '
                     f'and run your project using "python -m {package_name}".'
                 )
-            elif package_manager == 'poetry':
+            elif package_manager in {'poetry', 'uv'}:
                 typer.echo(
                     f'To run it, navigate to the directory: "cd {project_name}", '
-                    f'and run it using "poetry run python -m {package_name}".'
+                    f'and run it using "{package_manager} run python -m {package_name}".'
                 )
 
             typer.echo(f'See the "{project_name}/README.md" for more information.')
