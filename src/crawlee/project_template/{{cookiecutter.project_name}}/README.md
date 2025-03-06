@@ -34,6 +34,37 @@ When the dependencies are installed, you may launch the crawler with:
 ```sh
 python -m {{cookiecutter.__package_name}}
 ```
+
+{% elif cookiecutter.package_manager == 'uv' -%}
+To get started, ensure you have [UV](https://docs.astral.sh/uv/), a package and dependency management system, installed on your machine. We recommend installing it with the following command:
+
+```sh
+pipx install uv
+```
+
+Next, install the project dependencies:
+
+```sh
+uv sync
+```
+
+Finally, launch the crawler with:
+
+```sh
+uv run python -m {{cookiecutter.__package_name}}
+```
+{% elif cookiecutter.package_manager == 'pip' -%}
+To install dependencies, your can run the following command:
+
+```sh
+python -m pip install .
+```
+
+When the dependencies are installed, you may launch the crawler with:
+
+```sh
+python -m {{cookiecutter.__package_name}}
+```
 {% elif cookiecutter.package_manager == 'manual' -%}
 You selected the manual dependency installation method, so you're on your own. There is a simple `requirements.txt` file to get you started.
 {% endif %}

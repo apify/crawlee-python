@@ -35,6 +35,28 @@ RUN echo "Python version:" \
     pip install -r /dev/stdin --no-dependencies \
  && echo "All installed Python packages:" \
  && pip freeze
+# % elif cookiecutter.package_manager == 'uv'
+RUN pip install -U pip setuptools \
+    && pip install 'uv<1'
+
+ENV UV_PROJECT_ENVIRONMENT="/usr/local"
+
+COPY pyproject.toml uv.lock ./
+
+RUN echo "Python version:" \
+    && python --version \
+    && echo "Installing dependencies:" \
+    # Check if playwright is already installed
+    && PLAYWRIGHT_INSTALLED=$(pip freeze | grep -q playwright && echo "true" || echo "false") \
+    && if [ "$PLAYWRIGHT_INSTALLED" = "true" ]; then \
+        echo "Playwright already installed, excluding from uv sync" \
+        && uv sync --frozen --no-install-project --no-editable -q --no-dev --inexact --no-install-package playwright; \
+    else \
+        echo "Playwright not found, installing all dependencies" \
+        && uv sync --frozen --no-install-project --no-editable -q --no-dev --inexact; \
+    fi \
+    && echo "All installed Python packages:" \
+    && pip freeze
 # % elif cookiecutter.package_manager == 'pip'
 RUN pip install -U pip setuptools
 

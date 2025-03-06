@@ -4,13 +4,21 @@ from pathlib import Path
 
 Path('_pyproject.toml').rename('pyproject.toml')
 
-# % if cookiecutter.package_manager == 'poetry'
+# % if cookiecutter.package_manager in ['poetry', 'uv']
 Path('requirements.txt').unlink()
 
+# % if cookiecutter.package_manager == 'poetry'
 subprocess.check_call(['poetry', 'install'])
-# % if cookiecutter.crawler_type == 'playwright'
-subprocess.check_call(['poetry', 'run', 'playwright', 'install'])
+# % elif cookiecutter.package_manager == 'uv'
+subprocess.check_call(['uv', 'sync'])
 # % endif
+
+# % if cookiecutter.crawler_type == 'playwright'
+manager = "{{ cookiecutter.package_manager }}"
+subprocess.check_call([manager, 'run', 'playwright', 'install'])
+# % endif
+
+
 # % elif cookiecutter.package_manager == 'pip'
 import venv  # noqa: E402
 
