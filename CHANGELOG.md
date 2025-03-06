@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.6.3 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Update project templates for Poetry v2.x compatibility ([#1049](https://github.com/apify/crawlee-python/pull/1049)) ([96dc2f9](https://github.com/apify/crawlee-python/commit/96dc2f9b53b0a2d0f1d0c73d10e5244114e849ff)) by [@Mantisus](https://github.com/Mantisus), closes [#954](https://github.com/apify/crawlee-python/issues/954)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.6.2](https://github.com/apify/crawlee-python/releases/tag/v0.6.2) (2025-03-05)
+
+### 🚀 Features
+
+- Extend ErrorTracker with error grouping ([#1014](https://github.com/apify/crawlee-python/pull/1014)) ([561de5c](https://github.com/apify/crawlee-python/commit/561de5c6b76af386cad5ac804a22fb7af227e460)) by [@Pijukatel](https://github.com/Pijukatel)
+
+
 ## [0.6.1](https://github.com/apify/crawlee-python/releases/tag/v0.6.1) (2025-03-03)
 
 ### 🐛 Bug Fixes

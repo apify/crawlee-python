@@ -16,8 +16,6 @@ try:
     version = subprocess.check_output([manager, '--version']).decode().strip()
 except OSError as exc:
     raise RuntimeError(f'You chose to use the {manager_text} package manager, but it does not seem to be installed') from exc
-print(version)
-print(version_regex)
 if not re.match(version_regex, version):
     raise RuntimeError(f'{manager_text} {r_version} is required, but "{version}" is installed')
 # % endif

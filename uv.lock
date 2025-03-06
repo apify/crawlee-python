@@ -578,7 +578,7 @@ toml = [
 
 [[package]]
 name = "crawlee"
-version = "0.6.1"
+version = "0.6.3"
 source = { editable = "." }
 dependencies = [
     { name = "browserforge" },
