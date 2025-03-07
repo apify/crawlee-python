@@ -139,7 +139,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         # If browser_pool is not provided, create a new instance of BrowserPool with specified arguments.
         else:
             if fingerprint_generator == 'default':
-                generator_browser_type = [browser_type] if browser_type else browser_type
+                generator_browser_type = None if browser_type is None else [browser_type]
                 fingerprint_generator = DefaultFingerprintGenerator(
                     header_options=HeaderGeneratorOptions(browsers=generator_browser_type)
                 )
