@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from functools import partial
-from typing import TYPE_CHECKING, Any, Callable, Generic, Optional, cast
+from typing import TYPE_CHECKING, Any, Callable, Generic, Literal
 
 from pydantic import ValidationError
 from typing_extensions import NotRequired, TypedDict, TypeVar
@@ -35,13 +35,6 @@ if TYPE_CHECKING:
     from crawlee import RequestTransformAction
     from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs
     from crawlee.browsers._types import BrowserType
-
-
-class _DefaultNone:
-    """Helper class used to distinguish between intentional `None` and default `None`.
-
-    For mutable arguments where `None` means truly `None` and not default mutable.
-    """
 
 
 @docs_group('Classes')
@@ -85,8 +78,6 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
     ```
     """
 
-    _default_none = _DefaultNone()
-
     def __init__(
         self,
         *,
@@ -95,7 +86,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         user_data_dir: str | Path | None = None,
         browser_launch_options: Mapping[str, Any] | None = None,
         browser_new_context_options: Mapping[str, Any] | None = None,
-        fingerprint_generator: FingerprintGenerator | None | _DefaultNone = _default_none,
+        fingerprint_generator: FingerprintGenerator | None | Literal['default'] = 'default',
         headless: bool | None = None,
         use_incognito_pages: bool | None = None,
         **kwargs: Unpack[BasicCrawlerOptions[PlaywrightCrawlingContext, StatisticsState]],
@@ -128,7 +119,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         if browser_pool:
             # Raise an exception if browser_pool is provided together with other browser-related arguments.
             if any(
-                param not in [None, self._default_none]
+                param not in [None, 'default']
                 for param in (
                     user_data_dir,
                     use_incognito_pages,
@@ -147,13 +138,11 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
         # If browser_pool is not provided, create a new instance of BrowserPool with specified arguments.
         else:
-            if fingerprint_generator is self._default_none:
+            if fingerprint_generator == 'default':
                 generator_browser_type = [browser_type] if browser_type else browser_type
                 fingerprint_generator = DefaultFingerprintGenerator(
                     header_options=HeaderGeneratorOptions(browsers=generator_browser_type)
                 )
-            # To clean the type from _default_none.
-            fingerprint_generator = cast(Optional[FingerprintGenerator], fingerprint_generator)
 
             browser_pool = BrowserPool.with_default_plugin(
                 headless=headless,

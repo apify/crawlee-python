@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 from unittest import mock
 from unittest.mock import Mock
 
@@ -32,7 +32,6 @@ if TYPE_CHECKING:
     from crawlee._request import RequestOptions
     from crawlee.browsers._types import BrowserType
     from crawlee.crawlers import PlaywrightCrawlingContext, PlaywrightPreNavCrawlingContext
-    from crawlee.crawlers._playwright._playwright_crawler import _DefaultNone
 
 
 async def test_basic_request(httpbin: URL) -> None:
@@ -155,11 +154,11 @@ async def test_redirect_handling() -> None:
             DefaultFingerprintGenerator(header_options=HeaderGeneratorOptions(browsers=['chromium'])),
             id='Explicitly passed fingerprint generator.',
         ),
-        pytest.param(PlaywrightCrawler._default_none, id='Default fingerprint generator.'),
+        pytest.param('default', id='Default fingerprint generator.'),
     ],
 )
 async def test_chromium_headless_headers(
-    header_network: dict, fingerprint_generator: None | FingerprintGenerator | _DefaultNone
+    header_network: dict, fingerprint_generator: None | FingerprintGenerator | Literal['default']
 ) -> None:
     browser_type: BrowserType = 'chromium'
     crawler = PlaywrightCrawler(headless=True, browser_type=browser_type, fingerprint_generator=fingerprint_generator)
