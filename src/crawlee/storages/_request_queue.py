@@ -447,6 +447,9 @@ class RequestQueue(Storage, RequestManager):
 
                 self._is_finished_log_throttle_counter += 1
 
+            logger.debug(
+                f'Deciding if we are finished based on `queue_has_locked_requests` = {self._queue_has_locked_requests}'
+            )
             return not self._queue_has_locked_requests
 
         metadata = await self._resource_client.get()

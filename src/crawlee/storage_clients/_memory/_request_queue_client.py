@@ -230,7 +230,7 @@ class RequestQueueClient(BaseRequestQueueClient):
             existing_queue_by_id._in_progress.add(item.id)  # noqa: SLF001
 
         return RequestQueueHeadWithLocks(
-            queue_has_locked_requests=len(self._in_progress) > 0,
+            queue_has_locked_requests=len(existing_queue_by_id._in_progress) > 0,  # noqa: SLF001
             lock_secs=lock_secs,
             limit=result.limit,
             had_multiple_clients=result.had_multiple_clients,
