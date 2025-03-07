@@ -1,6 +1,13 @@
 .navbarLogo {
     position: relative;
     cursor: pointer;
+
+    /* do not display the other theme logo when loading */
+    a {
+        img:nth-child(2) {
+            display: none !important;
+        }
+    }
 }
 
 .logoWithArrows {
