@@ -9,4 +9,5 @@ BROWSER_TYPE_HEADER_KEYWORD = {
     'firefox': {'Firefox', 'FxiOS'},
     'edge': {'Edg', 'Edge', 'EdgA', 'EdgiOS'},
     'webkit': {'Safari'},
+    'safari': {'Safari'},
 }

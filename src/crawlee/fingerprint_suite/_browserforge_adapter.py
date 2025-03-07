@@ -60,7 +60,7 @@ class PatchedHeaderGenerator(bf_HeaderGenerator):
         For example this Safari user agent can be generated for `chromium` input:
         `Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko)
          CriOS/130.0.6723.90 Mobile/15E148 Safari/604.1`
-        To remain consistent with previous implementation only subset of `chromium` header will be allowed.
+        To remain consistent with previous implementation only subset of `chromium` headers will be allowed.
         """
         # browserforge header generation can be flaky. Enforce basic QA on generated headers
         max_attempts = 10
@@ -78,7 +78,7 @@ class PatchedHeaderGenerator(bf_HeaderGenerator):
         # Browserforge uses term 'safari', we use term 'webkit'
         bf_browser_type = 'safari' if single_browser == 'webkit' else single_browser
 
-        # Use browserforge to generate headers until it satisfy our additional requirements.
+        # Use browserforge to generate headers until it satisfies our additional requirements.
         for _attempt in range(max_attempts):
             generated_header: dict[str, str] = super().generate(
                 browser=bf_browser_type,
@@ -94,7 +94,7 @@ class PatchedHeaderGenerator(bf_HeaderGenerator):
             if ('headless' in generated_header.get('User-Agent', '').lower()) or (
                 'headless' in generated_header.get('sec-ch-ua', '').lower()
             ):
-                # It can be a valid header, but we never want to leak it. Get a different one.
+                # It can be a valid header, but we never want to leak "headless". Get a different one.
                 continue
 
             if any(
@@ -122,9 +122,11 @@ class PatchedHeaderGenerator(bf_HeaderGenerator):
         """Get single browser type.
 
         Browserforge header generator accepts wider range of possible types.
-        Narrow it to string as that is how we use it.
+        Narrow it to single optional string as that is how we use it.
+        Handling the original multitype would be pointlessly complex.
         """
-        # In our case we never pass more than one browser type.
+        # In our case we never pass more than one browser type. In general case more browsers are just bigger pool to
+        # select from, so narrowing it to the first one is still a valid action.
         first_browser = (
             next(iter(browser)) if (isinstance(browser, Iterable) and not isinstance(browser, str)) else browser
         )
