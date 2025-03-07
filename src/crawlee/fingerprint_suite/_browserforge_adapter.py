@@ -54,14 +54,18 @@ class PatchedHeaderGenerator(bf_HeaderGenerator):
         strict: bool | None = None,
         request_dependent_headers: dict[str, str] | None = None,
     ) -> dict[str, str]:
-        """
-        Generate HTTP headers based on the specified parameters.
+        """Generate HTTP headers based on the specified parameters.
 
-        The `browser` parameter accepts `chromium` as a general category, which includes not only Google Chrome 
-        but also other Chromium-based browsers. As a result, a Safari-like user agent may be generated for a `chromium` input,
-        such as:          
+        For detailed description of the original method see: `browserforge.headers.generator.HeaderGenerator.generate`
+        This patched version of the method adds additional quality checks on the output of the original method. It tries
+        to generate headers several times until they match the requirements.
+
+        The `browser` parameter accepts `chromium` as a general category, which includes not only Google Chrome
+        but also other Chromium-based browsers. As a result, a Safari-like user agent may be generated for a `chromium`
+        input, such as:
         ```
-        Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/130.0.6723.90 Mobile/15E148 Safari/604.1
+        Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko)
+         CriOS/130.0.6723.90 Mobile/15E148 Safari/604.1
         ```
         To maintain consistency with previous implementations, only a subset of Chromium headers will be allowed.
 
