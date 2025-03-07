@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from typing import TYPE_CHECKING
 
 from crawlee._consts import METADATA_FILENAME
@@ -18,17 +17,17 @@ async def test_persist_metadata_skips_when_disabled(tmp_path: Path) -> None:
 
 async def test_persist_metadata_creates_files_and_directories_when_enabled(tmp_path: Path) -> None:
     data = {'key': 'value'}
-    entity_directory = os.path.join(tmp_path, 'new_dir')
-    await persist_metadata_if_enabled(data=data, entity_directory=entity_directory, write_metadata=True)
-    assert os.path.exists(entity_directory)  # Check if directory was created
-    assert os.path.isfile(os.path.join(entity_directory, METADATA_FILENAME))  # Check if file was created
+    entity_directory = tmp_path / 'new_dir'
+    await persist_metadata_if_enabled(data=data, entity_directory=str(entity_directory), write_metadata=True)
+    assert entity_directory.exists()  # Check if directory was created
+    assert (entity_directory / METADATA_FILENAME).is_file()  # Check if file was created
 
 
 async def test_persist_metadata_correctly_writes_data(tmp_path: Path) -> None:
     data = {'key': 'value'}
-    entity_directory = os.path.join(tmp_path, 'data_dir')
-    await persist_metadata_if_enabled(data=data, entity_directory=entity_directory, write_metadata=True)
-    metadata_path = os.path.join(entity_directory, METADATA_FILENAME)
+    entity_directory = tmp_path / 'data_dir'
+    await persist_metadata_if_enabled(data=data, entity_directory=str(entity_directory), write_metadata=True)
+    metadata_path = entity_directory / METADATA_FILENAME
     with open(metadata_path) as f:  # noqa: ASYNC230
         content = f.read()
     assert json.loads(content) == data  # Check if correct data was written
