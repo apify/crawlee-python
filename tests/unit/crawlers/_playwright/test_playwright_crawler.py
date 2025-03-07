@@ -144,8 +144,8 @@ async def test_redirect_handling() -> None:
     await crawler.run([request])
     assert handled_urls == set()
 
-@pytest.mark.parametrize('_', range(100))
-async def test_chromium_headless_headers(header_network: dict, _) -> None:
+
+async def test_chromium_headless_headers(header_network: dict) -> None:
     browser_type: BrowserType = 'chromium'
     crawler = PlaywrightCrawler(headless=True, browser_type=browser_type)
     headers = dict[str, str]()

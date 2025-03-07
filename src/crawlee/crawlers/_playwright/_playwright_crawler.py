@@ -43,6 +43,7 @@ class _DefaultNone:
     For mutable arguments where `None` means truly `None` and not default mutable.
     """
 
+
 @docs_group('Classes')
 class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]):
     """A web crawler that leverages the `Playwright` browser automation library.
