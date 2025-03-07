@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "crawlee"
-version = "0.6.0"
+version = "0.6.3"
 description = "Crawlee for Python"
 authors = [{ name = "Apify Technologies s.r.o.", email = "support@apify.com" }]
 license = { file = "LICENSE" }
@@ -33,13 +33,12 @@ keywords = [
     "scraping",
 ]
 dependencies = [
+    "browserforge>=1.2.3",
     "cachetools>=5.5.0",
     "colorama>=0.4.0",
-    "cookiecutter>=2.6.0",
     "docutils>=0.21.0",
     "eval-type-backport>=0.2.0",
     "httpx[brotli,http2,zstd]>=0.27.0",
-    "inquirer>=3.3.0",
     "more-itertools>=10.2.0",
     "psutil>=6.0.0",
     "pydantic-settings>=2.2.0,<2.7.0",
@@ -48,7 +47,6 @@ dependencies = [
     "rich>=13.9.0",
     "sortedcollections>=2.1.0",
     "tldextract>=5.1.0",
-    "typer>=0.12.0",
     "typing-extensions>=4.1.0",
     "yarl>=1.18.0",
 ]
@@ -58,14 +56,16 @@ dependencies = [
 # https://github.com/apify/crawlee-python/issues/995
 all = [
     "beautifulsoup4[lxml]>=4.12.0",
-    "browserforge>=1.2.3",
+    "cookiecutter>=2.6.0",
     "curl-cffi>=0.9.0",
     "html5lib>=1.0",
+    "inquirer>=3.3.0",
     "jaro-winkler>=2.0.3",
     "parsel>=1.10.0",
     "playwright>=1.27.0",
     "scikit-learn==1.5.2; python_version == '3.9'",
     "scikit-learn>=1.6.0; python_version >= '3.10'",
+    'typer>=0.12.0'
 ]
 adaptive-crawler = [
     "jaro-winkler>=2.0.3",
@@ -74,9 +74,13 @@ adaptive-crawler = [
     "scikit-learn>=1.6.0; python_version >= '3.10'",
 ]
 beautifulsoup = ["beautifulsoup4[lxml]>=4.12.0", "html5lib>=1.0"]
+cli = ["cookiecutter>=2.6.0", "inquirer>=3.3.0", "typer>=0.12.0"]
 curl-impersonate = ["curl-cffi>=0.9.0"]
 parsel = ["parsel>=1.10.0"]
-playwright = ["browserforge>=1.2.3", "playwright>=1.27.0"]
+playwright = ["playwright>=1.27.0"]
+
+[project.scripts]
+crawlee = "crawlee._cli:cli"
 
 [project.urls]
 "Homepage" = "https://crawlee.dev/python"
@@ -102,7 +106,7 @@ dev = [
     "pytest-xdist~=3.6.0",
     "pytest~=8.3.0",
     "respx~=0.22.0",
-    "ruff~=0.8.0",
+    "ruff~=0.9.0",
     "setuptools~=75.8.0",                    # setuptools are used by pytest, but not explicitly required
     "sortedcontainers-stubs~=2.4.0",
     "types-beautifulsoup4~=4.12.0.20240229",

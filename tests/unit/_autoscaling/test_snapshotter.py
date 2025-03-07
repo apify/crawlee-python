@@ -9,7 +9,7 @@ import pytest
 
 from crawlee import service_locator
 from crawlee._autoscaling import Snapshotter
-from crawlee._autoscaling.types import CpuSnapshot, EventLoopSnapshot, Snapshot
+from crawlee._autoscaling._types import CpuSnapshot, EventLoopSnapshot, Snapshot
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.system import CpuInfo, MemoryInfo
 from crawlee.configuration import Configuration

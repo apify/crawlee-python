@@ -343,7 +343,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             if matched_selectors:
                 raise SessionError(
                     'Assuming the session is blocked - '
-                    f"HTTP response matched the following selectors: {'; '.join(matched_selectors)}"
+                    f'HTTP response matched the following selectors: {"; ".join(matched_selectors)}'
                 )
 
         yield context

@@ -3,7 +3,34 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 0.6.0 - **not yet released**
+## 0.6.3 - **not yet released**
+
+### 🚀 Features
+
+- Add project template with `uv` package manager ([#1057](https://github.com/apify/crawlee-python/pull/1057)) ([9ec06e5](https://github.com/apify/crawlee-python/commit/9ec06e58032aa11af46ac9cd1ea7bb002a18eb13)) by [@Mantisus](https://github.com/Mantisus), closes [#1053](https://github.com/apify/crawlee-python/issues/1053)
+
+### 🐛 Bug Fixes
+
+- Update project templates for Poetry v2.x compatibility ([#1049](https://github.com/apify/crawlee-python/pull/1049)) ([96dc2f9](https://github.com/apify/crawlee-python/commit/96dc2f9b53b0a2d0f1d0c73d10e5244114e849ff)) by [@Mantisus](https://github.com/Mantisus), closes [#954](https://github.com/apify/crawlee-python/issues/954)
+- Remove tmp folder for PlaywrightCrawler in non-headless mode ([#1046](https://github.com/apify/crawlee-python/pull/1046)) ([3a7f444](https://github.com/apify/crawlee-python/commit/3a7f444fb7ee9a0ab1867c8c9586b15aab1e7df2)) by [@Mantisus](https://github.com/Mantisus)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.6.2](https://github.com/apify/crawlee-python/releases/tag/v0.6.2) (2025-03-05)
+
+### 🚀 Features
+
+- Extend ErrorTracker with error grouping ([#1014](https://github.com/apify/crawlee-python/pull/1014)) ([561de5c](https://github.com/apify/crawlee-python/commit/561de5c6b76af386cad5ac804a22fb7af227e460)) by [@Pijukatel](https://github.com/Pijukatel)
+
+
+## [0.6.1](https://github.com/apify/crawlee-python/releases/tag/v0.6.1) (2025-03-03)
+
+### 🐛 Bug Fixes
+
+- Add `browserforge` to mandatory dependencies ([#1044](https://github.com/apify/crawlee-python/pull/1044)) ([ddfbde8](https://github.com/apify/crawlee-python/commit/ddfbde89dd3e3cbef0f3954936f4a41c3d6df909)) by [@Pijukatel](https://github.com/Pijukatel)
+
+
+## [0.6.0](https://github.com/apify/crawlee-python/releases/tag/v0.6.0) (2025-03-03)
 
 ### 🚀 Features
 
@@ -32,9 +59,9 @@ All notable changes to this project will be documented in this file.
 - [**breaking**] Change `Session` cookies from `dict` to `SessionCookies` with `CookieJar` ([#984](https://github.com/apify/crawlee-python/pull/984)) ([6523b3a](https://github.com/apify/crawlee-python/commit/6523b3ade0eed53b0363ddce250c557024339b5e)) by [@Mantisus](https://github.com/Mantisus), closes [#710](https://github.com/apify/crawlee-python/issues/710), [#933](https://github.com/apify/crawlee-python/issues/933)
 - [**breaking**] Replace enum with literal for `EnqueueStrategy` ([#1019](https://github.com/apify/crawlee-python/pull/1019)) ([d2481ef](https://github.com/apify/crawlee-python/commit/d2481ef71d3539979c5b1129387e72b4126fe366)) by [@vdusek](https://github.com/vdusek)
 - [**breaking**] Update status code handling ([#1028](https://github.com/apify/crawlee-python/pull/1028)) ([6b59471](https://github.com/apify/crawlee-python/commit/6b5947125e63abdfff481b0669398fc9a7293e55)) by [@Mantisus](https://github.com/Mantisus), closes [#830](https://github.com/apify/crawlee-python/issues/830), [#998](https://github.com/apify/crawlee-python/issues/998)
+- [**breaking**] Move `cli` dependencies to optional dependencies ([#1011](https://github.com/apify/crawlee-python/pull/1011)) ([4382959](https://github.com/apify/crawlee-python/commit/43829590c6b4efd1dc9b833373f82a842a0a1a8e)) by [@Mantisus](https://github.com/Mantisus), closes [#703](https://github.com/apify/crawlee-python/issues/703), [#1010](https://github.com/apify/crawlee-python/issues/1010)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.5.4](https://github.com/apify/crawlee-python/releases/tag/v0.5.4) (2025-02-05)
 
 ### 🚀 Features

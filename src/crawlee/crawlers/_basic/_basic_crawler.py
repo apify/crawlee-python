@@ -31,9 +31,9 @@ from crawlee._types import (
     SendRequestFunction,
 )
 from crawlee._utils.docs import docs_group
-from crawlee._utils.http import is_status_code_client_error, is_status_code_server_error
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
+from crawlee._utils.web import is_status_code_client_error, is_status_code_server_error
 from crawlee.errors import (
     ContextPipelineInitializationError,
     ContextPipelineInterruptedError,
@@ -1160,8 +1160,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         await wait_for(
             lambda: self._context_pipeline(context, self.router),
             timeout=self._request_handler_timeout,
-            timeout_message='Request handler timed out after '
-            f'{self._request_handler_timeout.total_seconds()} seconds',
+            timeout_message=f'Request handler timed out after {self._request_handler_timeout.total_seconds()} seconds',
             logger=self._logger,
         )
 
