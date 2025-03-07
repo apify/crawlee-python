@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Add project template with `uv` package manager ([#1057](https://github.com/apify/crawlee-python/pull/1057)) ([9ec06e5](https://github.com/apify/crawlee-python/commit/9ec06e58032aa11af46ac9cd1ea7bb002a18eb13)) by [@Mantisus](https://github.com/Mantisus), closes [#1053](https://github.com/apify/crawlee-python/issues/1053)
+- Use fingerprint generator in `PlaywrightCrawler` by default  ([#1060](https://github.com/apify/crawlee-python/pull/1060)) ([09cec53](https://github.com/apify/crawlee-python/commit/09cec532911043623eeb475aa8552c70bd94f8b7)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1054](https://github.com/apify/crawlee-python/issues/1054)
 
 ### 🐛 Bug Fixes
 
