@@ -277,6 +277,7 @@ async def test_from_storage_object() -> None:
         accessed_at=datetime.now(timezone.utc),
         created_at=datetime.now(timezone.utc),
         modified_at=datetime.now(timezone.utc),
+        extra_attribute='extra',
     )
 
     request_queue = RequestQueue.from_storage_object(storage_client, storage_object)
@@ -284,3 +285,4 @@ async def test_from_storage_object() -> None:
     assert request_queue.id == storage_object.id
     assert request_queue.name == storage_object.name
     assert request_queue.storage_object == storage_object
+    assert storage_object.model_extra.get('extra_attribute') == 'extra'  # type: ignore[union-attr]

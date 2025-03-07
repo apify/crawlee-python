@@ -145,6 +145,7 @@ async def test_from_storage_object() -> None:
         accessed_at=datetime.now(timezone.utc),
         created_at=datetime.now(timezone.utc),
         modified_at=datetime.now(timezone.utc),
+        extra_attribute='extra',
     )
 
     dataset = Dataset.from_storage_object(storage_client, storage_object)
@@ -152,3 +153,4 @@ async def test_from_storage_object() -> None:
     assert dataset.id == storage_object.id
     assert dataset.name == storage_object.name
     assert dataset.storage_object == storage_object
+    assert storage_object.model_extra.get('extra_attribute') == 'extra'  # type: ignore[union-attr]
