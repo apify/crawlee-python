@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.6.3 - **not yet released**
+## [0.6.3](https://github.com/apify/crawlee-python/releases/tag/v0.6.3) (2025-03-07)
 
 ### 🚀 Features
 
@@ -16,7 +15,6 @@ All notable changes to this project will be documented in this file.
 - Remove tmp folder for PlaywrightCrawler in non-headless mode ([#1046](https://github.com/apify/crawlee-python/pull/1046)) ([3a7f444](https://github.com/apify/crawlee-python/commit/3a7f444fb7ee9a0ab1867c8c9586b15aab1e7df2)) by [@Mantisus](https://github.com/Mantisus)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.6.2](https://github.com/apify/crawlee-python/releases/tag/v0.6.2) (2025-03-05)
 
 ### 🚀 Features
