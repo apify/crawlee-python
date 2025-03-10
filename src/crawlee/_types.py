@@ -67,7 +67,7 @@ class HttpHeaders(RootModel, Mapping[str, str]):
         dict[str, str],
         PlainValidator(lambda value: _normalize_headers(value)),
         Field(default_factory=dict),
-    ] = {}  # noqa: RUF012
+    ] = {}
 
     def __getitem__(self, key: str) -> str:
         return self.root[key.lower()]
