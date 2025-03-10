@@ -62,7 +62,6 @@ export default function NavbarContent() {
     const location = useLocation();
     const mobileSidebar = useNavbarMobileSidebar();
     const items = useNavbarItems();
-    console.log(location.pathname);
     const effectiveItems = (location.pathname?.endsWith('/python/') || location.pathname?.endsWith('/python')) ? items : [...items, VERSIONS_ITEM];
     const [leftItems, rightItems] = splitNavbarItems(effectiveItems);
     const searchBarItem = items.find((item) => item.type === 'search');

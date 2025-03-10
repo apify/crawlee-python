@@ -2,7 +2,7 @@
 
 html[data-theme='dark'] {
     --ifm-navbar-background-color: #1a1b23;
-    --ifm-background-color: #1a1b23;
+    --ifm-background-color: #1a1b21;
     --ifm-background-surface-color: #242736;
 
     --ifm-font-color-base: #f2f3fb;
@@ -21,6 +21,7 @@ html[data-theme='dark'] {
 
     --color-background: #1a1b21;
     --color-background-subtle: #2a2d39;
+    --color-background-muted: #252832;
     --color-field-background: #101114;
     --color-separator: #343847;
     --color-border: #414758;
@@ -33,6 +34,7 @@ html[data-theme='dark'] {
     --color-black-action: #fff;
     --color-icon: #b2b8cc;
     --color-hover: #2d313e;
+    --color-primary-action-hover: #d1d5e4;
 }
 
 :root {
@@ -75,6 +77,7 @@ html[data-theme='dark'] {
     --max-layout-width: 1200px;
 
     --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+    --docsearch-highlight-color: #242836;
 
     --ifm-heading-color: #242736;
 
@@ -83,6 +86,7 @@ html[data-theme='dark'] {
 
     --color-background: #fff;
     --color-background-subtle: #f3f4fa;
+    --color-background-muted: #f8f9fc;
     --color-field-background: #f8f9fc;
     --color-separator: #e0e3f2;
     --color-border: #d0d5e9;
@@ -95,6 +99,7 @@ html[data-theme='dark'] {
     --color-black-action: #272d3e;
     --color-icon: #555d76;
     --color-hover: #eef0f8;
+    --color-primary-action-hover: #2b3143;
 }
 
 @font-face {
@@ -566,7 +571,8 @@ html[data-theme='dark'] .runnable-code-block svg .apify-logo {
 .prism-code.language-python .token-line::before,
 .prism-code.language-dockerfile .token-line::before,
 .prism-code.language-XML .token-line::before,
-.prism-code.language-js .token-line::before {
+.prism-code.language-js .token-line::before,
+.prism-code.language-python .token-line::before {
     counter-increment: line-number;
     content: counter(line-number);
     margin-right: calc(var(--ifm-pre-padding) * 0.8);
