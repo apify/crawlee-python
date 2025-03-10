@@ -10,8 +10,8 @@ from crawlee import Request
 from crawlee.errors import ProxyError
 from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_values
 from crawlee.fingerprint_suite._consts import COMMON_ACCEPT_LANGUAGE
-from crawlee.fingerprint_suite._fallback_consts import COMMON_ACCEPT, USER_AGENT_POOL
 from crawlee.http_clients import HttpxHttpClient
+from crawlee.http_clients._fallback_consts import COMMON_ACCEPT, USER_AGENT_POOL
 from crawlee.statistics import Statistics
 
 if TYPE_CHECKING:

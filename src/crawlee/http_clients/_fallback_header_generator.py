@@ -1,10 +1,10 @@
 import random
+from typing import Literal
 
 from crawlee import HttpHeaders
-from crawlee.browsers._types import BrowserType
-from crawlee.fingerprint_suite._consts import COMMON_ACCEPT_LANGUAGE
-from crawlee.fingerprint_suite._fallback_consts import (
+from crawlee.http_clients._fallback_consts import (
     COMMON_ACCEPT,
+    COMMON_ACCEPT_LANGUAGE,
     PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA,
     PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_MOBILE,
     PW_CHROMIUM_HEADLESS_DEFAULT_SEC_CH_UA_PLATFORM,
@@ -13,6 +13,8 @@ from crawlee.fingerprint_suite._fallback_consts import (
     PW_WEBKIT_HEADLESS_DEFAULT_USER_AGENT,
     USER_AGENT_POOL,
 )
+
+BrowserType = Literal['chromium', 'firefox', 'webkit']
 
 
 class HeaderGenerator:
