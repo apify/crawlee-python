@@ -1,11 +1,19 @@
 .navbarLogo {
     position: relative;
     cursor: pointer;
+
+    /* do not display the other theme logo when loading */
+    a {
+        img:nth-child(2) {
+            display: none !important;
+        }
+    }
 }
 
 .logoWithArrows {
     display: flex;
     align-items: center;
+    pointer-events: none;
 
     svg {
         margin: 0 2px;
