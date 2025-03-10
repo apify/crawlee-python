@@ -90,6 +90,7 @@ function CodeExampleSection() {
     );
 }
 
+// TODO use Python example
 const benefitsCodeBlockCrawler = `{
     useFingerprints: true,
     fingerprintOptions: {
@@ -102,6 +103,7 @@ const benefitsCodeBlockCrawler = `{
 },
 `;
 
+// TODO use Python example
 const benefitsCodeBlockHeadless = `const crawler = new AdaptivePlaywrightCrawler({
     renderingTypeDetectionRatio: 0.1,
     async requestHandler({ querySelector, enqueueLinks }) {

@@ -134,6 +134,11 @@
             }
             code {
                 background: var(--color-background-muted);
+                padding: 16px 8px 16px 2px;
+                span::before {
+                    margin-right: 16px !important;
+                    left: 0 !important;
+                }
             }
         }
     }

@@ -200,12 +200,17 @@
         border-left: 1px dashed var(--color-separator);
         border-right: 1px dashed var(--color-separator);
 
-        :global(.code-block.theme-code-block) {
+        :global(.theme-code-block) {
             margin-bottom: 0;
             border-radius: 0;
             box-shadow: none;
             code {
                 background: var(--color-background-muted);
+                padding: 16px 8px 16px 2px;
+                span::before {
+                    margin-right: 16px !important;
+                    left: 0 !important;
+                }
             }
         }
     }
