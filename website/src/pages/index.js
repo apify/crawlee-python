@@ -94,8 +94,8 @@ const benefitsCodeBlockCrawler = `{
     useFingerprints: true,
     fingerprintOptions: {
         fingerprintGeneratorOptions: {
-            browsers: [BrowserName.chrome, BrowserName.firefox],
-            devices: [DeviceCategory.mobile],
+            browsers: ['chrome', 'firefox'],
+            devices: ['mobile'],
             locales: ['en-US'],
         },
     },
@@ -122,7 +122,7 @@ function BenefitsSection() {
                 title="Unblock websites by default"
                 description="Crawlee crawls stealthily with zero configuration, but you can customize its behavior to overcome any protection. Real-world fingerprints included."
                 content={
-                    <CodeBlock className="code-block">
+                    <CodeBlock className="code-block" language="python">
                         {benefitsCodeBlockCrawler}
                     </CodeBlock>
                 }
@@ -149,7 +149,7 @@ function BenefitsSection() {
                 title="One API for headless and HTTP"
                 description="Switch between HTTP and headless without big rewrites thanks to a shared API. Or even let Adaptive crawler decide if JS rendering is needed."
                 content={
-                    <CodeBlock className="code-block">
+                    <CodeBlock className="code-block" language="python">
                         {benefitsCodeBlockHeadless}
                     </CodeBlock>
                 }
@@ -402,7 +402,7 @@ export default function JavascriptHomepage() {
                 <DeployToCloudSection />
                 <div className={styles.dashedSeparator} />
                 <BuildFastScrapersSection />
-                <HomepageCtaSection showPython />
+                <HomepageCtaSection />
             </div>
         </Layout>
     );
