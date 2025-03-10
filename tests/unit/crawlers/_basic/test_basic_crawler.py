@@ -889,11 +889,20 @@ async def test_respects_no_persist_storage() -> None:
 
 
 @pytest.mark.skipif(os.name == 'nt' and 'CI' in os.environ, reason='Skipped in Windows CI')
-async def test_logs_final_statistics(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+@pytest.mark.parametrize(
+    ('use_table_logs'),
+    [
+        pytest.param(True, id='With table for logs'),
+        pytest.param(False, id='Without table for logs'),
+    ],
+)
+async def test_logs_final_statistics(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, *, use_table_logs: bool
+) -> None:
     # Set the log level to INFO to capture the final statistics log.
     caplog.set_level(logging.INFO)
 
-    crawler = BasicCrawler(configure_logging=False)
+    crawler = BasicCrawler(configure_logging=False, use_table_logs=use_table_logs)
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
@@ -923,21 +932,29 @@ async def test_logs_final_statistics(monkeypatch: pytest.MonkeyPatch, caplog: py
     )
 
     assert final_statistics is not None
-    assert final_statistics.msg.splitlines() == [
-        'Final request statistics:',
-        '┌───────────────────────────────┬───────────┐',
-        '│ requests_finished             │ 4         │',
-        '│ requests_failed               │ 33        │',
-        '│ retry_histogram               │ [1, 4, 8] │',
-        '│ request_avg_failed_duration   │ 99.0      │',
-        '│ request_avg_finished_duration │ 0.483     │',
-        '│ requests_finished_per_minute  │ 0.33      │',
-        '│ requests_failed_per_minute    │ 0.1       │',
-        '│ request_total_duration        │ 720.0     │',
-        '│ requests_total                │ 37        │',
-        '│ crawler_runtime               │ 300.0     │',
-        '└───────────────────────────────┴───────────┘',
-    ]
+    if use_table_logs:
+        assert final_statistics.msg.splitlines() == [
+            'Final request statistics:',
+            '┌───────────────────────────────┬───────────┐',
+            '│ requests_finished             │ 4         │',
+            '│ requests_failed               │ 33        │',
+            '│ retry_histogram               │ [1, 4, 8] │',
+            '│ request_avg_failed_duration   │ 99.0      │',
+            '│ request_avg_finished_duration │ 0.483     │',
+            '│ requests_finished_per_minute  │ 0.33      │',
+            '│ requests_failed_per_minute    │ 0.1       │',
+            '│ request_total_duration        │ 720.0     │',
+            '│ requests_total                │ 37        │',
+            '│ crawler_runtime               │ 300.0     │',
+            '└───────────────────────────────┴───────────┘',
+        ]
+    else:
+        assert final_statistics.msg == (
+            'Final request statistics: requests_finished: 4; requests_failed: 33; '
+            'retry_histogram: [1, 4, 8]; request_avg_failed_duration: 99.0; request_avg_finished_duration: 0.483; '
+            'requests_finished_per_minute: 0.33; requests_failed_per_minute: 0.1; request_total_duration: 720.0; '
+            'requests_total: 37; crawler_runtime: 300.0'
+        )
 
 
 async def test_crawler_manual_stop(httpbin: URL) -> None:
