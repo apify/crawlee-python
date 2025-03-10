@@ -10,7 +10,7 @@ from crawlee._types import HttpHeaders
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
 from crawlee._utils.docs import docs_group
 from crawlee.errors import ProxyError
-from crawlee.fingerprint_suite import HeaderGenerator
+from crawlee.fingerprint_suite._fallback_header_generator import HeaderGenerator
 from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
 from crawlee.sessions import Session
 

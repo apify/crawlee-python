@@ -10,6 +10,7 @@ from crawlee import Request
 from crawlee.errors import ProxyError
 from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_values
 from crawlee.fingerprint_suite._consts import COMMON_ACCEPT_LANGUAGE
+from crawlee.fingerprint_suite._fallback_consts import COMMON_ACCEPT, USER_AGENT_POOL
 from crawlee.http_clients import HttpxHttpClient
 from crawlee.statistics import Statistics
 
@@ -97,7 +98,9 @@ async def test_common_headers_and_user_agent(httpbin: URL, header_network: dict)
     response_headers = response_dict.get('headers', {})
 
     assert 'Accept' in response_headers
-    assert response_headers['Accept'] in get_available_header_values(header_network, {'Accept', 'accept'})
+    assert response_headers['Accept'] in (
+        get_available_header_values(header_network, {'Accept', 'accept'}) | {COMMON_ACCEPT}
+    )
 
     assert 'Accept-Language' in response_headers
     assert response_headers['Accept-Language'] == COMMON_ACCEPT_LANGUAGE
@@ -105,7 +108,9 @@ async def test_common_headers_and_user_agent(httpbin: URL, header_network: dict)
     # By default, HTTPX uses its own User-Agent, which should be replaced by the one from the header generator.
     assert 'User-Agent' in response_headers
     assert 'python-httpx' not in response_headers['User-Agent']
-    assert response_headers['User-Agent'] in get_available_header_values(header_network, {'User-Agent', 'user-agent'})
+    assert response_headers['User-Agent'] in (
+        get_available_header_values(header_network, {'User-Agent', 'user-agent'}) | set(USER_AGENT_POOL)
+    )
 
 
 async def test_crawl_follow_redirects_by_default(http_client: HttpxHttpClient, httpbin: URL) -> None:

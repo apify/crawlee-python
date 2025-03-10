@@ -581,7 +581,6 @@ name = "crawlee"
 version = "0.6.3"
 source = { editable = "." }
 dependencies = [
-    { name = "browserforge" },
     { name = "cachetools" },
     { name = "colorama" },
     { name = "docutils" },
@@ -601,6 +600,7 @@ dependencies = [
 
 [package.optional-dependencies]
 adaptive-crawler = [
+    { name = "browserforge" },
     { name = "jaro-winkler" },
     { name = "playwright" },
     { name = "scikit-learn", version = "1.5.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
@@ -608,6 +608,7 @@ adaptive-crawler = [
 ]
 all = [
     { name = "beautifulsoup4", extra = ["lxml"] },
+    { name = "browserforge" },
     { name = "cookiecutter" },
     { name = "curl-cffi" },
     { name = "html5lib" },
@@ -635,6 +636,7 @@ parsel = [
     { name = "parsel" },
 ]
 playwright = [
+    { name = "browserforge" },
     { name = "playwright" },
 ]
 
@@ -668,7 +670,9 @@ dev = [
 requires-dist = [
     { name = "beautifulsoup4", extras = ["lxml"], marker = "extra == 'all'", specifier = ">=4.12.0" },
     { name = "beautifulsoup4", extras = ["lxml"], marker = "extra == 'beautifulsoup'", specifier = ">=4.12.0" },
-    { name = "browserforge", specifier = ">=1.2.3" },
+    { name = "browserforge", marker = "extra == 'adaptive-crawler'", specifier = "==1.2.3" },
+    { name = "browserforge", marker = "extra == 'all'", specifier = "==1.2.3" },
+    { name = "browserforge", marker = "extra == 'playwright'", specifier = "==1.2.3" },
     { name = "cachetools", specifier = ">=5.5.0" },
     { name = "colorama", specifier = ">=0.4.0" },
     { name = "cookiecutter", marker = "extra == 'all'", specifier = ">=2.6.0" },
@@ -1113,7 +1117,7 @@ name = "importlib-metadata"
 version = "8.6.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "zipp" },
+    { name = "zipp", marker = "python_full_version < '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/33/08/c1395a292bb23fd03bdf572a1357c5a733d3eecbab877641ceacab23db6e/importlib_metadata-8.6.1.tar.gz", hash = "sha256:310b41d755445d74569f993ccfc22838295d9fe005425094fad953d7f15c8580", size = 55767 }
 wheels = [
