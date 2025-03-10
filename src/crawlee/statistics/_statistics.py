@@ -116,7 +116,7 @@ class Statistics(Generic[TStatisticsState]):
             periodic_message_logger=self._periodic_message_logger,
             state_model=state_model,
         )
-        new_statistics._periodic_logger = self._periodic_logger  # noqa:SLF001  # Accessing private member to create copy like-object.
+        new_statistics._periodic_logger = self._periodic_logger  # Accessing private member to create copy like-object.
         return new_statistics
 
     @staticmethod
