@@ -11,7 +11,7 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 from unittest.mock import AsyncMock, Mock, call
 
 import httpx
@@ -890,19 +890,19 @@ async def test_respects_no_persist_storage() -> None:
 
 @pytest.mark.skipif(os.name == 'nt' and 'CI' in os.environ, reason='Skipped in Windows CI')
 @pytest.mark.parametrize(
-    ('use_table_logs'),
+    ('statistics_log_format'),
     [
-        pytest.param(True, id='With table for logs'),
-        pytest.param(False, id='Without table for logs'),
+        pytest.param('table', id='With table for logs'),
+        pytest.param('inline', id='With inline logs'),
     ],
 )
 async def test_logs_final_statistics(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, *, use_table_logs: bool
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, statistics_log_format: Literal['table', 'inline']
 ) -> None:
     # Set the log level to INFO to capture the final statistics log.
     caplog.set_level(logging.INFO)
 
-    crawler = BasicCrawler(configure_logging=False, use_table_logs=use_table_logs)
+    crawler = BasicCrawler(configure_logging=False, statistics_log_format=statistics_log_format)
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
@@ -932,7 +932,7 @@ async def test_logs_final_statistics(
     )
 
     assert final_statistics is not None
-    if use_table_logs:
+    if statistics_log_format == 'table':
         assert final_statistics.msg.splitlines() == [
             'Final request statistics:',
             '┌───────────────────────────────┬───────────┐',

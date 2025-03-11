@@ -1,6 +1,7 @@
 import asyncio
 import inspect
 import logging
+from typing import Any
 
 from loguru import logger
 
@@ -12,7 +13,7 @@ class InterceptHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         # Get corresponding Loguru level if it exists
         try:
-            level = logger.level(record.levelname).name
+            level: Any[str, int] = logger.level(record.levelname).name
         except ValueError:
             level = record.levelno
 
@@ -41,7 +42,7 @@ async def main() -> None:
     # Initialize crawler with disabled table logs
     crawler = HttpCrawler(
         configure_logging=False,  # Disable default logging configuration
-        use_table_logs=False,  # Disable table formatting in statistics logs
+        statistics_log_format='inline',  # Set inline formatting for statistics logs
     )
 
     # Define the default request handler, which will be called for every request.

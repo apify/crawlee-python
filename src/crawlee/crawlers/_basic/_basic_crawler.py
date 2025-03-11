@@ -12,7 +12,7 @@ from contextlib import AsyncExitStack, suppress
 from datetime import timedelta
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Generic, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Generic, Literal, Union, cast
 from urllib.parse import ParseResult, urlparse
 from weakref import WeakKeyDictionary
 
@@ -134,9 +134,9 @@ class _BasicCrawlerOptions(TypedDict):
     configure_logging: NotRequired[bool]
     """If True, the crawler will set up logging infrastructure automatically."""
 
-    use_table_logs: NotRequired[bool]
-    """If True, displays crawler statistics as formatted tables in logs. If False, outputs statistics as plain
-    text logmessages.
+    statistics_log_format: NotRequired[Literal['table', 'inline']]
+    """If 'table', displays crawler statistics as formatted tables in logs. If 'inline', outputs statistics as plain
+    text log messages.
     """
 
     keep_alive: NotRequired[bool]
@@ -235,7 +235,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         abort_on_error: bool = False,
         keep_alive: bool = False,
         configure_logging: bool = True,
-        use_table_logs: bool = True,
+        statistics_log_format: Literal['table', 'inline'] = 'table',
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         _additional_context_managers: Sequence[AbstractAsyncContextManager] | None = None,
         _logger: logging.Logger | None = None,
@@ -276,8 +276,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             keep_alive: If True, it will keep crawler alive even if there are no requests in queue.
                 Use `crawler.stop()` to exit the crawler.
             configure_logging: If True, the crawler will set up logging infrastructure automatically.
-            use_table_logs: If True, displays crawler statistics as formatted tables in logs. If False, outputs
-                statistics as plain text log messages.
+            statistics_log_format: If 'table', displays crawler statistics as formatted tables in logs. If 'inline',
+                outputs statistics as plain text log messages.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
             _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
@@ -353,15 +353,15 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             httpx_logger = logging.getLogger('httpx')  # Silence HTTPX logger
             httpx_logger.setLevel(logging.DEBUG if get_configured_log_level() <= logging.DEBUG else logging.WARNING)
         self._logger = _logger or logging.getLogger(__name__)
-        self._use_table_logs = use_table_logs
+        self._statistics_log_format = statistics_log_format
 
         # Statistics
         self._statistics = statistics or cast(
             Statistics[TStatisticsState],
             Statistics.with_default_state(
                 periodic_message_logger=self._logger,
-                use_table_logs=self._use_table_logs,
-                log_message='Current request statistics:',
+                statistics_log_format=self._statistics_log_format,
+                log_message='Current request statistics',
             ),
         )
 
@@ -574,7 +574,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         await self._save_crawler_state()
 
         final_statistics = self._statistics.calculate()
-        if self._use_table_logs:
+        if self._statistics_log_format == 'table':
             self._logger.info(f'Final request statistics:\n{final_statistics.to_table()}')
         else:
             self._logger.info(f'Final request statistics: {final_statistics.to_string()}')

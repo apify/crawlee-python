@@ -4,7 +4,7 @@ from __future__ import annotations
 import math
 from datetime import datetime, timedelta, timezone
 from logging import Logger, getLogger
-from typing import TYPE_CHECKING, Any, Generic, cast
+from typing import TYPE_CHECKING, Any, Generic, Literal, cast
 
 from typing_extensions import Self, TypeVar
 
@@ -76,7 +76,7 @@ class Statistics(Generic[TStatisticsState]):
         periodic_message_logger: Logger | None = None,
         log_interval: timedelta = timedelta(minutes=1),
         state_model: type[TStatisticsState],
-        use_table_logs: bool = True,
+        statistics_log_format: Literal['table', 'inline'] = 'table',
     ) -> None:
         self._id = Statistics.__next_id
         Statistics.__next_id += 1
@@ -100,7 +100,7 @@ class Statistics(Generic[TStatisticsState]):
         self._key_value_store: KeyValueStore | None = key_value_store
 
         self._log_message = log_message
-        self._use_table_logs = use_table_logs
+        self._statistics_log_format = statistics_log_format
         self._periodic_message_logger = periodic_message_logger or logger
         self._periodic_logger = RecurringTask(self._log, log_interval)
 
@@ -131,7 +131,7 @@ class Statistics(Generic[TStatisticsState]):
         log_message: str = 'Statistics',
         periodic_message_logger: Logger | None = None,
         log_interval: timedelta = timedelta(minutes=1),
-        use_table_logs: bool = True,
+        statistics_log_format: Literal['table', 'inline'] = 'table',
     ) -> Statistics[StatisticsState]:
         """Convenience constructor for creating a `Statistics` with default state model `StatisticsState`."""
         return Statistics[StatisticsState](
@@ -143,7 +143,7 @@ class Statistics(Generic[TStatisticsState]):
             periodic_message_logger=periodic_message_logger,
             log_interval=log_interval,
             state_model=StatisticsState,
-            use_table_logs=use_table_logs,
+            statistics_log_format=statistics_log_format,
         )
 
     @property
@@ -285,7 +285,7 @@ class Statistics(Generic[TStatisticsState]):
 
     def _log(self) -> None:
         stats = self.calculate()
-        if self._use_table_logs:
+        if self._statistics_log_format == 'table':
             self._periodic_message_logger.info(f'{self._log_message}\n{stats.to_table()}')
         else:
             self._periodic_message_logger.info(f'{self._log_message}: {stats.to_string()}')
