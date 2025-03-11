@@ -9,11 +9,8 @@ from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
     from ._dataset_client import DatasetClient
-    from ._dataset_collection_client import DatasetCollectionClient
     from ._key_value_store_client import KeyValueStoreClient
-    from ._key_value_store_collection_client import KeyValueStoreCollectionClient
     from ._request_queue_client import RequestQueueClient
-    from ._request_queue_collection_client import RequestQueueCollectionClient
 
 
 @docs_group('Abstract classes')
@@ -29,24 +26,12 @@ class StorageClient(ABC):
         """Gets a subclient for a specific dataset by its ID."""
 
     @abstractmethod
-    def datasets(self) -> DatasetCollectionClient:
-        """Gets a subclient for dataset collection operations."""
-
-    @abstractmethod
     def key_value_store(self, id: str) -> KeyValueStoreClient:
         """Gets a subclient for a specific key-value store by its ID."""
 
     @abstractmethod
-    def key_value_stores(self) -> KeyValueStoreCollectionClient:
-        """Gets a subclient for key-value store collection operations."""
-
-    @abstractmethod
     def request_queue(self, id: str) -> RequestQueueClient:
         """Gets a subclient for a specific request queue by its ID."""
-
-    @abstractmethod
-    def request_queues(self) -> RequestQueueCollectionClient:
-        """Gets a subclient for request queue collection operations."""
 
     @abstractmethod
     async def purge_on_start(self) -> None:

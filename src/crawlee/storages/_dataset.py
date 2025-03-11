@@ -205,7 +205,6 @@ class Dataset(Storage):
 
         # Get resource clients from the storage client.
         self._resource_client = storage_client.dataset(self._id)
-        self._resource_collection_client = storage_client.datasets()
 
     @classmethod
     def from_storage_object(cls, storage_client: StorageClient, storage_object: StorageMetadata) -> Dataset:

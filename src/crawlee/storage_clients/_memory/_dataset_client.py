@@ -12,8 +12,8 @@ from typing_extensions import override
 
 from crawlee._types import StorageTypes
 from crawlee._utils.crypto import crypto_random_object_id
-from crawlee._utils.data_processing import raise_on_duplicate_storage, raise_on_non_existing_storage
-from crawlee._utils.file import force_rename, json_dumps
+from crawlee._utils.data_processing import raise_on_non_existing_storage
+from crawlee._utils.file import json_dumps
 from crawlee.storage_clients._base import DatasetClient as BaseDatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
@@ -96,47 +96,6 @@ class DatasetClient(BaseDatasetClient):
         return None
 
     @override
-    async def update(self, *, name: str | None = None) -> DatasetMetadata:
-        # Check by id
-        existing_dataset_by_id = find_or_create_client_by_id_or_name_inner(
-            resource_client_class=DatasetClient,
-            memory_storage_client=self._memory_storage_client,
-            id=self.id,
-            name=self.name,
-        )
-
-        if existing_dataset_by_id is None:
-            raise_on_non_existing_storage(StorageTypes.DATASET, self.id)
-
-        # Skip if no changes
-        if name is None:
-            return existing_dataset_by_id.resource_info
-
-        async with existing_dataset_by_id.file_operation_lock:
-            # Check that name is not in use already
-            existing_dataset_by_name = next(
-                (
-                    dataset
-                    for dataset in self._memory_storage_client.datasets_handled
-                    if dataset.name and dataset.name.lower() == name.lower()
-                ),
-                None,
-            )
-
-            if existing_dataset_by_name is not None:
-                raise_on_duplicate_storage(StorageTypes.DATASET, 'name', name)
-
-            previous_dir = existing_dataset_by_id.resource_directory
-            existing_dataset_by_id.name = name
-
-            await force_rename(previous_dir, existing_dataset_by_id.resource_directory)
-
-            # Update timestamps
-            await existing_dataset_by_id.update_timestamps(has_been_modified=True)
-
-        return existing_dataset_by_id.resource_info
-
-    @override
     async def delete(self) -> None:
         dataset = next(
             (dataset for dataset in self._memory_storage_client.datasets_handled if dataset.id == self.id), None
@@ -150,6 +109,43 @@ class DatasetClient(BaseDatasetClient):
 
                 if os.path.exists(dataset.resource_directory):
                     await asyncio.to_thread(shutil.rmtree, dataset.resource_directory)
+
+    @override
+    async def push_items(
+        self,
+        items: JsonSerializable,
+    ) -> None:
+        # Check by id
+        existing_dataset_by_id = find_or_create_client_by_id_or_name_inner(
+            resource_client_class=DatasetClient,
+            memory_storage_client=self._memory_storage_client,
+            id=self.id,
+            name=self.name,
+        )
+
+        if existing_dataset_by_id is None:
+            raise_on_non_existing_storage(StorageTypes.DATASET, self.id)
+
+        normalized = self._normalize_items(items)
+
+        added_ids: list[str] = []
+        for entry in normalized:
+            existing_dataset_by_id.item_count += 1
+            idx = self._generate_local_entry_name(existing_dataset_by_id.item_count)
+
+            existing_dataset_by_id.dataset_entries[idx] = entry
+            added_ids.append(idx)
+
+        data_entries = [(id, existing_dataset_by_id.dataset_entries[id]) for id in added_ids]
+
+        async with existing_dataset_by_id.file_operation_lock:
+            await existing_dataset_by_id.update_timestamps(has_been_modified=True)
+
+            await self._persist_dataset_items_to_disk(
+                data=data_entries,
+                entity_directory=existing_dataset_by_id.resource_directory,
+                persist_storage=self._memory_storage_client.persist_storage,
+            )
 
     @override
     async def list_items(
@@ -287,43 +283,6 @@ class DatasetClient(BaseDatasetClient):
         xml_row: str | None = None,
     ) -> AbstractAsyncContextManager[Response | None]:
         raise NotImplementedError('This method is not supported in memory storage.')
-
-    @override
-    async def push_items(
-        self,
-        items: JsonSerializable,
-    ) -> None:
-        # Check by id
-        existing_dataset_by_id = find_or_create_client_by_id_or_name_inner(
-            resource_client_class=DatasetClient,
-            memory_storage_client=self._memory_storage_client,
-            id=self.id,
-            name=self.name,
-        )
-
-        if existing_dataset_by_id is None:
-            raise_on_non_existing_storage(StorageTypes.DATASET, self.id)
-
-        normalized = self._normalize_items(items)
-
-        added_ids: list[str] = []
-        for entry in normalized:
-            existing_dataset_by_id.item_count += 1
-            idx = self._generate_local_entry_name(existing_dataset_by_id.item_count)
-
-            existing_dataset_by_id.dataset_entries[idx] = entry
-            added_ids.append(idx)
-
-        data_entries = [(id, existing_dataset_by_id.dataset_entries[id]) for id in added_ids]
-
-        async with existing_dataset_by_id.file_operation_lock:
-            await existing_dataset_by_id.update_timestamps(has_been_modified=True)
-
-            await self._persist_dataset_items_to_disk(
-                data=data_entries,
-                entity_directory=existing_dataset_by_id.resource_directory,
-                persist_storage=self._memory_storage_client.persist_storage,
-            )
 
     async def _persist_dataset_items_to_disk(
         self,
