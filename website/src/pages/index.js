@@ -90,31 +90,21 @@ function CodeExampleSection() {
     );
 }
 
-// TODO use Python example
-const benefitsCodeBlockCrawler = `{
-    useFingerprints: true,
-    fingerprintOptions: {
-        fingerprintGeneratorOptions: {
-            browsers: ['chrome', 'firefox'],
-            devices: ['mobile'],
-            locales: ['en-US'],
-        },
-    },
-},
-`;
+const benefitsCodeBlockCrawler = `fingerprint_generator = DefaultFingerprintGenerator(
+    header_options=HeaderGeneratorOptions(
+        browsers=["chromium", "firefox"],
+        devices=["mobile"],
+        locales=["en-US"]
+    ),
+)`;
 
-// TODO use Python example
-const benefitsCodeBlockHeadless = `const crawler = new AdaptivePlaywrightCrawler({
-    renderingTypeDetectionRatio: 0.1,
-    async requestHandler({ querySelector, enqueueLinks }) {
-        // The crawler detects if JS rendering is needed
-        // to extract this data. If not, it will use HTTP
-        // for follow-up requests to save time and costs.
-        const $prices = await querySelector('span.price')
-        await enqueueLinks();
-    },
-});
-`;
+// TODO:
+const benefitsCodeBlockHeadless = `crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser()
+
+@crawler.router.default_handler
+async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+    prices = await context.query_selector_all('span.price')
+    await context.enqueue_links()`;
 
 function BenefitsSection() {
     return (
