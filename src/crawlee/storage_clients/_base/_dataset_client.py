@@ -35,23 +35,16 @@ class DatasetClient(ABC):
         """
 
     @abstractmethod
-    async def update(
-        self,
-        *,
-        name: str | None = None,
-    ) -> DatasetMetadata:
-        """Update the dataset metadata.
-
-        Args:
-            name: New new name for the dataset.
-
-        Returns:
-            An object reflecting the updated dataset metadata.
-        """
-
-    @abstractmethod
     async def delete(self) -> None:
         """Permanently delete the dataset managed by this client."""
+
+    @abstractmethod
+    async def push_items(self, items: JsonSerializable) -> None:
+        """Push items to the dataset.
+
+        Args:
+            items: The items which to push in the dataset. They must be JSON serializable.
+        """
 
     @abstractmethod
     async def list_items(
@@ -220,12 +213,4 @@ class DatasetClient(ABC):
 
         Yields:
             The dataset items in a streaming response.
-        """
-
-    @abstractmethod
-    async def push_items(self, items: JsonSerializable) -> None:
-        """Push items to the dataset.
-
-        Args:
-            items: The items which to push in the dataset. They must be JSON serializable.
         """

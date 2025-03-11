@@ -96,7 +96,6 @@ class RequestQueue(Storage, RequestManager):
 
         # Get resource clients from storage client
         self._resource_client = storage_client.request_queue(self._id)
-        self._resource_collection_client = storage_client.request_queues()
 
         self._request_lock_time = timedelta(minutes=3)
         self._queue_paused_for_migration = False

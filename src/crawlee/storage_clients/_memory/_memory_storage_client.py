@@ -15,11 +15,8 @@ from crawlee.configuration import Configuration
 from crawlee.storage_clients import StorageClient
 
 from ._dataset_client import DatasetClient
-from ._dataset_collection_client import DatasetCollectionClient
 from ._key_value_store_client import KeyValueStoreClient
-from ._key_value_store_collection_client import KeyValueStoreCollectionClient
 from ._request_queue_client import RequestQueueClient
-from ._request_queue_collection_client import RequestQueueCollectionClient
 
 if TYPE_CHECKING:
     from crawlee.storage_clients._base import ResourceClient
@@ -147,24 +144,12 @@ class MemoryStorageClient(StorageClient):
         return DatasetClient(memory_storage_client=self, id=id)
 
     @override
-    def datasets(self) -> DatasetCollectionClient:
-        return DatasetCollectionClient(memory_storage_client=self)
-
-    @override
     def key_value_store(self, id: str) -> KeyValueStoreClient:
         return KeyValueStoreClient(memory_storage_client=self, id=id)
 
     @override
-    def key_value_stores(self) -> KeyValueStoreCollectionClient:
-        return KeyValueStoreCollectionClient(memory_storage_client=self)
-
-    @override
     def request_queue(self, id: str) -> RequestQueueClient:
         return RequestQueueClient(memory_storage_client=self, id=id)
-
-    @override
-    def request_queues(self) -> RequestQueueCollectionClient:
-        return RequestQueueCollectionClient(memory_storage_client=self)
 
     @override
     async def purge_on_start(self) -> None:
