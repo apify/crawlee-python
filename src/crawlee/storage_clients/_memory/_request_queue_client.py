@@ -13,8 +13,8 @@ from typing_extensions import override
 
 from crawlee._types import StorageTypes
 from crawlee._utils.crypto import crypto_random_object_id
-from crawlee._utils.data_processing import raise_on_duplicate_storage, raise_on_non_existing_storage
-from crawlee._utils.file import force_remove, force_rename, json_dumps
+from crawlee._utils.data_processing import raise_on_non_existing_storage
+from crawlee._utils.file import force_remove, json_dumps
 from crawlee._utils.requests import unique_key_to_request_id
 from crawlee.storage_clients._base import RequestQueueClient as BaseRequestQueueClient
 from crawlee.storage_clients.models import (
@@ -112,47 +112,6 @@ class RequestQueueClient(BaseRequestQueueClient):
                 return found.resource_info
 
         return None
-
-    @override
-    async def update(self, *, name: str | None = None) -> RequestQueueMetadata:
-        # Check by id
-        existing_queue_by_id = find_or_create_client_by_id_or_name_inner(
-            resource_client_class=RequestQueueClient,
-            memory_storage_client=self._memory_storage_client,
-            id=self.id,
-            name=self.name,
-        )
-
-        if existing_queue_by_id is None:
-            raise_on_non_existing_storage(StorageTypes.REQUEST_QUEUE, self.id)
-
-        # Skip if no changes
-        if name is None:
-            return existing_queue_by_id.resource_info
-
-        async with existing_queue_by_id.file_operation_lock:
-            # Check that name is not in use already
-            existing_queue_by_name = next(
-                (
-                    queue
-                    for queue in self._memory_storage_client.request_queues_handled
-                    if queue.name and queue.name.lower() == name.lower()
-                ),
-                None,
-            )
-
-            if existing_queue_by_name is not None:
-                raise_on_duplicate_storage(StorageTypes.REQUEST_QUEUE, 'name', name)
-
-            previous_dir = existing_queue_by_id.resource_directory
-            existing_queue_by_id.name = name
-
-            await force_rename(previous_dir, existing_queue_by_id.resource_directory)
-
-            # Update timestamps
-            await existing_queue_by_id.update_timestamps(has_been_modified=True)
-
-            return existing_queue_by_id.resource_info
 
     @override
     async def delete(self) -> None:
@@ -293,6 +252,42 @@ class RequestQueueClient(BaseRequestQueueClient):
             )
 
     @override
+    async def batch_add_requests(
+        self,
+        requests: Sequence[Request],
+        *,
+        forefront: bool = False,
+    ) -> BatchRequestsOperationResponse:
+        processed_requests = list[ProcessedRequest]()
+        unprocessed_requests = list[UnprocessedRequest]()
+
+        for request in requests:
+            try:
+                processed_request = await self.add_request(request, forefront=forefront)
+                processed_requests.append(
+                    ProcessedRequest(
+                        id=processed_request.id,
+                        unique_key=processed_request.unique_key,
+                        was_already_present=processed_request.was_already_present,
+                        was_already_handled=processed_request.was_already_handled,
+                    )
+                )
+            except Exception as exc:  # noqa: PERF203
+                logger.warning(f'Error adding request to the queue: {exc}')
+                unprocessed_requests.append(
+                    UnprocessedRequest(
+                        unique_key=request.unique_key,
+                        url=request.url,
+                        method=request.method,
+                    )
+                )
+
+        return BatchRequestsOperationResponse(
+            processed_requests=processed_requests,
+            unprocessed_requests=unprocessed_requests,
+        )
+
+    @override
     async def get_request(self, request_id: str) -> Request | None:
         existing_queue_by_id = find_or_create_client_by_id_or_name_inner(
             resource_client_class=RequestQueueClient,
@@ -398,6 +393,10 @@ class RequestQueueClient(BaseRequestQueueClient):
                 )
 
     @override
+    async def batch_delete_requests(self, requests: list[Request]) -> BatchRequestsOperationResponse:
+        raise NotImplementedError('This method is not supported in memory storage.')
+
+    @override
     async def prolong_request_lock(
         self,
         request_id: str,
@@ -425,46 +424,6 @@ class RequestQueueClient(BaseRequestQueueClient):
             raise_on_non_existing_storage(StorageTypes.REQUEST_QUEUE, self.id)
 
         existing_queue_by_id._in_progress.discard(request_id)  # noqa: SLF001
-
-    @override
-    async def batch_add_requests(
-        self,
-        requests: Sequence[Request],
-        *,
-        forefront: bool = False,
-    ) -> BatchRequestsOperationResponse:
-        processed_requests = list[ProcessedRequest]()
-        unprocessed_requests = list[UnprocessedRequest]()
-
-        for request in requests:
-            try:
-                processed_request = await self.add_request(request, forefront=forefront)
-                processed_requests.append(
-                    ProcessedRequest(
-                        id=processed_request.id,
-                        unique_key=processed_request.unique_key,
-                        was_already_present=processed_request.was_already_present,
-                        was_already_handled=processed_request.was_already_handled,
-                    )
-                )
-            except Exception as exc:  # noqa: PERF203
-                logger.warning(f'Error adding request to the queue: {exc}')
-                unprocessed_requests.append(
-                    UnprocessedRequest(
-                        unique_key=request.unique_key,
-                        url=request.url,
-                        method=request.method,
-                    )
-                )
-
-        return BatchRequestsOperationResponse(
-            processed_requests=processed_requests,
-            unprocessed_requests=unprocessed_requests,
-        )
-
-    @override
-    async def batch_delete_requests(self, requests: list[Request]) -> BatchRequestsOperationResponse:
-        raise NotImplementedError('This method is not supported in memory storage.')
 
     async def update_timestamps(self, *, has_been_modified: bool) -> None:
         """Update the timestamps of the request queue."""
