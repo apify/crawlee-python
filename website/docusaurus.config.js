@@ -36,6 +36,9 @@ module.exports = {
         '/crawlee-python/js/custom.js',
     ],
     githubHost: 'github.com',
+    future: {
+        experimental_faster: true,
+    },
     headTags: [
         // Intercom messenger
         {

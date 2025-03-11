@@ -6,9 +6,9 @@ description: How to avoid getting blocked when scraping
 import ApiLink from '@site/src/components/ApiLink';
 import CodeBlock from '@theme/CodeBlock';
 
-import PlaywrightDefaultFingerprintGenerator from '!!raw-loader!./code/browser_fingerprint/playwright_with_fingerprint_generator.py';
-import PlaywrightDefaultFingerprintGeneratorWithArgs from '!!raw-loader!./code/browser_fingerprint/default_fingerprint_generator_with_args.py';
-import PlaywrightWithCamoufox from '!!raw-loader!../examples/code/playwright_crawler_with_camoufox.py';
+import PlaywrightDefaultFingerprintGenerator from '!!raw-loader!./code_examples/browser_fingerprint/playwright_with_fingerprint_generator.py';
+import PlaywrightDefaultFingerprintGeneratorWithArgs from '!!raw-loader!./code_examples/browser_fingerprint/default_fingerprint_generator_with_args.py';
+import PlaywrightWithCamoufox from '!!raw-loader!../examples/code_examples/playwright_crawler_with_camoufox.py';
 
 
 A scraper might get blocked for numerous reasons. Let's narrow it down to the two main ones. The first is a bad or blocked IP address. You can learn about this topic in the [proxy management guide](./proxy-management). The second reason is [browser fingerprints](https://pixelprivacy.com/resources/browser-fingerprinting/) (or signatures), which we will explore more in this guide. Check the [Apify Academy anti-scraping course](https://docs.apify.com/academy/anti-scraping) to gain a deeper theoretical understanding of blocking and learn a few tips and tricks.
@@ -17,7 +17,7 @@ Browser fingerprint is a collection of browser attributes and significant featur
 
 ## Using browser fingerprints
 
-Changing browser fingerprints can be a tedious job. Luckily, Crawlee provides this feature with minimal configuration necessary - the usage of fingerprints can be enabled  in <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> by using the `fingerprint_generator` argument of the <ApiLink to="class/PlaywrightCrawler#__init__">`PlaywrightCrawler.__init__`</ApiLink>. You can either pass your own implementation of <ApiLink to="class/FingerprintGenerator">`FingerprintGenerator`</ApiLink> or use <ApiLink to="class/BrowserforgeFingerprintGenerator">`DefaultFingerprintGenerator`</ApiLink>.
+Changing browser fingerprints can be a tedious job. Luckily, Crawlee provides this feature with minimal configuration necessary - the usage of fingerprints in <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> is enabled by default. You can customize the fingerprints by using the `fingerprint_generator` argument of the <ApiLink to="class/PlaywrightCrawler#__init__">`PlaywrightCrawler.__init__`</ApiLink>, either pass your own implementation of <ApiLink to="class/FingerprintGenerator">`FingerprintGenerator`</ApiLink> or use <ApiLink to="class/BrowserforgeFingerprintGenerator">`DefaultFingerprintGenerator`</ApiLink>.
 
 <CodeBlock className="language-python">
     {PlaywrightDefaultFingerprintGenerator}
@@ -29,7 +29,7 @@ In certain cases we want to narrow down the fingerprints used - e.g. specify a c
     {PlaywrightDefaultFingerprintGeneratorWithArgs}
 </CodeBlock>
 
-If you do not want to use fingerprints, then do not pass `fingerprint_generator` argument to the <ApiLink to="class/PlaywrightCrawler#__init__">`PlaywrightCrawler.__init__`</ApiLink>. By default, fingerprints are disabled.
+If you do not want to use fingerprints, then pass `fingerprint_generator=None` argument to the <ApiLink to="class/PlaywrightCrawler#__init__">`PlaywrightCrawler.__init__`</ApiLink>.
 
 ## Using Camoufox
 

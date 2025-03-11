@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import logging
 from functools import partial
-from typing import TYPE_CHECKING, Any, Callable, Generic
+from typing import TYPE_CHECKING, Any, Callable, Generic, Literal
 
 from pydantic import ValidationError
 from typing_extensions import NotRequired, TypedDict, TypeVar
-from yarl import URL
 
-from crawlee import EnqueueStrategy, RequestTransformAction
 from crawlee._request import Request, RequestOptions
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.docs import docs_group
@@ -16,6 +14,8 @@ from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.browsers import BrowserPool
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
+from crawlee.fingerprint_suite import DefaultFingerprintGenerator, FingerprintGenerator, HeaderGeneratorOptions
+from crawlee.sessions._cookies import PlaywrightCookieParam
 from crawlee.statistics import StatisticsState
 
 from ._playwright_crawling_context import PlaywrightCrawlingContext
@@ -27,13 +27,14 @@ TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=St
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable, Mapping
+    from pathlib import Path
 
     from playwright.async_api import Page
     from typing_extensions import Unpack
 
+    from crawlee import RequestTransformAction
     from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs
     from crawlee.browsers._types import BrowserType
-    from crawlee.fingerprint_suite import FingerprintGenerator
 
 
 @docs_group('Classes')
@@ -82,9 +83,10 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         *,
         browser_pool: BrowserPool | None = None,
         browser_type: BrowserType | None = None,
+        user_data_dir: str | Path | None = None,
         browser_launch_options: Mapping[str, Any] | None = None,
         browser_new_context_options: Mapping[str, Any] | None = None,
-        fingerprint_generator: FingerprintGenerator | None = None,
+        fingerprint_generator: FingerprintGenerator | None | Literal['default'] = 'default',
         headless: bool | None = None,
         use_incognito_pages: bool | None = None,
         **kwargs: Unpack[BasicCrawlerOptions[PlaywrightCrawlingContext, StatisticsState]],
@@ -93,6 +95,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
         Args:
             browser_pool: A `BrowserPool` instance to be used for launching the browsers and getting pages.
+            user_data_dir: Path to a user data directory, which stores browser session data like cookies
+                and local storage.
             browser_type: The type of browser to launch ('chromium', 'firefox', or 'webkit').
                 This option should not be used if `browser_pool` is provided.
             browser_launch_options: Keyword arguments to pass to the browser launch method. These options are provided
@@ -115,8 +119,9 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         if browser_pool:
             # Raise an exception if browser_pool is provided together with other browser-related arguments.
             if any(
-                param is not None
+                param not in [None, 'default']
                 for param in (
+                    user_data_dir,
                     use_incognito_pages,
                     headless,
                     browser_type,
@@ -127,15 +132,22 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             ):
                 raise ValueError(
                     'You cannot provide `headless`, `browser_type`, `browser_launch_options`, '
-                    '`browser_new_context_options`, `use_incognito_pages`  or `fingerprint_generator` arguments when '
-                    '`browser_pool` is provided.'
+                    '`browser_new_context_options`, `use_incognito_pages`, `user_data_dir`  or'
+                    '`fingerprint_generator` arguments when `browser_pool` is provided.'
                 )
 
         # If browser_pool is not provided, create a new instance of BrowserPool with specified arguments.
         else:
+            if fingerprint_generator == 'default':
+                generator_browser_type = None if browser_type is None else [browser_type]
+                fingerprint_generator = DefaultFingerprintGenerator(
+                    header_options=HeaderGeneratorOptions(browsers=generator_browser_type)
+                )
+
             browser_pool = BrowserPool.with_default_plugin(
                 headless=headless,
                 browser_type=browser_type,
+                user_data_dir=user_data_dir,
                 browser_launch_options=browser_launch_options,
                 browser_new_context_options=browser_new_context_options,
                 use_incognito_pages=use_incognito_pages,
@@ -146,7 +158,11 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
         # Compose the context pipeline with the Playwright-specific context enhancer.
         kwargs['_context_pipeline'] = (
-            ContextPipeline().compose(self._open_page).compose(self._navigate).compose(self._handle_blocked_request)
+            ContextPipeline()
+            .compose(self._open_page)
+            .compose(self._navigate)
+            .compose(self._handle_status_code_response)
+            .compose(self._handle_blocked_request_by_content)
         )
         kwargs['_additional_context_managers'] = [self._browser_pool]
         kwargs.setdefault('_logger', logging.getLogger(__name__))
@@ -202,7 +218,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         """
         async with context.page:
             if context.session:
-                await self._set_cookies(context.page, context.request.url, context.session.cookies)
+                session_cookies = context.session.cookies.get_cookies_as_playwright_format()
+                await self._update_cookies(context.page, session_cookies)
 
             if context.request.headers:
                 await context.page.set_extra_http_headers(context.request.headers.model_dump())
@@ -216,8 +233,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             context.request.loaded_url = context.page.url
 
             if context.session:
-                cookies = await self._get_cookies(context.page)
-                context.session.cookies.update(cookies)
+                pw_cookies = await self._get_cookies(context.page)
+                context.session.cookies.set_cookies_from_playwright_format(pw_cookies)
 
             async def enqueue_links(
                 *,
@@ -229,7 +246,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 **kwargs: Unpack[EnqueueLinksKwargs],
             ) -> None:
                 """The `PlaywrightCrawler` implementation of the `EnqueueLinksFunction` function."""
-                kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
+                kwargs.setdefault('strategy', 'same-hostname')
 
                 requests = list[Request]()
                 base_user_data = user_data or {}
@@ -286,11 +303,33 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 block_requests=partial(block_requests, page=context.page),
             )
 
-    async def _handle_blocked_request(
+    async def _handle_status_code_response(
+        self, context: PlaywrightCrawlingContext
+    ) -> AsyncGenerator[PlaywrightCrawlingContext, None]:
+        """Validate the HTTP status code and raise appropriate exceptions if needed.
+
+        Args:
+            context: The current crawling context containing the response.
+
+        Raises:
+            SessionError: If the status code indicates the session is blocked.
+            HttpStatusCodeError: If the status code represents a server error or is explicitly configured as an error.
+            HttpClientStatusCodeError: If the status code represents a client error.
+
+        Yields:
+            The original crawling context if no errors are detected.
+        """
+        status_code = context.response.status
+        if self._retry_on_blocked:
+            self._raise_for_session_blocked_status_code(context.session, status_code)
+        self._raise_for_error_status_code(status_code)
+        yield context
+
+    async def _handle_blocked_request_by_content(
         self,
         context: PlaywrightCrawlingContext,
     ) -> AsyncGenerator[PlaywrightCrawlingContext, None]:
-        """Try to detect if the request is blocked based on the HTTP status code or the response content.
+        """Try to detect if the request is blocked based on the response content.
 
         Args:
             context: The current crawling context.
@@ -302,12 +341,6 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             The original crawling context if no errors are detected.
         """
         if self._retry_on_blocked:
-            status_code = context.response.status
-
-            # Check if the session is blocked based on the HTTP status code.
-            if self._is_session_blocked_status_code(context.session, status_code):
-                raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
-
             matched_selectors = [
                 selector for selector in RETRY_CSS_SELECTORS if (await context.page.query_selector(selector))
             ]
@@ -316,7 +349,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             if matched_selectors:
                 raise SessionError(
                     'Assuming the session is blocked - '
-                    f"HTTP response matched the following selectors: {'; '.join(matched_selectors)}"
+                    f'HTTP response matched the following selectors: {"; ".join(matched_selectors)}'
                 )
 
         yield context
@@ -329,17 +362,14 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         """
         self._pre_navigation_hooks.append(hook)
 
-    async def _get_cookies(self, page: Page) -> dict[str, str]:
+    async def _get_cookies(self, page: Page) -> list[PlaywrightCookieParam]:
         """Get the cookies from the page."""
         cookies = await page.context.cookies()
-        return {cookie['name']: cookie['value'] for cookie in cookies if cookie.get('name') and cookie.get('value')}
+        return [PlaywrightCookieParam(**cookie) for cookie in cookies]
 
-    async def _set_cookies(self, page: Page, url: str, cookies: dict[str, str]) -> None:
-        """Set the cookies to the page."""
-        parsed_url = URL(url)
-        await page.context.add_cookies(
-            [{'name': name, 'value': value, 'domain': parsed_url.host, 'path': '/'} for name, value in cookies.items()]
-        )
+    async def _update_cookies(self, page: Page, cookies: list[PlaywrightCookieParam]) -> None:
+        """Update the cookies in the page context."""
+        await page.context.add_cookies([{**cookie} for cookie in cookies])
 
 
 class _PlaywrightCrawlerAdditionalOptions(TypedDict):

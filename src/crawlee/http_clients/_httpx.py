@@ -15,7 +15,6 @@ from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
 from crawlee.sessions import Session
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
     from ssl import SSLContext
 
     from crawlee import Request
@@ -62,9 +61,7 @@ class _HttpxTransport(httpx.AsyncHTTPTransport):
         response.request = request
 
         if session := cast(Session, request.extensions.get('crawlee_session')):
-            response_cookies = httpx.Cookies()
-            response_cookies.extract_cookies(response)
-            session.cookies.update(response_cookies)
+            session.cookies.store_cookies(list(response.cookies.jar))
 
         if 'Set-Cookie' in response.headers:
             del response.headers['Set-Cookie']
@@ -98,8 +95,6 @@ class HttpxHttpClient(HttpClient):
         self,
         *,
         persist_cookies_per_session: bool = True,
-        additional_http_error_status_codes: Iterable[int] = (),
-        ignore_http_error_status_codes: Iterable[int] = (),
         http1: bool = True,
         http2: bool = True,
         verify: str | bool | SSLContext = True,
@@ -110,8 +105,6 @@ class HttpxHttpClient(HttpClient):
 
         Args:
             persist_cookies_per_session: Whether to persist cookies per HTTP session.
-            additional_http_error_status_codes: Additional HTTP status codes to treat as errors.
-            ignore_http_error_status_codes: HTTP status codes to ignore as errors.
             http1: Whether to enable HTTP/1.1 support.
             http2: Whether to enable HTTP/2 support.
             verify: SSL certificates used to verify the identity of requested hosts.
@@ -120,8 +113,6 @@ class HttpxHttpClient(HttpClient):
         """
         super().__init__(
             persist_cookies_per_session=persist_cookies_per_session,
-            additional_http_error_status_codes=additional_http_error_status_codes,
-            ignore_http_error_status_codes=ignore_http_error_status_codes,
         )
         self._http1 = http1
         self._http2 = http2
@@ -160,12 +151,12 @@ class HttpxHttpClient(HttpClient):
             method=request.method,
             headers=headers,
             content=request.payload,
-            cookies=session.cookies if session else None,
+            cookies=session.cookies.jar if session else None,
             extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
         )
 
         try:
-            response = await client.send(http_request, follow_redirects=True)
+            response = await client.send(http_request)
         except httpx.TransportError as exc:
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
@@ -173,12 +164,6 @@ class HttpxHttpClient(HttpClient):
 
         if statistics:
             statistics.register_status_code(response.status_code)
-
-        self._raise_for_error_status_code(
-            response.status_code,
-            self._additional_http_error_status_codes,
-            self._ignore_http_error_status_codes,
-        )
 
         request.loaded_url = str(response.url)
 
@@ -218,12 +203,6 @@ class HttpxHttpClient(HttpClient):
                 raise ProxyError from exc
             raise
 
-        self._raise_for_error_status_code(
-            response.status_code,
-            self._additional_http_error_status_codes,
-            self._ignore_http_error_status_codes,
-        )
-
         return _HttpxResponse(response)
 
     def _get_client(self, proxy_url: str | None) -> httpx.AsyncClient:
@@ -237,6 +216,7 @@ class HttpxHttpClient(HttpClient):
                 'proxy': proxy_url,
                 'http1': self._http1,
                 'http2': self._http2,
+                'follow_redirects': True,
             }
 
             # Update the default kwargs with any additional user-provided kwargs.

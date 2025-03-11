@@ -12,6 +12,7 @@ from yarl import URL
 
 from crawlee import service_locator
 from crawlee.configuration import Configuration
+from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_network
 from crawlee.proxy_configuration import ProxyInfo
 from crawlee.storage_clients import MemoryStorageClient
 from crawlee.storages import KeyValueStore, _creation_management
@@ -176,6 +177,11 @@ def memory_storage_client(tmp_path: Path) -> MemoryStorageClient:
     )
 
     return MemoryStorageClient.from_config(config)
+
+
+@pytest.fixture(scope='session')
+def header_network() -> dict:
+    return get_available_header_network()
 
 
 @pytest.fixture

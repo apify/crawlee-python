@@ -43,35 +43,23 @@ jobs:
           custom_version: ${{ inputs.custom_version }}
           existing_changelog_path: CHANGELOG.md
 
-  # If github.ref points to a [skip ci] commit, we assume that it was added by the pre_release workflow,
-  # which doesn't push the commit if code checks don't pass.
-  # Otherwise, the checks will have been triggered by the `run_code_checks` workflow.
-  wait_for_checks:
-    name: Wait for code checks to pass
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Check if the head commit contains [skip ci]
-        id: check_skip
-        run: |
-          if git log --format=%B -n 1 ${{ github.sha }} | head -n 1 | grep '\[skip ci\]$'; then
-            echo 'skipped=true' >> $GITHUB_OUTPUT
-          else
-            echo 'skipped=false' >> $GITHUB_OUTPUT
-          fi
+  lint_check:
+    name: Lint check
+    uses: apify/workflows/.github/workflows/python_lint_check.yaml@main
 
-      - uses: lewagon/wait-on-check-action@v1.3.4
-        if: ${{ steps.check_skip.outputs.skipped == 'false' }}
-        with:
-          ref: ${{ github.ref }}
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          check-regexp: "( check| tests)$"
-          wait-interval: 5
+  type_check:
+    name: Type check
+    uses: apify/workflows/.github/workflows/python_type_check.yaml@main
+
+  unit_tests:
+    name: Unit tests
+    uses: apify/workflows/.github/workflows/python_unit_tests.yaml@main
+    secrets:
+      httpbin_url: ${{ secrets.APIFY_HTTPBIN_TOKEN && format('https://httpbin.apify.actor?token={0}', secrets.APIFY_HTTPBIN_TOKEN) || 'https://httpbin.org'}}
 
   update_changelog:
     name: Update changelog
-    needs: [release_metadata, wait_for_checks]
+    needs: [release_metadata, lint_check, type_check, unit_tests]
     uses: apify/workflows/.github/workflows/python_bump_and_update_changelog.yaml@main
     with:
       version_number: ${{ needs.release_metadata.outputs.version_number }}

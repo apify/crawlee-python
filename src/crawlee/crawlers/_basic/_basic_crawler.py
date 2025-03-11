@@ -33,10 +33,12 @@ from crawlee._types import (
 from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
+from crawlee._utils.web import is_status_code_client_error, is_status_code_server_error
 from crawlee.errors import (
     ContextPipelineInitializationError,
     ContextPipelineInterruptedError,
     HttpClientStatusCodeError,
+    HttpStatusCodeError,
     RequestHandlerError,
     SessionError,
     UserDefinedErrorHandlerError,
@@ -296,21 +298,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             set(ignore_http_error_status_codes) if ignore_http_error_status_codes else set()
         )
 
-        self._http_client = http_client or HttpxHttpClient(
-            additional_http_error_status_codes=self._additional_http_error_status_codes,
-            ignore_http_error_status_codes=self._ignore_http_error_status_codes,
-        )
-
-        if self._http_client.additional_blocked_status_codes != self._additional_http_error_status_codes:
-            raise ValueError(
-                'Used `additional_blocked_status_codes` argument does not match with '
-                f'{self._http_client.additional_blocked_status_codes=}. They have to be the same.'
-            )
-        if self._http_client.ignore_http_error_status_codes != self._ignore_http_error_status_codes:
-            raise ValueError(
-                'Used `ignore_http_error_status_codes` argument does not match with '
-                f'{self._http_client.ignore_http_error_status_codes=}. They have to be the same.'
-            )
+        self._http_client = http_client or HttpxHttpClient()
 
         # Request router setup
         self._router: Router[TCrawlingContext] | None = None
@@ -801,10 +789,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         origin_url: ParseResult,
     ) -> bool:
         """Check if a URL matches the enqueue_strategy."""
-        if strategy == EnqueueStrategy.SAME_HOSTNAME:
+        if strategy == 'same-hostname':
             return target_url.hostname == origin_url.hostname
 
-        if strategy == EnqueueStrategy.SAME_DOMAIN:
+        if strategy == 'same-domain':
             if origin_url.hostname is None or target_url.hostname is None:
                 raise ValueError('Both origin and target URLs must have a hostname')
 
@@ -812,10 +800,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             target_domain = self._tld_extractor.extract_str(target_url.hostname).domain
             return origin_domain == target_domain
 
-        if strategy == EnqueueStrategy.SAME_ORIGIN:
+        if strategy == 'same-origin':
             return target_url.hostname == origin_url.hostname and target_url.scheme == origin_url.scheme
 
-        if strategy == EnqueueStrategy.ALL:
+        if strategy == 'all':
             return True
 
         assert_never(strategy)
@@ -981,7 +969,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 if (
                     (self._max_crawl_depth is None or dst_request.crawl_depth <= self._max_crawl_depth)
                     and self._check_enqueue_strategy(
-                        add_requests_call.get('strategy', EnqueueStrategy.ALL),
+                        add_requests_call.get('strategy', 'all'),
                         target_url=urlparse(dst_request.url),
                         origin_url=urlparse(origin),
                     )
@@ -1172,23 +1160,44 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         await wait_for(
             lambda: self._context_pipeline(context, self.router),
             timeout=self._request_handler_timeout,
-            timeout_message='Request handler timed out after '
-            f'{self._request_handler_timeout.total_seconds()} seconds',
+            timeout_message=f'Request handler timed out after {self._request_handler_timeout.total_seconds()} seconds',
             logger=self._logger,
         )
 
-    def _is_session_blocked_status_code(self, session: Session | None, status_code: int) -> bool:
-        """Check if the HTTP status code indicates that the session was blocked by the target website.
+    def _raise_for_error_status_code(self, status_code: int) -> None:
+        """Raise an exception if the given status code is considered an error.
 
         Args:
-            session: The session used for the request. If None, the method always returns False.
             status_code: The HTTP status code to check.
 
-        Returns:
-            True if the status code indicates the session was blocked, False otherwise.
+        Raises:
+            HttpStatusCodeError: If the status code represents a server error or is explicitly configured as an error.
+            HttpClientStatusCodeError: If the status code represents a client error.
         """
-        return session is not None and session.is_blocked_status_code(
+        is_ignored_status = status_code in self._ignore_http_error_status_codes
+        is_explicit_error = status_code in self._additional_http_error_status_codes
+
+        if is_explicit_error:
+            raise HttpStatusCodeError('Error status code (user-configured) returned.', status_code)
+
+        if is_status_code_client_error(status_code) and not is_ignored_status:
+            raise HttpClientStatusCodeError('Client error status code returned', status_code)
+
+        if is_status_code_server_error(status_code) and not is_ignored_status:
+            raise HttpStatusCodeError('Error status code returned', status_code)
+
+    def _raise_for_session_blocked_status_code(self, session: Session | None, status_code: int) -> None:
+        """Raise an exception if the given status code indicates the session is blocked.
+
+        Args:
+            session: The session used for the request. If None, no check is performed.
+            status_code: The HTTP status code to check.
+
+        Raises:
+            SessionError: If the status code indicates the session is blocked.
+        """
+        if session is not None and session.is_blocked_status_code(
             status_code=status_code,
-            additional_blocked_status_codes=self._additional_http_error_status_codes,
             ignore_http_error_status_codes=self._ignore_http_error_status_codes,
-        )
+        ):
+            raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')

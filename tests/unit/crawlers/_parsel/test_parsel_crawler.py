@@ -312,3 +312,7 @@ async def test_xml(server: respx.MockRouter) -> None:
     assert handler.called
 
     assert handler.call_args[0][0] == ['<hello>world</hello>']
+
+
+def test_default_logger() -> None:
+    assert ParselCrawler().log.name == 'ParselCrawler'

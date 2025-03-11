@@ -4,11 +4,15 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
-from typing import ClassVar, Literal, overload
+from typing import TYPE_CHECKING, ClassVar, Literal, overload
 
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.docs import docs_group
+from crawlee.sessions._cookies import CookieParam, SessionCookies
 from crawlee.sessions._models import SessionModel
+
+if TYPE_CHECKING:
+    from http.cookiejar import CookieJar
 
 logger = getLogger(__name__)
 
@@ -38,7 +42,7 @@ class Session:
         usage_count: int = 0,
         max_usage_count: int = 50,
         error_score: float = 0.0,
-        cookies: dict[str, str] | None = None,
+        cookies: SessionCookies | CookieJar | dict[str, str] | list[CookieParam] | None = None,
         blocked_status_codes: list | None = None,
     ) -> None:
         """A default constructor.
@@ -65,13 +69,14 @@ class Session:
         self._usage_count = usage_count
         self._max_usage_count = max_usage_count
         self._error_score = error_score
-        self._cookies = cookies or {}
+        self._cookies = SessionCookies(cookies) or SessionCookies()
         self._blocked_status_codes = set(blocked_status_codes or self._DEFAULT_BLOCKED_STATUS_CODES)
 
     @classmethod
     def from_model(cls, model: SessionModel) -> Session:
         """Create a new instance from a `SessionModel`."""
-        return cls(**model.model_dump())
+        cookies = SessionCookies(model.cookies)
+        return cls(**model.model_dump(exclude={'cookies'}), cookies=cookies)
 
     def __repr__(self) -> str:
         """Get a string representation."""
@@ -94,7 +99,7 @@ class Session:
         return self._user_data
 
     @property
-    def cookies(self) -> dict[str, str]:
+    def cookies(self) -> SessionCookies:
         """Get the cookies."""
         return self._cookies
 
@@ -151,7 +156,7 @@ class Session:
             usage_count=self._usage_count,
             max_usage_count=self._max_usage_count,
             error_score=self._error_score,
-            cookies=self._cookies,
+            cookies=self._cookies.get_cookies_as_dicts(),
             blocked_status_codes=self._blocked_status_codes,
         )
         if as_dict:
@@ -194,21 +199,16 @@ class Session:
         self,
         *,
         status_code: int,
-        additional_blocked_status_codes: set[int] | None = None,
         ignore_http_error_status_codes: set[int] | None = None,
     ) -> bool:
         """Evaluate whether a session should be retired based on the received HTTP status code.
 
         Args:
             status_code: The HTTP status code received from a server response.
-            additional_blocked_status_codes: Optional additional status codes that should trigger session retirement.
             ignore_http_error_status_codes: Optional status codes to allow suppression of
             codes from `blocked_status_codes`.
 
         Returns:
             True if the session should be retired, False otherwise.
         """
-        if additional_blocked_status_codes and status_code in additional_blocked_status_codes:
-            return True
-
         return status_code in (self._blocked_status_codes - (ignore_http_error_status_codes or set()))

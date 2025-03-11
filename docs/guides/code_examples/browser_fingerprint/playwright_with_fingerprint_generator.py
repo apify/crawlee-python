@@ -1,14 +1,11 @@
 import asyncio
 
 from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext
-from crawlee.fingerprint_suite import DefaultFingerprintGenerator
 
 
 async def main() -> None:
-    crawler = PlaywrightCrawler(
-        # Fingerprint generator to be used. By default no fingerprint generation is done.
-        fingerprint_generator=DefaultFingerprintGenerator(),
-    )
+    # Fingerprint generator is used by default.
+    crawler = PlaywrightCrawler()
 
     # Define the default request handler, which will be called for every request.
     @crawler.router.default_handler

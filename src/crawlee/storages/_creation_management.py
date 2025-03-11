@@ -157,19 +157,19 @@ async def open_storage(
     async with _creation_lock:
         if id and not is_default_on_memory:
             resource_client = _get_resource_client(storage_class, storage_client, id)
-            storage_info = await resource_client.get()
-            if not storage_info:
+            storage_object = await resource_client.get()
+            if not storage_object:
                 raise RuntimeError(f'{storage_class.__name__} with id "{id}" does not exist!')
 
         elif is_default_on_memory:
             resource_collection_client = _get_resource_collection_client(storage_class, storage_client)
-            storage_info = await resource_collection_client.get_or_create(name=name, id=id)
+            storage_object = await resource_collection_client.get_or_create(name=name, id=id)
 
         else:
             resource_collection_client = _get_resource_collection_client(storage_class, storage_client)
-            storage_info = await resource_collection_client.get_or_create(name=name)
+            storage_object = await resource_collection_client.get_or_create(name=name)
 
-        storage = storage_class(id=storage_info.id, name=storage_info.name, storage_client=storage_client)
+        storage = storage_class.from_storage_object(storage_client=storage_client, storage_object=storage_object)
 
         # Cache the storage by ID and name
         _add_to_cache_by_id(storage.id, storage)

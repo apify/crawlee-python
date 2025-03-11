@@ -7,13 +7,11 @@ from typing import TYPE_CHECKING, Any, Callable, Generic
 from pydantic import ValidationError
 from typing_extensions import TypeVar
 
-from crawlee import EnqueueStrategy, RequestTransformAction
 from crawlee._request import Request, RequestOptions
 from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
-from crawlee.http_clients import HttpxHttpClient
 from crawlee.statistics import StatisticsState
 
 from ._http_crawling_context import HttpCrawlingContext, ParsedHttpCrawlingContext, TParseResult, TSelectResult
@@ -23,6 +21,7 @@ if TYPE_CHECKING:
 
     from typing_extensions import Unpack
 
+    from crawlee import RequestTransformAction
     from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, EnqueueLinksKwargs
 
     from ._abstract_http_parser import AbstractHttpParser
@@ -57,16 +56,6 @@ class AbstractHttpCrawler(
     ) -> None:
         self._parser = parser
         self._pre_navigation_hooks: list[Callable[[BasicCrawlingContext], Awaitable[None]]] = []
-        kwargs.setdefault('additional_http_error_status_codes', ())
-        kwargs.setdefault('ignore_http_error_status_codes', ())
-
-        kwargs.setdefault(
-            'http_client',
-            HttpxHttpClient(
-                additional_http_error_status_codes=kwargs['additional_http_error_status_codes'],
-                ignore_http_error_status_codes=kwargs['ignore_http_error_status_codes'],
-            ),
-        )
 
         if '_context_pipeline' not in kwargs:
             raise ValueError(
@@ -74,7 +63,7 @@ class AbstractHttpCrawler(
                 'AbstractHttpCrawler._create_static_content_crawler_pipeline() method to initialize it.'
             )
 
-        kwargs.setdefault('_logger', logging.getLogger(__name__))
+        kwargs.setdefault('_logger', logging.getLogger(self.__class__.__name__))
         super().__init__(**kwargs)
 
     @classmethod
@@ -111,8 +100,9 @@ class AbstractHttpCrawler(
             ContextPipeline()
             .compose(self._execute_pre_navigation_hooks)
             .compose(self._make_http_request)
+            .compose(self._handle_status_code_response)
             .compose(self._parse_http_response)
-            .compose(self._handle_blocked_request)
+            .compose(self._handle_blocked_request_by_content)
         )
 
     async def _execute_pre_navigation_hooks(
@@ -162,7 +152,7 @@ class AbstractHttpCrawler(
             | None = None,
             **kwargs: Unpack[EnqueueLinksKwargs],
         ) -> None:
-            kwargs.setdefault('strategy', EnqueueStrategy.SAME_HOSTNAME)
+            kwargs.setdefault('strategy', 'same-hostname')
 
             requests = list[Request]()
             base_user_data = user_data or {}
@@ -216,10 +206,32 @@ class AbstractHttpCrawler(
 
         yield HttpCrawlingContext.from_basic_crawling_context(context=context, http_response=result.http_response)
 
-    async def _handle_blocked_request(
+    async def _handle_status_code_response(
+        self, context: HttpCrawlingContext
+    ) -> AsyncGenerator[HttpCrawlingContext, None]:
+        """Validate the HTTP status code and raise appropriate exceptions if needed.
+
+        Args:
+            context: The current crawling context containing the HTTP response.
+
+        Raises:
+            SessionError: If the status code indicates the session is blocked.
+            HttpStatusCodeError: If the status code represents a server error or is explicitly configured as an error.
+            HttpClientStatusCodeError: If the status code represents a client error.
+
+        Yields:
+            The original crawling context if no errors are detected.
+        """
+        status_code = context.http_response.status_code
+        if self._retry_on_blocked:
+            self._raise_for_session_blocked_status_code(context.session, status_code)
+        self._raise_for_error_status_code(status_code)
+        yield context
+
+    async def _handle_blocked_request_by_content(
         self, context: ParsedHttpCrawlingContext[TParseResult]
     ) -> AsyncGenerator[ParsedHttpCrawlingContext[TParseResult], None]:
-        """Try to detect if the request is blocked based on the HTTP status code or the parsed response content.
+        """Try to detect if the request is blocked based on the parsed response content.
 
         Args:
             context: The current crawling context.
@@ -228,14 +240,10 @@ class AbstractHttpCrawler(
             SessionError: If the request is considered blocked.
 
         Yields:
-            The original crawling context if no errors are detected.
+            The original crawling context if no blocking is detected.
         """
-        if self._retry_on_blocked:
-            status_code = context.http_response.status_code
-            if self._is_session_blocked_status_code(context.session, status_code):
-                raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
-            if blocked_info := self._parser.is_blocked(context.parsed_content):
-                raise SessionError(blocked_info.reason)
+        if self._retry_on_blocked and (blocked_info := self._parser.is_blocked(context.parsed_content)):
+            raise SessionError(blocked_info.reason)
         yield context
 
     def pre_navigation_hook(self, hook: Callable[[BasicCrawlingContext], Awaitable[None]]) -> None:

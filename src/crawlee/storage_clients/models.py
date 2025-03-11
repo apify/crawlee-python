@@ -16,13 +16,14 @@ from crawlee._utils.urls import validate_http_url
 KvsValueType = TypeVar('KvsValueType', default=Any)
 
 
-class _StorageMetadata(BaseModel):
+@docs_group('Data structures')
+class StorageMetadata(BaseModel):
     """Represents the base model for storage metadata.
 
     It contains common fields shared across all specific storage types.
     """
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra='allow')
 
     id: Annotated[str, Field(alias='id')]
     name: Annotated[str | None, Field(alias='name', default='')]
@@ -32,7 +33,7 @@ class _StorageMetadata(BaseModel):
 
 
 @docs_group('Data structures')
-class DatasetMetadata(_StorageMetadata):
+class DatasetMetadata(StorageMetadata):
     """Model for a dataset metadata."""
 
     model_config = ConfigDict(populate_by_name=True)
@@ -41,7 +42,7 @@ class DatasetMetadata(_StorageMetadata):
 
 
 @docs_group('Data structures')
-class KeyValueStoreMetadata(_StorageMetadata):
+class KeyValueStoreMetadata(StorageMetadata):
     """Model for a key-value store metadata."""
 
     model_config = ConfigDict(populate_by_name=True)
@@ -50,7 +51,7 @@ class KeyValueStoreMetadata(_StorageMetadata):
 
 
 @docs_group('Data structures')
-class RequestQueueMetadata(_StorageMetadata):
+class RequestQueueMetadata(StorageMetadata):
     """Model for a request queue metadata."""
 
     model_config = ConfigDict(populate_by_name=True)
