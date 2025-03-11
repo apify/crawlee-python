@@ -361,7 +361,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             Statistics.with_default_state(
                 periodic_message_logger=self._logger,
                 statistics_log_format=self._statistics_log_format,
-                log_message='Current request statistics',
+                log_message='Current request statistics:',
             ),
         )
 
@@ -577,7 +577,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if self._statistics_log_format == 'table':
             self._logger.info(f'Final request statistics:\n{final_statistics.to_table()}')
         else:
-            self._logger.info(f'Final request statistics: {final_statistics.to_string()}')
+            self._logger.info('Final request statistics:', extra=final_statistics.to_dict())
         return final_statistics
 
     async def _run_crawler(self) -> None:

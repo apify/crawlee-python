@@ -949,12 +949,19 @@ async def test_logs_final_statistics(
             '└───────────────────────────────┴───────────┘',
         ]
     else:
-        assert final_statistics.msg == (
-            'Final request statistics: requests_finished: 4; requests_failed: 33; '
-            'retry_histogram: [1, 4, 8]; request_avg_failed_duration: 99.0; request_avg_finished_duration: 0.483; '
-            'requests_finished_per_minute: 0.33; requests_failed_per_minute: 0.1; request_total_duration: 720.0; '
-            'requests_total: 37; crawler_runtime: 300.0'
-        )
+        assert final_statistics.msg == 'Final request statistics:'
+
+        # ignore[attr-defined] since `extra` parameters are not defined for `LogRecord`
+        assert final_statistics.requests_finished == 4  # type: ignore[attr-defined]
+        assert final_statistics.requests_failed == 33  # type: ignore[attr-defined]
+        assert final_statistics.retry_histogram == [1, 4, 8]  # type: ignore[attr-defined]
+        assert final_statistics.request_avg_failed_duration == 99.0  # type: ignore[attr-defined]
+        assert final_statistics.request_avg_finished_duration == 0.483  # type: ignore[attr-defined]
+        assert final_statistics.requests_finished_per_minute == 0.33  # type: ignore[attr-defined]
+        assert final_statistics.requests_failed_per_minute == 0.1  # type: ignore[attr-defined]
+        assert final_statistics.request_total_duration == 720.0  # type: ignore[attr-defined]
+        assert final_statistics.requests_total == 37  # type: ignore[attr-defined]
+        assert final_statistics.crawler_runtime == 300.0  # type: ignore[attr-defined]
 
 
 async def test_crawler_manual_stop(httpbin: URL) -> None:

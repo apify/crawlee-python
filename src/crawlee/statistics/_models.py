@@ -47,10 +47,8 @@ class FinalStatistics:
 
         return capture.get().strip('\n')
 
-    def to_string(self) -> str:
-        return '; '.join(
-            [f'{k}: {v.total_seconds() if isinstance(v, timedelta) else v}' for k, v in asdict(self).items()]
-        )
+    def to_dict(self) -> dict[str, float | int | list[int]]:
+        return {k: v.total_seconds() if isinstance(v, timedelta) else v for k, v in asdict(self).items()}
 
     @override
     def __str__(self) -> str:

@@ -288,7 +288,7 @@ class Statistics(Generic[TStatisticsState]):
         if self._statistics_log_format == 'table':
             self._periodic_message_logger.info(f'{self._log_message}\n{stats.to_table()}')
         else:
-            self._periodic_message_logger.info(f'{self._log_message}: {stats.to_string()}')
+            self._periodic_message_logger.info(self._log_message, extra=stats.to_dict())
 
     async def _maybe_load_statistics(self) -> None:
         if not self._persistence_enabled:

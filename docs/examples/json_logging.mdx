@@ -20,26 +20,37 @@ Here's an example of what a crawler statistics log entry in JSONL format.
 
 ```json
 {
-    "text": "2025-03-07 16:51:09.947 | INFO     | crawlee.crawlers._basic._basic_crawler:run:580 - Final request statistics: requests_finished: 1; requests_failed: 0; retry_histogram: [1]; request_avg_failed_duration: None; request_avg_finished_duration: 0.795506; requests_finished_per_minute: 73; requests_failed_per_minute: 0; request_total_duration: 0.795506; requests_total: 1; crawler_runtime: 0.818803\n",
+    "text": "2025-03-11 19:48:51.927 | INFO     | crawlee.crawlers._basic._basic_crawler:run:580 - Final request statistics:\n",
     "record": {
-        "elapsed": { "repr": "0:00:01.921982", "seconds": 1.921982 },
+        "elapsed": { "repr": "0:00:06.908244", "seconds": 6.908244 },
         "exception": null,
-        "extra": {},
+        "extra": {
+            "requests_finished": 1,
+            "requests_failed": 0,
+            "retry_histogram": [1],
+            "request_avg_failed_duration": null,
+            "request_avg_finished_duration": 5.869948,
+            "requests_finished_per_minute": 10,
+            "requests_failed_per_minute": 0,
+            "request_total_duration": 5.869948,
+            "requests_total": 1,
+            "crawler_runtime": 5.891902
+        },
         "file": {
             "name": "_basic_crawler.py",
-            "path": "/src/crawlee/crawlers/_basic/_basic_crawler.py"
+            "path": "/crawlee/crawlers/_basic/_basic_crawler.py"
         },
         "function": "run",
         "level": { "icon": "ℹ️", "name": "INFO", "no": 20 },
         "line": 580,
-        "message": "Final request statistics: requests_finished: 1; requests_failed: 0; retry_histogram: [1]; request_avg_failed_duration: None; request_avg_finished_duration: 0.795506; requests_finished_per_minute: 73; requests_failed_per_minute: 0; request_total_duration: 0.795506; requests_total: 1; crawler_runtime: 0.818803",
+        "message": "Final request statistics:",
         "module": "_basic_crawler",
         "name": "crawlee.crawlers._basic._basic_crawler",
-        "process": { "id": 32118, "name": "MainProcess" },
-        "thread": { "id": 139760540858176, "name": "MainThread" },
+        "process": { "id": 715998, "name": "MainProcess" },
+        "thread": { "id": 140608499947328, "name": "MainThread" },
         "time": {
-            "repr": "2025-03-07 16:51:09.947345+00:00",
-            "timestamp": 1741366269.947345
+            "repr": "2025-03-11 19:48:51.927493+00:00",
+            "timestamp": 1741722531.927493
         }
     }
 }

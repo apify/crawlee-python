@@ -1,11 +1,17 @@
+from __future__ import annotations
+
 import asyncio
 import inspect
 import logging
-from typing import Any
+import sys
+from typing import TYPE_CHECKING
 
 from loguru import logger
 
 from crawlee.crawlers import HttpCrawler, HttpCrawlingContext
+
+if TYPE_CHECKING:
+    from loguru import Record
 
 
 # Configure loguru interceptor to capture standard logging output
@@ -13,7 +19,7 @@ class InterceptHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         # Get corresponding Loguru level if it exists
         try:
-            level: Any[str, int] = logger.level(record.levelname).name
+            level: str | int = logger.level(record.levelname).name
         except ValueError:
             level = record.levelno
 
@@ -28,11 +34,34 @@ class InterceptHandler(logging.Handler):
             frame = frame.f_back
             depth += 1
 
+        dummy_record = logging.LogRecord('dummy', 0, 'dummy', 0, 'dummy', None, None)
+        standard_attrs = set(dummy_record.__dict__.keys())
+        extra_dict = {
+            key: value
+            for key, value in record.__dict__.items()
+            if key not in standard_attrs
+        }
+
+        logger.bind(**extra_dict)
         logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
 
 
+# Configure loguru formatter for console
+def console_formatter(record: Record) -> str:
+    basic_format = '[{name}] | <level>{level: ^8}</level> | - {message}'
+    if record['extra']:
+        basic_format = basic_format + ' {extra}'
+    return f'{basic_format}\n'
+
+
+# Remove default loguru logger
+logger.remove()
+
 # Set up loguru with JSONL serialization in file `crawler.log`
 logger.add('crawler.log', serialize=True, level='INFO')
+
+# Set up loguru logger for console
+logger.add(sys.stderr, format=console_formatter, colorize=True, level='INFO')
 
 # Configure standard logging to use our interceptor
 logging.basicConfig(handlers=[InterceptHandler()], level=logging.INFO, force=True)
