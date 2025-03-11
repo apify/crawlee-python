@@ -30,21 +30,6 @@ class KeyValueStoreClient(ABC):
         """
 
     @abstractmethod
-    async def update(
-        self,
-        *,
-        name: str | None = None,
-    ) -> KeyValueStoreMetadata:
-        """Update the key-value store metadata.
-
-        Args:
-            name: New new name for the key-value store.
-
-        Returns:
-            An object reflecting the updated key-value store metadata.
-        """
-
-    @abstractmethod
     async def delete(self) -> None:
         """Permanently delete the key-value store managed by this client."""
 
