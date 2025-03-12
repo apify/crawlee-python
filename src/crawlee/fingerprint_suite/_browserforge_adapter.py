@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os.path
 from collections.abc import Iterable
 from copy import deepcopy
 from functools import reduce
@@ -252,7 +253,11 @@ class BrowserforgeHeaderGenerator:
 
 def get_available_header_network() -> dict:
     """Get header network that contains possible header values."""
-    return extract_json(DATA_DIR / 'header-network.zip')
+    if os.path.isfile(DATA_DIR / 'header-network.zip'):
+        return extract_json(DATA_DIR / 'header-network.zip')
+    if os.path.isfile(DATA_DIR / 'header-network-definition.zip'):
+        return extract_json(DATA_DIR / 'header-network-definition.zip')
+    raise FileNotFoundError('Missing header-network file.')
 
 
 def get_available_header_values(header_network: dict, node_name: str | set[str]) -> set[str]:
