@@ -205,11 +205,16 @@
             border-radius: 0;
             box-shadow: none;
             code {
+                font-size: 14px;
                 background: var(--color-background-muted);
-                padding: 16px 8px 16px 2px;
+                padding: 16px 8px 16px 4px;
+
                 span::before {
                     margin-right: 16px !important;
                     left: unset !important;
+                    margin-right: 16px !important;
+                    color: var(--color-text-subtle) !important;
+                    opacity: 1 !important;
                 }
             }
         }

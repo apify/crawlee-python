@@ -92,9 +92,9 @@ function CodeExampleSection() {
 
 const benefitsCodeBlockCrawler = `fingerprint_generator = DefaultFingerprintGenerator(
     header_options=HeaderGeneratorOptions(
-        browsers=["chromium", "firefox"],
-        devices=["mobile"],
-        locales=["en-US"]
+        browsers=['chromium', 'firefox'],
+        devices=['mobile'],
+        locales=['en-US']
     ),
 )`;
 
@@ -128,8 +128,8 @@ function BenefitsSection() {
                     <ThemedImage
                         alt="Work with your favorite tools"
                         sources={{
-                            light: 'img/py-schema-light.webp',
-                            dark: 'img/py-schema-dark.webp',
+                            light: 'img/favorite-tools-light.webp',
+                            dark: 'img/favorite-tools-dark.webp',
                         }}
                     />
                 }
