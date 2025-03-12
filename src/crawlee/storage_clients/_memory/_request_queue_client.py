@@ -72,6 +72,8 @@ class RequestQueueClient(BaseRequestQueueClient):
         self.file_operation_lock = asyncio.Lock()
         self._last_used_timestamp = Decimal(0)
 
+        self._in_progress = set[str]()
+
     @property
     def resource_info(self) -> RequestQueueMetadata:
         """Get the resource info for the request queue client."""
@@ -170,7 +172,7 @@ class RequestQueueClient(BaseRequestQueueClient):
                     await asyncio.to_thread(shutil.rmtree, queue.resource_directory)
 
     @override
-    async def list_head(self, *, limit: int | None = None) -> RequestQueueHead:
+    async def list_head(self, *, limit: int | None = None, skip_in_progress: bool = False) -> RequestQueueHead:
         existing_queue_by_id = find_or_create_client_by_id_or_name_inner(
             resource_client_class=RequestQueueClient,
             memory_storage_client=self._memory_storage_client,
@@ -194,6 +196,8 @@ class RequestQueueClient(BaseRequestQueueClient):
                 if len(requests) == limit:
                     break
 
+                if skip_in_progress and request_key in existing_queue_by_id._in_progress:  # noqa: SLF001
+                    continue
                 internal_request = existing_queue_by_id.requests.get(request_key)
 
                 # Check that the request still exists and was not handled,
@@ -210,8 +214,23 @@ class RequestQueueClient(BaseRequestQueueClient):
 
     @override
     async def list_and_lock_head(self, *, lock_secs: int, limit: int | None = None) -> RequestQueueHeadWithLocks:
-        result = await self.list_head(limit=limit)
+        existing_queue_by_id = find_or_create_client_by_id_or_name_inner(
+            resource_client_class=RequestQueueClient,
+            memory_storage_client=self._memory_storage_client,
+            id=self.id,
+            name=self.name,
+        )
+
+        if existing_queue_by_id is None:
+            raise_on_non_existing_storage(StorageTypes.REQUEST_QUEUE, self.id)
+
+        result = await self.list_head(limit=limit, skip_in_progress=True)
+
+        for item in result.items:
+            existing_queue_by_id._in_progress.add(item.id)  # noqa: SLF001
+
         return RequestQueueHeadWithLocks(
+            queue_has_locked_requests=len(existing_queue_by_id._in_progress) > 0,  # noqa: SLF001
             lock_secs=lock_secs,
             limit=result.limit,
             had_multiple_clients=result.had_multiple_clients,
@@ -341,6 +360,9 @@ class RequestQueueClient(BaseRequestQueueClient):
                 persist_storage=self._memory_storage_client.persist_storage,
             )
 
+            if request.handled_at is not None:
+                existing_queue_by_id._in_progress.discard(request.id)  # noqa: SLF001
+
             return ProcessedRequest(
                 id=internal_request.id,
                 unique_key=internal_request.unique_key,
@@ -392,7 +414,17 @@ class RequestQueueClient(BaseRequestQueueClient):
         *,
         forefront: bool = False,
     ) -> None:
-        return None
+        existing_queue_by_id = find_or_create_client_by_id_or_name_inner(
+            resource_client_class=RequestQueueClient,
+            memory_storage_client=self._memory_storage_client,
+            id=self.id,
+            name=self.name,
+        )
+
+        if existing_queue_by_id is None:
+            raise_on_non_existing_storage(StorageTypes.REQUEST_QUEUE, self.id)
+
+        existing_queue_by_id._in_progress.discard(request_id)  # noqa: SLF001
 
     @override
     async def batch_add_requests(
