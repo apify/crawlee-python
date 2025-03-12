@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Add a check thread before set `add_signal_handler` ([#1068](https://github.com/apify/crawlee-python/pull/1068)) ([6983bda](https://github.com/apify/crawlee-python/commit/6983bda2dbc202b3ecbf7db62b11deee007b4b5f)) by [@Mantisus](https://github.com/Mantisus)
+- Temporary workaround for `browserforge` import time code execution ([#1073](https://github.com/apify/crawlee-python/pull/1073)) ([17d914f](https://github.com/apify/crawlee-python/commit/17d914f78242078f88c07d686a567d1091255eb1)) by [@Pijukatel](https://github.com/Pijukatel)
 
 
 <!-- git-cliff-unreleased-end -->
