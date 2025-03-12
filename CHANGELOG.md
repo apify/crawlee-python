@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.6.4 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Add a check thread before set `add_signal_handler` ([#1068](https://github.com/apify/crawlee-python/pull/1068)) ([6983bda](https://github.com/apify/crawlee-python/commit/6983bda2dbc202b3ecbf7db62b11deee007b4b5f)) by [@Mantisus](https://github.com/Mantisus)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.6.3](https://github.com/apify/crawlee-python/releases/tag/v0.6.3) (2025-03-07)
 
 ### 🚀 Features
