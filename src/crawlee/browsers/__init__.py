@@ -3,6 +3,12 @@ from crawlee._utils.try_import import try_import as _try_import
 
 _install_import_hook(__name__)
 
+# Due to patch_browserforge
+# ruff: noqa
+from .._browserforge_workaround import patch_browserforge
+
+patch_browserforge()
+
 # The following imports are wrapped in try_import to handle optional dependencies,
 # ensuring the module can still function even if these dependencies are missing.
 with _try_import(__name__, 'BrowserPool'):

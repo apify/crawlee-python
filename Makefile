@@ -11,7 +11,6 @@ install-dev:
 	uv sync --all-extras
 	uv run pre-commit install
 	uv run playwright install
-	uv run python -m browserforge update
 
 build:
 	uv build --verbose
