@@ -2,7 +2,7 @@
     display: flex;
     align-items: center;
     margin-inline: auto;
-    gap: 32px;
+    gap: 16px;
 }
 
 .navbarItems__leftMargin {
