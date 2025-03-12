@@ -13,7 +13,7 @@ async def main() -> None:
     # Generator will generate real looking browser fingerprint based on the options.
     # Unspecified fingerprint options will be automatically selected by the generator.
     fingerprint_generator = DefaultFingerprintGenerator(
-        header_options=HeaderGeneratorOptions(browsers=['chromium']),
+        header_options=HeaderGeneratorOptions(browsers=['chrome']),
         screen_options=ScreenOptions(min_width=400),
     )
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 from collections.abc import Iterable
 from copy import deepcopy
 from functools import reduce
@@ -10,7 +11,6 @@ from browserforge.bayesian_network import extract_json
 from browserforge.fingerprints import Fingerprint as bf_Fingerprint
 from browserforge.fingerprints import FingerprintGenerator as bf_FingerprintGenerator
 from browserforge.fingerprints import Screen
-from browserforge.headers import Browser
 from browserforge.headers.generator import DATA_DIR, ListOrString
 from browserforge.headers.generator import HeaderGenerator as bf_HeaderGenerator
 from typing_extensions import override
@@ -21,6 +21,8 @@ from ._consts import BROWSER_TYPE_HEADER_KEYWORD
 from ._fingerprint_generator import FingerprintGenerator
 
 if TYPE_CHECKING:
+    from browserforge.headers import Browser
+
     from ._types import HeaderGeneratorOptions, ScreenOptions, SupportedBrowserType
 
 
@@ -60,8 +62,8 @@ class PatchedHeaderGenerator(bf_HeaderGenerator):
         This patched version of the method adds additional quality checks on the output of the original method. It tries
         to generate headers several times until they match the requirements.
 
-        The `browser` parameter accepts `chromium` as a general category, which includes not only Google Chrome
-        but also other Chromium-based browsers. As a result, a Safari-like user agent may be generated for a `chromium`
+        The `browser` parameter accepts `chrome` as a general category, which includes not only Google Chrome
+        but also other Chromium-based browsers. As a result, a Safari-like user agent may be generated for a `chrome`
         input, such as:
         ```
         Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko)
@@ -77,21 +79,18 @@ class PatchedHeaderGenerator(bf_HeaderGenerator):
 
         single_browser = self._get_single_browser_type(browser)
 
-        if single_browser == 'chromium':
-            # `BrowserForge` header generator considers `chromium` in general sense and therefore will generate also
-            # other `Chromium` based browser headers. This adapter desires only specific subset of `chromium` headers
+        if single_browser == 'chrome':
+            # `BrowserForge` header generator considers `chrome` in general sense and therefore will generate also
+            # other `chrome` based browser headers. This adapter desires only specific subset of `chrome` headers
             # that contain all 'sec-ch-ua', 'sec-ch-ua-mobile', 'sec-ch-ua-platform' headers.
             # Increase max attempts as from `BrowserForge` header generator perspective even `chromium`
             # headers without `sec-...` headers are valid.
             max_attempts += 50
 
-        # Browserforge uses term 'safari', we use term 'webkit'
-        bf_browser_type = 'safari' if single_browser == 'webkit' else single_browser
-
         # Use browserforge to generate headers until it satisfies our additional requirements.
         for _attempt in range(max_attempts):
             generated_header: dict[str, str] = super().generate(
-                browser=bf_browser_type,
+                browser=single_browser,
                 os=os,
                 device=device,
                 locale=locale,
@@ -111,7 +110,7 @@ class PatchedHeaderGenerator(bf_HeaderGenerator):
                 keyword in generated_header['User-Agent']
                 for keyword in self._get_expected_browser_keywords(single_browser)
             ):
-                if single_browser == 'chromium' and not self._contains_all_sec_headers(generated_header):
+                if single_browser == 'chrome' and not self._contains_all_sec_headers(generated_header):
                     # Accept chromium header only with all sec headers.
                     continue
 
@@ -136,19 +135,16 @@ class PatchedHeaderGenerator(bf_HeaderGenerator):
         Handling the original multitype would be pointlessly complex.
         """
         # In our case we never pass more than one browser type. In general case more browsers are just bigger pool to
-        # select from, so narrowing it to the first one is still a valid action.
-        first_browser = (
-            next(iter(browser)) if (isinstance(browser, Iterable) and not isinstance(browser, str)) else browser
-        )
+        # select from, so narrowing it to any of them is still a valid action.
 
-        if isinstance(first_browser, str):
-            single_name = first_browser
-        elif isinstance(first_browser, Browser):
-            single_name = first_browser.name
-        else:
-            single_name = None
-
-        return single_name
+        if isinstance(browser, Iterable):
+            return random.choice(
+                [
+                    single_browser if isinstance(single_browser, str) else single_browser.name
+                    for single_browser in browser
+                ]
+            )
+        return None
 
 
 class PatchedFingerprintGenerator(bf_FingerprintGenerator):
@@ -245,9 +241,9 @@ class BrowserforgeHeaderGenerator:
     def __init__(self) -> None:
         self._generator = PatchedHeaderGenerator(locale=['en-US', 'en'])
 
-    def generate(self, browser_type: SupportedBrowserType = 'chromium') -> dict[str, str]:
+    def generate(self, browser_type: SupportedBrowserType = 'chrome') -> dict[str, str]:
         """Generate headers."""
-        return self._generator.generate(browser=browser_type)
+        return self._generator.generate(browser=[browser_type])
 
 
 def get_available_header_network() -> dict:

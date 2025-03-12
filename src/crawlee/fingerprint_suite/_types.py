@@ -9,7 +9,7 @@ from crawlee._utils.docs import docs_group
 SupportedOperatingSystems = Literal['windows', 'macos', 'linux', 'android', 'ios']
 SupportedDevices = Literal['desktop', 'mobile']
 SupportedHttpVersion = Literal['1', '2']
-SupportedBrowserType = Literal['chromium', 'firefox', 'webkit', 'edge']
+SupportedBrowserType = Literal['chrome', 'firefox', 'safari', 'edge']
 
 
 @docs_group('Data structures')

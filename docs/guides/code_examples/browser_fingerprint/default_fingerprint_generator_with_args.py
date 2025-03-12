@@ -5,6 +5,6 @@ from crawlee.fingerprint_suite import (
 )
 
 fingerprint_generator = DefaultFingerprintGenerator(
-    header_options=HeaderGeneratorOptions(browsers=['chromium']),
+    header_options=HeaderGeneratorOptions(browsers=['chrome']),
     screen_options=ScreenOptions(min_width=400),
 )

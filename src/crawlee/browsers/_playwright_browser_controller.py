@@ -13,6 +13,7 @@ from crawlee._utils.docs import docs_group
 from crawlee.browsers._browser_controller import BrowserController
 from crawlee.browsers._types import BrowserType
 from crawlee.fingerprint_suite import HeaderGenerator
+from crawlee.fingerprint_suite._header_generator import fingerprint_browser_type_from_playwright_browser_type
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -225,7 +226,7 @@ class PlaywrightBrowserController(BrowserController):
                         'sec-ch-ua-mobile',
                         'sec-ch-ua-platform',
                     },
-                    browser_type=self.browser_type,
+                    browser_type=fingerprint_browser_type_from_playwright_browser_type(self.browser_type),
                 )
             )
         else:
