@@ -37,7 +37,6 @@ dependencies = [
     "browserforge>=1.2.3",
     "cachetools>=5.5.0",
     "colorama>=0.4.0",
-    "eval-type-backport>=0.2.0",
     "httpx[brotli,http2,zstd]>=0.27.0",
     "more-itertools>=10.2.0",
     "psutil>=6.0.0",
@@ -93,6 +92,7 @@ crawlee = "crawlee._cli:cli"
 [dependency-groups]
 dev = [
     "build~=1.2.0",
+    "eval-type-backport~=0.2.0",
     "filelock~=3.17.0",
     "ipdb~=0.13.0",
     "mypy~=1.15.0",
