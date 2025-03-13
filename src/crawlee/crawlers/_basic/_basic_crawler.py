@@ -40,6 +40,7 @@ from crawlee.errors import (
     ContextPipelineInterruptedError,
     HttpClientStatusCodeError,
     HttpStatusCodeError,
+    RequestCollisionError,
     RequestHandlerError,
     SessionError,
     UserDefinedErrorHandlerError,
@@ -432,6 +433,20 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         return await wait_for(
             self._session_pool.get_session,
+            timeout=self._internal_timeout,
+            timeout_message='Fetching a session from the pool timed out after '
+            f'{self._internal_timeout.total_seconds()} seconds',
+            max_retries=3,
+            logger=self._logger,
+        )
+
+    async def _get_session_by_id(self, session_id: str | None) -> Session | None:
+        """If session pool is being used, try to take a session by id from it."""
+        if not self._use_session_pool or not session_id:
+            return None
+
+        return await wait_for(
+            partial(self._session_pool.get_session_by_id, session_id),
             timeout=self._internal_timeout,
             timeout_message='Fetching a session from the pool timed out after '
             f'{self._internal_timeout.total_seconds()} seconds',
@@ -1043,7 +1058,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if request is None:
             return
 
-        session = await self._get_session()
+        if request.session_id:
+            session = await self._get_session_by_id(request.session_id)
+        else:
+            session = await self._get_session()
         proxy_info = await self._get_proxy_info(request, session)
         result = RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store)
 
@@ -1066,6 +1084,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         try:
             request.state = RequestState.REQUEST_HANDLER
 
+            self._raise_context_request_colission(context)
+
             try:
                 await self._run_request_handler(context=context)
             except asyncio.TimeoutError as e:
@@ -1087,6 +1107,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 context.session.mark_good()
 
             self._statistics.record_request_processing_finish(statistics_id)
+
+        except RequestCollisionError as request_error:
+            context.request.no_retry = True
+            await self._handle_request_error(context, request_error)
 
         except RequestHandlerError as primary_error:
             primary_error = cast(
@@ -1204,3 +1228,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             ignore_http_error_status_codes=self._ignore_http_error_status_codes,
         ):
             raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
+
+    def _raise_context_request_colission(self, context: BasicCrawlingContext) -> None:
+        if self._use_session_pool and context.request.session_id and not context.session:
+            raise RequestCollisionError('The `Session` binded to the `Request` is no longer available in `SessionPool`')

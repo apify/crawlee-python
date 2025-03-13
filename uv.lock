@@ -587,7 +587,7 @@ toml = [
 
 [[package]]
 name = "crawlee"
-version = "0.6.4"
+version = "0.6.5"
 source = { editable = "." }
 dependencies = [
     { name = "apify-fingerprint-datapoints" },
