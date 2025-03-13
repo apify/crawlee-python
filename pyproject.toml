@@ -92,7 +92,7 @@ crawlee = "crawlee._cli:cli"
 [dependency-groups]
 dev = [
     "build~=1.2.0",
-    "eval-type-backport~=0.2.0",
+    "eval-type-backport~=0.2.0",  # can be removed when we drop support for Python 3.9
     "filelock~=3.17.0",
     "ipdb~=0.13.0",
     "mypy~=1.15.0",
