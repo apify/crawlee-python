@@ -2,15 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.6.5 - **not yet released**
+## [0.6.5](https://github.com/apify/crawlee-python/releases/tag/v0.6.5) (2025-03-13)
 
 ### 🐛 Bug Fixes
 
 - Update to `browserforge` workaround ([#1075](https://github.com/apify/crawlee-python/pull/1075)) ([2378cf8](https://github.com/apify/crawlee-python/commit/2378cf84ab1ed06473049a9ddfca2ba6f166306d)) by [@Pijukatel](https://github.com/Pijukatel)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.6.4](https://github.com/apify/crawlee-python/releases/tag/v0.6.4) (2025-03-12)
 
 ### 🐛 Bug Fixes
