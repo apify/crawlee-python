@@ -1084,7 +1084,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         try:
             request.state = RequestState.REQUEST_HANDLER
 
-            self._raise_context_request_colission(context)
+            self._raise_request_collision(context.request, context.session)
 
             try:
                 await self._run_request_handler(context=context)
@@ -1229,6 +1229,17 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         ):
             raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
 
-    def _raise_context_request_colission(self, context: BasicCrawlingContext) -> None:
-        if self._use_session_pool and context.request.session_id and not context.session:
-            raise RequestCollisionError('The `Session` binded to the `Request` is no longer available in `SessionPool`')
+    def _raise_request_collision(self, request: Request, session: Session | None) -> None:
+        """Raise an exception if a request cannot access required resources.
+
+        Args:
+            request: The Request that might require specific resources (like a session).
+            session: The Session object that was retrieved for the request, or None if not available.
+
+        Raises:
+            RequestCollisionError: If the Session referenced by the request is not available.
+        """
+        if self._use_session_pool and request.session_id and not session:
+            raise RequestCollisionError(
+                f'The Session (id: {request.session_id}) bound to the Request is no longer available in SessionPool'
+            )

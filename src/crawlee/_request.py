@@ -76,7 +76,7 @@ class UserData(BaseModel, MutableMapping[str, JsonSerializable]):
     """Label used for request routing."""
 
     session_id: Annotated[str | None, Field()] = None
-    """Bind a request to a specific Session"""
+    """ID of a session to which the request is bound."""
 
     def __getitem__(self, key: str) -> JsonSerializable:
         return self.__pydantic_extra__[key]
@@ -129,6 +129,7 @@ class RequestOptions(TypedDict):
     headers: NotRequired[HttpHeaders | dict[str, str] | None]
     payload: NotRequired[HttpPayload | str | None]
     label: NotRequired[str | None]
+    session_id: NotRequired[str | None]
     unique_key: NotRequired[str | None]
     id: NotRequired[str | None]
     keep_url_fragment: NotRequired[bool]
@@ -259,7 +260,9 @@ class Request(BaseModel):
             payload: The data to be sent as the request body. Typically used with 'POST' or 'PUT' requests.
             label: A custom label to differentiate between request types. This is stored in `user_data`, and it is
                 used for request routing (different requests go to different handlers).
-            session_id: TODO
+            session_id: ID of a specific Session to which the request will be strictly bound.
+                If the session becomes unavailable when the request is processed, a RequestCollisionError will be
+                raised.
             unique_key: A unique key identifying the request. If not provided, it is automatically computed based on
                 the URL and other parameters. Requests with the same `unique_key` are treated as identical.
             id: A unique identifier for the request. If not provided, it is automatically generated from the
@@ -325,7 +328,7 @@ class Request(BaseModel):
 
     @property
     def session_id(self) -> str | None:
-        """A string used to differentiate between arbitrary request types."""
+        """A string used to identify the bound session."""
         return cast(UserData, self.user_data).session_id
 
     @property
