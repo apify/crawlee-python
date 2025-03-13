@@ -228,6 +228,8 @@ warn_unused_ignores = true
 module = [
     "apify",                # Example code shows integration of apify and crawlee.
     "camoufox",             # Example code shows integration of camoufox and crawlee.
+    "flask",                # Example code shows deploy on Google Cloud.
+    "functions_framework",  # Example code shows deploy on Google Cloud.
     "jaro",                 # Untyped and stubs not available
     "sklearn.linear_model", # Untyped and stubs not available
 ]
