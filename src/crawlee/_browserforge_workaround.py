@@ -9,21 +9,26 @@ def patch_browserforge() -> None:
     from typing import Dict
     import apify_fingerprint_datapoints  # type:ignore[import-untyped]
     from browserforge import download
-    from browserforge.download import DATA_FILES
 
-    # Needed to be done before the import of code that does import time download
     download.DATA_DIRS: Dict[str, Path] = {  # type:ignore[misc]
         'headers': apify_fingerprint_datapoints.get_header_network().parent,
         'fingerprints': apify_fingerprint_datapoints.get_fingerprint_network().parent,
     }
+
+    def DownloadIfNotExists(**flags: bool) -> None:
+        pass
+
+    download.DownloadIfNotExists = DownloadIfNotExists
+
     import browserforge.bayesian_network
 
     class BayesianNetwork(browserforge.bayesian_network.BayesianNetwork):
         def __init__(self, path: Path) -> None:
-            if path.name in DATA_FILES['headers']:
-                path = download.DATA_DIRS['headers'] / path.name
+            """Inverted mapping as browserforge expects somewhat renamed file names."""
+            if path.name in download.DATA_FILES['headers']:
+                path = download.DATA_DIRS['headers'] / download.DATA_FILES['headers'][path.name]
             else:
-                path = download.DATA_DIRS['fingerprints'] / path.name
+                path = download.DATA_DIRS['fingerprints'] / download.DATA_FILES['fingerprints'][path.name]
             super().__init__(path)
 
     browserforge.bayesian_network.BayesianNetwork = BayesianNetwork  # type:ignore[misc]
