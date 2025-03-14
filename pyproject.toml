@@ -46,6 +46,7 @@ dependencies = [
     "pyee>=9.0.0",
     "rich>=13.9.0",
     "sortedcollections>=2.1.0",
+    "sortedcontainers>=2.4.0",
     "tldextract>=5.1.0",
     "typing-extensions>=4.1.0",
     "yarl>=1.18.0",
