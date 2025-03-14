@@ -11,7 +11,7 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 from unittest.mock import AsyncMock, Mock, call
 
 import httpx
@@ -889,11 +889,20 @@ async def test_respects_no_persist_storage() -> None:
 
 
 @pytest.mark.skipif(os.name == 'nt' and 'CI' in os.environ, reason='Skipped in Windows CI')
-async def test_logs_final_statistics(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+@pytest.mark.parametrize(
+    ('statistics_log_format'),
+    [
+        pytest.param('table', id='With table for logs'),
+        pytest.param('inline', id='With inline logs'),
+    ],
+)
+async def test_logs_final_statistics(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, statistics_log_format: Literal['table', 'inline']
+) -> None:
     # Set the log level to INFO to capture the final statistics log.
     caplog.set_level(logging.INFO)
 
-    crawler = BasicCrawler(configure_logging=False)
+    crawler = BasicCrawler(configure_logging=False, statistics_log_format=statistics_log_format)
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
@@ -923,21 +932,36 @@ async def test_logs_final_statistics(monkeypatch: pytest.MonkeyPatch, caplog: py
     )
 
     assert final_statistics is not None
-    assert final_statistics.msg.splitlines() == [
-        'Final request statistics:',
-        '┌───────────────────────────────┬───────────┐',
-        '│ requests_finished             │ 4         │',
-        '│ requests_failed               │ 33        │',
-        '│ retry_histogram               │ [1, 4, 8] │',
-        '│ request_avg_failed_duration   │ 99.0      │',
-        '│ request_avg_finished_duration │ 0.483     │',
-        '│ requests_finished_per_minute  │ 0.33      │',
-        '│ requests_failed_per_minute    │ 0.1       │',
-        '│ request_total_duration        │ 720.0     │',
-        '│ requests_total                │ 37        │',
-        '│ crawler_runtime               │ 300.0     │',
-        '└───────────────────────────────┴───────────┘',
-    ]
+    if statistics_log_format == 'table':
+        assert final_statistics.msg.splitlines() == [
+            'Final request statistics:',
+            '┌───────────────────────────────┬───────────┐',
+            '│ requests_finished             │ 4         │',
+            '│ requests_failed               │ 33        │',
+            '│ retry_histogram               │ [1, 4, 8] │',
+            '│ request_avg_failed_duration   │ 99.0      │',
+            '│ request_avg_finished_duration │ 0.483     │',
+            '│ requests_finished_per_minute  │ 0.33      │',
+            '│ requests_failed_per_minute    │ 0.1       │',
+            '│ request_total_duration        │ 720.0     │',
+            '│ requests_total                │ 37        │',
+            '│ crawler_runtime               │ 300.0     │',
+            '└───────────────────────────────┴───────────┘',
+        ]
+    else:
+        assert final_statistics.msg == 'Final request statistics:'
+
+        # ignore[attr-defined] since `extra` parameters are not defined for `LogRecord`
+        assert final_statistics.requests_finished == 4  # type: ignore[attr-defined]
+        assert final_statistics.requests_failed == 33  # type: ignore[attr-defined]
+        assert final_statistics.retry_histogram == [1, 4, 8]  # type: ignore[attr-defined]
+        assert final_statistics.request_avg_failed_duration == 99.0  # type: ignore[attr-defined]
+        assert final_statistics.request_avg_finished_duration == 0.483  # type: ignore[attr-defined]
+        assert final_statistics.requests_finished_per_minute == 0.33  # type: ignore[attr-defined]
+        assert final_statistics.requests_failed_per_minute == 0.1  # type: ignore[attr-defined]
+        assert final_statistics.request_total_duration == 720.0  # type: ignore[attr-defined]
+        assert final_statistics.requests_total == 37  # type: ignore[attr-defined]
+        assert final_statistics.crawler_runtime == 300.0  # type: ignore[attr-defined]
 
 
 async def test_crawler_manual_stop(httpbin: URL) -> None:
