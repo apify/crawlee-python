@@ -1215,7 +1215,7 @@ async def test_bound_session_to_request() -> None:
         await crawler.run(requests)
 
         assert len(used_sessions) == 10
-        assert all(session_id == check_session.id for session_id in used_sessions)
+        assert set(used_sessions) == {check_session.id}
 
 
 async def test_error_bound_session_to_request() -> None:

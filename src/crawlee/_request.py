@@ -58,6 +58,9 @@ class CrawleeRequestData(BaseModel):
     crawl_depth: Annotated[int, Field(alias='crawlDepth')] = 0
     """The depth of the request in the crawl tree."""
 
+    session_id: Annotated[str | None, Field()] = None
+    """ID of a session to which the request is bound."""
+
 
 class UserData(BaseModel, MutableMapping[str, JsonSerializable]):
     """Represents the `user_data` part of a Request.
@@ -75,9 +78,6 @@ class UserData(BaseModel, MutableMapping[str, JsonSerializable]):
     label: Annotated[str | None, Field()] = None
     """Label used for request routing."""
 
-    session_id: Annotated[str | None, Field()] = None
-    """ID of a session to which the request is bound."""
-
     def __getitem__(self, key: str) -> JsonSerializable:
         return self.__pydantic_extra__[key]
 
@@ -87,12 +87,6 @@ class UserData(BaseModel, MutableMapping[str, JsonSerializable]):
                 raise ValueError('`label` must be str or None')
 
             self.label = value
-
-        if key == 'session_id':
-            if value is not None and not isinstance(value, str):
-                raise ValueError('`session_id` must be str or None')
-
-            self.session_id = value
 
         self.__pydantic_extra__[key] = value
 
@@ -312,7 +306,7 @@ class Request(BaseModel):
             request.user_data['label'] = label
 
         if session_id is not None:
-            request.user_data['session_id'] = session_id
+            request.crawlee_data.session_id = session_id
 
         return request
 
@@ -329,7 +323,7 @@ class Request(BaseModel):
     @property
     def session_id(self) -> str | None:
         """A string used to identify the bound session."""
-        return cast(UserData, self.user_data).session_id
+        return self.crawlee_data.session_id
 
     @property
     def crawlee_data(self) -> CrawleeRequestData:
