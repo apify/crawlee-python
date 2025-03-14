@@ -7,5 +7,5 @@ from crawlee.storage_clients._base import KeyValueStoreClient
 logger = getLogger(__name__)
 
 
-class MemoryKeyValueStoreClient(KeyValueStoreClient):
+class FileSystemKeyValueStoreClient(KeyValueStoreClient):
     pass

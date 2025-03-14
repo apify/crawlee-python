@@ -74,7 +74,7 @@ async def test_persist_storage(persist_storage: bool, tmp_path: Path) -> None:  
     ds_client = ms.datasets()
     ds_info = await ds_client.get_or_create(name='ds')
 
-    await ms.dataset(ds_info.id).push_items([{'foo': 'bar'}])
+    await ms.dataset(ds_info.id).push_data([{'foo': 'bar'}])
 
 
 def test_persist_storage_set_to_false_via_string_env_var(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

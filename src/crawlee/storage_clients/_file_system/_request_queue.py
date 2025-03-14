@@ -7,5 +7,5 @@ from crawlee.storage_clients._base import RequestQueueClient
 logger = getLogger(__name__)
 
 
-class MemoryRequestQueueClient(RequestQueueClient):
+class FileSystemRequestQueueClient(RequestQueueClient):
     pass
