@@ -11,13 +11,13 @@ from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
 from crawlee.browsers._browser_controller import BrowserController
-from crawlee.browsers._types import BrowserType
 from crawlee.fingerprint_suite import HeaderGenerator
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from crawlee.browsers._playwright_browser import PlaywrightPersistentBrowser
+    from crawlee.browsers._types import BrowserType
     from crawlee.fingerprint_suite import FingerprintGenerator
     from crawlee.proxy_configuration import ProxyInfo
 
@@ -107,7 +107,7 @@ class PlaywrightBrowserController(BrowserController):
     @property
     @override
     def browser_type(self) -> BrowserType:
-        return cast(BrowserType, self._browser.browser_type.name)
+        return cast('BrowserType', self._browser.browser_type.name)
 
     @override
     async def new_page(

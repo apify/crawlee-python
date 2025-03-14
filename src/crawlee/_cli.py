@@ -78,7 +78,7 @@ def _prompt_for_project_name(initial_project_name: str | None) -> str:
 
 def _prompt_text(message: str, default: str) -> str:
     return cast(
-        str,
+        'str',
         ConsoleRender().render(
             inquirer.Text(
                 name='text',
@@ -93,7 +93,7 @@ def _prompt_text(message: str, default: str) -> str:
 def _prompt_choice(message: str, choices: list[str]) -> str:
     """Prompt the user to pick one from a list of choices."""
     return cast(
-        str,
+        'str',
         ConsoleRender().render(
             inquirer.List(
                 name='choice',
@@ -106,7 +106,7 @@ def _prompt_choice(message: str, choices: list[str]) -> str:
 
 def _prompt_bool(message: str, *, default: bool) -> bool:
     return cast(
-        bool,
+        'bool',
         ConsoleRender().render(
             inquirer.Confirm(
                 name='confirm',

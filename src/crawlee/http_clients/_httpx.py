@@ -12,7 +12,6 @@ from crawlee._utils.docs import docs_group
 from crawlee.errors import ProxyError
 from crawlee.fingerprint_suite import HeaderGenerator
 from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
-from crawlee.sessions import Session
 
 if TYPE_CHECKING:
     from ssl import SSLContext
@@ -20,6 +19,7 @@ if TYPE_CHECKING:
     from crawlee import Request
     from crawlee._types import HttpMethod, HttpPayload
     from crawlee.proxy_configuration import ProxyInfo
+    from crawlee.sessions import Session
     from crawlee.statistics import Statistics
 
 logger = getLogger(__name__)
@@ -60,7 +60,7 @@ class _HttpxTransport(httpx.AsyncHTTPTransport):
         response = await super().handle_async_request(request)
         response.request = request
 
-        if session := cast(Session, request.extensions.get('crawlee_session')):
+        if session := cast('Session', request.extensions.get('crawlee_session')):
             session.cookies.store_cookies(list(response.cookies.jar))
 
         if 'Set-Cookie' in response.headers:

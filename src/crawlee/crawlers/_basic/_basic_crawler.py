@@ -303,8 +303,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         # Request router setup
         self._router: Router[TCrawlingContext] | None = None
-        if isinstance(cast(Router, request_handler), Router):
-            self._router = cast(Router[TCrawlingContext], request_handler)
+        if isinstance(cast('Router', request_handler), Router):
+            self._router = cast('Router[TCrawlingContext]', request_handler)
         elif request_handler is not None:
             self._router = None
             self.router.default_handler(request_handler)
@@ -349,7 +349,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         # Statistics
         self._statistics = statistics or cast(
-            Statistics[TStatisticsState],
+            'Statistics[TStatisticsState]',
             Statistics.with_default_state(
                 periodic_message_logger=self._logger,
                 log_message='Current request statistics:',
@@ -1090,7 +1090,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         except RequestHandlerError as primary_error:
             primary_error = cast(
-                RequestHandlerError[TCrawlingContext], primary_error
+                'RequestHandlerError[TCrawlingContext]', primary_error
             )  # valid thanks to ContextPipeline
 
             self._logger.debug(
