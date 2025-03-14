@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import inspect
 from collections import defaultdict
-from collections.abc import Awaitable, Callable
 from datetime import timedelta
 from functools import wraps
 from logging import getLogger
@@ -28,6 +27,7 @@ from crawlee.events._types import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
     from types import TracebackType
 
     from typing_extensions import NotRequired
@@ -158,7 +158,7 @@ class EventManager:
         """
         signature = inspect.signature(listener)
 
-        @wraps(cast(Callable[..., Union[None, Awaitable[None]]], listener))
+        @wraps(cast('Callable[..., Union[None, Awaitable[None]]]', listener))
         async def listener_wrapper(event_data: EventData) -> None:
             try:
                 bound_args = signature.bind(event_data)
@@ -170,7 +170,7 @@ class EventManager:
             coro = (
                 listener(*bound_args.args, **bound_args.kwargs)
                 if asyncio.iscoroutinefunction(listener)
-                else asyncio.to_thread(cast(Callable[..., None], listener), *bound_args.args, **bound_args.kwargs)
+                else asyncio.to_thread(cast('Callable[..., None]', listener), *bound_args.args, **bound_args.kwargs)
             )
             # Note: use `asyncio.iscoroutinefunction` rather then `inspect.iscoroutinefunction` since it works with
             # unittests.mock.AsyncMock. See https://github.com/python/cpython/issues/84753.
