@@ -22,7 +22,7 @@ from crawlee._request import Request
 from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpHeaders
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
-from crawlee.errors import SessionError, UserDefinedErrorHandlerError
+from crawlee.errors import RequestCollisionError, SessionError, UserDefinedErrorHandlerError
 from crawlee.events._local_event_manager import LocalEventManager
 from crawlee.request_loaders import RequestList, RequestManagerTandem
 from crawlee.sessions import SessionPool
@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from yarl import URL
 
     from crawlee._types import JsonSerializable
+    from crawlee.sessions._session import Session
 
 
 async def test_processes_requests_from_explicit_queue() -> None:
@@ -1194,3 +1195,52 @@ async def test_session_retire_in_user_handler(*, retire: bool) -> None:
         assert sessions[1] != sessions[0]
     else:
         assert sessions[1] == sessions[0]
+
+
+async def test_bound_session_to_request() -> None:
+    async with SessionPool() as session_pool:
+        check_session: Session = await session_pool.get_session()
+        used_sessions = list[str]()
+        crawler = BasicCrawler(session_pool=session_pool)
+
+        @crawler.router.default_handler
+        async def handler(context: BasicCrawlingContext) -> None:
+            if context.session:
+                used_sessions.append(context.session.id)
+
+        requests = [
+            Request.from_url('http://a.com/', session_id=check_session.id, always_enqueue=True) for _ in range(10)
+        ]
+
+        await crawler.run(requests)
+
+        assert len(used_sessions) == 10
+        assert all(session_id == check_session.id for session_id in used_sessions)
+
+
+async def test_error_bound_session_to_request() -> None:
+    crawler = BasicCrawler(request_handler=AsyncMock())
+
+    requests = [Request.from_url('http://a.com/', session_id='1', always_enqueue=True) for _ in range(10)]
+
+    stats = await crawler.run(requests)
+
+    assert stats.requests_total == 10
+    assert stats.requests_failed == 10
+    assert stats.retry_histogram == [10]
+
+
+async def test_handle_error_bound_session_to_request() -> None:
+    error_handler_mock = AsyncMock()
+    crawler = BasicCrawler(request_handler=AsyncMock())
+
+    @crawler.failed_request_handler
+    async def error_req_hook(context: BasicCrawlingContext, error: Exception) -> None:
+        if isinstance(error, RequestCollisionError):
+            await error_handler_mock(context, error)
+
+    requests = [Request.from_url('http://a.com/', session_id='1')]
+
+    await crawler.run(requests)
+
+    assert error_handler_mock.call_count == 1
