@@ -290,7 +290,7 @@ class Statistics(Generic[TStatisticsState]):
         if not self._key_value_store:
             return
 
-        stored_state = await self._key_value_store.get_value(self._persist_state_key, cast(Any, {}))
+        stored_state = await self._key_value_store.get_value(self._persist_state_key, cast('Any', {}))
 
         saved_state = self.state.__class__.model_validate(stored_state)
         self.state = saved_state

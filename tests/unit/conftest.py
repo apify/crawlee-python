@@ -91,7 +91,7 @@ def _isolate_test_environment(prepare_test_env: Callable[[], None]) -> None:
 def _set_crawler_log_level(pytestconfig: pytest.Config, monkeypatch: pytest.MonkeyPatch) -> None:
     from crawlee import _log_config
 
-    loglevel = cast(Optional[str], pytestconfig.getoption('--log-level'))
+    loglevel = cast('Optional[str]', pytestconfig.getoption('--log-level'))
     if loglevel is not None:
         monkeypatch.setattr(_log_config, 'get_configured_log_level', lambda: getattr(logging, loglevel.upper()))
 
@@ -128,7 +128,7 @@ def httpbin() -> URL:
         def __str__(self) -> str:
             return str(self.url)
 
-    return cast(URL, URLWrapper(URL(os.environ.get('HTTPBIN_URL', 'https://httpbin.org'))))
+    return cast('URL', URLWrapper(URL(os.environ.get('HTTPBIN_URL', 'https://httpbin.org'))))
 
 
 @pytest.fixture

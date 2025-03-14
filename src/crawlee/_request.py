@@ -318,7 +318,7 @@ class Request(BaseModel):
     @property
     def label(self) -> str | None:
         """A string used to differentiate between arbitrary request types."""
-        return cast(UserData, self.user_data).label
+        return cast('UserData', self.user_data).label
 
     @property
     def session_id(self) -> str | None:
@@ -328,7 +328,7 @@ class Request(BaseModel):
     @property
     def crawlee_data(self) -> CrawleeRequestData:
         """Crawlee-specific configuration stored in the `user_data`."""
-        user_data = cast(UserData, self.user_data)
+        user_data = cast('UserData', self.user_data)
         if user_data.crawlee_data is None:
             user_data.crawlee_data = CrawleeRequestData()
 

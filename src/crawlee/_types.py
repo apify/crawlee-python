@@ -244,7 +244,7 @@ class KeyValueStoreChangeRecords:
 
     async def get_value(self, key: str, default_value: T | None = None) -> T | None:
         if key in self.updates:
-            return cast(T, self.updates[key].content)
+            return cast('T', self.updates[key].content)
 
         return await self._actual_key_value_store.get_value(key, default_value)
 
