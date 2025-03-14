@@ -1,71 +1,77 @@
-import React from 'react';
-import clsx from 'clsx';
-// eslint-disable-next-line import/no-extraneous-dependencies
+import Link from '@docusaurus/Link';
 import { useThemeConfig } from '@docusaurus/theme-common';
+import useBaseUrl from '@docusaurus/useBaseUrl';
 import LinkItem from '@theme/Footer/LinkItem';
+import NavbarColorModeToggle from '@theme/Navbar/ColorModeToggle';
+import ThemedImage from '@theme/ThemedImage';
+import clsx from 'clsx';
+import React from 'react';
+
 import styles from './index.module.css';
 
 function FooterLinksColumn({ column }) {
     return (
-        <>
+        <div>
             <div className={styles.footerTitle}>{column.title}</div>
-            <ul className={clsx(styles.footerItem, 'clean-list')}>
+            <ul className={clsx(styles.footerList, 'clean-list')}>
                 {column.items.map((item, i) => (
-                    <li key={i} className="footer__item">
+                    <li key={i}>
                         <LinkItem item={item} />
                     </li>
                 ))}
             </ul>
-        </>
+        </div>
     );
 }
 
 function Footer() {
     const { footer } = useThemeConfig();
+
+    const { links, style } = footer;
+
+    const HearthIcon = require('../../../static/img/hearth.svg').default;
+    const logoSources = {
+        light: useBaseUrl('/img/crawlee-light.svg'),
+        dark: useBaseUrl('/img/crawlee-dark.svg'),
+    };
+
     if (!footer) {
         return null;
     }
-    const { links, style } = footer;
-    const OpenSourceIcon = require('../../../static/img/footer-open-source.svg').default;
-    const ApifyLogo = require('../../../static/img/footer-apify-logo.svg').default;
+
     return (
-        <footer className={clsx(styles.footer, style)}>
-            <div className="container padding-horiz--lg">
-                <div className="row">
-                    <div className="col col--5">
-                        <div className="row">
-                            <div className="col col--6">
-                                <FooterLinksColumn column={links[0]} />
-                            </div>
-                            <div className="col col--6">
-                                <FooterLinksColumn column={links[1]} />
-                            </div>
-                        </div>
+        <footer className={clsx(styles.footer, style)
+        } >
+            <div className={styles.footerTop}>
+                <div className={styles.footerTopRow}>
+                    <div className={styles.footerTopRowLeft}>
+                        <Link href="https://crawlee.dev" width="120" className={styles.footerLogo} target="_self" rel="dofollow">
+                            <ThemedImage
+                                width="120"
+                                alt="Docusaurus themed image"
+                                sources={logoSources}
+                            />
+                        </Link>
+                        <NavbarColorModeToggle />
                     </div>
-                    <div className="col col--7">
-                        <div className="row">
-                            <div className="col col--3 col--offset-9">
-                                <FooterLinksColumn column={links[2]} />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div className="row padding-vert--md padding-top--lg">
-                    <div className="col padding-vert--md col--6">
-                        <div className={styles.freeAndOpenSource}>
-                            <OpenSourceIcon className={styles.alignMiddle} />
-                            <span className={styles.alignMiddle}>Crawlee is free and open source</span>
-                        </div>
-                    </div>
-                    <div className="col padding-vert--md col--6 text--right">
-                        <span className={styles.builtBy}>
-                            <span className={styles.alignMiddle}>Built by</span>
-                            <a href="https://apify.com"><ApifyLogo className={styles.alignMiddle} /></a>
-                        </span>
+                    <div className={styles.footerTopRowRight}>
+                        <FooterLinksColumn column={links[0]} />
+                        <FooterLinksColumn column={links[1]} />
+                        <FooterLinksColumn column={links[2]} />
                     </div>
                 </div>
             </div>
-        </footer>
+
+            <div className={styles.footerBottom}>
+                <div className={styles.footerBottomRow}>
+                    <div>
+                        <HearthIcon className={styles.hearthIcon} />
+                        Crawlee is forever free and open source
+                    </div>
+                    <div>© 2025 Apify</div>
+                </div>
+            </div>
+        </footer >
     );
 }
 
