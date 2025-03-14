@@ -276,7 +276,7 @@ class RequestHandlerRunResult:
         """Track a call to the `push_data` context helper."""
         from crawlee.storages._dataset import Dataset
 
-        await Dataset.check_and_serialize(data)
+        await Dataset._check_and_serialize(data)
 
         self.push_data_calls.append(
             PushDataFunctionCall(

@@ -79,11 +79,7 @@ class ServiceLocator:
         if self._storage_client is None:
             from crawlee.storage_clients import MemoryStorageClient
 
-            self._storage_client = (
-                MemoryStorageClient.from_config(config=self._configuration)
-                if self._configuration
-                else MemoryStorageClient.from_config()
-            )
+            self._storage_client = MemoryStorageClient()
 
         self._storage_client_was_retrieved = True
         return self._storage_client

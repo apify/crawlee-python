@@ -8,31 +8,32 @@ from datetime import datetime, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
+from pydantic_core._pydantic_core import ValidationError
 from typing_extensions import override
 
-from crawlee._types import StorageTypes
+from crawlee._consts import METADATA_FILENAME
 from crawlee._utils.crypto import crypto_random_object_id
-from crawlee._utils.data_processing import raise_on_non_existing_storage
-from crawlee._utils.file import json_dumps
 from crawlee.storage_clients._base import DatasetClient as BaseDatasetClient
+from crawlee.storage_clients._memory._utils import json_dumps
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
-
-from ._creation_management import find_or_create_client_by_id_or_name_inner
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
-    from contextlib import AbstractAsyncContextManager
-
-    from httpx import Response
 
     from crawlee._types import JsonSerializable
-    from crawlee.storage_clients import MemoryStorageClient
+    from crawlee.configuration import Configuration
 
 logger = getLogger(__name__)
 
 
 class DatasetClient(BaseDatasetClient):
-    """Subclient for manipulating a single dataset."""
+    """A memory storage implementation of the dataset client."""
+
+    _DEFAULT_NAME = 'default'
+    """The name of the unnamed dataset."""
+
+    _STORAGE_SUBDIR = 'datasets'
+    """The name of the subdirectory where datasets are stored."""
 
     _LIST_ITEMS_LIMIT = 999_999_999_999
     """This is what API returns in the x-apify-pagination-limit header when no limit query parameter is used."""
@@ -43,116 +44,157 @@ class DatasetClient(BaseDatasetClient):
     def __init__(
         self,
         *,
-        memory_storage_client: MemoryStorageClient,
-        id: str | None = None,
-        name: str | None = None,
-        created_at: datetime | None = None,
-        accessed_at: datetime | None = None,
-        modified_at: datetime | None = None,
-        item_count: int = 0,
+        id: str,
+        name: str,
+        created_at: datetime,
+        accessed_at: datetime,
+        modified_at: datetime,
+        item_count: int,
+        storage_dir: str,
     ) -> None:
-        self._memory_storage_client = memory_storage_client
-        self.id = id or crypto_random_object_id()
-        self.name = name
-        self._created_at = created_at or datetime.now(timezone.utc)
-        self._accessed_at = accessed_at or datetime.now(timezone.utc)
-        self._modified_at = modified_at or datetime.now(timezone.utc)
+        """A default constructor.
 
-        self.dataset_entries: dict[str, dict] = {}
-        self.file_operation_lock = asyncio.Lock()
-        self.item_count = item_count
+        Preferably use the `DatasetClient.open` constructor to create a new instance.
+
+        Args:
+            client: An instance of a dataset client.
+        """
+        self._id = id
+        self._name = name
+        self._created_at = created_at
+        self._accessed_at = accessed_at
+        self._modified_at = modified_at
+        self._item_count = item_count
+        self._storage_dir = storage_dir
+
+        # Internal attributes.
+        self._lock = asyncio.Lock()
+        """A lock to ensure that only one file operation is performed at a time."""
+
+    @override
+    @property
+    def id(self) -> str:
+        return self._id
+
+    @override
+    @property
+    def name(self) -> str | None:
+        return self._name
+
+    @override
+    @property
+    def created_at(self) -> datetime:
+        return self._created_at
+
+    @override
+    @property
+    def accessed_at(self) -> datetime:
+        return self._accessed_at
+
+    @override
+    @property
+    def modified_at(self) -> datetime:
+        return self._modified_at
+
+    @override
+    @property
+    def item_count(self) -> int:
+        return self._item_count
 
     @property
-    def resource_info(self) -> DatasetMetadata:
-        """Get the resource info for the dataset client."""
-        return DatasetMetadata(
-            id=self.id,
-            name=self.name,
-            accessed_at=self._accessed_at,
-            created_at=self._created_at,
-            modified_at=self._modified_at,
-            item_count=self.item_count,
-        )
-
-    @property
-    def resource_directory(self) -> str:
-        """Get the resource directory for the client."""
-        return os.path.join(self._memory_storage_client.datasets_directory, self.name or self.id)
+    def _path_to_dataset(self) -> str:
+        return os.path.join(self._storage_dir, self._STORAGE_SUBDIR, self._name)
 
     @override
-    async def get(self) -> DatasetMetadata | None:
-        found = find_or_create_client_by_id_or_name_inner(
-            resource_client_class=DatasetClient,
-            memory_storage_client=self._memory_storage_client,
-            id=self.id,
-            name=self.name,
-        )
+    @classmethod
+    async def open(cls, id: str | None, name: str | None, configuration: Configuration) -> DatasetClient:
+        storage_dir = configuration.storage_dir
 
-        if found:
-            async with found.file_operation_lock:
-                await found.update_timestamps(has_been_modified=False)
-                return found.resource_info
+        name = name or cls._DEFAULT_NAME
+        dataset_path = os.path.join(storage_dir, cls._STORAGE_SUBDIR, name)
+        metadata_path = os.path.join(dataset_path, METADATA_FILENAME)
 
-        return None
+        # If the dataset directory exists, reconstruct the dataset client from the metadata file.
+        if os.path.exists(dataset_path):
+            # If the metadata file does not exist, raise an error.
+            if not os.path.exists(metadata_path):
+                raise ValueError(f'Metadata file not found for dataset "{name}"')
 
-    @override
-    async def delete(self) -> None:
-        dataset = next(
-            (dataset for dataset in self._memory_storage_client.datasets_handled if dataset.id == self.id), None
-        )
+            file = await asyncio.to_thread(open, metadata_path)
+            try:
+                file_content = json.load(file)
+            finally:
+                await asyncio.to_thread(file.close)
+            try:
+                metadata = DatasetMetadata(**file_content)
+            except ValidationError as exc:
+                raise ValueError(f'Invalid metadata file for dataset "{name}"') from exc
 
-        if dataset is not None:
-            async with dataset.file_operation_lock:
-                self._memory_storage_client.datasets_handled.remove(dataset)
-                dataset.item_count = 0
-                dataset.dataset_entries.clear()
-
-                if os.path.exists(dataset.resource_directory):
-                    await asyncio.to_thread(shutil.rmtree, dataset.resource_directory)
-
-    @override
-    async def push_items(
-        self,
-        items: JsonSerializable,
-    ) -> None:
-        # Check by id
-        existing_dataset_by_id = find_or_create_client_by_id_or_name_inner(
-            resource_client_class=DatasetClient,
-            memory_storage_client=self._memory_storage_client,
-            id=self.id,
-            name=self.name,
-        )
-
-        if existing_dataset_by_id is None:
-            raise_on_non_existing_storage(StorageTypes.DATASET, self.id)
-
-        normalized = self._normalize_items(items)
-
-        added_ids: list[str] = []
-        for entry in normalized:
-            existing_dataset_by_id.item_count += 1
-            idx = self._generate_local_entry_name(existing_dataset_by_id.item_count)
-
-            existing_dataset_by_id.dataset_entries[idx] = entry
-            added_ids.append(idx)
-
-        data_entries = [(id, existing_dataset_by_id.dataset_entries[id]) for id in added_ids]
-
-        async with existing_dataset_by_id.file_operation_lock:
-            await existing_dataset_by_id.update_timestamps(has_been_modified=True)
-
-            await self._persist_dataset_items_to_disk(
-                data=data_entries,
-                entity_directory=existing_dataset_by_id.resource_directory,
-                persist_storage=self._memory_storage_client.persist_storage,
+            client = cls(
+                id=metadata.id,
+                name=name,
+                created_at=metadata.created_at,
+                accessed_at=metadata.accessed_at,
+                modified_at=metadata.modified_at,
+                item_count=metadata.item_count,
+                storage_dir=storage_dir,
             )
+            await client._update_metadata(update_accessed_at=True)
+
+        # Create a new dataset with the given name otherwise.
+        else:
+            client = cls(
+                id=crypto_random_object_id(),
+                name=name,
+                created_at=datetime.now(timezone.utc),
+                accessed_at=datetime.now(timezone.utc),
+                modified_at=datetime.now(timezone.utc),
+                item_count=0,
+                storage_dir=storage_dir,
+            )
+            await client._update_metadata()
+
+        return client
 
     @override
-    async def list_items(
+    async def drop(self) -> None:
+        if os.path.exists(self._path_to_dataset):
+            await asyncio.to_thread(shutil.rmtree, self._path_to_dataset)
+
+    @override
+    async def push_data(self, data: JsonSerializable) -> None:
+        if isinstance(data, list):
+            for item in data:
+                await self._push_item(item)
+        else:
+            await self._push_item(data)
+
+    async def _push_item(self, item: dict[str, Any]) -> None:
+        self._item_count += 1
+        filename = f'{str(self._item_count).zfill(self._LOCAL_ENTRY_NAME_DIGITS)}.json'
+        file_path = os.path.join(self._path_to_dataset, filename)
+
+        async with self._lock:
+            # Ensure the dataset directory exists.
+            await asyncio.to_thread(os.makedirs, self._path_to_dataset, exist_ok=True)
+
+            # Write each normalized item to its own file on disk.
+            file = await asyncio.to_thread(open, file_path, mode='w', encoding='utf-8')
+            try:
+                data_serialized = await json_dumps(item)
+                await asyncio.to_thread(file.write, data_serialized)
+            finally:
+                await asyncio.to_thread(file.close)
+
+        # Update timestamps and persist the metadata.
+        await self._update_metadata(update_accessed_at=True, update_modified_at=True)
+
+    @override
+    async def get_data(
         self,
         *,
         offset: int | None = 0,
-        limit: int | None = _LIST_ITEMS_LIMIT,
+        limit: int | None = 999_999_999_999,
         clean: bool = False,
         desc: bool = False,
         fields: list[str] | None = None,
@@ -163,47 +205,72 @@ class DatasetClient(BaseDatasetClient):
         flatten: list[str] | None = None,
         view: str | None = None,
     ) -> DatasetItemsListPage:
-        # Check by id
-        existing_dataset_by_id = find_or_create_client_by_id_or_name_inner(
-            resource_client_class=DatasetClient,
-            memory_storage_client=self._memory_storage_client,
-            id=self.id,
-            name=self.name,
+        # Check if any unsupported argument is set (non-default value).
+        unsupported_args = [clean, fields, omit, unwind, skip_hidden, flatten, view]
+        invalid = [arg for arg in unsupported_args if arg not in (False, None)]
+        if invalid:
+            logger.warning(
+                f'The arguments {invalid} of iterate_items are not supported by the {self.__class__.__name__} client.'
+            )
+
+        # Check if the dataset directory exists.
+        if not os.path.exists(self._path_to_dataset):
+            logger.warning(f'Dataset directory not found: {self._path_to_dataset}')
+            return DatasetItemsListPage(
+                count=0,
+                offset=offset or 0,
+                limit=limit or 0,
+                total=0,
+                desc=desc,
+                items=[],
+            )
+
+        # Get all JSON files in the dataset directory.
+        all_files = await asyncio.to_thread(os.listdir, self._path_to_dataset)
+        data_files = [f for f in all_files if f.endswith('.json') and f != METADATA_FILENAME]
+
+        # Sort files numerically (based on the filename without extension).
+        data_files.sort(key=lambda f: int(os.path.splitext(f)[0]))
+        if desc:
+            data_files.reverse()
+
+        # Calculate total number of items and apply offset and limit. Apply offset and limit slicing.
+        total = len(data_files)
+        start = offset or 0
+        selected_files = data_files[start:] if limit is None else data_files[start : start + limit]
+
+        # Read each file one by one.
+        items = []
+        for filename in selected_files:
+            file_path = os.path.join(self._path_to_dataset, filename)
+
+            def read_json_file(fp: str) -> dict:
+                with open(fp, encoding='utf-8') as f:
+                    return dict(json.load(f))
+
+            try:
+                item = await asyncio.to_thread(read_json_file, file_path)
+            except Exception:
+                logger.exception(f'Error reading {file_path}, skipping the item.')
+                continue
+
+            # Skip empty items if requested.
+            if skip_empty and not item:
+                continue
+
+            items.append(item)
+
+        return DatasetItemsListPage(
+            count=len(items),
+            offset=start,
+            limit=limit if limit is not None else total - start,
+            total=total,
+            desc=desc,
+            items=items,
         )
 
-        if existing_dataset_by_id is None:
-            raise_on_non_existing_storage(StorageTypes.DATASET, self.id)
-
-        async with existing_dataset_by_id.file_operation_lock:
-            start, end = existing_dataset_by_id.get_start_and_end_indexes(
-                max(existing_dataset_by_id.item_count - (offset or 0) - (limit or self._LIST_ITEMS_LIMIT), 0)
-                if desc
-                else offset or 0,
-                limit,
-            )
-
-            items = []
-
-            for idx in range(start, end):
-                entry_number = self._generate_local_entry_name(idx)
-                items.append(existing_dataset_by_id.dataset_entries[entry_number])
-
-            await existing_dataset_by_id.update_timestamps(has_been_modified=False)
-
-            if desc:
-                items.reverse()
-
-            return DatasetItemsListPage(
-                count=len(items),
-                desc=desc or False,
-                items=items,
-                limit=limit or self._LIST_ITEMS_LIMIT,
-                offset=offset or 0,
-                total=existing_dataset_by_id.item_count,
-            )
-
     @override
-    async def iterate_items(
+    async def iterate(
         self,
         *,
         offset: int = 0,
@@ -216,154 +283,74 @@ class DatasetClient(BaseDatasetClient):
         skip_empty: bool = False,
         skip_hidden: bool = False,
     ) -> AsyncIterator[dict]:
-        cache_size = 1000
-        first_item = offset
-
-        # If there is no limit, set last_item to None until we get the total from the first API response
-        last_item = None if limit is None else offset + limit
-        current_offset = first_item
-
-        while last_item is None or current_offset < last_item:
-            current_limit = cache_size if last_item is None else min(cache_size, last_item - current_offset)
-
-            current_items_page = await self.list_items(
-                offset=current_offset,
-                limit=current_limit,
-                desc=desc,
+        # Check if any unsupported argument is set (non-default value).
+        unsupported_args = [clean, fields, omit, unwind, skip_hidden]
+        invalid = [arg for arg in unsupported_args if arg not in (False, None)]
+        if invalid:
+            logger.warning(
+                f'The arguments {invalid} of iterate_items are not supported by the {self.__class__.__name__} client.'
             )
 
-            current_offset += current_items_page.count
-            if last_item is None or current_items_page.total < last_item:
-                last_item = current_items_page.total
-
-            for item in current_items_page.items:
-                yield item
-
-    @override
-    async def get_items_as_bytes(
-        self,
-        *,
-        item_format: str = 'json',
-        offset: int | None = None,
-        limit: int | None = None,
-        desc: bool = False,
-        clean: bool = False,
-        bom: bool = False,
-        delimiter: str | None = None,
-        fields: list[str] | None = None,
-        omit: list[str] | None = None,
-        unwind: str | None = None,
-        skip_empty: bool = False,
-        skip_header_row: bool = False,
-        skip_hidden: bool = False,
-        xml_root: str | None = None,
-        xml_row: str | None = None,
-        flatten: list[str] | None = None,
-    ) -> bytes:
-        raise NotImplementedError('This method is not supported in memory storage.')
-
-    @override
-    async def stream_items(
-        self,
-        *,
-        item_format: str = 'json',
-        offset: int | None = None,
-        limit: int | None = None,
-        desc: bool = False,
-        clean: bool = False,
-        bom: bool = False,
-        delimiter: str | None = None,
-        fields: list[str] | None = None,
-        omit: list[str] | None = None,
-        unwind: str | None = None,
-        skip_empty: bool = False,
-        skip_header_row: bool = False,
-        skip_hidden: bool = False,
-        xml_root: str | None = None,
-        xml_row: str | None = None,
-    ) -> AbstractAsyncContextManager[Response | None]:
-        raise NotImplementedError('This method is not supported in memory storage.')
-
-    async def _persist_dataset_items_to_disk(
-        self,
-        *,
-        data: list[tuple[str, dict]],
-        entity_directory: str,
-        persist_storage: bool,
-    ) -> None:
-        """Writes dataset items to the disk.
-
-        The function iterates over a list of dataset items, each represented as a tuple of an identifier
-        and a dictionary, and writes them as individual JSON files in a specified directory. The function
-        will skip writing if `persist_storage` is False. Before writing, it ensures that the target
-        directory exists, creating it if necessary.
-
-        Args:
-            data: A list of tuples, each containing an identifier (string) and a data dictionary.
-            entity_directory: The directory path where the dataset items should be stored.
-            persist_storage: A boolean flag indicating whether the data should be persisted to the disk.
-        """
-        # Skip writing files to the disk if the client has the option set to false
-        if not persist_storage:
+        # Check if the dataset directory exists.
+        if not os.path.exists(self._path_to_dataset):
+            logger.warning(f'Dataset directory not found: {self._path_to_dataset}')
             return
 
-        # Ensure the directory for the entity exists
-        await asyncio.to_thread(os.makedirs, entity_directory, exist_ok=True)
+        # Get all JSON files in the dataset directory.
+        all_files = await asyncio.to_thread(os.listdir, self._path_to_dataset)
+        data_files = [f for f in all_files if f.endswith('.json') and f != METADATA_FILENAME]
 
-        # Save all the new items to the disk
-        for idx, item in data:
-            file_path = os.path.join(entity_directory, f'{idx}.json')
-            f = await asyncio.to_thread(open, file_path, mode='w', encoding='utf-8')
-            try:
-                s = await json_dumps(item)
-                await asyncio.to_thread(f.write, s)
-            finally:
-                await asyncio.to_thread(f.close)
+        # Sort files numerically (based on the filename without extension).
+        data_files.sort(key=lambda f: int(os.path.splitext(f)[0]))
+        if desc:
+            data_files.reverse()
 
-    async def update_timestamps(self, *, has_been_modified: bool) -> None:
-        """Update the timestamps of the dataset."""
-        from ._creation_management import persist_metadata_if_enabled
+        # Apply offset and limit.
+        data_files = data_files[offset:]
+        if limit is not None:
+            data_files = data_files[:limit]
 
-        self._accessed_at = datetime.now(timezone.utc)
+        # Yield each item by reading its JSON file off the event loop.
+        for filename in data_files:
+            file_path = os.path.join(self._path_to_dataset, filename)
 
-        if has_been_modified:
-            self._modified_at = datetime.now(timezone.utc)
+            def read_json_file(file_path: str) -> dict:
+                with open(file_path, encoding='utf-8') as f:
+                    return dict(json.load(f))
 
-        await persist_metadata_if_enabled(
-            data=self.resource_info.model_dump(),
-            entity_directory=self.resource_directory,
-            write_metadata=self._memory_storage_client.write_metadata,
+            item = await asyncio.to_thread(read_json_file, file_path)
+
+            # Skip empty items if requested.
+            if skip_empty and not item:
+                continue
+
+            yield item
+
+    async def _update_metadata(
+        self,
+        *,
+        update_accessed_at: bool = False,
+        update_modified_at: bool = False,
+    ) -> None:
+        """A helper method to update and persist the dataset metadata."""
+        metadata = DatasetMetadata(
+            id=self._id,
+            name=self._name,
+            created_at=self._created_at,
+            accessed_at=datetime.now(timezone.utc) if update_accessed_at else self._accessed_at,
+            modified_at=datetime.now(timezone.utc) if update_modified_at else self._modified_at,
+            item_count=self._item_count,
         )
 
-    def get_start_and_end_indexes(self, offset: int, limit: int | None = None) -> tuple[int, int]:
-        """Calculate the start and end indexes for listing items."""
-        actual_limit = limit or self.item_count
-        start = offset + 1
-        end = min(offset + actual_limit, self.item_count) + 1
-        return (start, end)
+        metadata_path = os.path.join(self._path_to_dataset, METADATA_FILENAME)
+        directory = os.path.dirname(metadata_path)
+        await asyncio.to_thread(os.makedirs, directory, exist_ok=True)
 
-    def _generate_local_entry_name(self, idx: int) -> str:
-        return str(idx).zfill(self._LOCAL_ENTRY_NAME_DIGITS)
+        file = await asyncio.to_thread(open, metadata_path, mode='wb+')
+        data = metadata.model_dump()
 
-    def _normalize_items(self, items: JsonSerializable) -> list[dict]:
-        def normalize_item(item: Any) -> dict | None:
-            if isinstance(item, str):
-                item = json.loads(item)
-
-            if isinstance(item, list):
-                received = ',\n'.join(item)
-                raise TypeError(
-                    f'Each dataset item can only be a single JSON object, not an array. Received: [{received}]'
-                )
-
-            if (not isinstance(item, dict)) and item is not None:
-                raise TypeError(f'Each dataset item must be a JSON object. Received: {item}')
-
-            return item
-
-        if isinstance(items, str):
-            items = json.loads(items)
-
-        result = list(map(normalize_item, items)) if isinstance(items, list) else [normalize_item(items)]
-        # filter(None, ..) returns items that are True
-        return list(filter(None, result))
+        try:
+            string = await json_dumps(data)
+            await asyncio.to_thread(file.write, string.encode('utf-8'))
+        finally:
+            await asyncio.to_thread(file.close)

@@ -22,25 +22,25 @@ class StorageClient(ABC):
     """
 
     @abstractmethod
-    def dataset(self, id: str) -> DatasetClient:
-        """Gets a subclient for a specific dataset by its ID."""
+    def dataset(self) -> type[DatasetClient]:
+        """Get a dataset client class."""
 
     @abstractmethod
-    def key_value_store(self, id: str) -> KeyValueStoreClient:
-        """Gets a subclient for a specific key-value store by its ID."""
+    def key_value_store(self) -> type[KeyValueStoreClient]:
+        """Get a key-value store client class."""
 
     @abstractmethod
-    def request_queue(self, id: str) -> RequestQueueClient:
-        """Gets a subclient for a specific request queue by its ID."""
+    def request_queue(self) -> type[RequestQueueClient]:
+        """Get a request queue client class."""
 
-    @abstractmethod
-    async def purge_on_start(self) -> None:
-        """Performs a purge of the default storages.
+    # @abstractmethod
+    # async def purge_on_start(self) -> None:
+    #     """Performs a purge of the default storages.
 
-        This method ensures that the purge is executed only once during the lifetime of the instance.
-        It is primarily used to clean up residual data from previous runs to maintain a clean state.
-        If the storage client does not support purging, leave it empty.
-        """
+    #     This method ensures that the purge is executed only once during the lifetime of the instance.
+    #     It is primarily used to clean up residual data from previous runs to maintain a clean state.
+    #     If the storage client does not support purging, leave it empty.
+    #     """
 
     def get_rate_limit_errors(self) -> dict[int, int]:
         """Returns statistics about rate limit errors encountered by the HTTP client in storage client."""
