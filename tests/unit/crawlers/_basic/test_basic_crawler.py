@@ -28,7 +28,6 @@ from crawlee.request_loaders import RequestList, RequestManagerTandem
 from crawlee.sessions import SessionPool
 from crawlee.statistics import FinalStatistics
 from crawlee.storage_clients import MemoryStorageClient
-from crawlee.storage_clients._memory import DatasetClient
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 if TYPE_CHECKING:
@@ -38,6 +37,7 @@ if TYPE_CHECKING:
     from yarl import URL
 
     from crawlee._types import JsonSerializable
+    from crawlee.storage_clients._memory import DatasetClient
 
 
 async def test_processes_requests_from_explicit_queue() -> None:
@@ -1016,7 +1016,7 @@ async def test_sets_services() -> None:
     assert service_locator.get_storage_client() is custom_storage_client
 
     dataset = await crawler.get_dataset(name='test')
-    assert cast(DatasetClient, dataset._resource_client)._memory_storage_client is custom_storage_client
+    assert cast('DatasetClient', dataset._resource_client)._memory_storage_client is custom_storage_client
 
 
 async def test_allows_storage_client_overwrite_before_run(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1040,7 +1040,7 @@ async def test_allows_storage_client_overwrite_before_run(monkeypatch: pytest.Mo
         assert spy.call_count >= 1
 
     dataset = await crawler.get_dataset()
-    assert cast(DatasetClient, dataset._resource_client)._memory_storage_client is other_storage_client
+    assert cast('DatasetClient', dataset._resource_client)._memory_storage_client is other_storage_client
 
     data = await dataset.get_data()
     assert data.items == [{'foo': 'bar'}]
@@ -1061,7 +1061,7 @@ async def test_context_use_state_race_condition_in_handlers(key_value_store: Key
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        state = cast(dict[str, int], await context.use_state())
+        state = cast('dict[str, int]', await context.use_state())
         await handler_barrier.wait()  # Block until both handlers get the state.
         state['counter'] += 1
         await handler_barrier.wait()  # Block until both handlers increment the state.

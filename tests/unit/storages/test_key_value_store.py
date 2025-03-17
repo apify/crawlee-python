@@ -199,7 +199,7 @@ async def test_get_auto_saved_value_auto_save_race_conditions(key_value_store: K
         return await KeyValueStore.get_value(key_value_store, key=key, default_value=default_value)
 
     async def increment_counter() -> None:
-        state = cast(dict[str, int], await key_value_store.get_auto_saved_value('state'))
+        state = cast('dict[str, int]', await key_value_store.get_auto_saved_value('state'))
         state['counter'] += 1
 
     with patch.object(key_value_store, 'get_value', delayed_get_value):

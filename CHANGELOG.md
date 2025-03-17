@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.5](https://github.com/apify/crawlee-python/releases/tag/v0.6.5) (2025-03-13)
+
+### 🐛 Bug Fixes
+
+- Update to `browserforge` workaround ([#1075](https://github.com/apify/crawlee-python/pull/1075)) ([2378cf8](https://github.com/apify/crawlee-python/commit/2378cf84ab1ed06473049a9ddfca2ba6f166306d)) by [@Pijukatel](https://github.com/Pijukatel)
+
+
+## [0.6.4](https://github.com/apify/crawlee-python/releases/tag/v0.6.4) (2025-03-12)
+
+### 🐛 Bug Fixes
+
+- Add a check thread before set `add_signal_handler` ([#1068](https://github.com/apify/crawlee-python/pull/1068)) ([6983bda](https://github.com/apify/crawlee-python/commit/6983bda2dbc202b3ecbf7db62b11deee007b4b5f)) by [@Mantisus](https://github.com/Mantisus)
+- Temporary workaround for `browserforge` import time code execution ([#1073](https://github.com/apify/crawlee-python/pull/1073)) ([17d914f](https://github.com/apify/crawlee-python/commit/17d914f78242078f88c07d686a567d1091255eb1)) by [@Pijukatel](https://github.com/Pijukatel)
+
+
 ## [0.6.3](https://github.com/apify/crawlee-python/releases/tag/v0.6.3) (2025-03-07)
 
 ### 🚀 Features

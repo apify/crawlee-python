@@ -14,7 +14,7 @@ def _timedelta_to_ms(td: timedelta | None) -> float | None:
         return float('inf')
     if td is None:
         return td
-    return int(round(td.total_seconds() * 1000))
+    return round(td.total_seconds() * 1000)
 
 
 def _timedelta_to_secs(td: timedelta | None) -> float | None:
