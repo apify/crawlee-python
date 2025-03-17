@@ -42,12 +42,16 @@ class InterceptHandler(logging.Handler):
             if key not in standard_attrs
         }
 
-        logger.bind(**extra_dict)
-        logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
+        (
+            logger.bind(**extra_dict)
+            .opt(depth=depth, exception=record.exc_info)
+            .patch(lambda loguru_record: loguru_record.update({'name': record.name}))
+            .log(level, record.getMessage())
+        )
 
 
-# Configure loguru formatter for console
-def console_formatter(record: Record) -> str:
+# Configure loguru formatter
+def formatter(record: Record) -> str:
     basic_format = '[{name}] | <level>{level: ^8}</level> | - {message}'
     if record['extra']:
         basic_format = basic_format + ' {extra}'
@@ -58,10 +62,10 @@ def console_formatter(record: Record) -> str:
 logger.remove()
 
 # Set up loguru with JSONL serialization in file `crawler.log`
-logger.add('crawler.log', serialize=True, level='INFO')
+logger.add('crawler.log', format=formatter, serialize=True, level='INFO')
 
 # Set up loguru logger for console
-logger.add(sys.stderr, format=console_formatter, colorize=True, level='INFO')
+logger.add(sys.stderr, format=formatter, colorize=True, level='INFO')
 
 # Configure standard logging to use our interceptor
 logging.basicConfig(handlers=[InterceptHandler()], level=logging.INFO, force=True)
