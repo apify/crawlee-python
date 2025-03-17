@@ -66,7 +66,7 @@ all = [
     "playwright>=1.27.0",
     "scikit-learn==1.5.2; python_version == '3.9'",
     "scikit-learn>=1.6.0; python_version >= '3.10'",
-    'typer>=0.12.0'
+    'typer>=0.12.0',
 ]
 adaptive-crawler = [
     "jaro-winkler>=2.0.3",
@@ -107,7 +107,7 @@ dev = [
     "pytest-xdist~=3.6.0",
     "pytest~=8.3.0",
     "respx~=0.22.0",
-    "ruff~=0.10.0",
+    "ruff~=0.11.0",
     "setuptools~=76.0.0",                    # setuptools are used by pytest, but not explicitly required
     "sortedcontainers-stubs~=2.4.0",
     "types-beautifulsoup4~=4.12.0.20240229",
@@ -227,10 +227,11 @@ warn_unused_ignores = true
 [[tool.mypy.overrides]]
 # Example codes are sometimes showing integration of crawlee with external tool, which is not dependency of crawlee.
 module = [
-    "apify",                # Example code shows integration of apify and crawlee.
-    "camoufox",             # Example code shows integration of camoufox and crawlee.
-    "jaro",                 # Untyped and stubs not available
-    "sklearn.linear_model", # Untyped and stubs not available
+    "apify",                        # Example code shows integration of apify and crawlee.
+    "apify_fingerprint_datapoints", # Untyped and stubs not available
+    "camoufox",                     # Example code shows integration of camoufox and crawlee.
+    "jaro",                         # Untyped and stubs not available
+    "sklearn.linear_model",         # Untyped and stubs not available
 ]
 ignore_missing_imports = true
 
