@@ -22,11 +22,21 @@ def test_two_columns() -> None:
     data = [('Name', 'Age'), ('Alice', '30'), ('Bob', '25')]
     result = make_table(data)
     lines = result.split('\n')
-    assert lines == ['┌───────┬─────┐', '│ Name  │ Age │', '│ Alice │ 30  │', '│ Bob   │ 25  │', '└───────┴─────┘']
+    # fmt: off
+    assert lines == ['┌───────┬─────┐',
+                     '│ Name  │ Age │',
+                     '│ Alice │ 30  │',
+                     '│ Bob   │ 25  │',
+                     '└───────┴─────┘']
+    # fmt: on
 
 
 def test_long_content_truncation() -> None:
     data = [('Short', 'VeryVeryVeryLongContent')]
     result = make_table(data, width=25)
     lines = result.split('\n')
-    assert lines == ['┌───────────┬───────────┐', '│ Short     │ VeryVe... │', '└───────────┴───────────┘']
+    # fmt: off
+    assert lines == ['┌───────────┬───────────┐',
+                     '│ Short     │ VeryVe... │',
+                     '└───────────┴───────────┘']
+    # fmt: on
