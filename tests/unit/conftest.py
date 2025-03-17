@@ -3,8 +3,9 @@
 
 from __future__ import annotations
 
+import logging
 import os
-from typing import TYPE_CHECKING, Any, Callable, cast
+from typing import TYPE_CHECKING, Any, Callable, Optional, cast
 
 import pytest
 from proxy import Proxy
@@ -86,6 +87,15 @@ def _isolate_test_environment(prepare_test_env: Callable[[], None]) -> None:
     prepare_test_env()
 
 
+@pytest.fixture(autouse=True)
+def _set_crawler_log_level(pytestconfig: pytest.Config, monkeypatch: pytest.MonkeyPatch) -> None:
+    from crawlee import _log_config
+
+    loglevel = cast('Optional[str]', pytestconfig.getoption('--log-level'))
+    if loglevel is not None:
+        monkeypatch.setattr(_log_config, 'get_configured_log_level', lambda: getattr(logging, loglevel.upper()))
+
+
 @pytest.fixture
 def httpbin() -> URL:
     class URLWrapper:
@@ -118,7 +128,7 @@ def httpbin() -> URL:
         def __str__(self) -> str:
             return str(self.url)
 
-    return cast(URL, URLWrapper(URL(os.environ.get('HTTPBIN_URL', 'https://httpbin.org'))))
+    return cast('URL', URLWrapper(URL(os.environ.get('HTTPBIN_URL', 'https://httpbin.org'))))
 
 
 @pytest.fixture

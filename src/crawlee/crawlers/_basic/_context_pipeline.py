@@ -76,7 +76,7 @@ class ContextPipeline(Generic[TCrawlingContext]):
                     cleanup_stack.append(middleware_instance)
 
             try:
-                await final_context_consumer(cast(TCrawlingContext, crawling_context))
+                await final_context_consumer(cast('TCrawlingContext', crawling_context))
             except SessionError:  # Session errors get special treatment
                 raise
             except Exception as e:
@@ -111,7 +111,7 @@ class ContextPipeline(Generic[TCrawlingContext]):
         """
         return ContextPipeline[TMiddlewareCrawlingContext](
             _middleware=cast(
-                Callable[[BasicCrawlingContext], AsyncGenerator[TMiddlewareCrawlingContext, None]], middleware
+                'Callable[[BasicCrawlingContext], AsyncGenerator[TMiddlewareCrawlingContext, None]]', middleware
             ),
-            _parent=cast(ContextPipeline[BasicCrawlingContext], self),
+            _parent=cast('ContextPipeline[BasicCrawlingContext]', self),
         )

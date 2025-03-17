@@ -6,10 +6,9 @@ from datetime import datetime, timedelta
 from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field
-from rich.console import Console
-from rich.table import Table
 from typing_extensions import override
 
+from crawlee._utils.console import make_table
 from crawlee._utils.docs import docs_group
 from crawlee._utils.models import timedelta_ms
 
@@ -32,20 +31,9 @@ class FinalStatistics:
 
     def to_table(self) -> str:
         """Print out the Final Statistics data as a table."""
-        table = Table(show_header=False)
-        table.add_column()
-        table.add_column()
-
         str_dict = {k: v.total_seconds() if isinstance(v, timedelta) else v for k, v in asdict(self).items()}
 
-        for k, v in str_dict.items():
-            table.add_row(str(k), str(v))
-
-        console = Console(width=60)
-        with console.capture() as capture:
-            console.print(table, end='\n')
-
-        return capture.get().strip('\n')
+        return make_table([(str(k), str(v)) for k, v in str_dict.items()], width=60)
 
     def to_dict(self) -> dict[str, float | int | list[int]]:
         return {k: v.total_seconds() if isinstance(v, timedelta) else v for k, v in asdict(self).items()}

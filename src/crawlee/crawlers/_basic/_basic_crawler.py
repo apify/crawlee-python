@@ -6,6 +6,7 @@ import logging
 import signal
 import sys
 import tempfile
+import threading
 from asyncio import CancelledError
 from collections.abc import AsyncGenerator, Awaitable, Iterable, Sequence
 from contextlib import AsyncExitStack, suppress
@@ -310,8 +311,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         # Request router setup
         self._router: Router[TCrawlingContext] | None = None
-        if isinstance(cast(Router, request_handler), Router):
-            self._router = cast(Router[TCrawlingContext], request_handler)
+        if isinstance(cast('Router', request_handler), Router):
+            self._router = cast('Router[TCrawlingContext]', request_handler)
         elif request_handler is not None:
             self._router = None
             self.router.default_handler(request_handler)
@@ -357,7 +358,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         # Statistics
         self._statistics = statistics or cast(
-            Statistics[TStatisticsState],
+            'Statistics[TStatisticsState]',
             Statistics.with_default_state(
                 periodic_message_logger=self._logger,
                 statistics_log_format=self._statistics_log_format,
@@ -545,16 +546,18 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         run_task = asyncio.create_task(self._run_crawler(), name='run_crawler_task')
 
-        with suppress(NotImplementedError):  # event loop signal handlers are not supported on Windows
-            asyncio.get_running_loop().add_signal_handler(signal.SIGINT, sigint_handler)
+        if threading.current_thread() is threading.main_thread():  # `add_signal_handler` works only in the main thread
+            with suppress(NotImplementedError):  # event loop signal handlers are not supported on Windows
+                asyncio.get_running_loop().add_signal_handler(signal.SIGINT, sigint_handler)
 
         try:
             await run_task
         except CancelledError:
             pass
         finally:
-            with suppress(NotImplementedError):
-                asyncio.get_running_loop().remove_signal_handler(signal.SIGINT)
+            if threading.current_thread() is threading.main_thread():
+                with suppress(NotImplementedError):
+                    asyncio.get_running_loop().remove_signal_handler(signal.SIGINT)
 
         if self._statistics.error_tracker.total > 0:
             self._logger.info(
@@ -1099,7 +1102,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         except RequestHandlerError as primary_error:
             primary_error = cast(
-                RequestHandlerError[TCrawlingContext], primary_error
+                'RequestHandlerError[TCrawlingContext]', primary_error
             )  # valid thanks to ContextPipeline
 
             self._logger.debug(

@@ -118,7 +118,7 @@ class Statistics(Generic[TStatisticsState]):
             periodic_message_logger=self._periodic_message_logger,
             state_model=state_model,
         )
-        new_statistics._periodic_logger = self._periodic_logger  # noqa:SLF001  # Accessing private member to create copy like-object.
+        new_statistics._periodic_logger = self._periodic_logger  # Accessing private member to create copy like-object.
         return new_statistics
 
     @staticmethod
@@ -297,7 +297,7 @@ class Statistics(Generic[TStatisticsState]):
         if not self._key_value_store:
             return
 
-        stored_state = await self._key_value_store.get_value(self._persist_state_key, cast(Any, {}))
+        stored_state = await self._key_value_store.get_value(self._persist_state_key, cast('Any', {}))
 
         saved_state = self.state.__class__.model_validate(stored_state)
         self.state = saved_state

@@ -67,7 +67,7 @@ class HttpHeaders(RootModel, Mapping[str, str]):
         dict[str, str],
         PlainValidator(lambda value: _normalize_headers(value)),
         Field(default_factory=dict),
-    ] = {}  # noqa: RUF012
+    ] = {}
 
     def __getitem__(self, key: str) -> str:
         return self.root[key.lower()]
@@ -244,7 +244,7 @@ class KeyValueStoreChangeRecords:
 
     async def get_value(self, key: str, default_value: T | None = None) -> T | None:
         if key in self.updates:
-            return cast(T, self.updates[key].content)
+            return cast('T', self.updates[key].content)
 
         return await self._actual_key_value_store.get_value(key, default_value)
 
