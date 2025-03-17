@@ -54,10 +54,10 @@ async def test_basic_request(server_url: URL) -> None:
     assert '<html' in result.get('page_content', '')  # there is some HTML content
 
 
-async def test_enqueue_links(server_url: URL) -> None:
-    # www.crawlee.dev create a redirect to crawlee.dev
-    # !!!With server_url there is no host-to-host redirect emulation
-    requests = [str(server_url / 'start_enqueue')]
+async def test_enqueue_links(redirect_server_url: URL, server_url: URL) -> None:
+    redirect_target = str(server_url / 'start_enqueue')
+    redirect_url = str(redirect_server_url.with_path('redirect').with_query(url=redirect_target))
+    requests = [redirect_url]
     crawler = PlaywrightCrawler(max_requests_per_crawl=11)
     visit = mock.Mock()
 
@@ -68,9 +68,11 @@ async def test_enqueue_links(server_url: URL) -> None:
 
     await crawler.run(requests)
 
-    visited = {call[0][0] for call in visit.call_args_list}
+    first_visited = visit.call_args_list[0][0][0]
+    visited = {call[0][0] for call in visit.call_args_list[1:]}
+
+    assert first_visited == redirect_url
     assert visited == {
-        str(server_url / 'start_enqueue'),
         str(server_url / 'asdf'),
         str(server_url / 'hjkl'),
         str(server_url / 'qwer'),

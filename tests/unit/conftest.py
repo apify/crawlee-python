@@ -215,3 +215,18 @@ def http_server(unused_tcp_port_factory: Callable[[], int]) -> Iterator[TestServ
 def server_url(http_server: TestServer) -> URL:
     """Provide the base URL of the test server."""
     return http_server.url
+
+
+# It is needed only in some tests, so we use the standard `scope=function`
+@pytest.fixture
+def redirect_http_server(unused_tcp_port_factory: Callable[[], int]) -> Iterator[TestServer]:
+    """Create and start an HTTP test server."""
+    config = Config(app=app, lifespan='off', loop='asyncio', port=unused_tcp_port_factory())
+    server = TestServer(config=config)
+    yield from serve_in_thread(server)
+
+
+@pytest.fixture
+def redirect_server_url(redirect_http_server: TestServer) -> URL:
+    """Provide the base URL of the test server."""
+    return redirect_http_server.url

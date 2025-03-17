@@ -49,6 +49,8 @@ async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
         await echo_headers(scope, send)
     elif path.startswith('/post'):
         await post_echo(scope, receive, send)
+    elif path.startswith('/redirect'):
+        await redirect_to_url(scope, send)
     else:
         await hello_world(send)
 
@@ -347,6 +349,28 @@ async def generic_response_endpoint(send: Send) -> None:
         </html>""",
         }
     )
+
+
+async def redirect_to_url(scope: dict[str, Any], send: Send) -> None:
+    """Handle requests that should redirect to a specified full URL."""
+    query_string = scope.get('query_string', b'').decode()
+    query_params = parse_qs(query_string)
+
+    target_url = query_params.get('url', ['http://example.com'])[0]
+
+    status_code = int(query_params.get('status', [302])[0])
+
+    await send(
+        {
+            'type': 'http.response.start',
+            'status': status_code,
+            'headers': [
+                [b'content-type', b'text/plain; charset=utf-8'],
+                [b'location', target_url.encode()],
+            ],
+        }
+    )
+    await send({'type': 'http.response.body', 'body': f'Redirecting to {target_url}...'.encode()})
 
 
 class TestServer(Server):
