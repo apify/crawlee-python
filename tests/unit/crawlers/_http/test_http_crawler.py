@@ -7,6 +7,7 @@ from urllib.parse import parse_qs, urlencode
 
 import pytest
 import respx
+from curl_cffi import CurlHttpVersion
 from httpx import Response
 
 from crawlee import ConcurrencySettings, Request
@@ -54,6 +55,18 @@ async def crawler_without_retries(
         retry_on_blocked=False,
         max_request_retries=0,
     )
+
+
+@pytest.fixture(
+    params=[
+        pytest.param('curl', id='curl'),
+        pytest.param('httpx', id='httpx'),
+    ]
+)
+async def http_client(request: pytest.FixtureRequest) -> CurlImpersonateHttpClient | HttpxHttpClient:
+    if request.param == 'curl':
+        return CurlImpersonateHttpClient(http_version=CurlHttpVersion.V1_1)
+    return HttpxHttpClient(http2=False)
 
 
 @pytest.fixture
@@ -121,14 +134,6 @@ async def server() -> AsyncGenerator[respx.MockRouter, None]:
                 ('set-cookie', 'short=5; Path=/;'),
                 ('set-cookie', 'domain=6; Path=/; Domain=.test.io;'),
             ],
-        )
-
-        mock.get('/simple_set_cookies', name='simple_set_cookies').return_value = Response(
-            200, headers={'set-cookie': 'a=1; Path=/'}
-        )
-
-        mock.get('/get_cookies', name='get_cookies').side_effect = lambda request: Response(
-            200, json={'cookies': request.headers.get('cookie', '')}, headers={'Content-Type': 'application/json'}
         )
 
         yield mock
@@ -257,15 +262,7 @@ async def test_handles_server_error(
     assert server['500_endpoint'].called
 
 
-@pytest.mark.parametrize(
-    'http_client_class',
-    [
-        pytest.param(CurlImpersonateHttpClient, id='curl'),
-        pytest.param(HttpxHttpClient, id='httpx'),
-    ],
-)
-async def test_stores_cookies(http_client_class: type[HttpClient], httpbin: URL) -> None:
-    http_client = http_client_class()
+async def test_stores_cookies(http_client: HttpClient, server_url: URL) -> None:
     visit = Mock()
     track_session_usage = Mock()
 
@@ -284,9 +281,9 @@ async def test_stores_cookies(http_client_class: type[HttpClient], httpbin: URL)
 
         await crawler.run(
             [
-                str(httpbin.with_path('/cookies/set').extend_query(a=1)),
-                str(httpbin.with_path('/cookies/set').extend_query(b=2)),
-                str(httpbin.with_path('/cookies/set').extend_query(c=3)),
+                str(server_url.with_path('set_cookies').extend_query(a=1)),
+                str(server_url.with_path('set_cookies').extend_query(b=2)),
+                str(server_url.with_path('set_cookies').extend_query(c=3)),
             ]
         )
 
@@ -298,7 +295,7 @@ async def test_stores_cookies(http_client_class: type[HttpClient], httpbin: URL)
 
         session = await session_pool.get_session_by_id(session_ids.pop())
         assert session is not None
-        assert {cookie['name']: cookie['value'] for cookie in session.cookies.get_cookies_as_playwright_format()} == {
+        assert {cookie['name']: cookie['value'] for cookie in session.cookies.get_cookies_as_dicts()} == {
             'a': '1',
             'b': '2',
             'c': '3',
@@ -337,11 +334,7 @@ async def test_http_status_statistics(crawler: HttpCrawler, server: respx.MockRo
     assert len(server['500_endpoint'].calls) == 30
 
 
-@pytest.mark.parametrize(
-    'http_client_class', [pytest.param(CurlImpersonateHttpClient, id='curl'), pytest.param(HttpxHttpClient, id='httpx')]
-)
-async def test_sending_payload_as_raw_data(http_client_class: type[HttpClient], httpbin: URL) -> None:
-    http_client = http_client_class()
+async def test_sending_payload_as_raw_data(http_client: HttpClient, server_url: URL) -> None:
     crawler = HttpCrawler(http_client=http_client)
     responses = []
 
@@ -353,7 +346,7 @@ async def test_sending_payload_as_raw_data(http_client_class: type[HttpClient], 
 
     encoded_payload = urlencode(PAYLOAD).encode()
     request = Request.from_url(
-        url=str(httpbin / 'post'),
+        url=str(server_url / 'post'),
         method='POST',
         payload=encoded_payload,
     )
@@ -372,11 +365,7 @@ async def test_sending_payload_as_raw_data(http_client_class: type[HttpClient], 
     assert responses[0]['form'] == {}, 'Response form data should be empty when only raw data is sent.'
 
 
-@pytest.mark.parametrize(
-    'http_client_class', [pytest.param(CurlImpersonateHttpClient, id='curl'), pytest.param(HttpxHttpClient, id='httpx')]
-)
-async def test_sending_payload_as_form_data(http_client_class: type[HttpClient], httpbin: URL) -> None:
-    http_client = http_client_class()
+async def test_sending_payload_as_form_data(http_client: HttpClient, server_url: URL) -> None:
     crawler = HttpCrawler(http_client=http_client)
     responses = []
 
@@ -387,7 +376,7 @@ async def test_sending_payload_as_form_data(http_client_class: type[HttpClient],
         responses.append(response)
 
     request = Request.from_url(
-        url=str(httpbin / 'post'),
+        url=str(server_url / 'post'),
         method='POST',
         headers={'content-type': 'application/x-www-form-urlencoded'},
         payload=urlencode(PAYLOAD).encode(),
@@ -402,11 +391,7 @@ async def test_sending_payload_as_form_data(http_client_class: type[HttpClient],
     assert responses[0]['data'] == '', 'Response raw data should be empty when only form data is sent.'
 
 
-@pytest.mark.parametrize(
-    'http_client_class', [pytest.param(CurlImpersonateHttpClient, id='curl'), pytest.param(HttpxHttpClient, id='httpx')]
-)
-async def test_sending_payload_as_json(http_client_class: type[HttpClient], httpbin: URL) -> None:
-    http_client = http_client_class()
+async def test_sending_payload_as_json(http_client: HttpClient, server_url: URL) -> None:
     crawler = HttpCrawler(http_client=http_client)
     responses = []
 
@@ -418,7 +403,7 @@ async def test_sending_payload_as_json(http_client_class: type[HttpClient], http
 
     json_payload = json.dumps(PAYLOAD).encode()
     request = Request.from_url(
-        url=str(httpbin / 'post'),
+        url=str(server_url / 'post'),
         method='POST',
         payload=json_payload,
         headers={'content-type': 'application/json'},
@@ -493,9 +478,8 @@ async def test_http_crawler_pre_navigation_hooks_executed_before_request() -> No
     assert execution_order == ['pre-navigation-hook 1', 'pre-navigation-hook 2', 'request', 'final handler']
 
 
-async def test_isolation_cookies_curl(httpbin: URL) -> None:
+async def test_isolation_cookies(http_client: HttpClient, server_url: URL) -> None:
     """Test isolation cookies for Session with curl and httpbin"""
-    http_client = CurlImpersonateHttpClient()
     sessions_ids: list[str] = []
     sessions_cookies: dict[str, dict[str, str]] = {}
     response_cookies: dict[str, dict[str, str]] = {}
@@ -534,11 +518,11 @@ async def test_isolation_cookies_curl(httpbin: URL) -> None:
     await crawler.run(
         [
             # The first request sets the cookie in the session
-            str(httpbin.with_path('/cookies/set').extend_query(a=1)),
+            str(server_url.with_path('set_cookies').extend_query(a=1)),
             # With the second request, we check the cookies in the session and set retire
-            Request.from_url(str(httpbin.with_path('/cookies')), unique_key='1', user_data={'retire_session': True}),
+            Request.from_url(str(server_url.with_path('/cookies')), unique_key='1', user_data={'retire_session': True}),
             # The third request is made with a new session to make sure it does not use another session's cookies
-            Request.from_url(str(httpbin.with_path('/cookies')), unique_key='2'),
+            Request.from_url(str(server_url.with_path('/cookies')), unique_key='2'),
         ]
     )
 
@@ -584,7 +568,7 @@ async def test_store_complex_cookies(server: respx.MockRouter) -> None:
         session = await session_pool.get_session_by_id(session_ids.pop())
         assert session is not None
 
-        session_cookies_dict = {cookie['name']: cookie for cookie in session.cookies.get_cookies_as_playwright_format()}
+        session_cookies_dict = {cookie['name']: cookie for cookie in session.cookies.get_cookies_as_dicts()}
 
         assert len(session_cookies_dict) == 6
 
@@ -595,8 +579,8 @@ async def test_store_complex_cookies(server: respx.MockRouter) -> None:
             'domain': 'test.io',
             'path': '/',
             'secure': False,
-            'httpOnly': True,
-            'sameSite': 'Lax',
+            'http_only': True,
+            'same_site': 'Lax',
         }
 
         # cookie string: 'withpath=2; Path=/html; SameSite=None'
@@ -606,8 +590,8 @@ async def test_store_complex_cookies(server: respx.MockRouter) -> None:
             'domain': 'test.io',
             'path': '/html',
             'secure': False,
-            'httpOnly': False,
-            'sameSite': 'None',
+            'http_only': False,
+            'same_site': 'None',
         }
 
         # cookie string: 'strict=3; Path=/; SameSite=Strict'
@@ -617,8 +601,8 @@ async def test_store_complex_cookies(server: respx.MockRouter) -> None:
             'domain': 'test.io',
             'path': '/',
             'secure': False,
-            'httpOnly': False,
-            'sameSite': 'Strict',
+            'http_only': False,
+            'same_site': 'Strict',
         }
 
         # cookie string: 'secure=4; Path=/; HttpOnly; Secure; SameSite=Strict'
@@ -628,8 +612,8 @@ async def test_store_complex_cookies(server: respx.MockRouter) -> None:
             'domain': 'test.io',
             'path': '/',
             'secure': True,
-            'httpOnly': True,
-            'sameSite': 'Strict',
+            'http_only': True,
+            'same_site': 'Strict',
         }
 
         # cookie string: 'short=5; Path=/;'
@@ -639,7 +623,7 @@ async def test_store_complex_cookies(server: respx.MockRouter) -> None:
             'domain': 'test.io',
             'path': '/',
             'secure': False,
-            'httpOnly': False,
+            'http_only': False,
         }
 
         assert session_cookies_dict['domain'] == {
@@ -648,7 +632,7 @@ async def test_store_complex_cookies(server: respx.MockRouter) -> None:
             'domain': '.test.io',
             'path': '/',
             'secure': False,
-            'httpOnly': False,
+            'http_only': False,
         }
 
 
@@ -678,7 +662,7 @@ async def test_store_multidomain_cookies(server: respx.MockRouter) -> None:
             session = await session_pool.get_session_by_id(session_ids.pop())
             assert session is not None
 
-            session_cookies_dict = {cookie['domain'] for cookie in session.cookies.get_cookies_as_playwright_format()}
+            session_cookies_dict = {cookie.get('domain', '') for cookie in session.cookies.get_cookies_as_dicts()}
 
             assert len(session_cookies_dict) == 3
 
