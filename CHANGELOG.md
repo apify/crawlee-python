@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.6.6 - **not yet released**
+
+### 🚀 Features
+
+- Add `statistics_log_format` parameter to `BasicCrawler` ([#1061](https://github.com/apify/crawlee-python/pull/1061)) ([635ae4a](https://github.com/apify/crawlee-python/commit/635ae4a56c65e434783ca721f4164203f465abf0)) by [@Mantisus](https://github.com/Mantisus), closes [#700](https://github.com/apify/crawlee-python/issues/700)
+
+### 🐛 Bug Fixes
+
+- Add port for `same-origin` strategy check ([#1096](https://github.com/apify/crawlee-python/pull/1096)) ([9e24598](https://github.com/apify/crawlee-python/commit/9e245987d0aab0ba9c763689f12958b5a332db46)) by [@Mantisus](https://github.com/Mantisus)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.6.5](https://github.com/apify/crawlee-python/releases/tag/v0.6.5) (2025-03-13)
 
 ### 🐛 Bug Fixes
