@@ -23,7 +23,7 @@ class StorageMetadata(BaseModel):
     It contains common fields shared across all specific storage types.
     """
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra='allow')
 
     id: Annotated[str, Field(alias='id')]
     name: Annotated[str | None, Field(alias='name', default='')]
@@ -141,6 +141,7 @@ class RequestQueueHeadWithLocks(RequestQueueHead):
     """Model for request queue head with locks."""
 
     lock_secs: Annotated[int, Field(alias='lockSecs')]
+    queue_has_locked_requests: Annotated[bool | None, Field(alias='queueHasLockedRequests')] = None
 
 
 class _ListPage(BaseModel):

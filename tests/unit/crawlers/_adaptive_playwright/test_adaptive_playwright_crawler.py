@@ -410,7 +410,7 @@ async def test_adaptive_crawling_result_use_state_isolation(
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
         nonlocal request_handler_calls
-        state = cast(dict[str, int], await context.use_state())
+        state = cast('dict[str, int]', await context.use_state())
         request_handler_calls += 1
         state['counter'] += 1
 

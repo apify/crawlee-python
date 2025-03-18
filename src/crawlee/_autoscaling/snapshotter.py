@@ -186,7 +186,7 @@ class Snapshotter:
         Returns:
             A sample of memory snapshots.
         """
-        snapshots = cast(list[Snapshot], self._memory_snapshots)
+        snapshots = cast('list[Snapshot]', self._memory_snapshots)
         return self._get_sample(snapshots, duration)
 
     @ensure_context
@@ -199,7 +199,7 @@ class Snapshotter:
         Returns:
             A sample of event loop snapshots.
         """
-        snapshots = cast(list[Snapshot], self._event_loop_snapshots)
+        snapshots = cast('list[Snapshot]', self._event_loop_snapshots)
         return self._get_sample(snapshots, duration)
 
     @ensure_context
@@ -212,7 +212,7 @@ class Snapshotter:
         Returns:
             A sample of CPU snapshots.
         """
-        snapshots = cast(list[Snapshot], self._cpu_snapshots)
+        snapshots = cast('list[Snapshot]', self._cpu_snapshots)
         return self._get_sample(snapshots, duration)
 
     @ensure_context
@@ -225,7 +225,7 @@ class Snapshotter:
         Returns:
             A sample of client snapshots.
         """
-        snapshots = cast(list[Snapshot], self._client_snapshots)
+        snapshots = cast('list[Snapshot]', self._client_snapshots)
         return self._get_sample(snapshots, duration)
 
     @staticmethod
@@ -255,7 +255,7 @@ class Snapshotter:
             created_at=event_data.cpu_info.created_at,
         )
 
-        snapshots = cast(list[Snapshot], self._cpu_snapshots)
+        snapshots = cast('list[Snapshot]', self._cpu_snapshots)
         self._prune_snapshots(snapshots, event_data.cpu_info.created_at)
         self._cpu_snapshots.add(snapshot)
 
@@ -275,7 +275,7 @@ class Snapshotter:
             created_at=event_data.memory_info.created_at,
         )
 
-        snapshots = cast(list[Snapshot], self._memory_snapshots)
+        snapshots = cast('list[Snapshot]', self._memory_snapshots)
         self._prune_snapshots(snapshots, snapshot.created_at)
         self._memory_snapshots.add(snapshot)
         self._evaluate_memory_load(event_data.memory_info.current_size, event_data.memory_info.created_at)
@@ -295,7 +295,7 @@ class Snapshotter:
             event_loop_delay = snapshot.created_at - previous_snapshot.created_at - self._EVENT_LOOP_SNAPSHOT_INTERVAL
             snapshot.delay = event_loop_delay
 
-        snapshots = cast(list[Snapshot], self._event_loop_snapshots)
+        snapshots = cast('list[Snapshot]', self._event_loop_snapshots)
         self._prune_snapshots(snapshots, snapshot.created_at)
         self._event_loop_snapshots.add(snapshot)
 
@@ -312,7 +312,7 @@ class Snapshotter:
         error_count = rate_limit_errors.get(self._CLIENT_RATE_LIMIT_ERROR_RETRY_COUNT, 0)
         snapshot = ClientSnapshot(error_count=error_count, max_error_count=self._max_client_errors)
 
-        snapshots = cast(list[Snapshot], self._client_snapshots)
+        snapshots = cast('list[Snapshot]', self._client_snapshots)
         self._prune_snapshots(snapshots, snapshot.created_at)
         self._client_snapshots.add(snapshot)
 

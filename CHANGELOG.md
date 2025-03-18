@@ -2,6 +2,48 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.6.6 - **not yet released**
+
+### 🚀 Features
+
+- Add `statistics_log_format` parameter to `BasicCrawler` ([#1061](https://github.com/apify/crawlee-python/pull/1061)) ([635ae4a](https://github.com/apify/crawlee-python/commit/635ae4a56c65e434783ca721f4164203f465abf0)) by [@Mantisus](https://github.com/Mantisus), closes [#700](https://github.com/apify/crawlee-python/issues/700)
+
+### 🐛 Bug Fixes
+
+- Add port for `same-origin` strategy check ([#1096](https://github.com/apify/crawlee-python/pull/1096)) ([9e24598](https://github.com/apify/crawlee-python/commit/9e245987d0aab0ba9c763689f12958b5a332db46)) by [@Mantisus](https://github.com/Mantisus)
+- Fix handling of loading empty `metadata` file for queue ([#1042](https://github.com/apify/crawlee-python/pull/1042)) ([b00876e](https://github.com/apify/crawlee-python/commit/b00876e8dcb30a12d3737bd31237da9daada46bb)) by [@Mantisus](https://github.com/Mantisus), closes [#1029](https://github.com/apify/crawlee-python/issues/1029)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.6.5](https://github.com/apify/crawlee-python/releases/tag/v0.6.5) (2025-03-13)
+
+### 🐛 Bug Fixes
+
+- Update to `browserforge` workaround ([#1075](https://github.com/apify/crawlee-python/pull/1075)) ([2378cf8](https://github.com/apify/crawlee-python/commit/2378cf84ab1ed06473049a9ddfca2ba6f166306d)) by [@Pijukatel](https://github.com/Pijukatel)
+
+
+## [0.6.4](https://github.com/apify/crawlee-python/releases/tag/v0.6.4) (2025-03-12)
+
+### 🐛 Bug Fixes
+
+- Add a check thread before set `add_signal_handler` ([#1068](https://github.com/apify/crawlee-python/pull/1068)) ([6983bda](https://github.com/apify/crawlee-python/commit/6983bda2dbc202b3ecbf7db62b11deee007b4b5f)) by [@Mantisus](https://github.com/Mantisus)
+- Temporary workaround for `browserforge` import time code execution ([#1073](https://github.com/apify/crawlee-python/pull/1073)) ([17d914f](https://github.com/apify/crawlee-python/commit/17d914f78242078f88c07d686a567d1091255eb1)) by [@Pijukatel](https://github.com/Pijukatel)
+
+
+## [0.6.3](https://github.com/apify/crawlee-python/releases/tag/v0.6.3) (2025-03-07)
+
+### 🚀 Features
+
+- Add project template with `uv` package manager ([#1057](https://github.com/apify/crawlee-python/pull/1057)) ([9ec06e5](https://github.com/apify/crawlee-python/commit/9ec06e58032aa11af46ac9cd1ea7bb002a18eb13)) by [@Mantisus](https://github.com/Mantisus), closes [#1053](https://github.com/apify/crawlee-python/issues/1053)
+- Use fingerprint generator in `PlaywrightCrawler` by default  ([#1060](https://github.com/apify/crawlee-python/pull/1060)) ([09cec53](https://github.com/apify/crawlee-python/commit/09cec532911043623eeb475aa8552c70bd94f8b7)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1054](https://github.com/apify/crawlee-python/issues/1054)
+
+### 🐛 Bug Fixes
+
+- Update project templates for Poetry v2.x compatibility ([#1049](https://github.com/apify/crawlee-python/pull/1049)) ([96dc2f9](https://github.com/apify/crawlee-python/commit/96dc2f9b53b0a2d0f1d0c73d10e5244114e849ff)) by [@Mantisus](https://github.com/Mantisus), closes [#954](https://github.com/apify/crawlee-python/issues/954)
+- Remove tmp folder for PlaywrightCrawler in non-headless mode ([#1046](https://github.com/apify/crawlee-python/pull/1046)) ([3a7f444](https://github.com/apify/crawlee-python/commit/3a7f444fb7ee9a0ab1867c8c9586b15aab1e7df2)) by [@Mantisus](https://github.com/Mantisus)
+
+
 ## [0.6.2](https://github.com/apify/crawlee-python/releases/tag/v0.6.2) (2025-03-05)
 
 ### 🚀 Features

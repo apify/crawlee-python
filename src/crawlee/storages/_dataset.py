@@ -367,7 +367,7 @@ class Dataset(Storage):
         Args:
             kwargs: Keyword arguments for the storage client method.
         """
-        key = cast(str, kwargs.get('key'))
+        key = cast('str', kwargs.get('key'))
         content_type = kwargs.get('content_type', 'json')
         to_key_value_store_id = kwargs.get('to_key_value_store_id')
         to_key_value_store_name = kwargs.get('to_key_value_store_name')

@@ -14,8 +14,8 @@ RUN apt update && apt install -yq git && rm -rf /var/lib/apt/lists/*
 
 # % if cookiecutter.package_manager == 'poetry'
 RUN pip install -U pip setuptools \
-    && pip install 'poetry<2' \
-    && poetry self add 'poetry-plugin-export<1.9.0'
+    && pip install 'poetry<3' \
+    && poetry self add 'poetry-plugin-export'
 
 # Second, copy just poetry.lock and pyproject.toml into the Actor image,
 # since those should be the only files that affects the dependency install in the next step,
@@ -35,6 +35,28 @@ RUN echo "Python version:" \
     pip install -r /dev/stdin --no-dependencies \
  && echo "All installed Python packages:" \
  && pip freeze
+# % elif cookiecutter.package_manager == 'uv'
+RUN pip install -U pip setuptools \
+    && pip install 'uv<1'
+
+ENV UV_PROJECT_ENVIRONMENT="/usr/local"
+
+COPY pyproject.toml uv.lock ./
+
+RUN echo "Python version:" \
+    && python --version \
+    && echo "Installing dependencies:" \
+    # Check if playwright is already installed
+    && PLAYWRIGHT_INSTALLED=$(pip freeze | grep -q playwright && echo "true" || echo "false") \
+    && if [ "$PLAYWRIGHT_INSTALLED" = "true" ]; then \
+        echo "Playwright already installed, excluding from uv sync" \
+        && uv sync --frozen --no-install-project --no-editable -q --no-dev --inexact --no-install-package playwright; \
+    else \
+        echo "Playwright not found, installing all dependencies" \
+        && uv sync --frozen --no-install-project --no-editable -q --no-dev --inexact; \
+    fi \
+    && echo "All installed Python packages:" \
+    && pip freeze
 # % elif cookiecutter.package_manager == 'pip'
 RUN pip install -U pip setuptools
 

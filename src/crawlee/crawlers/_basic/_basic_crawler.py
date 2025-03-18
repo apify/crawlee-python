@@ -6,13 +6,14 @@ import logging
 import signal
 import sys
 import tempfile
+import threading
 from asyncio import CancelledError
 from collections.abc import AsyncGenerator, Awaitable, Iterable, Sequence
 from contextlib import AsyncExitStack, suppress
 from datetime import timedelta
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Generic, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Generic, Literal, Union, cast
 from urllib.parse import ParseResult, urlparse
 from weakref import WeakKeyDictionary
 
@@ -134,6 +135,11 @@ class _BasicCrawlerOptions(TypedDict):
     configure_logging: NotRequired[bool]
     """If True, the crawler will set up logging infrastructure automatically."""
 
+    statistics_log_format: NotRequired[Literal['table', 'inline']]
+    """If 'table', displays crawler statistics as formatted tables in logs. If 'inline', outputs statistics as plain
+    text log messages.
+    """
+
     keep_alive: NotRequired[bool]
     """Flag that can keep crawler running even when there are no requests in queue."""
 
@@ -230,6 +236,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         abort_on_error: bool = False,
         keep_alive: bool = False,
         configure_logging: bool = True,
+        statistics_log_format: Literal['table', 'inline'] = 'table',
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         _additional_context_managers: Sequence[AbstractAsyncContextManager] | None = None,
         _logger: logging.Logger | None = None,
@@ -270,6 +277,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             keep_alive: If True, it will keep crawler alive even if there are no requests in queue.
                 Use `crawler.stop()` to exit the crawler.
             configure_logging: If True, the crawler will set up logging infrastructure automatically.
+            statistics_log_format: If 'table', displays crawler statistics as formatted tables in logs. If 'inline',
+                outputs statistics as plain text log messages.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
             _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
@@ -302,8 +311,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         # Request router setup
         self._router: Router[TCrawlingContext] | None = None
-        if isinstance(cast(Router, request_handler), Router):
-            self._router = cast(Router[TCrawlingContext], request_handler)
+        if isinstance(cast('Router', request_handler), Router):
+            self._router = cast('Router[TCrawlingContext]', request_handler)
         elif request_handler is not None:
             self._router = None
             self.router.default_handler(request_handler)
@@ -345,12 +354,14 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             httpx_logger = logging.getLogger('httpx')  # Silence HTTPX logger
             httpx_logger.setLevel(logging.DEBUG if get_configured_log_level() <= logging.DEBUG else logging.WARNING)
         self._logger = _logger or logging.getLogger(__name__)
+        self._statistics_log_format = statistics_log_format
 
         # Statistics
         self._statistics = statistics or cast(
-            Statistics[TStatisticsState],
+            'Statistics[TStatisticsState]',
             Statistics.with_default_state(
                 periodic_message_logger=self._logger,
+                statistics_log_format=self._statistics_log_format,
                 log_message='Current request statistics:',
             ),
         )
@@ -535,16 +546,18 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         run_task = asyncio.create_task(self._run_crawler(), name='run_crawler_task')
 
-        with suppress(NotImplementedError):  # event loop signal handlers are not supported on Windows
-            asyncio.get_running_loop().add_signal_handler(signal.SIGINT, sigint_handler)
+        if threading.current_thread() is threading.main_thread():  # `add_signal_handler` works only in the main thread
+            with suppress(NotImplementedError):  # event loop signal handlers are not supported on Windows
+                asyncio.get_running_loop().add_signal_handler(signal.SIGINT, sigint_handler)
 
         try:
             await run_task
         except CancelledError:
             pass
         finally:
-            with suppress(NotImplementedError):
-                asyncio.get_running_loop().remove_signal_handler(signal.SIGINT)
+            if threading.current_thread() is threading.main_thread():
+                with suppress(NotImplementedError):
+                    asyncio.get_running_loop().remove_signal_handler(signal.SIGINT)
 
         if self._statistics.error_tracker.total > 0:
             self._logger.info(
@@ -564,8 +577,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         await self._save_crawler_state()
 
         final_statistics = self._statistics.calculate()
-        self._logger.info(f'Final request statistics:\n{final_statistics.to_table()}')
-
+        if self._statistics_log_format == 'table':
+            self._logger.info(f'Final request statistics:\n{final_statistics.to_table()}')
+        else:
+            self._logger.info('Final request statistics:', extra=final_statistics.to_dict())
         return final_statistics
 
     async def _run_crawler(self) -> None:
@@ -801,7 +816,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             return origin_domain == target_domain
 
         if strategy == 'same-origin':
-            return target_url.hostname == origin_url.hostname and target_url.scheme == origin_url.scheme
+            return (
+                target_url.hostname == origin_url.hostname
+                and target_url.scheme == origin_url.scheme
+                and target_url.port == origin_url.port
+            )
 
         if strategy == 'all':
             return True
@@ -1087,7 +1106,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         except RequestHandlerError as primary_error:
             primary_error = cast(
-                RequestHandlerError[TCrawlingContext], primary_error
+                'RequestHandlerError[TCrawlingContext]', primary_error
             )  # valid thanks to ContextPipeline
 
             self._logger.debug(

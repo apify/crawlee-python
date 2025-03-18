@@ -78,7 +78,7 @@ def _prompt_for_project_name(initial_project_name: str | None) -> str:
 
 def _prompt_text(message: str, default: str) -> str:
     return cast(
-        str,
+        'str',
         ConsoleRender().render(
             inquirer.Text(
                 name='text',
@@ -93,7 +93,7 @@ def _prompt_text(message: str, default: str) -> str:
 def _prompt_choice(message: str, choices: list[str]) -> str:
     """Prompt the user to pick one from a list of choices."""
     return cast(
-        str,
+        'str',
         ConsoleRender().render(
             inquirer.List(
                 name='choice',
@@ -106,7 +106,7 @@ def _prompt_choice(message: str, choices: list[str]) -> str:
 
 def _prompt_bool(message: str, *, default: bool) -> bool:
     return cast(
-        bool,
+        'bool',
         ConsoleRender().render(
             inquirer.Confirm(
                 name='confirm',
@@ -226,10 +226,10 @@ def create(
                     f'activate the virtual environment in ".venv" ("source .venv/bin/activate") '
                     f'and run your project using "python -m {package_name}".'
                 )
-            elif package_manager == 'poetry':
+            elif package_manager in {'poetry', 'uv'}:
                 typer.echo(
                     f'To run it, navigate to the directory: "cd {project_name}", '
-                    f'and run it using "poetry run python -m {package_name}".'
+                    f'and run it using "{package_manager} run python -m {package_name}".'
                 )
 
             typer.echo(f'See the "{project_name}/README.md" for more information.')

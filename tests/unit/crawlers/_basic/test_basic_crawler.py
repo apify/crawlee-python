@@ -11,7 +11,7 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 from unittest.mock import AsyncMock, Mock, call
 
 import httpx
@@ -28,7 +28,6 @@ from crawlee.request_loaders import RequestList, RequestManagerTandem
 from crawlee.sessions import SessionPool
 from crawlee.statistics import FinalStatistics
 from crawlee.storage_clients import MemoryStorageClient
-from crawlee.storage_clients._memory import DatasetClient
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 if TYPE_CHECKING:
@@ -38,6 +37,7 @@ if TYPE_CHECKING:
     from yarl import URL
 
     from crawlee._types import JsonSerializable
+    from crawlee.storage_clients._memory import DatasetClient
 
 
 async def test_processes_requests_from_explicit_queue() -> None:
@@ -889,11 +889,20 @@ async def test_respects_no_persist_storage() -> None:
 
 
 @pytest.mark.skipif(os.name == 'nt' and 'CI' in os.environ, reason='Skipped in Windows CI')
-async def test_logs_final_statistics(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+@pytest.mark.parametrize(
+    ('statistics_log_format'),
+    [
+        pytest.param('table', id='With table for logs'),
+        pytest.param('inline', id='With inline logs'),
+    ],
+)
+async def test_logs_final_statistics(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, statistics_log_format: Literal['table', 'inline']
+) -> None:
     # Set the log level to INFO to capture the final statistics log.
     caplog.set_level(logging.INFO)
 
-    crawler = BasicCrawler(configure_logging=False)
+    crawler = BasicCrawler(configure_logging=False, statistics_log_format=statistics_log_format)
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
@@ -923,21 +932,36 @@ async def test_logs_final_statistics(monkeypatch: pytest.MonkeyPatch, caplog: py
     )
 
     assert final_statistics is not None
-    assert final_statistics.msg.splitlines() == [
-        'Final request statistics:',
-        '┌───────────────────────────────┬───────────┐',
-        '│ requests_finished             │ 4         │',
-        '│ requests_failed               │ 33        │',
-        '│ retry_histogram               │ [1, 4, 8] │',
-        '│ request_avg_failed_duration   │ 99.0      │',
-        '│ request_avg_finished_duration │ 0.483     │',
-        '│ requests_finished_per_minute  │ 0.33      │',
-        '│ requests_failed_per_minute    │ 0.1       │',
-        '│ request_total_duration        │ 720.0     │',
-        '│ requests_total                │ 37        │',
-        '│ crawler_runtime               │ 300.0     │',
-        '└───────────────────────────────┴───────────┘',
-    ]
+    if statistics_log_format == 'table':
+        assert final_statistics.msg.splitlines() == [
+            'Final request statistics:',
+            '┌───────────────────────────────┬───────────┐',
+            '│ requests_finished             │ 4         │',
+            '│ requests_failed               │ 33        │',
+            '│ retry_histogram               │ [1, 4, 8] │',
+            '│ request_avg_failed_duration   │ 99.0      │',
+            '│ request_avg_finished_duration │ 0.483     │',
+            '│ requests_finished_per_minute  │ 0.33      │',
+            '│ requests_failed_per_minute    │ 0.1       │',
+            '│ request_total_duration        │ 720.0     │',
+            '│ requests_total                │ 37        │',
+            '│ crawler_runtime               │ 300.0     │',
+            '└───────────────────────────────┴───────────┘',
+        ]
+    else:
+        assert final_statistics.msg == 'Final request statistics:'
+
+        # ignore[attr-defined] since `extra` parameters are not defined for `LogRecord`
+        assert final_statistics.requests_finished == 4  # type: ignore[attr-defined]
+        assert final_statistics.requests_failed == 33  # type: ignore[attr-defined]
+        assert final_statistics.retry_histogram == [1, 4, 8]  # type: ignore[attr-defined]
+        assert final_statistics.request_avg_failed_duration == 99.0  # type: ignore[attr-defined]
+        assert final_statistics.request_avg_finished_duration == 0.483  # type: ignore[attr-defined]
+        assert final_statistics.requests_finished_per_minute == 0.33  # type: ignore[attr-defined]
+        assert final_statistics.requests_failed_per_minute == 0.1  # type: ignore[attr-defined]
+        assert final_statistics.request_total_duration == 720.0  # type: ignore[attr-defined]
+        assert final_statistics.requests_total == 37  # type: ignore[attr-defined]
+        assert final_statistics.crawler_runtime == 300.0  # type: ignore[attr-defined]
 
 
 async def test_crawler_manual_stop(httpbin: URL) -> None:
@@ -1016,7 +1040,7 @@ async def test_sets_services() -> None:
     assert service_locator.get_storage_client() is custom_storage_client
 
     dataset = await crawler.get_dataset(name='test')
-    assert cast(DatasetClient, dataset._resource_client)._memory_storage_client is custom_storage_client
+    assert cast('DatasetClient', dataset._resource_client)._memory_storage_client is custom_storage_client
 
 
 async def test_allows_storage_client_overwrite_before_run(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1040,7 +1064,7 @@ async def test_allows_storage_client_overwrite_before_run(monkeypatch: pytest.Mo
         assert spy.call_count >= 1
 
     dataset = await crawler.get_dataset()
-    assert cast(DatasetClient, dataset._resource_client)._memory_storage_client is other_storage_client
+    assert cast('DatasetClient', dataset._resource_client)._memory_storage_client is other_storage_client
 
     data = await dataset.get_data()
     assert data.items == [{'foo': 'bar'}]
@@ -1061,7 +1085,7 @@ async def test_context_use_state_race_condition_in_handlers(key_value_store: Key
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        state = cast(dict[str, int], await context.use_state())
+        state = cast('dict[str, int]', await context.use_state())
         await handler_barrier.wait()  # Block until both handlers get the state.
         state['counter'] += 1
         await handler_barrier.wait()  # Block until both handlers increment the state.
