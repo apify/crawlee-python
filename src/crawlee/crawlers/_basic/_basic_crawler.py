@@ -804,7 +804,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             return origin_domain == target_domain
 
         if strategy == 'same-origin':
-            return target_url.hostname == origin_url.hostname and target_url.scheme == origin_url.scheme
+            return (
+                target_url.hostname == origin_url.hostname
+                and target_url.scheme == origin_url.scheme
+                and target_url.port == origin_url.port
+            )
 
         if strategy == 'all':
             return True
