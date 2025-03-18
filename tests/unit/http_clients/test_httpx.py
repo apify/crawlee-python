@@ -36,6 +36,7 @@ async def test_http_2(httpbin: URL) -> None:
     assert response.http_version == 'HTTP/2'
 
 
+@pytest.mark.skipif(os.name == 'nt', reason='Skipped on Windows')
 async def test_proxy(
     http_client: HttpxHttpClient,
     proxy: ProxyInfo,
@@ -64,6 +65,7 @@ async def test_proxy_disabled(
             await http_client.crawl(request, proxy_info=disabled_proxy, statistics=statistics)
 
 
+@pytest.mark.skipif(os.name == 'nt', reason='Skipped on Windows')
 async def test_send_request_with_proxy(
     http_client: HttpxHttpClient,
     proxy: ProxyInfo,

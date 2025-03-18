@@ -22,6 +22,7 @@ def http_client() -> CurlImpersonateHttpClient:
     return CurlImpersonateHttpClient(http_version=CurlHttpVersion.V1_1)
 
 
+@pytest.mark.skipif(os.name == 'nt', reason='Skipped on Windows')
 async def test_crawl_with_proxy(
     http_client: CurlImpersonateHttpClient,
     proxy: ProxyInfo,
@@ -50,6 +51,7 @@ async def test_crawl_with_proxy_disabled(
             await http_client.crawl(request, proxy_info=disabled_proxy, statistics=statistics)
 
 
+@pytest.mark.skipif(os.name == 'nt', reason='Skipped on Windows')
 async def test_send_request_with_proxy(
     http_client: CurlImpersonateHttpClient,
     proxy: ProxyInfo,
