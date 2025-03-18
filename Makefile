@@ -27,7 +27,10 @@ type-check:
 	uv run mypy
 
 unit-tests:
-	uv run pytest --numprocesses=auto --verbose --cov=src/crawlee tests/unit
+	uv run pytest --numprocesses=auto --verbose tests/unit
+
+templates-apify-integration-tests:
+	uv run pytest --numprocesses=auto --verbose --cov=src/crawlee tests/integration
 
 unit-tests-cov:
 	uv run pytest --numprocesses=auto --verbose --cov=src/crawlee --cov-report=html tests/unit

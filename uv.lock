@@ -674,7 +674,6 @@ playwright = [
 [package.dev-dependencies]
 dev = [
     { name = "apify-client" },
-    { name = "apify-shared" },
     { name = "build" },
     { name = "filelock" },
     { name = "ipdb" },
@@ -747,7 +746,6 @@ provides-extras = ["all", "adaptive-crawler", "beautifulsoup", "cli", "curl-impe
 [package.metadata.requires-dev]
 dev = [
     { name = "apify-client" },
-    { name = "apify-shared" },
     { name = "build", specifier = "~=1.2.0" },
     { name = "filelock", specifier = "~=3.18.0" },
     { name = "ipdb", specifier = "~=0.13.0" },
