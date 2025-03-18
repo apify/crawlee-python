@@ -121,27 +121,22 @@ async def test_nonexistent_url_invokes_error_handler() -> None:
     assert failed_handler.call_count == 1
 
 
-async def test_redirect_handling() -> None:
+async def test_redirect_handling(server_url: URL, redirect_server_url: URL) -> None:
     # Set up a dummy crawler that tracks visited URLs
     crawler = PlaywrightCrawler()
     handled_urls = set[str]()
 
-    @crawler.pre_navigation_hook
-    async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
-        # Emulate server response to prevent Playwright from making real requests
-        await context.page.route(
-            '**/redirect', lambda route: route.fulfill(status=301, headers={'Location': 'https://apify.com'})
-        )
-        await context.page.route('https://apify.com/**', lambda route: route.fulfill(status=200))
+    redirect_target = str(server_url / 'start_enqueue')
+    redirect_url = str(redirect_server_url.with_path('redirect').with_query(url=redirect_target))
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
         handled_urls.add(context.request.loaded_url or '')
 
-    # Request with redirects to apify.com
-    request = Request.from_url(url='https://test.com/redirect')
+    # Request with redirects
+    request = Request.from_url(url=redirect_url)
 
-    # Ensure that the request uses the same origin strategy - apify.com will be considered out of scope
+    # Ensure that the request uses the same origin strategy - `redirect_target` will be considered out of scope
     request.crawlee_data.enqueue_strategy = 'same-origin'
 
     # No URLs should be visited in the run
