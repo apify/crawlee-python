@@ -421,7 +421,7 @@ async def test_sending_payload_as_json(http_client: HttpClient, server_url: URL)
 @pytest.mark.parametrize(
     'http_client_class', [pytest.param(CurlImpersonateHttpClient, id='curl'), pytest.param(HttpxHttpClient, id='httpx')]
 )
-async def test_sending_url_query_params(http_client_class: type[HttpClient], httpbin: URL) -> None:
+async def test_sending_url_query_params(http_client_class: type[HttpClient], server_url: URL) -> None:
     http_client = http_client_class()
     crawler = HttpCrawler(http_client=http_client)
     responses = []
@@ -432,7 +432,7 @@ async def test_sending_url_query_params(http_client_class: type[HttpClient], htt
         # The httpbin.org/get endpoint returns the provided query parameters in the response.
         responses.append(response)
 
-    base_url = httpbin / 'get'
+    base_url = server_url / 'get'
     query_params = {'param1': 'value1', 'param2': 'value2'}
     request = Request.from_url(url=str(base_url.extend_query(query_params)))
 

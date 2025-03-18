@@ -19,6 +19,61 @@ Receive = Callable[[], Awaitable[dict[str, Any]]]
 Send = Callable[[dict[str, Any]], Coroutine[None, None, None]]
 
 
+def get_headers_dict(scope: dict[str, Any]) -> dict[str, str]:
+    """Extract request headers and return them as a dictionary."""
+    headers = {}
+    for name, value in scope.get('headers', []):
+        headers[name.decode()] = value.decode()
+    return headers
+
+
+def get_query_params(query_string: bytes) -> dict[str, str]:
+    """Extract and parse query parameters from the request."""
+    args = parse_qs(query_string.decode(), keep_blank_values=True)
+    result_args = {}
+
+    for key, values in args.items():
+        if values:
+            result_args[key] = values[0]
+
+    return result_args
+
+
+def get_cookies_from_headers(headers: dict[str, Any]) -> dict[str, str]:
+    """Extract cookies from request headers."""
+    cookies = {}
+    cookie_header: str = headers.get('cookie', '')
+    if cookie_header:
+        for cookie in cookie_header.split(';'):
+            name, value = cookie.strip().split('=')
+            cookies[name] = value
+    return cookies
+
+
+async def send_json_response(send: Send, data: Any, status: int = 200) -> None:
+    """Send a JSON response to the client."""
+    await send(
+        {
+            'type': 'http.response.start',
+            'status': status,
+            'headers': [[b'content-type', b'application/json']],
+        }
+    )
+    await send({'type': 'http.response.body', 'body': json.dumps(data, indent=2).encode()})
+
+
+async def send_html_response(send: Send, html_content: bytes, status: int = 200) -> None:
+    """Send an HTML response to the client."""
+    await send(
+        {
+            'type': 'http.response.start',
+            'status': status,
+            'headers': [[b'content-type', b'text/html; charset=utf-8']],
+        }
+    )
+    await send({'type': 'http.response.body', 'body': html_content})
+
+
 async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
     """Main ASGI application handler that routes requests to specific handlers.
 
@@ -47,6 +102,10 @@ async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
         await echo_status(scope, send)
     elif path.startswith('/headers'):
         await echo_headers(scope, send)
+    elif path.startswith('/user-agent'):
+        await echo_user_agent(scope, send)
+    elif path.startswith('/get'):
+        await get_echo(scope, send)
     elif path.startswith('/post'):
         await post_echo(scope, receive, send)
     elif path.startswith('/redirect'):
@@ -57,37 +116,15 @@ async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
 
 async def get_cookies(scope: dict[str, Any], send: Send) -> None:
     """Handle requests to retrieve cookies sent in the request."""
-    headers = scope.get('headers', [])
-    cookies = {}
-    for header in headers:
-        if header[0].decode() == 'cookie':
-            cookies_header = header[1].decode()
-            for cookie in cookies_header.split(';'):
-                name, value = cookie.strip().split('=')
-                cookies[name] = value
-            break
-
-    await send(
-        {
-            'type': 'http.response.start',
-            'status': 200,
-            'headers': [
-                [b'content-type', b'application/json'],
-            ],
-        }
-    )
-    await send({'type': 'http.response.body', 'body': json.dumps({'cookies': cookies}).encode()})
+    headers = get_headers_dict(scope)
+    cookies = get_cookies_from_headers(headers)
+    await send_json_response(send, {'cookies': cookies})
 
 
 async def set_cookies(scope: dict[str, Any], send: Send) -> None:
-    """Handle requests to set cookies from query parameters and redirect.
+    """Handle requests to set cookies from query parameters and redirect."""
 
-    Args:
-        scope: The ASGI connection scope.
-        send: The ASGI send function.
-    """
-    query_string = scope.get('query_string', b'').decode()
-    query_params = parse_qs(query_string)
+    query_params = get_query_params(scope.get('query_string', b''))
 
     headers = [
         [b'content-type', b'text/plain; charset=utf-8'],
@@ -110,27 +147,14 @@ async def set_cookies(scope: dict[str, Any], send: Send) -> None:
 
 
 async def hello_world(send: Send) -> None:
-    """Handle basic requests with a simple HTML response.
-
-    Args:
-        send: The ASGI send function.
-    """
-    await send(
-        {
-            'type': 'http.response.start',
-            'status': 200,
-            'headers': [[b'content-type', b'text/html; charset=utf-8']],
-        }
-    )
-    await send(
-        {
-            'type': 'http.response.body',
-            'body': b"""<html>
-            <head>
-                <title>Hello, world!</title>
-            </head>
-        </html>""",
-        }
+    """Handle basic requests with a simple HTML response."""
+    await send_html_response(
+        send,
+        b"""<html>
+        <head>
+            <title>Hello, world!</title>
+        </head>
+    </html>""",
     )
 
 
@@ -138,27 +162,11 @@ async def post_echo(scope: dict[str, Any], receive: Receive, send: Send) -> None
     """Echo back POST request details similar to httpbin.org/post."""
     # Extract basic request info
     path = scope.get('path', '')
-    query_string = scope.get('query_string', b'').decode()
+    query_string = scope.get('query_string', b'')
+    args = get_query_params(query_string)
 
-    # Extract headers
-    headers = {}
-    for name, value in scope.get('headers', []):
-        headers[name.decode()] = value.decode()
-
-    # Parse query parameters
-    args = {}
-    if query_string:
-        query_params = parse_qs(query_string)
-        for key, values in query_params.items():
-            args[key] = values[0] if len(values) == 1 else values
-
-    # Extract cookies
-    cookies = {}
-    cookie_header: str = headers.get('cookie', '')
-    if cookie_header:
-        for cookie in cookie_header[0].split(';'):
-            name, value = cookie.strip().split('=')
-            cookies[name] = value
+    # Extract headers and cookies
+    headers = get_headers_dict(scope)
 
     # Read the request body
     body = b''
@@ -197,18 +205,7 @@ async def post_echo(scope: dict[str, Any], receive: Receive, send: Send) -> None
         'url': f'http://{headers["host"]}{path}',
     }
 
-    response_body = json.dumps(response, indent=2).encode()
-
-    await send(
-        {
-            'type': 'http.response.start',
-            'status': 200,
-            'headers': [
-                [b'content-type', b'application/json'],
-            ],
-        }
-    )
-    await send({'type': 'http.response.body', 'body': response_body})
+    await send_json_response(send, response)
 
 
 async def echo_status(scope: dict[str, Any], send: Send) -> None:
@@ -226,139 +223,79 @@ async def echo_status(scope: dict[str, Any], send: Send) -> None:
 
 async def echo_headers(scope: dict[str, Any], send: Send) -> None:
     """Echo back the request headers as JSON."""
-    headers = {}
-    for name, value in scope.get('headers', []):
-        headers[name.decode()] = value.decode()
-
-    await send(
-        {
-            'type': 'http.response.start',
-            'status': 200,
-            'headers': [[b'content-type', b'application/json']],
-        }
-    )
-    await send({'type': 'http.response.body', 'body': json.dumps(headers, indent=2).encode()})
+    headers = get_headers_dict(scope)
+    await send_json_response(send, headers)
 
 
 async def start_enqueue_endpoint(send: Send) -> None:
-    """Handle requests for the main page with links.
-
-    Args:
-        send: The ASGI send function.
-    """
-    await send(
-        {
-            'type': 'http.response.start',
-            'status': 200,
-            'headers': [[b'content-type', b'text/html']],
-        }
-    )
-    await send(
-        {
-            'type': 'http.response.body',
-            'body': b"""<html>
-            <head>
-                <title>Hello</title>
-            </head>
-            <body>
-                <a href="/asdf" class="foo">Link 1</a>
-                <a href="/hjkl">Link 2</a>
-            </body>
-        </html>""",
-        }
+    """Handle requests for the main page with links."""
+    await send_html_response(
+        send,
+        b"""<html>
+        <head>
+            <title>Hello</title>
+        </head>
+        <body>
+            <a href="/asdf" class="foo">Link 1</a>
+            <a href="/hjkl">Link 2</a>
+        </body>
+    </html>""",
     )
 
 
 async def secondary_index_endpoint(send: Send) -> None:
-    """Handle requests for the secondary page with links.
-
-    Args:
-        send: The ASGI send function.
-    """
-    await send(
-        {
-            'type': 'http.response.start',
-            'status': 200,
-            'headers': [[b'content-type', b'text/html']],
-        }
-    )
-    await send(
-        {
-            'type': 'http.response.body',
-            'body': b"""<html>
-            <head>
-                <title>Hello</title>
-            </head>
-            <body>
-                <a href="/uiop">Link 3</a>
-                <a href="/qwer">Link 4</a>
-            </body>
-        </html>""",
-        }
+    """Handle requests for the secondary page with links."""
+    await send_html_response(
+        send,
+        b"""<html>
+        <head>
+            <title>Hello</title>
+        </head>
+        <body>
+            <a href="/uiop">Link 3</a>
+            <a href="/qwer">Link 4</a>
+        </body>
+    </html>""",
     )
 
 
 async def incapsula_endpoint(send: Send) -> None:
     """Handle requests for a page with an incapsula iframe."""
-    await send(
-        {
-            'type': 'http.response.start',
-            'status': 200,
-            'headers': [[b'content-type', b'text/html']],
-        }
-    )
-    await send(
-        {
-            'type': 'http.response.body',
-            'body': b"""<html>
-            <head>
-                <title>Hello</title>
-            </head>
-            <body>
-                <iframe src=Test_Incapsula_Resource>
-                </iframe>
-            </body>
-        </html>""",
-        }
+    await send_html_response(
+        send,
+        b"""<html>
+        <head>
+            <title>Hello</title>
+        </head>
+        <body>
+            <iframe src=Test_Incapsula_Resource>
+            </iframe>
+        </body>
+    </html>""",
     )
 
 
 async def generic_response_endpoint(send: Send) -> None:
-    """Handle requests with a generic HTML response.
-
-    Args:
-        send: The ASGI send function.
-    """
-    await send(
-        {
-            'type': 'http.response.start',
-            'status': 200,
-            'headers': [[b'content-type', b'text/html']],
-        }
-    )
-    await send(
-        {
-            'type': 'http.response.body',
-            'body': b"""<html>
-            <head>
-                <title>Hello</title>
-            </head>
-            <body>
-                Insightful content
-            </body>
-        </html>""",
-        }
+    """Handle requests with a generic HTML response."""
+    await send_html_response(
+        send,
+        b"""<html>
+        <head>
+            <title>Hello</title>
+        </head>
+        <body>
+            Insightful content
+        </body>
+    </html>""",
     )
 
 
 async def redirect_to_url(scope: dict[str, Any], send: Send) -> None:
     """Handle requests that should redirect to a specified full URL."""
-    query_string = scope.get('query_string', b'').decode()
-    query_params = parse_qs(query_string)
+    query_params = get_query_params(scope.get('query_string', b''))
 
-    target_url = query_params.get('url', ['http://example.com'])[0]
-
-    status_code = int(query_params.get('status', [302])[0])
+    target_url = query_params.get('url', 'http://example.com')
+    status_code = int(query_params.get('status', 302))
 
     await send(
         {
@@ -371,6 +308,38 @@ async def redirect_to_url(scope: dict[str, Any], send: Send) -> None:
         }
     )
     await send({'type': 'http.response.body', 'body': f'Redirecting to {target_url}...'.encode()})
+
+
+async def echo_user_agent(scope: dict[str, Any], send: Send) -> None:
+    """Echo back the user agent header as a response."""
+    headers = get_headers_dict(scope)
+    user_agent = headers.get('user-agent', 'Not provided')
+    await send_json_response(send, {'user-agent': user_agent})
+
+
+async def get_echo(scope: dict[str, Any], send: Send) -> None:
+    """Echo back GET request details similar to httpbin.org/get."""
+    path = scope.get('path', '')
+    query_string = scope.get('query_string', b'')
+    args = get_query_params(query_string)
+    headers = get_headers_dict(scope)
+
+    origin = scope.get('client', ('unknown', 0))[0]
+
+    host = headers.get('host', 'localhost')
+    scheme = headers.get('x-forwarded-proto', 'http')
+    url = f'{scheme}://{host}{path}'
+    if query_string:
+        url += f'?{query_string}'
+
+    response = {
+        'args': args,
+        'headers': headers,
+        'origin': origin,
+        'url': url,
+    }
+
+    await send_json_response(send, response)
 
 
 class TestServer(Server):

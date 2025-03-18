@@ -34,7 +34,6 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     import respx
-    from yarl import URL
 
     from crawlee._types import JsonSerializable
     from crawlee.storage_clients._memory import DatasetClient
@@ -551,7 +550,7 @@ async def test_crawler_get_storages() -> None:
     assert isinstance(kvs, KeyValueStore)
 
 
-async def test_crawler_run_requests(httpbin: URL) -> None:
+async def test_crawler_run_requests() -> None:
     crawler = BasicCrawler()
     seen_urls = list[str]()
 
@@ -560,9 +559,9 @@ async def test_crawler_run_requests(httpbin: URL) -> None:
         seen_urls.append(context.request.url)
 
     start_urls = [
-        str(httpbin / '1'),
-        str(httpbin / '2'),
-        str(httpbin / '3'),
+        'http://test.io/1',
+        'http://test.io/2',
+        'http://test.io/3',
     ]
     stats = await crawler.run(start_urls)
 
@@ -571,7 +570,7 @@ async def test_crawler_run_requests(httpbin: URL) -> None:
     assert stats.requests_finished == 3
 
 
-async def test_context_push_and_get_data(httpbin: URL) -> None:
+async def test_context_push_and_get_data() -> None:
     crawler = BasicCrawler()
     dataset = await Dataset.open()
 
@@ -585,7 +584,7 @@ async def test_context_push_and_get_data(httpbin: URL) -> None:
     await dataset.push_data('{"c": 3}')
     assert (await crawler.get_data()).items == [{'a': 1}, {'c': 3}]
 
-    stats = await crawler.run([str(httpbin / '1')])
+    stats = await crawler.run(['http://test.io/1'])
 
     assert (await crawler.get_data()).items == [{'a': 1}, {'c': 3}, {'b': 2}]
     assert stats.requests_total == 1
@@ -626,7 +625,7 @@ async def test_crawler_push_and_export_data(tmp_path: Path) -> None:
     assert (tmp_path / 'dataset.csv').read_bytes() == b'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
 
 
-async def test_context_push_and_export_data(httpbin: URL, tmp_path: Path) -> None:
+async def test_context_push_and_export_data(tmp_path: Path) -> None:
     crawler = BasicCrawler()
 
     @crawler.router.default_handler
@@ -634,7 +633,7 @@ async def test_context_push_and_export_data(httpbin: URL, tmp_path: Path) -> Non
         await context.push_data([{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}])
         await context.push_data({'id': 2, 'test': 'test'})
 
-    await crawler.run([str(httpbin / '1')])
+    await crawler.run(['http://test.io/1'])
 
     await crawler.export_data_json(path=tmp_path / 'dataset.json')
     await crawler.export_data_csv(path=tmp_path / 'dataset.csv')
@@ -648,7 +647,7 @@ async def test_context_push_and_export_data(httpbin: URL, tmp_path: Path) -> Non
     assert (tmp_path / 'dataset.csv').read_bytes() == b'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
 
 
-async def test_crawler_push_and_export_data_and_json_dump_parameter(httpbin: URL, tmp_path: Path) -> None:
+async def test_crawler_push_and_export_data_and_json_dump_parameter(tmp_path: Path) -> None:
     crawler = BasicCrawler()
 
     @crawler.router.default_handler
@@ -656,7 +655,7 @@ async def test_crawler_push_and_export_data_and_json_dump_parameter(httpbin: URL
         await context.push_data([{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}])
         await context.push_data({'id': 2, 'test': 'test'})
 
-    await crawler.run([str(httpbin / '1')])
+    await crawler.run(['http://test.io/1'])
 
     await crawler.export_data_json(path=tmp_path / 'dataset.json', indent=3)
 
@@ -758,13 +757,13 @@ async def test_context_handlers_use_state(key_value_store: KeyValueStore) -> Non
     assert (await store.get_value(BasicCrawler._CRAWLEE_STATE_KEY)) == {'hello': 'last_world'}
 
 
-async def test_max_requests_per_crawl(httpbin: URL) -> None:
+async def test_max_requests_per_crawl() -> None:
     start_urls = [
-        str(httpbin / '1'),
-        str(httpbin / '2'),
-        str(httpbin / '3'),
-        str(httpbin / '4'),
-        str(httpbin / '5'),
+        'http://test.io/1',
+        'http://test.io/2',
+        'http://test.io/3',
+        'http://test.io/4',
+        'http://test.io/5',
     ]
     processed_urls = []
 
@@ -786,7 +785,7 @@ async def test_max_requests_per_crawl(httpbin: URL) -> None:
     assert stats.requests_finished == 3
 
 
-async def test_max_crawl_depth(httpbin: URL) -> None:
+async def test_max_crawl_depth() -> None:
     processed_urls = []
 
     # Set max_concurrency to 1 to ensure testing max_requests_per_crawl accurately
@@ -964,12 +963,12 @@ async def test_logs_final_statistics(
         assert final_statistics.crawler_runtime == 300.0  # type: ignore[attr-defined]
 
 
-async def test_crawler_manual_stop(httpbin: URL) -> None:
+async def test_crawler_manual_stop() -> None:
     """Test that no new requests are handled after crawler.stop() is called."""
     start_urls = [
-        str(httpbin / '1'),
-        str(httpbin / '2'),
-        str(httpbin / '3'),
+        'http://test.io/1',
+        'http://test.io/2',
+        'http://test.io/3',
     ]
     processed_urls = []
 
@@ -991,13 +990,13 @@ async def test_crawler_manual_stop(httpbin: URL) -> None:
 
 
 @pytest.mark.skipif(sys.version_info[:3] < (3, 11), reason='asyncio.Barrier was introduced in Python 3.11.')
-async def test_crawler_multiple_stops_in_parallel(httpbin: URL) -> None:
+async def test_crawler_multiple_stops_in_parallel() -> None:
     """Test that no new requests are handled after crawler.stop() is called, but ongoing requests can still finish."""
 
     start_urls = [
-        str(httpbin / '1'),
-        str(httpbin / '2'),
-        str(httpbin / '3'),
+        'http://test.io/1',
+        'http://test.io/2',
+        'http://test.io/3',
     ]
     processed_urls = []
 
