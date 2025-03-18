@@ -1,4 +1,5 @@
 /* eslint-disable global-require */
+const { cp } = require('fs');
 const path = require('path');
 
 const { externalLinkProcessor } = require('./tools/utils/externalLink');
@@ -165,6 +166,39 @@ module.exports = {
                             alias: {
                                 'roa-loader': require.resolve(`${__dirname}/roa-loader/`),
                             },
+                        },
+                    };
+                },
+            };
+        },
+        // skipping svgo for animated crawlee logo
+        async function doNotUseSVGO() {
+            return {
+                name: 'docusaurus-svgo',
+                configureWebpack(config) {
+                    // find the svg rule
+                    const svgRule = config.module.rules.find((r) => typeof r === 'object' && r.test.toString() === '/\\.svg$/i');
+
+                    // find the svgr loader
+                    const svgrLoader = svgRule?.oneOf?.[0];
+
+                    // make copy of svgr loader and disable svgo
+                    const svgrLoaderCopy = JSON.parse(JSON.stringify(svgrLoader));
+
+                    // turn off svgo
+                    svgrLoaderCopy.use[0].options.svgo = false;
+
+                    // insert the copy after the original svgr loader
+                    svgRule.oneOf.splice(1, 0, svgrLoaderCopy);
+
+                    // exclude animated logo from the first svgr loader (with svgo enabled)
+                    svgrLoader.exclude = /animated-crawlee-logo/;
+                    return {
+                        mergeStrategy: {
+                            'module.rules': 'replace',
+                        },
+                        module: {
+                            rules: config.module.rules,
                         },
                     };
                 },
