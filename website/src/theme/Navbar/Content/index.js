@@ -29,10 +29,7 @@ function NavbarItems({ items, className }) {
     );
 }
 
-function NavbarContentLayout({
-    left,
-    right,
-}) {
+function NavbarContentLayout({ left, right }) {
     return (
         <div className="navbar__inner">
             <div className="navbar__items">{left}</div>
@@ -62,7 +59,10 @@ export default function NavbarContent() {
     const location = useLocation();
     const mobileSidebar = useNavbarMobileSidebar();
     const items = useNavbarItems();
-    const effectiveItems = (location.pathname?.endsWith('/python/') || location.pathname?.endsWith('/python')) ? items : [...items, VERSIONS_ITEM];
+    const effectiveItems = location.pathname?.endsWith('/python/')
+        || location.pathname?.endsWith('/python')
+        ? items
+        : [...items, VERSIONS_ITEM];
     const [leftItems, rightItems] = splitNavbarItems(effectiveItems);
     const searchBarItem = items.find((item) => item.type === 'search');
     return (
@@ -75,20 +75,22 @@ export default function NavbarContent() {
             }
             right={
                 <>
-                    {rightItems?.length > 0
-                        && <NavbarItems items={rightItems} />
-                    }
+                    {rightItems?.length > 0 && (
+                        <NavbarItems items={rightItems} />
+                    )}
                     {!searchBarItem && (
                         <NavbarSearch>
                             <SearchBar />
                         </NavbarSearch>
                     )}
-                    <Link className={styles.getStartedButton} to="/docs/quick-start">
+                    <Link
+                        className={styles.getStartedButton}
+                        to="/docs/quick-start"
+                    >
                         Get started
                     </Link>
                     {!mobileSidebar.disabled && <NavbarMobileSidebarToggle />}
                 </>
-
             }
         />
     );
