@@ -13,11 +13,10 @@ import HomepageHeroSection from '../components/Homepage/HomepageHeroSection';
 import LanguageInfoWidget from '../components/Homepage/LanguageInfoWidget';
 import RiverSection from '../components/Homepage/RiverSection';
 import ThreeCardsWithIcon from '../components/Homepage/ThreeCardsWithIcon';
-import RunnableCodeBlock from '../components/RunnableCodeBlock';
 
 function GetStartedSection() {
     return (
-        <section className={styles.styles}>
+        <section className={styles.languageGetStartedSection}>
             <LanguageInfoWidget
                 language="Python"
                 githubUrl="https://github.com/apify/crawlee-python"
@@ -77,12 +76,7 @@ function CodeExampleSection() {
         <section className={styles.codeExampleSection}>
             <div className={styles.decorativeRow} />
             <div className={styles.codeBlockContainer}>
-                <RunnableCodeBlock className={styles.codeBlock}>
-                    {{
-                        code: example,
-                        hash: '',
-                    }}
-                </RunnableCodeBlock>
+                <CodeBlock language="python">{example}</CodeBlock>
             </div>
             <div className={styles.dashedSeparator} />
             <div className={styles.decorativeRow} />
