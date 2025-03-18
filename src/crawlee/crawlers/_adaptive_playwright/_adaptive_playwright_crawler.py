@@ -131,7 +131,7 @@ class AdaptivePlaywrightCrawler(
         statistics: Statistics[AdaptivePlaywrightCrawlerStatisticState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> None:
-        """A default constructor. Recommended way to create instance is to call factory methods.
+        """Create a new instance. Recommended way to create instance is to call factory methods.
 
         Recommended factory methods: `with_beautifulsoup_static_parser`, `with_parsel_static_parser`.
 
@@ -219,7 +219,7 @@ class AdaptivePlaywrightCrawler(
         statistics: Statistics[StatisticsState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[BeautifulSoup], BeautifulSoup, Tag]:
-        """Creates `AdaptivePlaywrightCrawler` that uses `BeautifulSoup` for parsing static content."""
+        """Create `AdaptivePlaywrightCrawler` that uses `BeautifulSoup` for parsing static content."""
         if statistics is not None:
             adaptive_statistics = statistics.replace_state_model(AdaptivePlaywrightCrawlerStatisticState)
         else:
@@ -244,7 +244,7 @@ class AdaptivePlaywrightCrawler(
         statistics: Statistics[StatisticsState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[Selector], Selector, Selector]:
-        """Creates `AdaptivePlaywrightCrawler` that uses `Parcel` for parsing static content."""
+        """Create `AdaptivePlaywrightCrawler` that uses `Parcel` for parsing static content."""
         if statistics is not None:
             adaptive_statistics = statistics.replace_state_model(AdaptivePlaywrightCrawlerStatisticState)
         else:

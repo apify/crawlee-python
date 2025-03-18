@@ -63,7 +63,7 @@ class DefaultRenderingTypePredictor(RenderingTypePredictor):
     """
 
     def __init__(self, detection_ratio: float = 0.1) -> None:
-        """A default constructor.
+        """Create a new instance.
 
         Args:
             detection_ratio: A number between 0 and 1 that determines the desired ratio of rendering type detections.

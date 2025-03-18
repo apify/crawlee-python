@@ -131,6 +131,9 @@ ignore = [
     "D100",     # Missing docstring in public module
     "D104",     # Missing docstring in public package
     "D107",     # Missing docstring in `__init__`
+    "D203",     # One blank line required before class docstring
+    "D213",     # Multi-line docstring summary should start at the second line
+    "D413",     # Missing blank line after last section
     "EM",       # flake8-errmsg
     "G004",     # Logging statement uses f-string
     "ISC001",   # This rule may cause conflicts when used with the formatter
@@ -187,9 +190,6 @@ runtime-evaluated-base-classes = [
 
 [tool.ruff.lint.flake8-builtins]
 builtins-ignorelist = ["id"]
-
-[tool.ruff.lint.pydocstyle]
-convention = "google"
 
 [tool.ruff.lint.isort]
 known-first-party = ["crawlee"]

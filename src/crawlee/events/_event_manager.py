@@ -65,7 +65,7 @@ class EventManager:
         persist_state_interval: timedelta = timedelta(minutes=1),
         close_timeout: timedelta | None = None,
     ) -> None:
-        """A default constructor.
+        """Create a new instance.
 
         Args:
             persist_state_interval: Interval between emitted `PersistState` events to maintain state persistence.
@@ -101,7 +101,7 @@ class EventManager:
         return self._active
 
     async def __aenter__(self) -> EventManager:
-        """Initializes the event manager upon entering the async context.
+        """Initialize the event manager upon entering the async context.
 
         Raises:
             RuntimeError: If the context manager is already active.
@@ -119,7 +119,7 @@ class EventManager:
         exc_value: BaseException | None,
         exc_traceback: TracebackType | None,
     ) -> None:
-        """Closes the local event manager upon exiting the async context.
+        """Close the local event manager upon exiting the async context.
 
         This will stop listening for the events, and it will wait for all the event listeners to finish.
 
@@ -255,5 +255,5 @@ class EventManager:
         await wait_for_all_tasks_for_finish(tasks=tasks, logger=logger, timeout=timeout)
 
     async def _emit_persist_state_event(self) -> None:
-        """Emits a persist state event with the given migration status."""
+        """Emit a persist state event with the given migration status."""
         self.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False))

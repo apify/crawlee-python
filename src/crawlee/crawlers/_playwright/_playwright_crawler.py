@@ -91,7 +91,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         use_incognito_pages: bool | None = None,
         **kwargs: Unpack[BasicCrawlerOptions[PlaywrightCrawlingContext, StatisticsState]],
     ) -> None:
-        """A default constructor.
+        """Create a new instance.
 
         Args:
             browser_pool: A `BrowserPool` instance to be used for launching the browsers and getting pages.
@@ -203,7 +203,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         self,
         context: PlaywrightPreNavCrawlingContext,
     ) -> AsyncGenerator[PlaywrightCrawlingContext, None]:
-        """Executes an HTTP request utilizing the `BrowserPool` and the `Playwright` library.
+        """Execute an HTTP request utilizing the `BrowserPool` and the `Playwright` library.
 
         Args:
             context: The basic crawling context to be enhanced.
@@ -245,7 +245,10 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 | None = None,
                 **kwargs: Unpack[EnqueueLinksKwargs],
             ) -> None:
-                """The `PlaywrightCrawler` implementation of the `EnqueueLinksFunction` function."""
+                """Extract and enqueue links from the current page.
+
+                The `PlaywrightCrawler` implementation of the `EnqueueLinksFunction` function.
+                """
                 kwargs.setdefault('strategy', 'same-hostname')
 
                 requests = list[Request]()

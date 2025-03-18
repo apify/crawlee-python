@@ -29,7 +29,7 @@ class PatchedHeaderGenerator(bf_HeaderGenerator):
     """Browserforge `HeaderGenerator` that contains patches specific for our usage of the generator."""
 
     def _get_accept_language_header(self, locales: tuple[str, ...]) -> str:
-        """Generates the Accept-Language header based on the given locales.
+        """Generate the Accept-Language header based on the given locales.
 
         Patched version due to PR of upstream repo not being merged: https://github.com/daijro/browserforge/pull/24
 
@@ -164,7 +164,7 @@ class PatchedFingerprintGenerator(bf_FingerprintGenerator):
         slim: bool = False,
         **header_kwargs,  # noqa:ANN003 # Upstream repo types missing.
     ) -> None:
-        """A default constructor.
+        """Create a new instance.
 
         Args:
             screen: Screen constraints for the generated fingerprint.
@@ -193,7 +193,7 @@ class BrowserforgeFingerprintGenerator(FingerprintGenerator):
         mock_web_rtc: bool | None = None,
         slim: bool | None = None,
     ) -> None:
-        """A default constructor.
+        """Create a new instance.
 
         All generator options are optional. If any value is not specified, then `None` is set in the options.
         Default values for options set to `None` are implementation detail of used fingerprint generator.

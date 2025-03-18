@@ -5,7 +5,7 @@ from hashlib import sha256
 
 
 def compute_short_hash(data: bytes, *, length: int = 8) -> str:
-    """Computes a hexadecimal SHA-256 hash of the provided data and returns a substring (prefix) of it.
+    """Compute a hexadecimal SHA-256 hash of the provided data and returns a substring (prefix) of it.
 
     Args:
         data: The binary data to be hashed.
@@ -19,6 +19,6 @@ def compute_short_hash(data: bytes, *, length: int = 8) -> str:
 
 
 def crypto_random_object_id(length: int = 17) -> str:
-    """Generates a random object ID."""
+    """Generate a random object ID."""
     chars = 'abcdefghijklmnopqrstuvwxyzABCEDFGHIJKLMNOPQRSTUVWXYZ0123456789'
     return ''.join(secrets.choice(chars) for _ in range(length))

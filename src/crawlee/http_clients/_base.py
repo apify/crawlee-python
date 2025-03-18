@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 @docs_group('Data structures')
 class HttpResponse(Protocol):
-    """This protocol defines the interface that any HTTP response object must implement."""
+    """Define the interface that any HTTP response object must implement."""
 
     @property
     def http_version(self) -> str:
@@ -57,7 +57,7 @@ class HttpClient(ABC):
         *,
         persist_cookies_per_session: bool = True,
     ) -> None:
-        """A default constructor.
+        """Create a new instance.
 
         Args:
             persist_cookies_per_session: Whether to persist cookies per HTTP session.

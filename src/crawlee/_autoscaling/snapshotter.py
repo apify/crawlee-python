@@ -65,7 +65,7 @@ class Snapshotter:
         max_client_errors: int,
         max_memory_size: ByteSize,
     ) -> None:
-        """A default constructor.
+        """Create a new instance.
 
         In most cases, you should use the `from_config` constructor to create a new instance based on
         the provided configuration.
@@ -136,7 +136,7 @@ class Snapshotter:
         return self._active
 
     async def __aenter__(self) -> Snapshotter:
-        """Starts capturing snapshots at configured intervals.
+        """Start capturing snapshots at configured intervals.
 
         Raises:
             RuntimeError: If the context manager is already active.
@@ -158,7 +158,7 @@ class Snapshotter:
         exc_value: BaseException | None,
         exc_traceback: TracebackType | None,
     ) -> None:
-        """Stops all resource capturing.
+        """Stop all resource capturing.
 
         This method stops capturing snapshots of system resources (CPU, memory, event loop, and client information).
         It should be called to terminate resource capturing when it is no longer needed.
@@ -241,7 +241,7 @@ class Snapshotter:
         return [snapshot for snapshot in snapshots if latest_time - snapshot.created_at <= duration]
 
     def _snapshot_cpu(self, event_data: EventSystemInfoData) -> None:
-        """Captures a snapshot of the current CPU usage.
+        """Capture a snapshot of the current CPU usage.
 
         This method does not perform CPU usage measurement. Instead, it just reads the data received through
         the `event_data` parameter, which is expected to be supplied by the event manager.
@@ -260,7 +260,7 @@ class Snapshotter:
         self._cpu_snapshots.add(snapshot)
 
     def _snapshot_memory(self, event_data: EventSystemInfoData) -> None:
-        """Captures a snapshot of the current memory usage.
+        """Capture a snapshot of the current memory usage.
 
         This method does not perform memory usage measurement. Instead, it just reads the data received through
         the `event_data` parameter, which is expected to be supplied by the event manager.
@@ -281,7 +281,7 @@ class Snapshotter:
         self._evaluate_memory_load(event_data.memory_info.current_size, event_data.memory_info.created_at)
 
     def _snapshot_event_loop(self) -> None:
-        """Captures a snapshot of the current event loop usage.
+        """Capture a snapshot of the current event loop usage.
 
         This method evaluates the event loop's latency by comparing the expected time between snapshots to the actual
         time elapsed since the last snapshot. The delay in the snapshot reflects the time deviation due to event loop
@@ -300,7 +300,7 @@ class Snapshotter:
         self._event_loop_snapshots.add(snapshot)
 
     def _snapshot_client(self) -> None:
-        """Captures a snapshot of the current API state by checking for rate limit errors (HTTP 429).
+        """Capture a snapshot of the current API state by checking for rate limit errors (HTTP 429).
 
         Only errors produced by a 2nd retry of the API call are considered for snapshotting since earlier errors may
         just be caused by a random spike in the number of requests and do not necessarily signify API overloading.
@@ -317,7 +317,7 @@ class Snapshotter:
         self._client_snapshots.add(snapshot)
 
     def _prune_snapshots(self, snapshots: list[Snapshot], now: datetime) -> None:
-        """Removes snapshots that are older than the `self._snapshot_history`.
+        """Remove snapshots that are older than the `self._snapshot_history`.
 
         This method modifies the list of snapshots in place, removing all snapshots that are older than the defined
         snapshot history relative to the `now` parameter.
@@ -342,7 +342,7 @@ class Snapshotter:
             snapshots.clear()
 
     def _evaluate_memory_load(self, current_memory_usage_size: ByteSize, snapshot_timestamp: datetime) -> None:
-        """Evaluates and logs critical memory load conditions based on the system information.
+        """Evaluate and logs critical memory load conditions based on the system information.
 
         Args:
             current_memory_usage_size: The current memory usage.

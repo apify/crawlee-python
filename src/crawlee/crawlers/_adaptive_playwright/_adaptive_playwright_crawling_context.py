@@ -169,14 +169,16 @@ class AdaptivePlaywrightCrawlingContext(
         context: ParsedHttpCrawlingContext[TStaticParseResult],
         parser: AbstractHttpParser[TStaticParseResult, TStaticSelectResult],
     ) -> AdaptivePlaywrightCrawlingContext[TStaticParseResult, TStaticSelectResult]:
-        """Convenience constructor that creates new context from existing `ParsedHttpCrawlingContext`."""
+        """Create a new instance from an existing `ParsedHttpCrawlingContext`."""
         return cls(_static_parser=parser, **{field.name: getattr(context, field.name) for field in fields(context)})
 
     @classmethod
     async def from_playwright_crawling_context(
-        cls, context: PlaywrightCrawlingContext, parser: AbstractHttpParser[TStaticParseResult, TStaticSelectResult]
+        cls,
+        context: PlaywrightCrawlingContext,
+        parser: AbstractHttpParser[TStaticParseResult, TStaticSelectResult],
     ) -> AdaptivePlaywrightCrawlingContext[TStaticParseResult, TStaticSelectResult]:
-        """Convenience constructor that creates new context from existing `PlaywrightCrawlingContext`."""
+        """Create a new instance from an existing `PlaywrightCrawlingContext`."""
         context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
         # Remove playwright specific attributes and pass them as private instead to be available as property.
         context_kwargs['_response'] = context_kwargs.pop('response')
@@ -200,7 +202,7 @@ class AdaptivePlaywrightCrawlingContext(
 @dataclass(frozen=True)
 @docs_group('Data structures')
 class AdaptivePlaywrightPreNavCrawlingContext(BasicCrawlingContext):
-    """This is just wrapper around BasicCrawlingContext or AdaptivePlaywrightCrawlingContext.
+    """A wrapper around BasicCrawlingContext or AdaptivePlaywrightCrawlingContext.
 
     Trying to access `page` on this context will raise AdaptiveContextError if wrapped context is BasicCrawlingContext.
     """
@@ -225,7 +227,7 @@ class AdaptivePlaywrightPreNavCrawlingContext(BasicCrawlingContext):
 
     @classmethod
     def from_pre_navigation_context(cls, context: BasicCrawlingContext) -> Self:
-        """Convenience constructor that creates new context from existing pre navigation contexts."""
+        """Create a new instance from an existing pre-navigation `BasicCrawlingContext`."""
         context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
         context_kwargs['_page'] = context_kwargs.pop('page', None)
 

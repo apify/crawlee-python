@@ -20,7 +20,7 @@ class HttpCrawlingContext(BasicCrawlingContext, HttpCrawlingResult):
 
     @classmethod
     def from_basic_crawling_context(cls, context: BasicCrawlingContext, http_response: HttpResponse) -> Self:
-        """Convenience constructor that creates `HttpCrawlingContext` from existing `BasicCrawlingContext`."""
+        """Create a new instance from an existing `BasicCrawlingContext`."""
         context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
         return cls(http_response=http_response, **context_kwargs)
 
@@ -38,8 +38,11 @@ class ParsedHttpCrawlingContext(Generic[TParseResult], HttpCrawlingContext):
 
     @classmethod
     def from_http_crawling_context(
-        cls, context: HttpCrawlingContext, parsed_content: TParseResult, enqueue_links: EnqueueLinksFunction
+        cls,
+        context: HttpCrawlingContext,
+        parsed_content: TParseResult,
+        enqueue_links: EnqueueLinksFunction,
     ) -> Self:
-        """Convenience constructor that creates new context from existing HttpCrawlingContext."""
+        """Create a new instance from an existing `HttpCrawlingContext`."""
         context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
         return cls(parsed_content=parsed_content, enqueue_links=enqueue_links, **context_kwargs)

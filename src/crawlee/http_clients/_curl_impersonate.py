@@ -112,7 +112,7 @@ class CurlImpersonateHttpClient(HttpClient):
         persist_cookies_per_session: bool = True,
         **async_session_kwargs: Any,
     ) -> None:
-        """A default constructor.
+        """Create a new instance.
 
         Args:
             persist_cookies_per_session: Whether to persist cookies per HTTP session.
@@ -199,11 +199,11 @@ class CurlImpersonateHttpClient(HttpClient):
         return _CurlImpersonateResponse(response)
 
     def _get_client(self, proxy_url: str | None) -> AsyncSession:
-        """Helper to get a HTTP client for the given proxy URL.
+        """Retrieve or create an asynchronous HTTP session for the given proxy URL.
 
-        The method checks if an `AsyncSession` already exists for the provided proxy URL. If no session exists,
-        it creates a new one, configured with the specified proxy and additional session options. The new session
-        is then stored for future use.
+        Check if an `AsyncSession` already exists for the specified proxy URL. If no session is found,
+        create a new one with the provided proxy settings and additional session options.
+        Store the new session for future use.
         """
         # Check if a session for the given proxy URL has already been created.
         if proxy_url not in self._client_by_proxy_url:
@@ -224,7 +224,11 @@ class CurlImpersonateHttpClient(HttpClient):
 
     @staticmethod
     def _is_proxy_error(error: CurlRequestError) -> bool:
-        """Helper to check whether the given error is a proxy-related error."""
+        """Determine whether the given error is related to a proxy issue.
+
+        Check if the error message contains known proxy-related error keywords or if it is an instance
+        of `CurlProxyError`.
+        """
         if any(needle in str(error) for needle in ROTATE_PROXY_ERRORS):
             return True
 

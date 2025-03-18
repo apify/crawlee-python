@@ -133,7 +133,7 @@ class Statistics(Generic[TStatisticsState]):
         log_interval: timedelta = timedelta(minutes=1),
         statistics_log_format: Literal['table', 'inline'] = 'table',
     ) -> Statistics[StatisticsState]:
-        """Convenience constructor for creating a `Statistics` with default state model `StatisticsState`."""
+        """Create a new instance with default state model `StatisticsState`."""
         return Statistics[StatisticsState](
             persistence_enabled=persistence_enabled,
             persist_state_kvs_name=persist_state_kvs_name,

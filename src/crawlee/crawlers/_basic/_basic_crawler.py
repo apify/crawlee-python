@@ -241,7 +241,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         _additional_context_managers: Sequence[AbstractAsyncContextManager] | None = None,
         _logger: logging.Logger | None = None,
     ) -> None:
-        """A default constructor.
+        """Create a new instance.
 
         Args:
             configuration: The `Configuration` instance. Some of its properties are used as defaults for the crawler.
@@ -488,14 +488,20 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     def error_handler(
         self, handler: ErrorHandler[TCrawlingContext | BasicCrawlingContext]
     ) -> ErrorHandler[TCrawlingContext]:
-        """Decorator for configuring an error handler (called after a request handler error and before retrying)."""
+        """Register a function to handle errors occurring in request handlers.
+
+        The error handler is invoked after a request handler error occurs and before a retry attempt.
+        """
         self._error_handler = handler
         return handler
 
     def failed_request_handler(
         self, handler: FailedRequestHandler[TCrawlingContext | BasicCrawlingContext]
     ) -> FailedRequestHandler[TCrawlingContext]:
-        """Decorator for configuring a failed request handler (called after max retries are reached)."""
+        """Register a function to handle requests that exceed the maximum retry limit.
+
+        The failed request handler is invoked when a request has failed all retry attempts.
+        """
         self._failed_request_handler = handler
         return handler
 
@@ -781,9 +787,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         return (context.request.retry_count + 1) < max_request_retries
 
     async def _check_url_after_redirects(self, context: TCrawlingContext) -> AsyncGenerator[TCrawlingContext, None]:
-        """Invoked at the end of the context pipeline to make sure that the `loaded_url` still matches enqueue_strategy.
+        """Ensure that the `loaded_url` still matches the enqueue strategy after redirects.
 
-        This is done to filter out links that redirect outside of the crawled domain.
+        Filter out links that redirect outside of the crawled domain.
         """
         if context.request.loaded_url is not None and not self._check_enqueue_strategy(
             context.request.enqueue_strategy,

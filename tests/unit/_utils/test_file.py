@@ -106,7 +106,7 @@ def test_determine_file_extension() -> None:
     assert determine_file_extension('APPLICATION/JSON') == 'json'
     assert determine_file_extension('application/json;charset=utf-8') == 'json'
 
-    # Returns None for non-existent content types
+    # Return None for non-existent content types
     assert determine_file_extension('clearly not a content type') is None
     assert determine_file_extension('') is None
 
@@ -118,7 +118,7 @@ async def test_force_remove(tmp_path: Path) -> None:
     await force_remove(test_file_path)
     assert os.path.exists(test_file_path) is False
 
-    # Removes the file if it exists
+    # Remove the file if it exists
     with open(test_file_path, 'a', encoding='utf-8'):  # noqa: ASYNC230
         pass
     assert os.path.exists(test_file_path) is True

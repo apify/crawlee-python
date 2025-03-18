@@ -54,7 +54,7 @@ class BrowserPool:
         identify_inactive_browsers_interval: timedelta = timedelta(seconds=20),
         close_inactive_browsers_interval: timedelta = timedelta(seconds=30),
     ) -> None:
-        """A default constructor.
+        """Create a new instance.
 
         Args:
             plugins: Browser plugins serve as wrappers around various browser automation libraries,
@@ -282,7 +282,11 @@ class BrowserPool:
         plugin: BrowserPlugin,
         proxy_info: ProxyInfo | None,
     ) -> CrawleePage:
-        """Internal method to initialize a new page in a browser using the specified plugin."""
+        """Initialize a new browser page using the specified plugin.
+
+        Select a browser with available capacity or launch a new one if needed. Create a new page in the selected
+        browser with the provided proxy settings.
+        """
         timeout = self._operation_timeout.total_seconds()
         browser_controller = self._pick_browser_with_free_capacity(plugin)
 

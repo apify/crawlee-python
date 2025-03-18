@@ -101,7 +101,7 @@ class HttpxHttpClient(HttpClient):
         header_generator: HeaderGenerator | None = _DEFAULT_HEADER_GENERATOR,
         **async_client_kwargs: Any,
     ) -> None:
-        """A default constructor.
+        """Create a new instance.
 
         Args:
             persist_cookies_per_session: Whether to persist cookies per HTTP session.
@@ -206,9 +206,9 @@ class HttpxHttpClient(HttpClient):
         return _HttpxResponse(response)
 
     def _get_client(self, proxy_url: str | None) -> httpx.AsyncClient:
-        """Helper to get a HTTP client for the given proxy URL.
+        """Retrieve or create an HTTP client for the given proxy URL.
 
-        If the client for the given proxy URL doesn't exist, it will be created and stored.
+        If a client for the specified proxy URL does not exist, create and store a new one.
         """
         if proxy_url not in self._client_by_proxy_url:
             # Prepare a default kwargs for the new client.
@@ -235,7 +235,11 @@ class HttpxHttpClient(HttpClient):
         return self._client_by_proxy_url[proxy_url]
 
     def _combine_headers(self, explicit_headers: HttpHeaders | None) -> HttpHeaders | None:
-        """Helper to get the headers for a HTTP request."""
+        """Merge default headers with explicit headers for an HTTP request.
+
+        Generate a final set of request headers by combining default headers, a random User-Agent header,
+        and any explicitly provided headers.
+        """
         common_headers = self._header_generator.get_common_headers() if self._header_generator else HttpHeaders()
         user_agent_header = (
             self._header_generator.get_random_user_agent_header() if self._header_generator else HttpHeaders()
@@ -246,7 +250,11 @@ class HttpxHttpClient(HttpClient):
 
     @staticmethod
     def _is_proxy_error(error: httpx.TransportError) -> bool:
-        """Helper to check whether the given error is a proxy-related error."""
+        """Determine whether the given error is related to a proxy issue.
+
+        Check if the error is an instance of `httpx.ProxyError` or if its message contains known proxy-related
+        error keywords.
+        """
         if isinstance(error, httpx.ProxyError):
             return True
 
