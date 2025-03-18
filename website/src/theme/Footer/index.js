@@ -68,7 +68,7 @@ function Footer() {
                         <HearthIcon className={styles.hearthIcon} />
                         Crawlee is forever free and open source
                     </div>
-                    <div>© 2025 Apify</div>
+                    <div>© {new Date().getFullYear()} Apify</div>
                 </div>
             </div>
         </footer >
