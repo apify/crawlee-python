@@ -226,6 +226,7 @@ module = [
     "apify_fingerprint_datapoints", # Untyped and stubs not available
     "camoufox",                     # Example code shows integration of camoufox and crawlee.
     "jaro",                         # Untyped and stubs not available
+    "loguru",                       # Example code shows integration of loguru and crawlee for JSON logging.
     "sklearn.linear_model",         # Untyped and stubs not available
 ]
 ignore_missing_imports = true

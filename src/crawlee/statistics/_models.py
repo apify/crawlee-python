@@ -35,6 +35,9 @@ class FinalStatistics:
 
         return make_table([(str(k), str(v)) for k, v in str_dict.items()], width=60)
 
+    def to_dict(self) -> dict[str, float | int | list[int]]:
+        return {k: v.total_seconds() if isinstance(v, timedelta) else v for k, v in asdict(self).items()}
+
     @override
     def __str__(self) -> str:
         return json.dumps(
