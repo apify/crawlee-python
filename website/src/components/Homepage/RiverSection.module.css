@@ -133,7 +133,7 @@
         border-radius: 0;
         box-shadow: none;
 
-        :global(div[class*='codeBlockContent']) {
+        :global(div[class*="codeBlockContent"]) {
             height: 100%;
 
             pre {
@@ -147,8 +147,11 @@
                 font-size: 14px;
                 background: var(--color-background-muted);
                 min-width: initial;
+                padding: 16px 8px 16px 4px;
+
                 span::before {
                     margin-right: 16px;
+                    left: unset !important;
                     color: var(--color-text-subtle);
                     opacity: 1;
                 }

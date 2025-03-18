@@ -185,6 +185,9 @@ module.exports = {
                     // make copy of svgr loader and disable svgo
                     const svgrLoaderCopy = JSON.parse(JSON.stringify(svgrLoader));
 
+                    // include only animated logo
+                    svgrLoaderCopy.include = /animated-crawlee-logo/;
+
                     // turn off svgo
                     svgrLoaderCopy.use[0].options.svgo = false;
 
@@ -193,6 +196,7 @@ module.exports = {
 
                     // exclude animated logo from the first svgr loader (with svgo enabled)
                     svgrLoader.exclude = /animated-crawlee-logo/;
+
                     return {
                         mergeStrategy: {
                             'module.rules': 'replace',
