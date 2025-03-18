@@ -33,7 +33,10 @@ class Router(Generic[TCrawlingContext]):
 
         return handler
 
-    def handler(self, label: str) -> Callable[[RequestHandler[TCrawlingContext]], None]:
+    def handler(
+        self,
+        label: str,
+    ) -> Callable[[RequestHandler[TCrawlingContext]], Callable[[TCrawlingContext], Awaitable]]:
         """Register a request handler based on a label.
 
         This decorator registers a request handler for a specific label. The handler will be invoked only for requests
