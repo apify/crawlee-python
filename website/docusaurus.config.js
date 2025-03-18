@@ -222,7 +222,7 @@ module.exports = {
                 src: 'img/crawlee-python-light.svg',
                 srcDark: 'img/crawlee-python-dark.svg',
             },
-            title: 'Crawlee Python',
+            title: 'Crawlee for Python',
             items: [
                 {
                     type: 'doc',
@@ -323,7 +323,7 @@ module.exports = {
                     title: 'More',
                     items: [
                         {
-                            label: 'Apify Platform',
+                            label: 'Apify platform',
                             href: 'https://apify.com',
                         },
                         {
@@ -334,7 +334,6 @@ module.exports = {
                             label: 'GitHub',
                             href: 'https://github.com/apify/crawlee-python',
                         },
-
                     ],
                 },
             ],
