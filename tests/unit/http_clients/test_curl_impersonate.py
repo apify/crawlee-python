@@ -4,6 +4,7 @@ import os
 from typing import TYPE_CHECKING
 
 import pytest
+from curl_cffi import CurlHttpVersion
 
 from crawlee import Request
 from crawlee.errors import ProxyError
@@ -18,18 +19,15 @@ if TYPE_CHECKING:
 
 @pytest.fixture
 def http_client() -> CurlImpersonateHttpClient:
-    return CurlImpersonateHttpClient()
+    return CurlImpersonateHttpClient(http_version=CurlHttpVersion.V1_1)
 
 
-# TODO: improve this flaky test and remove the skip
-# https://github.com/apify/crawlee-python/issues/743
-@pytest.mark.skip
 async def test_crawl_with_proxy(
     http_client: CurlImpersonateHttpClient,
     proxy: ProxyInfo,
-    httpbin: URL,
+    server_url: URL,
 ) -> None:
-    url = str(httpbin / 'status/222')
+    url = str(server_url / 'status/222')
     request = Request.from_url(url)
 
     async with Statistics.with_default_state() as statistics:
@@ -52,13 +50,12 @@ async def test_crawl_with_proxy_disabled(
             await http_client.crawl(request, proxy_info=disabled_proxy, statistics=statistics)
 
 
-@pytest.mark.skipif(os.name == 'nt', reason='Skipped on Windows')
 async def test_send_request_with_proxy(
     http_client: CurlImpersonateHttpClient,
     proxy: ProxyInfo,
-    httpbin: URL,
+    server_url: URL,
 ) -> None:
-    url = str(httpbin / 'status/222')
+    url = str(server_url / 'status/222')
 
     response = await http_client.send_request(url, proxy_info=proxy)
     assert response.status_code == 222  # 222 - authentication successful
@@ -76,49 +73,46 @@ async def test_send_request_with_proxy_disabled(
         await http_client.send_request(url, proxy_info=disabled_proxy)
 
 
-async def test_crawl_allow_redirects_by_default(http_client: CurlImpersonateHttpClient, httpbin: URL) -> None:
-    target_url = str(httpbin.with_path('get', keep_query=False))
-    check_url = str(httpbin / 'get')
-    redirect_url = str((httpbin / 'redirect-to').update_query(url=target_url))
+async def test_crawl_allow_redirects_by_default(http_client: CurlImpersonateHttpClient, server_url: URL) -> None:
+    target_url = str(server_url / 'status/200')
+    redirect_url = str((server_url / 'redirect').update_query(url=target_url))
     request = Request.from_url(redirect_url)
     crawling_result = await http_client.crawl(request)
 
     assert crawling_result.http_response.status_code == 200
-    assert request.loaded_url == check_url
+    assert request.loaded_url == target_url
 
 
-async def test_crawl_allow_redirects_false(httpbin: URL) -> None:
-    http_client = CurlImpersonateHttpClient(allow_redirects=False)
+async def test_crawl_allow_redirects_false(server_url: URL) -> None:
+    http_client = CurlImpersonateHttpClient(allow_redirects=False, http_version=CurlHttpVersion.V1_1)
 
-    target_url = str(httpbin.with_path('get', keep_query=False))
-    check_url = str(httpbin / 'get')
-    redirect_url = str((httpbin / 'redirect-to').update_query(url=target_url))
+    target_url = str(server_url / 'status/200')
+    redirect_url = str((server_url / 'redirect').update_query(url=target_url))
     request = Request.from_url(redirect_url)
 
     crawling_result = await http_client.crawl(request)
 
     assert crawling_result.http_response.status_code == 302
-    assert crawling_result.http_response.headers['Location'] == check_url
+    assert crawling_result.http_response.headers['Location'] == target_url
     assert request.loaded_url == redirect_url
 
 
-async def test_send_request_allow_redirects_by_default(http_client: CurlImpersonateHttpClient, httpbin: URL) -> None:
-    target_url = str(httpbin.with_path('get', keep_query=False))
-    redirect_url = str((httpbin / 'redirect-to').update_query(url=target_url))
+async def test_send_request_allow_redirects_by_default(http_client: CurlImpersonateHttpClient, server_url: URL) -> None:
+    target_url = str(server_url / 'status/200')
+    redirect_url = str((server_url / 'redirect').update_query(url=target_url))
 
     response = await http_client.send_request(redirect_url)
 
     assert response.status_code == 200
 
 
-async def test_send_request_allow_redirects_false(httpbin: URL) -> None:
-    http_client = CurlImpersonateHttpClient(allow_redirects=False)
+async def test_send_request_allow_redirects_false(server_url: URL) -> None:
+    http_client = CurlImpersonateHttpClient(allow_redirects=False, http_version=CurlHttpVersion.V1_1)
 
-    target_url = str(httpbin.with_path('get', keep_query=False))
-    check_url = str(httpbin / 'get')
-    redirect_url = str((httpbin / 'redirect-to').update_query(url=target_url))
+    target_url = str(server_url / 'status/200')
+    redirect_url = str((server_url / 'redirect').update_query(url=target_url))
 
     response = await http_client.send_request(redirect_url)
 
     assert response.status_code == 302
-    assert response.headers['Location'] == check_url
+    assert response.headers['Location'] == target_url
