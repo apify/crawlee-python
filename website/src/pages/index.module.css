@@ -205,7 +205,7 @@
         border-right: 1px dashed var(--color-separator);
 
         :global(.theme-code-block) {
-            margin-bottom: 32px;
+            margin-bottom: 0;
             border-radius: 0;
             box-shadow: none;
             code {
