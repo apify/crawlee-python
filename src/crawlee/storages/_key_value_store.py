@@ -77,7 +77,7 @@ class KeyValueStore(Storage):
 
     @classmethod
     def from_storage_object(cls, storage_client: StorageClient, storage_object: StorageMetadata) -> KeyValueStore:
-        """Create a new instance of KeyValueStore from a storage metadata object."""
+        """Initialize a new instance of KeyValueStore from a storage metadata object."""
         key_value_store = KeyValueStore(
             id=storage_object.id,
             name=storage_object.name,

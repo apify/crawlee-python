@@ -209,7 +209,7 @@ class Dataset(Storage):
 
     @classmethod
     def from_storage_object(cls, storage_client: StorageClient, storage_object: StorageMetadata) -> Dataset:
-        """Create a new instance of Dataset from a storage metadata object."""
+        """Initialize a new instance of Dataset from a storage metadata object."""
         dataset = Dataset(
             id=storage_object.id,
             name=storage_object.name,

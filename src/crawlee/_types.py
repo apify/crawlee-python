@@ -106,7 +106,7 @@ class ConcurrencySettings:
         max_tasks_per_minute: float = float('inf'),
         desired_concurrency: int | None = None,
     ) -> None:
-        """Create a new instance.
+        """Initialize a new instance.
 
         Args:
             min_concurrency: The minimum number of tasks running in parallel. If you set this value too high

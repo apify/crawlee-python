@@ -50,7 +50,7 @@ class HttpCrawler(AbstractHttpCrawler[ParsedHttpCrawlingContext[bytes], bytes, b
         self,
         **kwargs: Unpack[BasicCrawlerOptions[ParsedHttpCrawlingContext[bytes]]],
     ) -> None:
-        """Create a new instance.
+        """Initialize a new instance.
 
         Args:
             kwargs: Additional keyword arguments to pass to the underlying `AbstractHttpCrawler`.

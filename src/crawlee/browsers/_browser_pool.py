@@ -54,7 +54,7 @@ class BrowserPool:
         identify_inactive_browsers_interval: timedelta = timedelta(seconds=20),
         close_inactive_browsers_interval: timedelta = timedelta(seconds=30),
     ) -> None:
-        """Create a new instance.
+        """Initialize a new instance.
 
         Args:
             plugins: Browser plugins serve as wrappers around various browser automation libraries,
@@ -110,7 +110,7 @@ class BrowserPool:
         use_incognito_pages: bool | None = False,
         **kwargs: Any,
     ) -> BrowserPool:
-        """Create a new instance with a single `PlaywrightBrowserPlugin` configured with the provided options.
+        """Initialize a new instance with a single `PlaywrightBrowserPlugin` configured with the provided options.
 
         Args:
             browser_type: The type of browser to launch ('chromium', 'firefox', or 'webkit').

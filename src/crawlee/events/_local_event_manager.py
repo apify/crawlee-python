@@ -36,7 +36,7 @@ class LocalEventManager(EventManager):
         system_info_interval: timedelta = timedelta(seconds=1),
         **event_manager_options: Unpack[EventManagerOptions],
     ) -> None:
-        """Create a new instance.
+        """Initialize a new instance.
 
         In most cases, you should use the `from_config` constructor to create a new instance based on
         the provided configuration.
@@ -57,7 +57,7 @@ class LocalEventManager(EventManager):
 
     @classmethod
     def from_config(cls, config: Configuration | None = None) -> LocalEventManager:
-        """Create a new instance based on the provided `Configuration`.
+        """Initialize a new instance based on the provided `Configuration`.
 
         Args:
             config: The `Configuration` instance. Uses the global (default) one if not provided.

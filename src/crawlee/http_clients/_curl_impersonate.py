@@ -112,7 +112,7 @@ class CurlImpersonateHttpClient(HttpClient):
         persist_cookies_per_session: bool = True,
         **async_session_kwargs: Any,
     ) -> None:
-        """Create a new instance.
+        """Initialize a new instance.
 
         Args:
             persist_cookies_per_session: Whether to persist cookies per HTTP session.

@@ -58,7 +58,7 @@ class ParselCrawler(AbstractHttpCrawler[ParselCrawlingContext, Selector, Selecto
         self,
         **kwargs: Unpack[BasicCrawlerOptions[ParselCrawlingContext]],
     ) -> None:
-        """Create a new instance.
+        """Initialize a new instance.
 
         Args:
             kwargs: Additional keyword arguments to pass to the underlying `AbstractHttpCrawler`.

@@ -241,7 +241,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         _additional_context_managers: Sequence[AbstractAsyncContextManager] | None = None,
         _logger: logging.Logger | None = None,
     ) -> None:
-        """Create a new instance.
+        """Initialize a new instance.
 
         Args:
             configuration: The `Configuration` instance. Some of its properties are used as defaults for the crawler.

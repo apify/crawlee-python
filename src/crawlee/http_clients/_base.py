@@ -57,7 +57,7 @@ class HttpClient(ABC):
         *,
         persist_cookies_per_session: bool = True,
     ) -> None:
-        """Create a new instance.
+        """Initialize a new instance.
 
         Args:
             persist_cookies_per_session: Whether to persist cookies per HTTP session.

@@ -46,7 +46,7 @@ class SystemStatus:
         event_loop_overload_threshold: float = 0.6,
         client_overload_threshold: float = 0.3,
     ) -> None:
-        """Create a new instance.
+        """Initialize a new instance.
 
         Args:
             snapshotter: The `Snapshotter` instance to be queried for `SystemStatus`.

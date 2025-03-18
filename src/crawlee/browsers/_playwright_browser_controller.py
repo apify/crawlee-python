@@ -46,7 +46,7 @@ class PlaywrightBrowserController(BrowserController):
         header_generator: HeaderGenerator | None = _DEFAULT_HEADER_GENERATOR,
         fingerprint_generator: FingerprintGenerator | None = None,
     ) -> None:
-        """Create a new instance.
+        """Initialize a new instance.
 
         Args:
             browser: The browser instance to control.

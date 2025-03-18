@@ -28,7 +28,7 @@ class RequestList(RequestLoader):
         requests: Iterable[str | Request] | AsyncIterable[str | Request] | None = None,
         name: str | None = None,
     ) -> None:
-        """Create a new instance.
+        """Initialize a new instance.
 
         Args:
             requests: The request objects (or their string representations) to be added to the provider.

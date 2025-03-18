@@ -72,7 +72,7 @@ class ProxyConfiguration:
         new_url_function: _NewUrlFunction | None = None,
         tiered_proxy_urls: list[list[str | None]] | None = None,
     ) -> None:
-        """Create a new instance.
+        """Initialize a new instance.
 
         Exactly one of `proxy_urls`, `tiered_proxy_urls` or `new_url_function` must be specified.
 

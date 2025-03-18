@@ -65,7 +65,7 @@ class EventManager:
         persist_state_interval: timedelta = timedelta(minutes=1),
         close_timeout: timedelta | None = None,
     ) -> None:
-        """Create a new instance.
+        """Initialize a new instance.
 
         Args:
             persist_state_interval: Interval between emitted `PersistState` events to maintain state persistence.

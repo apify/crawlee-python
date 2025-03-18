@@ -44,7 +44,7 @@ class SessionPool:
         persist_state_kvs_name: str | None = None,
         persist_state_key: str = 'CRAWLEE_SESSION_POOL_STATE',
     ) -> None:
-        """Create a new instance.
+        """Initialize a new instance.
 
         Args:
             max_pool_size: Maximum number of sessions to maintain in the pool. You can add more sessions to the pool

@@ -164,7 +164,7 @@ class PatchedFingerprintGenerator(bf_FingerprintGenerator):
         slim: bool = False,
         **header_kwargs,  # noqa:ANN003 # Upstream repo types missing.
     ) -> None:
-        """Create a new instance.
+        """Initialize a new instance.
 
         Args:
             screen: Screen constraints for the generated fingerprint.
@@ -193,7 +193,7 @@ class BrowserforgeFingerprintGenerator(FingerprintGenerator):
         mock_web_rtc: bool | None = None,
         slim: bool | None = None,
     ) -> None:
-        """Create a new instance.
+        """Initialize a new instance.
 
         All generator options are optional. If any value is not specified, then `None` is set in the options.
         Default values for options set to `None` are implementation detail of used fingerprint generator.

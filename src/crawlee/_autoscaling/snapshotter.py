@@ -65,7 +65,7 @@ class Snapshotter:
         max_client_errors: int,
         max_memory_size: ByteSize,
     ) -> None:
-        """Create a new instance.
+        """Initialize a new instance.
 
         In most cases, you should use the `from_config` constructor to create a new instance based on
         the provided configuration.
@@ -102,7 +102,7 @@ class Snapshotter:
 
     @classmethod
     def from_config(cls, config: Configuration | None = None) -> Snapshotter:
-        """Create a new instance based on the provided `Configuration`.
+        """Initialize a new instance based on the provided `Configuration`.
 
         Args:
             config: The `Configuration` instance. Uses the global (default) one if not provided.

@@ -70,7 +70,7 @@ class AutoscaledPool:
         is_task_ready_function: Callable[[], Awaitable[bool]],
         is_finished_function: Callable[[], Awaitable[bool]],
     ) -> None:
-        """Create a new instance.
+        """Initialize a new instance.
 
         Args:
             system_status: Provides data about system utilization (load).

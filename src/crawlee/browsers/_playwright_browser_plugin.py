@@ -52,7 +52,7 @@ class PlaywrightBrowserPlugin(BrowserPlugin):
         use_incognito_pages: bool = False,
         fingerprint_generator: FingerprintGenerator | None = None,
     ) -> None:
-        """Create a new instance.
+        """Initialize a new instance.
 
         Args:
             browser_type: The type of browser to launch ('chromium', 'firefox', or 'webkit').

@@ -169,7 +169,7 @@ class AdaptivePlaywrightCrawlingContext(
         context: ParsedHttpCrawlingContext[TStaticParseResult],
         parser: AbstractHttpParser[TStaticParseResult, TStaticSelectResult],
     ) -> AdaptivePlaywrightCrawlingContext[TStaticParseResult, TStaticSelectResult]:
-        """Create a new instance from an existing `ParsedHttpCrawlingContext`."""
+        """Initialize a new instance from an existing `ParsedHttpCrawlingContext`."""
         return cls(_static_parser=parser, **{field.name: getattr(context, field.name) for field in fields(context)})
 
     @classmethod
@@ -178,7 +178,7 @@ class AdaptivePlaywrightCrawlingContext(
         context: PlaywrightCrawlingContext,
         parser: AbstractHttpParser[TStaticParseResult, TStaticSelectResult],
     ) -> AdaptivePlaywrightCrawlingContext[TStaticParseResult, TStaticSelectResult]:
-        """Create a new instance from an existing `PlaywrightCrawlingContext`."""
+        """Initialize a new instance from an existing `PlaywrightCrawlingContext`."""
         context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
         # Remove playwright specific attributes and pass them as private instead to be available as property.
         context_kwargs['_response'] = context_kwargs.pop('response')
@@ -227,7 +227,7 @@ class AdaptivePlaywrightPreNavCrawlingContext(BasicCrawlingContext):
 
     @classmethod
     def from_pre_navigation_context(cls, context: BasicCrawlingContext) -> Self:
-        """Create a new instance from an existing pre-navigation `BasicCrawlingContext`."""
+        """Initialize a new instance from an existing pre-navigation `BasicCrawlingContext`."""
         context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
         context_kwargs['_page'] = context_kwargs.pop('page', None)
 

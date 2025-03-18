@@ -91,7 +91,7 @@ class CrawleeLogFormatter(logging.Formatter):
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        """Create a new instance.
+        """Initialize a new instance.
 
         Args:
             include_logger_name: Include logger name at the beginning of the log line.

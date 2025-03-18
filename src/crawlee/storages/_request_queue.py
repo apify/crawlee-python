@@ -123,7 +123,7 @@ class RequestQueue(Storage, RequestManager):
 
     @classmethod
     def from_storage_object(cls, storage_client: StorageClient, storage_object: StorageMetadata) -> RequestQueue:
-        """Create a new instance of RequestQueue from a storage metadata object."""
+        """Initialize a new instance of RequestQueue from a storage metadata object."""
         request_queue = RequestQueue(
             id=storage_object.id,
             name=storage_object.name,

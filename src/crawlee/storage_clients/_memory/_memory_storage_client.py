@@ -66,7 +66,7 @@ class MemoryStorageClient(StorageClient):
         default_key_value_store_id: str,
         default_dataset_id: str,
     ) -> None:
-        """Create a new instance.
+        """Initialize a new instance.
 
         In most cases, you should use the `from_config` constructor to create a new instance based on
         the provided configuration.
@@ -96,7 +96,7 @@ class MemoryStorageClient(StorageClient):
 
     @classmethod
     def from_config(cls, config: Configuration | None = None) -> MemoryStorageClient:
-        """Create a new instance based on the provided `Configuration`.
+        """Initialize a new instance based on the provided `Configuration`.
 
         Args:
             config: The `Configuration` instance. Uses the global (default) one if not provided.

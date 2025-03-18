@@ -91,7 +91,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         use_incognito_pages: bool | None = None,
         **kwargs: Unpack[BasicCrawlerOptions[PlaywrightCrawlingContext, StatisticsState]],
     ) -> None:
-        """Create a new instance.
+        """Initialize a new instance.
 
         Args:
             browser_pool: A `BrowserPool` instance to be used for launching the browsers and getting pages.

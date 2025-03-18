@@ -101,7 +101,7 @@ class HttpxHttpClient(HttpClient):
         header_generator: HeaderGenerator | None = _DEFAULT_HEADER_GENERATOR,
         **async_client_kwargs: Any,
     ) -> None:
-        """Create a new instance.
+        """Initialize a new instance.
 
         Args:
             persist_cookies_per_session: Whether to persist cookies per HTTP session.

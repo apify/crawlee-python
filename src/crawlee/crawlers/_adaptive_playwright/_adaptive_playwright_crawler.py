@@ -131,7 +131,7 @@ class AdaptivePlaywrightCrawler(
         statistics: Statistics[AdaptivePlaywrightCrawlerStatisticState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> None:
-        """Create a new instance. Recommended way to create instance is to call factory methods.
+        """Initialize a new instance. Recommended way to create instance is to call factory methods.
 
         Recommended factory methods: `with_beautifulsoup_static_parser`, `with_parsel_static_parser`.
 
