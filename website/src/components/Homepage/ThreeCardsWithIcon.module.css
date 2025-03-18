@@ -30,6 +30,10 @@
     }
 }
 
+.cardItem:has(:local(.cardAction)) {
+    padding: 24px;
+}
+
 .cardIcon {
     margin-bottom: 16px;
     display: flex;
@@ -81,7 +85,7 @@
 }
 
 .cardAction::after {
-    content: '→';
+    content: "→";
     margin-left: 4px;
     transition: margin 0.3s ease;
 }

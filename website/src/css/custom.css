@@ -185,7 +185,7 @@ aside > div > a > b {
     }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
     .navbar__items--right > div,
     .navbar__items--right > a {
         display: none;
@@ -284,6 +284,12 @@ aside > div > a > b {
     }
     @media (min-width: 1024px) {
         padding: 20px 64px;
+    }
+}
+
+nav[class*='navbarHidden'] {
+    div[class*='navbarLogo'] {
+        display: none;
     }
 }
 
