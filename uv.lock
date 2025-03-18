@@ -41,12 +41,35 @@ wheels = [
 ]
 
 [[package]]
+name = "apify-client"
+version = "1.9.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "apify-shared" },
+    { name = "httpx" },
+    { name = "more-itertools" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/64/95/5456d114f83749f74969577824abc74fc3ab5e1722acab37f77b0b1800c6/apify_client-1.9.2.tar.gz", hash = "sha256:af76b78c3153263040615daec0619765e067466bbb82e569afe799ad72c53050", size = 46276 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c5/3d/d71b7c79c8da2ca2ccd2aa43cea0cfb2d17475ea8fafb4e7d7a78b24c02c/apify_client-1.9.2-py3-none-any.whl", hash = "sha256:a441fb59b5ec1c42aead73284c90304029442ddc26e764c151b8dc7f15e38600", size = 72505 },
+]
+
+[[package]]
 name = "apify-fingerprint-datapoints"
 version = "0.0.2"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/94/d8/315b56dcca35a1b434e8a18bc1f4694c3ddc6fc8d7f8c19a3c983db15b9f/apify_fingerprint_datapoints-0.0.2.tar.gz", hash = "sha256:96e6f103774c7b64bb91c6a6a98315cdec340e154636b048824d3bd53401116f", size = 1145046 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e5/29/0bc61fa8d357bd5f0f14c7250f19c984c3ed402575e8e2283ff58ba851a6/apify_fingerprint_datapoints-0.0.2-py3-none-any.whl", hash = "sha256:fc0a3707353d98064ac51541880290dc2dbbd2898affcf770d6762836812b9c1", size = 836233 },
+]
+
+[[package]]
+name = "apify-shared"
+version = "1.3.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/67/f4/4ab1dbbc9fe4c3c2467275df66fda137b254c750d1de95cd8ba75a34830a/apify_shared-1.3.1.tar.gz", hash = "sha256:58f123f5627a0cb9e8e7ac0e6f3f27bed76d93af17c80ae2d19fad9c83783bc7", size = 13560 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/50/23/bfe508e33844f4ac9256d72164166281a76f7a1f21745f3e5a76411333aa/apify_shared-1.3.1-py3-none-any.whl", hash = "sha256:3d2630934683911e0fb1e741389abcb885aebfd282f17670e16a0e175af68d7d", size = 12379 },
 ]
 
 [[package]]
@@ -650,6 +673,8 @@ playwright = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "apify-client" },
+    { name = "apify-shared" },
     { name = "build" },
     { name = "filelock" },
     { name = "ipdb" },
@@ -721,6 +746,8 @@ provides-extras = ["all", "adaptive-crawler", "beautifulsoup", "cli", "curl-impe
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "apify-client" },
+    { name = "apify-shared" },
     { name = "build", specifier = "~=1.2.0" },
     { name = "filelock", specifier = "~=3.18.0" },
     { name = "ipdb", specifier = "~=0.13.0" },
