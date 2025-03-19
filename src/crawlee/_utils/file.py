@@ -12,6 +12,7 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from pathlib import Path
     from typing import Any
 
 
@@ -30,7 +31,7 @@ def is_content_type(content_type_enum: ContentType, content_type: str) -> bool:
     return content_type_enum.matches(content_type)
 
 
-async def force_remove(filename: str) -> None:
+async def force_remove(filename: str | Path) -> None:
     """Remove a file, suppressing the FileNotFoundError if it does not exist.
 
     JS-like rm(filename, { force: true }).
@@ -42,7 +43,7 @@ async def force_remove(filename: str) -> None:
         await asyncio.to_thread(os.remove, filename)
 
 
-async def force_rename(src_dir: str, dst_dir: str) -> None:
+async def force_rename(src_dir: str | Path, dst_dir: str | Path) -> None:
     """Rename a directory, ensuring that the destination directory is removed if it exists.
 
     Args:
