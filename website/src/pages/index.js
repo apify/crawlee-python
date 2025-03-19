@@ -4,6 +4,7 @@ import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import CodeBlock from '@theme/CodeBlock';
 import Layout from '@theme/Layout';
 import ThemedImage from '@theme/ThemedImage';
+import clsx from 'clsx';
 import React from 'react';
 
 import styles from './index.module.css';
@@ -380,7 +381,7 @@ export default function JavascriptHomepage() {
             <div id={styles.homepageContainer}>
                 <HomepageHeroSection />
                 <GetStartedSection />
-                <div className={styles.dashedSeparator} />
+                <div className={clsx(styles.dashedSeparator, styles.codeExampleTopSeparator)} />
                 <CodeExampleSection />
                 <HomepageCliExample />
                 <div className={styles.dashedSeparator}>
