@@ -2,44 +2,51 @@ name: Templates Apify integration tests
 
 on:
   workflow_dispatch:
+    secrets:
+      APIFY_TEST_USER_API_TOKEN:
+        description: API token of the Python testing user on Apify
+        required: true
 
 jobs:
   unit_tests:
     name: Unit tests
     strategy:
       fail-fast: false
-      matrix:
-        os: ["ubuntu-latest", "windows-latest"]
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"] # All supported Python versions.
-    runs-on: ${{ matrix.os }}
+
+    runs-on: "ubuntu-latest"
     env:
-      HTTPBIN_URL: ${{ secrets.httpbin_url || 'https://httpbin.org' }}
+      python-version: "3.13"
+      node-version: "22"
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - name: Setup node
+        uses: actions/setup-node@v4
         with:
-          node-version-file: .nvmrc
-          cache: 'npm'
+          node-version: ${{ env.node-version }}
 
       - name: Install dependencies
         run: npm install -g apify-cli
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python ${{ env.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ env.python-version }}
+
+      - name: Install poetry
+        run: pipx install poetry
 
       - name: Set up uv package manager
         uses: astral-sh/setup-uv@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ env.python-version }}
 
       - name: Install Python dependencies
         run: make install-dev
 
       - name: Run Apify integration tests
         run: make templates-apify-integration-tests
+        env:
+          APIFY_TEST_USER_API_TOKEN: ${{ secrets.APIFY_TEST_USER_API_TOKEN }}

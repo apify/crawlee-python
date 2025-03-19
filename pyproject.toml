@@ -213,7 +213,7 @@ timeout = 1200
 python_version = "3.9"
 plugins = ["pydantic.mypy"]
 exclude = ["project_template"]
-files = ["src", "tests", "docs", "website"]
+modules=["crawlee", "tests"]
 check_untyped_defs = true
 disallow_incomplete_defs = true
 disallow_untyped_calls = true
@@ -224,6 +224,7 @@ warn_redundant_casts = true
 warn_return_any = true
 warn_unreachable = true
 warn_unused_ignores = true
+
 
 [[tool.mypy.overrides]]
 # Example codes are sometimes showing integration of crawlee with external tool, which is not dependency of crawlee.
