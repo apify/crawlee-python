@@ -31,7 +31,7 @@ logger = getLogger(__name__)
 
 
 async def persist_metadata_if_enabled(*, data: dict, entity_directory: str, write_metadata: bool) -> None:
-    """Updates or writes metadata to a specified directory.
+    """Update or writes metadata to a specified directory.
 
     The function writes a given metadata dictionary to a JSON file within a specified directory.
     The writing process is skipped if `write_metadata` is False. Before writing, it ensures that
@@ -65,7 +65,7 @@ def find_or_create_client_by_id_or_name_inner(
     id: str | None = None,
     name: str | None = None,
 ) -> TResourceClient | None:
-    """Locates or creates a new storage client based on the given ID or name.
+    """Locate or create a new storage client based on the given ID or name.
 
     This method attempts to find a storage client in the memory cache first. If not found,
     it tries to locate a storage directory by name. If still not found, it searches through
@@ -409,9 +409,16 @@ def _determine_storage_path(
                 metadata_path = os.path.join(entry.path, METADATA_FILENAME)
                 if os.access(metadata_path, os.F_OK):
                     with open(metadata_path, encoding='utf-8') as metadata_file:
-                        metadata = json.load(metadata_file)
-                    if (id and metadata.get('id') == id) or (name and metadata.get('name') == name):
-                        return entry.path
+                        try:
+                            metadata = json.load(metadata_file)
+                            if (id and metadata.get('id') == id) or (name and metadata.get('name') == name):
+                                return entry.path
+                        except Exception:
+                            logger.warning(
+                                f'Metadata of store entry "{entry.name}" for store {name or id} could not be parsed. '
+                                'The metadata file will be ignored.',
+                                exc_info=True,
+                            )
 
     # Check for default storage directory as a last resort
     if id == default_id:

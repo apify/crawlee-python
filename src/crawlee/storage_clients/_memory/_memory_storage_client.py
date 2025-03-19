@@ -66,7 +66,7 @@ class MemoryStorageClient(StorageClient):
         default_key_value_store_id: str,
         default_dataset_id: str,
     ) -> None:
-        """A default constructor.
+        """Initialize a new instance.
 
         In most cases, you should use the `from_config` constructor to create a new instance based on
         the provided configuration.
@@ -96,7 +96,7 @@ class MemoryStorageClient(StorageClient):
 
     @classmethod
     def from_config(cls, config: Configuration | None = None) -> MemoryStorageClient:
-        """Create a new instance based on the provided `Configuration`.
+        """Initialize a new instance based on the provided `Configuration`.
 
         Args:
             config: The `Configuration` instance. Uses the global (default) one if not provided.
@@ -216,7 +216,7 @@ class MemoryStorageClient(StorageClient):
             self.request_queues_handled.append(resource_client)
 
     async def _purge_default_storages(self) -> None:
-        """Cleans up the storage directories, preparing the environment for a new run.
+        """Clean up the storage directories, preparing the environment for a new run.
 
         It aims to remove residues from previous executions to avoid data contamination between runs.
 
@@ -255,7 +255,7 @@ class MemoryStorageClient(StorageClient):
                     await self._batch_remove_files(request_queue_folder.path)
 
     async def _handle_default_key_value_store(self, folder: str) -> None:
-        """Manages the cleanup of the default key-value store.
+        """Manage the cleanup of the default key-value store.
 
         It removes all files to ensure a clean state except for a set of predefined input keys (`possible_input_keys`).
 
@@ -303,7 +303,7 @@ class MemoryStorageClient(StorageClient):
             await self._batch_remove_files(temp_path_for_old_folder)
 
     async def _batch_remove_files(self, folder: str, counter: int = 0) -> None:
-        """Removes a folder and its contents in batches to minimize blocking time.
+        """Remove a folder and its contents in batches to minimize blocking time.
 
         This method first renames the target folder to a temporary name, then deletes the temporary folder,
         allowing the file system operations to proceed without hindering other asynchronous tasks.

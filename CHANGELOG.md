@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Add port for `same-origin` strategy check ([#1096](https://github.com/apify/crawlee-python/pull/1096)) ([9e24598](https://github.com/apify/crawlee-python/commit/9e245987d0aab0ba9c763689f12958b5a332db46)) by [@Mantisus](https://github.com/Mantisus)
+- Fix handling of loading empty `metadata` file for queue ([#1042](https://github.com/apify/crawlee-python/pull/1042)) ([b00876e](https://github.com/apify/crawlee-python/commit/b00876e8dcb30a12d3737bd31237da9daada46bb)) by [@Mantisus](https://github.com/Mantisus), closes [#1029](https://github.com/apify/crawlee-python/issues/1029)
 
 
 <!-- git-cliff-unreleased-end -->
