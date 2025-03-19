@@ -40,7 +40,7 @@ def unique_key_to_request_id(unique_key: str, *, request_id_length: int = 15) ->
 
 
 def normalize_url(url: str, *, keep_url_fragment: bool = False) -> str:
-    """Normalizes a URL.
+    """Normalize a URL.
 
     This function cleans and standardizes a URL by removing leading and trailing whitespaces,
     converting the scheme and netloc to lower case, stripping unwanted tracking parameters

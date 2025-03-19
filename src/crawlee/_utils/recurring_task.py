@@ -26,7 +26,11 @@ class RecurringTask:
         self.task: asyncio.Task | None = None
 
     async def _wrapper(self) -> None:
-        """Internal method that repeatedly executes the provided function with the specified delay."""
+        """Continuously execute the provided function with the specified delay.
+
+        Run the function in a loop, waiting for the configured delay between executions.
+        Supports both synchronous and asynchronous functions.
+        """
         sleep_time_secs = self.delay.total_seconds()
         while True:
             await self.func() if asyncio.iscoroutinefunction(self.func) else self.func()

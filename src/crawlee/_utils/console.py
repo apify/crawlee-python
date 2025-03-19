@@ -9,7 +9,7 @@ BORDER = {'TL': '┌', 'TR': '┐', 'BL': '└', 'BR': '┘', 'H': '─', 'V': '
 
 
 def make_table(rows: Sequence[Sequence[str]], width: int = 100) -> str:
-    """Creates a text table using Unicode characters.
+    """Create a text table using Unicode characters.
 
     Args:
         rows: A list of tuples/lists to be displayed in the table.

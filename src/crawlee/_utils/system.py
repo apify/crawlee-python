@@ -61,7 +61,7 @@ class MemoryInfo(MemoryUsageInfo):
 
 
 def get_cpu_info() -> CpuInfo:
-    """Retrieves the current CPU usage.
+    """Retrieve the current CPU usage.
 
     It utilizes the `psutil` library. Function `psutil.cpu_percent()` returns a float representing the current
     system-wide CPU utilization as a percentage.
@@ -72,7 +72,7 @@ def get_cpu_info() -> CpuInfo:
 
 
 def get_memory_info() -> MemoryInfo:
-    """Retrieves the current memory usage of the process and its children.
+    """Retrieve the current memory usage of the process and its children.
 
     It utilizes the `psutil` library.
     """

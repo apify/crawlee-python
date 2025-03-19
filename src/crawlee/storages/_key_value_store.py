@@ -77,7 +77,7 @@ class KeyValueStore(Storage):
 
     @classmethod
     def from_storage_object(cls, storage_client: StorageClient, storage_object: StorageMetadata) -> KeyValueStore:
-        """Create a new instance of KeyValueStore from a storage metadata object."""
+        """Initialize a new instance of KeyValueStore from a storage metadata object."""
         key_value_store = KeyValueStore(
             id=storage_object.id,
             name=storage_object.name,
@@ -216,14 +216,14 @@ class KeyValueStore(Storage):
         key: str,
         default_value: dict[str, JsonSerializable] | None = None,
     ) -> dict[str, JsonSerializable]:
-        """Gets a value from KVS that will be automatically saved on changes.
+        """Get a value from KVS that will be automatically saved on changes.
 
         Args:
             key: Key of the record, to store the value.
             default_value: Value to be used if the record does not exist yet. Should be a dictionary.
 
         Returns:
-            Returns the value of the key.
+            Return the value of the key.
         """
         default_value = {} if default_value is None else default_value
 
@@ -257,7 +257,7 @@ class KeyValueStore(Storage):
             await self.set_value(key, value)
 
     def _ensure_persist_event(self) -> None:
-        """Setup persist state event handling if not already done."""
+        """Ensure persist state event handling if not already done."""
         if self._persist_state_event_started:
             return
 

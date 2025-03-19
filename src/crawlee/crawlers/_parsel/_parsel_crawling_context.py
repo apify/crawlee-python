@@ -24,7 +24,7 @@ class ParselCrawlingContext(ParsedHttpCrawlingContext[Selector]):
 
     @classmethod
     def from_parsed_http_crawling_context(cls, context: ParsedHttpCrawlingContext[Selector]) -> Self:
-        """Convenience constructor that creates new context from existing `ParsedHttpCrawlingContext[BeautifulSoup]`."""
+        """Create a new context from an existing `ParsedHttpCrawlingContext[Selector]`."""
         return cls(**{field.name: getattr(context, field.name) for field in fields(context)})
 
     def html_to_text(self) -> str:

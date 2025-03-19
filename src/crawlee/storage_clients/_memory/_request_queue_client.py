@@ -486,7 +486,7 @@ class RequestQueueClient(BaseRequestQueueClient):
         entity_directory: str,
         persist_storage: bool,
     ) -> None:
-        """Updates or writes a single request item to the disk.
+        """Update or writes a single request item to the disk.
 
         This function writes a given request dictionary to a JSON file, named after the request's ID,
         within a specified directory. The writing process is skipped if `persist_storage` is False.
@@ -514,7 +514,7 @@ class RequestQueueClient(BaseRequestQueueClient):
             f.close()
 
     async def _delete_request_file_from_storage(self, *, request_id: str, entity_directory: str) -> None:
-        """Deletes a specific request item from the disk.
+        """Delete a specific request item from the disk.
 
         This function removes a file representing a request, identified by the request's ID, from a
         specified directory. Before attempting to remove the file, it ensures that the target directory
