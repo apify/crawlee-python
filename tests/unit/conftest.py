@@ -5,12 +5,11 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import TYPE_CHECKING, Any, Callable, Optional, cast
+from typing import TYPE_CHECKING, Callable, Optional, cast
 
 import pytest
 from proxy import Proxy
 from uvicorn.config import Config
-from yarl import URL
 
 from crawlee import service_locator
 from crawlee.configuration import Configuration
@@ -23,6 +22,8 @@ from tests.unit.server import TestServer, app, serve_in_thread
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Iterator
     from pathlib import Path
+
+    from yarl import URL
 
 
 @pytest.fixture
@@ -166,41 +167,6 @@ async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
     kvs = await KeyValueStore.open()
     yield kvs
     await kvs.drop()
-
-
-@pytest.fixture
-def httpbin() -> URL:
-    class URLWrapper:
-        def __init__(self, url: URL) -> None:
-            self.url = url
-
-        def __getattr__(self, name: str) -> Any:
-            result = getattr(self.url, name)
-            return_type = getattr(result, '__annotations__', {}).get('return', None)
-
-            if return_type == 'URL':
-
-                def wrapper(*args: Any, **kwargs: Any) -> URLWrapper:
-                    return URLWrapper(result(*args, **kwargs))
-
-                return wrapper
-
-            return result
-
-        def with_path(
-            self, path: str, *, keep_query: bool = True, keep_fragment: bool = True, encoded: bool = False
-        ) -> URLWrapper:
-            return URLWrapper(
-                URL.with_path(self.url, path, keep_query=keep_query, keep_fragment=keep_fragment, encoded=encoded)
-            )
-
-        def __truediv__(self, other: Any) -> URLWrapper:
-            return self.with_path(other)
-
-        def __str__(self) -> str:
-            return str(self.url)
-
-    return cast('URL', URLWrapper(URL(os.environ.get('HTTPBIN_URL', 'https://httpbin.org'))))
 
 
 @pytest.fixture(scope='session')

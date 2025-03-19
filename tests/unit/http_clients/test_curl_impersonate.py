@@ -41,9 +41,8 @@ async def test_crawl_with_proxy(
 async def test_crawl_with_proxy_disabled(
     http_client: CurlImpersonateHttpClient,
     disabled_proxy: ProxyInfo,
-    httpbin: URL,
 ) -> None:
-    url = str(httpbin / 'status/222')
+    url = 'https://apify.com/'
     request = Request.from_url(url)
 
     with pytest.raises(ProxyError):
@@ -67,9 +66,8 @@ async def test_send_request_with_proxy(
 async def test_send_request_with_proxy_disabled(
     http_client: CurlImpersonateHttpClient,
     disabled_proxy: ProxyInfo,
-    httpbin: URL,
 ) -> None:
-    url = str(httpbin / 'status/222')
+    url = 'https://apify.com/'
 
     with pytest.raises(ProxyError):
         await http_client.send_request(url, proxy_info=disabled_proxy)

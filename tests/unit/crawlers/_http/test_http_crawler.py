@@ -341,7 +341,7 @@ async def test_sending_payload_as_raw_data(http_client: HttpClient, server_url: 
     @crawler.router.default_handler
     async def request_handler(context: HttpCrawlingContext) -> None:
         response = json.loads(context.http_response.read())
-        # The httpbin.org/post endpoint returns the provided payload in the response.
+        # The post endpoint returns the provided payload in the response.
         responses.append(response)
 
     encoded_payload = urlencode(PAYLOAD).encode()
@@ -372,7 +372,7 @@ async def test_sending_payload_as_form_data(http_client: HttpClient, server_url:
     @crawler.router.default_handler
     async def request_handler(context: HttpCrawlingContext) -> None:
         response = json.loads(context.http_response.read())
-        # The httpbin.org/post endpoint returns the provided payload in the response.
+        # The /post endpoint returns the provided payload in the response.
         responses.append(response)
 
     request = Request.from_url(
@@ -398,7 +398,7 @@ async def test_sending_payload_as_json(http_client: HttpClient, server_url: URL)
     @crawler.router.default_handler
     async def request_handler(context: HttpCrawlingContext) -> None:
         response = json.loads(context.http_response.read())
-        # The httpbin.org/post endpoint returns the provided payload in the response.
+        # The /post endpoint returns the provided payload in the response.
         responses.append(response)
 
     json_payload = json.dumps(PAYLOAD).encode()
@@ -429,7 +429,7 @@ async def test_sending_url_query_params(http_client_class: type[HttpClient], ser
     @crawler.router.default_handler
     async def request_handler(context: HttpCrawlingContext) -> None:
         response = json.loads(context.http_response.read())
-        # The httpbin.org/get endpoint returns the provided query parameters in the response.
+        # The /get endpoint returns the provided query parameters in the response.
         responses.append(response)
 
     base_url = server_url / 'get'
@@ -479,7 +479,7 @@ async def test_http_crawler_pre_navigation_hooks_executed_before_request() -> No
 
 
 async def test_isolation_cookies(http_client: HttpClient, server_url: URL) -> None:
-    """Test isolation cookies for Session with curl and httpbin"""
+    """Test isolation cookies for Session with curl"""
     sessions_ids: list[str] = []
     sessions_cookies: dict[str, dict[str, str]] = {}
     response_cookies: dict[str, dict[str, str]] = {}

@@ -30,9 +30,9 @@ async def test_http_1(server_url: URL) -> None:
     assert response.http_version == 'HTTP/1.1'
 
 
-async def test_http_2(httpbin: URL) -> None:
+async def test_http_2() -> None:
     http_client = HttpxHttpClient(http2=True)
-    response = await http_client.send_request(str(httpbin))
+    response = await http_client.send_request('https://apify.com/')
     assert response.http_version == 'HTTP/2'
 
 
@@ -55,9 +55,8 @@ async def test_proxy(
 async def test_proxy_disabled(
     http_client: HttpxHttpClient,
     disabled_proxy: ProxyInfo,
-    httpbin: URL,
 ) -> None:
-    url = str(httpbin / 'status/222')
+    url = 'https://apify.com/'
     request = Request.from_url(url)
 
     with pytest.raises(ProxyError):
@@ -81,9 +80,8 @@ async def test_send_request_with_proxy(
 async def test_send_request_with_proxy_disabled(
     http_client: HttpxHttpClient,
     disabled_proxy: ProxyInfo,
-    httpbin: URL,
 ) -> None:
-    url = str(httpbin / 'status/222')
+    url = 'https://apify.com/'
 
     with pytest.raises(ProxyError):
         await http_client.send_request(url, proxy_info=disabled_proxy)
