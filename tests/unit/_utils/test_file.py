@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import io
-import os
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import pytest
 
@@ -16,9 +15,6 @@ from crawlee._utils.file import (
     is_file_or_bytes,
     json_dumps,
 )
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 async def test_json_dumps() -> None:
@@ -112,42 +108,42 @@ def test_determine_file_extension() -> None:
 
 
 async def test_force_remove(tmp_path: Path) -> None:
-    test_file_path = os.path.join(tmp_path, 'test.txt')
+    test_file_path = Path(tmp_path, 'test.txt')
     # Does not crash/raise when the file does not exist
-    assert os.path.exists(test_file_path) is False
+    assert test_file_path.exists() is False
     await force_remove(test_file_path)
-    assert os.path.exists(test_file_path) is False
+    assert test_file_path.exists() is False
 
     # Remove the file if it exists
     with open(test_file_path, 'a', encoding='utf-8'):  # noqa: ASYNC230
         pass
-    assert os.path.exists(test_file_path) is True
+    assert test_file_path.exists() is True
     await force_remove(test_file_path)
-    assert os.path.exists(test_file_path) is False
+    assert test_file_path.exists() is False
 
 
 async def test_force_rename(tmp_path: Path) -> None:
-    src_dir = os.path.join(tmp_path, 'src')
-    dst_dir = os.path.join(tmp_path, 'dst')
-    src_file = os.path.join(src_dir, 'src_dir.txt')
-    dst_file = os.path.join(dst_dir, 'dst_dir.txt')
+    src_dir = Path(tmp_path, 'src')
+    dst_dir = Path(tmp_path, 'dst')
+    src_file = Path(src_dir, 'src_dir.txt')
+    dst_file = Path(dst_dir, 'dst_dir.txt')
     # Won't crash if source directory does not exist
-    assert os.path.exists(src_dir) is False
+    assert src_dir.exists() is False
     await force_rename(src_dir, dst_dir)
 
     # Will remove dst_dir if it exists (also covers normal case)
     # Create the src_dir with a file in it
-    os.mkdir(src_dir)
+    src_dir.mkdir()
     with open(src_file, 'a', encoding='utf-8'):  # noqa: ASYNC230
         pass
     # Create the dst_dir with a file in it
-    os.mkdir(dst_dir)
+    dst_dir.mkdir()
     with open(dst_file, 'a', encoding='utf-8'):  # noqa: ASYNC230
         pass
-    assert os.path.exists(src_file) is True
-    assert os.path.exists(dst_file) is True
+    assert src_file.exists() is True
+    assert dst_file.exists() is True
     await force_rename(src_dir, dst_dir)
-    assert os.path.exists(src_dir) is False
-    assert os.path.exists(dst_file) is False
+    assert src_dir.exists() is False
+    assert dst_file.exists() is False
     # src_dir.txt should exist in dst_dir
-    assert os.path.exists(os.path.join(dst_dir, 'src_dir.txt')) is True
+    assert (dst_dir / 'src_dir.txt').exists() is True

@@ -9,7 +9,10 @@ import os
 import re
 import shutil
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class ContentType(Enum):
@@ -26,7 +29,7 @@ def is_content_type(content_type_enum: ContentType, content_type: str) -> bool:
     """Check if the provided content type string matches the specified ContentType."""
     return content_type_enum.matches(content_type)
 
-
+  
 async def force_remove(filename: str) -> None:
     """Remove a file, suppressing the FileNotFoundError if it does not exist.
 
