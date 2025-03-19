@@ -88,11 +88,11 @@ async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
     # Route requests to appropriate handlers
     if path.startswith('/start_enqueue'):
         await start_enqueue_endpoint(send)
-    elif path.startswith('/asdf'):
+    elif path.startswith('/sub_index'):
         await secondary_index_endpoint(send)
-    elif path.startswith('/fdyr'):
+    elif path.startswith('/incapsula'):
         await incapsula_endpoint(send)
-    elif path.startswith(('/hjkl', '/qwer', '/uiop')):
+    elif path.startswith(('/page_1', '/page_2', '/page_3')):
         await generic_response_endpoint(send)
     elif path.startswith('/set_cookies'):
         await set_cookies(scope, send)
@@ -236,8 +236,8 @@ async def start_enqueue_endpoint(send: Send) -> None:
             <title>Hello</title>
         </head>
         <body>
-            <a href="/asdf" class="foo">Link 1</a>
-            <a href="/hjkl">Link 2</a>
+            <a href="/sub_index" class="foo">Link 1</a>
+            <a href="/page_1">Link 2</a>
         </body>
     </html>""",
     )
@@ -252,8 +252,8 @@ async def secondary_index_endpoint(send: Send) -> None:
             <title>Hello</title>
         </head>
         <body>
-            <a href="/uiop">Link 3</a>
-            <a href="/qwer">Link 4</a>
+            <a href="/page_3">Link 3</a>
+            <a href="/page_2">Link 4</a>
         </body>
     </html>""",
     )

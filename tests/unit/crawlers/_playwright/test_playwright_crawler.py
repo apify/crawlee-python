@@ -73,10 +73,10 @@ async def test_enqueue_links(redirect_server_url: URL, server_url: URL) -> None:
 
     assert first_visited == redirect_url
     assert visited == {
-        str(server_url / 'asdf'),
-        str(server_url / 'hjkl'),
-        str(server_url / 'qwer'),
-        str(server_url / 'uiop'),
+        str(server_url / 'sub_index'),
+        str(server_url / 'page_1'),
+        str(server_url / 'page_2'),
+        str(server_url / 'page_3'),
     }
 
 
@@ -86,7 +86,7 @@ async def test_enqueue_links_with_transform_request_function(server_url: URL) ->
     headers = []
 
     def test_transform_request_function(request: RequestOptions) -> RequestOptions | RequestTransformAction:
-        if request['url'] == str(server_url / 'asdf'):
+        if request['url'] == str(server_url / 'sub_index'):
             request['headers'] = HttpHeaders({'transform-header': 'my-header'})
             return request
         return 'skip'
@@ -101,7 +101,7 @@ async def test_enqueue_links_with_transform_request_function(server_url: URL) ->
 
     visited = {call[0][0] for call in visit.call_args_list}
 
-    assert visited == {str(server_url / 'start_enqueue'), str(server_url / 'asdf')}
+    assert visited == {str(server_url / 'start_enqueue'), str(server_url / 'sub_index')}
 
     # all urls added to `enqueue_links` must have a custom header
     assert headers[1]['transform-header'] == 'my-header'
