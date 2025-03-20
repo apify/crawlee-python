@@ -11,7 +11,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from crawlee import ConcurrencySettings, Glob, HttpHeaders, Request, RequestTransformAction
+from crawlee import ConcurrencySettings, HttpHeaders, Request, RequestTransformAction
 from crawlee.crawlers import PlaywrightCrawler
 from crawlee.fingerprint_suite import (
     DefaultFingerprintGenerator,
@@ -34,8 +34,8 @@ if TYPE_CHECKING:
     from crawlee.crawlers import PlaywrightCrawlingContext, PlaywrightPreNavCrawlingContext
 
 
-async def test_basic_request(httpbin: URL) -> None:
-    requests = [str(httpbin.with_path('/'))]
+async def test_basic_request(server_url: URL) -> None:
+    requests = [str(server_url)]
     crawler = PlaywrightCrawler()
     result: dict = {}
 
@@ -50,40 +50,43 @@ async def test_basic_request(httpbin: URL) -> None:
     await crawler.run(requests)
 
     assert result.get('request_url') == result.get('page_url') == requests[0]
-    assert 'httpbin' in result.get('page_title', '')
+    assert 'Hello, world!' in result.get('page_title', '')
     assert '<html' in result.get('page_content', '')  # there is some HTML content
 
 
-async def test_enqueue_links() -> None:
-    # www.crawlee.dev create a redirect to crawlee.dev
-    requests = ['https://www.crawlee.dev/docs/examples']
+async def test_enqueue_links(redirect_server_url: URL, server_url: URL) -> None:
+    redirect_target = str(server_url / 'start_enqueue')
+    redirect_url = str(redirect_server_url.with_path('redirect').with_query(url=redirect_target))
+    requests = [redirect_url]
     crawler = PlaywrightCrawler(max_requests_per_crawl=11)
     visit = mock.Mock()
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
         visit(context.request.url)
-        await context.enqueue_links(include=[Glob('https://crawlee.dev/docs/examples/**')])
+        await context.enqueue_links()
 
     await crawler.run(requests)
 
     first_visited = visit.call_args_list[0][0][0]
-    visited: set[str] = {call[0][0] for call in visit.call_args_list[1:]}
+    visited = {call[0][0] for call in visit.call_args_list[1:]}
 
-    # The first link visited use original domain
-    assert first_visited == 'https://www.crawlee.dev/docs/examples'
-    assert len(visited) >= 10
-    # All other links must have a domain name after the redirect
-    assert all(url.startswith('https://crawlee.dev/docs/examples') for url in visited)
+    assert first_visited == redirect_url
+    assert visited == {
+        str(server_url / 'sub_index'),
+        str(server_url / 'page_1'),
+        str(server_url / 'page_2'),
+        str(server_url / 'page_3'),
+    }
 
 
-async def test_enqueue_links_with_transform_request_function() -> None:
+async def test_enqueue_links_with_transform_request_function(server_url: URL) -> None:
     crawler = PlaywrightCrawler()
     visit = mock.Mock()
     headers = []
 
     def test_transform_request_function(request: RequestOptions) -> RequestOptions | RequestTransformAction:
-        if request['url'] == 'https://crawlee.dev/python/docs/introduction':
+        if request['url'] == str(server_url / 'sub_index'):
             request['headers'] = HttpHeaders({'transform-header': 'my-header'})
             return request
         return 'skip'
@@ -94,11 +97,11 @@ async def test_enqueue_links_with_transform_request_function() -> None:
         headers.append(context.request.headers)
         await context.enqueue_links(transform_request_function=test_transform_request_function)
 
-    await crawler.run(['https://crawlee.dev/python'])
+    await crawler.run([str(server_url / 'start_enqueue')])
 
     visited = {call[0][0] for call in visit.call_args_list}
 
-    assert visited == {'https://crawlee.dev/python', 'https://crawlee.dev/python/docs/introduction'}
+    assert visited == {str(server_url / 'start_enqueue'), str(server_url / 'sub_index')}
 
     # all urls added to `enqueue_links` must have a custom header
     assert headers[1]['transform-header'] == 'my-header'
@@ -118,27 +121,22 @@ async def test_nonexistent_url_invokes_error_handler() -> None:
     assert failed_handler.call_count == 1
 
 
-async def test_redirect_handling() -> None:
+async def test_redirect_handling(server_url: URL, redirect_server_url: URL) -> None:
     # Set up a dummy crawler that tracks visited URLs
     crawler = PlaywrightCrawler()
     handled_urls = set[str]()
 
-    @crawler.pre_navigation_hook
-    async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
-        # Emulate server response to prevent Playwright from making real requests
-        await context.page.route(
-            '**/redirect', lambda route: route.fulfill(status=301, headers={'Location': 'https://apify.com'})
-        )
-        await context.page.route('https://apify.com/**', lambda route: route.fulfill(status=200))
+    redirect_target = str(server_url / 'start_enqueue')
+    redirect_url = str(redirect_server_url.with_path('redirect').with_query(url=redirect_target))
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
         handled_urls.add(context.request.loaded_url or '')
 
-    # Request with redirects to apify.com
-    request = Request.from_url(url='https://test.com/redirect')
+    # Request with redirects
+    request = Request.from_url(url=redirect_url)
 
-    # Ensure that the request uses the same origin strategy - apify.com will be considered out of scope
+    # Ensure that the request uses the same origin strategy - `redirect_target` will be considered out of scope
     request.crawlee_data.enqueue_strategy = 'same-origin'
 
     # No URLs should be visited in the run
@@ -158,18 +156,11 @@ async def test_redirect_handling() -> None:
     ],
 )
 async def test_chromium_headless_headers(
-    header_network: dict, fingerprint_generator: None | FingerprintGenerator | Literal['default']
+    header_network: dict, fingerprint_generator: None | FingerprintGenerator | Literal['default'], server_url: URL
 ) -> None:
     browser_type: BrowserType = 'chromium'
     crawler = PlaywrightCrawler(headless=True, browser_type=browser_type, fingerprint_generator=fingerprint_generator)
     headers = dict[str, str]()
-
-    @crawler.pre_navigation_hook
-    async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
-        # Emulate server response to prevent Playwright from making real requests
-        await context.page.route(
-            '**/*', lambda route: route.fulfill(status=200, body=json.dumps(route.request.headers))
-        )
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
@@ -179,7 +170,7 @@ async def test_chromium_headless_headers(
         for key, val in response_headers.items():
             headers[key] = val
 
-    await crawler.run(['https://test.com'])
+    await crawler.run([str(server_url / 'headers')])
 
     user_agent = headers.get('user-agent')
     assert user_agent in get_available_header_values(header_network, {'user-agent', 'User-Agent'})
@@ -193,17 +184,10 @@ async def test_chromium_headless_headers(
     assert 'headless' not in headers['user-agent'].lower()
 
 
-async def test_firefox_headless_headers(header_network: dict) -> None:
+async def test_firefox_headless_headers(header_network: dict, server_url: URL) -> None:
     browser_type: BrowserType = 'firefox'
     crawler = PlaywrightCrawler(headless=True, browser_type=browser_type)
     headers = dict[str, str]()
-
-    @crawler.pre_navigation_hook
-    async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
-        # Emulate server response to prevent Playwright from making real requests
-        await context.page.route(
-            '**/*', lambda route: route.fulfill(status=200, body=json.dumps(route.request.headers))
-        )
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
@@ -213,7 +197,7 @@ async def test_firefox_headless_headers(header_network: dict) -> None:
         for key, val in response_headers.items():
             headers[key] = val
 
-    await crawler.run(['https://test.com'])
+    await crawler.run([str(server_url / 'headers')])
 
     assert 'user-agent' in headers
     assert 'sec-ch-ua' not in headers
@@ -227,7 +211,7 @@ async def test_firefox_headless_headers(header_network: dict) -> None:
     assert any(keyword in user_agent for keyword in BROWSER_TYPE_HEADER_KEYWORD[browser_type])
 
 
-async def test_custom_headers(httpbin: URL) -> None:
+async def test_custom_headers(server_url: URL) -> None:
     crawler = PlaywrightCrawler()
     response_headers = dict[str, str]()
     request_headers = {'Power-Header': 'ring', 'Library': 'storm', 'My-Test-Header': 'fuzz'}
@@ -235,16 +219,15 @@ async def test_custom_headers(httpbin: URL) -> None:
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
         response = await context.response.text()
-        context_response_headers = dict(json.loads(response)).get('headers', {})
-
+        context_response_headers = json.loads(response)
         for key, val in context_response_headers.items():
             response_headers[key] = val
 
-    await crawler.run([Request.from_url(str(httpbin / 'get'), headers=request_headers)])
+    await crawler.run([Request.from_url(str(server_url / 'headers'), headers=request_headers)])
 
-    assert response_headers.get('Power-Header') == request_headers['Power-Header']
-    assert response_headers.get('Library') == request_headers['Library']
-    assert response_headers.get('My-Test-Header') == request_headers['My-Test-Header']
+    assert response_headers.get('power-header') == request_headers['Power-Header']
+    assert response_headers.get('library') == request_headers['Library']
+    assert response_headers.get('my-test-header') == request_headers['My-Test-Header']
 
 
 async def test_pre_navigation_hook() -> None:
@@ -293,7 +276,7 @@ async def test_proxy_set() -> None:
         pytest.param(True, id='with use_incognito_pages'),
     ],
 )
-async def test_isolation_cookies(*, use_incognito_pages: bool) -> None:
+async def test_isolation_cookies(*, use_incognito_pages: bool, server_url: URL) -> None:
     sessions_ids: list[str] = []
     sessions_cookies: dict[str, dict[str, str]] = {}
     response_cookies: dict[str, dict[str, str]] = {}
@@ -303,20 +286,6 @@ async def test_isolation_cookies(*, use_incognito_pages: bool) -> None:
         use_incognito_pages=use_incognito_pages,
         concurrency_settings=ConcurrencySettings(max_concurrency=1),
     )
-
-    @crawler.pre_navigation_hook
-    async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
-        # Emulate server response to prevent Playwright from making real requests
-        await context.page.route(
-            '**/cookies_set', lambda route: route.fulfill(status=200, headers={'Set-Cookie': 'a=1; Path=/'})
-        )
-
-        await context.page.route(
-            '**/cookies_get',
-            lambda route: route.fulfill(
-                status=200, body=json.dumps({'cookies': route.request.headers.get('cookie', '')})
-            ),
-        )
 
     @crawler.router.default_handler
     async def handler(context: PlaywrightCrawlingContext) -> None:
@@ -340,10 +309,11 @@ async def test_isolation_cookies(*, use_incognito_pages: bool) -> None:
     await crawler.run(
         [
             # The first request sets the cookie in the session
-            'https://test.com/cookies_set',
+            str(server_url.with_path('set_cookies').extend_query(a=1)),
             # With the second request, we check the cookies in the session and set retire
-            Request.from_url('https://test.com/cookies_get', unique_key='1', user_data={'retire_session': True}),
-            Request.from_url('https://test.com/cookies_get', unique_key='2'),
+            Request.from_url(str(server_url.with_path('/cookies')), unique_key='1', user_data={'retire_session': True}),
+            # The third request is made with a new session to make sure it does not use another session's cookies
+            Request.from_url(str(server_url.with_path('/cookies')), unique_key='2'),
         ]
     )
 
@@ -360,27 +330,23 @@ async def test_isolation_cookies(*, use_incognito_pages: bool) -> None:
     # When using `use_incognito_pages` there should be full cookie isolation
     if use_incognito_pages:
         # The initiated cookies must match in both the response and the session store
-        assert sessions_cookies[cookie_session_id] == {'a': '1'}
-        assert response_cookies[cookie_session_id] == 'a=1'
+        assert sessions_cookies[cookie_session_id] == response_cookies[cookie_session_id] == {'a': '1'}
 
         # For a clean session, the cookie should not be in the sesstion store or in the response
         # This way we can be sure that no cookies are being leaked through the http client
-        assert sessions_cookies[clean_session_id] == {}
-        assert response_cookies[clean_session_id] == ''
+        assert sessions_cookies[clean_session_id] == response_cookies[clean_session_id] == {}
     # Without `use_incognito_pages` we will have access to the session cookie,
     # but there will be a cookie leak via PlaywrightContext
     else:
         # The initiated cookies must match in both the response and the session store
-        assert sessions_cookies[cookie_session_id] == {'a': '1'}
-        assert response_cookies[cookie_session_id] == 'a=1'
+        assert sessions_cookies[cookie_session_id] == response_cookies[cookie_session_id] == {'a': '1'}
 
         # PlaywrightContext makes cookies shared by all sessions that work with it.
         # So in this case a clean session contains the same cookies
-        assert sessions_cookies[clean_session_id] == {'a': '1'}
-        assert response_cookies[clean_session_id] == 'a=1'
+        assert sessions_cookies[clean_session_id] == response_cookies[clean_session_id] == {'a': '1'}
 
 
-async def test_custom_fingerprint_uses_generator_options(httpbin: URL) -> None:
+async def test_custom_fingerprint_uses_generator_options(server_url: URL) -> None:
     min_width = 300
     max_width = 600
     min_height = 500
@@ -407,7 +373,7 @@ async def test_custom_fingerprint_uses_generator_options(httpbin: URL) -> None:
         ):
             fingerprints[relevant_key] = await context.page.evaluate(f'()=>{relevant_key}')
 
-    await crawler.run([Request.from_url(str(httpbin / 'get'))])
+    await crawler.run([str(server_url)])
 
     assert 'Firefox' in fingerprints['window.navigator.userAgent']
     assert fingerprints['window.navigator.userAgentData']['platform'] == 'Android'
@@ -415,19 +381,12 @@ async def test_custom_fingerprint_uses_generator_options(httpbin: URL) -> None:
     assert min_height <= int(fingerprints['window.screen.height']) <= max_height
 
 
-async def test_custom_fingerprint_matches_header_user_agent() -> None:
+async def test_custom_fingerprint_matches_header_user_agent(server_url: URL) -> None:
     """Test that generated fingerprint and header have matching user agent."""
 
     crawler = PlaywrightCrawler(headless=True, fingerprint_generator=DefaultFingerprintGenerator())
     response_headers = dict[str, str]()
     fingerprints = dict[str, str]()
-
-    @crawler.pre_navigation_hook
-    async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
-        # Emulate server response to prevent Playwright from making real requests
-        await context.page.route(
-            '**/*', lambda route: route.fulfill(status=200, body=json.dumps(route.request.headers))
-        )
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
@@ -437,32 +396,27 @@ async def test_custom_fingerprint_matches_header_user_agent() -> None:
         response_headers['User-Agent'] = context_response_headers['user-agent']
         fingerprints['window.navigator.userAgent'] = await context.page.evaluate('()=>window.navigator.userAgent')
 
-    await crawler.run(['https://test.com'])
+    await crawler.run([str(server_url / 'headers')])
 
     assert response_headers['User-Agent'] == fingerprints['window.navigator.userAgent']
 
 
-async def test_ignore_http_error_status_codes() -> None:
+async def test_ignore_http_error_status_codes(server_url: URL) -> None:
     """Test that error codes that would normally trigger session error can be ignored."""
     crawler = PlaywrightCrawler(ignore_http_error_status_codes={403})
-
+    target_url = str(server_url / 'status/403')
     mocked_handler = Mock()
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
         mocked_handler(context.request.url)
 
-    @crawler.pre_navigation_hook
-    async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
-        # Emulate server response to prevent Playwright from making real requests
-        await context.page.route('**/*', lambda route: route.fulfill(status=403))
+    await crawler.run([target_url])
 
-    await crawler.run(['https://test.com'])
-
-    mocked_handler.assert_called_once_with('https://test.com')
+    mocked_handler.assert_called_once_with(target_url)
 
 
-async def test_additional_http_error_status_codes() -> None:
+async def test_additional_http_error_status_codes(server_url: URL) -> None:
     """Test that use of `additional_http_error_status_codes` can raise error on common status code."""
     crawler = PlaywrightCrawler(additional_http_error_status_codes={200})
 
@@ -472,35 +426,26 @@ async def test_additional_http_error_status_codes() -> None:
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
         mocked_handler(context.request.url)
 
-    @crawler.pre_navigation_hook
-    async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
-        # Emulate server response to prevent Playwright from making real requests
-        await context.page.route('**/*', lambda route: route.fulfill(status=200))
-
-    await crawler.run(['https://test.com'])
+    await crawler.run([str(server_url)])
 
     mocked_handler.assert_not_called()
 
 
-async def test_launch_with_user_data_dir(tmp_path: Path) -> None:
+async def test_launch_with_user_data_dir(tmp_path: Path, server_url: URL) -> None:
     """Check that the persist context is created in the specified folder in `user_data_dir`."""
     check_path = tmp_path / 'Default'
     crawler = PlaywrightCrawler(
         headless=True, user_data_dir=tmp_path, request_handler=mock.AsyncMock(return_value=None)
     )
 
-    @crawler.pre_navigation_hook
-    async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
-        await context.page.route('**/*', lambda route: route.fulfill(status=200))
-
     assert not check_path.exists()
 
-    await crawler.run(['https://test.io'])
+    await crawler.run([str(server_url)])
 
     assert check_path.exists()
 
 
-async def test_launch_with_user_data_dir_and_fingerprint(tmp_path: Path) -> None:
+async def test_launch_with_user_data_dir_and_fingerprint(tmp_path: Path, server_url: URL) -> None:
     """Check that the persist context works with fingerprints."""
     check_path = tmp_path / 'Default'
     fingerprints = dict[str, str]()
@@ -515,11 +460,10 @@ async def test_launch_with_user_data_dir_and_fingerprint(tmp_path: Path) -> None
     @crawler.pre_navigation_hook
     async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
         fingerprints['window.navigator.userAgent'] = await context.page.evaluate('()=>window.navigator.userAgent')
-        await context.page.route('**/*', lambda route: route.fulfill(status=200))
 
     assert not check_path.exists()
 
-    await crawler.run(['https://test.io'])
+    await crawler.run([str(server_url)])
 
     assert check_path.exists()
 
