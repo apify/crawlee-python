@@ -11,9 +11,13 @@ from crawlee._cli import default_start_url,template_directory
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.test_utils import patch_crawlee_version_in_pyproject_toml_based_project
 
+# To run these tests locally, make sure you have apify-cli installed and available in the path.
+# https://docs.apify.com/cli/docs/installation
+
+
 @pytest.mark.parametrize("http_client", ["httpx", "curl-impersonate"])
 @pytest.mark.parametrize("crawler_type", ["parsel", "beautifulsoup"])
-@pytest.mark.parametrize("package_manager", ["uv", "poetry"])
+@pytest.mark.parametrize("package_manager", ["uv","poetry"])
 async def test_static_crawler_actor_at_apify(tmp_path: Path,
                                                       crawlee_wheel_path: Path,
                                                       package_manager: str,
