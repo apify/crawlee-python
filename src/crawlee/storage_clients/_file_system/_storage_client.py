@@ -7,8 +7,8 @@ from typing_extensions import override
 from crawlee.storage_clients._base import StorageClient
 
 from ._dataset_client import FileSystemDatasetClient
-from ._key_value_store import FileSystemKeyValueStoreClient
-from ._request_queue import FileSystemRequestQueueClient
+from ._key_value_store_client import FileSystemKeyValueStoreClient
+from ._request_queue_client import FileSystemRequestQueueClient
 
 if TYPE_CHECKING:
     from pathlib import Path
