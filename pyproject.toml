@@ -93,9 +93,6 @@ crawlee = "crawlee._cli:cli"
 [dependency-groups]
 dev = [
     "apify_client",  # For integration tests.
-    "build~=1.2.0",
-    "filelock~=3.18.0",
-    "ipdb~=0.13.0",
     "mypy~=1.15.0",
     "pre-commit~=4.2.0",
     "proxy-py~=2.4.0",

@@ -9,7 +9,7 @@ from cookiecutter.main import cookiecutter
 
 from crawlee._cli import default_start_url, template_directory
 from crawlee._utils.crypto import crypto_random_object_id
-from crawlee._utils.test_utils import patch_crawlee_version_in_pyproject_toml_based_project
+from tests.integration.project_template.utils import patch_crawlee_version_in_pyproject_toml_based_project
 
 # To run these tests locally, make sure you have apify-cli installed and available in the path.
 # https://docs.apify.com/cli/docs/installation
