@@ -14,7 +14,40 @@ RequestHandler = Callable[[TCrawlingContext], Awaitable[None]]
 
 @docs_group('Classes')
 class Router(Generic[TCrawlingContext]):
-    """Dispatches requests to registered handlers based on their labels."""
+    """Dispatches requests to registered handlers based on their labels.
+
+    Create a `Router` instance and decorate handlers with it, specifying the `label` parameter to correctly process
+    requests requiring different logic. Pass it to the crawler as the `request_handler` parameter.
+
+    ```python
+    from crawlee.crawlers import HttpCrawler, HttpCrawlingContext
+    from crawlee.router import Router
+
+    router = Router[HttpCrawlingContext]()
+
+
+    # Handler for requests without a matching label handler
+    @router.default_handler
+    async def basic_handler(context: HttpCrawlingContext) -> None:
+        context.log.info(f'Request without label {context.request.url} ...')
+
+
+    # Handler for category requests
+    @router.handler(label='category')
+    async def a_handler(context: HttpCrawlingContext) -> None:
+        context.log.info(f'Category request {context.request.url} ...')
+
+
+    # Handler for product requests
+    @router.handler(label='product')
+    async def b_handler(context: HttpCrawlingContext) -> None:
+        context.log.info(f'Product {context.request.url} ...')
+
+
+    crawler = HttpCrawler(request_handler=router)
+
+    await crawler.run()
+    """
 
     def __init__(self) -> None:
         self._default_handler: RequestHandler[TCrawlingContext] | None = None
