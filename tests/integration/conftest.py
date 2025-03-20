@@ -12,7 +12,7 @@ def crawlee_wheel_path(tmp_path_factory: pytest.TempPathFactory, testrun_uid: st
     """Build the package wheel if it hasn't been built yet, and return the path to the wheel."""
     # Make sure the wheel is not being built concurrently across all the pytest-xdist runners,
     # through locking the building process with a temp file.
-    with FileLock(tmp_path_factory.getbasetemp().parent / 'sdk_wheel_build.lock'):
+    with FileLock(tmp_path_factory.getbasetemp().parent / 'crawlee_wheel_build.lock'):
         # Make sure the wheel is built exactly once across all the pytest-xdist runners,
         # through an indicator file saying that the wheel was already built.
         was_wheel_built_this_test_run_file = tmp_path_factory.getbasetemp() / f'wheel_was_built_in_run_{testrun_uid}'
@@ -31,12 +31,12 @@ def crawlee_wheel_path(tmp_path_factory: pytest.TempPathFactory, testrun_uid: st
         for line in pyproject_toml_file.splitlines():
             if line.startswith('version = '):
                 delim = '"' if '"' in line else "'"
-                sdk_version = line.split(delim)[1]
+                crawlee_version = line.split(delim)[1]
                 break
         else:
             raise RuntimeError('Unable to find version string.')
 
-        wheel_path = _CRAWLEE_ROOT_PATH / 'dist' / f'crawlee-{sdk_version}-py3-none-any.whl'
+        wheel_path = _CRAWLEE_ROOT_PATH / 'dist' / f'crawlee-{crawlee_version}-py3-none-any.whl'
 
         # Just to be sure.
         assert wheel_path.exists()
