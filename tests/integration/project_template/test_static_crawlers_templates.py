@@ -14,7 +14,6 @@ from crawlee._utils.test_utils import patch_crawlee_version_in_pyproject_toml_ba
 # To run these tests locally, make sure you have apify-cli installed and available in the path.
 # https://docs.apify.com/cli/docs/installation
 
-
 @pytest.mark.parametrize("http_client", ["httpx", "curl-impersonate"])
 @pytest.mark.parametrize("crawler_type", ["parsel", "beautifulsoup"])
 @pytest.mark.parametrize("package_manager", ["uv","poetry"])
@@ -53,19 +52,21 @@ async def test_static_crawler_actor_at_apify(tmp_path: Path,
         cwd=tmp_path / actor_name,
     )
     subprocess.run(['apify', 'init', '-y', actor_name], capture_output=True, check=True, cwd=tmp_path / actor_name)  # noqa: ASYNC221, S603, S607
-    build_process = subprocess.run(['apify', 'push'], capture_output=True, check=True, cwd=tmp_path / actor_name)  # noqa: ASYNC221, S603, S607
 
+    build_process = subprocess.run(['apify', 'push'], capture_output=True, check=False, cwd=tmp_path / actor_name)  # noqa: ASYNC221, S603, S607
     # Get actor ID from build log
     actor_id_regexp = re.compile(r'https:\/\/console\.apify\.com\/actors\/(.*)#\/builds\/\d*\.\d*\.\d*')
     # Why is it in stderr and not in stdout???
     actor_id = re.findall(actor_id_regexp, build_process.stderr.decode())[0]
 
+    client = ApifyClientAsync(
+        token=os.getenv('APIFY_TEST_USER_API_TOKEN'), api_url=os.getenv('APIFY_INTEGRATION_TESTS_API_URL')
+    )
+    actor = client.actor(actor_id)
+
     # Run actor
     try:
-        client = ApifyClientAsync(
-            token=os.getenv('APIFY_TEST_USER_API_TOKEN'), api_url=os.getenv('APIFY_INTEGRATION_TESTS_API_URL')
-        )
-        actor = client.actor(actor_id)
+        assert build_process.returncode == 0
         started_run_data = await actor.start()
         actor_run = client.run(started_run_data['id'])
 
@@ -76,10 +77,11 @@ async def test_static_crawler_actor_at_apify(tmp_path: Path,
         await actor.delete()
 
     # Asserts
+    additional_run_info = f"Full actor run log: {actor_run_log}"
     assert actor_run_log
     assert finished_run_data
-    assert finished_run_data['status'] == 'SUCCEEDED'
+    assert finished_run_data['status'] == 'SUCCEEDED', additional_run_info
     assert (
         'Crawler.stop() was called with following reason: The crawler has reached its limit of 50 requests per crawl.'
-    ) in actor_run_log
-    assert int(re.findall(r'requests_finished\s*│\s*(\d*)', actor_run_log)[-1]) >= 50
+    ) in actor_run_log, additional_run_info
+    assert int(re.findall(r'requests_finished\s*│\s*(\d*)', actor_run_log)[-1]) >= 50, additional_run_info
