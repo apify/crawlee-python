@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from parsel import Selector
+
 from crawlee._utils.docs import docs_group
 from crawlee.crawlers import AbstractHttpCrawler, BasicCrawlerOptions
-from parsel import Selector
 
 from ._parsel_crawling_context import ParselCrawlingContext
 from ._parsel_parser import ParselParser

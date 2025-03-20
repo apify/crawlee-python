@@ -1,10 +1,10 @@
 from dataclasses import dataclass, fields
 
+from parsel import Selector
 from typing_extensions import Self
 
 from crawlee._utils.docs import docs_group
 from crawlee.crawlers._abstract_http import ParsedHttpCrawlingContext
-from parsel import Selector
 
 from ._utils import html_to_text
 

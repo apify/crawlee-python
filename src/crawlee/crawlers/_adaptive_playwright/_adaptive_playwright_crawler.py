@@ -9,6 +9,7 @@ from random import random
 from typing import TYPE_CHECKING, Any, Generic, get_args
 
 from bs4 import BeautifulSoup, Tag
+from parsel import Selector
 from typing_extensions import Self, TypeVar, override
 
 from crawlee._types import BasicCrawlingContext, JsonSerializable, RequestHandlerRunResult
@@ -27,7 +28,6 @@ from crawlee.crawlers import (
 from crawlee.crawlers._beautifulsoup._beautifulsoup_parser import BeautifulSoupParser
 from crawlee.crawlers._parsel._parsel_parser import ParselParser
 from crawlee.statistics import Statistics, StatisticsState
-from parsel import Selector
 
 from ._adaptive_playwright_crawler_statistics import (
     AdaptivePlaywrightCrawlerStatisticState,

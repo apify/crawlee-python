@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import re
 
+from parsel import Selector
+
 from crawlee._utils.html_to_text import (
     _ANY_CONSECUTIVE_WHITE_SPACES,
     _EMPTY_OR_ENDS_WITH_ANY_WHITE_SPACE,
@@ -9,7 +11,6 @@ from crawlee._utils.html_to_text import (
     BLOCK_TAGS,
     SKIP_TAGS,
 )
-from parsel import Selector
 
 
 def html_to_text(source: str | Selector) -> str:
