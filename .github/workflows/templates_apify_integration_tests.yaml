@@ -8,8 +8,8 @@ on:
         required: true
 
 jobs:
-  unit_tests:
-    name: Unit tests
+  integration_tests:
+    name: Integration tests
     strategy:
       fail-fast: false
 

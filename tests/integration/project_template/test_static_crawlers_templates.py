@@ -20,8 +20,7 @@ async def test_static_crawler_actor_at_apify(tmp_path: Path,
                                                       crawler_type: str,
                                                       http_client: str) -> None:
     # Generate new actor name
-    actor_name = (f'crawlee-python-template-integration-test-'
-                  f'{package_manager}-{crawler_type}-{http_client}-{crypto_random_object_id(8).lower()}')
+    actor_name = f'crawlee-python-template-integration-test-{crypto_random_object_id(8).lower()}'
 
     # Create project from template
     cookiecutter(
