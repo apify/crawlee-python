@@ -3,40 +3,37 @@ import subprocess
 from pathlib import Path
 
 
-def _inject_pip_install_crawlee_from_whl_to_docker_file(wheel_name: str, docker_file: Path, line_marker: str) -> None:
-    """Modify docker file to have crawlee .whl file available before the marker text."""
-    with open(docker_file) as f:
-        modified_lines = []
-        for line in f:
-            if line.startswith(line_marker):
-                # Add command to copy .whl to the docker image and pip install crawlee from it.
-                modified_lines.append(f"""COPY {wheel_name} ./\nRUN pip install ./{wheel_name}\n""")
-            modified_lines.append(line)
-
-    with open(docker_file, 'w') as f:
-        f.write(''.join(modified_lines))
-
-
-def patch_crawlee_version_in_uv_project(project_path: Path, wheel_path: Path) -> None:
+def patch_crawlee_version_in_pyproject_toml_based_project(project_path: Path, wheel_path: Path) -> None:
     """Ensure that the integration test is using current version of the crawlee from the source and not from Pypi."""
     # Copy prepared .whl file
     shutil.copy(wheel_path, project_path)
 
-    # Update the docker file just before installing the project to have .whl file available.
-    _inject_pip_install_crawlee_from_whl_to_docker_file(
-        docker_file=project_path / 'Dockerfile', wheel_name=wheel_path.name, line_marker='COPY pyproject.toml uv.lock'
-    )
+    # Inject crawlee wheel file to the docker image un update project to depend on it."""
+    with open(project_path / 'Dockerfile') as f:
+        modified_lines = []
+        for line in f:
+            modified_lines.append(line)
+            if line.startswith('COPY pyproject.toml'):
+                if 'uv.lock' in line:
+                    package_manager = 'uv'
+                elif 'poetry.lock' in line:
+                    package_manager = 'poetry'
+                else:
+                    raise RuntimeError('This does not look like a uv or poetry based project.')
 
-    # Add crawlee .whl dependency to the project toml and regenerate the lock file.
-    subprocess.run(
-        args=['uv', 'add', wheel_path.name],
-        cwd=str(project_path),
-        check=True,
-        capture_output=True,
-    )
-    subprocess.run(
-        args=['uv', 'lock'],
-        cwd=str(project_path),
-        check=True,
-        capture_output=True,
-    )
+                # Create lock file that is expected by the docker to exist(Even though it wil be patched in the docker).
+                subprocess.run(
+                    args=[package_manager, 'lock'],
+                    cwd=str(project_path),
+                    check=True,
+                    capture_output=True,
+                )
+
+                # Add command to copy .whl to the docker image and update project with it.
+                modified_lines.extend(
+                    [
+                        'COPY {wheel_name} ./',
+                        f'RUN {package_manager} add ./{wheel_path.name}',
+                        f'RUN {package_manager} lock',
+                    ]
+                )

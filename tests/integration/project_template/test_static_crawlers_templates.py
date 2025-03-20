@@ -3,29 +3,25 @@ import re
 import subprocess
 from pathlib import Path
 
+import pytest
 from apify_client import ApifyClientAsync
 from cookiecutter.main import cookiecutter
 
-from crawlee._cli import (
-    crawler_choices,
-    default_start_url,
-    http_client_choices,
-    package_manager_choices,
-    template_directory,
-)
+from crawlee._cli import default_start_url,template_directory
 from crawlee._utils.crypto import crypto_random_object_id
-from crawlee._utils.test_utils import patch_crawlee_version_in_uv_project
+from crawlee._utils.test_utils import patch_crawlee_version_in_pyproject_toml_based_project
 
-
-def generate_unique_actor_name(label: str) -> str:
-    """Generates a unique resource name, which will contain the given label."""
-    label = label.replace('_', '-')
-    return f'python-crawlee-integration-tests-{label}-generated-{crypto_random_object_id(8).lower()}'
-
-
-async def test_parsel_uv_template_actor_at_apify(tmp_path: Path, crawlee_wheel_path: Path) -> None:
+@pytest.mark.parametrize("http_client", ["httpx", "curl-impersonate"])
+@pytest.mark.parametrize("crawler_type", ["parsel", "beautifulsoup"])
+@pytest.mark.parametrize("package_manager", ["uv", "poetry"])
+async def test_static_crawler_actor_at_apify(tmp_path: Path,
+                                                      crawlee_wheel_path: Path,
+                                                      package_manager: str,
+                                                      crawler_type: str,
+                                                      http_client: str) -> None:
     # Generate new actor name
-    actor_name = generate_unique_actor_name('default')
+    actor_name = (f'crawlee-python-template-integration-test-'
+                  f'{package_manager}-{crawler_type}-{http_client}-{crypto_random_object_id(8).lower()}')
 
     # Create project from template
     cookiecutter(
@@ -33,9 +29,9 @@ async def test_parsel_uv_template_actor_at_apify(tmp_path: Path, crawlee_wheel_p
         no_input=True,
         extra_context={
             'project_name': actor_name,
-            'package_manager': package_manager_choices[2],
-            'crawler_type': crawler_choices[1],
-            'http_client': http_client_choices[0],
+            'package_manager': package_manager,
+            'crawler_type': crawler_type,
+            'http_client': http_client,
             'enable_apify_integration': True,
             'start_url': default_start_url,
         },
@@ -43,7 +39,8 @@ async def test_parsel_uv_template_actor_at_apify(tmp_path: Path, crawlee_wheel_p
         output_dir=tmp_path,
     )
 
-    patch_crawlee_version_in_uv_project(project_path=tmp_path / actor_name, wheel_path=crawlee_wheel_path)
+    patch_crawlee_version_in_pyproject_toml_based_project(
+        project_path=tmp_path / actor_name, wheel_path=crawlee_wheel_path)
 
     # Build actor using sequence of cli commands as the user would
     subprocess.run(  # noqa: ASYNC221, S603
