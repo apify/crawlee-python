@@ -119,7 +119,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/crawlee"]
+packages = ["src/crawlee/crawlee"]
 
 [tool.ruff]
 line-length = 120
@@ -212,7 +212,7 @@ timeout = 1200
 [tool.mypy]
 python_version = "3.9"
 plugins = ["pydantic.mypy"]
-exclude = ["project_template"]
+exclude = ["src/crawlee/project_template"]
 modules=["crawlee", "tests"]
 check_untyped_defs = true
 disallow_incomplete_defs = true
@@ -233,6 +233,7 @@ module = [
     "camoufox",             # Example code shows integration of camoufox and crawlee.
     "jaro",                 # Untyped and stubs not available
     "sklearn.linear_model", # Untyped and stubs not available
+    "cookiecutter.*",       # Untyped and stubs not available
 ]
 ignore_missing_imports = true
 

@@ -76,9 +76,10 @@ async def test_parsel_uv_template_actor_at_apify(tmp_path: Path, crawlee_wheel_p
         await actor.delete()
 
     # Asserts
+    assert actor_run_log
+    assert finished_run_data
     assert finished_run_data['status'] == 'SUCCEEDED'
     assert (
         'Crawler.stop() was called with following reason: The crawler has reached its limit of 50 requests per crawl.'
     ) in actor_run_log
     assert int(re.findall(r'requests_finished\s*│\s*(\d*)', actor_run_log)[-1]) >= 50
-    a:int = "ASD"
