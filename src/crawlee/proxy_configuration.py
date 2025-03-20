@@ -72,7 +72,7 @@ class ProxyConfiguration:
         new_url_function: _NewUrlFunction | None = None,
         tiered_proxy_urls: list[list[str | None]] | None = None,
     ) -> None:
-        """A default constructor.
+        """Initialize a new instance.
 
         Exactly one of `proxy_urls`, `tiered_proxy_urls` or `new_url_function` must be specified.
 
@@ -114,7 +114,7 @@ class ProxyConfiguration:
     async def new_proxy_info(
         self, session_id: str | None, request: Request | None, proxy_tier: int | None
     ) -> ProxyInfo | None:
-        """Returns a new ProxyInfo object based on the configured proxy rotation strategy.
+        """Return a new ProxyInfo object based on the configured proxy rotation strategy.
 
         Args:
             session_id: Session identifier. If provided, same proxy URL will be returned for
@@ -159,7 +159,7 @@ class ProxyConfiguration:
     async def new_url(
         self, session_id: str | None = None, request: Request | None = None, proxy_tier: int | None = None
     ) -> str | None:
-        """Returns a proxy URL string based on the configured proxy rotation strategy.
+        """Return a proxy URL string based on the configured proxy rotation strategy.
 
         Args:
             session_id: Session identifier. If provided, same proxy URL will be returned for

@@ -9,7 +9,6 @@ from random import random
 from typing import TYPE_CHECKING, Any, Generic, get_args
 
 from bs4 import BeautifulSoup, Tag
-from parsel import Selector
 from typing_extensions import Self, TypeVar, override
 
 from crawlee._types import BasicCrawlingContext, JsonSerializable, RequestHandlerRunResult
@@ -28,6 +27,7 @@ from crawlee.crawlers import (
 from crawlee.crawlers._beautifulsoup._beautifulsoup_parser import BeautifulSoupParser
 from crawlee.crawlers._parsel._parsel_parser import ParselParser
 from crawlee.statistics import Statistics, StatisticsState
+from parsel import Selector
 
 from ._adaptive_playwright_crawler_statistics import (
     AdaptivePlaywrightCrawlerStatisticState,
@@ -131,7 +131,7 @@ class AdaptivePlaywrightCrawler(
         statistics: Statistics[AdaptivePlaywrightCrawlerStatisticState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> None:
-        """A default constructor. Recommended way to create instance is to call factory methods.
+        """Initialize a new instance. Recommended way to create instance is to call factory methods.
 
         Recommended factory methods: `with_beautifulsoup_static_parser`, `with_parsel_static_parser`.
 
@@ -219,7 +219,7 @@ class AdaptivePlaywrightCrawler(
         statistics: Statistics[StatisticsState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[BeautifulSoup], BeautifulSoup, Tag]:
-        """Creates `AdaptivePlaywrightCrawler` that uses `BeautifulSoup` for parsing static content."""
+        """Create `AdaptivePlaywrightCrawler` that uses `BeautifulSoup` for parsing static content."""
         if statistics is not None:
             adaptive_statistics = statistics.replace_state_model(AdaptivePlaywrightCrawlerStatisticState)
         else:
@@ -244,7 +244,7 @@ class AdaptivePlaywrightCrawler(
         statistics: Statistics[StatisticsState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[Selector], Selector, Selector]:
-        """Creates `AdaptivePlaywrightCrawler` that uses `Parcel` for parsing static content."""
+        """Create `AdaptivePlaywrightCrawler` that uses `Parcel` for parsing static content."""
         if statistics is not None:
             adaptive_statistics = statistics.replace_state_model(AdaptivePlaywrightCrawlerStatisticState)
         else:

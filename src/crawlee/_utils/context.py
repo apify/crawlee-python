@@ -8,13 +8,19 @@ T = TypeVar('T', bound=Callable[..., Any])
 
 
 def ensure_context(method: T) -> T:
-    """Decorator to ensure the (async) context manager is initialized before calling the method.
+    """Ensure the (async) context manager is initialized before executing the method.
+
+    This decorator checks if the calling instance has an `active` attribute and verifies that it is set to `True`.
+    If the instance is inactive, it raises a `RuntimeError`. Works for both synchronous and asynchronous methods.
 
     Args:
         method: The method to wrap.
 
     Returns:
         The wrapped method with context checking applied.
+
+    Raises:
+        RuntimeError: If the instance lacks an `active` attribute or is not active.
     """
 
     @wraps(method)

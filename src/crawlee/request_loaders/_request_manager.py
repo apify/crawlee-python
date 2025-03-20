@@ -20,7 +20,7 @@ class RequestManager(RequestLoader, ABC):
 
     @abstractmethod
     async def drop(self) -> None:
-        """Removes persistent state either from the Apify Cloud storage or from the local database."""
+        """Remove persistent state either from the Apify Cloud storage or from the local database."""
 
     @abstractmethod
     async def add_request(

@@ -7,21 +7,20 @@ import pytest
 from apify_client import ApifyClientAsync
 from cookiecutter.main import cookiecutter
 
-from crawlee._cli import default_start_url,template_directory
+from crawlee._cli import default_start_url, template_directory
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.test_utils import patch_crawlee_version_in_pyproject_toml_based_project
 
 # To run these tests locally, make sure you have apify-cli installed and available in the path.
 # https://docs.apify.com/cli/docs/installation
 
-@pytest.mark.parametrize("http_client", ["httpx", "curl-impersonate"])
-@pytest.mark.parametrize("crawler_type", ["parsel", "beautifulsoup"])
-@pytest.mark.parametrize("package_manager", ["uv","poetry"])
-async def test_static_crawler_actor_at_apify(tmp_path: Path,
-                                                      crawlee_wheel_path: Path,
-                                                      package_manager: str,
-                                                      crawler_type: str,
-                                                      http_client: str) -> None:
+
+@pytest.mark.parametrize('http_client', ['httpx', 'curl-impersonate'])
+@pytest.mark.parametrize('crawler_type', ['parsel', 'beautifulsoup'])
+@pytest.mark.parametrize('package_manager', ['uv', 'poetry'])
+async def test_static_crawler_actor_at_apify(
+    tmp_path: Path, crawlee_wheel_path: Path, package_manager: str, crawler_type: str, http_client: str
+) -> None:
     # Generate new actor name
     actor_name = f'crawlee-python-template-integration-test-{crypto_random_object_id(8).lower()}'
 
@@ -42,7 +41,8 @@ async def test_static_crawler_actor_at_apify(tmp_path: Path,
     )
 
     patch_crawlee_version_in_pyproject_toml_based_project(
-        project_path=tmp_path / actor_name, wheel_path=crawlee_wheel_path)
+        project_path=tmp_path / actor_name, wheel_path=crawlee_wheel_path
+    )
 
     # Build actor using sequence of cli commands as the user would
     subprocess.run(  # noqa: ASYNC221, S603
@@ -77,7 +77,7 @@ async def test_static_crawler_actor_at_apify(tmp_path: Path,
         await actor.delete()
 
     # Asserts
-    additional_run_info = f"Full actor run log: {actor_run_log}"
+    additional_run_info = f'Full actor run log: {actor_run_log}'
     assert actor_run_log
     assert finished_run_data
     assert finished_run_data['status'] == 'SUCCEEDED', additional_run_info

@@ -11,7 +11,6 @@ from unittest.mock import Mock, call, patch
 import httpx
 import pytest
 from bs4 import Tag
-from parsel import Selector
 from typing_extensions import override
 
 from crawlee import Request
@@ -33,6 +32,7 @@ from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context
 )
 from crawlee.statistics import Statistics
 from crawlee.storages import KeyValueStore
+from parsel import Selector
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Iterator

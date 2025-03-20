@@ -1,5 +1,6 @@
+# ruff: noqa: E402, TID252
+
 # Due to patch_browserforge
-# ruff: noqa
 from .._browserforge_workaround import patch_browserforge
 
 patch_browserforge()

@@ -1,10 +1,10 @@
 from dataclasses import dataclass, fields
 
-from parsel import Selector
 from typing_extensions import Self
 
 from crawlee._utils.docs import docs_group
 from crawlee.crawlers._abstract_http import ParsedHttpCrawlingContext
+from parsel import Selector
 
 from ._utils import html_to_text
 
@@ -24,7 +24,7 @@ class ParselCrawlingContext(ParsedHttpCrawlingContext[Selector]):
 
     @classmethod
     def from_parsed_http_crawling_context(cls, context: ParsedHttpCrawlingContext[Selector]) -> Self:
-        """Convenience constructor that creates new context from existing `ParsedHttpCrawlingContext[BeautifulSoup]`."""
+        """Create a new context from an existing `ParsedHttpCrawlingContext[Selector]`."""
         return cls(**{field.name: getattr(context, field.name) for field in fields(context)})
 
     def html_to_text(self) -> str:

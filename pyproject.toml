@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "crawlee"
-version = "0.6.5"
+version = "0.6.6"
 description = "Crawlee for Python"
 authors = [{ name = "Apify Technologies s.r.o.", email = "support@apify.com" }]
 license = { file = "LICENSE" }
@@ -44,7 +44,6 @@ dependencies = [
     "pydantic-settings>=2.2.0,<2.7.0",
     "pydantic>=2.8.0,!=2.10.0,!=2.10.1,!=2.10.2",
     "pyee>=9.0.0",
-    "rich>=13.9.0",
     "sortedcollections>=2.1.0",
     "sortedcontainers>=2.4.0",
     "tldextract>=5.1.0",
@@ -66,7 +65,7 @@ all = [
     "playwright>=1.27.0",
     "scikit-learn==1.5.2; python_version == '3.9'",
     "scikit-learn>=1.6.0; python_version >= '3.10'",
-    'typer>=0.12.0'
+    'typer>=0.12.0',
 ]
 adaptive-crawler = [
     "jaro-winkler>=2.0.3",
@@ -75,7 +74,7 @@ adaptive-crawler = [
     "scikit-learn>=1.6.0; python_version >= '3.10'",
 ]
 beautifulsoup = ["beautifulsoup4[lxml]>=4.12.0", "html5lib>=1.0"]
-cli = ["cookiecutter>=2.6.0", "inquirer>=3.3.0", "typer>=0.12.0"]
+cli = ["cookiecutter>=2.6.0", "inquirer>=3.3.0", "rich>=13.9.0", "typer>=0.12.0"]
 curl-impersonate = ["curl-cffi>=0.9.0"]
 parsel = ["parsel>=1.10.0"]
 playwright = ["playwright>=1.27.0"]
@@ -98,24 +97,24 @@ dev = [
     "filelock~=3.18.0",
     "ipdb~=0.13.0",
     "mypy~=1.15.0",
-    "pre-commit~=4.1.0",
+    "pre-commit~=4.2.0",
     "proxy-py~=2.4.0",
     "pydoc-markdown~=4.8.0",
     "pytest-asyncio~=0.25.0",
     "pytest-cov~=6.0.0",
     "pytest-only~=2.1.0",
-    "pytest-timeout~=2.3.0",
     "pytest-xdist~=3.6.0",
     "pytest~=8.3.0",
     "respx~=0.22.0",
-    "ruff~=0.10.0",
-    "setuptools~=76.0.0",                    # setuptools are used by pytest, but not explicitly required
+    "ruff~=0.11.0",
+    "setuptools~=77.0.1",                    # setuptools are used by pytest, but not explicitly required
     "sortedcontainers-stubs~=2.4.0",
     "types-beautifulsoup4~=4.12.0.20240229",
     "types-cachetools~=5.5.0.20240820",
     "types-colorama~=0.4.15.20240106",
     "types-psutil~=7.0.0.20250218",
     "types-python-dateutil~=2.9.0.20240316",
+    "uvicorn[standard]~=0.34.0",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -124,7 +123,7 @@ packages = ["src/crawlee"]
 [tool.ruff]
 line-length = 120
 include = ["src/**/*.py", "tests/**/*.py", "docs/**/*.py", "website/**/*.py"]
-extend-exclude = ["project_template"]
+extend-exclude = ["src/crawlee/project_template"]
 
 [tool.ruff.lint]
 select = ["ALL"]
@@ -137,6 +136,9 @@ ignore = [
     "D100",     # Missing docstring in public module
     "D104",     # Missing docstring in public package
     "D107",     # Missing docstring in `__init__`
+    "D203",     # One blank line required before class docstring
+    "D213",     # Multi-line docstring summary should start at the second line
+    "D413",     # Missing blank line after last section
     "EM",       # flake8-errmsg
     "G004",     # Logging statement uses f-string
     "ISC001",   # This rule may cause conflicts when used with the formatter
@@ -194,9 +196,6 @@ runtime-evaluated-base-classes = [
 [tool.ruff.lint.flake8-builtins]
 builtins-ignorelist = ["id"]
 
-[tool.ruff.lint.pydocstyle]
-convention = "google"
-
 [tool.ruff.lint.isort]
 known-first-party = ["crawlee"]
 
@@ -213,7 +212,7 @@ timeout = 1200
 python_version = "3.9"
 plugins = ["pydantic.mypy"]
 exclude = ["src/crawlee/project_template"]
-modules=["crawlee", "tests"]
+files = ["src", "tests", "docs", "website"]
 check_untyped_defs = true
 disallow_incomplete_defs = true
 disallow_untyped_calls = true
@@ -225,15 +224,16 @@ warn_return_any = true
 warn_unreachable = true
 warn_unused_ignores = true
 
-
 [[tool.mypy.overrides]]
 # Example codes are sometimes showing integration of crawlee with external tool, which is not dependency of crawlee.
 module = [
-    "apify",                # Example code shows integration of apify and crawlee.
-    "camoufox",             # Example code shows integration of camoufox and crawlee.
-    "jaro",                 # Untyped and stubs not available
-    "sklearn.linear_model", # Untyped and stubs not available
-    "cookiecutter.*",       # Untyped and stubs not available
+    "apify",                        # Example code shows integration of apify and crawlee.
+    "apify_fingerprint_datapoints", # Untyped and stubs not available
+    "camoufox",                     # Example code shows integration of camoufox and crawlee.
+    "jaro",                         # Untyped and stubs not available
+    "loguru",                       # Example code shows integration of loguru and crawlee for JSON logging.
+    "sklearn.linear_model",         # Untyped and stubs not available
+    "cookiecutter.*",               # Untyped and stubs not available
 ]
 ignore_missing_imports = true
 

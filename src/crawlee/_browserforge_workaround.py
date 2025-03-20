@@ -1,16 +1,18 @@
-# ruff: noqa
+# ruff: noqa: N802
+
+
 def patch_browserforge() -> None:
     """Patches `browserforge` to use data from `apify_fingerprint_datapoints`.
 
-    This avoids import time or runtime file downloads."""
-
+    This avoids import time or runtime file downloads.
+    """
     # Temporary fix until https://github.com/daijro/browserforge/pull/29 is merged
     from pathlib import Path
-    from typing import Dict
-    import apify_fingerprint_datapoints  # type:ignore[import-untyped]
+
+    import apify_fingerprint_datapoints
     from browserforge import download
 
-    download.DATA_DIRS: Dict[str, Path] = {  # type:ignore[misc]
+    download.DATA_DIRS: dict[str, Path] = {  # type:ignore[misc]
         'headers': apify_fingerprint_datapoints.get_header_network().parent,
         'fingerprints': apify_fingerprint_datapoints.get_fingerprint_network().parent,
     }

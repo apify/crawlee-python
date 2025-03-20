@@ -34,13 +34,13 @@ async def test_initial_state() -> None:
     assert plugin.max_open_pages_per_browser == 10
 
 
-async def test_new_browser(plugin: PlaywrightBrowserPlugin, httpbin: URL) -> None:
+async def test_new_browser(plugin: PlaywrightBrowserPlugin, server_url: URL) -> None:
     browser_controller = await plugin.new_browser()
 
     assert browser_controller.is_browser_connected
 
     page = await browser_controller.new_page()
-    await page.goto(str(httpbin))
+    await page.goto(str(server_url))
 
     await page.close()
     await browser_controller.close()

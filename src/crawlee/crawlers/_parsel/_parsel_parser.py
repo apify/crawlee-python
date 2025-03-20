@@ -3,10 +3,10 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
-from parsel import Selector
 from typing_extensions import override
 
 from crawlee.crawlers._abstract_http import AbstractHttpParser
+from parsel import Selector
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence

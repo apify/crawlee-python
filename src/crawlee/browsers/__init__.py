@@ -1,10 +1,11 @@
+# ruff: noqa: E402, TID252
+
 from crawlee._utils.try_import import install_import_hook as _install_import_hook
 from crawlee._utils.try_import import try_import as _try_import
 
 _install_import_hook(__name__)
 
 # Due to patch_browserforge
-# ruff: noqa
 from .._browserforge_workaround import patch_browserforge
 
 patch_browserforge()
