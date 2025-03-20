@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 # TODO:
 # - inherit from storage class
 # - export methods
+# - caching / memoization of both datasets & dataset clients
 
 # Dataset
 # - properties:
@@ -116,29 +117,24 @@ class Dataset:
         id: str | None = None,
         name: str | None = None,
         purge_on_start: bool | None = None,
+        storage_dir: Path | None = None,
         configuration: Configuration | None = None,
         storage_client: StorageClient | None = None,
     ) -> Dataset:
         if id and name:
             raise ValueError('Only one of "id" or "name" can be specified, not both.')
 
-        configuration = configuration or service_locator.get_configuration()
-        storage_client = storage_client or service_locator.get_storage_client()
+        configuration = service_locator.get_configuration() if configuration is None else configuration
+        storage_client = service_locator.get_storage_client() if storage_client is None else storage_client
         purge_on_start = configuration.purge_on_start if purge_on_start is None else purge_on_start
+        storage_dir = Path(configuration.storage_dir) if storage_dir is None else storage_dir
 
-        dataset_client = await storage_client.dataset_client_class.open(
+        dataset_client = await storage_client.open_dataset_client(
             id=id,
             name=name,
-            storage_dir=Path(configuration.storage_dir),
+            purge_on_start=purge_on_start,
+            storage_dir=storage_dir,
         )
-
-        if purge_on_start:
-            await dataset_client.drop()
-            dataset_client = await storage_client.dataset_client_class.open(
-                id=id,
-                name=name,
-                storage_dir=Path(configuration.storage_dir),
-            )
 
         return cls(dataset_client)
 

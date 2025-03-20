@@ -1,3 +1,3 @@
-from ._storage_client import memory_storage_client
+from ._storage_client import MemoryStorageClient
 
-__all__ = ['memory_storage_client']
+__all__ = ['MemoryStorageClient']
