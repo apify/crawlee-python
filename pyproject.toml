@@ -119,7 +119,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/crawlee/crawlee"]
+packages = ["src/crawlee"]
 
 [tool.ruff]
 line-length = 120
