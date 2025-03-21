@@ -1,0 +1,52 @@
+name: Templates Apify integration tests
+
+on:
+  workflow_dispatch:
+    secrets:
+      APIFY_TEST_USER_API_TOKEN:
+        description: API token of the Python testing user on Apify
+        required: true
+
+jobs:
+  integration_tests:
+    name: Integration tests
+    strategy:
+      fail-fast: false
+
+    runs-on: "ubuntu-latest"
+    env:
+      python-version: "3.13"
+      node-version: "22"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.node-version }}
+
+      - name: Install dependencies
+        run: npm install -g apify-cli
+
+      - name: Set up Python ${{ env.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.python-version }}
+
+      - name: Install poetry
+        run: pipx install poetry
+
+      - name: Set up uv package manager
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ env.python-version }}
+
+      - name: Install Python dependencies
+        run: make install-dev
+
+      - name: Run Apify integration tests
+        run: make integration-tests
+        env:
+          APIFY_TEST_USER_API_TOKEN: ${{ secrets.APIFY_TEST_USER_API_TOKEN }}
