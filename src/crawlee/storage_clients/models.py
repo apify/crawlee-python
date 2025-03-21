@@ -47,8 +47,6 @@ class KeyValueStoreMetadata(StorageMetadata):
 
     model_config = ConfigDict(populate_by_name=True)
 
-    user_id: Annotated[str, Field(alias='userId')]
-
 
 @docs_group('Data structures')
 class RequestQueueMetadata(StorageMetadata):
@@ -61,7 +59,6 @@ class RequestQueueMetadata(StorageMetadata):
     pending_request_count: Annotated[int, Field(alias='pendingRequestCount')]
     stats: Annotated[dict, Field(alias='stats')]
     total_request_count: Annotated[int, Field(alias='totalRequestCount')]
-    user_id: Annotated[str, Field(alias='userId')]
     resource_directory: Annotated[str, Field(alias='resourceDirectory')]
 
 
