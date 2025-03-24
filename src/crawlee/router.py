@@ -14,10 +14,13 @@ RequestHandler = Callable[[TCrawlingContext], Awaitable[None]]
 
 @docs_group('Classes')
 class Router(Generic[TCrawlingContext]):
-    """Dispatches requests to registered handlers based on their labels.
+    """A request dispatching system that routes requests to registered handlers based on their labels.
 
-    Create a `Router` instance and decorate handlers with it, specifying the `label` parameter to correctly process
-    requests requiring different logic. Pass it to the crawler as the `request_handler` parameter.
+    The `Router` allows you to define and register request handlers for specific labels. When a request is received,
+    the router invokes the corresponding `request_handler` based on the request's `label`. If no matching handler
+    is found, the default handler is used.
+
+    ### Usage
 
     ```python
     from crawlee.crawlers import HttpCrawler, HttpCrawlingContext
@@ -28,25 +31,25 @@ class Router(Generic[TCrawlingContext]):
 
     # Handler for requests without a matching label handler
     @router.default_handler
-    async def basic_handler(context: HttpCrawlingContext) -> None:
+    async def default_handler(context: HttpCrawlingContext) -> None:
         context.log.info(f'Request without label {context.request.url} ...')
 
 
     # Handler for category requests
     @router.handler(label='category')
-    async def a_handler(context: HttpCrawlingContext) -> None:
+    async def category_handler(context: HttpCrawlingContext) -> None:
         context.log.info(f'Category request {context.request.url} ...')
 
 
     # Handler for product requests
     @router.handler(label='product')
-    async def b_handler(context: HttpCrawlingContext) -> None:
+    async def product_handler(context: HttpCrawlingContext) -> None:
         context.log.info(f'Product {context.request.url} ...')
 
 
-    crawler = HttpCrawler(request_handler=router)
-
-    await crawler.run()
+    async def main() -> None:
+        crawler = HttpCrawler(request_handler=router)
+        await crawler.run()
     """
 
     def __init__(self) -> None:
