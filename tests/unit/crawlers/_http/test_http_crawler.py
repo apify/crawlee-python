@@ -673,3 +673,18 @@ async def test_store_multidomain_cookies(server: respx.MockRouter) -> None:
 
 def test_default_logger() -> None:
     assert HttpCrawler().log.name == 'HttpCrawler'
+
+
+async def test_get_snapshot(server_url: URL) -> None:
+    crawler = HttpCrawler()
+
+    snapshot = None
+    @crawler.router.default_handler
+    async def request_handler(context: HttpCrawlingContext) -> None:
+        nonlocal snapshot
+        snapshot = await context.get_snapshot()
+
+    await crawler.run([str(server_url)])
+
+    assert (snapshot.html ==
+            '<html>\n        <head>\n            <title>Hello, world!</title>\n        </head>\n    </html>')

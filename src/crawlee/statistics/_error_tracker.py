@@ -6,10 +6,12 @@ import traceback
 from collections import Counter, defaultdict
 from itertools import zip_longest
 from logging import getLogger
-from typing import Union
+from typing import TYPE_CHECKING, Union
 
-from crawlee._types import BasicCrawlingContext
 from crawlee.statistics._error_snapshotter import ErrorSnapshotter
+
+if TYPE_CHECKING:
+    from crawlee._types import BasicCrawlingContext
 
 GroupName = Union[str, None]
 ErrorFilenameGroups = dict[GroupName, dict[GroupName, Counter[GroupName]]]

@@ -471,8 +471,7 @@ async def test_launch_with_user_data_dir_and_fingerprint(tmp_path: Path, server_
     assert 'headless' not in fingerprints['window.navigator.userAgent'].lower()
 
 
-async def test_get_snapshot(tmp_path: Path, server_url: URL) -> None:
-
+async def test_get_snapshot(server_url: URL) -> None:
     crawler = PlaywrightCrawler()
 
     snapshot = None
@@ -481,7 +480,10 @@ async def test_get_snapshot(tmp_path: Path, server_url: URL) -> None:
         nonlocal snapshot
         snapshot = await context.get_snapshot()
 
-    await crawler.run(['https://crawlee.dev/'])
+    await crawler.run([str(server_url)])
 
-    assert snapshot
-
+    assert snapshot.screenshot
+    assert snapshot.html == ('<html><head>\n            '
+                             '<title>Hello, world!</title>\n        '
+                             '</head>\n    '
+                             '<body></body></html>')

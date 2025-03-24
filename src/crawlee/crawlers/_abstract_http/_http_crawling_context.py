@@ -24,8 +24,8 @@ class HttpCrawlingContext(BasicCrawlingContext, HttpCrawlingResult):
         context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
         return cls(http_response=http_response, **context_kwargs)
 
-    def get_snapshot(self) -> PageSnapshot:
-        return PageSnapshot(html=self.http_response.read())
+    async def get_snapshot(self) -> PageSnapshot:
+        return PageSnapshot(html=self.http_response.read().decode('utf-8'))
 
 
 @dataclass(frozen=True)
