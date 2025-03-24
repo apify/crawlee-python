@@ -5,11 +5,18 @@ from __future__ import annotations
 import traceback
 from collections import Counter, defaultdict
 from itertools import zip_longest
+from logging import getLogger
 from typing import Union
+
+from crawlee._types import BasicCrawlingContext
+from crawlee.statistics._error_snapshotter import ErrorSnapshotter
 
 GroupName = Union[str, None]
 ErrorFilenameGroups = dict[GroupName, dict[GroupName, Counter[GroupName]]]
 
+
+
+logger = getLogger(__name__)
 
 class ErrorTracker:
     """Track errors and aggregates their counts by similarity."""
@@ -21,7 +28,9 @@ class ErrorTracker:
         show_file_and_line_number: bool = True,
         show_error_message: bool = True,
         show_full_message: bool = False,
+        save_error_snapshots: bool = False,
     ) -> None:
+        self.error_snapshotter = ErrorSnapshotter() if save_error_snapshots else None
         self.show_error_name = show_error_name
         self.show_file_and_line_number = show_file_and_line_number
         self.show_error_message = show_error_message
@@ -57,6 +66,16 @@ class ErrorTracker:
             else:
                 # No similar message found. Create new group.
                 self._errors[error_group_file_and_line][error_group_name].update([error_group_message])
+
+    def capture_snapshots(self, storage: dict, error: Exception, context: BasicCrawlingContext) -> None:
+        if self.error_snapshotter:
+            try:
+                self.error_snapshotter.capture_snapshot(error, context)
+            except Exception:
+                logger.exception(
+                    f'Error during snapshot capture for exception: {error}'
+                )
+
 
     def _get_file_and_line(self, error: Exception) -> str | None:
         if self.show_file_and_line_number:
