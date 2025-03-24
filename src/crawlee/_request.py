@@ -254,8 +254,8 @@ class Request(BaseModel):
             payload: The data to be sent as the request body. Typically used with 'POST' or 'PUT' requests.
             label: A custom label to differentiate between request types. This is stored in `user_data`, and it is
                 used for request routing (different requests go to different handlers).
-            session_id: ID of a specific Session to which the request will be strictly bound.
-                If the session becomes unavailable when the request is processed, a RequestCollisionError will be
+            session_id: ID of a specific `Session` to which the request will be strictly bound.
+                If the `Session` becomes unavailable when the request is processed, a `RequestCollisionError` will be
                 raised.
             unique_key: A unique key identifying the request. If not provided, it is automatically computed based on
                 the URL and other parameters. Requests with the same `unique_key` are treated as identical.
