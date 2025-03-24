@@ -71,9 +71,9 @@ These examples demonstrate the basics of configuring and using the <ApiLink to="
 
 Please, bear in mind that <ApiLink to="class/SessionPool">`SessionPool`</ApiLink> requires some time to establish a stable pool of working IPs. During the initial setup, you may encounter errors as the pool identifies and filters out blocked or non-functional IPs. This stabilization period is expected and will improve over time.
 
-## Single Session Configuration
+## Configuring a single session
 
-In some cases, you need fine-grained control over session usage. For example, when working with websites requiring authentication or initialization of certain parameters like cookies.
+In some cases, you need full control over session usage. For example, when working with websites requiring authentication or initialization of certain parameters like cookies.
 
 When working with a site that requires authentication, we typically don't want multiple sessions with different browser fingerprints or client parameters accessing the site. In this case, we need to configure the <ApiLink to="class/SessionPool">`SessionPool`</ApiLink> appropriately:
 
@@ -81,7 +81,7 @@ When working with a site that requires authentication, we typically don't want m
     {OneSession}
 </CodeBlock>
 
-## Binding Requests to Specific Sessions
+## Binding requests to specific sessions
 
 In the previous example, there's one obvious limitation - you're restricted to only one session.
 
