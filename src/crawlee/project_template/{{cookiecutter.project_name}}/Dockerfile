@@ -95,4 +95,4 @@ RUN python -m camoufox fetch
 # % endif
 
 # Specify how to launch the source code of your Actor.
-CMD ["python", "-m", "{{ cookiecutter.__package_name }}"]
+CMD ["python", "-m", "src"]

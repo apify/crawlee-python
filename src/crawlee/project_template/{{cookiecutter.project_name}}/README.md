@@ -20,7 +20,7 @@ poetry install
 Finally, launch the crawler with:
 
 ```sh
-poetry run python -m {{cookiecutter.__package_name}}
+poetry run python -m src
 ```
 {% elif cookiecutter.package_manager == 'pip' -%}
 To install dependencies, your can run the following command:
@@ -32,7 +32,7 @@ python -m pip install .
 When the dependencies are installed, you may launch the crawler with:
 
 ```sh
-python -m {{cookiecutter.__package_name}}
+python -m src
 ```
 
 {% elif cookiecutter.package_manager == 'uv' -%}
@@ -51,7 +51,7 @@ uv sync
 Finally, launch the crawler with:
 
 ```sh
-uv run python -m {{cookiecutter.__package_name}}
+uv run python -m src
 ```
 {% elif cookiecutter.package_manager == 'pip' -%}
 To install dependencies, your can run the following command:
@@ -63,7 +63,7 @@ python -m pip install .
 When the dependencies are installed, you may launch the crawler with:
 
 ```sh
-python -m {{cookiecutter.__package_name}}
+python -m src
 ```
 {% elif cookiecutter.package_manager == 'manual' -%}
 You selected the manual dependency installation method, so you're on your own. There is a simple `requirements.txt` file to get you started.
