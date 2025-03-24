@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 def create_default_comparator(
     result_checker: Callable[[RequestHandlerRunResult], bool] | None,
 ) -> Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool]:
-    """Factory for creating comparator function."""
+    """Create a default comparator function for evaluating request handler results."""
     if result_checker:
         # Fallback comparator if only user-specific checker is defined.
         return lambda result_1, result_2: result_checker(result_1) and result_checker(result_2)

@@ -93,7 +93,7 @@ crawlee = "crawlee._cli:cli"
 [dependency-groups]
 dev = [
     "mypy~=1.15.0",
-    "pre-commit~=4.1.0",
+    "pre-commit~=4.2.0",
     "proxy-py~=2.4.0",
     "pydoc-markdown~=4.8.0",
     "pytest-asyncio~=0.25.0",
@@ -103,13 +103,14 @@ dev = [
     "pytest~=8.3.0",
     "respx~=0.22.0",
     "ruff~=0.11.0",
-    "setuptools~=76.0.0",                    # setuptools are used by pytest, but not explicitly required
+    "setuptools~=77.0.1",                    # setuptools are used by pytest, but not explicitly required
     "sortedcontainers-stubs~=2.4.0",
     "types-beautifulsoup4~=4.12.0.20240229",
     "types-cachetools~=5.5.0.20240820",
     "types-colorama~=0.4.15.20240106",
     "types-psutil~=7.0.0.20250218",
     "types-python-dateutil~=2.9.0.20240316",
+    "uvicorn[standard]~=0.34.0",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -131,6 +132,9 @@ ignore = [
     "D100",     # Missing docstring in public module
     "D104",     # Missing docstring in public package
     "D107",     # Missing docstring in `__init__`
+    "D203",     # One blank line required before class docstring
+    "D213",     # Multi-line docstring summary should start at the second line
+    "D413",     # Missing blank line after last section
     "EM",       # flake8-errmsg
     "G004",     # Logging statement uses f-string
     "ISC001",   # This rule may cause conflicts when used with the formatter
@@ -187,9 +191,6 @@ runtime-evaluated-base-classes = [
 
 [tool.ruff.lint.flake8-builtins]
 builtins-ignorelist = ["id"]
-
-[tool.ruff.lint.pydocstyle]
-convention = "google"
 
 [tool.ruff.lint.isort]
 known-first-party = ["crawlee"]

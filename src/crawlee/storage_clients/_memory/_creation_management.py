@@ -31,7 +31,7 @@ logger = getLogger(__name__)
 
 
 async def persist_metadata_if_enabled(*, data: dict, entity_directory: str, write_metadata: bool) -> None:
-    """Updates or writes metadata to a specified directory.
+    """Update or writes metadata to a specified directory.
 
     The function writes a given metadata dictionary to a JSON file within a specified directory.
     The writing process is skipped if `write_metadata` is False. Before writing, it ensures that
@@ -65,7 +65,7 @@ def find_or_create_client_by_id_or_name_inner(
     id: str | None = None,
     name: str | None = None,
 ) -> TResourceClient | None:
-    """Locates or creates a new storage client based on the given ID or name.
+    """Locate or create a new storage client based on the given ID or name.
 
     This method attempts to find a storage client in the memory cache first. If not found,
     it tries to locate a storage directory by name. If still not found, it searches through

@@ -69,7 +69,7 @@ class RequestQueueClient(ABC):
     async def list_and_lock_head(self, *, lock_secs: int, limit: int | None = None) -> RequestQueueHeadWithLocks:
         """Fetch and lock a specified number of requests from the start of the queue.
 
-        Retrieves and locks the first few requests of a queue for the specified duration. This prevents the requests
+        Retrieve and locks the first few requests of a queue for the specified duration. This prevents the requests
         from being fetched by another client until the lock expires.
 
         Args:
