@@ -1233,11 +1233,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         """Raise an exception if a request cannot access required resources.
 
         Args:
-            request: The Request that might require specific resources (like a session).
-            session: The Session object that was retrieved for the request, or None if not available.
+            request: The `Request` that might require specific resources (like a session).
+            session: The `Session` that was retrieved for the request, or `None` if not available.
 
         Raises:
-            RequestCollisionError: If the Session referenced by the request is not available.
+            RequestCollisionError: If the `Session` referenced by the `Request` is not available.
         """
         if self._use_session_pool and request.session_id and not session:
             raise RequestCollisionError(
