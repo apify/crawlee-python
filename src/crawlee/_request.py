@@ -322,7 +322,7 @@ class Request(BaseModel):
 
     @property
     def session_id(self) -> str | None:
-        """A string used to identify the bound session."""
+        """The ID of the bound session, if there is any."""
         return self.crawlee_data.session_id
 
     @property
