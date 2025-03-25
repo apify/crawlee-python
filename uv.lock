@@ -703,7 +703,7 @@ dev = [
     { name = "pytest-xdist", specifier = "~=3.6.0" },
     { name = "respx", specifier = "~=0.22.0" },
     { name = "ruff", specifier = "~=0.11.0" },
-    { name = "setuptools", specifier = "~=77.0.1" },
+    { name = "setuptools", specifier = "~=78.0.2" },
     { name = "sortedcontainers-stubs", specifier = "~=2.4.0" },
     { name = "types-beautifulsoup4", specifier = "~=4.12.0.20240229" },
     { name = "types-cachetools", specifier = "~=5.5.0.20240820" },
@@ -2527,11 +2527,11 @@ wheels = [
 
 [[package]]
 name = "setuptools"
-version = "77.0.1"
+version = "78.0.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/ea/df/9f719dc48f64284be8bd99e2e0bb0dd6e9f8e2c2c3c7bf7a685bc5adf2c7/setuptools-77.0.1.tar.gz", hash = "sha256:a1246a1b4178c66d7cf50c9fc6d530fac3f89bc284cf803c7fa878c41b1a03b2", size = 1366225 }
+sdist = { url = "https://files.pythonhosted.org/packages/4c/f4/aa8d364f0dc1f33b2718938648c31202e2db5cd6479a73f0a9ca5a88372d/setuptools-78.0.2.tar.gz", hash = "sha256:137525e6afb9022f019d6e884a319017f9bf879a0d8783985d32cbc8683cab93", size = 1367747 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/40/50/bc3d02829a3babd70b7f1414c93cf6acd198976f0469a07d0e7b813c5002/setuptools-77.0.1-py3-none-any.whl", hash = "sha256:81a234dff81a82bb52e522c8aef145d0dd4de1fd6de4d3b196d0f77dc2fded26", size = 1254282 },
+    { url = "https://files.pythonhosted.org/packages/aa/db/2fd473dfe436ad19fda190f4079162d400402aedfcc41e048d38c0a375c6/setuptools-78.0.2-py3-none-any.whl", hash = "sha256:4a612c80e1f1d71b80e4906ce730152e8dec23df439f82731d9d0b608d7b700d", size = 1255965 },
 ]
 
 [[package]]
