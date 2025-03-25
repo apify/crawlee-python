@@ -124,8 +124,8 @@ function BenefitsSection() {
                     <ThemedImage
                         alt="Work with your favorite tools"
                         sources={{
-                            light: 'img/favorite-tools-light.webp',
-                            dark: 'img/favorite-tools-dark.webp',
+                            light: '/python/img/favorite-tools-light.webp',
+                            dark: '/python/img/favorite-tools-dark.webp',
                         }}
                     />
                 }
@@ -156,8 +156,8 @@ function OtherFeaturesSection() {
                     <Link className={styles.cardWithImage} to="/docs/guides/scaling-crawlers">
                         <ThemedImage
                             sources={{
-                                light: 'img/auto-scaling-light.webp',
-                                dark: 'img/auto-scaling-dark.webp',
+                                light: '/python/img/auto-scaling-light.webp',
+                                dark: '/python/img/auto-scaling-dark.webp',
                             }}
                             alt=""
                         />
@@ -176,8 +176,8 @@ function OtherFeaturesSection() {
                     <Link className={styles.cardWithImage} to="/docs/guides/proxy-management">
                         <ThemedImage
                             sources={{
-                                light: 'img/smart-proxy-light.webp',
-                                dark: 'img/smart-proxy-dark.webp',
+                                light: '/python/img/smart-proxy-light.webp',
+                                dark: '/python/img/smart-proxy-dark.webp',
                             }}
                             alt=""
                         />
@@ -200,8 +200,8 @@ function OtherFeaturesSection() {
                             icon: (
                                 <ThemedImage
                                     sources={{
-                                        light: 'img/queue-light-icon.svg',
-                                        dark: 'img/queue-dark-icon.svg',
+                                        light: '/python/img/queue-light-icon.svg',
+                                        dark: '/python/img/queue-dark-icon.svg',
                                     }}
                                     alt=""
                                 />
@@ -215,8 +215,8 @@ function OtherFeaturesSection() {
                             icon: (
                                 <ThemedImage
                                     sources={{
-                                        light: 'img/scraping-utils-light-icon.svg',
-                                        dark: 'img/scraping-utils-dark-icon.svg',
+                                        light: '/python/img/scraping-utils-light-icon.svg',
+                                        dark: '/python/img/scraping-utils-dark-icon.svg',
                                     }}
                                     alt=""
                                 />
@@ -231,8 +231,8 @@ function OtherFeaturesSection() {
                             icon: (
                                 <ThemedImage
                                     sources={{
-                                        light: 'img/routing-light-icon.svg',
-                                        dark: 'img/routing-dark-icon.svg',
+                                        light: '/python/img/routing-light-icon.svg',
+                                        dark: '/python/img/routing-dark-icon.svg',
                                     }}
                                     alt=""
                                 />
@@ -318,8 +318,8 @@ function BuildFastScrapersSection() {
                         icon: (
                             <ThemedImage
                                 sources={{
-                                    light: 'img/zero-setup-light-icon.svg',
-                                    dark: 'img/zero-setup-dark-icon.svg',
+                                    light: '/python/img/zero-setup-light-icon.svg',
+                                    dark: '/python/img/zero-setup-dark-icon.svg',
                                 }}
                                 alt=""
                             />
@@ -336,8 +336,8 @@ function BuildFastScrapersSection() {
                         icon: (
                             <ThemedImage
                                 sources={{
-                                    light: 'img/defaults-light-icon.svg',
-                                    dark: 'img/defaults-dark-icon.svg',
+                                    light: '/python/img/defaults-light-icon.svg',
+                                    dark: '/python/img/defaults-dark-icon.svg',
                                 }}
                                 alt=""
                             />
@@ -354,8 +354,8 @@ function BuildFastScrapersSection() {
                         icon: (
                             <ThemedImage
                                 sources={{
-                                    light: 'img/community-light-icon.svg',
-                                    dark: 'img/community-dark-icon.svg',
+                                    light: '/python/img/community-light-icon.svg',
+                                    dark: '/python/img/community-dark-icon.svg',
                                 }}
                                 alt=""
                             />
