@@ -60,14 +60,14 @@ module.exports = {
         //                 'deployment/aws-browsers',
         //             ],
         //         },
-        //         {
-        //             type: 'category',
-        //             label: 'Deploy to Google Cloud',
-        //             items: [
-        //                 'deployment/gcp-cheerio',
-        //                 'deployment/gcp-browsers',
-        //             ],
-        //         },
+                {
+                    type: 'category',
+                    label: 'Deploy to Google Cloud',
+                    items: [
+                        'deployment/gcp-functions',
+                        // 'deployment/gcp-browsers',
+                    ],
+                },
             ],
         },
         {
