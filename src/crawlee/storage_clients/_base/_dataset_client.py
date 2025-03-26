@@ -56,6 +56,7 @@ class DatasetClient(ABC):
     @abstractmethod
     async def open(
         cls,
+        *,
         id: str | None,
         name: str | None,
         storage_dir: Path,
@@ -82,7 +83,7 @@ class DatasetClient(ABC):
         """
 
     @abstractmethod
-    async def push_data(self, data: list[Any] | dict[str, Any]) -> None:
+    async def push_data(self, *, data: list[Any] | dict[str, Any]) -> None:
         """Push data to the dataset.
 
         The backend method for the `Dataset.push_data` call.
