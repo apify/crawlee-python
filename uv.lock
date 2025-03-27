@@ -571,6 +571,7 @@ dependencies = [
     { name = "eval-type-backport" },
     { name = "httpx", extra = ["brotli", "http2", "zstd"] },
     { name = "more-itertools" },
+    { name = "pathvalidate" },
     { name = "psutil" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
@@ -668,6 +669,7 @@ requires-dist = [
     { name = "more-itertools", specifier = ">=10.2.0" },
     { name = "parsel", marker = "extra == 'all'", specifier = ">=1.10.0" },
     { name = "parsel", marker = "extra == 'parsel'", specifier = ">=1.10.0" },
+    { name = "pathvalidate", specifier = ">=3.2.3" },
     { name = "playwright", marker = "extra == 'adaptive-crawler'", specifier = ">=1.27.0" },
     { name = "playwright", marker = "extra == 'all'", specifier = ">=1.27.0" },
     { name = "playwright", marker = "extra == 'playwright'", specifier = ">=1.27.0" },
@@ -1726,6 +1728,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/ca/bc/f35b8446f4531a7cb215605d100cd88b7ac6f44ab3fc94870c120ab3adbf/pathspec-0.12.1.tar.gz", hash = "sha256:a482d51503a1ab33b1c67a6c3813a26953dbdc71c31dacaef9a838c4e29f5712", size = 51043 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cc/20/ff623b09d963f88bfde16306a54e12ee5ea43e9b597108672ff3a408aad6/pathspec-0.12.1-py3-none-any.whl", hash = "sha256:a0d503e138a4c123b27490a4f7beda6a01c6f288df0e4a8b79c7eb0dc7b4cc08", size = 31191 },
+]
+
+[[package]]
+name = "pathvalidate"
+version = "3.2.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/92/87/c7a2f51cc62df0495acb0ed2533a7c74cc895e569a1b020ee5f6e9fa4e21/pathvalidate-3.2.3.tar.gz", hash = "sha256:59b5b9278e30382d6d213497623043ebe63f10e29055be4419a9c04c721739cb", size = 61717 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/50/14/c5a0e1a947909810fc4c043b84cac472b70e438148d34f5393be1bac663f/pathvalidate-3.2.3-py3-none-any.whl", hash = "sha256:5eaf0562e345d4b6d0c0239d0f690c3bd84d2a9a3c4c73b99ea667401b27bee1", size = 24130 },
 ]
 
 [[package]]

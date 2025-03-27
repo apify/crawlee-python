@@ -305,6 +305,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 enqueue_links=enqueue_links,
                 block_requests=partial(block_requests, page=context.page),
             )
+        print("a")
+    print("b")
 
     async def _handle_status_code_response(
         self, context: PlaywrightCrawlingContext

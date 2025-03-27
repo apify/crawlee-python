@@ -9,6 +9,7 @@ from logging import getLogger
 from typing import TYPE_CHECKING, Union
 
 from crawlee.statistics._error_snapshotter import ErrorSnapshotter
+from crawlee.storages import KeyValueStore
 
 if TYPE_CHECKING:
     from crawlee._types import BasicCrawlingContext
@@ -41,13 +42,18 @@ class ErrorTracker:
         self.show_full_message = show_full_message
         self._errors: ErrorFilenameGroups = defaultdict(lambda: defaultdict(Counter))
 
-    def add(self, error: Exception) -> None:
+    async def add(self, error: Exception, context: BasicCrawlingContext, kvs: KeyValueStore |None =None) -> None:
         """Include an error in the statistics."""
+        if self.error_snapshotter and not kvs:
+            raise ValueError(
+                '`ErrorTracker` with  `save_error_snapshots=True` has to call `add` method with `kvs` argument.')
+
         error_group_name = error.__class__.__name__ if self.show_error_name else None
         error_group_message = self._get_error_message(error)
+        new_error_group_message = '' # In case of wildcard similarity match
         error_group_file_and_line = self._get_file_and_line(error)
 
-        # First two levels lare grouped only in case of exact match.
+        # First two levels are grouped only in case of exact match.
         specific_groups = self._errors[error_group_file_and_line][error_group_name]
 
         # Lowest level group is matched by similarity.
@@ -69,13 +75,26 @@ class ErrorTracker:
                 # No similar message found. Create new group.
                 self._errors[error_group_file_and_line][error_group_name].update([error_group_message])
 
-    def capture_snapshots(self, storage: dict, error: Exception, context: BasicCrawlingContext) -> None:
+        if self._errors[error_group_file_and_line][error_group_name][new_error_group_message or error_group_message] == 1:
+            # Save snapshot only on first the occurrence of the error
+            await self.capture_snapshots(
+                error_message=new_error_group_message or error_group_message,
+                file_and_line=error_group_file_and_line,
+                context=context,
+                kvs = kvs
+            )
+
+
+    async def capture_snapshots(self, error_message: str, file_and_line: str,  context: BasicCrawlingContext, kvs: KeyValueStore) -> None:
         if self.error_snapshotter:
             try:
-                self.error_snapshotter.capture_snapshot(error, context)
+                await self.error_snapshotter.capture_snapshot(error_message=error_message,
+                                                              file_and_line=file_and_line,
+                                                              context=context,
+                                                              kvs=kvs)
             except Exception:
                 logger.exception(
-                    f'Error during snapshot capture for exception: {error}'
+                    f'Error during snapshot capture for exception: {error_message}'
                 )
 
 

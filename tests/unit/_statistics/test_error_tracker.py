@@ -98,3 +98,5 @@ def test_show_full_message(*, show_full_message: bool, expected_message: str) ->
         error_tracker.add(e)
 
     assert error_tracker.get_most_common_errors()[0][0] == expected_message
+
+

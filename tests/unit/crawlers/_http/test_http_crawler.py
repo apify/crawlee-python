@@ -14,6 +14,7 @@ from crawlee import ConcurrencySettings, Request
 from crawlee.crawlers import HttpCrawler
 from crawlee.http_clients import CurlImpersonateHttpClient, HttpxHttpClient
 from crawlee.sessions import SessionPool
+from crawlee.statistics import Statistics
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable
@@ -688,3 +689,23 @@ async def test_get_snapshot(server_url: URL) -> None:
 
     assert (snapshot.html ==
             '<html>\n        <head>\n            <title>Hello, world!</title>\n        </head>\n    </html>')
+
+
+async def test_error_snapshots(server_url: URL):
+    crawler = HttpCrawler(statistics=Statistics.with_default_state(save_error_snapshots=True))
+
+    @crawler.router.default_handler
+    async def request_handler(context: HttpCrawlingContext) -> None:
+        raise Exception(r'Exception /\ with file name unfriendly symbols.')
+
+    await crawler.run([str(server_url)])
+
+    kvs = await crawler.get_key_value_store()
+    kvs_content = {}
+    async for key_info in kvs.iterate_keys():
+        kvs_content[key_info.key] = await kvs.get_value(key_info.key)
+
+    assert len(kvs_content) == 1
+    assert key_info.key.endswith(".html")
+    assert kvs_content[key_info.key] == '<html>\n        <head>\n            <title>Hello, world!</title>\n        </head>\n    </html>'
+
