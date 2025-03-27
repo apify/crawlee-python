@@ -88,7 +88,7 @@ class Statistics(Generic[TStatisticsState]):
         self._retry_histogram = dict[int, int]()
 
         self.error_tracker = ErrorTracker(save_error_snapshots=save_error_snapshots)
-        self.error_tracker_retry = ErrorTracker(save_error_snapshots=save_error_snapshots)
+        self.error_tracker_retry = ErrorTracker(save_error_snapshots=False)
 
         self._requests_in_progress = dict[str, RequestProcessingRecord]()
 

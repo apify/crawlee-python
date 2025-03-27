@@ -42,12 +42,8 @@ class ErrorTracker:
         self.show_full_message = show_full_message
         self._errors: ErrorFilenameGroups = defaultdict(lambda: defaultdict(Counter))
 
-    async def add(self, error: Exception, context: BasicCrawlingContext, kvs: KeyValueStore |None =None) -> None:
+    async def add(self, error: Exception, context: BasicCrawlingContext|None=None, kvs: KeyValueStore |None =None) -> None:
         """Include an error in the statistics."""
-        if self.error_snapshotter and not kvs:
-            raise ValueError(
-                '`ErrorTracker` with  `save_error_snapshots=True` has to call `add` method with `kvs` argument.')
-
         error_group_name = error.__class__.__name__ if self.show_error_name else None
         error_group_message = self._get_error_message(error)
         new_error_group_message = '' # In case of wildcard similarity match
@@ -75,8 +71,8 @@ class ErrorTracker:
                 # No similar message found. Create new group.
                 self._errors[error_group_file_and_line][error_group_name].update([error_group_message])
 
-        if self._errors[error_group_file_and_line][error_group_name][new_error_group_message or error_group_message] == 1:
-            # Save snapshot only on first the occurrence of the error
+        if self._errors[error_group_file_and_line][error_group_name][new_error_group_message or error_group_message] == 1 and context and kvs:
+            # Save snapshot only on first the occurrence of the error and only if context and kvs was passed as well.
             await self.capture_snapshots(
                 error_message=new_error_group_message or error_group_message,
                 file_and_line=error_group_file_and_line,

@@ -327,7 +327,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._context_result_map = WeakKeyDictionary[BasicCrawlingContext, RequestHandlerRunResult]()
 
         # Context pipeline
-        self._context_pipeline = (_context_pipeline or ContextPipeline()).compose(self._check_url_after_redirects)
+        self._context_pipeline = (_context_pipeline or ContextPipeline()).compose(self._check_url_after_redirects).compose(self._collect_error_data)
 
         # Crawl settings
         self._max_request_retries = max_request_retries
@@ -802,6 +802,17 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         yield context
 
+    async def _collect_error_data(self, context: TCrawlingContext):
+        """Try to collect data before the resources are closed."""
+        errors = yield context
+        if errors:
+            if context.request.retry_count > 0:
+                # Should we collect snapshots even on retries? Most likely they have already been captured in normal error_tracker
+                await self.statistics.error_tracker_retry.add(error = errors[0], context = context, kvs = await self.get_key_value_store())
+            else:
+                await self.statistics.error_tracker.add(error = errors[0], context = context, kvs = await self.get_key_value_store())
+
+
     def _check_enqueue_strategy(
         self,
         strategy: EnqueueStrategy,
@@ -1138,7 +1149,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 context.request.session_rotation_count += 1
 
                 await request_manager.reclaim_request(request)
-                await self._statistics.error_tracker_retry.add(session_error, context=context, kvs=await self.get_key_value_store())
+                await self._statistics.error_tracker_retry.add(session_error)
             else:
                 self._logger.exception('Request failed and reached maximum retries', exc_info=session_error)
 
@@ -1152,7 +1163,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 )
 
                 self._statistics.record_request_processing_failure(statistics_id)
-                await self._statistics.error_tracker.add(session_error, context=context, kvs=await self.get_key_value_store())
+                await self._statistics.error_tracker.add(session_error)
 
         except ContextPipelineInterruptedError as interrupted_error:
             self._logger.debug('The context pipeline was interrupted', exc_info=interrupted_error)

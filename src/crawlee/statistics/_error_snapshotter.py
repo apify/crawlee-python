@@ -2,7 +2,7 @@ import hashlib
 
 from pathvalidate import sanitize_filename
 
-from crawlee._types import BasicCrawlingContext
+from crawlee._types import BasicCrawlingContext, PageSnapshot
 from crawlee.storages import KeyValueStore
 
 
@@ -12,6 +12,14 @@ class ErrorSnapshotter:
     MAX_FILENAME_LENGTH = 250
     BASE_MESSAGE = 'An error occurred'
     SNAPSHOT_PREFIX = 'ERROR_SNAPSHOT'
+
+    def __init__(self) -> None:
+        """Initialize the error snapshotter."""
+        # Snapshots are collected earlier than they are reported.
+        _pre_collected_snapshots: dict[str, PageSnapshot] = {}
+
+    async def _collect_snapshot(self, context):
+        snapshot = await context.get_snapshot()
 
     async def capture_snapshot(self, error_message: str, file_and_line: str, context: BasicCrawlingContext, kvs: KeyValueStore) ->None:
         """Capture error snapshot.

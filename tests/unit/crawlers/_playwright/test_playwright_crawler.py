@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 from unittest import mock
 from unittest.mock import Mock
@@ -26,7 +27,7 @@ from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
 
 if TYPE_CHECKING:
-    from pathlib import Path
+
 
     from yarl import URL
 
@@ -504,6 +505,6 @@ async def test_error_snapshots(server_url: URL):
         kvs_content[key_info.key] = await kvs.get_value(key_info.key)
 
     assert len(kvs_content) == 2
-    assert key_info.key.endswith(".html")
-    assert kvs_content[key_info.key] == '<html>\n        <head>\n            <title>Hello, world!</title>\n        </head>\n    </html>'
-
+    base_name = Path(key_info.key).stem
+    assert kvs_content[f'{base_name}.html'] == '<html><head>\n            <title>Hello, world!</title>\n        </head>\n    <body></body></html>'
+    assert kvs_content[f'{base_name}.jpg'].startswith(b'\x89PNG') # Maybe too specific?

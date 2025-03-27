@@ -706,6 +706,6 @@ async def test_error_snapshots(server_url: URL):
         kvs_content[key_info.key] = await kvs.get_value(key_info.key)
 
     assert len(kvs_content) == 1
-    assert key_info.key.endswith(".html")
+    assert key_info.key.endswith('.html')
     assert kvs_content[key_info.key] == '<html>\n        <head>\n            <title>Hello, world!</title>\n        </head>\n    </html>'
 
