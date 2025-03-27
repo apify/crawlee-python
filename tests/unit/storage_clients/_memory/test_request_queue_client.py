@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-import os
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -45,18 +45,18 @@ async def test_update(request_queue_client: RequestQueueClient) -> None:
     old_rq_info = await request_queue_client.get()
     assert old_rq_info is not None
     assert old_rq_info.name is not None
-    old_rq_directory = os.path.join(
+    old_rq_directory = Path(
         request_queue_client._memory_storage_client.request_queues_directory,
         old_rq_info.name,
     )
-    new_rq_directory = os.path.join(request_queue_client._memory_storage_client.request_queues_directory, new_rq_name)
-    assert os.path.exists(os.path.join(old_rq_directory, 'fvwscO2UJLdr10B.json')) is True
-    assert os.path.exists(os.path.join(new_rq_directory, 'fvwscO2UJLdr10B.json')) is False
+    new_rq_directory = Path(request_queue_client._memory_storage_client.request_queues_directory, new_rq_name)
+    assert (old_rq_directory / 'fvwscO2UJLdr10B.json').exists() is True
+    assert (new_rq_directory / 'fvwscO2UJLdr10B.json').exists() is False
 
     await asyncio.sleep(0.1)
     updated_rq_info = await request_queue_client.update(name=new_rq_name)
-    assert os.path.exists(os.path.join(old_rq_directory, 'fvwscO2UJLdr10B.json')) is False
-    assert os.path.exists(os.path.join(new_rq_directory, 'fvwscO2UJLdr10B.json')) is True
+    assert (old_rq_directory / 'fvwscO2UJLdr10B.json').exists() is False
+    assert (new_rq_directory / 'fvwscO2UJLdr10B.json').exists() is True
     # Only modified_at and accessed_at should be different
     assert old_rq_info.created_at == updated_rq_info.created_at
     assert old_rq_info.modified_at != updated_rq_info.modified_at
@@ -72,11 +72,11 @@ async def test_delete(request_queue_client: RequestQueueClient) -> None:
     rq_info = await request_queue_client.get()
     assert rq_info is not None
 
-    rq_directory = os.path.join(request_queue_client._memory_storage_client.request_queues_directory, str(rq_info.name))
-    assert os.path.exists(os.path.join(rq_directory, 'fvwscO2UJLdr10B.json')) is True
+    rq_directory = Path(request_queue_client._memory_storage_client.request_queues_directory, str(rq_info.name))
+    assert (rq_directory / 'fvwscO2UJLdr10B.json').exists() is True
 
     await request_queue_client.delete()
-    assert os.path.exists(os.path.join(rq_directory, 'fvwscO2UJLdr10B.json')) is False
+    assert (rq_directory / 'fvwscO2UJLdr10B.json').exists() is False
 
     # Does not crash when called again
     await request_queue_client.delete()

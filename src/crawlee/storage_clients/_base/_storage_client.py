@@ -26,31 +26,31 @@ class StorageClient(ABC):
 
     @abstractmethod
     def dataset(self, id: str) -> DatasetClient:
-        """Gets a subclient for a specific dataset by its ID."""
+        """Get a subclient for a specific dataset by its ID."""
 
     @abstractmethod
     def datasets(self) -> DatasetCollectionClient:
-        """Gets a subclient for dataset collection operations."""
+        """Get a subclient for dataset collection operations."""
 
     @abstractmethod
     def key_value_store(self, id: str) -> KeyValueStoreClient:
-        """Gets a subclient for a specific key-value store by its ID."""
+        """Get a subclient for a specific key-value store by its ID."""
 
     @abstractmethod
     def key_value_stores(self) -> KeyValueStoreCollectionClient:
-        """Gets a subclient for key-value store collection operations."""
+        """Get a subclient for key-value store collection operations."""
 
     @abstractmethod
     def request_queue(self, id: str) -> RequestQueueClient:
-        """Gets a subclient for a specific request queue by its ID."""
+        """Get a subclient for a specific request queue by its ID."""
 
     @abstractmethod
     def request_queues(self) -> RequestQueueCollectionClient:
-        """Gets a subclient for request queue collection operations."""
+        """Get a subclient for request queue collection operations."""
 
     @abstractmethod
     async def purge_on_start(self) -> None:
-        """Performs a purge of the default storages.
+        """Perform a purge of the default storages.
 
         This method ensures that the purge is executed only once during the lifetime of the instance.
         It is primarily used to clean up residual data from previous runs to maintain a clean state.
@@ -58,5 +58,5 @@ class StorageClient(ABC):
         """
 
     def get_rate_limit_errors(self) -> dict[int, int]:
-        """Returns statistics about rate limit errors encountered by the HTTP client in storage client."""
+        """Return statistics about rate limit errors encountered by the HTTP client in storage client."""
         return {}

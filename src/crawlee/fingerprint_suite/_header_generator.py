@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 @docs_group('Classes')
 class HeaderGenerator:
-    """Generates realistic looking or browser-like HTTP headers."""
+    """Generate realistic looking or browser-like HTTP headers."""
 
     def __init__(self) -> None:
         self._generator = BrowserforgeHeaderGenerator()

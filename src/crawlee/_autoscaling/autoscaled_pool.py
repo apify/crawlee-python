@@ -70,7 +70,7 @@ class AutoscaledPool:
         is_task_ready_function: Callable[[], Awaitable[bool]],
         is_finished_function: Callable[[], Awaitable[bool]],
     ) -> None:
-        """A default constructor.
+        """Initialize a new instance.
 
         Args:
             system_status: Provides data about system utilization (load).
@@ -211,7 +211,7 @@ class AutoscaledPool:
         )
 
     async def _worker_task_orchestrator(self, run: _AutoscaledPoolRun) -> None:
-        """Launches worker tasks whenever there is free capacity and a task is ready.
+        """Launch worker tasks whenever there is free capacity and a task is ready.
 
         Exits when `is_finished_function` returns True.
         """
@@ -260,11 +260,11 @@ class AutoscaledPool:
                 run.result.set_result(object())
 
     def _reap_worker_task(self, task: asyncio.Task, run: _AutoscaledPoolRun) -> None:
-        """A callback for finished worker tasks.
+        """Handle cleanup and tracking of a completed worker task.
 
-        - It interrupts the run in case of an exception,
-        - keeps track of tasks in progress,
-        - notifies the orchestrator
+        - Interrupt the run if the task encountered an exception.
+        - Update the list of tasks in progress.
+        - Notify the orchestrator about the task completion.
         """
         run.worker_tasks_updated.set()
         run.worker_tasks.remove(task)

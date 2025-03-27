@@ -32,7 +32,7 @@ async def test_calls_consumer_without_middleware() -> None:
 
     pipeline = ContextPipeline()
     context = BasicCrawlingContext(
-        request=Request.from_url(url='https://httpbin.org/'),
+        request=Request.from_url(url='https://test.io/'),
         send_request=AsyncMock(),
         add_requests=AsyncMock(),
         session=Session(),
@@ -91,7 +91,7 @@ async def test_calls_consumers_and_middlewares() -> None:
     pipeline = ContextPipeline[BasicCrawlingContext]().compose(middleware_a).compose(middleware_b)
 
     context = BasicCrawlingContext(
-        request=Request.from_url(url='https://httpbin.org/'),
+        request=Request.from_url(url='https://test.io/'),
         send_request=AsyncMock(),
         add_requests=AsyncMock(),
         session=Session(),
@@ -117,7 +117,7 @@ async def test_wraps_consumer_errors() -> None:
 
     pipeline = ContextPipeline()
     context = BasicCrawlingContext(
-        request=Request.from_url(url='https://httpbin.org/'),
+        request=Request.from_url(url='https://test.io/'),
         send_request=AsyncMock(),
         add_requests=AsyncMock(),
         session=Session(),
@@ -146,7 +146,7 @@ async def test_handles_exceptions_in_middleware_initialization() -> None:
 
     pipeline = ContextPipeline().compose(step_1).compose(step_2)
     context = BasicCrawlingContext(
-        request=Request.from_url(url='https://httpbin.org/'),
+        request=Request.from_url(url='https://test.io/'),
         send_request=AsyncMock(),
         add_requests=AsyncMock(),
         session=Session(),
@@ -178,7 +178,7 @@ async def test_handles_exceptions_in_middleware_finalization() -> None:
 
     pipeline = ContextPipeline().compose(step_1).compose(step_2)
     context = BasicCrawlingContext(
-        request=Request.from_url(url='https://httpbin.org/'),
+        request=Request.from_url(url='https://test.io/'),
         send_request=AsyncMock(),
         add_requests=AsyncMock(),
         session=Session(),

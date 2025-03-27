@@ -14,7 +14,7 @@ from crawlee._utils.html_to_text import (
 
 
 def html_to_text(source: str | Selector) -> str:
-    """Converts markup string or `Selector` to newline-separated plain text without tags using Parsel.
+    """Convert markup string or `Selector` to newline-separated plain text without tags using Parsel.
 
     Args:
         source: Input markup string or `Selector` object.
@@ -32,7 +32,15 @@ def html_to_text(source: str | Selector) -> str:
     text = ''
 
     def _extract_text(elements: list[Selector], *, compress: bool = True) -> None:
-        """Custom html parsing that performs as implementation from Javascript version of Crawlee."""
+        """Extract text content from HTML elements while preserving formatting.
+
+        Perform custom HTML parsing to match the behavior of the JavaScript version of Crawlee. Handles whitespace
+        compression and block-level tag formatting.
+
+        Args:
+            elements: A list of selectors representing the HTML elements.
+            compress: Whether to compress consecutive whitespace outside of `<pre>` blocks.
+        """
         nonlocal text
         for element in elements:
             tag = element.root.tag if hasattr(element.root, 'tag') else None

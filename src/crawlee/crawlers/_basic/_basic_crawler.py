@@ -13,7 +13,7 @@ from contextlib import AsyncExitStack, suppress
 from datetime import timedelta
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Generic, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Generic, Literal, Union, cast
 from urllib.parse import ParseResult, urlparse
 from weakref import WeakKeyDictionary
 
@@ -136,6 +136,11 @@ class _BasicCrawlerOptions(TypedDict):
     configure_logging: NotRequired[bool]
     """If True, the crawler will set up logging infrastructure automatically."""
 
+    statistics_log_format: NotRequired[Literal['table', 'inline']]
+    """If 'table', displays crawler statistics as formatted tables in logs. If 'inline', outputs statistics as plain
+    text log messages.
+    """
+
     keep_alive: NotRequired[bool]
     """Flag that can keep crawler running even when there are no requests in queue."""
 
@@ -232,11 +237,12 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         abort_on_error: bool = False,
         keep_alive: bool = False,
         configure_logging: bool = True,
+        statistics_log_format: Literal['table', 'inline'] = 'table',
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         _additional_context_managers: Sequence[AbstractAsyncContextManager] | None = None,
         _logger: logging.Logger | None = None,
     ) -> None:
-        """A default constructor.
+        """Initialize a new instance.
 
         Args:
             configuration: The `Configuration` instance. Some of its properties are used as defaults for the crawler.
@@ -272,6 +278,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             keep_alive: If True, it will keep crawler alive even if there are no requests in queue.
                 Use `crawler.stop()` to exit the crawler.
             configure_logging: If True, the crawler will set up logging infrastructure automatically.
+            statistics_log_format: If 'table', displays crawler statistics as formatted tables in logs. If 'inline',
+                outputs statistics as plain text log messages.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
             _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
@@ -347,12 +355,14 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             httpx_logger = logging.getLogger('httpx')  # Silence HTTPX logger
             httpx_logger.setLevel(logging.DEBUG if get_configured_log_level() <= logging.DEBUG else logging.WARNING)
         self._logger = _logger or logging.getLogger(__name__)
+        self._statistics_log_format = statistics_log_format
 
         # Statistics
         self._statistics = statistics or cast(
             'Statistics[TStatisticsState]',
             Statistics.with_default_state(
                 periodic_message_logger=self._logger,
+                statistics_log_format=self._statistics_log_format,
                 log_message='Current request statistics:',
             ),
         )
@@ -493,14 +503,20 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     def error_handler(
         self, handler: ErrorHandler[TCrawlingContext | BasicCrawlingContext]
     ) -> ErrorHandler[TCrawlingContext]:
-        """Decorator for configuring an error handler (called after a request handler error and before retrying)."""
+        """Register a function to handle errors occurring in request handlers.
+
+        The error handler is invoked after a request handler error occurs and before a retry attempt.
+        """
         self._error_handler = handler
         return handler
 
     def failed_request_handler(
         self, handler: FailedRequestHandler[TCrawlingContext | BasicCrawlingContext]
     ) -> FailedRequestHandler[TCrawlingContext]:
-        """Decorator for configuring a failed request handler (called after max retries are reached)."""
+        """Register a function to handle requests that exceed the maximum retry limit.
+
+        The failed request handler is invoked when a request has failed all retry attempts.
+        """
         self._failed_request_handler = handler
         return handler
 
@@ -582,8 +598,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         await self._save_crawler_state()
 
         final_statistics = self._statistics.calculate()
-        self._logger.info(f'Final request statistics:\n{final_statistics.to_table()}')
-
+        if self._statistics_log_format == 'table':
+            self._logger.info(f'Final request statistics:\n{final_statistics.to_table()}')
+        else:
+            self._logger.info('Final request statistics:', extra=final_statistics.to_dict())
         return final_statistics
 
     async def _run_crawler(self) -> None:
@@ -784,9 +802,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         return (context.request.retry_count + 1) < max_request_retries
 
     async def _check_url_after_redirects(self, context: TCrawlingContext) -> AsyncGenerator[TCrawlingContext, None]:
-        """Invoked at the end of the context pipeline to make sure that the `loaded_url` still matches enqueue_strategy.
+        """Ensure that the `loaded_url` still matches the enqueue strategy after redirects.
 
-        This is done to filter out links that redirect outside of the crawled domain.
+        Filter out links that redirect outside of the crawled domain.
         """
         if context.request.loaded_url is not None and not self._check_enqueue_strategy(
             context.request.enqueue_strategy,
@@ -819,7 +837,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             return origin_domain == target_domain
 
         if strategy == 'same-origin':
-            return target_url.hostname == origin_url.hostname and target_url.scheme == origin_url.scheme
+            return (
+                target_url.hostname == origin_url.hostname
+                and target_url.scheme == origin_url.scheme
+                and target_url.port == origin_url.port
+            )
 
         if strategy == 'all':
             return True

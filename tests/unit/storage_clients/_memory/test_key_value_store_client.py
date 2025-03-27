@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
-import os
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -16,8 +16,6 @@ from crawlee._utils.file import json_dumps
 from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecordMetadata
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from crawlee.storage_clients import MemoryStorageClient
     from crawlee.storage_clients._memory import KeyValueStoreClient
 
@@ -79,19 +77,17 @@ async def test_update(key_value_store_client: KeyValueStoreClient) -> None:
     await key_value_store_client.set_record('test', {'abc': 123})
     old_kvs_info = await key_value_store_client.get()
     assert old_kvs_info is not None
-    old_kvs_directory = os.path.join(
+    old_kvs_directory = Path(
         key_value_store_client._memory_storage_client.key_value_stores_directory, old_kvs_info.name or ''
     )
-    new_kvs_directory = os.path.join(
-        key_value_store_client._memory_storage_client.key_value_stores_directory, new_kvs_name
-    )
-    assert os.path.exists(os.path.join(old_kvs_directory, 'test.json')) is True
-    assert os.path.exists(os.path.join(new_kvs_directory, 'test.json')) is False
+    new_kvs_directory = Path(key_value_store_client._memory_storage_client.key_value_stores_directory, new_kvs_name)
+    assert (old_kvs_directory / 'test.json').exists() is True
+    assert (new_kvs_directory / 'test.json').exists() is False
 
     await asyncio.sleep(0.1)
     updated_kvs_info = await key_value_store_client.update(name=new_kvs_name)
-    assert os.path.exists(os.path.join(old_kvs_directory, 'test.json')) is False
-    assert os.path.exists(os.path.join(new_kvs_directory, 'test.json')) is True
+    assert (old_kvs_directory / 'test.json').exists() is False
+    assert (new_kvs_directory / 'test.json').exists() is True
     # Only modified_at and accessed_at should be different
     assert old_kvs_info.created_at == updated_kvs_info.created_at
     assert old_kvs_info.modified_at != updated_kvs_info.modified_at
@@ -106,12 +102,10 @@ async def test_delete(key_value_store_client: KeyValueStoreClient) -> None:
     await key_value_store_client.set_record('test', {'abc': 123})
     kvs_info = await key_value_store_client.get()
     assert kvs_info is not None
-    kvs_directory = os.path.join(
-        key_value_store_client._memory_storage_client.key_value_stores_directory, kvs_info.name or ''
-    )
-    assert os.path.exists(os.path.join(kvs_directory, 'test.json')) is True
+    kvs_directory = Path(key_value_store_client._memory_storage_client.key_value_stores_directory, kvs_info.name or '')
+    assert (kvs_directory / 'test.json').exists() is True
     await key_value_store_client.delete()
-    assert os.path.exists(os.path.join(kvs_directory, 'test.json')) is False
+    assert (kvs_directory / 'test.json').exists() is False
     # Does not crash when called again
     await key_value_store_client.delete()
 
@@ -188,7 +182,7 @@ async def test_get_and_set_record(tmp_path: Path, key_value_store_client: KeyVal
     assert bytes_record_info.value.decode('utf-8') == bytes_value.decode('utf-8')
 
     # Test using file descriptor
-    with open(os.path.join(tmp_path, 'test.json'), 'w+', encoding='utf-8') as f:  # noqa: ASYNC230
+    with open(tmp_path / 'test.json', 'w+', encoding='utf-8') as f:  # noqa: ASYNC230
         f.write('Test')
         with pytest.raises(NotImplementedError, match='File-like values are not supported in local memory storage'):
             await key_value_store_client.set_record('file', f)
@@ -283,12 +277,12 @@ async def test_writes_correct_metadata(
     )
 
     # Check that everything was written correctly, both the data and metadata
-    storage_path = os.path.join(memory_storage_client.key_value_stores_directory, key_value_store_name)
-    item_path = os.path.join(storage_path, expected_output['filename'])
-    item_metadata_path = os.path.join(storage_path, f'{expected_output["filename"]}.__metadata__.json')
+    storage_path = Path(memory_storage_client.key_value_stores_directory, key_value_store_name)
+    item_path = Path(storage_path, expected_output['filename'])
+    item_metadata_path = storage_path / f'{expected_output["filename"]}.__metadata__.json'
 
-    assert os.path.exists(item_path)
-    assert os.path.exists(item_metadata_path)
+    assert item_path.exists()
+    assert item_metadata_path.exists()
 
     # Test the actual value of the item
     with open(item_path, 'rb') as item_file:  # noqa: ASYNC230
@@ -396,8 +390,8 @@ async def test_reads_correct_metadata(
     key_value_store_name = crypto_random_object_id()
 
     # Ensure the directory for the store exists
-    storage_path = os.path.join(memory_storage_client.key_value_stores_directory, key_value_store_name)
-    os.makedirs(storage_path, exist_ok=True)
+    storage_path = Path(memory_storage_client.key_value_stores_directory, key_value_store_name)
+    storage_path.mkdir(exist_ok=True, parents=True)
 
     store_metadata = KeyValueStoreMetadata(
         id=crypto_random_object_id(),
@@ -409,12 +403,12 @@ async def test_reads_correct_metadata(
     )
 
     # Write the store metadata to disk
-    storage_metadata_path = os.path.join(storage_path, METADATA_FILENAME)
+    storage_metadata_path = storage_path / METADATA_FILENAME
     with open(storage_metadata_path, mode='wb') as f:  # noqa: ASYNC230
         f.write(store_metadata.model_dump_json().encode('utf-8'))
 
     # Write the test input item to the disk
-    item_path = os.path.join(storage_path, input_data['filename'])
+    item_path = storage_path / input_data['filename']
     with open(item_path, 'wb') as item_file:  # noqa: ASYNC230
         if isinstance(input_data['value'], bytes):
             item_file.write(input_data['value'])
@@ -426,7 +420,7 @@ async def test_reads_correct_metadata(
 
     # Optionally write the metadata to disk if there is some
     if input_data['metadata'] is not None:
-        storage_metadata_path = os.path.join(storage_path, input_data['filename'] + '.__metadata__.json')
+        storage_metadata_path = storage_path / f'{input_data["filename"]}.__metadata__.json'
         with open(storage_metadata_path, 'w', encoding='utf-8') as metadata_file:  # noqa: ASYNC230
             s = await json_dumps(
                 {
