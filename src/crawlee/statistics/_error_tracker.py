@@ -47,7 +47,7 @@ class ErrorTracker:
         error_group_message = self._get_error_message(error)
         error_group_file_and_line = self._get_file_and_line(error)
 
-        # First two levels are grouped only in case of exact match.
+        # First two levels lare grouped only in case of exact match.
         specific_groups = self._errors[error_group_file_and_line][error_group_name]
 
         # Lowest level group is matched by similarity.
