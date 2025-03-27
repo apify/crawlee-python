@@ -25,19 +25,18 @@ from crawlee.crawlers import BasicCrawler
 from crawlee.errors import RequestCollisionError, SessionError, UserDefinedErrorHandlerError
 from crawlee.events._local_event_manager import LocalEventManager
 from crawlee.request_loaders import RequestList, RequestManagerTandem
-from crawlee.sessions import SessionPool
+from crawlee.sessions import Session, SessionPool
 from crawlee.statistics import FinalStatistics
 from crawlee.storage_clients import MemoryStorageClient
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
     import respx
     from yarl import URL
 
     from crawlee._types import JsonSerializable
-    from crawlee.sessions._session import Session
     from crawlee.storage_clients._memory import DatasetClient
 
 
@@ -1216,6 +1215,38 @@ async def test_bound_session_to_request() -> None:
 
         assert len(used_sessions) == 10
         assert set(used_sessions) == {check_session.id}
+
+
+async def test_bound_sessions_to_same_request() -> None:
+    # Use a custom function to avoid errors due to random Session retrieval
+    def create_session_function() -> Callable[[], Session]:
+        counter = -1
+
+        def create_session() -> Session:
+            nonlocal counter
+            counter += 1
+            return Session(id=str(counter))
+
+        return create_session
+
+    check_sessions = [str(session_id) for session_id in range(10)]
+    used_sessions = list[str]()
+    crawler = BasicCrawler(session_pool=SessionPool(create_session_function=create_session_function()))
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        if context.session:
+            used_sessions.append(context.session.id)
+
+    requests = [
+        Request.from_url('http://a.com/', session_id=str(session_id), use_extended_unique_key=True)
+        for session_id in range(10)
+    ]
+
+    await crawler.run(requests)
+
+    assert len(used_sessions) == 10
+    assert set(used_sessions) == set(check_sessions)
 
 
 async def test_error_bound_session_to_request() -> None:

@@ -74,7 +74,7 @@ async def main() -> None:
             'https://example.org/',
             label='session_init',
             session_id=str(session_id),
-            always_enqueue=True,
+            use_extended_unique_key=True,
         )
         for session_id in range(1, 11)
     ]

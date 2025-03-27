@@ -255,7 +255,7 @@ class Request(BaseModel):
             label: A custom label to differentiate between request types. This is stored in `user_data`, and it is
                 used for request routing (different requests go to different handlers).
             session_id: ID of a specific `Session` to which the request will be strictly bound.
-                If the `Session` becomes unavailable when the request is processed, a `RequestCollisionError` will be
+                If the session becomes unavailable when the request is processed, a `RequestCollisionError` will be
                 raised.
             unique_key: A unique key identifying the request. If not provided, it is automatically computed based on
                 the URL and other parameters. Requests with the same `unique_key` are treated as identical.
@@ -263,8 +263,8 @@ class Request(BaseModel):
                 `unique_key`.
             keep_url_fragment: Determines whether the URL fragment (e.g., `#section`) should be included in
                 the `unique_key` computation. This is only relevant when `unique_key` is not provided.
-            use_extended_unique_key: Determines whether to include the HTTP method and payload in the `unique_key`
-                computation. This is only relevant when `unique_key` is not provided.
+            use_extended_unique_key: Determines whether to include the HTTP method, ID Session and payload in the
+                `unique_key` computation. This is only relevant when `unique_key` is not provided.
             always_enqueue: If set to `True`, the request will be enqueued even if it is already present in the queue.
                 Using this is not allowed when a custom `unique_key` is also provided and will result in a `ValueError`.
             **kwargs: Additional request properties.
@@ -283,6 +283,7 @@ class Request(BaseModel):
             method=method,
             headers=headers,
             payload=payload,
+            session_id=session_id,
             keep_url_fragment=keep_url_fragment,
             use_extended_unique_key=use_extended_unique_key,
         )

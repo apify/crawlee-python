@@ -78,6 +78,7 @@ def compute_unique_key(
     method: HttpMethod = 'GET',
     headers: HttpHeaders | None = None,
     payload: HttpPayload | None = None,
+    session_id: str | None = None,
     *,
     keep_url_fragment: bool = False,
     use_extended_unique_key: bool = False,
@@ -96,6 +97,7 @@ def compute_unique_key(
         payload: The data to be sent as the request body.
         keep_url_fragment: A flag indicating whether to keep the URL fragment.
         use_extended_unique_key: A flag indicating whether to include a hashed payload in the key.
+        session_id: The ID of a specific `Session` to which the request will be strictly bound
 
     Returns:
         A string representing the unique key for the request.
@@ -114,9 +116,10 @@ def compute_unique_key(
     if use_extended_unique_key:
         payload_hash = _get_payload_hash(payload)
         headers_hash = _get_headers_hash(headers)
+        normilizead_session = '' if session_id is None else session_id.lower()
 
         # Return the extended unique key. Use pipe as a separator of the different parts of the unique key.
-        return f'{normalized_method}|{headers_hash}|{payload_hash}|{normalized_url}'
+        return f'{normalized_method}|{headers_hash}|{payload_hash}|{normilizead_session}|{normalized_url}'
 
     # Log information if there is a non-GET request with a payload.
     if normalized_method != 'GET' and payload:
