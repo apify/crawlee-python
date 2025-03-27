@@ -7,10 +7,10 @@ from pathlib import Path
 from typing import Annotated, Optional, cast
 
 try:
-    import inquirer  # type: ignore[import-untyped]
+    import inquirer
     import typer
     from cookiecutter.main import cookiecutter
-    from inquirer.render.console import ConsoleRender  # type: ignore[import-untyped]
+    from inquirer.render.console import ConsoleRender
     from rich.progress import Progress, SpinnerColumn, TextColumn
 except ModuleNotFoundError as exc:
     raise ImportError(

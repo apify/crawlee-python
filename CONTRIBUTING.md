@@ -72,13 +72,19 @@ To run unit tests with HTML coverage report:
 make unit-tests-cov
 ```
 
-<!--
-TODO:
-
 ## Integration tests
 
-...
--->
+Pre-requisites for running integration tests:
+ - [apify-cli](https://docs.apify.com/cli/docs/installation) correctly installed
+ - apify-cli available in PATH environment variable
+ - Your [apify token](https://docs.apify.com/platform/integrations/api#api-token) is available in APIFY_TEST_USER_API_TOKEN environment variable
+
+
+To run integration tests:
+
+```sh
+make integration-tests
+```
 
 ## Documentation
 

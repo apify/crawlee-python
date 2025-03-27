@@ -93,6 +93,7 @@ crawlee = "crawlee._cli:cli"
 [dependency-groups]
 dev = [
     "apify_client",  # For integration tests.
+    "build~=1.2.2",  # For integration tests.
     "mypy~=1.15.0",
     "pre-commit~=4.2.0",
     "proxy-py~=2.4.0",
@@ -231,6 +232,7 @@ module = [
     "loguru",                       # Example code shows integration of loguru and crawlee for JSON logging.
     "sklearn.linear_model",         # Untyped and stubs not available
     "cookiecutter.*",               # Untyped and stubs not available
+    "inquirer.*",                   # Untyped and stubs not available
 ]
 ignore_missing_imports = true
 
