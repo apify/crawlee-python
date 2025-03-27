@@ -133,6 +133,7 @@ def test_compute_unique_key_complex() -> None:
         method='POST',
         headers=headers,
         payload=payload,
+        session_id='test_session',
         use_extended_unique_key=False,
     )
     assert uk == url
@@ -142,9 +143,10 @@ def test_compute_unique_key_complex() -> None:
         method='POST',
         headers=headers,
         payload=payload,
+        session_id='test_session',
         use_extended_unique_key=True,
     )
-    assert extended_uk == 'POST|4e1a2cf6|9724c1e2|https://crawlee.dev'
+    assert extended_uk == 'POST|4e1a2cf6|9724c1e2|test_session|https://crawlee.dev'
 
 
 def test_compute_unique_key_post_with_none_payload() -> None:

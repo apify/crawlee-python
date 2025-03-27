@@ -119,7 +119,10 @@ def compute_unique_key(
         normilizead_session = '' if session_id is None else session_id.lower()
 
         # Return the extended unique key. Use pipe as a separator of the different parts of the unique key.
-        return f'{normalized_method}|{headers_hash}|{payload_hash}|{normilizead_session}|{normalized_url}'
+        extended_part = f'{normalized_method}|{headers_hash}|{payload_hash}'
+        if normilizead_session:
+            extended_part = f'{extended_part}|{normilizead_session}'
+        return f'{extended_part}|{normalized_url}'
 
     # Log information if there is a non-GET request with a payload.
     if normalized_method != 'GET' and payload:
