@@ -35,6 +35,9 @@ unit-tests-cov:
 integration-tests:
 	uv run pytest --numprocesses=$(INTEGRATION_TESTS_CONCURRENCY) --verbose tests/integration
 
+e2e-templates-tests:
+	uv run pytest --numprocesses=$(INTEGRATION_TESTS_CONCURRENCY) --verbose tests/e2e/project_template
+
 format:
 	uv run ruff check --fix
 	uv run ruff format

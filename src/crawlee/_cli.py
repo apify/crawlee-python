@@ -7,10 +7,10 @@ from pathlib import Path
 from typing import Annotated, Optional, cast
 
 try:
-    import inquirer  # type: ignore[import-untyped]
+    import inquirer
     import typer
-    from cookiecutter.main import cookiecutter  # type: ignore[import-untyped]
-    from inquirer.render.console import ConsoleRender  # type: ignore[import-untyped]
+    from cookiecutter.main import cookiecutter
+    from inquirer.render.console import ConsoleRender
     from rich.progress import Progress, SpinnerColumn, TextColumn
 except ModuleNotFoundError as exc:
     raise ImportError(
@@ -21,7 +21,8 @@ except ModuleNotFoundError as exc:
 cli = typer.Typer(no_args_is_help=True)
 
 template_directory = importlib.resources.files('crawlee') / 'project_template'
-cookiecutter_json = json.load((template_directory / 'cookiecutter.json').open())
+with open(str(template_directory / 'cookiecutter.json')) as f:
+    cookiecutter_json = json.load(f)
 
 crawler_choices = cookiecutter_json['crawler_type']
 http_client_choices = cookiecutter_json['http_client']

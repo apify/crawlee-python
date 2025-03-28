@@ -20,8 +20,7 @@ RUN pip install -U pip setuptools \
 # Second, copy just poetry.lock and pyproject.toml into the Actor image,
 # since those should be the only files that affects the dependency install in the next step,
 # in order to speed up the build
-COPY pyproject.toml ./
-COPY poetry.lock ./
+COPY pyproject.toml poetry.lock ./
 
 # Install the dependencies
 RUN echo "Python version:" \
