@@ -53,11 +53,11 @@ class ErrorSnapshotter:
         await kvs.set_value(file_name, screenshot, content_type='image/jpeg')
 
     def _sanitize_filename(self, filename: str) -> str:
-        return re.sub(f'[^{re.escape(self.ALLOWED_CHARACTERS)}]', '', filename[: self.MAX_ERROR_CHARACTERS])
+        return re.sub(f'[^{re.escape(self.ALLOWED_CHARACTERS)}]', '', filename[: self.MAX_FILENAME_LENGTH])
 
     def _get_snapshot_base_name(self, error_message: str, file_and_line: str) -> str:
         sha1_hash = hashlib.sha1()  # noqa:S324 # Collisions related attacks are of no concern here.
         sha1_hash.update(file_and_line.encode('utf-8'))
-        hashed_file_and_text = sha1_hash.hexdigest()
+        hashed_file_and_text = sha1_hash.hexdigest()[: self.MAX_HASH_LENGTH]
         error_message_start = (error_message or self.BASE_MESSAGE)[: self.MAX_ERROR_CHARACTERS]
         return self._sanitize_filename(f'{self.SNAPSHOT_PREFIX}_{hashed_file_and_text}_{error_message_start}')

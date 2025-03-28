@@ -15,6 +15,7 @@ from crawlee.crawlers import HttpCrawler
 from crawlee.http_clients import CurlImpersonateHttpClient, HttpxHttpClient
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
+from tests.unit.server_endpoints import HELLO_WORLD
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable
@@ -690,10 +691,7 @@ async def test_get_snapshot(server_url: URL) -> None:
 
     assert snapshot is not None
     assert snapshot.html is not None
-    assert (
-        snapshot.html
-        == '<html>\n        <head>\n            <title>Hello, world!</title>\n        </head>\n    </html>'
-    )
+    assert snapshot.html == HELLO_WORLD.decode('utf8')
 
 
 async def test_error_snapshot_through_statistics(server_url: URL) -> None:
@@ -712,6 +710,4 @@ async def test_error_snapshot_through_statistics(server_url: URL) -> None:
 
     assert len(kvs_content) == 1
     assert key_info.key.endswith('.html')
-    assert kvs_content[key_info.key] == (
-        '<html>\n        <head>\n            <title>Hello, world!</title>\n        </head>\n    </html>'
-    )
+    assert kvs_content[key_info.key] == HELLO_WORLD.decode('utf8')
