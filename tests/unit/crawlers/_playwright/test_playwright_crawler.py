@@ -25,6 +25,7 @@ from crawlee.fingerprint_suite._consts import BROWSER_TYPE_HEADER_KEYWORD
 from crawlee.proxy_configuration import ProxyConfiguration
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
+from crawlee.statistics._error_snapshotter import ErrorSnapshotter
 
 if TYPE_CHECKING:
     from yarl import URL
@@ -500,7 +501,7 @@ async def test_error_snapshots(server_url: URL) -> None:
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
-        raise RuntimeError(rf'Exception /\ with file name unfriendly symbols. in {context.request.url}')
+        raise RuntimeError(rf'-*/+~!@.Exception with weird symbols in {context.request.url}')
 
     await crawler.run([str(server_url)])
 
@@ -508,6 +509,7 @@ async def test_error_snapshots(server_url: URL) -> None:
     kvs_content = {}
     async for key_info in kvs.iterate_keys():
         kvs_content[key_info.key] = await kvs.get_value(key_info.key)
+        assert set(key_info.key).issubset(ErrorSnapshotter.ALLOWED_CHARACTERS)
 
     assert crawler.statistics.error_tracker.total == max_retries
     assert crawler.statistics.error_tracker.unique_error_count == 1
