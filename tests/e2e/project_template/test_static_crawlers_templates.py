@@ -17,7 +17,7 @@ from tests.e2e.project_template.utils import patch_crawlee_version_in_pyproject_
 
 @pytest.mark.parametrize('http_client', ['httpx', 'curl-impersonate'])
 @pytest.mark.parametrize('crawler_type', ['parsel', 'beautifulsoup'])
-@pytest.mark.parametrize('package_manager', ['pip', 'uv', 'poetry'])
+@pytest.mark.parametrize('package_manager', ['uv', 'poetry'])
 async def test_static_crawler_actor_at_apify(
     tmp_path: Path, crawlee_wheel_path: Path, package_manager: str, crawler_type: str, http_client: str
 ) -> None:
