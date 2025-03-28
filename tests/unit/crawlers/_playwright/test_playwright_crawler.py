@@ -487,7 +487,9 @@ async def test_get_snapshot(server_url: URL) -> None:
     assert snapshot is not None
     assert snapshot.html is not None
     assert snapshot.screenshot is not None
-    assert snapshot.screenshot.startswith(b'\x89PNG')
+    # Check at least jpeg start and end expected bytes. Content is not relevant for the test.
+    assert snapshot.screenshot.startswith(b'\xff\xd8')
+    assert snapshot.screenshot.endswith(b'\xff\xd9')
     assert snapshot.html == (
         '<html><head>\n            <title>Hello, world!</title>\n        </head>\n    <body></body></html>'
     )
@@ -518,4 +520,6 @@ async def test_error_snapshots(server_url: URL) -> None:
     assert kvs_content[f'{base_name}.html'] == (
         '<html><head>\n            <title>Hello, world!</title>\n        </head>\n    <body></body></html>'
     )
-    assert kvs_content[f'{base_name}.jpg'].startswith(b'\x89PNG')
+    # Check at least jpeg start and end expected bytes. Content is not relevant for the test.
+    assert kvs_content[f'{base_name}.jpg'].startswith(b'\xff\xd8')
+    assert kvs_content[f'{base_name}.jpg'].endswith(b'\xff\xd9')

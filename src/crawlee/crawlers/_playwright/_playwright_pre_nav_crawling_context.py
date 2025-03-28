@@ -36,7 +36,7 @@ class PlaywrightPreNavCrawlingContext(BasicCrawlingContext):
             self.log.exception(f'Failed to get html snapshot for {self.request.url}.')
 
         try:
-            screenshot = await self.page.screenshot()
+            screenshot = await self.page.screenshot(full_page=True, type='jpeg')
         except Exception:
             self.log.exception(f'Failed to get page screenshot for {self.request.url}.')
 
