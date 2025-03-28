@@ -72,18 +72,18 @@ To run unit tests with HTML coverage report:
 make unit-tests-cov
 ```
 
-## Integration tests
+## End-to-end tests
 
-Pre-requisites for running integration tests:
+Pre-requisites for running end-to-end tests:
  - [apify-cli](https://docs.apify.com/cli/docs/installation) correctly installed
  - `apify-cli` available in `PATH` environment variable
  - Your [apify token](https://docs.apify.com/platform/integrations/api#api-token) is available in `APIFY_TEST_USER_API_TOKEN` environment variable
 
 
-To run integration tests:
+To run end-to-end tests:
 
 ```sh
-make integration-tests
+make e2e-templates-tests
 ```
 
 ## Documentation

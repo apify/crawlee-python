@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 def patch_crawlee_version_in_pyproject_toml_based_project(project_path: Path, wheel_path: Path) -> None:
-    """Ensure that the integration test is using current version of the crawlee from the source and not from Pypi."""
+    """Ensure that the test is using current version of the crawlee from the source and not from Pypi."""
     # Copy prepared .whl file
     shutil.copy(wheel_path, project_path)
 
