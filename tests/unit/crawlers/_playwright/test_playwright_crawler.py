@@ -27,8 +27,6 @@ from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
 
 if TYPE_CHECKING:
-
-
     from yarl import URL
 
     from crawlee._request import RequestOptions
@@ -477,6 +475,7 @@ async def test_get_snapshot(server_url: URL) -> None:
     crawler = PlaywrightCrawler()
 
     snapshot = None
+
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
         nonlocal snapshot
@@ -484,18 +483,24 @@ async def test_get_snapshot(server_url: URL) -> None:
 
     await crawler.run([str(server_url)])
 
-    assert snapshot.screenshot
-    assert snapshot.html == ('<html><head>\n            '
-                             '<title>Hello, world!</title>\n        '
-                             '</head>\n    '
-                             '<body></body></html>')
+    assert snapshot is not None
+    assert snapshot.html is not None
+    assert snapshot.screenshot is not None
+    assert snapshot.screenshot.startswith(b'\x89PNG')
+    assert snapshot.html == (
+        '<html><head>\n            <title>Hello, world!</title>\n        </head>\n    <body></body></html>'
+    )
 
-async def test_error_snapshots(server_url: URL):
-    crawler = PlaywrightCrawler(statistics=Statistics.with_default_state(save_error_snapshots=True))
+
+async def test_error_snapshots(server_url: URL) -> None:
+    max_retries = 2
+    crawler = PlaywrightCrawler(
+        statistics=Statistics.with_default_state(save_error_snapshots=True), max_request_retries=max_retries
+    )
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
-        raise Exception(r'Exception /\ with file name unfriendly symbols.')
+        raise RuntimeError(rf'Exception /\ with file name unfriendly symbols. in {context.request.url}')
 
     await crawler.run([str(server_url)])
 
@@ -504,7 +509,11 @@ async def test_error_snapshots(server_url: URL):
     async for key_info in kvs.iterate_keys():
         kvs_content[key_info.key] = await kvs.get_value(key_info.key)
 
+    assert crawler.statistics.error_tracker.total == max_retries
+    assert crawler.statistics.error_tracker.unique_error_count == 1
     assert len(kvs_content) == 2
     base_name = Path(key_info.key).stem
-    assert kvs_content[f'{base_name}.html'] == '<html><head>\n            <title>Hello, world!</title>\n        </head>\n    <body></body></html>'
-    assert kvs_content[f'{base_name}.jpg'].startswith(b'\x89PNG') # Maybe too specific?
+    assert kvs_content[f'{base_name}.html'] == (
+        '<html><head>\n            <title>Hello, world!</title>\n        </head>\n    <body></body></html>'
+    )
+    assert kvs_content[f'{base_name}.jpg'].startswith(b'\x89PNG')

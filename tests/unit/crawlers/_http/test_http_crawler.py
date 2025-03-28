@@ -680,6 +680,7 @@ async def test_get_snapshot(server_url: URL) -> None:
     crawler = HttpCrawler()
 
     snapshot = None
+
     @crawler.router.default_handler
     async def request_handler(context: HttpCrawlingContext) -> None:
         nonlocal snapshot
@@ -687,16 +688,20 @@ async def test_get_snapshot(server_url: URL) -> None:
 
     await crawler.run([str(server_url)])
 
-    assert (snapshot.html ==
-            '<html>\n        <head>\n            <title>Hello, world!</title>\n        </head>\n    </html>')
+    assert snapshot is not None
+    assert snapshot.html is not None
+    assert (
+        snapshot.html
+        == '<html>\n        <head>\n            <title>Hello, world!</title>\n        </head>\n    </html>'
+    )
 
 
-async def test_error_snapshots(server_url: URL):
+async def test_error_snapshot_through_statistics(server_url: URL) -> None:
     crawler = HttpCrawler(statistics=Statistics.with_default_state(save_error_snapshots=True))
 
     @crawler.router.default_handler
     async def request_handler(context: HttpCrawlingContext) -> None:
-        raise Exception(r'Exception /\ with file name unfriendly symbols.')
+        raise RuntimeError(rf'Exception /\ with file name unfriendly symbols in {context.request.url}')
 
     await crawler.run([str(server_url)])
 
@@ -707,5 +712,6 @@ async def test_error_snapshots(server_url: URL):
 
     assert len(kvs_content) == 1
     assert key_info.key.endswith('.html')
-    assert kvs_content[key_info.key] == '<html>\n        <head>\n            <title>Hello, world!</title>\n        </head>\n    </html>'
-
+    assert kvs_content[key_info.key] == (
+        '<html>\n        <head>\n            <title>Hello, world!</title>\n        </head>\n    </html>'
+    )

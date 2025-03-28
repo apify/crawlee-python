@@ -56,8 +56,7 @@ class ContextPipeline(Generic[TCrawlingContext]):
         """
         chain = list(self._middleware_chain())
         cleanup_stack = list[AsyncGenerator]()
-        final_consumer_exceptions = []
-
+        final_consumer_exception = None
 
         try:
             for member in reversed(chain):
@@ -80,15 +79,15 @@ class ContextPipeline(Generic[TCrawlingContext]):
             try:
                 await final_context_consumer(cast('TCrawlingContext', crawling_context))
             except SessionError as e:  # Session errors get special treatment
-                final_consumer_exceptions.append(e)
+                final_consumer_exception = e
                 raise
             except Exception as e:
-                final_consumer_exceptions.append(e)
+                final_consumer_exception = e
                 raise RequestHandlerError(e, crawling_context) from e
         finally:
             for middleware_instance in reversed(cleanup_stack):
                 try:
-                    result = await middleware_instance.asend(final_consumer_exceptions)
+                    result = await middleware_instance.asend(final_consumer_exception)
                 except StopAsyncIteration:  # noqa: PERF203
                     pass
                 except ContextPipelineInterruptedError as e:

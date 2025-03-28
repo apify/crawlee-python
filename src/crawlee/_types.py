@@ -500,6 +500,7 @@ class SendRequestFunction(Protocol):
             The HTTP response received from the server.
         """
 
+
 @docs_group('Data structures')
 @dataclasses.dataclass
 class PageSnapshot:
@@ -508,6 +509,7 @@ class PageSnapshot:
 
     def __bool__(self) -> bool:
         return bool(self.screenshot or self.html)
+
 
 @docs_group('Functions')
 class GetPageSnapshot(Protocol):
@@ -519,6 +521,7 @@ class GetPageSnapshot(Protocol):
         Returns:
             Snapshot of a page.
         """
+
 
 @docs_group('Functions')
 class UseStateFunction(Protocol):
@@ -580,10 +583,9 @@ class BasicCrawlingContext:
     log: logging.Logger
     """Logger instance."""
 
-    def get_snapshot(self) -> PageSnapshot:
+    async def get_snapshot(self) -> PageSnapshot:
         """Get snapshot of crawled page."""
         return PageSnapshot()
-
 
     def __hash__(self) -> int:
         """Return hash of the context. Each context is considered unique."""
