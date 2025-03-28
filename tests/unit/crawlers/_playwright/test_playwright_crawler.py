@@ -503,9 +503,11 @@ async def test_error_snapshots(server_url: URL) -> None:
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
-        raise RuntimeError(context.request.url)
+        if 'page' in context.request.url:
+            raise RuntimeError('page error')
+        raise RuntimeError('home error')
 
-    await crawler.run([str(server_url), str(server_url / 'page_1')])
+    await crawler.run([str(server_url), str(server_url / 'page_1'), str(server_url / 'page_2')])
 
     kvs = await crawler.get_key_value_store()
     kvs_content = {}
@@ -514,15 +516,16 @@ async def test_error_snapshots(server_url: URL) -> None:
         kvs_content[key_info.key] = await kvs.get_value(key_info.key)
 
         assert set(key_info.key).issubset(ErrorSnapshotter.ALLOWED_CHARACTERS)
-        if key_info.key.endswith('page_1.html'):
-            assert kvs_content[key_info.key] == GENERIC_RESPONSE.decode('utf-8')
-        elif key_info.key.endswith('.jpg'):
+        if key_info.key.endswith('.jpg'):
             # Check at least jpeg start and end expected bytes. Content is not relevant for the test.
             assert kvs_content[key_info.key].startswith(b'\xff\xd8')
             assert kvs_content[key_info.key].endswith(b'\xff\xd9')
+        elif 'page' in key_info.key:
+            assert kvs_content[key_info.key] == GENERIC_RESPONSE.decode('utf-8')
         else:
             assert kvs_content[key_info.key] == HELLO_WORLD.decode('utf-8')
 
-    assert crawler.statistics.error_tracker.total == 2 * max_retries
+    # Three errors, but only 2 unique -> 4 (2 x (html and jpg)) artifacts expected.
+    assert crawler.statistics.error_tracker.total == 3 * max_retries
     assert crawler.statistics.error_tracker.unique_error_count == 2
     assert len(kvs_content) == 4
