@@ -76,8 +76,8 @@ make unit-tests-cov
 
 Pre-requisites for running integration tests:
  - [apify-cli](https://docs.apify.com/cli/docs/installation) correctly installed
- - apify-cli available in PATH environment variable
- - Your [apify token](https://docs.apify.com/platform/integrations/api#api-token) is available in APIFY_TEST_USER_API_TOKEN environment variable
+ - `apify-cli` available in `PATH` environment variable
+ - Your [apify token](https://docs.apify.com/platform/integrations/api#api-token) is available in `APIFY_TEST_USER_API_TOKEN` environment variable
 
 
 To run integration tests:
