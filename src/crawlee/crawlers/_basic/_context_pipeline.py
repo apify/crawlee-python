@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator, Awaitable, Generator
-from typing import Any, Callable, Generic, cast
+from typing import TYPE_CHECKING, Any, Callable, Generic, cast
 
 from typing_extensions import TypeVar
 
@@ -14,6 +13,9 @@ from crawlee.errors import (
     RequestHandlerError,
     SessionError,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Awaitable, Generator
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 TMiddlewareCrawlingContext = TypeVar('TMiddlewareCrawlingContext', bound=BasicCrawlingContext)
@@ -31,7 +33,7 @@ class ContextPipeline(Generic[TCrawlingContext]):
         *,
         _middleware: Callable[
             [TCrawlingContext],
-            AsyncGenerator[TMiddlewareCrawlingContext, None],
+            AsyncGenerator[TMiddlewareCrawlingContext, Exception | None],
         ]
         | None = None,
         _parent: ContextPipeline[BasicCrawlingContext] | None = None,
@@ -55,8 +57,8 @@ class ContextPipeline(Generic[TCrawlingContext]):
         Exceptions from the consumer function are wrapped together with the final crawling context.
         """
         chain = list(self._middleware_chain())
-        cleanup_stack = list[AsyncGenerator]()
-        final_consumer_exception = None
+        cleanup_stack: list[AsyncGenerator[Any, Exception | None]] = []
+        final_consumer_exception: Exception | None = None
 
         try:
             for member in reversed(chain):
@@ -114,7 +116,8 @@ class ContextPipeline(Generic[TCrawlingContext]):
         """
         return ContextPipeline[TMiddlewareCrawlingContext](
             _middleware=cast(
-                'Callable[[BasicCrawlingContext], AsyncGenerator[TMiddlewareCrawlingContext, None]]', middleware
+                'Callable[[BasicCrawlingContext], AsyncGenerator[TMiddlewareCrawlingContext, Exception | None]]',
+                middleware,
             ),
             _parent=cast('ContextPipeline[BasicCrawlingContext]', self),
         )

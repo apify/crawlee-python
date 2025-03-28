@@ -95,15 +95,11 @@ class ErrorTracker:
                 # No similar message found. Create new group.
                 self._errors[error_group_file_and_line][error_group_name].update([error_group_message])
 
-        if all(
-            (
-                self._errors[error_group_file_and_line][error_group_name][
-                    new_error_group_message or error_group_message
-                ]
-                == 1,
-                context,
-                kvs,
-            )
+        if (
+            self._errors[error_group_file_and_line][error_group_name][new_error_group_message or error_group_message]
+            == 1
+            and context is not None
+            and kvs is not None
         ):
             # Save snapshot only on first the occurrence of the error and only if context and kvs was passed as well.
             await self._capture_snapshots(
@@ -124,18 +120,18 @@ class ErrorTracker:
             except Exception:
                 logger.exception(f'Error during snapshot capture for exception: {error_message}')
 
-    def _get_file_and_line(self, error: Exception) -> str | None:
+    def _get_file_and_line(self, error: Exception) -> str:
         if self.show_file_and_line_number:
             error_traceback = traceback.extract_tb(error.__traceback__)
             return f'{error_traceback[0].filename.split("/")[-1]}:{error_traceback[0].lineno}'
-        return None
+        return ''
 
-    def _get_error_message(self, error: Exception) -> str | None:
+    def _get_error_message(self, error: Exception) -> str:
         if self.show_error_message:
             if self.show_full_message:
                 return str(error.args[0])
             return str(error.args[0]).split('\n')[0]
-        return None
+        return ''
 
     @property
     def unique_error_count(self) -> int:
@@ -174,13 +170,13 @@ class ErrorTracker:
         return f'{file_and_line_part}{name_part}{message_part}'
 
     @staticmethod
-    def _create_generic_message(message_1: str | None, message_2: str | None) -> str | None:
+    def _create_generic_message(message_1: str | None, message_2: str | None) -> str:
         """Create a generic error message from two messages, if they are similar enough.
 
         Different parts of similar messages are replaced by `_`.
         """
         if message_1 is None or message_2 is None:
-            return None
+            return ''
 
         replacement_string = '***'
         replacement_count = 0

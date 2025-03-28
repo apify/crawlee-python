@@ -505,7 +505,7 @@ class SendRequestFunction(Protocol):
 @dataclasses.dataclass
 class PageSnapshot:
     screenshot: bytes | None = None
-    html: bytes | None = None
+    html: str | None = None
 
     def __bool__(self) -> bool:
         return bool(self.screenshot or self.html)
