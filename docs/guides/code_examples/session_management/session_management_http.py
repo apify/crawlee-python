@@ -1,4 +1,3 @@
-import asyncio
 import re
 
 from crawlee.crawlers import HttpCrawler, HttpCrawlingContext
@@ -38,7 +37,3 @@ async def main() -> None:
                 context.session.mark_good()  # BasicCrawler handles this automatically.
 
     await crawler.run(['https://crawlee.dev/'])
-
-
-if __name__ == '__main__':
-    asyncio.run(main())

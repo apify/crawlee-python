@@ -1,5 +1,3 @@
-import asyncio
-
 from crawlee.configuration import Configuration
 from crawlee.crawlers import HttpCrawler, HttpCrawlingContext
 
@@ -17,7 +15,3 @@ async def main() -> None:
         context.log.info(f'Processing {context.request.url} ...')
 
     await crawler.run(['https://crawlee.dev/'])
-
-
-if __name__ == '__main__':
-    asyncio.run(main())

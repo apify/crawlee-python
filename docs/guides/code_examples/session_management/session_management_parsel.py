@@ -1,5 +1,3 @@
-import asyncio
-
 from crawlee.crawlers import ParselCrawler, ParselCrawlingContext
 from crawlee.proxy_configuration import ProxyConfiguration
 from crawlee.sessions import SessionPool
@@ -36,7 +34,3 @@ async def main() -> None:
                 context.session.mark_good()  # BasicCrawler handles this automatically.
 
     await crawler.run(['https://crawlee.dev/'])
-
-
-if __name__ == '__main__':
-    asyncio.run(main())

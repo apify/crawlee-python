@@ -1,5 +1,3 @@
-import asyncio
-
 from crawlee.browsers import BrowserPool, PlaywrightBrowserPlugin
 from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext
 
@@ -32,7 +30,3 @@ async def main() -> None:
 
     # Run the crawler with the initial list of URLs.
     await crawler.run(['https://crawlee.dev', 'https://apify.com/'])
-
-
-if __name__ == '__main__':
-    asyncio.run(main())

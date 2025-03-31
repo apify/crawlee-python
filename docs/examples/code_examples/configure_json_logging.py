@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import inspect
 import logging
 import sys
@@ -85,7 +84,3 @@ async def main() -> None:
 
     # Run the crawler
     await crawler.run(['https://www.crawlee.dev/'])
-
-
-if __name__ == '__main__':
-    asyncio.run(main())

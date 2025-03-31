@@ -1,5 +1,3 @@
-import asyncio
-
 from crawlee.crawlers import ParselCrawler, ParselCrawlingContext
 from crawlee.request_loaders import RequestList
 
@@ -21,6 +19,3 @@ async def main() -> None:
         await context.enqueue_links()
 
     await crawler.run()
-
-
-asyncio.run(main())

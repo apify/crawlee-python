@@ -1,5 +1,3 @@
-import asyncio
-
 # Add import of crawler and crawling context.
 from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 from crawlee.storages import RequestQueue
@@ -24,7 +22,3 @@ async def main() -> None:
         context.log.info(f'The title of {url} is: {title}.')
 
     await crawler.run()
-
-
-if __name__ == '__main__':
-    asyncio.run(main())

@@ -1,5 +1,3 @@
-import asyncio
-
 # Instead of BeautifulSoupCrawler let's use Playwright to be able to render JavaScript.
 from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext
 
@@ -26,7 +24,3 @@ async def main() -> None:
             context.log.info(f'CATEGORY_{i + 1}: {text}')
 
     await crawler.run(['https://warehouse-theme-metal.myshopify.com/collections'])
-
-
-if __name__ == '__main__':
-    asyncio.run(main())

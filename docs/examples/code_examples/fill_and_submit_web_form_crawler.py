@@ -1,4 +1,3 @@
-import asyncio
 from urllib.parse import urlencode
 
 from crawlee import Request
@@ -35,7 +34,3 @@ async def main() -> None:
 
     # Run the crawler with the initial list of requests.
     await crawler.run([request])
-
-
-if __name__ == '__main__':
-    asyncio.run(main())

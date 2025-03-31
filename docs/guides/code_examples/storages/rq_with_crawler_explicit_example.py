@@ -1,5 +1,3 @@
-import asyncio
-
 from crawlee.crawlers import HttpCrawler, HttpCrawlingContext
 from crawlee.storages import RequestQueue
 
@@ -25,7 +23,3 @@ async def main() -> None:
 
     # And execute the crawler.
     await crawler.run()
-
-
-if __name__ == '__main__':
-    asyncio.run(main())

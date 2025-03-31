@@ -1,5 +1,3 @@
-import asyncio
-
 from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 from crawlee.proxy_configuration import ProxyConfiguration
 
@@ -33,7 +31,3 @@ async def main() -> None:
 
     # Run the crawler with the initial list of requests.
     await crawler.run(['https://crawlee.dev/'])
-
-
-if __name__ == '__main__':
-    asyncio.run(main())

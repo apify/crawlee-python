@@ -1,5 +1,3 @@
-import asyncio
-
 #  Camoufox is external package and needs to be installed. It is not included in crawlee.
 from camoufox import AsyncNewBrowser
 from typing_extensions import override
@@ -63,7 +61,3 @@ async def main() -> None:
 
     # Run the crawler with the initial list of URLs.
     await crawler.run(['https://news.ycombinator.com/'])
-
-
-if __name__ == '__main__':
-    asyncio.run(main())

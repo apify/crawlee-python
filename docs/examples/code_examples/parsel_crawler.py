@@ -1,5 +1,3 @@
-import asyncio
-
 from crawlee.crawlers import BasicCrawlingContext, ParselCrawler, ParselCrawlingContext
 
 # Regex for identifying email addresses on a webpage.
@@ -41,7 +39,3 @@ async def main() -> None:
 
     # Export the entire dataset to a JSON file.
     await crawler.export_data_json(path='results.json')
-
-
-if __name__ == '__main__':
-    asyncio.run(main())
