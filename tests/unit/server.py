@@ -391,23 +391,12 @@ async def set_complex_cookies(send: Send) -> None:
 
 
 async def dynamic_content(scope: dict[str, Any], send: Send) -> None:
-    """Handle requests to serve an HTML page with dynamic JavaScript content."""
-    # Get the query parameters from the request
+    """Handle requests to serve HTML-page with dynamic content received in the request."""
     query_params = get_query_params(scope.get('query_string', b''))
 
-    # Get the content from the query parameter, or use default if not provided
     content = query_params.get('content', '')
-    print(content)
-    await send(
-        {
-            'type': 'http.response.start',
-            'status': 200,
-            'headers': [
-                [b'content-type', b'text/html; charset=utf-8'],
-            ],
-        }
-    )
-    await send({'type': 'http.response.body', 'body': content.encode()})
+
+    await send_html_response(send, html_content=content.encode())
 
 
 class TestServer(Server):
