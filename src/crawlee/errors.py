@@ -14,6 +14,7 @@ __all__ = [
     'HttpClientStatusCodeError',
     'HttpStatusCodeError',
     'ProxyError',
+    'RequestCollisionError',
     'RequestHandlerError',
     'ServiceConflictError',
     'SessionError',
@@ -106,3 +107,8 @@ class ContextPipelineFinalizationError(Exception):
 @docs_group('Errors')
 class ContextPipelineInterruptedError(Exception):
     """May be thrown in the initialization phase of a middleware to signal that the request should not be processed."""
+
+
+@docs_group('Errors')
+class RequestCollisionError(Exception):
+    """Raised when a request cannot be processed due to a conflict with required resources."""
