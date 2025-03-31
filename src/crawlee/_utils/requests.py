@@ -116,12 +116,12 @@ def compute_unique_key(
     if use_extended_unique_key:
         payload_hash = _get_payload_hash(payload)
         headers_hash = _get_headers_hash(headers)
-        normilized_session = '' if session_id is None else session_id.lower()
+        normalized_session = '' if session_id is None else session_id.lower()
 
         # Return the extended unique key. Use pipe as a separator of the different parts of the unique key.
         extended_part = f'{normalized_method}|{headers_hash}|{payload_hash}'
-        if normilized_session:
-            extended_part = f'{extended_part}|{normilized_session}'
+        if normalized_session:
+            extended_part = f'{extended_part}|{normalized_session}'
         return f'{extended_part}|{normalized_url}'
 
     # Log information if there is a non-GET request with a payload.
