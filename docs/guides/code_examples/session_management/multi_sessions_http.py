@@ -1,5 +1,6 @@
 import asyncio
 from datetime import timedelta
+from itertools import count
 from typing import Callable
 
 from crawlee import ConcurrencySettings, Request
@@ -12,13 +13,11 @@ from crawlee.sessions import Session, SessionPool
 # This is necessary if you need to specify a particular session for the first request,
 # for example during authentication
 def create_session_function() -> Callable[[], Session]:
-    counter = 0
+    counter = count()
 
     def create_session() -> Session:
-        nonlocal counter
-        counter += 1
         return Session(
-            id=str(counter),
+            id=str(next(counter)),
             max_usage_count=999_999,
             max_age=timedelta(hours=999_999),
             max_error_score=100,
