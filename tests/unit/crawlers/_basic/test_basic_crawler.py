@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
 from unittest.mock import AsyncMock, Mock, call
 
-import httpx
 import pytest
 
 from crawlee import ConcurrencySettings, Glob, service_locator
@@ -33,7 +32,7 @@ from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    import respx
+    from yarl import URL
 
     from crawlee._types import JsonSerializable
     from crawlee.storage_clients._memory import DatasetClient
@@ -300,35 +299,29 @@ async def test_handles_error_in_failed_request_handler() -> None:
         await crawler.run(['http://a.com/', 'http://b.com/', 'http://c.com/'])
 
 
-async def test_send_request_works(respx_mock: respx.MockRouter) -> None:
-    respx_mock.get('http://b.com/', name='test_endpoint').return_value = httpx.Response(
-        status_code=200, json={'hello': 'world'}
-    )
+async def test_send_request_works(server_url: URL) -> None:
+    response_data: dict[str, Any] = {}
 
-    response_body: Any = None
-    response_headers: HttpHeaders | None = None
-
-    crawler = BasicCrawler(
-        max_request_retries=3,
-    )
+    crawler = BasicCrawler(max_request_retries=3)
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        nonlocal response_body, response_headers
+        response = await context.send_request(str(server_url))
 
-        response = await context.send_request('http://b.com/')
-        response_body = response.read()
-        response_headers = response.headers
+        response_data['body'] = response.read()
+        response_data['headers'] = response.headers
 
     await crawler.run(['http://a.com/', 'http://b.com/', 'http://c.com/'])
-    assert respx_mock['test_endpoint'].called
 
-    assert json.loads(response_body) == {'hello': 'world'}
+    response_body = response_data.get('body')
+    assert response_body is not None
+    assert b'Hello, world!' in response_body
 
+    response_headers = response_data.get('headers')
     assert response_headers is not None
     content_type = response_headers.get('content-type')
     assert content_type is not None
-    assert content_type.endswith('/json')
+    assert content_type == 'text/html; charset=utf-8'
 
 
 @dataclass

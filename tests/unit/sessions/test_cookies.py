@@ -117,3 +117,18 @@ def test_store_cookie(session_cookies: SessionCookies) -> None:
     test_session_cookies.store_cookie(cookies[0])
 
     assert test_session_cookies == session_cookies
+
+
+def test_store_multidomain_cookies() -> None:
+    """Test of storing cookies with the same name for different domains"""
+    session_cookies = SessionCookies()
+    session_cookies.set(name='a', value='1', domain='test.io')
+    session_cookies.set(name='a', value='2', domain='notest.io')
+    check_cookies = {
+        item.get('domain'): (item['name'], item['value']) for item in session_cookies.get_cookies_as_dicts()
+    }
+
+    assert len(check_cookies) == 2
+
+    assert check_cookies['test.io'] == ('a', '1')
+    assert check_cookies['notest.io'] == ('a', '2')

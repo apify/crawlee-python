@@ -8,12 +8,14 @@ import os
 from typing import TYPE_CHECKING, Callable, Optional, cast
 
 import pytest
+from curl_cffi import CurlHttpVersion
 from proxy import Proxy
 from uvicorn.config import Config
 
 from crawlee import service_locator
 from crawlee.configuration import Configuration
 from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_network
+from crawlee.http_clients import CurlImpersonateHttpClient, HttpxHttpClient
 from crawlee.proxy_configuration import ProxyInfo
 from crawlee.storage_clients import MemoryStorageClient
 from crawlee.storages import KeyValueStore, _creation_management
@@ -196,3 +198,15 @@ def redirect_http_server(unused_tcp_port_factory: Callable[[], int]) -> Iterator
 def redirect_server_url(redirect_http_server: TestServer) -> URL:
     """Provide the base URL of the test server."""
     return redirect_http_server.url
+
+
+@pytest.fixture(
+    params=[
+        pytest.param('curl', id='curl'),
+        pytest.param('httpx', id='httpx'),
+    ]
+)
+async def http_client(request: pytest.FixtureRequest) -> CurlImpersonateHttpClient | HttpxHttpClient:
+    if request.param == 'curl':
+        return CurlImpersonateHttpClient(http_version=CurlHttpVersion.V1_1)
+    return HttpxHttpClient(http2=False)
