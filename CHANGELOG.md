@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Add `statistics_log_format` parameter to `BasicCrawler` ([#1061](https://github.com/apify/crawlee-python/pull/1061)) ([635ae4a](https://github.com/apify/crawlee-python/commit/635ae4a56c65e434783ca721f4164203f465abf0)) by [@Mantisus](https://github.com/Mantisus), closes [#700](https://github.com/apify/crawlee-python/issues/700)
+- Add Session binding capability via `session_id` in `Request` ([#1086](https://github.com/apify/crawlee-python/pull/1086)) ([cda7b31](https://github.com/apify/crawlee-python/commit/cda7b314ffda3104e4fd28a5e85c9e238d8866a4)) by [@Mantisus](https://github.com/Mantisus), closes [#1076](https://github.com/apify/crawlee-python/issues/1076)
 
 ### 🐛 Bug Fixes
 
