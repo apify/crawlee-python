@@ -1106,7 +1106,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         try:
             request.state = RequestState.REQUEST_HANDLER
 
-            self._raise_request_collision(context.request, context.session)
+            self._check_request_collision(context.request, context.session)
 
             try:
                 await self._run_request_handler(context=context)
@@ -1251,7 +1251,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         ):
             raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
 
-    def _raise_request_collision(self, request: Request, session: Session | None) -> None:
+    def _check_request_collision(self, request: Request, session: Session | None) -> None:
         """Raise an exception if a request cannot access required resources.
 
         Args:
