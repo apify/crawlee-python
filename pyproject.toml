@@ -92,8 +92,8 @@ crawlee = "crawlee._cli:cli"
 
 [dependency-groups]
 dev = [
-    "apify_client",  # For integration tests.
-    "build~=1.2.2",  # For integration tests.
+    "apify_client",  # For e2e tests.
+    "build~=1.2.2",  # For e2e tests.
     "mypy~=1.15.0",
     "pre-commit~=4.2.0",
     "proxy-py~=2.4.0",

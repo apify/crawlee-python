@@ -22,7 +22,7 @@ async def test_static_crawler_actor_at_apify(
     tmp_path: Path, crawlee_wheel_path: Path, package_manager: str, crawler_type: str, http_client: str
 ) -> None:
     # Generate new actor name
-    actor_name = f'crawlee-python-template-integration-test-{crypto_random_object_id(8).lower()}'
+    actor_name = f'crawlee-python-template-e2e-test-{crypto_random_object_id(8).lower()}'
 
     # Create project from template
     cookiecutter(
@@ -59,9 +59,7 @@ async def test_static_crawler_actor_at_apify(
     # Why is it in stderr and not in stdout???
     actor_id = re.findall(actor_id_regexp, build_process.stderr.decode())[0]
 
-    client = ApifyClientAsync(
-        token=os.getenv('APIFY_TEST_USER_API_TOKEN'), api_url=os.getenv('APIFY_INTEGRATION_TESTS_API_URL')
-    )
+    client = ApifyClientAsync(token=os.getenv('APIFY_TEST_USER_API_TOKEN'))
     actor = client.actor(actor_id)
 
     # Run actor
