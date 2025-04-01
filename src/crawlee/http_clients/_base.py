@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING, Protocol
 from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
+    from types import TracebackType
+
     from crawlee import Request
     from crawlee._types import HttpHeaders, HttpMethod, HttpPayload
     from crawlee.proxy_configuration import ProxyInfo
@@ -119,3 +121,16 @@ class HttpClient(ABC):
         Returns:
             The HTTP response received from the server.
         """
+
+    @abstractmethod
+    async def __aenter__(self) -> HttpClient:
+        """Make."""
+
+    @abstractmethod
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        exc_traceback: TracebackType | None,
+    ) -> None:
+        """Make."""

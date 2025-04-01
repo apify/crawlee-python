@@ -15,6 +15,7 @@ from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
 
 if TYPE_CHECKING:
     from ssl import SSLContext
+    from types import TracebackType
 
     from crawlee import Request
     from crawlee._types import HttpMethod, HttpPayload
@@ -262,3 +263,18 @@ class HttpxHttpClient(HttpClient):
             return True
 
         return False
+
+    @override
+    async def __aenter__(self) -> HttpxHttpClient:
+        return self
+
+    @override
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        exc_traceback: TracebackType | None,
+    ) -> None:
+        for client in self._client_by_proxy_url.values():
+            await client.aclose()
+        self._client_by_proxy_url.clear()
