@@ -36,7 +36,7 @@ function CodeExampleSection() {
         <section className={styles.codeExampleSection}>
             <div className={styles.decorativeRow} />
             <div className={styles.codeBlockContainer}>
-                <RunnableCodeBlock className="language-py" language="python">
+                <RunnableCodeBlock className="language-python" language="python">
                     {HomePageExample}
                 </RunnableCodeBlock>
             </div>

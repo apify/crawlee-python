@@ -7,11 +7,12 @@ import ApiLink from '@site/src/components/ApiLink';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import CodeBlock from '@theme/CodeBlock';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
-import BeautifulsoupCrawlerExample from '!!raw-loader!./code_examples/beautifulsoup_crawler_example.py';
-import ParselCrawlerExample from '!!raw-loader!./code_examples/parsel_crawler_example.py';
-import PlaywrightCrawlerExample from '!!raw-loader!./code_examples/playwright_crawler_example.py';
-import PlaywrightCrawlerHeadfulExample from '!!raw-loader!./code_examples/playwright_crawler_headful_example.py';
+import BeautifulsoupCrawlerExample from '!!raw-loader!roa-loader!./code_examples/beautifulsoup_crawler_example.py';
+import ParselCrawlerExample from '!!raw-loader!roa-loader!./code_examples/parsel_crawler_example.py';
+import PlaywrightCrawlerExample from '!!raw-loader!roa-loader!./code_examples/playwright_crawler_example.py';
+import PlaywrightCrawlerHeadfulExample from '!!raw-loader!roa-loader!./code_examples/playwright_crawler_headful_example.py';
 
 This short tutorial will help you start scraping with Crawlee in just a minute or two. For an in-depth understanding of how Crawlee works, check out the [Introduction](../introduction/index.mdx) section, which provides a comprehensive step-by-step guide to creating your first scraper.
 
@@ -65,21 +66,21 @@ For detailed installation instructions see the [Setting up](../introduction/01_s
 
 Run the following example to perform a recursive crawl of the Crawlee website using the selected crawler.
 
-<Tabs groupId="main">
-    <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
-        <CodeBlock className="language-python">
+<Tabs groupId="quickStart">
+    <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler" default>
+        <RunnableCodeBlock className="language-python" language="python">
             {BeautifulsoupCrawlerExample}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
     <TabItem value="ParselCrawler" label="ParselCrawler">
-        <CodeBlock className="language-python">
+        <RunnableCodeBlock className="language-python" language="python">
             {ParselCrawlerExample}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
     <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
-        <CodeBlock className="language-python">
+        <RunnableCodeBlock className="language-python" language="python">
             {PlaywrightCrawlerExample}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
 </Tabs>
 
