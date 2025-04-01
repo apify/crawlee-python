@@ -148,7 +148,7 @@ def test_snapshot_pruning_removes_outdated_records(snapshotter: Snapshotter) -> 
     snapshotter._cpu_snapshots = snapshots
 
     # Prune snapshots older than 2 hours
-    snapshots_casted = cast(list[Snapshot], snapshotter._cpu_snapshots)
+    snapshots_casted = cast('list[Snapshot]', snapshotter._cpu_snapshots)
     snapshotter._prune_snapshots(snapshots_casted, now)
 
     # Check that only the last two snapshots remain
@@ -160,7 +160,7 @@ def test_snapshot_pruning_removes_outdated_records(snapshotter: Snapshotter) -> 
 def test_pruning_empty_snapshot_list_remains_empty(snapshotter: Snapshotter) -> None:
     now = datetime.now(timezone.utc)
     snapshotter._cpu_snapshots = Snapshotter._get_sorted_list_by_created_at(list[CpuSnapshot]())
-    snapshots_casted = cast(list[Snapshot], snapshotter._cpu_snapshots)
+    snapshots_casted = cast('list[Snapshot]', snapshotter._cpu_snapshots)
     snapshotter._prune_snapshots(snapshots_casted, now)
     assert snapshotter._cpu_snapshots == []
 
@@ -184,7 +184,7 @@ def test_snapshot_pruning_keeps_recent_records_unaffected(snapshotter: Snapshott
     snapshotter._cpu_snapshots = snapshots
 
     # Prune snapshots older than 2 hours
-    snapshots_casted = cast(list[Snapshot], snapshotter._cpu_snapshots)
+    snapshots_casted = cast('list[Snapshot]', snapshotter._cpu_snapshots)
     snapshotter._prune_snapshots(snapshots_casted, now)
 
     # Check that only the last two snapshots remain

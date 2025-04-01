@@ -71,11 +71,11 @@ class AbstractHttpCrawler(
         cls,
         static_parser: AbstractHttpParser[TParseResult, TSelectResult],
     ) -> type[AbstractHttpCrawler[ParsedHttpCrawlingContext[TParseResult], TParseResult, TSelectResult]]:
-        """Convenience class factory that creates specific version of `AbstractHttpCrawler` class.
+        """Create a specific version of `AbstractHttpCrawler` class.
 
-        In general typing sense two generic types of `AbstractHttpCrawler` do not have to be dependent on each other.
-        This is convenience constructor for specific cases when `TParseResult` is used to specify both generic
-        parameters in `AbstractHttpCrawler`.
+        This is a convenience factory method for creating a specific `AbstractHttpCrawler` subclass.
+        While `AbstractHttpCrawler` allows its two generic parameters to be independent,
+        this method simplifies cases where `TParseResult` is used for both generic parameters.
         """
 
         class _ParsedHttpCrawler(

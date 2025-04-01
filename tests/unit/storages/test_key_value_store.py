@@ -9,7 +9,9 @@ from urllib.parse import urlparse
 
 import pytest
 
+from crawlee import service_locator
 from crawlee.events import EventManager
+from crawlee.storage_clients.models import StorageMetadata
 from crawlee.storages import KeyValueStore
 
 if TYPE_CHECKING:
@@ -42,6 +44,13 @@ async def test_open() -> None:
     # it doesn't work
     with pytest.raises(RuntimeError, match='KeyValueStore with id "dummy-name" does not exist!'):
         await KeyValueStore.open(id='dummy-name')
+
+
+async def test_open_save_storage_object() -> None:
+    default_key_value_store = await KeyValueStore.open()
+
+    assert default_key_value_store.storage_object is not None
+    assert default_key_value_store.storage_object.id == default_key_value_store.id
 
 
 async def test_consistency_accross_two_clients() -> None:
@@ -190,7 +199,7 @@ async def test_get_auto_saved_value_auto_save_race_conditions(key_value_store: K
         return await KeyValueStore.get_value(key_value_store, key=key, default_value=default_value)
 
     async def increment_counter() -> None:
-        state = cast(dict[str, int], await key_value_store.get_auto_saved_value('state'))
+        state = cast('dict[str, int]', await key_value_store.get_auto_saved_value('state'))
         state['counter'] += 1
 
     with patch.object(key_value_store, 'get_value', delayed_get_value):
@@ -198,3 +207,23 @@ async def test_get_auto_saved_value_auto_save_race_conditions(key_value_store: K
         await asyncio.gather(*tasks)
 
     assert (await key_value_store.get_auto_saved_value('state'))['counter'] == 2
+
+
+async def test_from_storage_object() -> None:
+    storage_client = service_locator.get_storage_client()
+
+    storage_object = StorageMetadata(
+        id='dummy-id',
+        name='dummy-name',
+        accessed_at=datetime.now(timezone.utc),
+        created_at=datetime.now(timezone.utc),
+        modified_at=datetime.now(timezone.utc),
+        extra_attribute='extra',
+    )
+
+    key_value_store = KeyValueStore.from_storage_object(storage_client, storage_object)
+
+    assert key_value_store.id == storage_object.id
+    assert key_value_store.name == storage_object.name
+    assert key_value_store.storage_object == storage_object
+    assert storage_object.model_extra.get('extra_attribute') == 'extra'  # type: ignore[union-attr]

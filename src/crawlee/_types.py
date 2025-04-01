@@ -51,7 +51,7 @@ EnqueueStrategy: TypeAlias = Literal['all', 'same-domain', 'same-hostname', 'sam
 
 
 def _normalize_headers(headers: Mapping[str, str]) -> dict[str, str]:
-    """Converts all header keys to lowercase, strips whitespace, and returns them sorted by key."""
+    """Convert all header keys to lowercase, strips whitespace, and returns them sorted by key."""
     normalized_headers = {k.lower().strip(): v.strip() for k, v in headers.items()}
     sorted_headers = sorted(normalized_headers.items())
     return dict(sorted_headers)
@@ -67,7 +67,7 @@ class HttpHeaders(RootModel, Mapping[str, str]):
         dict[str, str],
         PlainValidator(lambda value: _normalize_headers(value)),
         Field(default_factory=dict),
-    ] = {}  # noqa: RUF012
+    ] = {}
 
     def __getitem__(self, key: str) -> str:
         return self.root[key.lower()]
@@ -106,7 +106,7 @@ class ConcurrencySettings:
         max_tasks_per_minute: float = float('inf'),
         desired_concurrency: int | None = None,
     ) -> None:
-        """A default constructor.
+        """Initialize a new instance.
 
         Args:
             min_concurrency: The minimum number of tasks running in parallel. If you set this value too high
@@ -244,7 +244,7 @@ class KeyValueStoreChangeRecords:
 
     async def get_value(self, key: str, default_value: T | None = None) -> T | None:
         if key in self.updates:
-            return cast(T, self.updates[key].content)
+            return cast('T', self.updates[key].content)
 
         return await self._actual_key_value_store.get_value(key, default_value)
 
@@ -360,7 +360,7 @@ class EnqueueLinksFunction(Protocol):
         requests: Sequence[str | Request] | None = None,
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> Coroutine[None, None, None]:
-        """A call dunder method.
+        """Call enqueue links function.
 
         Args:
             selector: A selector used to find the elements containing the links. The behaviour differs based
@@ -509,7 +509,7 @@ class SendRequestFunction(Protocol):
         method: HttpMethod = 'GET',
         headers: HttpHeaders | dict[str, str] | None = None,
     ) -> Coroutine[None, None, HttpResponse]:
-        """A call dunder method.
+        """Call send request function.
 
         Args:
             url: The URL to send the request to.

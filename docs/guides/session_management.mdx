@@ -15,6 +15,8 @@ import BeautifulSoupSource from '!!raw-loader!./code_examples/session_management
 import ParselSource from '!!raw-loader!./code_examples/session_management/session_management_parsel.py';
 import PlaywrightSource from '!!raw-loader!./code_examples/session_management/session_management_playwright.py';
 import StandaloneSource from '!!raw-loader!./code_examples/session_management/session_management_standalone.py';
+import OneSession from '!!raw-loader!./code_examples/session_management/one_session_http.py';
+import MultiSessions from '!!raw-loader!./code_examples/session_management/multi_sessions_http.py';
 
 The <ApiLink to="class/SessionPool">`SessionPool`</ApiLink> class provides a robust way to manage the rotation of proxy IP addresses, cookies, and other custom settings in Crawlee. Its primary advantage is the ability to filter out blocked or non-functional proxies, ensuring that your scraper avoids retrying requests through known problematic proxies.
 
@@ -68,3 +70,25 @@ Now, let's explore examples of how to use the <ApiLink to="class/SessionPool">`S
 These examples demonstrate the basics of configuring and using the <ApiLink to="class/SessionPool">`SessionPool`</ApiLink>.
 
 Please, bear in mind that <ApiLink to="class/SessionPool">`SessionPool`</ApiLink> requires some time to establish a stable pool of working IPs. During the initial setup, you may encounter errors as the pool identifies and filters out blocked or non-functional IPs. This stabilization period is expected and will improve over time.
+
+## Configuring a single session
+
+In some cases, you need full control over session usage. For example, when working with websites requiring authentication or initialization of certain parameters like cookies.
+
+When working with a site that requires authentication, we typically don't want multiple sessions with different browser fingerprints or client parameters accessing the site. In this case, we need to configure the <ApiLink to="class/SessionPool">`SessionPool`</ApiLink> appropriately:
+
+<CodeBlock language="py">
+    {OneSession}
+</CodeBlock>
+
+## Binding requests to specific sessions
+
+In the previous example, there's one obvious limitation - you're restricted to only one session.
+
+In some cases, we need to achieve the same behavior but using multiple sessions in parallel, such as authenticating with different profiles or using different proxies.
+
+To do this, use the `session_id` parameter for the <ApiLink to="class/Request">`Request`</ApiLink> object to bind a request to a specific session:
+
+<CodeBlock language="py">
+    {MultiSessions}
+</CodeBlock>

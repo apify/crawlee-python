@@ -34,7 +34,7 @@ def test_global_configuration_works_reversed() -> None:
     )
 
 
-async def test_storage_not_persisted_when_disabled(tmp_path: Path, httpbin: URL) -> None:
+async def test_storage_not_persisted_when_disabled(tmp_path: Path, server_url: URL) -> None:
     config = Configuration(
         persist_storage=False,
         write_metadata=False,
@@ -48,14 +48,14 @@ async def test_storage_not_persisted_when_disabled(tmp_path: Path, httpbin: URL)
     async def default_handler(context: HttpCrawlingContext) -> None:
         await context.push_data({'url': context.request.url})
 
-    await crawler.run([str(httpbin)])
+    await crawler.run([str(server_url)])
 
     # Verify that no files were created in the storage directory.
     content = list(tmp_path.iterdir())
     assert content == [], 'Expected the storage directory to be empty, but it is not.'
 
 
-async def test_storage_persisted_when_enabled(tmp_path: Path, httpbin: URL) -> None:
+async def test_storage_persisted_when_enabled(tmp_path: Path, server_url: URL) -> None:
     config = Configuration(
         persist_storage=True,
         write_metadata=True,
@@ -69,7 +69,7 @@ async def test_storage_persisted_when_enabled(tmp_path: Path, httpbin: URL) -> N
     async def default_handler(context: HttpCrawlingContext) -> None:
         await context.push_data({'url': context.request.url})
 
-    await crawler.run([str(httpbin)])
+    await crawler.run([str(server_url)])
 
     # Verify that files were created in the storage directory.
     content = list(tmp_path.iterdir())

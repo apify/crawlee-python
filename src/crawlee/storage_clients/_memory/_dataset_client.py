@@ -332,7 +332,7 @@ class DatasetClient(BaseDatasetClient):
         entity_directory: str,
         persist_storage: bool,
     ) -> None:
-        """Writes dataset items to the disk.
+        """Write dataset items to the disk.
 
         The function iterates over a list of dataset items, each represented as a tuple of an identifier
         and a dictionary, and writes them as individual JSON files in a specified directory. The function

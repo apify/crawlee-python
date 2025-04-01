@@ -4,7 +4,7 @@ from __future__ import annotations
 import math
 from datetime import datetime, timedelta, timezone
 from logging import Logger, getLogger
-from typing import TYPE_CHECKING, Any, Generic, cast
+from typing import TYPE_CHECKING, Any, Generic, Literal, cast
 
 from typing_extensions import Self, TypeVar
 
@@ -76,6 +76,7 @@ class Statistics(Generic[TStatisticsState]):
         periodic_message_logger: Logger | None = None,
         log_interval: timedelta = timedelta(minutes=1),
         state_model: type[TStatisticsState],
+        statistics_log_format: Literal['table', 'inline'] = 'table',
     ) -> None:
         self._id = Statistics.__next_id
         Statistics.__next_id += 1
@@ -99,6 +100,7 @@ class Statistics(Generic[TStatisticsState]):
         self._key_value_store: KeyValueStore | None = key_value_store
 
         self._log_message = log_message
+        self._statistics_log_format = statistics_log_format
         self._periodic_message_logger = periodic_message_logger or logger
         self._periodic_logger = RecurringTask(self._log, log_interval)
 
@@ -116,7 +118,7 @@ class Statistics(Generic[TStatisticsState]):
             periodic_message_logger=self._periodic_message_logger,
             state_model=state_model,
         )
-        new_statistics._periodic_logger = self._periodic_logger  # noqa:SLF001  # Accessing private member to create copy like-object.
+        new_statistics._periodic_logger = self._periodic_logger  # Accessing private member to create copy like-object.
         return new_statistics
 
     @staticmethod
@@ -129,8 +131,9 @@ class Statistics(Generic[TStatisticsState]):
         log_message: str = 'Statistics',
         periodic_message_logger: Logger | None = None,
         log_interval: timedelta = timedelta(minutes=1),
+        statistics_log_format: Literal['table', 'inline'] = 'table',
     ) -> Statistics[StatisticsState]:
-        """Convenience constructor for creating a `Statistics` with default state model `StatisticsState`."""
+        """Initialize a new instance with default state model `StatisticsState`."""
         return Statistics[StatisticsState](
             persistence_enabled=persistence_enabled,
             persist_state_kvs_name=persist_state_kvs_name,
@@ -140,6 +143,7 @@ class Statistics(Generic[TStatisticsState]):
             periodic_message_logger=periodic_message_logger,
             log_interval=log_interval,
             state_model=StatisticsState,
+            statistics_log_format=statistics_log_format,
         )
 
     @property
@@ -281,7 +285,10 @@ class Statistics(Generic[TStatisticsState]):
 
     def _log(self) -> None:
         stats = self.calculate()
-        self._periodic_message_logger.info(f'{self._log_message}\n{stats.to_table()}')
+        if self._statistics_log_format == 'table':
+            self._periodic_message_logger.info(f'{self._log_message}\n{stats.to_table()}')
+        else:
+            self._periodic_message_logger.info(self._log_message, extra=stats.to_dict())
 
     async def _maybe_load_statistics(self) -> None:
         if not self._persistence_enabled:
@@ -290,7 +297,7 @@ class Statistics(Generic[TStatisticsState]):
         if not self._key_value_store:
             return
 
-        stored_state = await self._key_value_store.get_value(self._persist_state_key, cast(Any, {}))
+        stored_state = await self._key_value_store.get_value(self._persist_state_key, cast('Any', {}))
 
         saved_state = self.state.__class__.model_validate(stored_state)
         self.state = saved_state

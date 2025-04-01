@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 import pytest
 
+from crawlee import service_locator
+from crawlee.storage_clients.models import StorageMetadata
 from crawlee.storages import Dataset, KeyValueStore
 
 if TYPE_CHECKING:
@@ -131,3 +134,23 @@ async def test_iterate_items(dataset: Dataset) -> None:
         idx += 1
 
     assert idx == desired_item_count
+
+
+async def test_from_storage_object() -> None:
+    storage_client = service_locator.get_storage_client()
+
+    storage_object = StorageMetadata(
+        id='dummy-id',
+        name='dummy-name',
+        accessed_at=datetime.now(timezone.utc),
+        created_at=datetime.now(timezone.utc),
+        modified_at=datetime.now(timezone.utc),
+        extra_attribute='extra',
+    )
+
+    dataset = Dataset.from_storage_object(storage_client, storage_object)
+
+    assert dataset.id == storage_object.id
+    assert dataset.name == storage_object.name
+    assert dataset.storage_object == storage_object
+    assert storage_object.model_extra.get('extra_attribute') == 'extra'  # type: ignore[union-attr]

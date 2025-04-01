@@ -36,7 +36,7 @@ class LocalEventManager(EventManager):
         system_info_interval: timedelta = timedelta(seconds=1),
         **event_manager_options: Unpack[EventManagerOptions],
     ) -> None:
-        """A default constructor.
+        """Initialize a new instance.
 
         In most cases, you should use the `from_config` constructor to create a new instance based on
         the provided configuration.
@@ -57,7 +57,7 @@ class LocalEventManager(EventManager):
 
     @classmethod
     def from_config(cls, config: Configuration | None = None) -> LocalEventManager:
-        """Create a new instance based on the provided `Configuration`.
+        """Initialize a new instance based on the provided `Configuration`.
 
         Args:
             config: The `Configuration` instance. Uses the global (default) one if not provided.
@@ -70,7 +70,7 @@ class LocalEventManager(EventManager):
         )
 
     async def __aenter__(self) -> LocalEventManager:
-        """Initializes the local event manager upon entering the async context.
+        """Initialize the local event manager upon entering the async context.
 
         It starts emitting system info events at regular intervals.
         """
@@ -84,7 +84,7 @@ class LocalEventManager(EventManager):
         exc_value: BaseException | None,
         exc_traceback: TracebackType | None,
     ) -> None:
-        """Closes the local event manager upon exiting the async context.
+        """Close the local event manager upon exiting the async context.
 
         It stops emitting system info events and closes the event manager.
         """
@@ -92,7 +92,7 @@ class LocalEventManager(EventManager):
         await super().__aexit__(exc_type, exc_value, exc_traceback)
 
     async def _emit_system_info_event(self) -> None:
-        """Emits a system info event with the current CPU and memory usage."""
+        """Emit a system info event with the current CPU and memory usage."""
         cpu_info = await asyncio.to_thread(get_cpu_info)
         memory_info = await asyncio.to_thread(get_memory_info)
 

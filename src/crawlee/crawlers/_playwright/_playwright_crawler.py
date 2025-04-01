@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from functools import partial
-from typing import TYPE_CHECKING, Any, Callable, Generic, Union
+from typing import TYPE_CHECKING, Any, Callable, Generic, Literal, Union
 
 from pydantic import ValidationError
 from typing_extensions import NotRequired, TypedDict, TypeVar
@@ -14,6 +14,7 @@ from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.browsers import BrowserPool
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
+from crawlee.fingerprint_suite import DefaultFingerprintGenerator, FingerprintGenerator, HeaderGeneratorOptions
 from crawlee.sessions._cookies import PlaywrightCookieParam
 from crawlee.statistics import StatisticsState
 
@@ -34,7 +35,6 @@ if TYPE_CHECKING:
     from crawlee import RequestTransformAction
     from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs
     from crawlee.browsers._types import BrowserType
-    from crawlee.fingerprint_suite import FingerprintGenerator
 
 
 @docs_group('Classes')
@@ -86,12 +86,12 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         user_data_dir: str | Path | None = None,
         browser_launch_options: Mapping[str, Any] | None = None,
         browser_new_context_options: Mapping[str, Any] | None = None,
-        fingerprint_generator: FingerprintGenerator | None = None,
+        fingerprint_generator: FingerprintGenerator | None | Literal['default'] = 'default',
         headless: bool | None = None,
         use_incognito_pages: bool | None = None,
         **kwargs: Unpack[BasicCrawlerOptions[PlaywrightCrawlingContext, StatisticsState]],
     ) -> None:
-        """A default constructor.
+        """Initialize a new instance.
 
         Args:
             browser_pool: A `BrowserPool` instance to be used for launching the browsers and getting pages.
@@ -119,7 +119,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         if browser_pool:
             # Raise an exception if browser_pool is provided together with other browser-related arguments.
             if any(
-                param is not None
+                param not in [None, 'default']
                 for param in (
                     user_data_dir,
                     use_incognito_pages,
@@ -138,6 +138,12 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
         # If browser_pool is not provided, create a new instance of BrowserPool with specified arguments.
         else:
+            if fingerprint_generator == 'default':
+                generator_browser_type = None if browser_type is None else [browser_type]
+                fingerprint_generator = DefaultFingerprintGenerator(
+                    header_options=HeaderGeneratorOptions(browsers=generator_browser_type)
+                )
+
             browser_pool = BrowserPool.with_default_plugin(
                 headless=headless,
                 browser_type=browser_type,
@@ -197,7 +203,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         self,
         context: PlaywrightPreNavCrawlingContext,
     ) -> AsyncGenerator[PlaywrightCrawlingContext, None]:
-        """Executes an HTTP request utilizing the `BrowserPool` and the `Playwright` library.
+        """Execute an HTTP request utilizing the `BrowserPool` and the `Playwright` library.
 
         Args:
             context: The basic crawling context to be enhanced.
@@ -239,6 +245,10 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 | None = None,
                 **kwargs: Unpack[EnqueueLinksKwargs],
             ) -> list[str | Request]:
+                """Extract links from the current page.
+
+                The `PlaywrightCrawler` implementation of the `ExtractLinksFunction` function.
+                """
                 kwargs.setdefault('strategy', 'same-hostname')
 
                 requests = list[Union[str, Request]]()
@@ -289,7 +299,10 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 requests: Sequence[str | Request] | None = None,
                 **kwargs: Unpack[EnqueueLinksKwargs],
             ) -> None:
-                """The `PlaywrightCrawler` implementation of the `EnqueueLinksFunction` function."""
+                """Extract and enqueue links from the current page.
+
+                The `PlaywrightCrawler` implementation of the `EnqueueLinksFunction` function.
+                """
                 kwargs.setdefault('strategy', 'same-hostname')
 
                 if requests:

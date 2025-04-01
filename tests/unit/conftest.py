@@ -3,12 +3,13 @@
 
 from __future__ import annotations
 
+import logging
 import os
-from typing import TYPE_CHECKING, Any, Callable, cast
+from typing import TYPE_CHECKING, Callable, Optional, cast
 
 import pytest
 from proxy import Proxy
-from yarl import URL
+from uvicorn.config import Config
 
 from crawlee import service_locator
 from crawlee.configuration import Configuration
@@ -16,10 +17,13 @@ from crawlee.fingerprint_suite._browserforge_adapter import get_available_header
 from crawlee.proxy_configuration import ProxyInfo
 from crawlee.storage_clients import MemoryStorageClient
 from crawlee.storages import KeyValueStore, _creation_management
+from tests.unit.server import TestServer, app, serve_in_thread
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
+    from collections.abc import AsyncGenerator, Iterator
     from pathlib import Path
+
+    from yarl import URL
 
 
 @pytest.fixture
@@ -86,39 +90,13 @@ def _isolate_test_environment(prepare_test_env: Callable[[], None]) -> None:
     prepare_test_env()
 
 
-@pytest.fixture
-def httpbin() -> URL:
-    class URLWrapper:
-        def __init__(self, url: URL) -> None:
-            self.url = url
+@pytest.fixture(autouse=True)
+def _set_crawler_log_level(pytestconfig: pytest.Config, monkeypatch: pytest.MonkeyPatch) -> None:
+    from crawlee import _log_config
 
-        def __getattr__(self, name: str) -> Any:
-            result = getattr(self.url, name)
-            return_type = getattr(result, '__annotations__', {}).get('return', None)
-
-            if return_type == 'URL':
-
-                def wrapper(*args: Any, **kwargs: Any) -> URLWrapper:
-                    return URLWrapper(result(*args, **kwargs))
-
-                return wrapper
-
-            return result
-
-        def with_path(
-            self, path: str, *, keep_query: bool = True, keep_fragment: bool = True, encoded: bool = False
-        ) -> URLWrapper:
-            return URLWrapper(
-                URL.with_path(self.url, path, keep_query=keep_query, keep_fragment=keep_fragment, encoded=encoded)
-            )
-
-        def __truediv__(self, other: Any) -> URLWrapper:
-            return self.with_path(other)
-
-        def __str__(self) -> str:
-            return str(self.url)
-
-    return cast(URL, URLWrapper(URL(os.environ.get('HTTPBIN_URL', 'https://httpbin.org'))))
+    loglevel = cast('Optional[str]', pytestconfig.getoption('--log-level'))
+    if loglevel is not None:
+        monkeypatch.setattr(_log_config, 'get_configured_log_level', lambda: getattr(logging, loglevel.upper()))
 
 
 @pytest.fixture
@@ -189,3 +167,32 @@ async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
     kvs = await KeyValueStore.open()
     yield kvs
     await kvs.drop()
+
+
+@pytest.fixture(scope='session')
+def http_server(unused_tcp_port_factory: Callable[[], int]) -> Iterator[TestServer]:
+    """Create and start an HTTP test server."""
+    config = Config(app=app, lifespan='off', loop='asyncio', port=unused_tcp_port_factory())
+    server = TestServer(config=config)
+    yield from serve_in_thread(server)
+
+
+@pytest.fixture(scope='session')
+def server_url(http_server: TestServer) -> URL:
+    """Provide the base URL of the test server."""
+    return http_server.url
+
+
+# It is needed only in some tests, so we use the standard `scope=function`
+@pytest.fixture
+def redirect_http_server(unused_tcp_port_factory: Callable[[], int]) -> Iterator[TestServer]:
+    """Create and start an HTTP test server."""
+    config = Config(app=app, lifespan='off', loop='asyncio', port=unused_tcp_port_factory())
+    server = TestServer(config=config)
+    yield from serve_in_thread(server)
+
+
+@pytest.fixture
+def redirect_server_url(redirect_http_server: TestServer) -> URL:
+    """Provide the base URL of the test server."""
+    return redirect_http_server.url
