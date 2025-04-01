@@ -14,9 +14,10 @@ import HomepageCtaSection from '../components/Homepage/HomepageCtaSection';
 import HomepageHeroSection from '../components/Homepage/HomepageHeroSection';
 import LanguageInfoWidget from '../components/Homepage/LanguageInfoWidget';
 import RiverSection from '../components/Homepage/RiverSection';
+import RunnableCodeBlock from '../components/RunnableCodeBlock';
 import ThreeCardsWithIcon from '../components/Homepage/ThreeCardsWithIcon';
 
-import HomePageExample from '!!raw-loader!./home_page_example.py';
+import HomePageExample from '!!raw-loader!roa-loader!./home_page_example.py';
 
 function GetStartedSection() {
     return (
@@ -35,7 +36,9 @@ function CodeExampleSection() {
         <section className={styles.codeExampleSection}>
             <div className={styles.decorativeRow} />
             <div className={styles.codeBlockContainer}>
-                <CodeBlock language="python">{HomePageExample}</CodeBlock>
+                <RunnableCodeBlock className="language-py" language="python">
+                    {HomePageExample}
+                </RunnableCodeBlock>
             </div>
             <div className={styles.dashedSeparator} />
             <div className={styles.decorativeRow} />
