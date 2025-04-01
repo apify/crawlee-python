@@ -877,7 +877,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         if self._should_retry_request(context, error):
             request.retry_count += 1
-            await self._statistics.error_tracker.add(error=error, context=context, kvs=await self.get_key_value_store())
+            await self._statistics.error_tracker.add(error=error, context=context)
 
             if self._error_handler:
                 try:
@@ -931,7 +931,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     async def _handle_failed_request(self, context: TCrawlingContext | BasicCrawlingContext, error: Exception) -> None:
         self._logger.exception('Request failed and reached maximum retries', exc_info=error)
-        await self._statistics.error_tracker.add(error=error, context=context, kvs=await self.get_key_value_store())
+        await self._statistics.error_tracker.add(error=error, context=context)
 
         if self._failed_request_handler:
             try:
@@ -1138,7 +1138,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 context.request.session_rotation_count += 1
 
                 await request_manager.reclaim_request(request)
-                await self._statistics.error_tracker_retry.add(error=session_error)
+                await self._statistics.error_tracker_retry.add(error=session_error, context=context)
             else:
                 self._logger.exception('Request failed and reached maximum retries', exc_info=session_error)
 
@@ -1152,7 +1152,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 )
 
                 self._statistics.record_request_processing_failure(statistics_id)
-                await self._statistics.error_tracker.add(error=session_error)
+                await self._statistics.error_tracker.add(error=session_error, context=context)
 
         except ContextPipelineInterruptedError as interrupted_error:
             self._logger.debug('The context pipeline was interrupted', exc_info=interrupted_error)

@@ -307,11 +307,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             )
 
             # Collect data in case of errors, before the page object is closed.
-            if error and context.request.retry_count == 0:
-                # No additional collection on retries.
-                await self.statistics.error_tracker.add(
-                    error=error, context=context, kvs=await self.get_key_value_store(), early=True
-                )
+            if error:
+                await self.statistics.error_tracker.add(error=error, context=context, early=True)
 
     async def _handle_status_code_response(
         self, context: PlaywrightCrawlingContext

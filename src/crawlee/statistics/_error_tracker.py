@@ -12,7 +12,6 @@ from crawlee.statistics._error_snapshotter import ErrorSnapshotter
 
 if TYPE_CHECKING:
     from crawlee._types import BasicCrawlingContext
-    from crawlee.storages import KeyValueStore
 
 GroupName = Union[str, None]
 ErrorFilenameGroups = dict[GroupName, dict[GroupName, Counter[GroupName]]]
@@ -48,7 +47,6 @@ class ErrorTracker:
         error: Exception,
         *,
         context: BasicCrawlingContext | None = None,
-        kvs: KeyValueStore | None = None,
         early: bool = False,
     ) -> None:
         """Add an error in the statistics.
@@ -56,7 +54,6 @@ class ErrorTracker:
         Args:
             error: Error to be added to statistics.
             context: Context used to collect error snapshot.
-            kvs: Key value store used to store error snapshots.
             early: Flag indicating that the error is added earlier than usual to have access to resources that will be
              closed before normal error collection. This prevents double reporting during normal error collection.
         """
@@ -99,23 +96,21 @@ class ErrorTracker:
             self._errors[error_group_file_and_line][error_group_name][new_error_group_message or error_group_message]
             == 1
             and context is not None
-            and kvs is not None
         ):
             # Save snapshot only on the first occurrence of the error and only if context and kvs was passed as well.
             await self._capture_error_snapshot(
                 error_message=new_error_group_message or error_group_message,
                 file_and_line=error_group_file_and_line,
                 context=context,
-                kvs=kvs,
             )
 
     async def _capture_error_snapshot(
-        self, error_message: str, file_and_line: str, context: BasicCrawlingContext, kvs: KeyValueStore
+        self, error_message: str, file_and_line: str, context: BasicCrawlingContext
     ) -> None:
         if self.error_snapshotter:
             try:
                 await self.error_snapshotter.capture_snapshot(
-                    error_message=error_message, file_and_line=file_and_line, context=context, kvs=kvs
+                    error_message=error_message, file_and_line=file_and_line, context=context
                 )
             except Exception:
                 logger.exception(f'Error when trying to collect error snapshot for exception: {error_message}')

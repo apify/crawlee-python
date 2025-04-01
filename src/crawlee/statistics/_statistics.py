@@ -172,6 +172,9 @@ class Statistics(Generic[TStatisticsState]):
         if self._key_value_store is None:
             self._key_value_store = await KeyValueStore.open(name=self._persist_state_kvs_name)
 
+        if self.error_tracker.error_snapshotter:
+            self.error_tracker.error_snapshotter.kvs = self._key_value_store
+
         await self._maybe_load_statistics()
         event_manager = service_locator.get_event_manager()
         event_manager.on(event=Event.PERSIST_STATE, listener=self._persist_state)
