@@ -27,6 +27,8 @@ if TYPE_CHECKING:
 
     from yarl import URL
 
+    from crawlee.http_clients._base import HttpClient
+
 
 @pytest.fixture
 def prepare_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callable[[], None]:
@@ -206,7 +208,7 @@ def redirect_server_url(redirect_http_server: TestServer) -> URL:
         pytest.param('httpx', id='httpx'),
     ]
 )
-async def http_client(request: pytest.FixtureRequest) -> CurlImpersonateHttpClient | HttpxHttpClient:
+async def http_client(request: pytest.FixtureRequest) -> HttpClient:
     if request.param == 'curl':
         return CurlImpersonateHttpClient(http_version=CurlHttpVersion.V1_1)
     return HttpxHttpClient(http2=False)
