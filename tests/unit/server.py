@@ -175,7 +175,7 @@ async def hello_world_json(send: Send) -> None:
 
 
 async def hello_world_xml(send: Send) -> None:
-    """Handle basic requests with a simple HTML response."""
+    """Handle basic requests with a simple XML response."""
     await send_html_response(
         send,
         b"""<?xml version="1.0"?>
