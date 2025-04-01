@@ -54,8 +54,11 @@ def result_comparator(
     )  #  For example compare `push_data` calls.
 
 
-crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(
-    rendering_type_predictor=CustomRenderingTypePredictor(),
-    result_checker=result_checker,
-    result_comparator=result_comparator,
-)
+async def main() -> None:
+    crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(
+        rendering_type_predictor=CustomRenderingTypePredictor(),
+        result_checker=result_checker,
+        result_comparator=result_comparator,
+    )
+
+    # ...

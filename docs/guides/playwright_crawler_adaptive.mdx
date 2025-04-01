@@ -8,14 +8,14 @@ import ApiLink from '@site/src/components/ApiLink';
 import CodeBlock from '@theme/CodeBlock';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
-import AdaptivePlaywrightCrawlerInitBeautifulSoup from '!!raw-loader!./code_examples/adaptive_playwright_crawler/adaptive_playwright_crawler_init_beautifulsoup.py';
-import AdaptivePlaywrightCrawlerInitParsel from '!!raw-loader!./code_examples/adaptive_playwright_crawler/adaptive_playwright_crawler_init_parsel.py';
-import AdaptivePlaywrightCrawlerInitPrediction from '!!raw-loader!./code_examples/adaptive_playwright_crawler/adaptive_playwright_crawler_init_prediction.py';
-import AdaptivePlaywrightCrawlerHandler from '!!raw-loader!./code_examples/adaptive_playwright_crawler/adaptive_playwright_crawler_handler.py';
-import AdaptivePlaywrightCrawlerPreNavHooks from '!!raw-loader!./code_examples/adaptive_playwright_crawler/adaptive_playwright_crawler_pre_nav_hooks.py';
+import AdaptivePlaywrightCrawlerHandler from '!!raw-loader!roa-loader!./code_examples/playwright_crawler_adaptive/handler.py';
+import AdaptivePlaywrightCrawlerPreNavHooks from '!!raw-loader!roa-loader!./code_examples/playwright_crawler_adaptive/pre_nav_hooks.py';
 
-
+import AdaptivePlaywrightCrawlerInitBeautifulSoup from '!!raw-loader!./code_examples/playwright_crawler_adaptive/init_beautifulsoup.py';
+import AdaptivePlaywrightCrawlerInitParsel from '!!raw-loader!./code_examples/playwright_crawler_adaptive/init_parsel.py';
+import AdaptivePlaywrightCrawlerInitPrediction from '!!raw-loader!./code_examples/playwright_crawler_adaptive/init_prediction.py';
 
 An <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> is a combination of <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> and some implementation of HTTP-based crawler such as <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> or <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>.
 It uses a more limited crawling context interface so that it is able to switch to HTTP-only crawling when it detects that it may bring a performance benefit.
@@ -42,30 +42,29 @@ Request handler for <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlayw
 
 See the following example about how to create request handler and use context helpers:
 
-<CodeBlock className="language-python">
+<RunnableCodeBlock className="language-python" language="python">
     {AdaptivePlaywrightCrawlerHandler}
-</CodeBlock>
-
+</RunnableCodeBlock>
 
 ## Crawler configuration
+
 To use <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> it is recommended to use one of the prepared factory methods that will create the crawler with specific HTTP-based sub crawler variant: <ApiLink to="class/AdaptivePlaywrightCrawler#with_beautifulsoup_static_parser">`AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser`</ApiLink> or <ApiLink to="class/AdaptivePlaywrightCrawler#with_parsel_static_parser">`AdaptivePlaywrightCrawler.with_parsel_static_parser`</ApiLink>.
 
 <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> is internally composed of two sub crawlers and you can do a detailed configuration of both of them. For detailed configuration options of the sub crawlers, please refer to their pages: <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>, <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink>, <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>.
 
 In the following example you can see how to create and configure <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> with two different HTTP-based sub crawlers:
 
-
 <Tabs>
-  <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler" default>
-<CodeBlock className="language-python">
-    {AdaptivePlaywrightCrawlerInitBeautifulSoup}
-</CodeBlock>
-  </TabItem>
-<TabItem value="ParselCrawler" label="ParselCrawler" default>
-<CodeBlock className="language-python">
-    {AdaptivePlaywrightCrawlerInitParsel}
-</CodeBlock>
-  </TabItem>
+    <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler" default>
+        <CodeBlock className="language-python">
+            {AdaptivePlaywrightCrawlerInitBeautifulSoup}
+        </CodeBlock>
+    </TabItem>
+    <TabItem value="ParselCrawler" label="ParselCrawler">
+        <CodeBlock className="language-python">
+            {AdaptivePlaywrightCrawlerInitParsel}
+        </CodeBlock>
+    </TabItem>
 </Tabs>
 
 ### Prediction related arguments
@@ -84,13 +83,12 @@ See the following example about how to pass prediction related arguments:
     {AdaptivePlaywrightCrawlerInitPrediction}
 </CodeBlock>
 
-
-
 ## Page configuration with pre-navigation hooks
+
 In some use cases, you may need to configure the [page](https://playwright.dev/python/docs/api/class-page) before it navigates to the target URL. For instance, you might set navigation timeouts or manipulate other page-level settings. For such cases you can use the <ApiLink to="class/AdaptivePlaywrightCrawler#pre_navigation_hook">`pre_navigation_hook`</ApiLink> method of the <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink>. This method is called before the page navigates to the target URL and allows you to configure the page instance. Due to the dynamic nature of <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> it is possible that the hook will be executed for HTTP-based sub crawler or playwright-based sub crawler. Using [page](https://playwright.dev/python/docs/api/class-page) object for hook that will be executed on HTTP-based sub crawler will raise an exception. To overcome this you can use optional argument `playwright_only` = `True` when registering the hook.
 
 See the following example about how to register the pre navigation hooks:
 
-<CodeBlock className="language-python">
+<RunnableCodeBlock className="language-python" language="python">
     {AdaptivePlaywrightCrawlerPreNavHooks}
-</CodeBlock>
+</RunnableCodeBlock>
