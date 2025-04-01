@@ -167,7 +167,7 @@ async def hello_world(send: Send) -> None:
 
 
 async def hello_world_json(send: Send) -> None:
-    """Handle basic requests with a simple HTML response."""
+    """Handle basic requests with a simple JSON response."""
     await send_json_response(
         send,
         {'hello': 'world'},
