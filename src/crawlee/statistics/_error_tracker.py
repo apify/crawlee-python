@@ -101,15 +101,15 @@ class ErrorTracker:
             and context is not None
             and kvs is not None
         ):
-            # Save snapshot only on first the occurrence of the error and only if context and kvs was passed as well.
-            await self._capture_snapshots(
+            # Save snapshot only on the first occurrence of the error and only if context and kvs was passed as well.
+            await self._capture_error_snapshot(
                 error_message=new_error_group_message or error_group_message,
                 file_and_line=error_group_file_and_line,
                 context=context,
                 kvs=kvs,
             )
 
-    async def _capture_snapshots(
+    async def _capture_error_snapshot(
         self, error_message: str, file_and_line: str, context: BasicCrawlingContext, kvs: KeyValueStore
     ) -> None:
         if self.error_snapshotter:
@@ -118,7 +118,7 @@ class ErrorTracker:
                     error_message=error_message, file_and_line=file_and_line, context=context, kvs=kvs
                 )
             except Exception:
-                logger.exception(f'Error during snapshot capture for exception: {error_message}')
+                logger.exception(f'Error when trying to collect error snapshot for exception: {error_message}')
 
     def _get_file_and_line(self, error: Exception) -> str:
         if self.show_file_and_line_number:
@@ -174,7 +174,7 @@ class ErrorTracker:
     def _create_generic_message(message_1: str | None, message_2: str | None) -> str:
         """Create a generic error message from two messages, if they are similar enough.
 
-        Different parts of similar messages are replaced by `_`.
+        Different parts of similar messages are replaced by `***`.
         """
         if message_1 is None or message_2 is None:
             return ''

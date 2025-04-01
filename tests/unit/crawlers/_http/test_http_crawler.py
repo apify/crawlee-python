@@ -708,6 +708,9 @@ async def test_error_snapshot_through_statistics(server_url: URL) -> None:
     async for key_info in kvs.iterate_keys():
         kvs_content[key_info.key] = await kvs.get_value(key_info.key)
 
+    # One error, three time retried.
+    assert crawler.statistics.error_tracker.total == 3
+    assert crawler.statistics.error_tracker.unique_error_count == 1
     assert len(kvs_content) == 1
     assert key_info.key.endswith('.html')
     assert kvs_content[key_info.key] == HELLO_WORLD.decode('utf8')

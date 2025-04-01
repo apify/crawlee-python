@@ -495,7 +495,14 @@ async def test_get_snapshot(server_url: URL) -> None:
     assert snapshot.html == HELLO_WORLD.decode('utf-8')
 
 
-async def test_error_snapshots(server_url: URL) -> None:
+async def test_error_snapshot_through_statistics(server_url: URL) -> None:
+    """Test correct use of error snapshotter by the Playwright crawler.
+
+    In this test the crawler will visit 4 pages.
+    - 2 x page endpoints will return the same error
+    - homepage endpoint will return unique error
+    - headers endpoint will return no error
+    """
     max_retries = 2
     crawler = PlaywrightCrawler(
         statistics=Statistics.with_default_state(save_error_snapshots=True), max_request_retries=max_retries
@@ -505,9 +512,13 @@ async def test_error_snapshots(server_url: URL) -> None:
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
         if 'page' in context.request.url:
             raise RuntimeError('page error')
+        if 'headers' in context.request.url:
+            return
         raise RuntimeError('home error')
 
-    await crawler.run([str(server_url), str(server_url / 'page_1'), str(server_url / 'page_2')])
+    await crawler.run(
+        [str(server_url), str(server_url / 'page_1'), str(server_url / 'page_2'), str(server_url / 'headers')]
+    )
 
     kvs = await crawler.get_key_value_store()
     kvs_content = {}
@@ -525,7 +536,7 @@ async def test_error_snapshots(server_url: URL) -> None:
         else:
             assert kvs_content[key_info.key] == HELLO_WORLD.decode('utf-8')
 
-    # Three errors, but only 2 unique -> 4 (2 x (html and jpg)) artifacts expected.
+    # Three errors twice retried errors, but only 2 unique -> 4 (2 x (html and jpg)) artifacts expected.
     assert crawler.statistics.error_tracker.total == 3 * max_retries
     assert crawler.statistics.error_tracker.unique_error_count == 2
     assert len(kvs_content) == 4

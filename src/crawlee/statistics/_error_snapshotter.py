@@ -1,8 +1,9 @@
+import asyncio
 import hashlib
 import re
 import string
 
-from crawlee._types import BasicCrawlingContext, PageSnapshot
+from crawlee._types import BasicCrawlingContext
 from crawlee.storages import KeyValueStore
 
 
@@ -14,15 +15,10 @@ class ErrorSnapshotter:
     SNAPSHOT_PREFIX = 'ERROR_SNAPSHOT'
     ALLOWED_CHARACTERS = string.ascii_letters + string.digits + '!-_.'
 
-    def __init__(self) -> None:
-        """Initialize the error snapshotter."""
-        # Snapshots are collected earlier than they are reported.
-        _pre_collected_snapshots: dict[str, PageSnapshot] = {}
-
     async def capture_snapshot(
         self, error_message: str, file_and_line: str, context: BasicCrawlingContext, kvs: KeyValueStore
     ) -> None:
-        """Capture error snapshot.
+        """Capture error snapshot and save it to key value store.
 
         It saves the error snapshot directly to a key value store. It can't use `context.get_key_value_store` because
         it returns `KeyValueStoreChangeRecords` which is commited to the key value store only if the `RequestHandler`
@@ -37,10 +33,18 @@ class ErrorSnapshotter:
         """
         if snapshot := await context.get_snapshot():
             snapshot_base_name = self._get_snapshot_base_name(error_message, file_and_line)
+            snapshot_save_tasks = []
             if snapshot.html:
-                await self._save_html(snapshot.html, base_name=snapshot_base_name, kvs=kvs)
+                snapshot_save_tasks.append(
+                    asyncio.create_task(self._save_html(snapshot.html, base_name=snapshot_base_name, kvs=kvs))
+                )
             if snapshot.screenshot:
-                await self._save_screenshot(snapshot.screenshot, base_name=snapshot_base_name, kvs=kvs)
+                snapshot_save_tasks.append(
+                    asyncio.create_task(
+                        self._save_screenshot(snapshot.screenshot, base_name=snapshot_base_name, kvs=kvs)
+                    )
+                )
+            await asyncio.gather(*snapshot_save_tasks)
 
     @staticmethod
     async def _save_html(html: str, base_name: str, kvs: KeyValueStore) -> None:
