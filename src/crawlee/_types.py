@@ -380,6 +380,37 @@ class EnqueueLinksFunction(Protocol):
 
 
 @docs_group('Functions')
+class ExtractLinksFunction(Protocol):
+    """A function for extracting URLs to crawl based on elements selected by a given selector."""
+
+    def __call__(
+        self,
+        *,
+        selector: str,
+        label: str | None = None,
+        user_data: dict[str, Any] | None = None,
+        transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
+        **kwargs: Unpack[EnqueueLinksKwargs],
+    ) -> Coroutine[None, None, list[str | Request]]:
+        """Call extract links function.
+
+        Args:
+            selector: A selector used to find the elements containing the links. The behaviour differs based
+                on the crawler used:
+                - `PlaywrightCrawler` supports CSS and XPath selectors.
+                - `ParselCrawler` supports CSS selectors.
+                - `BeautifulSoupCrawler` supports CSS selectors.
+            label: Label for the newly created `Request` objects, used for request routing.
+            user_data: User data to be provided to the newly created `Request` objects.
+            transform_request_function: A function that takes `RequestOptions` and returns either:
+                - Modified `RequestOptions` to update the request configuration,
+                - `'skip'` to exclude the request from being enqueued,
+                - `'unchanged'` to use the original request options without modification.
+            **kwargs: Additional keyword arguments.
+        """
+
+
+@docs_group('Functions')
 class ExportToFunction(Protocol):
     """A function for exporting data from a `Dataset`.
 

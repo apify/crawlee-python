@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from typing_extensions import Unpack
 
     from crawlee import RequestTransformAction
-    from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, EnqueueLinksKwargs
+    from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, EnqueueLinksKwargs, ExtractLinksFunction
 
     from ._abstract_http_parser import AbstractHttpParser
 
@@ -124,23 +124,25 @@ class AbstractHttpCrawler(
             The original crawling context enhanced by the parsing result and enqueue links function.
         """
         parsed_content = await self._parser.parse(context.http_response)
+        extract_links = self._create_extract_links_function(context, parsed_content)
         yield ParsedHttpCrawlingContext.from_http_crawling_context(
             context=context,
             parsed_content=parsed_content,
-            enqueue_links=self._create_enqueue_links_function(context, parsed_content),
+            enqueue_links=self._create_enqueue_links_function(context, extract_links),
+            extract_links=extract_links,
         )
 
-    def _create_enqueue_links_function(
+    def _create_extract_links_function(
         self, context: HttpCrawlingContext, parsed_content: TParseResult
-    ) -> EnqueueLinksFunction:
-        """Create a callback function for extracting links from parsed content and enqueuing them to the crawl.
+    ) -> ExtractLinksFunction:
+        """Create a callback function for extracting links from parsed content.
 
         Args:
             context: The current crawling context.
             parsed_content: The parsed http response.
 
         Returns:
-            Awaitable that is used for extracting links from parsed content and enqueuing them to the crawl.
+            Awaitable that is used for extracting links from parsed content.
         """
 
         async def extract_links(
@@ -184,6 +186,21 @@ class AbstractHttpCrawler(
 
                 requests.append(request)
             return requests
+
+        return extract_links
+
+    def _create_enqueue_links_function(
+        self, context: HttpCrawlingContext, extract_links: ExtractLinksFunction
+    ) -> EnqueueLinksFunction:
+        """Create a callback function for extracting links from parsed content and enqueuing them to the crawl.
+
+        Args:
+            context: The current crawling context.
+            extract_links: Function used to extract links from the page.
+
+        Returns:
+            Awaitable that is used for extracting links from parsed content and enqueuing them to the crawl.
+        """
 
         async def enqueue_links(
             *,
