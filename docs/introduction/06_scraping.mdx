@@ -4,9 +4,9 @@ title: Scraping
 ---
 
 import ApiLink from '@site/src/components/ApiLink';
-import CodeBlock from '@theme/CodeBlock';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
-import ScrapingExample from '!!raw-loader!./code_examples/06_scraping.py';
+import ScrapingExample from '!!raw-loader!roa-loader!./code_examples/06_scraping.py';
 
 In the [Real-world project](./real-world-project#choosing-the-data-you-need) chapter, you've created a list of the information you wanted to collect about the products in the example Warehouse store. Let's review that and figure out ways to access the data.
 
@@ -32,7 +32,9 @@ You can use `request.loaded_url` as well. Remember the difference: `request.url`
 By splitting the `request.url`, we can extract the manufacturer name directly from the URL. This is done by first splitting the URL to get the product identifier and then splitting that identifier to get the manufacturer name.
 
 ```python
-# context.request.url: https://warehouse-theme-metal.myshopify.com/products/sennheiser-mke-440-professional-stereo-shotgun-microphone-mke-440
+# context.request.url:
+# https://warehouse-theme-metal.myshopify.com/products/
+# sennheiser-mke-440-professional-stereo-shotgun-microphone-mke-440
 
 # Split the URL and get the last part.
 url_part = context.request.url.split('/').pop()
@@ -132,9 +134,9 @@ For this, all that matters is whether the element exists or not. You can use the
 
 You have everything that is needed, so grab your newly created scraping logic, dump it into your original request handler and see the magic happen!
 
-<CodeBlock className="language-python">
+<RunnableCodeBlock className="language-python" language="python">
     {ScrapingExample}
-</CodeBlock>
+</RunnableCodeBlock>
 
 When you run the crawler, you will see the crawled URLs and their scraped data printed to the console. The output will look something like this:
 

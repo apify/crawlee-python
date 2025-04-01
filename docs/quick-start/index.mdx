@@ -12,7 +12,8 @@ import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 import BeautifulsoupCrawlerExample from '!!raw-loader!roa-loader!./code_examples/beautifulsoup_crawler_example.py';
 import ParselCrawlerExample from '!!raw-loader!roa-loader!./code_examples/parsel_crawler_example.py';
 import PlaywrightCrawlerExample from '!!raw-loader!roa-loader!./code_examples/playwright_crawler_example.py';
-import PlaywrightCrawlerHeadfulExample from '!!raw-loader!roa-loader!./code_examples/playwright_crawler_headful_example.py';
+
+import PlaywrightCrawlerHeadfulExample from '!!raw-loader!./code_examples/playwright_crawler_headful_example.py';
 
 This short tutorial will help you start scraping with Crawlee in just a minute or two. For an in-depth understanding of how Crawlee works, check out the [Introduction](../introduction/index.mdx) section, which provides a comprehensive step-by-step guide to creating your first scraper.
 
@@ -92,9 +93,9 @@ When you run the example, you will see Crawlee automating the data extraction pr
 
 By default, browsers controlled by Playwright run in headless mode (without a visible window). However, you can configure the crawler to run in a headful mode, which is useful during the development phase to observe the browser's actions. You can also switch from the default Chromium browser to Firefox or WebKit.
 
-<RunnableCodeBlock className="language-python" language="python">
+<CodeBlock language="python">
     {PlaywrightCrawlerHeadfulExample}
-</RunnableCodeBlock>
+</CodeBlock>
 
 When you run the example code, you'll see an automated browser navigating through the Crawlee website.
 

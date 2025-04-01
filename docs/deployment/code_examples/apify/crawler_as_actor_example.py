@@ -6,7 +6,7 @@ from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 async def main() -> None:
     # Wrap the crawler code in an Actor context manager.
     async with Actor:
-        crawler = BeautifulSoupCrawler(max_requests_per_crawl=50)
+        crawler = BeautifulSoupCrawler(max_requests_per_crawl=10)
 
         @crawler.router.default_handler
         async def request_handler(context: BeautifulSoupCrawlingContext) -> None:

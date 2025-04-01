@@ -27,7 +27,7 @@ def transform_request(
 
 
 async def main() -> None:
-    crawler = BeautifulSoupCrawler(max_requests_per_crawl=50)
+    crawler = BeautifulSoupCrawler(max_requests_per_crawl=10)
 
     @crawler.router.default_handler
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:

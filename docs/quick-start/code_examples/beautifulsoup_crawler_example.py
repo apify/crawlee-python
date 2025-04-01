@@ -4,7 +4,7 @@ from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 async def main() -> None:
     # BeautifulSoupCrawler crawls the web using HTTP requests
     # and parses HTML using the BeautifulSoup library.
-    crawler = BeautifulSoupCrawler(max_requests_per_crawl=50)
+    crawler = BeautifulSoupCrawler(max_requests_per_crawl=10)
 
     # Define a request handler to process each crawled page
     # and attach it to the crawler using a decorator.

@@ -4,9 +4,9 @@ title: Real-world project
 ---
 
 import ApiLink from '@site/src/components/ApiLink';
-import CodeBlock from '@theme/CodeBlock';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
-import SanityCheckExample from '!!raw-loader!./code_examples/04_sanity_check.py';
+import SanityCheckExample from '!!raw-loader!roa-loader!./code_examples/04_sanity_check.py';
 
 > _Hey, guys, you know, it's cool that we can scrape the `<title>` elements of web pages, but that's not very useful. Can we finally scrape some real data and save it somewhere in a machine-readable format? Because that's why I started reading this tutorial in the first place!_
 
@@ -110,9 +110,9 @@ Let's check that everything is set up correctly before writing the scraping logi
 
 The example below creates a new crawler that visits the start URL and prints the text content of all the categories on that page. When you run the code, you will see the _very badly formatted_ content of the individual category card.
 
-<CodeBlock className="language-python">
+<RunnableCodeBlock className="language-python" language="python">
     {SanityCheckExample}
-</CodeBlock>
+</RunnableCodeBlock>
 
 If you're wondering how to get that `.collection-block-item` selector. We'll explain it in the next chapter on DevTools.
 
