@@ -975,11 +975,12 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         return send_request
 
-    async def _commit_request_handler_result(self, context: BasicCrawlingContext) -> None:
+    async def _commit_request_handler_result(self, context: BasicCrawlingContext, start_timestamp:int) -> None:
         """Commit request handler result for the input `context`. Result is taken from `_context_result_map`."""
         result = self._context_result_map[context]
 
         request_manager = await self.get_request_manager()
+        self.log_if_delayed("get_request_manager in commit_request_handler_result" ,start_timestamp)
         origin = context.request.loaded_url or context.request.url
 
         for add_requests_call in result.add_requests_calls:
@@ -1022,9 +1023,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                     requests.append(dst_request)
 
             await request_manager.add_requests_batched(requests)
+            self.log_if_delayed("add_requests_batched in commit_request_handler_result", start_timestamp)
 
         for push_data_call in result.push_data_calls:
             await self._push_data(**push_data_call)
+        self.log_if_delayed("pushed data in commit_request_handler_result", start_timestamp)
 
         await self._commit_key_value_store_changes(result, get_kvs=self.get_key_value_store)
 
@@ -1066,11 +1069,16 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         request_manager = await self.get_request_manager()
         return not await request_manager.is_empty()
 
+    def log_if_delayed(self, log_point_name: str, start_timestamp:int, delay = 1):
+        if (time_from_start:=(datetime.now().timestamp()-start_timestamp)) > delay:
+            self._logger.info(f'Task: {start_timestamp}, {log_point_name} after {time_from_start}')
+
+
     async def __run_task_function(self) -> None:
         timestamp= datetime.now().timestamp()
         self._logger.info(f'Task: {timestamp}, start. 0s')
         request_manager = await self.get_request_manager()
-        self._logger.info(f'Task: {timestamp}, get_request_manager after {datetime.now().timestamp()-timestamp}')
+        self.log_if_delayed("get_request_manager", timestamp)
 
         request = await wait_for(
             lambda: request_manager.fetch_next_request(),
@@ -1079,8 +1087,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             logger=self._logger,
             max_retries=3,
         )
-        self._logger.info(
-            f'Task: {timestamp}, fetch_next_request after {datetime.now().timestamp() - timestamp}')
+        self.log_if_delayed("fetch_next_request", timestamp)
 
 
         if request is None:
@@ -1090,16 +1097,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             session = await self._get_session_by_id(request.session_id)
         else:
             session = await self._get_session()
-
-        self._logger.info(
-            f'Task: {timestamp}, _get_session after {datetime.now().timestamp() - timestamp}')
-
+        self.log_if_delayed("_get_session", timestamp)
 
         proxy_info = await self._get_proxy_info(request, session)
 
-        self._logger.info(
-            f'Task: {timestamp}, _get_proxy_info after {datetime.now().timestamp() - timestamp}')
-
+        self.log_if_delayed("_get_proxy_info", timestamp)
 
         result = RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store)
 
@@ -1125,20 +1127,15 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             self._check_request_collision(context.request, context.session)
 
             try:
-                self._logger.info(
-                    f'Task: {timestamp}, started request_handler after {datetime.now().timestamp() - timestamp}')
+                self.log_if_delayed("started request_handler", timestamp)
 
                 await self._run_request_handler(context=context)
-                self._logger.info(
-                    f'Task: {timestamp}, finished request_handler after {datetime.now().timestamp() - timestamp}')
-
+                self.log_if_delayed("finished request_handler", timestamp)
             except asyncio.TimeoutError as e:
                 raise RequestHandlerError(e, context) from e
 
-            await self._commit_request_handler_result(context)
-            self._logger.info(
-                f'Task: {timestamp}, _commit_request_handler_result after {datetime.now().timestamp() - timestamp}')
-
+            await self._commit_request_handler_result(context, timestamp)
+            self.log_if_delayed("_commit_request_handler_result", timestamp)
             await wait_for(
                 lambda: request_manager.mark_request_as_handled(context.request),
                 timeout=self._internal_timeout,
@@ -1147,9 +1144,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 logger=self._logger,
                 max_retries=3,
             )
-            self._logger.info(
-                f'Task: {timestamp}, mark_request_as_handled after {datetime.now().timestamp() - timestamp}')
-
+            self.log_if_delayed("mark_request_as_handled", timestamp)
 
             request.state = RequestState.DONE
 
