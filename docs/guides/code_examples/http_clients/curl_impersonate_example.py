@@ -1,4 +1,7 @@
-from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
+from crawlee.crawlers import (
+    BeautifulSoupCrawler,
+    BeautifulSoupCrawlingContext,
+)
 from crawlee.http_clients import CurlImpersonateHttpClient
 
 

@@ -1,5 +1,8 @@
 from crawlee import Glob
-from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
+from crawlee.crawlers import (
+    BeautifulSoupCrawler,
+    BeautifulSoupCrawlingContext,
+)
 
 
 async def main() -> None:

@@ -1,4 +1,5 @@
-# Instead of BeautifulSoupCrawler let's use Playwright to be able to render JavaScript.
+# Instead of BeautifulSoupCrawler let's use Playwright to be able
+# to render JavaScript.
 from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext
 
 

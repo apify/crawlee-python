@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from crawlee import HttpHeaders, RequestOptions, RequestTransformAction
-from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
+from crawlee.crawlers import (
+    BeautifulSoupCrawler,
+    BeautifulSoupCrawlingContext,
+)
 
 
 def transform_request(
