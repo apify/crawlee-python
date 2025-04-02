@@ -1,4 +1,8 @@
-from crawlee.crawlers import BasicCrawlingContext, ParselCrawler, ParselCrawlingContext
+from crawlee.crawlers import (
+    BasicCrawlingContext,
+    ParselCrawler,
+    ParselCrawlingContext,
+)
 
 # Regex for identifying email addresses on a webpage.
 EMAIL_REGEX = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'

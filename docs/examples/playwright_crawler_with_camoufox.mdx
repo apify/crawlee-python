@@ -4,9 +4,9 @@ title: Playwright crawler with Camoufox
 ---
 
 import ApiLink from '@site/src/components/ApiLink';
-import CodeBlock from '@theme/CodeBlock';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
-import PlaywrightCrawlerExampleWithCamoufox from '!!raw-loader!./code_examples/playwright_crawler_with_camoufox.py';
+import PlaywrightCrawlerExampleWithCamoufox from '!!raw-loader!roa-loader!./code_examples/playwright_crawler_with_camoufox.py';
 
 This example demonstrates how to integrate Camoufox into <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> using <ApiLink to="class/BrowserPool">`BrowserPool`</ApiLink> with custom <ApiLink to="class/PlaywrightBrowserPlugin">`PlaywrightBrowserPlugin`</ApiLink>.
 
@@ -21,6 +21,6 @@ For more details please refer to: https://github.com/daijro/camoufox/tree/main/p
 
 The example code after PlayWrightCrawler instantiation is similar to example describing the use of Playwright Crawler. The main difference is that in this example Camoufox will be used as the browser through BrowserPool.
 
-<CodeBlock className="language-python">
+<RunnableCodeBlock className="language-python" language="python">
     {PlaywrightCrawlerExampleWithCamoufox}
-</CodeBlock>
+</RunnableCodeBlock>
