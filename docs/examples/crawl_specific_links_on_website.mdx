@@ -11,8 +11,8 @@ import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 import BeautifulSoupExample from '!!raw-loader!roa-loader!./code_examples/crawl_specific_links_on_website_bs.py';
 import PlaywrightExample from '!!raw-loader!roa-loader!./code_examples/crawl_specific_links_on_website_pw.py';
 
-import BeautifulSoupExampleExtractAndAdd from '!!raw-loader!./code_examples/extract_and_add_specific_links_on_website_bs.py';
-import PlaywrightExampleExtractAndAdd from '!!raw-loader!./code_examples/extract_and_add_specific_links_on_website_pw.py';
+import BeautifulSoupExampleExtractAndAdd from '!!raw-loader!roa-loader!./code_examples/extract_and_add_specific_links_on_website_bs.py';
+import PlaywrightExampleExtractAndAdd from '!!raw-loader!roa-loader!./code_examples/extract_and_add_specific_links_on_website_pw.py';
 
 This example demonstrates how to crawl a website while targeting specific patterns of links. By utilizing the <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> helper, you can pass `include` or `exclude` parameters to improve your crawling strategy. This approach ensures that only the links matching the specified patterns are added to the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>. Both `include` and `exclude` support lists of globs or regular expressions. This functionality is great for focusing on relevant sections of a website and avoiding scraping unnecessary or irrelevant content.
 
@@ -35,13 +35,13 @@ This example demonstrates how to crawl a website while targeting specific patter
 
 <Tabs groupId="second-example">
     <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
-        <CodeBlock className="language-python">
+        <RunnableCodeBlock className="language-python">
             {BeautifulSoupExampleExtractAndAdd}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
     <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
-        <CodeBlock className="language-python">
+        <RunnableCodeBlock className="language-python">
             {PlaywrightExampleExtractAndAdd}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
 </Tabs>
