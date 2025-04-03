@@ -6,10 +6,10 @@ title: Crawl all links on website
 import ApiLink from '@site/src/components/ApiLink';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
-import CodeBlock from '@theme/CodeBlock';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
-import BeautifulSoupExample from '!!raw-loader!./code_examples/crawl_all_links_on_website_bs.py';
-import PlaywrightExample from '!!raw-loader!./code_examples/crawl_all_links_on_website_pw.py';
+import BeautifulSoupExample from '!!raw-loader!roa-loader!./code_examples/crawl_all_links_on_website_bs.py';
+import PlaywrightExample from '!!raw-loader!roa-loader!./code_examples/crawl_all_links_on_website_pw.py';
 
 This example uses the <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> helper to add new links to the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> as the crawler navigates from page to page. By automatically discovering and enqueuing all links on a given page, the crawler can systematically scrape an entire website. This approach is ideal for web scraping tasks where you need to collect data from multiple interconnected pages.
 
@@ -21,13 +21,13 @@ If no options are given, by default the method will only add links that are unde
 
 <Tabs groupId="main">
     <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
-        <CodeBlock className="language-python">
+        <RunnableCodeBlock className="language-python" language="python">
             {BeautifulSoupExample}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
     <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
-        <CodeBlock className="language-python">
+        <RunnableCodeBlock className="language-python" language="python">
             {PlaywrightExample}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
 </Tabs>

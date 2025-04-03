@@ -4,17 +4,17 @@ title: Сonfigure JSON logging
 ---
 
 import ApiLink from '@site/src/components/ApiLink';
-import CodeBlock from '@theme/CodeBlock';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
-import JsonLoggingExample from '!!raw-loader!./code_examples/configure_json_logging.py';
+import JsonLoggingExample from '!!raw-loader!roa-loader!./code_examples/configure_json_logging.py';
 
 This example demonstrates how to configure JSON line (JSONL) logging with Crawlee. By using the `use_table_logs=False` parameter, you can disable table-formatted statistics logs, which makes it easier to parse logs with external tools or to serialize them as JSON.
 
 The example shows how to integrate with the popular [`loguru`](https://github.com/delgan/loguru) library to capture Crawlee logs and format them as JSONL (one JSON object per line). This approach works well when you need to collect logs for analysis, monitoring, or when integrating with logging platforms like ELK Stack, Grafana Loki, or similar systems.
 
-<CodeBlock className="language-python">
+<RunnableCodeBlock className="language-python" language="python">
     {JsonLoggingExample}
-</CodeBlock>
+</RunnableCodeBlock>
 
 Here's an example of what a crawler statistics log entry in JSONL format.
 

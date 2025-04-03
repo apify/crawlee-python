@@ -5,10 +5,10 @@ description: Learn how to scale your crawlers by controlling concurrency and lim
 ---
 
 import ApiLink from '@site/src/components/ApiLink';
-import CodeBlock from '@theme/CodeBlock';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
-import MaxTasksPerMinuteExample from '!!raw-loader!./code_examples/scaling_crawlers/max_tasks_per_minute_example.py';
-import MinAndMaxConcurrencyExample from '!!raw-loader!./code_examples/scaling_crawlers/min_and_max_concurrency_example.py';
+import MaxTasksPerMinuteExample from '!!raw-loader!roa-loader!./code_examples/scaling_crawlers/max_tasks_per_minute_example.py';
+import MinAndMaxConcurrencyExample from '!!raw-loader!roa-loader!./code_examples/scaling_crawlers/min_and_max_concurrency_example.py';
 
 As we build our crawler, we may want to control how many tasks it performs at any given time. In other words, how many requests it makes to the web we are trying to scrape. Crawlee offers several options to fine-tune the number of parallel tasks, limit the number of requests per minute, and optimize scaling based on available system resources.
 
@@ -22,9 +22,9 @@ All of these options are available across all crawlers provided by Crawlee. In t
 
 The `max_tasks_per_minute` setting in <ApiLink to="class/ConcurrencySettings">`ConcurrencySettings`</ApiLink> controls how many total tasks the crawler can process per minute. It ensures that tasks are spread evenly throughout the minute, preventing a sudden burst at the `max_concurrency` limit followed by idle time. By default, this is set to `Infinity`, meaning the crawler can run at full speed, limited only by `max_concurrency`. Use this option if you want to throttle your crawler to avoid overwhelming the target website with continuous requests.
 
-<CodeBlock className="language-python">
+<RunnableCodeBlock className="language-python" language="python">
     {MaxTasksPerMinuteExample}
-</CodeBlock>
+</RunnableCodeBlock>
 
 ## Minimum and maximum concurrency
 
@@ -40,9 +40,9 @@ If you set `min_concurrency` too high compared to the available system resources
 
 The `desired_concurrency` option in the <ApiLink to="class/ConcurrencySettings">`ConcurrencySettings`</ApiLink> specifies the initial number of parallel tasks to start with, assuming sufficient resources are available. It defaults to the same value as `min_concurrency`.
 
-<CodeBlock className="language-python">
+<RunnableCodeBlock className="language-python" language="python">
     {MinAndMaxConcurrencyExample}
-</CodeBlock>
+</RunnableCodeBlock>
 
 ## Autoscaled pool
 

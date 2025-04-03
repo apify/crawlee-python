@@ -1,3 +1,5 @@
+import asyncio
+
 from apify import Actor, Configuration
 
 
@@ -11,3 +13,7 @@ async def main() -> None:
 
     async with Actor(config):
         Actor.log.info('Hello from Apify platform!')
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

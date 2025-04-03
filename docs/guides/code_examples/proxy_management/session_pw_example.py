@@ -1,3 +1,5 @@
+import asyncio
+
 from crawlee.crawlers import PlaywrightCrawler
 from crawlee.proxy_configuration import ProxyConfiguration
 
@@ -14,3 +16,9 @@ async def main() -> None:
         proxy_configuration=proxy_configuration,
         use_session_pool=True,
     )
+
+    # ...
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

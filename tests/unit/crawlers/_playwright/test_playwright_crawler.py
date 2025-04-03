@@ -58,7 +58,7 @@ async def test_enqueue_links(redirect_server_url: URL, server_url: URL) -> None:
     redirect_target = str(server_url / 'start_enqueue')
     redirect_url = str(redirect_server_url.with_path('redirect').with_query(url=redirect_target))
     requests = [redirect_url]
-    crawler = PlaywrightCrawler(max_requests_per_crawl=11)
+    crawler = PlaywrightCrawler()
     visit = mock.Mock()
 
     @crawler.router.default_handler

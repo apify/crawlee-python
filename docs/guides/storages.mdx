@@ -7,24 +7,24 @@ description: How to work with storages in Crawlee, how to manage requests and ho
 import ApiLink from '@site/src/components/ApiLink';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
-import CodeBlock from '@theme/CodeBlock';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
-import RqBasicExample from '!!raw-loader!./code_examples/storages/rq_basic_example.py';
-import RqWithCrawlerExample from '!!raw-loader!./code_examples/storages/rq_with_crawler_example.py';
-import RqWithCrawlerExplicitExample from '!!raw-loader!./code_examples/storages/rq_with_crawler_explicit_example.py';
-import RqHelperAddRequestsExample from '!!raw-loader!./code_examples/storages/helper_add_requests_example.py';
-import RqHelperEnqueueLinksExample from '!!raw-loader!./code_examples/storages/helper_enqueue_links_example.py';
+import RqBasicExample from '!!raw-loader!roa-loader!./code_examples/storages/rq_basic_example.py';
+import RqWithCrawlerExample from '!!raw-loader!roa-loader!./code_examples/storages/rq_with_crawler_example.py';
+import RqWithCrawlerExplicitExample from '!!raw-loader!roa-loader!./code_examples/storages/rq_with_crawler_explicit_example.py';
+import RqHelperAddRequestsExample from '!!raw-loader!roa-loader!./code_examples/storages/helper_add_requests_example.py';
+import RqHelperEnqueueLinksExample from '!!raw-loader!roa-loader!./code_examples/storages/helper_enqueue_links_example.py';
 
-import DatasetBasicExample from '!!raw-loader!./code_examples/storages/dataset_basic_example.py';
-import DatasetWithCrawlerExample from '!!raw-loader!./code_examples/storages/dataset_with_crawler_example.py';
-import DatasetWithCrawerExplicitExample from '!!raw-loader!./code_examples/storages/dataset_with_crawler_explicit_example.py';
+import DatasetBasicExample from '!!raw-loader!roa-loader!./code_examples/storages/dataset_basic_example.py';
+import DatasetWithCrawlerExample from '!!raw-loader!roa-loader!./code_examples/storages/dataset_with_crawler_example.py';
+import DatasetWithCrawerExplicitExample from '!!raw-loader!roa-loader!./code_examples/storages/dataset_with_crawler_explicit_example.py';
 
-import KvsBasicExample from '!!raw-loader!./code_examples/storages/kvs_basic_example.py';
-import KvsWithCrawlerExample from '!!raw-loader!./code_examples/storages/kvs_with_crawler_example.py';
-import KvsWithCrawlerExplicitExample from '!!raw-loader!./code_examples/storages/kvs_with_crawler_explicit_example.py';
+import KvsBasicExample from '!!raw-loader!roa-loader!./code_examples/storages/kvs_basic_example.py';
+import KvsWithCrawlerExample from '!!raw-loader!roa-loader!./code_examples/storages/kvs_with_crawler_example.py';
+import KvsWithCrawlerExplicitExample from '!!raw-loader!roa-loader!./code_examples/storages/kvs_with_crawler_explicit_example.py';
 
-import CleaningDoNotPurgeExample from '!!raw-loader!./code_examples/storages/cleaning_do_not_purge_example.py';
-import CleaningPurgeExplicitlyExample from '!!raw-loader!./code_examples/storages/cleaning_purge_explicitly_example.py';
+import CleaningDoNotPurgeExample from '!!raw-loader!roa-loader!./code_examples/storages/cleaning_do_not_purge_example.py';
+import CleaningPurgeExplicitlyExample from '!!raw-loader!roa-loader!./code_examples/storages/cleaning_purge_explicitly_example.py';
 
 Crawlee offers multiple storage types for managing and persisting your crawling data. Request-oriented storages, such as the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, help you store and deduplicate URLs, while result-oriented storages, like <ApiLink to="class/Dataset">`Dataset`</ApiLink> and <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, focus on storing and retrieving scraping results. This guide helps you choose the storage type that suits your needs.
 
@@ -75,19 +75,19 @@ The following code demonstrates the usage of the <ApiLink to="class/RequestQueue
 
 <Tabs groupId="request_queue">
     <TabItem value="request_queue_basic_example" label="Basic usage" default>
-        <CodeBlock className="language-python">
+        <RunnableCodeBlock className="language-python" language="python">
             {RqBasicExample}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
     <TabItem value="request_queue_with_crawler" label="Usage with Crawler">
-        <CodeBlock className="language-python">
+        <RunnableCodeBlock className="language-python" language="python">
             {RqWithCrawlerExample}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
     <TabItem value="request_queue_with_crawler_explicit" label="Explicit usage with Crawler" default>
-        <CodeBlock className="language-python">
+        <RunnableCodeBlock className="language-python" language="python">
             {RqWithCrawlerExplicitExample}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
 </Tabs>
 
@@ -100,14 +100,14 @@ Crawlee provides helper functions to simplify interactions with the <ApiLink to=
 
 <Tabs groupId="request_helpers">
     <TabItem value="request_helper_add_requests" label="Add requests" default>
-        <CodeBlock className="language-python">
+        <RunnableCodeBlock className="language-python" language="python">
             {RqHelperAddRequestsExample}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
     <TabItem value="request_helper_enqueue_links" label="Enqueue links">
-        <CodeBlock className="language-python">
+        <RunnableCodeBlock className="language-python" language="python">
             {RqHelperEnqueueLinksExample}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
 </Tabs>
 
@@ -136,19 +136,19 @@ The following code demonstrates basic operations of the dataset:
 
 <Tabs groupId="dataset_storage">
     <TabItem value="dataset_basic_example" label="Basic usage" default>
-        <CodeBlock className="language-python">
+        <RunnableCodeBlock className="language-python" language="python">
             {DatasetBasicExample}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
     <TabItem value="dataset_with_crawler" label="Usage with Crawler">
-        <CodeBlock className="language-python">
+        <RunnableCodeBlock className="language-python" language="python">
             {DatasetWithCrawlerExample}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
     <TabItem value="dataset_with_crawler_explicit" label="Explicit usage with Crawler" default>
-        <CodeBlock className="language-python">
+        <RunnableCodeBlock className="language-python" language="python">
             {DatasetWithCrawerExplicitExample}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
 </Tabs>
 
@@ -176,19 +176,19 @@ The following code demonstrates the usage of the <ApiLink to="class/KeyValueStor
 
 <Tabs groupId="kv_storage">
     <TabItem value="kvs_basic_example" label="Basic usage" default>
-        <CodeBlock className="language-python">
+        <RunnableCodeBlock className="language-python" language="python">
             {KvsBasicExample}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
     <TabItem value="kvs_with_crawler" label="Usage with Crawler">
-        <CodeBlock className="language-python">
+        <RunnableCodeBlock className="language-python" language="python">
             {KvsWithCrawlerExample}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
     <TabItem value="kvs_with_crawler_explicit" label="Explicit usage with Crawler" default>
-        <CodeBlock className="language-python">
+        <RunnableCodeBlock className="language-python" language="python">
             {KvsWithCrawlerExplicitExample}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
 </Tabs>
 
@@ -204,17 +204,17 @@ Crawlee provides the following helper function to simplify interactions with the
 
 Default storages are purged before the crawler starts, unless explicitly configured otherwise. For that case, see <ApiLink to="class/Configuration#purge_on_start">`Configuration.purge_on_start`</ApiLink>. This cleanup happens as soon as a storage is accessed, either when you open a storage (e.g. using <ApiLink to="class/RequestQueue#open">`RequestQueue.open`</ApiLink>, <ApiLink to="class/Dataset#open">`Dataset.open`</ApiLink>, <ApiLink to="class/KeyValueStore#open">`KeyValueStore.open`</ApiLink>) or when interacting with a storage through one of the helper functions (e.g. <ApiLink to="class/PushDataFunction">`push_data`</ApiLink>), which implicitly opens the result storage.
 
-<CodeBlock className="language-python">
+<RunnableCodeBlock className="language-python" language="python">
     {CleaningDoNotPurgeExample}
-</CodeBlock>
+</RunnableCodeBlock>
 
 If you do not explicitly interact with storages in your code, the purging will occur automatically when the <ApiLink to="class/BasicCrawler#run">`BasicCrawler.run`</ApiLink> method is invoked.
 
 If you need to purge storages earlier, you can call <ApiLink to="class/MemoryStorageClient#purge_on_start">`MemoryStorageClient.purge_on_start`</ApiLink> directly if you are using the default storage client. This method triggers the purging process for the underlying storage implementation you are currently using.
 
-<CodeBlock className="language-python">
+<RunnableCodeBlock className="language-python" language="python">
     {CleaningPurgeExplicitlyExample}
-</CodeBlock>
+</RunnableCodeBlock>
 
 ## Conclusion
 
