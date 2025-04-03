@@ -12,7 +12,7 @@ from httpx import Response
 
 from crawlee import ConcurrencySettings, Request
 from crawlee.crawlers import HttpCrawler
-from crawlee.http_clients import CurlImpersonateHttpClient, HttpxHttpClient
+from crawlee.http_clients import CurlImpersonateHttpClient, HttpxHttpClient, PlaywrightHttpClient
 from crawlee.sessions import SessionPool
 
 if TYPE_CHECKING:
@@ -61,11 +61,14 @@ async def crawler_without_retries(
     params=[
         pytest.param('curl', id='curl'),
         pytest.param('httpx', id='httpx'),
+        pytest.param('playwright', id='playwright'),
     ]
 )
-async def http_client(request: pytest.FixtureRequest) -> CurlImpersonateHttpClient | HttpxHttpClient:
+async def http_client(request: pytest.FixtureRequest) -> HttpClient:
     if request.param == 'curl':
         return CurlImpersonateHttpClient(http_version=CurlHttpVersion.V1_1)
+    if request.param == 'playwright':
+        return PlaywrightHttpClient()
     return HttpxHttpClient(http2=False)
 
 

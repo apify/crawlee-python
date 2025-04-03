@@ -12,6 +12,8 @@ _install_import_hook(__name__)
 with _try_import(__name__, 'CurlImpersonateHttpClient'):
     from ._curl_impersonate import CurlImpersonateHttpClient
 
+with _try_import(__name__, 'PlaywrightHttpClient'):
+    from ._playwright import PlaywrightHttpClient
 
 __all__ = [
     'CurlImpersonateHttpClient',
@@ -19,4 +21,5 @@ __all__ = [
     'HttpCrawlingResult',
     'HttpResponse',
     'HttpxHttpClient',
+    'PlaywrightHttpClient',
 ]

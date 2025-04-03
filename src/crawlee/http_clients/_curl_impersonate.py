@@ -20,6 +20,7 @@ from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
 
 if TYPE_CHECKING:
     from http.cookiejar import Cookie
+    from types import TracebackType
 
     from curl_cffi import Curl
     from curl_cffi.requests import Request as CurlRequest
@@ -245,3 +246,18 @@ class CurlImpersonateHttpClient(HttpClient):
             cookie = curl_morsel.to_cookiejar_cookie()
             cookies.append(cookie)
         return cookies
+
+    @override
+    async def __aenter__(self) -> CurlImpersonateHttpClient:
+        return self
+
+    @override
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        exc_traceback: TracebackType | None,
+    ) -> None:
+        for client in self._client_by_proxy_url.values():
+            await client.close()
+        self._client_by_proxy_url.clear()

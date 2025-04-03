@@ -162,8 +162,12 @@ class SessionCookies:
             result['httpOnly'] = result.pop('http_only')
         if 'same_site' in result:
             result['sameSite'] = result.pop('same_site')
+        else:
+            result['sameSite'] = 'None'
         if 'expires' in result:
             result['expires'] = float(result['expires'])
+        else:
+            result['expires'] = -1
 
         return PlaywrightCookieParam(**result)
 

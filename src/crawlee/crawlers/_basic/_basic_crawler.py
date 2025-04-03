@@ -615,6 +615,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 event_manager,
                 self._snapshotter,
                 self._statistics,
+                self._http_client,
                 self._session_pool if self._use_session_pool else None,
                 *self._additional_context_managers,
             )
