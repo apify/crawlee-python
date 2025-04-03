@@ -1,5 +1,5 @@
 # % if cookiecutter.crawler_type == 'playwright-camoufox'
-camoufox
+camoufox[geoip]>=0.4.5
 # % set extras = ['playwright']
 # % else
 # % set extras = [cookiecutter.crawler_type]
