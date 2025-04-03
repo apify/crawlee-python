@@ -14,9 +14,9 @@ jobs:
       fail-fast: false
       max-parallel: 2
       matrix:
-        http-client: [ "httpx", "curl_impersonate" ]
+        http-client: [ "httpx", "curl_impersonate"]
         crawler-type: [ "parsel", "beautifulsoup", "playwright", "playwright_camoufox"]
-        package-manager: [ "uv", "poetry" ]
+        package-manager: ["pip", "uv", "poetry"]
 
     runs-on: "ubuntu-latest"
     env:

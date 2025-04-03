@@ -2,6 +2,7 @@ import os
 import re
 import subprocess
 from pathlib import Path
+from typing import Literal
 
 import pytest
 from apify_client import ApifyClientAsync
@@ -9,7 +10,7 @@ from cookiecutter.main import cookiecutter
 
 from crawlee._cli import default_start_url, template_directory
 from crawlee._utils.crypto import crypto_random_object_id
-from tests.e2e.project_template.utils import patch_crawlee_version_in_pyproject_toml_based_project
+from tests.e2e.project_template.utils import patch_crawlee_version_in_project
 
 # To run these tests locally, make sure you have apify-cli installed and available in the path.
 # https://docs.apify.com/cli/docs/installation
@@ -32,10 +33,19 @@ from tests.e2e.project_template.utils import patch_crawlee_version_in_pyproject_
     ],
 )
 @pytest.mark.parametrize(
-    'package_manager', [pytest.param('uv', marks=pytest.mark.uv), pytest.param('poetry', marks=pytest.mark.poetry)]
+    'package_manager',
+    [
+        pytest.param('pip', marks=pytest.mark.pip),
+        pytest.param('uv', marks=pytest.mark.uv),
+        pytest.param('poetry', marks=pytest.mark.poetry),
+    ],
 )
 async def test_static_crawler_actor_at_apify(
-    tmp_path: Path, crawlee_wheel_path: Path, package_manager: str, crawler_type: str, http_client: str
+    tmp_path: Path,
+    crawlee_wheel_path: Path,
+    package_manager: Literal['pip', 'uv', 'poetry'],
+    crawler_type: str,
+    http_client: str,
 ) -> None:
     # Generate new actor name
     actor_name = f'crawlee-python-template-e2e-test-{crypto_random_object_id(8).lower()}'
@@ -56,8 +66,8 @@ async def test_static_crawler_actor_at_apify(
         output_dir=tmp_path,
     )
 
-    patch_crawlee_version_in_pyproject_toml_based_project(
-        project_path=tmp_path / actor_name, wheel_path=crawlee_wheel_path
+    patch_crawlee_version_in_project(
+        project_path=tmp_path / actor_name, wheel_path=crawlee_wheel_path, package_manager=package_manager
     )
 
     # Build actor using sequence of cli commands as the user would

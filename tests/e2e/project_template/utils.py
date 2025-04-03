@@ -2,13 +2,59 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Literal
 
 
-def patch_crawlee_version_in_pyproject_toml_based_project(project_path: Path, wheel_path: Path) -> None:
+def patch_crawlee_version_in_project(
+    project_path: Path, wheel_path: Path, package_manager: Literal['pip', 'uv', 'poetry']
+) -> None:
     """Ensure that the test is using current version of the crawlee from the source and not from Pypi."""
     # Copy prepared .whl file
     shutil.copy(wheel_path, project_path)
 
+    if package_manager in {'poetry', 'uv'}:
+        _patch_crawlee_version_in_pyproject_toml_based_project(project_path, wheel_path)
+    else:
+        _patch_crawlee_version_in_requirements_txt_based_project(project_path, wheel_path)
+
+
+def _patch_crawlee_version_in_requirements_txt_based_project(project_path: Path, wheel_path: Path) -> None:
+    # Get any extras
+    with open(project_path / 'requirements.txt') as f:
+        requirements = f.read()
+        crawlee_extras = re.findall(r'crawlee(\[.*\])', requirements)[0] or ''
+
+    # Modify requirements.txt to use crawlee from wheel file instead of from Pypi
+    with open(project_path / 'requirements.txt') as f:
+        modified_lines = []
+        for line in f:
+            if 'crawlee' in line:
+                modified_lines.append(f'./{wheel_path.name}{crawlee_extras}\n')
+            else:
+                modified_lines.append(line)
+    with open(project_path / 'requirements.txt', 'w') as f:
+        f.write(''.join(modified_lines))
+
+    # Patch the dockerfile to have wheel file available
+    with open(project_path / 'Dockerfile') as f:
+        modified_lines = []
+        for line in f:
+            modified_lines.append(line)
+            if line.startswith('COPY requirements.txt ./'):
+                modified_lines.extend(
+                    [
+                        f'COPY {wheel_path.name} ./\n',
+                        # If no crawlee version bump, pip might be lazy and take existing pre-installed crawlee version,
+                        # make sure that one is patched as well.
+                        f'RUN pip install ./{wheel_path.name}{crawlee_extras} --force-reinstall\n',
+                    ]
+                )
+    with open(project_path / 'Dockerfile', 'w') as f:
+        f.write(''.join(modified_lines))
+
+
+def _patch_crawlee_version_in_pyproject_toml_based_project(project_path: Path, wheel_path: Path) -> None:
+    """Ensure that the test is using current version of the crawlee from the source and not from Pypi."""
     # Get any extras
     with open(project_path / 'pyproject.toml') as f:
         pyproject = f.read()
@@ -40,13 +86,13 @@ def patch_crawlee_version_in_pyproject_toml_based_project(project_path: Path, wh
                 # and so the absolute path(in the container) is generated when running `add` command in the container.
                 modified_lines.extend(
                     [
-                        f'COPY {wheel_path.name} ./',
-                        # If no crawlee version bump, poetry might be lazy and take existing crawlee version,
-                        # make sure that one is patched as well.
-                        f'RUN pip install ./{wheel_path.name}{crawlee_extras} --force-reinstall',
-                        f'RUN {package_manager} add ./{wheel_path.name}{crawlee_extras}',
-                        f'RUN {package_manager} lock',
+                        f'COPY {wheel_path.name} ./\n',
+                        # If no crawlee version bump, poetry might be lazy and take existing pre-installed crawlee
+                        # version, make sure that one is patched as well.
+                        f'RUN pip install ./{wheel_path.name}{crawlee_extras} --force-reinstall\n',
+                        f'RUN {package_manager} add ./{wheel_path.name}{crawlee_extras}\n',
+                        f'RUN {package_manager} lock\n',
                     ]
                 )
     with open(project_path / 'Dockerfile', 'w') as f:
-        f.write('\n'.join(modified_lines))
+        f.write(''.join(modified_lines))

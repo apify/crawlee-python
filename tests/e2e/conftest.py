@@ -18,6 +18,7 @@ def pytest_configure(config: Config) -> None:
         'beautifulsoup',
         'uv',
         'poetry',
+        'pip',
     ]:
         config.addinivalue_line('markers', f'{marker}: Integration test parameter marker.')
 
