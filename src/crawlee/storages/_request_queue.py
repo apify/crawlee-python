@@ -281,7 +281,12 @@ class RequestQueue(Storage, RequestManager):
         """
         return await self._resource_client.get_request(request_id)
 
-    async def fetch_next_request(self) -> Request | None:
+    def log_if_delayed(self, log_point_name: str, start_timestamp:int, delay = 1):
+        if start_timestamp and (time_from_start:=(datetime.now().timestamp()-start_timestamp)) > delay:
+            logger.info(f'Task: {start_timestamp}, {log_point_name} after {time_from_start}')
+
+
+    async def fetch_next_request(self, start_timestamp:int=0, delay = 1) -> Request | None:
         """Return the next request in the queue to be processed.
 
         Once you successfully finish processing of the request, you need to call `RequestQueue.mark_request_as_handled`
@@ -299,13 +304,15 @@ class RequestQueue(Storage, RequestManager):
         self._last_activity = datetime.now(timezone.utc)
 
         await self._ensure_head_is_non_empty()
+        self.log_if_delayed("_ensure_head_is_non_empty", start_timestamp)
 
         # We are likely done at this point.
         if len(self._queue_head) == 0:
             return None
 
         next_request_id = self._queue_head.popleft()
-        request = await self._get_or_hydrate_request(next_request_id)
+        request = await self._get_or_hydrate_request(next_request_id, start_timestamp)
+        self.log_if_delayed("_get_or_hydrate_request", start_timestamp)
 
         # NOTE: It can happen that the queue head index is inconsistent with the main queue table.
         # This can occur in two situations:
@@ -593,18 +600,20 @@ class RequestQueue(Storage, RequestManager):
             'forefront': forefront,
         }
 
-    async def _get_or_hydrate_request(self, request_id: str) -> Request | None:
+    async def _get_or_hydrate_request(self, request_id: str, start_timestamp:int=0) -> Request | None:
         cached_entry = self._requests_cache.get(request_id)
 
         if not cached_entry:
             # 2.1. Attempt to prolong the request lock to see if we still own the request
             prolong_result = await self._prolong_request_lock(request_id)
+            self.log_if_delayed("2.1_prolong_request_lock", start_timestamp)
 
             if not prolong_result:
                 return None
 
             # 2.1.1. If successful, hydrate the request and return it
             hydrated_request = await self.get_request(request_id)
+            self.log_if_delayed("2.1.1.get_request", start_timestamp)
 
             # Queue head index is ahead of the main table and the request is not present in the main table yet
             # (i.e. get_request() returned null).
@@ -613,6 +622,7 @@ class RequestQueue(Storage, RequestManager):
                 # This may/may not succeed, but that's fine
                 with suppress(Exception):
                     await self._resource_client.delete_request_lock(request_id)
+                    self.log_if_delayed("2.1.1._resource_client.delete_request_lock", start_timestamp)
 
                 return None
 
@@ -632,6 +642,7 @@ class RequestQueue(Storage, RequestManager):
             # (or it was handled already)
             if cached_entry['lock_expires_at'] and cached_entry['lock_expires_at'] < datetime.now(timezone.utc):
                 prolonged = await self._prolong_request_lock(cached_entry['id'])
+                self.log_if_delayed("1.1.1_prolong_request_lock", start_timestamp)
 
                 if not prolonged:
                     return None
@@ -642,12 +653,14 @@ class RequestQueue(Storage, RequestManager):
 
         # 1.2. If not hydrated, try to prolong the lock first (to ensure we keep it in our queue), hydrate and return it
         prolonged = await self._prolong_request_lock(cached_entry['id'])
+        self.log_if_delayed("1.2_prolong_request_lock", start_timestamp)
 
         if not prolonged:
             return None
 
         # This might still return null if the queue head is inconsistent with the main queue table.
         hydrated_request = await self.get_request(cached_entry['id'])
+        self.log_if_delayed("1.2get_request", start_timestamp)
 
         cached_entry['hydrated'] = hydrated_request
 
@@ -658,6 +671,7 @@ class RequestQueue(Storage, RequestManager):
             # This may/may not succeed, but that's fine
             with suppress(Exception):
                 await self._resource_client.delete_request_lock(cached_entry['id'])
+                self.log_if_delayed("1.2_resource_client.delete_request_lock", start_timestamp)
 
             return None
 

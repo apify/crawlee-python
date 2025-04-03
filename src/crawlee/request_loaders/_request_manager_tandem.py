@@ -67,7 +67,7 @@ class RequestManagerTandem(RequestManager):
         )
 
     @override
-    async def fetch_next_request(self) -> Request | None:
+    async def fetch_next_request(self, *args) -> Request | None:
         if await self._read_only_loader.is_finished():
             return await self._read_write_manager.fetch_next_request()
 
