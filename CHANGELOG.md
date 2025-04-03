@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.6.6 - **not yet released**
+## [0.6.6](https://github.com/apify/crawlee-python/releases/tag/v0.6.6) (2025-04-03)
 
 ### 🚀 Features
 
@@ -19,7 +18,6 @@ All notable changes to this project will be documented in this file.
 - **website:** Use correct image source ([#1115](https://github.com/apify/crawlee-python/pull/1115)) ([ee7806f](https://github.com/apify/crawlee-python/commit/ee7806fc2f9b7b590d9668cc9f86009a898a3da6)) by [@baldasseva](https://github.com/baldasseva)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.6.5](https://github.com/apify/crawlee-python/releases/tag/v0.6.5) (2025-03-13)
 
 ### 🐛 Bug Fixes
