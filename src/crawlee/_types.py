@@ -384,7 +384,11 @@ class EnqueueLinksFunction(Protocol):
 
 @docs_group('Functions')
 class ExtractLinksFunction(Protocol):
-    """A function for extracting URLs to crawl based on elements selected by a given selector."""
+    """A function for extracting URLs to crawl based on elements selected by a given selector.
+
+    It extracts URLs from the current page and allows filtering through selectors and other options. You can also
+    specify labels and user data to be associated with the newly created `Request` objects.
+    """
 
     def __call__(
         self,
