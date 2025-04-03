@@ -15,9 +15,25 @@ from tests.e2e.project_template.utils import patch_crawlee_version_in_pyproject_
 # https://docs.apify.com/cli/docs/installation
 
 
-@pytest.mark.parametrize('http_client', ['httpx', 'curl-impersonate'])
-@pytest.mark.parametrize('crawler_type', ['parsel', 'beautifulsoup'])
-@pytest.mark.parametrize('package_manager', ['uv', 'poetry'])
+@pytest.mark.parametrize(
+    'http_client',
+    [
+        pytest.param('httpx', marks=pytest.mark.httpx),
+        pytest.param('curl-impersonate', marks=pytest.mark.curl_impersonate),
+    ],
+)
+@pytest.mark.parametrize(
+    'crawler_type',
+    [
+        pytest.param('parsel', marks=pytest.mark.parsel),
+        pytest.param('beautifulsoup', marks=pytest.mark.beautifulsoup),
+        pytest.param('playwright', marks=pytest.mark.playwright),
+        pytest.param('playwright-camoufox', marks=pytest.mark.playwright_camoufox),
+    ],
+)
+@pytest.mark.parametrize(
+    'package_manager', [pytest.param('uv', marks=pytest.mark.uv), pytest.param('poetry', marks=pytest.mark.poetry)]
+)
 async def test_static_crawler_actor_at_apify(
     tmp_path: Path, crawlee_wheel_path: Path, package_manager: str, crawler_type: str, http_client: str
 ) -> None:
@@ -65,7 +81,7 @@ async def test_static_crawler_actor_at_apify(
     # Run actor
     try:
         assert build_process.returncode == 0
-        started_run_data = await actor.start()
+        started_run_data = await actor.start(memory_mbytes=8192)
         actor_run = client.run(started_run_data['id'])
 
         finished_run_data = await actor_run.wait_for_finish()
@@ -80,6 +96,6 @@ async def test_static_crawler_actor_at_apify(
     assert finished_run_data
     assert finished_run_data['status'] == 'SUCCEEDED', additional_run_info
     assert (
-        'Crawler.stop() was called with following reason: The crawler has reached its limit of 50 requests per crawl.'
+        'Crawler.stop() was called with following reason: The crawler has reached its limit of 10 requests per crawl.'
     ) in actor_run_log, additional_run_info
-    assert int(re.findall(r'requests_finished\s*│\s*(\d*)', actor_run_log)[-1]) >= 50, additional_run_info
+    assert int(re.findall(r'requests_finished\s*│\s*(\d*)', actor_run_log)[-1]) >= 10, additional_run_info
