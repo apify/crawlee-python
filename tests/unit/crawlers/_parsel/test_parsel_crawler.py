@@ -6,7 +6,7 @@ from unittest import mock
 
 import pytest
 
-from crawlee import ConcurrencySettings, HttpHeaders, RequestTransformAction
+from crawlee import ConcurrencySettings, HttpHeaders, Request, RequestTransformAction
 from crawlee.crawlers import ParselCrawler
 
 if TYPE_CHECKING:
@@ -61,6 +61,25 @@ async def test_enqueue_links(redirect_server_url: URL, server_url: URL, http_cli
         str(server_url / 'page_2'),
         str(server_url / 'page_3'),
     }
+
+
+async def test_enqueue_links_with_incompatible_kwargs_raises_error(server_url: URL) -> None:
+    """Call `enqueue_links` with arguments that can't be used together."""
+    requests = ['https://www.test.io/']
+    crawler = ParselCrawler(max_request_retries=1)
+    exceptions = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        try:
+            await context.enqueue_links(requests=[Request.from_url(str(server_url / 'start_enqueue'))], selector='a')  # type:ignore[call-overload]  # Testing runtime enforcement of the overloads.
+        except Exception as e:
+            exceptions.append(e)
+
+    await crawler.run(requests)
+
+    assert len(exceptions) == 1
+    assert type(exceptions[0]) is ValueError
 
 
 async def test_enqueue_links_selector(server_url: URL, http_client: HttpClient) -> None:
