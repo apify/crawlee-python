@@ -4,9 +4,9 @@ title: Capture screenshots using Playwright
 ---
 
 import ApiLink from '@site/src/components/ApiLink';
-import CodeBlock from '@theme/CodeBlock';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
-import CaptureScreenshotExample from '!!raw-loader!./code_examples/capture_screenshot_using_playwright.py';
+import CaptureScreenshotExample from '!!raw-loader!roa-loader!./code_examples/capture_screenshot_using_playwright.py';
 
 This example demonstrates how to capture screenshots of web pages using <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> and store them in the key-value store.
 
@@ -14,6 +14,6 @@ The <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> is confi
 
 The captured screenshots are stored in the key-value store, which is suitable for managing and storing files in various formats. In this case, screenshots are stored as PNG images with a unique key generated from the URL of the page.
 
-<CodeBlock className="language-python">
+<RunnableCodeBlock className="language-python" language="python">
     {CaptureScreenshotExample}
-</CodeBlock>
+</RunnableCodeBlock>

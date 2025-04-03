@@ -4,11 +4,11 @@ title: First crawler
 ---
 
 import ApiLink from '@site/src/components/ApiLink';
-import CodeBlock from '@theme/CodeBlock';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
-import RequestQueueExample from '!!raw-loader!./code_examples/02_request_queue.py';
-import BeautifulSoupExample from '!!raw-loader!./code_examples/02_bs.py';
-import BeautifulSoupBetterExample from '!!raw-loader!./code_examples/02_bs_better.py';
+import RequestQueueExample from '!!raw-loader!roa-loader!./code_examples/02_request_queue.py';
+import BeautifulSoupExample from '!!raw-loader!roa-loader!./code_examples/02_bs.py';
+import BeautifulSoupBetterExample from '!!raw-loader!roa-loader!./code_examples/02_bs_better.py';
 
 Now, you will build your first crawler. But before you do, let's briefly introduce the Crawlee classes involved in the process.
 
@@ -44,9 +44,9 @@ Let's put the theory into practice and start with something easy. Visit a page a
 
 Earlier you learned that the crawler uses a queue of requests as its source of URLs to crawl. Let's create it and add the first request.
 
-<CodeBlock className="language-python">
+<RunnableCodeBlock className="language-python" language="python">
     {RequestQueueExample}
-</CodeBlock>
+</RunnableCodeBlock>
 
 The <ApiLink to="class/RequestQueue#add_request">`RequestQueue.add_request`</ApiLink> method automatically converts the object with URL string to a <ApiLink to="class/Request">`Request`</ApiLink> instance. So now you have a <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> that holds one request which points to `https://crawlee.dev`.
 
@@ -64,9 +64,9 @@ Unless you have a good reason to start with a different one, you should try buil
 
 Let's continue with the earlier <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> example.
 
-<CodeBlock className="language-python">
+<RunnableCodeBlock className="language-python" language="python">
     {BeautifulSoupExample}
-</CodeBlock>
+</RunnableCodeBlock>
 
 When you run the example, you will see the title of https://crawlee.dev printed to the log. What really happens is that <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> first makes an HTTP request to `https://crawlee.dev`, then parses the received HTML with BeautifulSoup and makes it available as the `context` argument of the request handler.
 
@@ -78,9 +78,9 @@ When you run the example, you will see the title of https://crawlee.dev printed 
 
 Earlier we mentioned that you'll learn how to use the  <ApiLink to="class/BasicCrawler#add_requests">`BasicCrawler.add_requests`</ApiLink> method to skip the request queue initialization. It's simple. Every crawler has an implicit <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> instance, and you can add requests to it with the  <ApiLink to="class/BasicCrawler#add_requests">`BasicCrawler.add_requests`</ApiLink> method. In fact, you can go even further and just use the first parameter of `crawler.run()`!
 
-<CodeBlock className="language-python">
+<RunnableCodeBlock className="language-python" language="python">
     {BeautifulSoupBetterExample}
-</CodeBlock>
+</RunnableCodeBlock>
 
 When you run this code, you'll see exactly the same output as with the earlier, longer example. The <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> is still there, it's just managed by the crawler automatically.
 

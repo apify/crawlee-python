@@ -6,7 +6,7 @@ from crawlee.crawlers import ParselCrawler, ParselCrawlingContext
 async def main() -> None:
     # ParselCrawler crawls the web using HTTP requests
     # and parses HTML using the Parsel library.
-    crawler = ParselCrawler(max_requests_per_crawl=50)
+    crawler = ParselCrawler(max_requests_per_crawl=10)
 
     # Define a request handler to process each crawled page
     # and attach it to the crawler using a decorator.

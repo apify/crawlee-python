@@ -1,3 +1,5 @@
+import asyncio
+
 from crawlee import Request
 from crawlee._types import RequestHandlerRunResult
 from crawlee.crawlers import (
@@ -54,8 +56,15 @@ def result_comparator(
     )  #  For example compare `push_data` calls.
 
 
-crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(
-    rendering_type_predictor=CustomRenderingTypePredictor(),
-    result_checker=result_checker,
-    result_comparator=result_comparator,
-)
+async def main() -> None:
+    crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(
+        rendering_type_predictor=CustomRenderingTypePredictor(),
+        result_checker=result_checker,
+        result_comparator=result_comparator,
+    )
+
+    # ...
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

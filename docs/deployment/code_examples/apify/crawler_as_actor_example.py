@@ -1,3 +1,5 @@
+import asyncio
+
 from apify import Actor
 
 from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
@@ -6,7 +8,7 @@ from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 async def main() -> None:
     # Wrap the crawler code in an Actor context manager.
     async with Actor:
-        crawler = BeautifulSoupCrawler(max_requests_per_crawl=50)
+        crawler = BeautifulSoupCrawler(max_requests_per_crawl=10)
 
         @crawler.router.default_handler
         async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
@@ -19,3 +21,7 @@ async def main() -> None:
             await context.enqueue_links()
 
         await crawler.run(['https://crawlee.dev'])
+
+
+if __name__ == '__main__':
+    asyncio.run(main())
