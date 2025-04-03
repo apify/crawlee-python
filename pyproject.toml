@@ -103,7 +103,6 @@ dev = [
     "pytest-only~=2.1.0",
     "pytest-xdist~=3.6.0",
     "pytest~=8.3.0",
-    "respx~=0.22.0",
     "ruff~=0.11.0",
     "setuptools~=78.1.0",                    # setuptools are used by pytest, but not explicitly required
     "sortedcontainers-stubs~=2.4.0",
