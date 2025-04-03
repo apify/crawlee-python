@@ -274,14 +274,14 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
             | None = None,
             **kwargs: Unpack[EnqueueLinksKwargs],
-        ) -> list[str | Request]:
+        ) -> list[Request]:
             """Extract links from the current page.
 
             The `PlaywrightCrawler` implementation of the `ExtractLinksFunction` function.
             """
             kwargs.setdefault('strategy', 'same-hostname')
 
-            requests = list[Union[str, Request]]()
+            requests = list[Request]()
             base_user_data = user_data or {}
 
             elements = await context.page.query_selector_all(selector)

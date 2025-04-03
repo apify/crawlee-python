@@ -153,10 +153,10 @@ class AbstractHttpCrawler(
             transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
             | None = None,
             **kwargs: Unpack[EnqueueLinksKwargs],
-        ) -> list[str | Request]:
+        ) -> list[Request]:
             kwargs.setdefault('strategy', 'same-hostname')
 
-            requests = list[Union[str, Request]]()
+            requests = list[Request]()
             base_user_data = user_data or {}
 
             for link in self._parser.find_links(parsed_content, selector=selector):

@@ -332,6 +332,9 @@ class EnqueueLinksFunction(Protocol):
 
     It should not be called with `selector`, `label`, `user_data` or `transform_request_function` arguments together
     with `requests` argument.
+
+    For even more control over the enqueued links you can use combination of `ExtractLinksFunction` and
+    `AddRequestsFunction`.
     """
 
     @overload
@@ -386,12 +389,12 @@ class ExtractLinksFunction(Protocol):
     def __call__(
         self,
         *,
-        selector: str,
+        selector: str = 'a',
         label: str | None = None,
         user_data: dict[str, Any] | None = None,
         transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
         **kwargs: Unpack[EnqueueLinksKwargs],
-    ) -> Coroutine[None, None, list[str | Request]]:
+    ) -> Coroutine[None, None, list[Request]]:
         """Call extract links function.
 
         Args:
