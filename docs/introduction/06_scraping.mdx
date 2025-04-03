@@ -33,8 +33,7 @@ By splitting the `request.url`, we can extract the manufacturer name directly fr
 
 ```python
 # context.request.url:
-# https://warehouse-theme-metal.myshopify.com/products/
-# sennheiser-mke-440-professional-stereo-shotgun-microphone-mke-440
+# https://warehouse-theme-metal.myshopify.com/products/sennheiser-mke-440-professional-stereo-shotgun-microphone-mke-440
 
 # Split the URL and get the last part.
 url_part = context.request.url.split('/').pop()
