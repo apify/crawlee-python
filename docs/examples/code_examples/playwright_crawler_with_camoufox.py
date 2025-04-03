@@ -1,4 +1,4 @@
-#  Camoufox is external package and needs to be installed.
+# Camoufox is external package and needs to be installed.
 # It is not included in Crawlee.
 from camoufox import AsyncNewBrowser
 from typing_extensions import override
