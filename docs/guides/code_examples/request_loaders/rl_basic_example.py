@@ -1,3 +1,5 @@
+import asyncio
+
 from crawlee.request_loaders import RequestList
 
 
@@ -19,3 +21,7 @@ async def main() -> None:
 
         # And mark it as handled.
         await request_list.mark_request_as_handled(request)
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

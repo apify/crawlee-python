@@ -1,3 +1,5 @@
+import asyncio
+
 from crawlee.crawlers import PlaywrightCrawler
 
 from .routes import router
@@ -12,3 +14,7 @@ async def main() -> None:
     )
 
     await crawler.run(['https://warehouse-theme-metal.myshopify.com/collections'])
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

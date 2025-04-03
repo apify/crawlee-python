@@ -1,3 +1,5 @@
+import asyncio
+
 from crawlee.storages import RequestQueue
 
 
@@ -23,3 +25,7 @@ async def main() -> None:
 
     # Remove the request queue.
     await request_queue.drop()
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

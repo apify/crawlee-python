@@ -1,3 +1,4 @@
+import asyncio
 from datetime import timedelta
 
 from crawlee import ConcurrencySettings, Request
@@ -49,3 +50,7 @@ async def main() -> None:
             crawler.stop()
 
     await crawler.run([Request.from_url('https://example.org/', label='session_init')])
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

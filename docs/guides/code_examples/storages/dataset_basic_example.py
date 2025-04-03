@@ -1,3 +1,5 @@
+import asyncio
+
 from crawlee.storages import Dataset
 
 
@@ -18,3 +20,7 @@ async def main() -> None:
 
     # Remove the dataset.
     await dataset.drop()
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

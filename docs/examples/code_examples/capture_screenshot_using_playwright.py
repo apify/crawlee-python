@@ -1,3 +1,5 @@
+import asyncio
+
 from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext
 from crawlee.storages import KeyValueStore
 
@@ -39,3 +41,7 @@ async def main() -> None:
             'https://example.com',
         ]
     )
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

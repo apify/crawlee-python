@@ -1,3 +1,5 @@
+import asyncio
+
 from crawlee.crawlers import HttpCrawler
 from crawlee.storage_clients import MemoryStorageClient
 
@@ -13,3 +15,7 @@ async def main() -> None:
     crawler = HttpCrawler(storage_client=storage_client)
 
     # ...
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

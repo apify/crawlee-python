@@ -1,7 +1,6 @@
-from crawlee.crawlers import (
-    BeautifulSoupCrawler,
-    BeautifulSoupCrawlingContext,
-)
+import asyncio
+
+from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 
 
 async def main() -> None:
@@ -20,3 +19,7 @@ async def main() -> None:
             'https://example.com',
         ]
     )
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

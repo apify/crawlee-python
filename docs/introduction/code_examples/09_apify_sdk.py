@@ -1,3 +1,5 @@
+import asyncio
+
 # highlight-next-line
 from apify import Actor
 
@@ -17,3 +19,7 @@ async def main() -> None:
         )
 
         await crawler.run(['https://warehouse-theme-metal.myshopify.com/collections'])
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

@@ -1,3 +1,4 @@
+import asyncio
 from datetime import timedelta
 from itertools import count
 from typing import Callable
@@ -78,3 +79,7 @@ async def main() -> None:
     ]
 
     await crawler.run(init_requests)
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

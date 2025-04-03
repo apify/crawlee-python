@@ -1,3 +1,5 @@
+import asyncio
+
 from crawlee.sessions import SessionPool
 
 
@@ -17,3 +19,7 @@ async def main() -> None:
 
         # Lower the error_score and mark the session good.
         session.mark_good()
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

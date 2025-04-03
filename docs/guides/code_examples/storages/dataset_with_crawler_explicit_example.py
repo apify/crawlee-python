@@ -1,7 +1,6 @@
-from crawlee.crawlers import (
-    BeautifulSoupCrawler,
-    BeautifulSoupCrawlingContext,
-)
+import asyncio
+
+from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 from crawlee.storages import Dataset
 
 
@@ -32,3 +31,7 @@ async def main() -> None:
 
     # Export the dataset to the key-value store.
     await dataset.export_to(key='dataset', content_type='csv')
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

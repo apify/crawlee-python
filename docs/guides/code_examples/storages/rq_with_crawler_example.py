@@ -1,3 +1,5 @@
+import asyncio
+
 from crawlee.crawlers import HttpCrawler, HttpCrawlingContext
 
 
@@ -19,3 +21,7 @@ async def main() -> None:
 
     # Run the crawler. You can optionally pass the list of initial requests.
     await crawler.run(['https://crawlee.dev/'])
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

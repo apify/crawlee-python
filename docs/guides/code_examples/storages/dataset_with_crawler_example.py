@@ -1,7 +1,6 @@
-from crawlee.crawlers import (
-    BeautifulSoupCrawler,
-    BeautifulSoupCrawlingContext,
-)
+import asyncio
+
+from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 
 
 async def main() -> None:
@@ -27,3 +26,7 @@ async def main() -> None:
 
     # Export the dataset to a file.
     await crawler.export_data(path='dataset.csv')
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

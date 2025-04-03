@@ -50,3 +50,7 @@ async def main() -> None:
     await crawler.run()
 
     await asyncio.gather(add_request_later_task1, add_request_later_task2)
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

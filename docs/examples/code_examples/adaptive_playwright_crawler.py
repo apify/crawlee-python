@@ -1,3 +1,4 @@
+import asyncio
 from datetime import timedelta
 
 from playwright.async_api import Route
@@ -58,3 +59,7 @@ async def main() -> None:
 
     # Run the crawler with the initial list of URLs.
     await crawler.run(['https://warehouse-theme-metal.myshopify.com/'])
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

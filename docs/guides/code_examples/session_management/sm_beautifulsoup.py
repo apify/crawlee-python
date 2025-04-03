@@ -1,7 +1,6 @@
-from crawlee.crawlers import (
-    BeautifulSoupCrawler,
-    BeautifulSoupCrawlingContext,
-)
+import asyncio
+
+from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 from crawlee.proxy_configuration import ProxyConfiguration
 from crawlee.sessions import SessionPool
 
@@ -37,3 +36,7 @@ async def main() -> None:
                 context.session.mark_good()  # BasicCrawler handles this automatically.
 
     await crawler.run(['https://crawlee.dev/'])
+
+
+if __name__ == '__main__':
+    asyncio.run(main())
