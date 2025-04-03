@@ -21,6 +21,7 @@ from crawlee.fingerprint_suite import (
 )
 from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_values
 from crawlee.fingerprint_suite._consts import BROWSER_TYPE_HEADER_KEYWORD
+from crawlee.http_clients import HttpxHttpClient
 from crawlee.proxy_configuration import ProxyConfiguration
 from crawlee.sessions import SessionPool
 
@@ -469,3 +470,47 @@ async def test_launch_with_user_data_dir_and_fingerprint(tmp_path: Path, server_
 
     assert fingerprints['window.navigator.userAgent']
     assert 'headless' not in fingerprints['window.navigator.userAgent'].lower()
+
+
+async def test_send_request(server_url: URL) -> None:
+    """Check that the persist context works with fingerprints."""
+    check_data: dict[str, Any] = {}
+
+    crawler = PlaywrightCrawler()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        response = await context.response.text()
+        check_data['default'] = dict(json.loads(response))
+        send_request_response = await context.send_request(str(server_url / 'user-agent'))
+        check_data['send_request'] = dict(json.loads(send_request_response.read()))
+
+    await crawler.run([str(server_url / 'user-agent')])
+
+    assert check_data['default'].get('user-agent') is not None
+    assert check_data['send_request'].get('user-agent') is not None
+
+    assert check_data['default'] == check_data['send_request']
+
+
+async def test_send_request_with_client(server_url: URL) -> None:
+    """Check that the persist context works with fingerprints."""
+    check_data: dict[str, Any] = {}
+
+    crawler = PlaywrightCrawler(
+        http_client=HttpxHttpClient(header_generator=None, headers={'user-agent': 'My User-Agent'})
+    )
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        response = await context.response.text()
+        check_data['default'] = dict(json.loads(response))
+        send_request_response = await context.send_request(str(server_url / 'user-agent'))
+        check_data['send_request'] = dict(json.loads(send_request_response.read()))
+
+    await crawler.run([str(server_url / 'user-agent')])
+
+    assert check_data['default'].get('user-agent') is not None
+    assert check_data['send_request']['user-agent'] == 'My User-Agent'
+
+    assert check_data['default'] != check_data['send_request']

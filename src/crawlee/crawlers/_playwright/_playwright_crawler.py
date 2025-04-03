@@ -20,7 +20,7 @@ from crawlee.statistics import StatisticsState
 
 from ._playwright_crawling_context import PlaywrightCrawlingContext
 from ._playwright_pre_nav_crawling_context import PlaywrightPreNavCrawlingContext
-from ._utils import block_requests, infinite_scroll
+from ._utils import block_requests, infinite_scroll, prepare_send_request_function
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=PlaywrightCrawlingContext)
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
@@ -168,6 +168,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         kwargs.setdefault('_logger', logging.getLogger(__name__))
         self._pre_navigation_hooks: list[Callable[[PlaywrightPreNavCrawlingContext], Awaitable[None]]] = []
 
+        self._use_http_client = bool(kwargs.get('http_client'))
+
         super().__init__(**kwargs)
 
     async def _open_page(
@@ -180,11 +182,15 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         # Create a new browser page
         crawlee_page = await self._browser_pool.new_page(proxy_info=context.proxy_info)
 
+        send_request = (
+            context.send_request if self._use_http_client else prepare_send_request_function(crawlee_page.page)
+        )
+
         pre_navigation_context = PlaywrightPreNavCrawlingContext(
             request=context.request,
             session=context.session,
             add_requests=context.add_requests,
-            send_request=context.send_request,
+            send_request=send_request,
             push_data=context.push_data,
             use_state=context.use_state,
             proxy_info=context.proxy_info,
@@ -289,11 +295,15 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
                 await context.add_requests(requests, **kwargs)
 
+            send_request = (
+                context.send_request if self._use_http_client else prepare_send_request_function(context.page)
+            )
+
             yield PlaywrightCrawlingContext(
                 request=context.request,
                 session=context.session,
                 add_requests=context.add_requests,
-                send_request=context.send_request,
+                send_request=send_request,
                 push_data=context.push_data,
                 use_state=context.use_state,
                 proxy_info=context.proxy_info,
