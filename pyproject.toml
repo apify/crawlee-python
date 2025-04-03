@@ -92,6 +92,8 @@ crawlee = "crawlee._cli:cli"
 
 [dependency-groups]
 dev = [
+    "apify_client",  # For e2e tests.
+    "build~=1.2.2",  # For e2e tests.
     "mypy~=1.15.0",
     "pre-commit~=4.2.0",
     "proxy-py~=2.4.0",
@@ -119,7 +121,7 @@ packages = ["src/crawlee"]
 [tool.ruff]
 line-length = 120
 include = ["src/**/*.py", "tests/**/*.py", "docs/**/*.py", "website/**/*.py"]
-extend-exclude = ["project_template"]
+extend-exclude = ["src/crawlee/project_template"]
 
 [tool.ruff.lint]
 select = ["ALL"]
@@ -207,7 +209,7 @@ timeout = 1200
 [tool.mypy]
 python_version = "3.9"
 plugins = ["pydantic.mypy"]
-exclude = ["project_template"]
+exclude = ["src/crawlee/project_template"]
 files = ["src", "tests", "docs", "website"]
 check_untyped_defs = true
 disallow_incomplete_defs = true
@@ -229,6 +231,8 @@ module = [
     "jaro",                         # Untyped and stubs not available
     "loguru",                       # Example code shows integration of loguru and crawlee for JSON logging.
     "sklearn.linear_model",         # Untyped and stubs not available
+    "cookiecutter.*",               # Untyped and stubs not available
+    "inquirer.*",                   # Untyped and stubs not available
 ]
 ignore_missing_imports = true
 
