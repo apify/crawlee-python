@@ -1,3 +1,4 @@
+import asyncio
 from datetime import timedelta
 
 from crawlee.crawlers import AdaptivePlaywrightCrawler, AdaptivePlaywrightCrawlingContext
@@ -14,3 +15,7 @@ async def main() -> None:
         context.log.info(h2)
 
     await crawler.run(['https://crawlee.dev/'])
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

@@ -1,3 +1,5 @@
+import asyncio
+
 from crawlee import Request
 from crawlee._types import RequestHandlerRunResult
 from crawlee.crawlers import (
@@ -62,3 +64,7 @@ async def main() -> None:
     )
 
     # ...
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

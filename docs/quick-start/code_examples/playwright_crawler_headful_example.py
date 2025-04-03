@@ -1,3 +1,5 @@
+import asyncio
+
 from crawlee.crawlers import PlaywrightCrawler
 
 
@@ -11,3 +13,7 @@ async def main() -> None:
     )
 
     # ...
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

@@ -1,3 +1,5 @@
+import asyncio
+
 from apify import Actor
 
 
@@ -16,3 +18,7 @@ async def main() -> None:
 
         proxy_url = await proxy_configuration.new_url()
         Actor.log.info(f'Proxy URL: {proxy_url}')
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

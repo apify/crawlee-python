@@ -1,10 +1,9 @@
 from __future__ import annotations
 
+import asyncio
+
 from crawlee import HttpHeaders, RequestOptions, RequestTransformAction
-from crawlee.crawlers import (
-    BeautifulSoupCrawler,
-    BeautifulSoupCrawlingContext,
-)
+from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 
 
 def transform_request(
@@ -44,3 +43,7 @@ async def main() -> None:
         context.log.info(f'Blog Processing {context.request.url}.')
 
     await crawler.run(['https://crawlee.dev/'])
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

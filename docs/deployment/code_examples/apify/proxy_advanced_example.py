@@ -1,3 +1,5 @@
+import asyncio
+
 from apify import Actor
 
 
@@ -12,3 +14,7 @@ async def main() -> None:
         )
 
         # ...
+
+
+if __name__ == '__main__':
+    asyncio.run(main())
