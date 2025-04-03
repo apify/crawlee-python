@@ -52,6 +52,8 @@ jobs:
 
       - name: Build Docusaurus docs
         run: make build-docs
+        env:
+          APIFY_SIGNING_TOKEN: ${{ secrets.APIFY_SIGNING_TOKEN }}
 
       - name: Set up GitHub Pages
         uses: actions/configure-pages@v5
