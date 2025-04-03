@@ -202,7 +202,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
     async def _navigate(
         self,
         context: PlaywrightPreNavCrawlingContext,
-    ) -> AsyncGenerator[PlaywrightCrawlingContext, None]:
+    ) -> AsyncGenerator[PlaywrightCrawlingContext, Exception | None]:
         """Execute an HTTP request utilizing the `BrowserPool` and the `Playwright` library.
 
         Args:
@@ -289,7 +289,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
                 await context.add_requests(requests, **kwargs)
 
-            yield PlaywrightCrawlingContext(
+            error = yield PlaywrightCrawlingContext(
                 request=context.request,
                 session=context.session,
                 add_requests=context.add_requests,
@@ -305,6 +305,10 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 enqueue_links=enqueue_links,
                 block_requests=partial(block_requests, page=context.page),
             )
+
+            # Collect data in case of errors, before the page object is closed.
+            if error:
+                await self.statistics.error_tracker.add(error=error, context=context, early=True)
 
     async def _handle_status_code_response(
         self, context: PlaywrightCrawlingContext

@@ -77,6 +77,7 @@ class Statistics(Generic[TStatisticsState]):
         log_interval: timedelta = timedelta(minutes=1),
         state_model: type[TStatisticsState],
         statistics_log_format: Literal['table', 'inline'] = 'table',
+        save_error_snapshots: bool = False,
     ) -> None:
         self._id = Statistics.__next_id
         Statistics.__next_id += 1
@@ -86,8 +87,8 @@ class Statistics(Generic[TStatisticsState]):
         self._instance_start: datetime | None = None
         self._retry_histogram = dict[int, int]()
 
-        self.error_tracker = ErrorTracker()
-        self.error_tracker_retry = ErrorTracker()
+        self.error_tracker = ErrorTracker(save_error_snapshots=save_error_snapshots)
+        self.error_tracker_retry = ErrorTracker(save_error_snapshots=False)
 
         self._requests_in_progress = dict[str, RequestProcessingRecord]()
 
@@ -132,6 +133,7 @@ class Statistics(Generic[TStatisticsState]):
         periodic_message_logger: Logger | None = None,
         log_interval: timedelta = timedelta(minutes=1),
         statistics_log_format: Literal['table', 'inline'] = 'table',
+        save_error_snapshots: bool = False,
     ) -> Statistics[StatisticsState]:
         """Initialize a new instance with default state model `StatisticsState`."""
         return Statistics[StatisticsState](
@@ -144,6 +146,7 @@ class Statistics(Generic[TStatisticsState]):
             log_interval=log_interval,
             state_model=StatisticsState,
             statistics_log_format=statistics_log_format,
+            save_error_snapshots=save_error_snapshots,
         )
 
     @property
@@ -168,6 +171,9 @@ class Statistics(Generic[TStatisticsState]):
 
         if self._key_value_store is None:
             self._key_value_store = await KeyValueStore.open(name=self._persist_state_kvs_name)
+
+        if self.error_tracker.error_snapshotter:
+            self.error_tracker.error_snapshotter.kvs = self._key_value_store
 
         await self._maybe_load_statistics()
         event_manager = service_locator.get_event_manager()

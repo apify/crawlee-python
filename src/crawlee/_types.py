@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from enum import Enum
@@ -500,6 +501,28 @@ class SendRequestFunction(Protocol):
         """
 
 
+@docs_group('Data structures')
+@dataclasses.dataclass
+class PageSnapshot:
+    screenshot: bytes | None = None
+    html: str | None = None
+
+    def __bool__(self) -> bool:
+        return bool(self.screenshot or self.html)
+
+
+@docs_group('Functions')
+class GetPageSnapshot(Protocol):
+    """A function for getting snapshot of a page."""
+
+    def __call__(self) -> Coroutine[None, None, PageSnapshot]:
+        """Get page snapshot.
+
+        Returns:
+            Snapshot of a page.
+        """
+
+
 @docs_group('Functions')
 class UseStateFunction(Protocol):
     """A function for managing state within the crawling context.
@@ -559,6 +582,10 @@ class BasicCrawlingContext:
 
     log: logging.Logger
     """Logger instance."""
+
+    async def get_snapshot(self) -> PageSnapshot:
+        """Get snapshot of crawled page."""
+        return PageSnapshot()
 
     def __hash__(self) -> int:
         """Return hash of the context. Each context is considered unique."""
