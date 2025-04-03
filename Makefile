@@ -9,8 +9,11 @@ E2E_TESTS_CONCURRENCY = 1
 clean:
 	rm -rf .mypy_cache .pytest_cache .ruff_cache build dist htmlcov .coverage
 
-install-dev:
+install-sync:
 	uv sync --all-extras
+
+install-dev:
+	make install-sync
 	uv run pre-commit install
 	uv run playwright install
 
