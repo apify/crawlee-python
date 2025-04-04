@@ -6,10 +6,15 @@ from typing import TYPE_CHECKING, Any
 from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
     from datetime import datetime
     from pathlib import Path
 
-    from crawlee.storage_clients.models import KeyValueStoreListKeysPage, KeyValueStoreRecord
+    from crawlee.storage_clients.models import (
+        KeyValueStoreListKeysPage,
+        KeyValueStoreRecord,
+        KeyValueStoreRecordMetadata,
+    )
 
 # Properties:
 # - id
@@ -122,6 +127,23 @@ class KeyValueStoreClient(ABC):
 
     @abstractmethod
     async def iterate_keys(
+        self,
+        *,
+        exclusive_start_key: str | None = None,
+        limit: int = 1000,
+    ) -> AsyncIterator[KeyValueStoreRecordMetadata]:
+        """Iterate over the existing keys in the key-value store.
+
+        The backend method for the `KeyValueStore.iterate_keys` call.
+        """
+        # This syntax is to make mypy properly work with abstract AsyncIterator.
+        # https://mypy.readthedocs.io/en/stable/more_types.html#asynchronous-iterators
+        raise NotImplementedError
+        if False:  # type: ignore[unreachable]
+            yield 0
+
+    @abstractmethod
+    async def list_keys(
         self,
         *,
         exclusive_start_key: str | None = None,

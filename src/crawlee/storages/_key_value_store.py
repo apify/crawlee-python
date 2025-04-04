@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
 
 from crawlee import service_locator
 from crawlee._utils.docs import docs_group
 from crawlee.events._types import Event, EventPersistStateData
-from crawlee.storage_clients.models import KeyValueStoreKeyInfo, KeyValueStoreMetadata
+from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecordMetadata
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -21,7 +20,7 @@ T = TypeVar('T')
 
 # TODO:
 # - inherit from storage class
-# - caching / memoization of both datasets & dataset clients
+# - caching / memoization of both KVS & KVS clients
 
 # Suggested KVS breaking changes:
 # - from_storage_object method has been removed - Use the open method with name and/or id instead.
@@ -29,6 +28,19 @@ T = TypeVar('T')
 # - storage_object -> metadata property
 # - set_metadata method has been removed - Do we want to support it (e.g. for renaming)?
 
+# Properties:
+# - id
+# - name
+# - metadata
+
+# Methods:
+# - open
+# - drop
+# - get_value
+# - set_value
+# - iterate_keys
+# - list_keys (new method)
+# - get_public_url
 
 @docs_group('Classes')
 class KeyValueStore:
@@ -163,7 +175,7 @@ class KeyValueStore:
         self,
         exclusive_start_key: str | None = None,
         limit: int = 1000,
-    ) -> AsyncIterator[KeyValueStoreKeyInfo]:
+    ) -> AsyncIterator[KeyValueStoreRecordMetadata]:
         """Iterate over the existing keys in the KVS.
 
         Args:

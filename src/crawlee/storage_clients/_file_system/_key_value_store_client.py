@@ -14,7 +14,6 @@ from typing_extensions import override
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee.storage_clients._base import KeyValueStoreClient
 from crawlee.storage_clients.models import (
-    KeyValueStoreKeyInfo,
     KeyValueStoreListKeysPage,
     KeyValueStoreMetadata,
     KeyValueStoreRecord,
@@ -245,11 +244,15 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         # Update the metadata to record access
         await self._update_metadata(update_accessed_at=True)
 
+        # Calculate the size of the value in bytes
+        size = len(value_bytes)
+
         return KeyValueStoreRecord(
             key=metadata.key,
             value=value,
             content_type=metadata.content_type,
             filename=filename,
+            size=size,
         )
 
     @override
@@ -271,7 +274,9 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         record_path = self._path_to_kvs / filename
 
         # Get the metadata.
-        record_metadata = KeyValueStoreRecordMetadata(key=key, content_type=content_type)
+        # Calculate the size of the value in bytes
+        size = len(value_bytes)
+        record_metadata = KeyValueStoreRecordMetadata(key=key, content_type=content_type, size=size)
         record_metadata_filepath = record_path.with_name(f'{record_path.name}.{METADATA_FILENAME}')
         record_metadata_content = await json_dumps(record_metadata.model_dump())
 
@@ -330,61 +335,87 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             if deleted:
                 await self._update_metadata(update_accessed_at=True, update_modified_at=True)
 
+    @override
     async def iterate_keys(
         self,
         *,
         exclusive_start_key: str | None = None,
         limit: int = 1000,
-    ) -> AsyncIterator[KeyValueStoreKeyInfo]:
-        keys = []
-        has_next = False
-
+    ) -> AsyncIterator[KeyValueStoreRecordMetadata]:
         # Check if the KVS directory exists
         if not self._path_to_kvs.exists():
             return
 
+        count = 0
         async with self._lock:
             # Get all files in the KVS directory
-            files = await asyncio.to_thread(self._path_to_kvs.glob, '*')
+            files = sorted(await asyncio.to_thread(list, self._path_to_kvs.glob('*')))
 
-            # Filter out metadata files and get unique key names
-            key_files = {}
             for file_path in files:
+                # Skip the main metadata file
                 if file_path.name == METADATA_FILENAME:
                     continue
 
-                # Skip metadata files for records
-                if file_path.name.endswith(f'.{METADATA_FILENAME}'):
+                # Only process metadata files for records
+                if not file_path.name.endswith(f'.{METADATA_FILENAME}'):
                     continue
 
-                # Extract the base key name
-                key = file_path.name
-                key_files[key] = file_path
+                # Extract the base key name from the metadata filename
+                key_name = file_path.name[: -len(f'.{METADATA_FILENAME}')]
 
-            # Sort keys for consistent ordering
-            all_keys = sorted(key_files.keys())
+                # Apply exclusive_start_key filter if provided
+                if exclusive_start_key is not None and key_name <= exclusive_start_key:
+                    continue
 
-            # Apply exclusive_start_key if provided
-            if exclusive_start_key is not None:
-                start_idx = 0
-                for idx, key in enumerate(all_keys):
-                    if key > exclusive_start_key:  # exclusive start
-                        start_idx = idx
+                # Try to read and parse the metadata file
+                try:
+                    metadata_content = await asyncio.to_thread(file_path.read_text, encoding='utf-8')
+                    metadata_dict = json.loads(metadata_content)
+                    record_metadata = KeyValueStoreRecordMetadata(**metadata_dict)
+
+                    yield record_metadata
+
+                    count += 1
+                    if count >= limit:
                         break
-                all_keys = all_keys[start_idx:]
-
-            # Apply limit
-            if len(all_keys) > limit:
-                keys = all_keys[:limit]
-                has_next = True
-            else:
-                keys = all_keys
-                has_next = False
+                except (json.JSONDecodeError, ValidationError) as e:
+                    logger.warning(f'Failed to parse metadata file {file_path}: {e}')
 
         # Update accessed_at timestamp
         await self._update_metadata(update_accessed_at=True)
 
-        return KeyValueStoreListKeysPage(keys=keys, has_next=has_next)
+    @override
+    async def list_keys(
+        self,
+        *,
+        exclusive_start_key: str | None = None,
+        limit: int = 1000,
+    ) -> KeyValueStoreListKeysPage:
+        keys = []
+        had_more = False
+        next_exclusive_start_key = None
+
+        # Use the iterate_keys method to get all keys
+        async for metadata in self.iterate_keys(exclusive_start_key=exclusive_start_key, limit=limit + 1):
+            keys.append(metadata.key)
+            # If we've collected more than the limit, we know there are more keys
+            if len(keys) > limit:
+                had_more = True
+                next_exclusive_start_key = metadata.key
+                keys.pop()  # Remove the extra key
+                break
+
+        # Update the accessed_at timestamp is already handled by iterate_keys
+
+        return KeyValueStoreListKeysPage(
+            count=len(keys),
+            items=keys,
+            had_more=had_more,
+            is_truncated=had_more,
+            limit=limit,
+            exclusive_start_key=exclusive_start_key,
+            next_exclusive_start_key=next_exclusive_start_key,
+        )
 
     @override
     async def get_public_url(self, *, key: str) -> str:
