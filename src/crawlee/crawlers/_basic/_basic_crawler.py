@@ -768,6 +768,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         data: JsonSerializable,
         dataset_id: str | None = None,
         dataset_name: str | None = None,
+        start_timestamp: int = 0,
         **kwargs: Unpack[PushDataKwargs],
     ) -> None:
         """Push data to a `Dataset`.
@@ -782,7 +783,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             kwargs: Keyword arguments to be passed to the `Dataset.push_data()` method.
         """
         dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
+        self.log_if_delayed("get_dataset in _push_data", start_timestamp)
         await dataset.push_data(data, **kwargs)
+        self.log_if_delayed("push_data in _push_data", start_timestamp)
 
     def _should_retry_request(self, context: BasicCrawlingContext, error: Exception) -> bool:
         if context.request.no_retry:
@@ -1026,7 +1029,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             self.log_if_delayed("add_requests_batched in commit_request_handler_result", start_timestamp)
 
         for push_data_call in result.push_data_calls:
-            await self._push_data(**push_data_call)
+            await self._push_data(**push_data_call, start_timestamp=start_timestamp)
         self.log_if_delayed("pushed data in commit_request_handler_result", start_timestamp)
 
         await self._commit_key_value_store_changes(result, get_kvs=self.get_key_value_store)

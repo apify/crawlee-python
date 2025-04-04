@@ -213,7 +213,6 @@ class RequestQueue(Storage, RequestManager):
 
         processed_request = await self._resource_client.add_request(request, forefront=forefront)
         processed_request.unique_key = request.unique_key
-
         self._cache_request(cache_key, processed_request, forefront=forefront)
 
         if not processed_request.was_already_present and forefront:
@@ -303,7 +302,7 @@ class RequestQueue(Storage, RequestManager):
         """
         self._last_activity = datetime.now(timezone.utc)
 
-        await self._ensure_head_is_non_empty()
+        await self._ensure_head_is_non_empty(start_timestamp=start_timestamp)
         self.log_if_delayed("_ensure_head_is_non_empty", start_timestamp)
 
         # We are likely done at this point.
@@ -486,12 +485,13 @@ class RequestQueue(Storage, RequestManager):
     async def get_total_count(self) -> int:
         return self._assumed_total_count
 
-    async def _ensure_head_is_non_empty(self) -> None:
+    async def _ensure_head_is_non_empty(self, start_timestamp:int=0) -> None:
         # Stop fetching if we are paused for migration
         if self._queue_paused_for_migration:
             return
 
         # We want to fetch ahead of time to minimize dead time
+        # Why is there >1 and not >0?
         if len(self._queue_head) > 1 and not self._should_check_for_forefront_requests:
             return
 
