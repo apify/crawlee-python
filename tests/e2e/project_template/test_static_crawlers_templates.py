@@ -17,19 +17,19 @@ from tests.e2e.project_template.utils import patch_crawlee_version_in_project
 
 
 @pytest.mark.parametrize(
+    'crawler_type',
+    [
+        pytest.param('playwright-camoufox', marks=pytest.mark.playwright_camoufox),
+        pytest.param('playwright', marks=pytest.mark.playwright),
+        pytest.param('parsel', marks=pytest.mark.parsel),
+        pytest.param('beautifulsoup', marks=pytest.mark.beautifulsoup),
+    ],
+)
+@pytest.mark.parametrize(
     'http_client',
     [
         pytest.param('httpx', marks=pytest.mark.httpx),
         pytest.param('curl-impersonate', marks=pytest.mark.curl_impersonate),
-    ],
-)
-@pytest.mark.parametrize(
-    'crawler_type',
-    [
-        pytest.param('parsel', marks=pytest.mark.parsel),
-        pytest.param('beautifulsoup', marks=pytest.mark.beautifulsoup),
-        pytest.param('playwright', marks=pytest.mark.playwright),
-        pytest.param('playwright-camoufox', marks=pytest.mark.playwright_camoufox),
     ],
 )
 @pytest.mark.parametrize(
