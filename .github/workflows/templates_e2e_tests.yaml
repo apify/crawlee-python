@@ -2,17 +2,15 @@ name: Templates end-to-end tests
 
 on:
   workflow_dispatch:
-    secrets:
-      APIFY_TEST_USER_API_TOKEN:
-        description: API token of the Python testing user on Apify
-        required: true
+  schedule:
+    - cron: '0 6 * * *'
 
 jobs:
   end_to_end_tests:
     name: End-to-end tests
     strategy:
       fail-fast: false
-      max-parallel: 2
+      max-parallel: 8
       matrix:
         http-client: [ "httpx", "curl_impersonate"]
         crawler-type: [ "parsel", "beautifulsoup", "playwright", "playwright_camoufox"]
