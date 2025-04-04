@@ -72,8 +72,8 @@ RUN echo "Python version:" \
  && cat requirements.txt | \
  # Replace playwright version so that it matches whatever is pre-installed in the image (the `hash` checks if playwright is installed)
     sed "s/^playwright==\(.*\)/playwright==$(hash playwright 2>/dev/null && (playwright --version | cut -d ' ' -f 2) || echo '\1')/" | \
- # Install everything using pip (ignore dependency checks - the lockfile is correct, period)
-    pip install -r /dev/stdin --no-dependencies \
+ # Install everything using pip
+    pip install -r /dev/stdin \
  && echo "All installed Python packages:" \
  && pip freeze
 # % elif cookiecutter.package_manager == 'manual'
