@@ -11,7 +11,7 @@ from ._request_queue import RequestQueue
 
 if TYPE_CHECKING:
     from crawlee.configuration import Configuration
-    from crawlee.storage_clients._base import ResourceClient, ResourceCollectionClient, StorageClient
+    from crawlee.storage_clients._base import ResourceClient, StorageClient
 
 TResource = TypeVar('TResource', Dataset, KeyValueStore, RequestQueue)
 
@@ -162,12 +162,12 @@ async def open_storage(
                 raise RuntimeError(f'{storage_class.__name__} with id "{id}" does not exist!')
 
         elif is_default_on_memory:
-            resource_collection_client = _get_resource_collection_client(storage_class, storage_client)
-            storage_object = await resource_collection_client.get_or_create(name=name, id=id)
+            resource_client = _get_resource_client(storage_class, storage_client)
+            storage_object = await resource_client.get_or_create(name=name, id=id)
 
         else:
-            resource_collection_client = _get_resource_collection_client(storage_class, storage_client)
-            storage_object = await resource_collection_client.get_or_create(name=name)
+            resource_client = _get_resource_client(storage_class, storage_client)
+            storage_object = await resource_client.get_or_create(name=name)
 
         storage = storage_class.from_storage_object(storage_client=storage_client, storage_object=storage_object)
 
@@ -208,19 +208,3 @@ def _get_resource_client(
         return storage_client.request_queue(id)
 
     raise ValueError(f'Unknown storage class label: {storage_class.__name__}')
-
-
-def _get_resource_collection_client(
-    storage_class: type,
-    storage_client: StorageClient,
-) -> ResourceCollectionClient:
-    if issubclass(storage_class, Dataset):
-        return storage_client.datasets()
-
-    if issubclass(storage_class, KeyValueStore):
-        return storage_client.key_value_stores()
-
-    if issubclass(storage_class, RequestQueue):
-        return storage_client.request_queues()
-
-    raise ValueError(f'Unknown storage class: {storage_class.__name__}')

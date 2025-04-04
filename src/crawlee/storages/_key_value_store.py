@@ -1,18 +1,12 @@
 from __future__ import annotations
 
-import asyncio
-from collections.abc import AsyncIterator
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, overload
-
-from typing_extensions import override
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
 
 from crawlee import service_locator
 from crawlee._utils.docs import docs_group
 from crawlee.events._types import Event, EventPersistStateData
-from crawlee.storage_clients.models import KeyValueStoreKeyInfo, KeyValueStoreMetadata, StorageMetadata
-
-from ._base import Storage
+from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecordMetadata
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -20,12 +14,36 @@ if TYPE_CHECKING:
     from crawlee._types import JsonSerializable
     from crawlee.configuration import Configuration
     from crawlee.storage_clients import StorageClient
+    from crawlee.storage_clients._base import KeyValueStoreClient
 
 T = TypeVar('T')
 
+# TODO:
+# - inherit from storage class
+# - caching / memoization of both KVS & KVS clients
+
+# Suggested KVS breaking changes:
+# - from_storage_object method has been removed - Use the open method with name and/or id instead.
+# - get_info -> metadata property
+# - storage_object -> metadata property
+# - set_metadata method has been removed - Do we want to support it (e.g. for renaming)?
+
+# Properties:
+# - id
+# - name
+# - metadata
+
+# Methods:
+# - open
+# - drop
+# - get_value
+# - set_value
+# - iterate_keys
+# - list_keys (new method)
+# - get_public_url
 
 @docs_group('Classes')
-class KeyValueStore(Storage):
+class KeyValueStore:
     """Represents a key-value based storage for reading and writing data records or files.
 
     Each data record is identified by a unique key and associated with a specific MIME content type. This class is
@@ -63,93 +81,64 @@ class KeyValueStore(Storage):
     _general_cache: ClassVar[dict[str, dict[str, dict[str, JsonSerializable]]]] = {}
     _persist_state_event_started = False
 
-    def __init__(self, id: str, name: str | None, storage_client: StorageClient) -> None:
-        self._id = id
-        self._name = name
-        datetime_now = datetime.now(timezone.utc)
-        self._storage_object = StorageMetadata(
-            id=id, name=name, accessed_at=datetime_now, created_at=datetime_now, modified_at=datetime_now
-        )
+    def __init__(self, client: KeyValueStoreClient) -> None:
+        """Initialize a new instance.
 
-        # Get resource clients from storage client
-        self._resource_client = storage_client.key_value_store(self._id)
-        self._autosave_lock = asyncio.Lock()
+        Preferably use the `KeyValueStore.open` constructor to create a new instance.
 
-    @classmethod
-    def from_storage_object(cls, storage_client: StorageClient, storage_object: StorageMetadata) -> KeyValueStore:
-        """Initialize a new instance of KeyValueStore from a storage metadata object."""
-        key_value_store = KeyValueStore(
-            id=storage_object.id,
-            name=storage_object.name,
-            storage_client=storage_client,
-        )
-
-        key_value_store.storage_object = storage_object
-        return key_value_store
+        Args:
+            client: An instance of a key-value store client.
+        """
+        self._client = client
 
     @property
-    @override
     def id(self) -> str:
-        return self._id
+        return self._client.id
 
     @property
-    @override
     def name(self) -> str | None:
-        return self._name
+        return self._client.name
 
     @property
-    @override
-    def storage_object(self) -> StorageMetadata:
-        return self._storage_object
+    def metadata(self) -> KeyValueStoreMetadata:
+        return KeyValueStoreMetadata(
+            id=self._client.id,
+            name=self._client.id,
+            accessed_at=self._client.accessed_at,
+            created_at=self._client.created_at,
+            modified_at=self._client.modified_at,
+        )
 
-    @storage_object.setter
-    @override
-    def storage_object(self, storage_object: StorageMetadata) -> None:
-        self._storage_object = storage_object
-
-    async def get_info(self) -> KeyValueStoreMetadata | None:
-        """Get an object containing general information about the key value store."""
-        return await self._resource_client.get()
-
-    @override
     @classmethod
     async def open(
         cls,
         *,
         id: str | None = None,
         name: str | None = None,
+        purge_on_start: bool | None = None,
+        storage_dir: Path | None = None,
         configuration: Configuration | None = None,
         storage_client: StorageClient | None = None,
     ) -> KeyValueStore:
-        from crawlee.storages._creation_management import open_storage
+        if id and name:
+            raise ValueError('Only one of "id" or "name" can be specified, not both.')
 
-        configuration = configuration or service_locator.get_configuration()
-        storage_client = storage_client or service_locator.get_storage_client()
+        configuration = service_locator.get_configuration() if configuration is None else configuration
+        storage_client = service_locator.get_storage_client() if storage_client is None else storage_client
+        purge_on_start = configuration.purge_on_start if purge_on_start is None else purge_on_start
+        storage_dir = Path(configuration.storage_dir) if storage_dir is None else storage_dir
 
-        return await open_storage(
-            storage_class=cls,
+        client = await storage_client.open_key_value_store_client(
             id=id,
             name=name,
-            configuration=configuration,
-            storage_client=storage_client,
+            purge_on_start=purge_on_start,
+            storage_dir=storage_dir,
         )
 
-    @override
+        return cls(client)
+
     async def drop(self) -> None:
-        from crawlee.storages._creation_management import remove_storage_from_cache
-
-        await self._resource_client.delete()
-        self._clear_cache()
-        remove_storage_from_cache(storage_class=self.__class__, id=self._id, name=self._name)
-
-    @overload
-    async def get_value(self, key: str) -> Any: ...
-
-    @overload
-    async def get_value(self, key: str, default_value: T) -> T: ...
-
-    @overload
-    async def get_value(self, key: str, default_value: T | None = None) -> T | None: ...
+        await self._client.drop()
 
     async def get_value(self, key: str, default_value: T | None = None) -> T | None:
         """Get a value from the KVS.
@@ -161,26 +150,8 @@ class KeyValueStore(Storage):
         Returns:
             The value associated with the given key. `default_value` is used in case the record does not exist.
         """
-        record = await self._resource_client.get_record(key)
+        record = await self._client.get_value(key=key)
         return record.value if record else default_value
-
-    async def iterate_keys(self, exclusive_start_key: str | None = None) -> AsyncIterator[KeyValueStoreKeyInfo]:
-        """Iterate over the existing keys in the KVS.
-
-        Args:
-            exclusive_start_key: Key to start the iteration from.
-
-        Yields:
-            Information about the key.
-        """
-        while True:
-            list_keys = await self._resource_client.list_keys(exclusive_start_key=exclusive_start_key)
-            for item in list_keys.items:
-                yield KeyValueStoreKeyInfo(key=item.key, size=item.size)
-
-            if not list_keys.is_truncated:
-                break
-            exclusive_start_key = list_keys.next_exclusive_start_key
 
     async def set_value(
         self,
@@ -196,9 +167,29 @@ class KeyValueStore(Storage):
             content_type: Content type of the record.
         """
         if value is None:
-            return await self._resource_client.delete_record(key)
+            await self._client.delete_value(key=key)
+        else:
+            await self._client.set_value(key=key, value=value, content_type=content_type)
 
-        return await self._resource_client.set_record(key, value, content_type)
+    async def iterate_keys(
+        self,
+        exclusive_start_key: str | None = None,
+        limit: int = 1000,
+    ) -> AsyncIterator[KeyValueStoreRecordMetadata]:
+        """Iterate over the existing keys in the KVS.
+
+        Args:
+            exclusive_start_key: Key to start the iteration from.
+            limit: Maximum number of keys to return.
+
+        Yields:
+            Information about the key.
+        """
+        async for item in self._client.iterate_keys(
+            exclusive_start_key=exclusive_start_key,
+            limit=limit,
+        ):
+            yield item
 
     async def get_public_url(self, key: str) -> str:
         """Get the public URL for the given key.
@@ -209,7 +200,9 @@ class KeyValueStore(Storage):
         Returns:
             The public URL for the given key.
         """
-        return await self._resource_client.get_public_url(key)
+        return await self._client.get_public_url(key=key)
+
+    # TODO: what to do with these?
 
     async def get_auto_saved_value(
         self,
@@ -247,9 +240,9 @@ class KeyValueStore(Storage):
     @property
     def _cache(self) -> dict[str, dict[str, JsonSerializable]]:
         """Cache dictionary for storing auto-saved values indexed by store ID."""
-        if self._id not in self._general_cache:
-            self._general_cache[self._id] = {}
-        return self._general_cache[self._id]
+        if self.id not in self._general_cache:
+            self._general_cache[self.id] = {}
+        return self._general_cache[self.id]
 
     async def _persist_save(self, _event_data: EventPersistStateData | None = None) -> None:
         """Save cache with persistent values. Can be used in Event Manager."""

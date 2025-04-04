@@ -36,21 +36,6 @@ class RequestQueueClient(ABC):
         """
 
     @abstractmethod
-    async def update(
-        self,
-        *,
-        name: str | None = None,
-    ) -> RequestQueueMetadata:
-        """Update the request queue metadata.
-
-        Args:
-            name: New new name for the request queue.
-
-        Returns:
-            An object reflecting the updated request queue metadata.
-        """
-
-    @abstractmethod
     async def delete(self) -> None:
         """Permanently delete the request queue managed by this client."""
 
@@ -151,6 +136,14 @@ class RequestQueueClient(ABC):
         """
 
     @abstractmethod
+    async def batch_delete_requests(self, requests: list[Request]) -> BatchRequestsOperationResponse:
+        """Delete given requests from the queue.
+
+        Args:
+            requests: The requests to delete from the queue.
+        """
+
+    @abstractmethod
     async def prolong_request_lock(
         self,
         request_id: str,
@@ -178,12 +171,4 @@ class RequestQueueClient(ABC):
         Args:
             request_id: ID of the request to delete the lock.
             forefront: Whether to put the request in the beginning or the end of the queue after the lock is deleted.
-        """
-
-    @abstractmethod
-    async def batch_delete_requests(self, requests: list[Request]) -> BatchRequestsOperationResponse:
-        """Delete given requests from the queue.
-
-        Args:
-            requests: The requests to delete from the queue.
         """
