@@ -82,8 +82,11 @@ async def test_static_crawler_actor_at_apify(
     build_process = subprocess.run(['apify', 'push'], capture_output=True, check=False, cwd=tmp_path / actor_name)  # noqa: ASYNC221, S603, S607
     # Get actor ID from build log
     actor_id_regexp = re.compile(r'https:\/\/console\.apify\.com\/actors\/(.*)#\/builds\/\d*\.\d*\.\d*')
-    # Why is it in stderr and not in stdout???
-    actor_id = re.findall(actor_id_regexp, build_process.stderr.decode())[0]
+
+    if match := re.findall(actor_id_regexp, build_process.stderr.decode()):
+        actor_id = match[0]
+    else:
+        raise AssertionError(f'Failed to find actor id in build log: {build_process.stderr.decode()}')
 
     client = ApifyClientAsync(token=os.getenv('APIFY_TEST_USER_API_TOKEN'))
     actor = client.actor(actor_id)

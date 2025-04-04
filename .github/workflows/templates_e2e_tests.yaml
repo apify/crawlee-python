@@ -10,7 +10,7 @@ jobs:
     name: End-to-end tests
     strategy:
       fail-fast: false
-      max-parallel: 8
+      max-parallel: 12
       matrix:
         http-client: [ "httpx", "curl_impersonate"]
         crawler-type: [ "parsel", "beautifulsoup", "playwright", "playwright_camoufox"]
