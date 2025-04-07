@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.resources
 import json
+import sys
 from pathlib import Path
 from typing import Annotated, Optional, cast
 
@@ -200,18 +201,27 @@ def create(
                 transient=True,
             ) as progress:
                 progress.add_task(description='Bootstrapping...', total=None)
-                cookiecutter(
-                    template=str(template_directory),
-                    no_input=True,
-                    extra_context={
-                        'project_name': project_name,
-                        'package_manager': package_manager,
-                        'crawler_type': crawler_type,
-                        'http_client': http_client,
-                        'enable_apify_integration': enable_apify_integration,
-                        'start_url': start_url,
-                    },
-                )
+                try:
+                    cookiecutter(
+                        template=str(template_directory),
+                        no_input=True,
+                        extra_context={
+                            'project_name': project_name,
+                            'package_manager': package_manager,
+                            'crawler_type': crawler_type,
+                            'http_client': http_client,
+                            'enable_apify_integration': enable_apify_integration,
+                            'start_url': start_url,
+                        },
+                    )
+                except Exception as exc:
+                    # Print just the last line of the error message (the actual error without traceback)
+                    if 'Hook script failed' in str(exc):
+                        typer.echo('Project creation failed. Check the error message above.', err=True)
+                    else:
+                        typer.echo(f'Project creation failed: {exc!s}', err=True)
+
+                    sys.exit(1)
 
             typer.echo(f'Your project "{project_name}" was created.')
 
