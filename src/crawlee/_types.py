@@ -563,8 +563,13 @@ class SendRequestFunction(Protocol):
 @docs_group('Data structures')
 @dataclasses.dataclass
 class PageSnapshot:
+    """Snapshot of a crawled page."""
+
     screenshot: bytes | None = None
+    """Screenshot of the page format."""
+
     html: str | None = None
+    """HTML content of the page."""
 
     def __bool__(self) -> bool:
         return bool(self.screenshot or self.html)

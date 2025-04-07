@@ -27,6 +27,7 @@ class PlaywrightPreNavCrawlingContext(BasicCrawlingContext):
     """Blocks network requests matching specified URL patterns."""
 
     async def get_snapshot(self) -> PageSnapshot:
+        """Get snapshot of crawled page."""
         html = None
         screenshot = None
 

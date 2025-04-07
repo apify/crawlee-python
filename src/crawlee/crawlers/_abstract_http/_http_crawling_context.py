@@ -25,7 +25,7 @@ class HttpCrawlingContext(BasicCrawlingContext, HttpCrawlingResult):
         return cls(http_response=http_response, **context_kwargs)
 
     async def get_snapshot(self) -> PageSnapshot:
-        """Get snapshot of a page."""
+        """Get snapshot of crawled page."""
         return PageSnapshot(html=self.http_response.read().decode('utf-8'))
 
 
