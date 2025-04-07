@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.6.7 - **not yet released**
+
+### 🚀 Features
+
+- Add `ErrorSnapshotter` to `ErrorTracker` ([#1125](https://github.com/apify/crawlee-python/pull/1125)) ([9666092](https://github.com/apify/crawlee-python/commit/9666092c6a59ac4d34409038d5476e5b6fb58a26)) by [@Pijukatel](https://github.com/Pijukatel), closes [#151](https://github.com/apify/crawlee-python/issues/151)
+
+### 🐛 Bug Fixes
+
+- Improve validation errors in Crawlee CLI ([#1140](https://github.com/apify/crawlee-python/pull/1140)) ([f2d33df](https://github.com/apify/crawlee-python/commit/f2d33dff178a3d3079eb3807feb9645a25cc7a93)) by [@vdusek](https://github.com/vdusek), closes [#1138](https://github.com/apify/crawlee-python/issues/1138)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.6.6](https://github.com/apify/crawlee-python/releases/tag/v0.6.6) (2025-04-03)
 
 ### 🚀 Features

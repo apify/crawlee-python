@@ -17,7 +17,7 @@ from crawlee.statistics._error_tracker import ErrorTracker
         (ErrorTracker(show_error_name=False, show_file_and_line_number=False, show_error_message=False), 1),
     ],
 )
-def test_error_tracker_counts(error_tracker: ErrorTracker, expected_unique_errors: int) -> None:
+async def test_error_tracker_counts(error_tracker: ErrorTracker, expected_unique_errors: int) -> None:
     """Use different settings of `error_tracker` and test unique errors count."""
 
     for error in [
@@ -31,12 +31,12 @@ def test_error_tracker_counts(error_tracker: ErrorTracker, expected_unique_error
         try:
             raise error  # Errors raised on same line
         except Exception as e:  # noqa:PERF203
-            error_tracker.add(e)
+            await error_tracker.add(e)
 
     try:
         raise ValueError('Some value error abc')  # Same as one previous error, but different line.
     except Exception as e:
-        error_tracker.add(e)
+        await error_tracker.add(e)
 
     assert error_tracker.total == 5
     assert error_tracker.unique_error_count == expected_unique_errors
@@ -50,7 +50,7 @@ def test_error_tracker_counts(error_tracker: ErrorTracker, expected_unique_error
         ('Some error number 0 0 0', 'Some error number 1 0 1', 'Some error number *** 0 ***'),
     ],
 )
-def test_error_tracker_similar_messages_full_stack(
+async def test_error_tracker_similar_messages_full_stack(
     message_1: str, message_2: str, expected_generic_message: str
 ) -> None:
     """Test that similar messages collapse into same group with generic name that contains wildcard symbols."""
@@ -66,7 +66,7 @@ def test_error_tracker_similar_messages_full_stack(
         try:
             raise error  # Errors raised on the same line
         except Exception as e:  # noqa:PERF203
-            error_tracker.add(e)
+            await error_tracker.add(e)
             line = traceback.extract_tb(e.__traceback__)[0].lineno
 
     file_name = __file__.split('/')[-1]
@@ -86,7 +86,7 @@ def test_error_tracker_similar_messages_full_stack(
         (False, 'Error line 1'),
     ],
 )
-def test_show_full_message(*, show_full_message: bool, expected_message: str) -> None:
+async def test_show_full_message(*, show_full_message: bool, expected_message: str) -> None:
     """Test error message settings with both options of `show_full_message`."""
     error_tracker = ErrorTracker(
         show_error_name=False, show_file_and_line_number=False, show_full_message=show_full_message
@@ -95,6 +95,6 @@ def test_show_full_message(*, show_full_message: bool, expected_message: str) ->
     try:
         raise RuntimeError('Error line 1\n Error line 2')  # Errors raised on the same line
     except Exception as e:
-        error_tracker.add(e)
+        await error_tracker.add(e)
 
     assert error_tracker.get_most_common_errors()[0][0] == expected_message

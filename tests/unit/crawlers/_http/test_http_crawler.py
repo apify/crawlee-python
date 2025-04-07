@@ -10,6 +10,8 @@ import pytest
 from crawlee import ConcurrencySettings, Request
 from crawlee.crawlers import HttpCrawler
 from crawlee.sessions import SessionPool
+from crawlee.statistics import Statistics
+from tests.unit.server_endpoints import HELLO_WORLD
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable
@@ -522,3 +524,42 @@ async def test_store_complex_cookies(server_url: URL) -> None:
 
 def test_default_logger() -> None:
     assert HttpCrawler().log.name == 'HttpCrawler'
+
+
+async def test_get_snapshot(server_url: URL) -> None:
+    crawler = HttpCrawler()
+
+    snapshot = None
+
+    @crawler.router.default_handler
+    async def request_handler(context: HttpCrawlingContext) -> None:
+        nonlocal snapshot
+        snapshot = await context.get_snapshot()
+
+    await crawler.run([str(server_url)])
+
+    assert snapshot is not None
+    assert snapshot.html is not None
+    assert snapshot.html == HELLO_WORLD.decode('utf8')
+
+
+async def test_error_snapshot_through_statistics(server_url: URL) -> None:
+    crawler = HttpCrawler(statistics=Statistics.with_default_state(save_error_snapshots=True))
+
+    @crawler.router.default_handler
+    async def request_handler(context: HttpCrawlingContext) -> None:
+        raise RuntimeError(rf'Exception /\ with file name unfriendly symbols in {context.request.url}')
+
+    await crawler.run([str(server_url)])
+
+    kvs = await crawler.get_key_value_store()
+    kvs_content = {}
+    async for key_info in kvs.iterate_keys():
+        kvs_content[key_info.key] = await kvs.get_value(key_info.key)
+
+    # One error, three time retried.
+    assert crawler.statistics.error_tracker.total == 3
+    assert crawler.statistics.error_tracker.unique_error_count == 1
+    assert len(kvs_content) == 1
+    assert key_info.key.endswith('.html')
+    assert kvs_content[key_info.key] == HELLO_WORLD.decode('utf8')

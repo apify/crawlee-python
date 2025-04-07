@@ -208,7 +208,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
     async def _navigate(
         self,
         context: PlaywrightPreNavCrawlingContext,
-    ) -> AsyncGenerator[PlaywrightCrawlingContext, None]:
+    ) -> AsyncGenerator[PlaywrightCrawlingContext, Exception | None]:
         """Execute an HTTP request utilizing the `BrowserPool` and the `Playwright` library.
 
         Args:
@@ -248,7 +248,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 context.send_request if self._use_http_client else prepare_send_request_function(context.page)
             )
 
-            yield PlaywrightCrawlingContext(
+            error = yield PlaywrightCrawlingContext(
                 request=context.request,
                 session=context.session,
                 add_requests=context.add_requests,
@@ -261,10 +261,14 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 page=context.page,
                 infinite_scroll=lambda: infinite_scroll(context.page),
                 response=response,
-                enqueue_links=self._create_enqueue_links_function(context, extract_links),
                 extract_links=extract_links,
+                enqueue_links=self._create_enqueue_links_function(context, extract_links),
                 block_requests=partial(block_requests, page=context.page),
             )
+
+            # Collect data in case of errors, before the page object is closed.
+            if error:
+                await self.statistics.error_tracker.add(error=error, context=context, early=True)
 
     def _create_extract_links_function(self, context: PlaywrightPreNavCrawlingContext) -> ExtractLinksFunction:
         """Create a callback function for extracting links from context.

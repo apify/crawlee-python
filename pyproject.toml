@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "crawlee"
-version = "0.6.6"
+version = "0.6.7"
 description = "Crawlee for Python"
 authors = [{ name = "Apify Technologies s.r.o.", email = "support@apify.com" }]
 license = { file = "LICENSE" }
@@ -179,6 +179,11 @@ indent-style = "space"
     "F841",   # Local variable {variable} is assigned to but never used
     "N999",   # Invalid module name
 ]
+"**/docs/examples/code_examples/*crawler_with_error_snapshotter.py" = [
+    "PLR2004", # Magic value used in comparison. Ignored for simplicity and readability of example code.
+]
+
+
 
 [tool.ruff.lint.flake8-quotes]
 docstring-quotes = "double"

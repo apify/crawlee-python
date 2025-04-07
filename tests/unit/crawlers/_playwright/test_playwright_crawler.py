@@ -24,6 +24,9 @@ from crawlee.fingerprint_suite._consts import BROWSER_TYPE_HEADER_KEYWORD
 from crawlee.http_clients import HttpxHttpClient
 from crawlee.proxy_configuration import ProxyConfiguration
 from crawlee.sessions import SessionPool
+from crawlee.statistics import Statistics
+from crawlee.statistics._error_snapshotter import ErrorSnapshotter
+from tests.unit.server_endpoints import GENERIC_RESPONSE, HELLO_WORLD
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -493,6 +496,74 @@ async def test_launch_with_user_data_dir_and_fingerprint(tmp_path: Path, server_
 
     assert fingerprints['window.navigator.userAgent']
     assert 'headless' not in fingerprints['window.navigator.userAgent'].lower()
+
+
+async def test_get_snapshot(server_url: URL) -> None:
+    crawler = PlaywrightCrawler()
+
+    snapshot = None
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        nonlocal snapshot
+        snapshot = await context.get_snapshot()
+
+    await crawler.run([str(server_url)])
+
+    assert snapshot is not None
+    assert snapshot.html is not None
+    assert snapshot.screenshot is not None
+    # Check at least jpeg start and end expected bytes. Content is not relevant for the test.
+    assert snapshot.screenshot.startswith(b'\xff\xd8')
+    assert snapshot.screenshot.endswith(b'\xff\xd9')
+    assert snapshot.html == HELLO_WORLD.decode('utf-8')
+
+
+async def test_error_snapshot_through_statistics(server_url: URL) -> None:
+    """Test correct use of error snapshotter by the Playwright crawler.
+
+    In this test the crawler will visit 4 pages.
+    - 2 x page endpoints will return the same error
+    - homepage endpoint will return unique error
+    - headers endpoint will return no error
+    """
+    max_retries = 2
+    crawler = PlaywrightCrawler(
+        statistics=Statistics.with_default_state(save_error_snapshots=True), max_request_retries=max_retries
+    )
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        if 'page' in context.request.url:
+            raise RuntimeError('page error')
+        if 'headers' in context.request.url:
+            return
+        raise RuntimeError('home error')
+
+    await crawler.run(
+        [str(server_url), str(server_url / 'page_1'), str(server_url / 'page_2'), str(server_url / 'headers')]
+    )
+
+    kvs = await crawler.get_key_value_store()
+    kvs_content = {}
+
+    async for key_info in kvs.iterate_keys():
+        kvs_content[key_info.key] = await kvs.get_value(key_info.key)
+
+        assert set(key_info.key).issubset(ErrorSnapshotter.ALLOWED_CHARACTERS)
+        if key_info.key.endswith('.jpg'):
+            # Check at least jpeg start and end expected bytes. Content is not relevant for the test.
+            assert kvs_content[key_info.key].startswith(b'\xff\xd8')
+            assert kvs_content[key_info.key].endswith(b'\xff\xd9')
+        elif 'page' in key_info.key:
+            assert kvs_content[key_info.key] == GENERIC_RESPONSE.decode('utf-8')
+        else:
+            assert kvs_content[key_info.key] == HELLO_WORLD.decode('utf-8')
+
+    # Three errors twice retried errors, but only 2 unique -> 4 (2 x (html and jpg)) artifacts expected.
+    assert crawler.statistics.error_tracker.total == 3 * max_retries
+    assert crawler.statistics.error_tracker.unique_error_count == 2
+    assert len(kvs_content) == 4
 
 
 async def test_send_request(server_url: URL) -> None:

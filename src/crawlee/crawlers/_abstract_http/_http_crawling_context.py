@@ -5,7 +5,7 @@ from typing import Generic
 
 from typing_extensions import Self, TypeVar
 
-from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, ExtractLinksFunction
+from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, ExtractLinksFunction, PageSnapshot
 from crawlee._utils.docs import docs_group
 from crawlee.http_clients import HttpCrawlingResult, HttpResponse
 
@@ -23,6 +23,10 @@ class HttpCrawlingContext(BasicCrawlingContext, HttpCrawlingResult):
         """Initialize a new instance from an existing `BasicCrawlingContext`."""
         context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
         return cls(http_response=http_response, **context_kwargs)
+
+    async def get_snapshot(self) -> PageSnapshot:
+        """Get snapshot of crawled page."""
+        return PageSnapshot(html=self.http_response.read().decode('utf-8'))
 
 
 @dataclass(frozen=True)
