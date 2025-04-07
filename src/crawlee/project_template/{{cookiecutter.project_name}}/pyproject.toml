@@ -19,7 +19,7 @@ requires-python = ">=3.9,<4.0"
 dependencies = [
     "crawlee[{{ extras|join(',') }}]",
     # % if cookiecutter.crawler_type == 'playwright-camoufox'
-    "camoufox[geoip]>=0.4.5",
+    "camoufox[geoip]~=0.4.5",
     # % endif
     # % if cookiecutter.enable_apify_integration
     "apify",

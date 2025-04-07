@@ -1,8 +1,6 @@
 .PHONY: clean install-sync install-dev build publish-to-pypi lint type-check unit-tests unit-tests-cov \
 	e2e-templates-tests format check-code build-api-reference run-docs
 
-
-
 # This is default for local testing, but GitHub workflows override it to a higher value in CI
 E2E_TESTS_CONCURRENCY = 1
 
