@@ -5,7 +5,7 @@ from typing import Generic
 
 from typing_extensions import Self, TypeVar
 
-from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction
+from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, ExtractLinksFunction
 from crawlee._utils.docs import docs_group
 from crawlee.http_clients import HttpCrawlingResult, HttpResponse
 
@@ -35,6 +35,7 @@ class ParsedHttpCrawlingContext(Generic[TParseResult], HttpCrawlingContext):
 
     parsed_content: TParseResult
     enqueue_links: EnqueueLinksFunction
+    extract_links: ExtractLinksFunction
 
     @classmethod
     def from_http_crawling_context(
@@ -42,7 +43,10 @@ class ParsedHttpCrawlingContext(Generic[TParseResult], HttpCrawlingContext):
         context: HttpCrawlingContext,
         parsed_content: TParseResult,
         enqueue_links: EnqueueLinksFunction,
+        extract_links: ExtractLinksFunction,
     ) -> Self:
         """Initialize a new instance from an existing `HttpCrawlingContext`."""
         context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
-        return cls(parsed_content=parsed_content, enqueue_links=enqueue_links, **context_kwargs)
+        return cls(
+            parsed_content=parsed_content, enqueue_links=enqueue_links, extract_links=extract_links, **context_kwargs
+        )

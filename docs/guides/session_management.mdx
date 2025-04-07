@@ -7,16 +7,16 @@ description: How to manage your cookies, proxy IP rotations and more.
 import ApiLink from '@site/src/components/ApiLink';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
-import CodeBlock from '@theme/CodeBlock';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
-import BasicSource from '!!raw-loader!./code_examples/session_management/session_management_basic.py';
-import HttpSource from '!!raw-loader!./code_examples/session_management/session_management_http.py';
-import BeautifulSoupSource from '!!raw-loader!./code_examples/session_management/session_management_beautifulsoup.py';
-import ParselSource from '!!raw-loader!./code_examples/session_management/session_management_parsel.py';
-import PlaywrightSource from '!!raw-loader!./code_examples/session_management/session_management_playwright.py';
-import StandaloneSource from '!!raw-loader!./code_examples/session_management/session_management_standalone.py';
-import OneSession from '!!raw-loader!./code_examples/session_management/one_session_http.py';
-import MultiSessions from '!!raw-loader!./code_examples/session_management/multi_sessions_http.py';
+import BasicSource from '!!raw-loader!roa-loader!./code_examples/session_management/sm_basic.py';
+import HttpSource from '!!raw-loader!roa-loader!./code_examples/session_management/sm_http.py';
+import BeautifulSoupSource from '!!raw-loader!roa-loader!./code_examples/session_management/sm_beautifulsoup.py';
+import ParselSource from '!!raw-loader!roa-loader!./code_examples/session_management/sm_parsel.py';
+import PlaywrightSource from '!!raw-loader!roa-loader!./code_examples/session_management/sm_playwright.py';
+import StandaloneSource from '!!raw-loader!roa-loader!./code_examples/session_management/sm_standalone.py';
+import OneSession from '!!raw-loader!roa-loader!./code_examples/session_management/one_session_http.py';
+import MultiSessions from '!!raw-loader!roa-loader!./code_examples/session_management/multi_sessions_http.py';
 
 The <ApiLink to="class/SessionPool">`SessionPool`</ApiLink> class provides a robust way to manage the rotation of proxy IP addresses, cookies, and other custom settings in Crawlee. Its primary advantage is the ability to filter out blocked or non-functional proxies, ensuring that your scraper avoids retrying requests through known problematic proxies.
 
@@ -36,34 +36,34 @@ Now, let's explore examples of how to use the <ApiLink to="class/SessionPool">`S
 
 <Tabs groupId="session_pool">
     <TabItem value="basic" label="BasicSource">
-        <CodeBlock language="py">
+        <RunnableCodeBlock className="language-python" language="python">
             {BasicSource}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
     <TabItem value="http" label="HttpCrawler">
-        <CodeBlock language="py">
+        <RunnableCodeBlock className="language-python" language="python">
             {HttpSource}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
     <TabItem value="beautifulsoup" label="BeautifulSoupCrawler">
-        <CodeBlock language="py">
+        <RunnableCodeBlock className="language-python" language="python">
             {BeautifulSoupSource}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
     <TabItem value="parsel" label="ParselCrawler">
-        <CodeBlock language="py">
+        <RunnableCodeBlock className="language-python" language="python">
             {ParselSource}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
     <TabItem value="playwright" label="PlaywrightCrawler">
-        <CodeBlock language="py">
+        <RunnableCodeBlock className="language-python" language="python">
             {PlaywrightSource}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
     <TabItem value="standalone" label="Standalone">
-        <CodeBlock language="py">
+        <RunnableCodeBlock className="language-python" language="python">
             {StandaloneSource}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
 </Tabs>
 
@@ -77,9 +77,9 @@ In some cases, you need full control over session usage. For example, when worki
 
 When working with a site that requires authentication, we typically don't want multiple sessions with different browser fingerprints or client parameters accessing the site. In this case, we need to configure the <ApiLink to="class/SessionPool">`SessionPool`</ApiLink> appropriately:
 
-<CodeBlock language="py">
+<RunnableCodeBlock className="language-python" language="python">
     {OneSession}
-</CodeBlock>
+</RunnableCodeBlock>
 
 ## Binding requests to specific sessions
 
@@ -89,6 +89,6 @@ In some cases, we need to achieve the same behavior but using multiple sessions 
 
 To do this, use the `session_id` parameter for the <ApiLink to="class/Request">`Request`</ApiLink> object to bind a request to a specific session:
 
-<CodeBlock language="py">
+<RunnableCodeBlock className="language-python" language="python">
     {MultiSessions}
-</CodeBlock>
+</RunnableCodeBlock>

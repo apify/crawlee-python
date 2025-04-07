@@ -7,12 +7,11 @@ description: How to manage the requests your crawler will go through.
 import ApiLink from '@site/src/components/ApiLink';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
-import CodeBlock from '@theme/CodeBlock';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
-import RlBasicExample from '!!raw-loader!./code_examples/request_loaders/rl_basic_example.py';
-
-import TandemExample from '!!raw-loader!./code_examples/request_loaders/tandem_example.py';
-import ExplicitTandemExample from '!!raw-loader!./code_examples/request_loaders/tandem_example_explicit.py';
+import RlBasicExample from '!!raw-loader!roa-loader!./code_examples/request_loaders/rl_basic_example.py';
+import TandemExample from '!!raw-loader!roa-loader!./code_examples/request_loaders/tandem_example.py';
+import ExplicitTandemExample from '!!raw-loader!roa-loader!./code_examples/request_loaders/tandem_example_explicit.py';
 
 The [`request_loaders`](https://github.com/apify/crawlee-python/tree/master/src/crawlee/request_loaders) sub-package extends the functionality of the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, providing additional tools for managing URLs. If you are new to Crawlee, and you do not know the `RequestQueue`, consider starting with the [Storages](https://crawlee.dev/python/docs/guides/storages) guide first. Request loaders define how requests are fetched and stored, enabling various use cases, such as reading URLs from files, external APIs or combining multiple sources together.
 
@@ -109,9 +108,9 @@ The <ApiLink to="class/RequestList">`RequestList`</ApiLink> can accept an asynch
 
 Here is a basic example of working with the <ApiLink to="class/RequestList">`RequestList`</ApiLink>:
 
-<CodeBlock className="language-python">
+<RunnableCodeBlock className="language-python" language="python">
     {RlBasicExample}
-</CodeBlock>
+</RunnableCodeBlock>
 
 ## Request manager
 
@@ -127,14 +126,14 @@ This sections describes the combination of the <ApiLink to="class/RequestList">`
 
 <Tabs groupId="request_manager_tandem">
     <TabItem value="request_manager_tandem_explicit" label="Explicitly usage">
-        <CodeBlock className="language-python">
+        <RunnableCodeBlock className="language-python" language="python">
             {ExplicitTandemExample}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
     <TabItem value="request_manager_tandem_helper" label="Using to_tandem helper" default>
-        <CodeBlock className="language-python">
+        <RunnableCodeBlock className="language-python" language="python">
             {TandemExample}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
 </Tabs>
 

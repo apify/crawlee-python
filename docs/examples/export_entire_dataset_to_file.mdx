@@ -6,10 +6,10 @@ title: Export entire dataset to file
 import ApiLink from '@site/src/components/ApiLink';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
-import CodeBlock from '@theme/CodeBlock';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
-import JsonExample from '!!raw-loader!./code_examples/export_entire_dataset_to_file_json.py';
-import CsvExample from '!!raw-loader!./code_examples/export_entire_dataset_to_file_csv.py';
+import JsonExample from '!!raw-loader!roa-loader!./code_examples/export_entire_dataset_to_file_json.py';
+import CsvExample from '!!raw-loader!roa-loader!./code_examples/export_entire_dataset_to_file_csv.py';
 
 This example demonstrates how to use the <ApiLink to="class/BasicCrawler#export_data">`BasicCrawler.export_data`</ApiLink> method of the crawler to export the entire default dataset to a single file. This method supports exporting data in either CSV or JSON format.
 
@@ -21,13 +21,13 @@ For these examples, we are using the <ApiLink to="class/BeautifulSoupCrawler">`B
 
 <Tabs groupId="main">
     <TabItem value="json" label="JSON">
-        <CodeBlock className="language-python">
+        <RunnableCodeBlock className="language-python" language="python">
             {JsonExample}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
     <TabItem value="csv" label="CSV">
-        <CodeBlock className="language-python">
+        <RunnableCodeBlock className="language-python" language="python">
             {CsvExample}
-        </CodeBlock>
+        </RunnableCodeBlock>
     </TabItem>
 </Tabs>

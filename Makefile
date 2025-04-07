@@ -1,14 +1,17 @@
-.PHONY: clean install-dev build publish-to-pypi lint type-check unit-tests unit-tests-cov \
-	integration-tests format check-code build-api-reference run-docs
+.PHONY: clean install-sync install-dev build publish-to-pypi lint type-check unit-tests unit-tests-cov \
+	e2e-templates-tests format check-code build-api-reference run-docs
 
 # This is default for local testing, but GitHub workflows override it to a higher value in CI
-INTEGRATION_TESTS_CONCURRENCY = 1
+E2E_TESTS_CONCURRENCY = 1
 
 clean:
 	rm -rf .mypy_cache .pytest_cache .ruff_cache build dist htmlcov .coverage
 
-install-dev:
+install-sync:
 	uv sync --all-extras
+
+install-dev:
+	make install-sync
 	uv run pre-commit install
 	uv run playwright install
 
@@ -32,8 +35,8 @@ unit-tests:
 unit-tests-cov:
 	uv run pytest --numprocesses=auto --verbose --cov=src/crawlee --cov-report=html tests/unit
 
-integration-tests:
-	uv run pytest --numprocesses=$(INTEGRATION_TESTS_CONCURRENCY) --verbose tests/integration
+e2e-templates-tests $(args):
+	uv run pytest --numprocesses=$(E2E_TESTS_CONCURRENCY) --verbose tests/e2e/project_template "$(args)"
 
 format:
 	uv run ruff check --fix

@@ -1,3 +1,5 @@
+import asyncio
+
 from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext
 from crawlee.storages import Dataset
 
@@ -14,3 +16,7 @@ async def main() -> None:
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
         ...
         # ...
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

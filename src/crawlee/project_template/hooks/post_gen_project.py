@@ -2,7 +2,6 @@ import platform
 import subprocess
 from pathlib import Path
 
-Path('_pyproject.toml').rename('pyproject.toml')
 
 # % if cookiecutter.package_manager in ['poetry', 'uv']
 Path('requirements.txt').unlink()

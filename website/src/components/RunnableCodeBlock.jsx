@@ -4,13 +4,9 @@ import CodeBlock from '@theme/CodeBlock';
 import Link from '@docusaurus/Link';
 import styles from './RunnableCodeBlock.module.css';
 
-const EXAMPLE_RUNNERS = {
-    playwright: '6i5QsHBMtm3hKph70',
-    puppeteer: '7tWSD8hrYzuc9Lte7',
-    cheerio: 'kk67IcZkKSSBTslXI',
-};
+const PYTHON_ACTOR_RUNNER = 'HH9rhkFXiZbheuq1V'
 
-const RunnableCodeBlock = ({ children, actor, hash, type, ...props }) => {
+const RunnableCodeBlock = ({ children, actor, hash, ...props }) => {
     hash = hash ?? children.hash;
 
     if (!children.code) {
@@ -26,7 +22,7 @@ Make sure you are importing the code block contents with the roa-loader.`);
         );
     }
 
-    const href = `https://console.apify.com/actors/${actor ?? EXAMPLE_RUNNERS[type ?? 'playwright']}?runConfig=${hash}&asrc=run_on_apify`;
+    const href = `https://console.apify.com/actors/${actor ?? PYTHON_ACTOR_RUNNER}?runConfig=${hash}&asrc=run_on_apify`;
 
     return (
         <div className={clsx(styles.container, 'runnable-code-block')}>

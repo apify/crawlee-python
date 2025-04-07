@@ -2,13 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.6.6 - **not yet released**
+## [0.6.6](https://github.com/apify/crawlee-python/releases/tag/v0.6.6) (2025-04-03)
 
 ### 🚀 Features
 
 - Add `statistics_log_format` parameter to `BasicCrawler` ([#1061](https://github.com/apify/crawlee-python/pull/1061)) ([635ae4a](https://github.com/apify/crawlee-python/commit/635ae4a56c65e434783ca721f4164203f465abf0)) by [@Mantisus](https://github.com/Mantisus), closes [#700](https://github.com/apify/crawlee-python/issues/700)
 - Add Session binding capability via `session_id` in `Request` ([#1086](https://github.com/apify/crawlee-python/pull/1086)) ([cda7b31](https://github.com/apify/crawlee-python/commit/cda7b314ffda3104e4fd28a5e85c9e238d8866a4)) by [@Mantisus](https://github.com/Mantisus), closes [#1076](https://github.com/apify/crawlee-python/issues/1076)
+- Add `requests` argument to `EnqueueLinksFunction` ([#1024](https://github.com/apify/crawlee-python/pull/1024)) ([fc8444c](https://github.com/apify/crawlee-python/commit/fc8444c245c7607d3e378a4835d7d3355c4059be)) by [@Pijukatel](https://github.com/Pijukatel)
 
 ### 🐛 Bug Fixes
 
@@ -18,7 +18,6 @@ All notable changes to this project will be documented in this file.
 - **website:** Use correct image source ([#1115](https://github.com/apify/crawlee-python/pull/1115)) ([ee7806f](https://github.com/apify/crawlee-python/commit/ee7806fc2f9b7b590d9668cc9f86009a898a3da6)) by [@baldasseva](https://github.com/baldasseva)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.6.5](https://github.com/apify/crawlee-python/releases/tag/v0.6.5) (2025-03-13)
 
 ### 🐛 Bug Fixes

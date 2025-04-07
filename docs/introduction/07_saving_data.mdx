@@ -5,9 +5,11 @@ title: Saving data
 
 import ApiLink from '@site/src/components/ApiLink';
 import CodeBlock from '@theme/CodeBlock';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
-import FinalCodeExample from '!!raw-loader!./code_examples/07_final_code.py';
 import FirstCodeExample from '!!raw-loader!./code_examples/07_first_code.py';
+
+import FinalCodeExample from '!!raw-loader!roa-loader!./code_examples/07_final_code.py';
 
 A data extraction job would not be complete without saving the data for later use and processing. You've come to the final and most difficult part of this tutorial so make sure to pay attention very carefully!
 
@@ -20,7 +22,7 @@ Crawlee provides a <ApiLink to="class/Dataset">`Dataset`</ApiLink> class, which 
 
 Here's an example:
 
-<CodeBlock className="language-python">
+<CodeBlock language="python">
     {FirstCodeExample}
 </CodeBlock>
 
@@ -76,9 +78,9 @@ Instead of importing a new class and manually creating an instance of the datase
 
 And that's it. Unlike earlier, we are being serious now. That's it, you're done. The final code looks like this:
 
-<CodeBlock className="language-python">
+<RunnableCodeBlock className="language-python" language="python">
     {FinalCodeExample}
-</CodeBlock>
+</RunnableCodeBlock>
 
 ## What `push_data` does?
 

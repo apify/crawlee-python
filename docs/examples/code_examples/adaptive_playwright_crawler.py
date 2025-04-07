@@ -14,7 +14,7 @@ async def main() -> None:
     # Crawler created by following factory method will use `beautifulsoup`
     # for parsing static content.
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
-        max_requests_per_crawl=5, playwright_crawler_specific_kwargs={'headless': False}
+        max_requests_per_crawl=10, playwright_crawler_specific_kwargs={'headless': False}
     )
 
     @crawler.router.default_handler

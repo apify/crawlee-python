@@ -96,6 +96,8 @@ async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
         await generic_response_endpoint(send)
     elif path.startswith('/set_cookies'):
         await set_cookies(scope, send)
+    elif path.startswith('/set_complex_cookies'):
+        await set_complex_cookies(send)
     elif path.startswith('/cookies'):
         await get_cookies(scope, send)
     elif path.startswith('/status/'):
@@ -108,8 +110,14 @@ async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
         await get_echo(scope, send)
     elif path.startswith('/post'):
         await post_echo(scope, receive, send)
+    elif path.startswith('/dynamic_content'):
+        await dynamic_content(scope, send)
     elif path.startswith('/redirect'):
         await redirect_to_url(scope, send)
+    elif path.startswith('/json'):
+        await hello_world_json(send)
+    elif path.startswith('/xml'):
+        await hello_world_xml(send)
     else:
         await hello_world(send)
 
@@ -155,6 +163,23 @@ async def hello_world(send: Send) -> None:
             <title>Hello, world!</title>
         </head>
     </html>""",
+    )
+
+
+async def hello_world_json(send: Send) -> None:
+    """Handle basic requests with a simple JSON response."""
+    await send_json_response(
+        send,
+        {'hello': 'world'},
+    )
+
+
+async def hello_world_xml(send: Send) -> None:
+    """Handle basic requests with a simple XML response."""
+    await send_html_response(
+        send,
+        b"""<?xml version="1.0"?>
+            <hello>world</hello>""",
     )
 
 
@@ -340,6 +365,38 @@ async def get_echo(scope: dict[str, Any], send: Send) -> None:
     }
 
     await send_json_response(send, response)
+
+
+async def set_complex_cookies(send: Send) -> None:
+    """Handle requests to set specific cookies with various attributes."""
+
+    headers = [
+        [b'content-type', b'text/plain; charset=utf-8'],
+        [b'set-cookie', b'basic=1; Path=/; HttpOnly; SameSite=Lax'],
+        [b'set-cookie', b'withpath=2; Path=/html; SameSite=None'],
+        [b'set-cookie', b'strict=3; Path=/; SameSite=Strict'],
+        [b'set-cookie', b'secure=4; Path=/; HttpOnly; Secure; SameSite=Strict'],
+        [b'set-cookie', b'short=5; Path=/;'],
+        [b'set-cookie', b'domain=6; Path=/; Domain=.127.0.0.1;'],
+    ]
+
+    await send(
+        {
+            'type': 'http.response.start',
+            'status': 200,
+            'headers': headers,
+        }
+    )
+    await send({'type': 'http.response.body', 'body': b'Cookies have been set!'})
+
+
+async def dynamic_content(scope: dict[str, Any], send: Send) -> None:
+    """Handle requests to serve HTML-page with dynamic content received in the request."""
+    query_params = get_query_params(scope.get('query_string', b''))
+
+    content = query_params.get('content', '')
+
+    await send_html_response(send, html_content=content.encode())
 
 
 class TestServer(Server):
