@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC
-from typing import TYPE_CHECKING, Any, Callable, Generic
+from typing import TYPE_CHECKING, Any, Callable, Generic, Union
 
 from pydantic import ValidationError
 from typing_extensions import TypeVar
@@ -17,12 +17,12 @@ from crawlee.statistics import StatisticsState
 from ._http_crawling_context import HttpCrawlingContext, ParsedHttpCrawlingContext, TParseResult, TSelectResult
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Awaitable
+    from collections.abc import AsyncGenerator, Awaitable, Sequence
 
     from typing_extensions import Unpack
 
     from crawlee import RequestTransformAction
-    from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, EnqueueLinksKwargs
+    from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, EnqueueLinksKwargs, ExtractLinksFunction
 
     from ._abstract_http_parser import AbstractHttpParser
 
@@ -124,26 +124,28 @@ class AbstractHttpCrawler(
             The original crawling context enhanced by the parsing result and enqueue links function.
         """
         parsed_content = await self._parser.parse(context.http_response)
+        extract_links = self._create_extract_links_function(context, parsed_content)
         yield ParsedHttpCrawlingContext.from_http_crawling_context(
             context=context,
             parsed_content=parsed_content,
-            enqueue_links=self._create_enqueue_links_function(context, parsed_content),
+            enqueue_links=self._create_enqueue_links_function(context, extract_links),
+            extract_links=extract_links,
         )
 
-    def _create_enqueue_links_function(
+    def _create_extract_links_function(
         self, context: HttpCrawlingContext, parsed_content: TParseResult
-    ) -> EnqueueLinksFunction:
-        """Create a callback function for extracting links from parsed content and enqueuing them to the crawl.
+    ) -> ExtractLinksFunction:
+        """Create a callback function for extracting links from parsed content.
 
         Args:
             context: The current crawling context.
             parsed_content: The parsed http response.
 
         Returns:
-            Awaitable that is used for extracting links from parsed content and enqueuing them to the crawl.
+            Awaitable that is used for extracting links from parsed content.
         """
 
-        async def enqueue_links(
+        async def extract_links(
             *,
             selector: str = 'a',
             label: str | None = None,
@@ -151,7 +153,7 @@ class AbstractHttpCrawler(
             transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
             | None = None,
             **kwargs: Unpack[EnqueueLinksKwargs],
-        ) -> None:
+        ) -> list[Request]:
             kwargs.setdefault('strategy', 'same-hostname')
 
             requests = list[Request]()
@@ -183,8 +185,54 @@ class AbstractHttpCrawler(
                     continue
 
                 requests.append(request)
+            return requests
 
-            await context.add_requests(requests, **kwargs)
+        return extract_links
+
+    def _create_enqueue_links_function(
+        self, context: HttpCrawlingContext, extract_links: ExtractLinksFunction
+    ) -> EnqueueLinksFunction:
+        """Create a callback function for extracting links from parsed content and enqueuing them to the crawl.
+
+        Args:
+            context: The current crawling context.
+            extract_links: Function used to extract links from the page.
+
+        Returns:
+            Awaitable that is used for extracting links from parsed content and enqueuing them to the crawl.
+        """
+
+        async def enqueue_links(
+            *,
+            selector: str | None = None,
+            label: str | None = None,
+            user_data: dict[str, Any] | None = None,
+            transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
+            | None = None,
+            requests: Sequence[str | Request] | None = None,
+            **kwargs: Unpack[EnqueueLinksKwargs],
+        ) -> None:
+            kwargs.setdefault('strategy', 'same-hostname')
+
+            if requests:
+                if any((selector, label, user_data, transform_request_function)):
+                    raise ValueError(
+                        'You cannot provide `selector`, `label`, `user_data` or '
+                        '`transform_request_function` arguments when `requests` is provided.'
+                    )
+                # Add directly passed requests.
+                await context.add_requests(requests or list[Union[str, Request]](), **kwargs)
+            else:
+                # Add requests from extracted links.
+                await context.add_requests(
+                    await extract_links(
+                        selector=selector or 'a',
+                        label=label,
+                        user_data=user_data,
+                        transform_request_function=transform_request_function,
+                    ),
+                    **kwargs,
+                )
 
         return enqueue_links
 

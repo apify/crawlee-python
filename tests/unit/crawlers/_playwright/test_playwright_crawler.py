@@ -61,7 +61,7 @@ async def test_enqueue_links(redirect_server_url: URL, server_url: URL) -> None:
     redirect_target = str(server_url / 'start_enqueue')
     redirect_url = str(redirect_server_url.with_path('redirect').with_query(url=redirect_target))
     requests = [redirect_url]
-    crawler = PlaywrightCrawler(max_requests_per_crawl=11)
+    crawler = PlaywrightCrawler()
     visit = mock.Mock()
 
     @crawler.router.default_handler
@@ -81,6 +81,29 @@ async def test_enqueue_links(redirect_server_url: URL, server_url: URL) -> None:
         str(server_url / 'page_2'),
         str(server_url / 'page_3'),
     }
+
+
+async def test_enqueue_links_with_incompatible_kwargs_raises_error() -> None:
+    """Call `enqueue_links` with arguments that can't be used together."""
+    requests = ['https://www.something.com']
+    crawler = PlaywrightCrawler(max_request_retries=1)
+    exceptions = []
+
+    @crawler.pre_navigation_hook
+    async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
+        await context.page.route('**/*', lambda route: route.fulfill(status=200))
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        try:
+            await context.enqueue_links(requests=[Request.from_url('https://www.whatever.com')], selector='a')  # type:ignore[call-overload]  # Testing runtime enforcement of the overloads.
+        except Exception as e:
+            exceptions.append(e)
+
+    await crawler.run(requests)
+
+    assert len(exceptions) == 1
+    assert type(exceptions[0]) is ValueError
 
 
 async def test_enqueue_links_with_transform_request_function(server_url: URL) -> None:

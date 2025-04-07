@@ -5,7 +5,7 @@ from typing import Generic
 
 from typing_extensions import Self, TypeVar
 
-from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, PageSnapshot
+from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, ExtractLinksFunction, PageSnapshot
 from crawlee._utils.docs import docs_group
 from crawlee.http_clients import HttpCrawlingResult, HttpResponse
 
@@ -25,6 +25,7 @@ class HttpCrawlingContext(BasicCrawlingContext, HttpCrawlingResult):
         return cls(http_response=http_response, **context_kwargs)
 
     async def get_snapshot(self) -> PageSnapshot:
+        """Get snapshot of a page."""
         return PageSnapshot(html=self.http_response.read().decode('utf-8'))
 
 
@@ -38,6 +39,7 @@ class ParsedHttpCrawlingContext(Generic[TParseResult], HttpCrawlingContext):
 
     parsed_content: TParseResult
     enqueue_links: EnqueueLinksFunction
+    extract_links: ExtractLinksFunction
 
     @classmethod
     def from_http_crawling_context(
@@ -45,7 +47,10 @@ class ParsedHttpCrawlingContext(Generic[TParseResult], HttpCrawlingContext):
         context: HttpCrawlingContext,
         parsed_content: TParseResult,
         enqueue_links: EnqueueLinksFunction,
+        extract_links: ExtractLinksFunction,
     ) -> Self:
         """Initialize a new instance from an existing `HttpCrawlingContext`."""
         context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
-        return cls(parsed_content=parsed_content, enqueue_links=enqueue_links, **context_kwargs)
+        return cls(
+            parsed_content=parsed_content, enqueue_links=enqueue_links, extract_links=extract_links, **context_kwargs
+        )

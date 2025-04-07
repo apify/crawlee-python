@@ -92,18 +92,19 @@ crawlee = "crawlee._cli:cli"
 
 [dependency-groups]
 dev = [
+    "apify_client",  # For e2e tests.
+    "build~=1.2.2",  # For e2e tests.
     "mypy~=1.15.0",
     "pre-commit~=4.2.0",
     "proxy-py~=2.4.0",
     "pydoc-markdown~=4.8.0",
-    "pytest-asyncio~=0.25.0",
-    "pytest-cov~=6.0.0",
+    "pytest-asyncio~=0.26.0",
+    "pytest-cov~=6.1.0",
     "pytest-only~=2.1.0",
     "pytest-xdist~=3.6.0",
     "pytest~=8.3.0",
-    "respx~=0.22.0",
     "ruff~=0.11.0",
-    "setuptools~=77.0.1",                    # setuptools are used by pytest, but not explicitly required
+    "setuptools~=78.1.0",                    # setuptools are used by pytest, but not explicitly required
     "sortedcontainers-stubs~=2.4.0",
     "types-beautifulsoup4~=4.12.0.20240229",
     "types-cachetools~=5.5.0.20240820",
@@ -119,7 +120,7 @@ packages = ["src/crawlee"]
 [tool.ruff]
 line-length = 120
 include = ["src/**/*.py", "tests/**/*.py", "docs/**/*.py", "website/**/*.py"]
-extend-exclude = ["project_template"]
+extend-exclude = ["src/crawlee/project_template"]
 
 [tool.ruff.lint]
 select = ["ALL"]
@@ -207,7 +208,7 @@ timeout = 1200
 [tool.mypy]
 python_version = "3.9"
 plugins = ["pydantic.mypy"]
-exclude = ["project_template"]
+exclude = ["src/crawlee/project_template"]
 files = ["src", "tests", "docs", "website"]
 check_untyped_defs = true
 disallow_incomplete_defs = true
@@ -226,9 +227,13 @@ module = [
     "apify",                        # Example code shows integration of apify and crawlee.
     "apify_fingerprint_datapoints", # Untyped and stubs not available
     "camoufox",                     # Example code shows integration of camoufox and crawlee.
+    "flask",                        # Example code shows deploy on Google Cloud.
+    "functions_framework",          # Example code shows deploy on Google Cloud.
     "jaro",                         # Untyped and stubs not available
     "loguru",                       # Example code shows integration of loguru and crawlee for JSON logging.
     "sklearn.linear_model",         # Untyped and stubs not available
+    "cookiecutter.*",               # Untyped and stubs not available
+    "inquirer.*",                   # Untyped and stubs not available
 ]
 ignore_missing_imports = true
 
