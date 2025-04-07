@@ -200,7 +200,8 @@ def create(
                 TextColumn('[progress.description]{task.description}'),
                 transient=True,
             ) as progress:
-                progress.add_task(description='Bootstrapping...', total=None)
+                bootstrap_task = progress.add_task(description='Bootstrapping...', total=None)
+
                 try:
                     cookiecutter(
                         template=str(template_directory),
@@ -215,6 +216,9 @@ def create(
                         },
                     )
                 except Exception as exc:
+                    progress.update(bootstrap_task, visible=False)
+                    progress.refresh()
+
                     # Print just the last line of the error message (the actual error without traceback)
                     if 'Hook script failed' in str(exc):
                         typer.echo('Project creation failed. Check the error message above.', err=True)
