@@ -6,10 +6,10 @@ title: Crawler login
 import ApiLink from '@site/src/components/ApiLink';
 import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
-import PlaywrightLogin from '!!raw-loader!roa-loader!./code_examples/playwright_login.py';
-import HttpLogin from '!!raw-loader!roa-loader!./code_examples/http_login.py';
+import PlaywrightLogin from '!!raw-loader!roa-loader!./code_examples/crawler_login/playwright_login.py';
+import HttpLogin from '!!raw-loader!roa-loader!./code_examples/crawler_login/http_login.py';
 
-When you need to authenticate on a website, you typically want to use the same <ApiLink to="class/Session">`Session`</ApiLink> throughout the crawl. This requires additional configuration of the <ApiLink to="class/SessionPool">`SessionPool`</ApiLink>. Learn more in the [session management guide](../guides/session-management).
+When you need to authenticate on a website, you typically want to use the same <ApiLink to="class/Session">`Session`</ApiLink> throughout the crawl. This requires additional configuration of the <ApiLink to="class/SessionPool">`SessionPool`</ApiLink>. Learn more in the [session management guide](./session-management).
 
 ## Login with Playwright crawler
 
