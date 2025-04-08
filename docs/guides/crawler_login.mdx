@@ -1,15 +1,20 @@
 ---
-id: crawler-login
-title: Crawler login
+id: login-crawler
+title: Logging in with a crawler
+description: How to log in to websites with Crawlee.
 ---
 
 import ApiLink from '@site/src/components/ApiLink';
 import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
-import PlaywrightLogin from '!!raw-loader!roa-loader!./code_examples/crawler_login/playwright_login.py';
-import HttpLogin from '!!raw-loader!roa-loader!./code_examples/crawler_login/http_login.py';
+import PlaywrightLogin from '!!raw-loader!roa-loader!./code_examples/login_crawler/playwright_login.py';
+import HttpLogin from '!!raw-loader!roa-loader!./code_examples/login_crawler/http_login.py';
 
-When you need to authenticate on a website, you typically want to use the same <ApiLink to="class/Session">`Session`</ApiLink> throughout the crawl. This requires additional configuration of the <ApiLink to="class/SessionPool">`SessionPool`</ApiLink>. Learn more in the [session management guide](./session-management).
+Sometimes to extract data from a website, you need to log in to access the target pages. This guide demonstrates how to do this using <ApiLink to="class/PlaywrightCrawler">PlaywrightCrawler</ApiLink> and <ApiLink to="class/HttpCrawler">HttpCrawler</ApiLink>.
+
+When you need to authenticate on a website, you typically want to use the same <ApiLink to="class/Session">Session</ApiLink> throughout the crawl. This requires additional configuration of the <ApiLink to="class/SessionPool">SessionPool</ApiLink>. Learn more in the [session management guide](./session-management). If you need to use multiple <ApiLink to="class/Session">Sessions</ApiLink> with different credentials, use the `new_session_function` parameter for <ApiLink to="class/SessionPool#__init__">SessionPool</ApiLink> and the `session_id` parameter for <ApiLink to="class/Request#from_url">Request</ApiLink> to bind requests to specific sessions.
+
+For this guide, we'll use a demo site specifically created for automation testing that provides various interactive elements including a [login form](https://demoqa.com/login).
 
 ## Login with Playwright crawler
 
