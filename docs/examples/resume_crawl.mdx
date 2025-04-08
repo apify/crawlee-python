@@ -1,0 +1,29 @@
+---
+id: resume-crawl
+title: Resume Crawl
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import CodeBlock from '@theme/CodeBlock';
+
+import ResumeCrawl from '!!raw-loader!./code_examples/resume_crawl.py';
+
+This example demonstrates how to resume crawling from its last state when running locally, if for some reason it was unexpectedly terminated.
+
+As a foundation, we use <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> and this [run example](./beautifulsoup-crawler).
+
+If each run should continue crawling from the previous state, you can configure this using `purge_on_start` in <ApiLink to="class/Configuration">`Configuration`</ApiLink>.
+
+The following code will crawl about 10 links per run, which is controlled by the `max_requests_per_crawl` parameter in <ApiLink to="class/BasicCrawlerOptions">`BasicCrawlerOptions`</ApiLink>, but each time it will continue from where it stopped in the previous run.
+
+<CodeBlock className="language-python">
+    {ResumeCrawl}
+</CodeBlock>
+
+Alternatively, use the environment variable `CRAWLEE_PURGE_ON_START=0`.
+
+For example, when running code:
+
+```bash
+CRAWLEE_PURGE_ON_START=0 python -m best_crawler
+```

@@ -600,7 +600,7 @@ toml = [
 
 [[package]]
 name = "crawlee"
-version = "0.6.6"
+version = "0.6.7"
 source = { editable = "." }
 dependencies = [
     { name = "apify-fingerprint-datapoints" },
@@ -1149,7 +1149,7 @@ name = "importlib-metadata"
 version = "8.6.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "zipp", marker = "python_full_version < '3.11'" },
+    { name = "zipp" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/33/08/c1395a292bb23fd03bdf572a1357c5a733d3eecbab877641ceacab23db6e/importlib_metadata-8.6.1.tar.gz", hash = "sha256:310b41d755445d74569f993ccfc22838295d9fe005425094fad953d7f15c8580", size = 55767 }
 wheels = [
