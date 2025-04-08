@@ -6,7 +6,7 @@ from crawlee.crawlers import (
     BeautifulSoupCrawlingContext,
 )
 
-# Disable clearing the `Queue` and `DataSet` on each run
+# Disable clearing the `Queue` and `Dataset` on each run
 # This allows you to continue from where you left off in the previous run
 configuration = service_locator.get_configuration()
 configuration.purge_on_start = False
