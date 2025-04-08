@@ -11,9 +11,9 @@ import HttpLogin from '!!raw-loader!roa-loader!./code_examples/http_login.py';
 
 This example demonstrates how to implement login functionality with <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> and <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink>.
 
-When you need to authenticate on a website, you typically want to use only one <ApiLink to="class/Session">`Session`</ApiLink> throughout the crawl. This requires additional configuration of the <ApiLink to="class/SessionPool">`SessionPool`</ApiLink>. Learn more in the [session management guide](../guides/session-management).
+When you need to authenticate on a website, you typically want to use the same <ApiLink to="class/Session">`Session`</ApiLink> throughout the crawl. This requires additional configuration of the <ApiLink to="class/SessionPool">`SessionPool`</ApiLink>. Learn more in the [session management guide](../guides/session-management).
 
-## Login with `PlaywrightCrawler`
+## Login with Playwright crawler
 
 This example shows how to log in to a website using the <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>.
 
@@ -21,7 +21,7 @@ This example shows how to log in to a website using the <ApiLink to="class/Playw
     {PlaywrightLogin}
 </RunnableCodeBlock>
 
-## Login with `HttpCrawler`
+## Login with HTTP crawler
 
 This example demonstrates how to log in using the <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink> by sending a POST <ApiLink to="class/Request">`Request`</ApiLink> with credentials to an API endpoint. HTTP-based authentication typically requires a more customized approach for each website, using [DevTools](https://developer.chrome.com/docs/devtools/overview) and analyzing the `network` tab to understand the authentication flow.
 
