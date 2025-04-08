@@ -31,7 +31,7 @@ async def main() -> None:
             'h3s': [h3.text for h3 in context.soup.find_all('h3')],
         }
 
-        # Save data to `DataSet`
+        # Save data to `Dataset`
         await context.push_data(data)
 
         # Extract links from HTML and add them to the `Queue`
@@ -39,7 +39,7 @@ async def main() -> None:
 
     await crawler.run(['https://crawlee.dev'])
 
-    # Export data from `DataSet` to `data.json` file
+    # Export data from `Dataset` to `data.json` file
     # After each run, you will get previous results along with new ones
     await crawler.export_data_json('data.json')
 

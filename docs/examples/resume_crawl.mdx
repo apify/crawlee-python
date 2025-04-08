@@ -1,10 +1,10 @@
 ---
 id: resume-crawl
-title: Resume Crawl
+title: Resuming a paused crawl
 ---
 
 import ApiLink from '@site/src/components/ApiLink';
-import CodeBlock from '@theme/CodeBlock';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
 import ResumeCrawl from '!!raw-loader!./code_examples/resume_crawl.py';
 
@@ -16,9 +16,9 @@ If each run should continue crawling from the previous state, you can configure 
 
 The following code will crawl about 10 links per run, which is controlled by the `max_requests_per_crawl` parameter in <ApiLink to="class/BasicCrawlerOptions">`BasicCrawlerOptions`</ApiLink>, but each time it will continue from where it stopped in the previous run.
 
-<CodeBlock className="language-python">
+<RunnableCodeBlock className="language-python" language="python">
     {ResumeCrawl}
-</CodeBlock>
+</RunnableCodeBlock>
 
 Alternatively, use the environment variable `CRAWLEE_PURGE_ON_START=0`.
 
