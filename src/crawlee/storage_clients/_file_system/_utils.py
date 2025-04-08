@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import json
-from logging import getLogger
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
 
-logger = getLogger(__name__)
+METADATA_FILENAME = '__metadata__.json'
+"""The name of the metadata file for storage clients."""
 
 
 async def json_dumps(obj: Any) -> str:

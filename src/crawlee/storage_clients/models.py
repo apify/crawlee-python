@@ -47,8 +47,6 @@ class KeyValueStoreMetadata(StorageMetadata):
 
     model_config = ConfigDict(populate_by_name=True)
 
-    user_id: Annotated[str, Field(alias='userId')]
-
 
 @docs_group('Data structures')
 class RequestQueueMetadata(StorageMetadata):
@@ -61,20 +59,7 @@ class RequestQueueMetadata(StorageMetadata):
     pending_request_count: Annotated[int, Field(alias='pendingRequestCount')]
     stats: Annotated[dict, Field(alias='stats')]
     total_request_count: Annotated[int, Field(alias='totalRequestCount')]
-    user_id: Annotated[str, Field(alias='userId')]
     resource_directory: Annotated[str, Field(alias='resourceDirectory')]
-
-
-@docs_group('Data structures')
-class KeyValueStoreRecord(BaseModel, Generic[KvsValueType]):
-    """Model for a key-value store record."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-    key: Annotated[str, Field(alias='key')]
-    value: Annotated[KvsValueType, Field(alias='value')]
-    content_type: Annotated[str | None, Field(alias='contentType', default=None)]
-    filename: Annotated[str | None, Field(alias='filename', default=None)]
 
 
 @docs_group('Data structures')
@@ -84,17 +69,29 @@ class KeyValueStoreRecordMetadata(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     key: Annotated[str, Field(alias='key')]
+    """The key of the record.
+
+    A unique identifier for the record in the key-value store.
+    """
+
     content_type: Annotated[str, Field(alias='contentType')]
+    """The MIME type of the record.
+
+    Describe the format and type of data stored in the record, following the MIME specification.
+    """
+
+    size: Annotated[int, Field(alias='size')]
+    """The size of the record in bytes."""
 
 
 @docs_group('Data structures')
-class KeyValueStoreKeyInfo(BaseModel):
-    """Model for a key-value store key info."""
+class KeyValueStoreRecord(KeyValueStoreRecordMetadata, Generic[KvsValueType]):
+    """Model for a key-value store record."""
 
     model_config = ConfigDict(populate_by_name=True)
 
-    key: Annotated[str, Field(alias='key')]
-    size: Annotated[int, Field(alias='size')]
+    value: Annotated[KvsValueType, Field(alias='value')]
+    """The value of the record."""
 
 
 @docs_group('Data structures')
@@ -106,9 +103,9 @@ class KeyValueStoreListKeysPage(BaseModel):
     count: Annotated[int, Field(alias='count')]
     limit: Annotated[int, Field(alias='limit')]
     is_truncated: Annotated[bool, Field(alias='isTruncated')]
-    items: Annotated[list[KeyValueStoreKeyInfo], Field(alias='items', default_factory=list)]
     exclusive_start_key: Annotated[str | None, Field(alias='exclusiveStartKey', default=None)]
     next_exclusive_start_key: Annotated[str | None, Field(alias='nextExclusiveStartKey', default=None)]
+    items: Annotated[list[KeyValueStoreRecordMetadata], Field(alias='items', default_factory=list)]
 
 
 @docs_group('Data structures')

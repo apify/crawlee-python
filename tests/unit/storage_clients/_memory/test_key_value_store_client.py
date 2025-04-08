@@ -399,7 +399,6 @@ async def test_reads_correct_metadata(
         accessed_at=datetime.now(timezone.utc),
         created_at=datetime.now(timezone.utc),
         modified_at=datetime.now(timezone.utc),
-        user_id='1',
     )
 
     # Write the store metadata to disk

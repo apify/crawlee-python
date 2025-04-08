@@ -1,0 +1,411 @@
+from __future__ import annotations
+
+import asyncio
+import json
+import shutil
+from datetime import datetime, timezone
+from logging import getLogger
+from typing import TYPE_CHECKING, Any
+
+from pydantic import ValidationError
+from typing_extensions import override
+
+from crawlee._utils.crypto import crypto_random_object_id
+from crawlee.storage_clients._base import KeyValueStoreClient
+from crawlee.storage_clients.models import (
+    KeyValueStoreMetadata,
+    KeyValueStoreRecord,
+    KeyValueStoreRecordMetadata,
+)
+
+from ._utils import METADATA_FILENAME, json_dumps
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+    from pathlib import Path
+
+logger = getLogger(__name__)
+
+
+class FileSystemKeyValueStoreClient(KeyValueStoreClient):
+    """A file system key-value store (KVS) implementation."""
+
+    _DEFAULT_NAME = 'default'
+    """The name of the unnamed KVS."""
+
+    _STORAGE_SUBDIR = 'key_value_stores'
+    """The name of the subdirectory where KVSs are stored."""
+
+    def __init__(
+        self,
+        *,
+        id: str,
+        name: str,
+        created_at: datetime,
+        accessed_at: datetime,
+        modified_at: datetime,
+        storage_dir: Path,
+    ) -> None:
+        """Initialize a new instance.
+
+        Preferably use the `FileSystemKeyValueStoreClient.open` class method to create a new instance.
+        """
+        self._id = id
+        self._name = name
+        self._created_at = created_at
+        self._accessed_at = accessed_at
+        self._modified_at = modified_at
+        self._storage_dir = storage_dir
+
+        # Internal attributes.
+        self._lock = asyncio.Lock()
+        """A lock to ensure that only one file operation is performed at a time."""
+
+    @override
+    @property
+    def id(self) -> str:
+        return self._id
+
+    @override
+    @property
+    def name(self) -> str | None:
+        return self._name
+
+    @override
+    @property
+    def created_at(self) -> datetime:
+        return self._created_at
+
+    @override
+    @property
+    def accessed_at(self) -> datetime:
+        return self._accessed_at
+
+    @override
+    @property
+    def modified_at(self) -> datetime:
+        return self._modified_at
+
+    @property
+    def _path_to_kvs(self) -> Path:
+        """The full path to the key-value store directory."""
+        return self._storage_dir / self._STORAGE_SUBDIR / self._name
+
+    @property
+    def _path_to_metadata(self) -> Path:
+        """The full path to the key-value store metadata file."""
+        return self._path_to_kvs / METADATA_FILENAME
+
+    @override
+    @classmethod
+    async def open(
+        cls,
+        id: str | None,
+        name: str | None,
+        storage_dir: Path,
+    ) -> FileSystemKeyValueStoreClient:
+        """Open an existing key-value store client or create a new one if it does not exist.
+
+        If the key-value store directory exists, this method reconstructs the client from the metadata file.
+        Otherwise, a new key-value store client is created with a new unique ID.
+
+        Args:
+            id: The key-value store ID.
+            name: The key-value store name; if not provided, defaults to the default name.
+            storage_dir: The base directory for storage.
+
+        Returns:
+           A new instance of the file system key-value store client.
+        """
+        if id:
+            raise ValueError(
+                'Opening a key-value store by "id" is not supported for file system storage client, use "name" instead.'
+            )
+
+        name = name or cls._DEFAULT_NAME
+        kvs_path = storage_dir / cls._STORAGE_SUBDIR / name
+        metadata_path = kvs_path / METADATA_FILENAME
+
+        # If the key-value store directory exists, reconstruct the client from the metadata file.
+        if kvs_path.exists():
+            # If metadata file is missing, raise an error.
+            if not metadata_path.exists():
+                raise ValueError(f'Metadata file not found for key-value store "{name}"')
+
+            file = await asyncio.to_thread(open, metadata_path)
+            try:
+                file_content = json.load(file)
+            finally:
+                await asyncio.to_thread(file.close)
+            try:
+                metadata = KeyValueStoreMetadata(**file_content)
+            except ValidationError as exc:
+                raise ValueError(f'Invalid metadata file for key-value store "{name}"') from exc
+
+            client = cls(
+                id=metadata.id,
+                name=name,
+                created_at=metadata.created_at,
+                accessed_at=metadata.accessed_at,
+                modified_at=metadata.modified_at,
+                storage_dir=storage_dir,
+            )
+
+            await client._update_metadata(update_accessed_at=True)
+
+        # Otherwise, create a new key-value store client.
+        else:
+            client = cls(
+                id=crypto_random_object_id(),
+                name=name,
+                created_at=datetime.now(timezone.utc),
+                accessed_at=datetime.now(timezone.utc),
+                modified_at=datetime.now(timezone.utc),
+                storage_dir=storage_dir,
+            )
+            await client._update_metadata()
+
+        return client
+
+    @override
+    async def drop(self) -> None:
+        # If the key-value store directory exists, remove it recursively.
+        if self._path_to_kvs.exists():
+            async with self._lock:
+                await asyncio.to_thread(shutil.rmtree, self._path_to_kvs)
+
+    @override
+    async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:
+        record_path = self._path_to_kvs / key
+
+        if not record_path.exists():
+            return None
+
+        # Found a file for this key, now look for its metadata
+        record_metadata_filepath = record_path.with_name(f'{record_path.name}.{METADATA_FILENAME}')
+        if not record_metadata_filepath.exists():
+            logger.warning(f'Found value file for key "{key}" but no metadata file.')
+            return None
+
+        # Read the metadata file
+        async with self._lock:
+            file = await asyncio.to_thread(open, record_metadata_filepath)
+            try:
+                metadata_content = json.load(file)
+            except json.JSONDecodeError:
+                logger.warning(f'Invalid metadata file for key "{key}"')
+                return None
+            finally:
+                await asyncio.to_thread(file.close)
+
+        try:
+            metadata = KeyValueStoreRecordMetadata(**metadata_content)
+        except ValidationError:
+            logger.warning(f'Invalid metadata schema for key "{key}"')
+            return None
+
+        # Read the actual value
+        value_bytes = await asyncio.to_thread(record_path.read_bytes)
+
+        # Handle JSON values
+        if 'application/json' in metadata.content_type:
+            try:
+                value = json.loads(value_bytes.decode('utf-8'))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                logger.warning(f'Failed to decode JSON value for key "{key}"')
+                return None
+
+        # Handle text values
+        elif metadata.content_type.startswith('text/'):
+            try:
+                value = value_bytes.decode('utf-8')
+            except UnicodeDecodeError:
+                logger.warning(f'Failed to decode text value for key "{key}"')
+                return None
+
+        # Handle binary values
+        else:
+            value = value_bytes
+
+        # Update the metadata to record access
+        await self._update_metadata(update_accessed_at=True)
+
+        # Calculate the size of the value in bytes
+        size = len(value_bytes)
+
+        return KeyValueStoreRecord(
+            key=metadata.key,
+            value=value,
+            content_type=metadata.content_type,
+            size=size,
+        )
+
+    @override
+    async def set_value(self, *, key: str, value: Any, content_type: str | None = None) -> None:
+        content_type = content_type or self._infer_mime_type(value)
+
+        # Serialize the value to bytes.
+        if 'application/json' in content_type:
+            value_bytes = (await json_dumps(value)).encode('utf-8')
+        elif isinstance(value, str):
+            value_bytes = value.encode('utf-8')
+        elif isinstance(value, (bytes, bytearray)):
+            value_bytes = value
+        else:
+            # Fallback: attempt to convert to string and encode.
+            value_bytes = str(value).encode('utf-8')
+
+        record_path = self._path_to_kvs / key
+
+        # Get the metadata.
+        # Calculate the size of the value in bytes
+        size = len(value_bytes)
+        record_metadata = KeyValueStoreRecordMetadata(key=key, content_type=content_type, size=size)
+        record_metadata_filepath = record_path.with_name(f'{record_path.name}.{METADATA_FILENAME}')
+        record_metadata_content = await json_dumps(record_metadata.model_dump())
+
+        async with self._lock:
+            # Ensure the key-value store directory exists.
+            await asyncio.to_thread(self._path_to_kvs.mkdir, parents=True, exist_ok=True)
+
+            # Dump the value to the file.
+            await asyncio.to_thread(record_path.write_bytes, value_bytes)
+
+            # Dump the record metadata to the file.
+            await asyncio.to_thread(
+                record_metadata_filepath.write_text,
+                record_metadata_content,
+                encoding='utf-8',
+            )
+
+            # Update the KVS metadata to record the access and modification.
+            await self._update_metadata(update_accessed_at=True, update_modified_at=True)
+
+    @override
+    async def delete_value(self, *, key: str) -> None:
+        record_path = self._path_to_kvs / key
+        metadata_path = record_path.with_name(f'{record_path.name}.{METADATA_FILENAME}')
+        deleted = False
+
+        async with self._lock:
+            # Delete the value file and its metadata if found
+            if record_path.exists():
+                await asyncio.to_thread(record_path.unlink)
+
+                # Delete the metadata file if it exists
+                if metadata_path.exists():
+                    await asyncio.to_thread(metadata_path.unlink)
+                else:
+                    logger.warning(f'Found value file for key "{key}" but no metadata file when trying to delete it.')
+
+                deleted = True
+
+            # If we deleted something, update the KVS metadata
+            if deleted:
+                await self._update_metadata(update_accessed_at=True, update_modified_at=True)
+
+    @override
+    async def iterate_keys(
+        self,
+        *,
+        exclusive_start_key: str | None = None,
+        limit: int | None = None,
+    ) -> AsyncIterator[KeyValueStoreRecordMetadata]:
+        # Check if the KVS directory exists
+        if not self._path_to_kvs.exists():
+            return
+
+        count = 0
+        async with self._lock:
+            # Get all files in the KVS directory
+            files = sorted(await asyncio.to_thread(list, self._path_to_kvs.glob('*')))
+
+            for file_path in files:
+                # Skip the main metadata file
+                if file_path.name == METADATA_FILENAME:
+                    continue
+
+                # Only process metadata files for records
+                if not file_path.name.endswith(f'.{METADATA_FILENAME}'):
+                    continue
+
+                # Extract the base key name from the metadata filename
+                key_name = file_path.name[: -len(f'.{METADATA_FILENAME}')]
+
+                # Apply exclusive_start_key filter if provided
+                if exclusive_start_key is not None and key_name <= exclusive_start_key:
+                    continue
+
+                # Try to read and parse the metadata file
+                try:
+                    metadata_content = await asyncio.to_thread(file_path.read_text, encoding='utf-8')
+                    metadata_dict = json.loads(metadata_content)
+                    record_metadata = KeyValueStoreRecordMetadata(**metadata_dict)
+
+                    yield record_metadata
+
+                    count += 1
+                    if limit and count >= limit:
+                        break
+
+                except (json.JSONDecodeError, ValidationError) as e:
+                    logger.warning(f'Failed to parse metadata file {file_path}: {e}')
+
+        # Update accessed_at timestamp
+        await self._update_metadata(update_accessed_at=True)
+
+    @override
+    async def get_public_url(self, *, key: str) -> str:
+        raise NotImplementedError('Public URLs are not supported for file system key-value stores.')
+
+    async def _update_metadata(
+        self,
+        *,
+        update_accessed_at: bool = False,
+        update_modified_at: bool = False,
+    ) -> None:
+        """Update the KVS metadata file with current information.
+
+        Args:
+            update_accessed_at: If True, update the `accessed_at` timestamp to the current time.
+            update_modified_at: If True, update the `modified_at` timestamp to the current time.
+        """
+        now = datetime.now(timezone.utc)
+        metadata = KeyValueStoreMetadata(
+            id=self._id,
+            name=self._name,
+            created_at=self._created_at,
+            accessed_at=now if update_accessed_at else self._accessed_at,
+            modified_at=now if update_modified_at else self._modified_at,
+        )
+
+        # Ensure the parent directory for the metadata file exists.
+        await asyncio.to_thread(self._path_to_metadata.parent.mkdir, parents=True, exist_ok=True)
+
+        # Dump the serialized metadata to the file.
+        data = await json_dumps(metadata.model_dump())
+        await asyncio.to_thread(self._path_to_metadata.write_text, data, encoding='utf-8')
+
+    def _infer_mime_type(self, value: Any) -> str:
+        """Infer the MIME content type from the value.
+
+        Args:
+            value: The value to infer the content type from.
+
+        Returns:
+            The inferred MIME content type.
+        """
+        # If the value is bytes (or bytearray), return binary content type.
+        if isinstance(value, (bytes, bytearray)):
+            return 'application/octet-stream'
+
+        # If the value is a dict or list, assume JSON.
+        if isinstance(value, (dict, list)):
+            return 'application/json; charset=utf-8'
+
+        # If the value is a string, assume plain text.
+        if isinstance(value, str):
+            return 'text/plain; charset=utf-8'
+
+        # Default fallback.
+        return 'application/octet-stream'

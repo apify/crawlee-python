@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import io
 import json
 import mimetypes
 import os
@@ -81,21 +80,6 @@ def determine_file_extension(content_type: str) -> str | None:
 
     # Remove the leading dot if extension successfully parsed
     return ext[1:] if ext is not None else ext
-
-
-def is_file_or_bytes(value: Any) -> bool:
-    """Determine if the input value is a file-like object or bytes.
-
-    This function checks whether the provided value is an instance of bytes, bytearray, or io.IOBase (file-like).
-    The method is simplified for common use cases and may not cover all edge cases.
-
-    Args:
-        value: The value to be checked.
-
-    Returns:
-        True if the value is either a file-like object or bytes, False otherwise.
-    """
-    return isinstance(value, (bytes, bytearray, io.IOBase))
 
 
 async def json_dumps(obj: Any) -> str:
