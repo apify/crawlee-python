@@ -8,7 +8,8 @@ from crawlee.crawlers import (
 
 # Disable clearing the `RequestQueue`, `KeyValueStore` and `Dataset` on each run.
 # This makes the scraper continue from where it left off in the previous run.
-# The recommended way to achieve this behavior is setting the environment variable `CRAWLEE_PURGE_ON_START=0`
+# The recommended way to achieve this behavior is setting the environment variable
+# `CRAWLEE_PURGE_ON_START=0`
 configuration = service_locator.get_configuration()
 configuration.purge_on_start = False
 
