@@ -10,17 +10,23 @@ import ResumeCrawl from '!!raw-loader!roa-loader!./code_examples/resuming_paused
 
 This example demonstrates how to resume crawling from its last state when running locally, if for some reason it was unexpectedly terminated.
 
-As a foundation, we use <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> and this [run example](./beautifulsoup-crawler).
-
 If each run should continue crawling from the previous state, you can configure this using `purge_on_start` in <ApiLink to="class/Configuration">`Configuration`</ApiLink>.
 
-The following code will crawl about 10 links per run, which is controlled by the `max_requests_per_crawl` parameter in <ApiLink to="class/BasicCrawlerOptions">`BasicCrawlerOptions`</ApiLink>, but each time it will continue from where it stopped in the previous run.
+Use the code below and perform 2 sequential runs. During the 1st run, stop the crawler by pressing `CTRL+C`, and the 2nd run will resume crawling from where it stopped.
 
 <RunnableCodeBlock className="language-python" language="python">
     {ResumeCrawl}
 </RunnableCodeBlock>
 
-Alternatively, use the environment variable `CRAWLEE_PURGE_ON_START=0`.
+Perform the 1st run, interrupting the crawler with `CTRL+C` after 2 links have been processed.
+
+![Run with interruption](/img/resuming-paused-crawl/00.jpg 'Run with interruption.')
+
+Now resume crawling after the pause to process the remaining 3 links.
+
+![Resuming crawling](/img/resuming-paused-crawl/01.jpg 'Resuming crawling.')
+
+Alternatively, use the environment variable `CRAWLEE_PURGE_ON_START=0` instead of using `configuration.purge_on_start = False`.
 
 For example, when running code:
 
