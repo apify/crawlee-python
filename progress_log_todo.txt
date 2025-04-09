@@ -1,0 +1,7 @@
+1) ALL classes inherit from _basic_crawler.py
+    - either directly (PlaywrightCrawler) or thru _abstract_http_crawler.py (ParselCrawler, BeautifulSoupCrawler)
+    - Monitor only needs to be placed into _basic_crawler.py!
+2) Does Monitor belong in crawlee? or should it go elsewhere?
+    - MONITOR.py IS COOL WHERE IT IS, crawlee/ = core/src/
+3) No idea how auto tests would look, would have to figure that out
+4)
