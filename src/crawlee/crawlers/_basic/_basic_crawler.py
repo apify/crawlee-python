@@ -426,6 +426,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._logger.info(f'Crawler.stop() was called with following reason: {reason}.')
         self._unexpected_stop = True
 
+        # MONITOR.STOP() HERE
+
     def _stop_if_max_requests_count_exceeded(self) -> None:
         """Call `stop` when the maximum number of requests to crawl has been reached."""
         if self._max_requests_per_crawl is None:
@@ -622,6 +624,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         ]
 
         async with AsyncExitStack() as exit_stack:
+            # MONITOR.START()? SOMEWHERE IN _run_crawler()
             for context in contexts_to_enter:
                 await exit_stack.enter_async_context(context)  # type: ignore[arg-type]
 

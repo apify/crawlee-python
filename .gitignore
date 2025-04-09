@@ -52,3 +52,6 @@ website/package-lock.json
 
 # Default directory for memory storage
 storage/
+
+# sandbox for testing changes
+sandbox/
