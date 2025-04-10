@@ -4,9 +4,13 @@ import asyncio
 from contextlib import suppress
 from typing import TYPE_CHECKING
 
+from ._types import PlaywrightHttpResponse
+
 if TYPE_CHECKING:
     from playwright.async_api import Page
     from playwright.async_api import Request as PlaywrightRequest
+
+    from crawlee._types import HttpHeaders, HttpMethod, SendRequestFunction
 
 _DEFAULT_BLOCK_REQUEST_URL_PATTERNS = [
     '.css',
@@ -108,3 +112,17 @@ async def block_requests(
 
         if specific_files:
             await page.route(f'**/{{{",".join(specific_files)}}}*', lambda route, _: route.abort())
+
+
+def prepare_send_request_function(page: Page) -> SendRequestFunction:
+    async def send_request(
+        url: str, *, method: HttpMethod = 'GET', headers: HttpHeaders | dict[str, str] | None = None
+    ) -> PlaywrightHttpResponse:
+        # It is necessary to pass `set_extra_http_headers` passed earlier to `Playwright`
+        # TODO: https://github.com/apify/crawlee-python/issues/1055
+        headers = dict(headers) if headers else None
+        # `request` is done based on the browser context and uses the same cookies and proxies
+        response = await page.request.fetch(url_or_request=url, method=method, headers=headers)
+        return await PlaywrightHttpResponse.from_playwright_response(response=response, protocol='')
+
+    return send_request
