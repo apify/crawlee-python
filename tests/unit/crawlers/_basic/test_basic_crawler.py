@@ -1291,3 +1291,22 @@ async def test_handle_error_bound_session_to_request() -> None:
     await crawler.run(requests)
 
     assert error_handler_mock.call_count == 1
+
+
+async def test_handles_session_error_in_failed_request_handler() -> None:
+    crawler = BasicCrawler(max_session_rotations=1)
+    handler_requests = set()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        raise SessionError('blocked')
+
+    @crawler.failed_request_handler
+    async def failed_request_handler(context: BasicCrawlingContext, error: Exception) -> None:
+        handler_requests.add(context.request.url)
+
+    requests = ['http://a.com/', 'http://b.com/', 'http://c.com/']
+
+    await crawler.run(requests)
+
+    assert set(requests) == handler_requests
