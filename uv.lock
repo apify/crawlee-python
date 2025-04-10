@@ -706,7 +706,7 @@ requires-dist = [
     { name = "html5lib", marker = "extra == 'beautifulsoup'", specifier = ">=1.0" },
     { name = "httpx", extras = ["brotli", "http2", "zstd"], specifier = ">=0.27.0" },
     { name = "impit", marker = "extra == 'all'", specifier = ">=0.1.0" },
-    { name = "impit", marker = "extra == 'impit'", specifier = ">=0.1.0" },
+    { name = "impit", marker = "extra == 'impit'", specifier = ">=0.2.0" },
     { name = "inquirer", marker = "extra == 'all'", specifier = ">=3.3.0" },
     { name = "inquirer", marker = "extra == 'cli'", specifier = ">=3.3.0" },
     { name = "jaro-winkler", marker = "extra == 'adaptive-crawler'", specifier = ">=2.0.3" },
