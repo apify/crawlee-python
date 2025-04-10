@@ -3,7 +3,7 @@ from __future__ import annotations
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, Optional
 
-import impit  # type: ignore[import-untyped]
+from impit import AsyncClient, Response
 from typing_extensions import override
 
 from crawlee._types import HttpHeaders
@@ -22,9 +22,9 @@ logger = getLogger(__name__)
 
 
 class _ImpitResponse:
-    """Adapter class for `httpx.Response` to conform to the `HttpResponse` protocol."""
+    """Adapter class for `impit.Response` to conform to the `HttpResponse` protocol."""
 
-    def __init__(self, response: impit.Response) -> None:
+    def __init__(self, response: Response) -> None:
         self._response = response
 
     @property
@@ -40,14 +40,14 @@ class _ImpitResponse:
         return HttpHeaders(dict(self._response.headers))
 
     def read(self) -> bytes:
-        return str(self._response.text).encode()
+        return self._response.content
 
 
 @docs_group('Classes')
 class ImpitHttpClient(HttpClient):
-    """HTTP client based on the `HTTPX` library.
+    """HTTP client based on the `impit` library.
 
-    This client uses the `HTTPX` library to perform HTTP requests in crawlers (`BasicCrawler` subclasses)
+    This client uses the `impit` library to perform HTTP requests in crawlers (`BasicCrawler` subclasses)
     and to manage sessions, proxies, and error handling.
 
     See the `HttpClient` class for more common information about HTTP clients.
@@ -56,9 +56,9 @@ class ImpitHttpClient(HttpClient):
 
     ```python
     from crawlee.crawlers import HttpCrawler  # or any other HTTP client-based crawler
-    from crawlee.http_clients import HttpxHttpClient
+    from crawlee.http_clients import ImpitHttpClient
 
-    http_client = HttpxHttpClient()
+    http_client = ImpitHttpClient()
     crawler = HttpCrawler(http_client=http_client)
     ```
     """
@@ -71,7 +71,6 @@ class ImpitHttpClient(HttpClient):
         persist_cookies_per_session: bool = True,
         http3: bool = True,
         verify: bool = True,
-        header_generator: HeaderGenerator | None = _DEFAULT_HEADER_GENERATOR,
         **async_client_kwargs: Any,
     ) -> None:
         """Initialize a new instance.
@@ -90,9 +89,8 @@ class ImpitHttpClient(HttpClient):
         self._verify = verify
 
         self._async_client_kwargs = async_client_kwargs
-        self._header_generator = header_generator
 
-        self._client_by_proxy_url = dict[Optional[str], impit.AsyncClient]()
+        self._client_by_proxy_url = dict[Optional[str], AsyncClient]()
 
     @override
     async def crawl(
@@ -145,7 +143,7 @@ class ImpitHttpClient(HttpClient):
 
         return _ImpitResponse(response)
 
-    def _get_client(self, proxy_url: str | None) -> impit.AsyncClient:
+    def _get_client(self, proxy_url: str | None) -> AsyncClient:
         """Retrieve or create an HTTP client for the given proxy URL.
 
         If a client for the specified proxy URL does not exist, create and store a new one.
@@ -156,12 +154,13 @@ class ImpitHttpClient(HttpClient):
                 'proxy': proxy_url,
                 'http3': self._http3,
                 'verify': self._verify,
+                'follow_redirects': True,
             }
 
             # Update the default kwargs with any additional user-provided kwargs.
             kwargs.update(self._async_client_kwargs)
 
-            client = impit.AsyncClient(**kwargs)
+            client = AsyncClient(**kwargs)
             self._client_by_proxy_url[proxy_url] = client
 
         return self._client_by_proxy_url[proxy_url]
