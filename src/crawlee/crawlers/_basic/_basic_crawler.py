@@ -46,6 +46,7 @@ from crawlee.errors import (
     UserDefinedErrorHandlerError,
 )
 from crawlee.http_clients import HttpxHttpClient
+from crawlee.monitor import Monitor
 from crawlee.router import Router
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics, StatisticsState
@@ -426,8 +427,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._logger.info(f'Crawler.stop() was called with following reason: {reason}.')
         self._unexpected_stop = True
 
-        # MONITOR.STOP() HERE
-
     def _stop_if_max_requests_count_exceeded(self) -> None:
         """Call `stop` when the maximum number of requests to crawl has been reached."""
         if self._max_requests_per_crawl is None:
@@ -573,11 +572,20 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             with suppress(NotImplementedError):  # event loop signal handlers are not supported on Windows
                 asyncio.get_running_loop().add_signal_handler(signal.SIGINT, sigint_handler)
 
+        monitor = Monitor(
+            cast('Statistics[StatisticsState]', self._statistics),
+            self._autoscaled_pool,
+            self._request_manager,  # assuming this is valid
+        )
+
+        await monitor.start()
+
         try:
             await run_task
         except CancelledError:
             pass
         finally:
+            await monitor.stop()
             if threading.current_thread() is threading.main_thread():
                 with suppress(NotImplementedError):
                     asyncio.get_running_loop().remove_signal_handler(signal.SIGINT)
@@ -624,7 +632,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         ]
 
         async with AsyncExitStack() as exit_stack:
-            # MONITOR.START()? SOMEWHERE IN _run_crawler()
             for context in contexts_to_enter:
                 await exit_stack.enter_async_context(context)  # type: ignore[arg-type]
 

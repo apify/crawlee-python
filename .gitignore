@@ -55,3 +55,4 @@ storage/
 
 # sandbox for testing changes
 sandbox/
+tests/unit/test_monitor.py
