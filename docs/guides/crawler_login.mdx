@@ -32,10 +32,10 @@ The following example demonstrates how to authenticate on a website using <ApiLi
 
 ## Login with HTTP crawler
 
-You can also use <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink> (or its more specific variants like <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> or <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>) to authenticate by sending a POST <ApiLink to="class/Request">`Request`</ApiLink> with your credentials directly to the authentication endpoint:
+You can also use <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink> (or its more specific variants like <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> or <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>) to authenticate by sending a POST <ApiLink to="class/Request">`Request`</ApiLink> with your credentials directly to the authentication endpoint.
+
+HTTP-based authentication often varies significantly between websites. Using browser [DevTools](https://developer.chrome.com/docs/devtools/overview) to analyze the `Network` tab during manual login can help you understand the specific authentication flow, required headers, and body parameters for your target website.
 
 <RunnableCodeBlock className="language-python" language="python">
     {HttpLogin}
 </RunnableCodeBlock>
-
-> **Tip:** HTTP-based authentication often varies significantly between websites. Using browser [DevTools](https://developer.chrome.com/docs/devtools/overview) to analyze the `Network` tab during manual login can help you understand the specific authentication flow, required headers, and body parameters for your target website.
