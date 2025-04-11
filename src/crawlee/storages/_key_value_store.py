@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 T = TypeVar('T')
 
 # TODO:
-# - caching / memoization of both KVS & KVS clients
+# - caching / memoization of KVS
 
 # Properties:
 # - id
