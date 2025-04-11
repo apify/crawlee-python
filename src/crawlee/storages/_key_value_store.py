@@ -3,9 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, overload
 
+from typing_extensions import override
+
 from crawlee import service_locator
 from crawlee._utils.docs import docs_group
 from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecordMetadata
+
+from ._base import Storage
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -18,7 +22,6 @@ if TYPE_CHECKING:
 T = TypeVar('T')
 
 # TODO:
-# - inherit from storage class
 # - caching / memoization of both KVS & KVS clients
 
 # Properties:
@@ -45,7 +48,7 @@ T = TypeVar('T')
 # - persist_autosaved_values method has been removed -> It should be managed by the underlying client.
 
 @docs_group('Classes')
-class KeyValueStore:
+class KeyValueStore(Storage):
     """Represents a key-value based storage for reading and writing data records or files.
 
     Each data record is identified by a unique key and associated with a specific MIME content type. This class is
@@ -93,14 +96,17 @@ class KeyValueStore:
         """
         self._client = client
 
+    @override
     @property
     def id(self) -> str:
         return self._client.id
 
+    @override
     @property
     def name(self) -> str | None:
         return self._client.name
 
+    @override
     @property
     def metadata(self) -> KeyValueStoreMetadata:
         return KeyValueStoreMetadata(
@@ -111,6 +117,7 @@ class KeyValueStore:
             modified_at=self._client.modified_at,
         )
 
+    @override
     @classmethod
     async def open(
         cls,
@@ -139,6 +146,7 @@ class KeyValueStore:
 
         return cls(client)
 
+    @override
     async def drop(self) -> None:
         await self._client.drop()
 
