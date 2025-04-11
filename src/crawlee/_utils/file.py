@@ -2,17 +2,26 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import csv
 import json
 import mimetypes
 import os
 import re
 import shutil
 from enum import Enum
+from logging import getLogger
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
     from pathlib import Path
-    from typing import Any
+    from typing import Any, TextIO
+
+    from typing_extensions import Unpack
+
+    from crawlee.storages._types import ExportDataCsvKwargs, ExportDataJsonKwargs
+
+logger = getLogger(__name__)
 
 
 class ContentType(Enum):
@@ -92,3 +101,36 @@ async def json_dumps(obj: Any) -> str:
         A string containing the JSON representation of the input object.
     """
     return await asyncio.to_thread(json.dumps, obj, ensure_ascii=False, indent=2, default=str)
+
+
+async def export_json_to_stream(
+    iterator: AsyncIterator[dict],
+    dst: TextIO,
+    **kwargs: Unpack[ExportDataJsonKwargs],
+) -> None:
+    items = [item async for item in iterator]
+
+    if items:
+        json.dump(items, dst, **kwargs)
+    else:
+        logger.warning('Attempting to export an empty dataset - no file will be created')
+
+
+async def export_csv_to_stream(
+    iterator: AsyncIterator[dict],
+    dst: TextIO,
+    **kwargs: Unpack[ExportDataCsvKwargs],
+) -> None:
+    writer = csv.writer(dst, **kwargs)
+    write_header = True
+
+    # Iterate over the dataset and write to CSV.
+    async for item in iterator:
+        if not item:
+            continue
+
+        if write_header:
+            writer.writerow(item.keys())
+            write_header = False
+
+        writer.writerow(item.values())

@@ -14,6 +14,22 @@ if TYPE_CHECKING:
     from crawlee.storage_clients.models import DatasetItemsListPage
 
 
+# Properties:
+# - id
+# - name
+# - created_at
+# - accessed_at
+# - modified_at
+# - item_count
+
+# Methods:
+# - open
+# - drop
+# - push_data
+# - get_data
+# - iterate
+
+
 @docs_group('Abstract classes')
 class DatasetClient(ABC):
     """An abstract class for dataset resource clients.
