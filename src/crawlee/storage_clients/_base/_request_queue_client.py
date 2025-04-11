@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from datetime import datetime
 
     from crawlee.storage_clients.models import (
         BatchRequestsOperationResponse,
@@ -15,7 +17,6 @@ if TYPE_CHECKING:
         Request,
         RequestQueueHead,
         RequestQueueHeadWithLocks,
-        RequestQueueMetadata,
     )
 
 
@@ -27,17 +28,67 @@ class RequestQueueClient(ABC):
     client, like a memory storage client.
     """
 
+    @property
     @abstractmethod
-    async def get(self) -> RequestQueueMetadata | None:
-        """Get metadata about the request queue being managed by this client.
+    def id(self) -> str:
+        """The ID of the dataset."""
 
-        Returns:
-            An object containing the request queue's details, or None if the request queue does not exist.
+    @property
+    @abstractmethod
+    def name(self) -> str | None:
+        """The name of the dataset."""
+
+    @property
+    @abstractmethod
+    def created_at(self) -> datetime:
+        """The time at which the dataset was created."""
+
+    @property
+    @abstractmethod
+    def accessed_at(self) -> datetime:
+        """The time at which the dataset was last accessed."""
+
+    @property
+    @abstractmethod
+    def modified_at(self) -> datetime:
+        """The time at which the dataset was last modified."""
+
+    @property
+    @abstractmethod
+    def had_multiple_clients(self) -> bool:
+        """TODO."""
+
+    @property
+    @abstractmethod
+    def handled_request_count(self) -> int:
+        """TODO."""
+
+    @property
+    @abstractmethod
+    def pending_request_count(self) -> int:
+        """TODO."""
+
+    @property
+    @abstractmethod
+    def stats(self) -> dict:
+        """TODO."""
+
+    @property
+    @abstractmethod
+    def total_request_count(self) -> int:
+        """TODO."""
+
+    @property
+    @abstractmethod
+    def resource_directory(self) -> str:
+        """TODO."""
+
+    @abstractmethod
+    async def drop(self) -> None:
+        """Drop the whole request queue and remove all its values.
+
+        The backend method for the `RequestQueue.drop` call.
         """
-
-    @abstractmethod
-    async def delete(self) -> None:
-        """Permanently delete the request queue managed by this client."""
 
     @abstractmethod
     async def list_head(self, *, limit: int | None = None) -> RequestQueueHead:

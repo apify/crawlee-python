@@ -5,11 +5,14 @@ from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+from typing_extensions import override
+
 from crawlee import service_locator
 from crawlee._utils.docs import docs_group
 from crawlee._utils.file import export_csv_to_stream, export_json_to_stream
 from crawlee.storage_clients.models import DatasetMetadata
 
+from ._base import Storage
 from ._key_value_store import KeyValueStore
 
 if TYPE_CHECKING:
@@ -28,7 +31,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # TODO:
-# - inherit from storage class
 # - caching / memoization of both datasets & dataset clients
 
 # Properties:
@@ -56,7 +58,7 @@ logger = logging.getLogger(__name__)
 
 
 @docs_group('Classes')
-class Dataset:
+class Dataset(Storage):
     """Dataset is an append-only structured storage, ideal for tabular data similar to database tables.
 
     The `Dataset` class is designed to store structured data, where each entry (row) maintains consistent attributes
@@ -98,14 +100,17 @@ class Dataset:
         """
         self._client = client
 
+    @override
     @property
     def id(self) -> str:
         return self._client.id
 
+    @override
     @property
     def name(self) -> str | None:
         return self._client.name
 
+    @override
     @property
     def metadata(self) -> DatasetMetadata:
         return DatasetMetadata(
@@ -117,6 +122,7 @@ class Dataset:
             item_count=self._client.item_count,
         )
 
+    @override
     @classmethod
     async def open(
         cls,
@@ -145,6 +151,7 @@ class Dataset:
 
         return cls(client)
 
+    @override
     async def drop(self) -> None:
         await self._client.drop()
 
