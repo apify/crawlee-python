@@ -219,7 +219,7 @@ class FileSystemDatasetClient(DatasetClient):
         invalid = [arg for arg in unsupported_args if arg not in (False, None)]
         if invalid:
             logger.warning(
-                f'The arguments {invalid} of iterate_items are not supported by the {self.__class__.__name__} client.'
+                f'The arguments {invalid} of get_data are not supported by the {self.__class__.__name__} client.'
             )
 
         # If the dataset directory does not exist, log a warning and return an empty page.

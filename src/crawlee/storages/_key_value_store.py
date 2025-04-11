@@ -21,14 +21,6 @@ T = TypeVar('T')
 # - inherit from storage class
 # - caching / memoization of both KVS & KVS clients
 
-# Suggested KVS breaking changes:
-# - from_storage_object method has been removed - Use the open method with name and/or id instead.
-# - get_info -> metadata property
-# - storage_object -> metadata property
-# - set_metadata method has been removed - Do we want to support it (e.g. for renaming)?
-# - get_auto_saved_value method has been removed -> It should be managed by the underlying client.
-# - persist_autosaved_values method has been removed -> It should be managed by the underlying client.
-
 # Properties:
 # - id
 # - name
@@ -44,6 +36,13 @@ T = TypeVar('T')
 # - list_keys (new method)
 # - get_public_url
 
+# Breaking changes:
+# - from_storage_object method has been removed - Use the open method with name and/or id instead.
+# - get_info -> metadata property
+# - storage_object -> metadata property
+# - set_metadata method has been removed - Do we want to support it (e.g. for renaming)?
+# - get_auto_saved_value method has been removed -> It should be managed by the underlying client.
+# - persist_autosaved_values method has been removed -> It should be managed by the underlying client.
 
 @docs_group('Classes')
 class KeyValueStore:

@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import csv
-import io
-import json
 import logging
+from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, TextIO, cast
+from typing import TYPE_CHECKING, Literal
 
 from crawlee import service_locator
 from crawlee._utils.docs import docs_group
+from crawlee._utils.file import export_csv_to_stream, export_json_to_stream
 from crawlee.storage_clients.models import DatasetMetadata
 
 from ._key_value_store import KeyValueStore
@@ -24,28 +23,36 @@ if TYPE_CHECKING:
     from crawlee.storage_clients._base import DatasetClient
     from crawlee.storage_clients.models import DatasetItemsListPage
 
-    from ._types import ExportDataCsvKwargs, ExportDataJsonKwargs, ExportToKwargs
+    from ._types import ExportDataCsvKwargs, ExportDataJsonKwargs
 
 logger = logging.getLogger(__name__)
 
 # TODO:
 # - inherit from storage class
-# - export methods
 # - caching / memoization of both datasets & dataset clients
 
-# Dataset
-# - properties:
-#   - id
-#   - name
-#   - metadata
-# - methods:
-#   - open
-#   - drop
-#   - push_data
-#   - get_data
-#   - iterate
-#   - export_to_csv
-#   - export_to_json
+# Properties:
+# - id
+# - name
+# - metadata
+
+# Methods:
+# - open
+# - drop
+# - push_data
+# - get_data
+# - iterate
+# - export_to
+# - export_to_json
+# - export_to_csv
+
+# Breaking changes:
+# - from_storage_object method has been removed - Use the open method with name and/or id instead.
+# - get_info -> metadata property
+# - storage_object -> metadata property
+# - set_metadata method has been removed - Do we want to support it (e.g. for renaming)?
+# - write_to_json -> export_to_json
+# - write_to_csv -> export_to_csv
 
 
 @docs_group('Classes')
@@ -253,8 +260,13 @@ class Dataset:
         ):
             yield item
 
-    # TODO: update this once KVS is implemented
-    async def export_to(self, **kwargs: Unpack[ExportToKwargs]) -> None:
+    async def export_to(
+        self,
+        key: str,
+        content_type: Literal['json', 'csv'] = 'json',
+        to_key_value_store_id: str | None = None,
+        to_key_value_store_name: str | None = None,
+    ) -> None:
         """Export the entire dataset into a specified file stored under a key in a key-value store.
 
         This method consolidates all entries from a specified dataset into one file, which is then saved under a
@@ -263,74 +275,48 @@ class Dataset:
         name should be used.
 
         Args:
-            kwargs: Keyword arguments for the storage client method.
+            key: The key under which to save the data in the key-value store.
+            content_type: The format in which to export the data.
+            to_key_value_store_id: ID of the key-value store to save the exported file.
+                Specify only one of ID or name.
+            to_key_value_store_name: Name of the key-value store to save the exported file.
+                Specify only one of ID or name.
         """
-        key = cast('str', kwargs.get('key'))
-        content_type = kwargs.get('content_type', 'json')
-        to_key_value_store_id = kwargs.get('to_key_value_store_id')
-        to_key_value_store_name = kwargs.get('to_key_value_store_name')
-
-        key_value_store = await KeyValueStore.open(id=to_key_value_store_id, name=to_key_value_store_name)
-
-        output = io.StringIO()
         if content_type == 'csv':
-            await self.write_to_csv(output)
+            await self.export_to_csv(
+                key,
+                to_key_value_store_id,
+                to_key_value_store_name,
+            )
         elif content_type == 'json':
-            await self.write_to_json(output)
+            await self.export_to_json(
+                key,
+                to_key_value_store_id,
+                to_key_value_store_name,
+            )
         else:
             raise ValueError('Unsupported content type, expecting CSV or JSON')
 
-        if content_type == 'csv':
-            await key_value_store.set_value(key, output.getvalue(), 'text/csv')
+    async def export_to_json(
+        self,
+        key: str,
+        to_key_value_store_id: str | None = None,
+        to_key_value_store_name: str | None = None,
+        **kwargs: Unpack[ExportDataJsonKwargs],
+    ) -> None:
+        kvs = await KeyValueStore.open(id=to_key_value_store_id, name=to_key_value_store_name)
+        dst = StringIO()
+        await export_json_to_stream(self.iterate(), dst, **kwargs)
+        await kvs.set_value(key, dst.getvalue(), 'application/json')
 
-        if content_type == 'json':
-            await key_value_store.set_value(key, output.getvalue(), 'application/json')
-
-    # TODO: update this once KVS is implemented
-    async def write_to_csv(self, destination: TextIO, **kwargs: Unpack[ExportDataCsvKwargs]) -> None:
-        """Export the entire dataset into an arbitrary stream.
-
-        Args:
-            destination: The stream into which the dataset contents should be written.
-            kwargs: Additional keyword arguments for `csv.writer`.
-        """
-        items: list[dict] = []
-        limit = 1000
-        offset = 0
-
-        while True:
-            list_items = await self._client.get_data(limit=limit, offset=offset)
-            items.extend(list_items.items)
-            if list_items.total <= offset + list_items.count:
-                break
-            offset += list_items.count
-
-        if items:
-            writer = csv.writer(destination, **kwargs)
-            writer.writerows([items[0].keys(), *[item.values() for item in items]])
-        else:
-            logger.warning('Attempting to export an empty dataset - no file will be created')
-
-    # TODO: update this once KVS is implemented
-    async def write_to_json(self, destination: TextIO, **kwargs: Unpack[ExportDataJsonKwargs]) -> None:
-        """Export the entire dataset into an arbitrary stream.
-
-        Args:
-            destination: The stream into which the dataset contents should be written.
-            kwargs: Additional keyword arguments for `json.dump`.
-        """
-        items: list[dict] = []
-        limit = 1000
-        offset = 0
-
-        while True:
-            list_items = await self._client.get_data(limit=limit, offset=offset)
-            items.extend(list_items.items)
-            if list_items.total <= offset + list_items.count:
-                break
-            offset += list_items.count
-
-        if items:
-            json.dump(items, destination, **kwargs)
-        else:
-            logger.warning('Attempting to export an empty dataset - no file will be created')
+    async def export_to_csv(
+        self,
+        key: str,
+        to_key_value_store_id: str | None = None,
+        to_key_value_store_name: str | None = None,
+        **kwargs: Unpack[ExportDataCsvKwargs],
+    ) -> None:
+        kvs = await KeyValueStore.open(id=to_key_value_store_id, name=to_key_value_store_name)
+        dst = StringIO()
+        await export_csv_to_stream(self.iterate(), dst, **kwargs)
+        await kvs.set_value(key, dst.getvalue(), 'text/csv')
