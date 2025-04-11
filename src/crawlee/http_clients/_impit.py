@@ -107,12 +107,13 @@ class ImpitHttpClient(HttpClient):
             url=request.url,
             method=request.method,
             content=request.payload,
+            headers=dict(request.headers) if request.headers else None,
         )
 
         if statistics:
             statistics.register_status_code(response.status_code)
 
-        request.loaded_url = str(request.url)
+        request.loaded_url = str(response.url)
 
         return HttpCrawlingResult(
             http_response=_ImpitResponse(response),
