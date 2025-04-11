@@ -12,11 +12,7 @@ from typing_extensions import override
 
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee.storage_clients._base import KeyValueStoreClient
-from crawlee.storage_clients.models import (
-    KeyValueStoreMetadata,
-    KeyValueStoreRecord,
-    KeyValueStoreRecordMetadata,
-)
+from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
 
 from ._utils import METADATA_FILENAME, json_dumps
 
@@ -25,6 +21,9 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 logger = getLogger(__name__)
+
+_cache_by_name = dict[str, 'FileSystemKeyValueStoreClient']()
+"""A dictionary to cache clients by their names."""
 
 
 class FileSystemKeyValueStoreClient(KeyValueStoreClient):
@@ -50,11 +49,14 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
         Preferably use the `FileSystemKeyValueStoreClient.open` class method to create a new instance.
         """
-        self._id = id
-        self._name = name
-        self._created_at = created_at
-        self._accessed_at = accessed_at
-        self._modified_at = modified_at
+        self._metadata = KeyValueStoreMetadata(
+            id=id,
+            name=name,
+            created_at=created_at,
+            accessed_at=accessed_at,
+            modified_at=modified_at,
+        )
+
         self._storage_dir = storage_dir
 
         # Internal attributes.
@@ -64,44 +66,45 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
     @override
     @property
     def id(self) -> str:
-        return self._id
+        return self._metadata.id
 
     @override
     @property
-    def name(self) -> str | None:
-        return self._name
+    def name(self) -> str:
+        return self._metadata.name
 
     @override
     @property
     def created_at(self) -> datetime:
-        return self._created_at
+        return self._metadata.created_at
 
     @override
     @property
     def accessed_at(self) -> datetime:
-        return self._accessed_at
+        return self._metadata.accessed_at
 
     @override
     @property
     def modified_at(self) -> datetime:
-        return self._modified_at
+        return self._metadata.modified_at
 
     @property
-    def _path_to_kvs(self) -> Path:
+    def path_to_kvs(self) -> Path:
         """The full path to the key-value store directory."""
-        return self._storage_dir / self._STORAGE_SUBDIR / self._name
+        return self._storage_dir / self._STORAGE_SUBDIR / self.name
 
     @property
-    def _path_to_metadata(self) -> Path:
+    def path_to_metadata(self) -> Path:
         """The full path to the key-value store metadata file."""
-        return self._path_to_kvs / METADATA_FILENAME
+        return self.path_to_kvs / METADATA_FILENAME
 
     @override
     @classmethod
     async def open(
         cls,
-        id: str | None,
-        name: str | None,
+        *,
+        id: str | None = None,
+        name: str | None = None,
         storage_dir: Path,
     ) -> FileSystemKeyValueStoreClient:
         """Open an existing key-value store client or create a new one if it does not exist.
@@ -123,6 +126,11 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             )
 
         name = name or cls._DEFAULT_NAME
+
+        # Check if the client is already cached by name.
+        if name in _cache_by_name:
+            return _cache_by_name[name]
+
         kvs_path = storage_dir / cls._STORAGE_SUBDIR / name
         metadata_path = kvs_path / METADATA_FILENAME
 
@@ -165,18 +173,28 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             )
             await client._update_metadata()
 
+        # Cache the client by name.
+        _cache_by_name[name] = client
+
         return client
 
     @override
     async def drop(self) -> None:
-        # If the key-value store directory exists, remove it recursively.
-        if self._path_to_kvs.exists():
+        # If the client directory exists, remove it recursively.
+        if self.path_to_kvs.exists():
             async with self._lock:
-                await asyncio.to_thread(shutil.rmtree, self._path_to_kvs)
+                await asyncio.to_thread(shutil.rmtree, self.path_to_kvs)
+
+        # Remove the client from the cache.
+        if self.name in _cache_by_name:
+            del _cache_by_name[self.name]
 
     @override
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:
-        record_path = self._path_to_kvs / key
+        # Update the metadata to record access
+        await self._update_metadata(update_accessed_at=True)
+
+        record_path = self.path_to_kvs / key
 
         if not record_path.exists():
             return None
@@ -227,9 +245,6 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         else:
             value = value_bytes
 
-        # Update the metadata to record access
-        await self._update_metadata(update_accessed_at=True)
-
         # Calculate the size of the value in bytes
         size = len(value_bytes)
 
@@ -255,7 +270,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             # Fallback: attempt to convert to string and encode.
             value_bytes = str(value).encode('utf-8')
 
-        record_path = self._path_to_kvs / key
+        record_path = self.path_to_kvs / key
 
         # Get the metadata.
         # Calculate the size of the value in bytes
@@ -266,7 +281,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
         async with self._lock:
             # Ensure the key-value store directory exists.
-            await asyncio.to_thread(self._path_to_kvs.mkdir, parents=True, exist_ok=True)
+            await asyncio.to_thread(self.path_to_kvs.mkdir, parents=True, exist_ok=True)
 
             # Dump the value to the file.
             await asyncio.to_thread(record_path.write_bytes, value_bytes)
@@ -283,7 +298,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
     @override
     async def delete_value(self, *, key: str) -> None:
-        record_path = self._path_to_kvs / key
+        record_path = self.path_to_kvs / key
         metadata_path = record_path.with_name(f'{record_path.name}.{METADATA_FILENAME}')
         deleted = False
 
@@ -312,13 +327,13 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         limit: int | None = None,
     ) -> AsyncIterator[KeyValueStoreRecordMetadata]:
         # Check if the KVS directory exists
-        if not self._path_to_kvs.exists():
+        if not self.path_to_kvs.exists():
             return
 
         count = 0
         async with self._lock:
             # Get all files in the KVS directory
-            files = sorted(await asyncio.to_thread(list, self._path_to_kvs.glob('*')))
+            files = sorted(await asyncio.to_thread(list, self.path_to_kvs.glob('*')))
 
             for file_path in files:
                 # Skip the main metadata file
@@ -371,20 +386,16 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             update_modified_at: If True, update the `modified_at` timestamp to the current time.
         """
         now = datetime.now(timezone.utc)
-        metadata = KeyValueStoreMetadata(
-            id=self._id,
-            name=self._name,
-            created_at=self._created_at,
-            accessed_at=now if update_accessed_at else self._accessed_at,
-            modified_at=now if update_modified_at else self._modified_at,
-        )
+
+        self._metadata.accessed_at = now if update_accessed_at else self._metadata.accessed_at
+        self._metadata.modified_at = now if update_modified_at else self._metadata.modified_at
 
         # Ensure the parent directory for the metadata file exists.
-        await asyncio.to_thread(self._path_to_metadata.parent.mkdir, parents=True, exist_ok=True)
+        await asyncio.to_thread(self.path_to_metadata.parent.mkdir, parents=True, exist_ok=True)
 
         # Dump the serialized metadata to the file.
-        data = await json_dumps(metadata.model_dump())
-        await asyncio.to_thread(self._path_to_metadata.write_text, data, encoding='utf-8')
+        data = await json_dumps(self._metadata.model_dump())
+        await asyncio.to_thread(self.path_to_metadata.write_text, data, encoding='utf-8')
 
     def _infer_mime_type(self, value: Any) -> str:
         """Infer the MIME content type from the value.

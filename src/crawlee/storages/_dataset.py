@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # TODO:
-# - caching / memoization of both datasets & dataset clients
+# - caching / memoization of Dataset
 
 # Properties:
 # - id

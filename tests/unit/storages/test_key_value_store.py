@@ -134,7 +134,7 @@ async def test_get_public_url(key_value_store: KeyValueStore) -> None:
     url = urlparse(public_url)
     path = url.netloc if url.netloc else url.path
 
-    with open(path) as f:  # noqa: ASYNC230
+    with open(path) as f:
         content = await asyncio.to_thread(f.read)
         assert content == 'static'
 

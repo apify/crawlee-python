@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import io
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -12,7 +11,6 @@ from crawlee._utils.file import (
     force_remove,
     force_rename,
     is_content_type,
-    is_file_or_bytes,
     json_dumps,
 )
 
@@ -23,15 +21,6 @@ async def test_json_dumps() -> None:
     assert await json_dumps('string') == '"string"'
     assert await json_dumps(123) == '123'
     assert await json_dumps(datetime(2022, 1, 1, tzinfo=timezone.utc)) == '"2022-01-01 00:00:00+00:00"'
-
-
-def test_is_file_or_bytes() -> None:
-    assert is_file_or_bytes(b'bytes') is True
-    assert is_file_or_bytes(bytearray(b'bytearray')) is True
-    assert is_file_or_bytes(io.BytesIO(b'some bytes')) is True
-    assert is_file_or_bytes(io.StringIO('string')) is True
-    assert is_file_or_bytes('just a regular string') is False
-    assert is_file_or_bytes(12345) is False
 
 
 @pytest.mark.parametrize(
@@ -115,7 +104,7 @@ async def test_force_remove(tmp_path: Path) -> None:
     assert test_file_path.exists() is False
 
     # Remove the file if it exists
-    with open(test_file_path, 'a', encoding='utf-8'):  # noqa: ASYNC230
+    with open(test_file_path, 'a', encoding='utf-8'):
         pass
     assert test_file_path.exists() is True
     await force_remove(test_file_path)
@@ -134,11 +123,11 @@ async def test_force_rename(tmp_path: Path) -> None:
     # Will remove dst_dir if it exists (also covers normal case)
     # Create the src_dir with a file in it
     src_dir.mkdir()
-    with open(src_file, 'a', encoding='utf-8'):  # noqa: ASYNC230
+    with open(src_file, 'a', encoding='utf-8'):
         pass
     # Create the dst_dir with a file in it
     dst_dir.mkdir()
-    with open(dst_file, 'a', encoding='utf-8'):  # noqa: ASYNC230
+    with open(dst_file, 'a', encoding='utf-8'):
         pass
     assert src_file.exists() is True
     assert dst_file.exists() is True

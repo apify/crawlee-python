@@ -23,6 +23,9 @@ if TYPE_CHECKING:
 
 logger = getLogger(__name__)
 
+_cache_by_name = dict[str, 'FileSystemDatasetClient']()
+"""A dictionary to cache clients by their names."""
+
 
 class FileSystemDatasetClient(DatasetClient):
     """A file system storage implementation of the dataset client.
@@ -55,12 +58,15 @@ class FileSystemDatasetClient(DatasetClient):
 
         Preferably use the `FileSystemDatasetClient.open` class method to create a new instance.
         """
-        self._id = id
-        self._name = name
-        self._created_at = created_at
-        self._accessed_at = accessed_at
-        self._modified_at = modified_at
-        self._item_count = item_count
+        self._metadata = DatasetMetadata(
+            id=id,
+            name=name,
+            created_at=created_at,
+            accessed_at=accessed_at,
+            modified_at=modified_at,
+            item_count=item_count,
+        )
+
         self._storage_dir = storage_dir
 
         # Internal attributes.
@@ -70,49 +76,50 @@ class FileSystemDatasetClient(DatasetClient):
     @override
     @property
     def id(self) -> str:
-        return self._id
+        return self._metadata.id
 
     @override
     @property
-    def name(self) -> str | None:
-        return self._name
+    def name(self) -> str:
+        return self._metadata.name
 
     @override
     @property
     def created_at(self) -> datetime:
-        return self._created_at
+        return self._metadata.created_at
 
     @override
     @property
     def accessed_at(self) -> datetime:
-        return self._accessed_at
+        return self._metadata.accessed_at
 
     @override
     @property
     def modified_at(self) -> datetime:
-        return self._modified_at
+        return self._metadata.modified_at
 
     @override
     @property
     def item_count(self) -> int:
-        return self._item_count
+        return self._metadata.item_count
 
     @property
-    def _path_to_dataset(self) -> Path:
+    def path_to_dataset(self) -> Path:
         """The full path to the dataset directory."""
-        return self._storage_dir / self._STORAGE_SUBDIR / self._name
+        return self._storage_dir / self._STORAGE_SUBDIR / self.name
 
     @property
-    def _path_to_metadata(self) -> Path:
+    def path_to_metadata(self) -> Path:
         """The full path to the dataset metadata file."""
-        return self._path_to_dataset / METADATA_FILENAME
+        return self.path_to_dataset / METADATA_FILENAME
 
     @override
     @classmethod
     async def open(
         cls,
-        id: str | None,
-        name: str | None,
+        *,
+        id: str | None = None,
+        name: str | None = None,
         storage_dir: Path,
     ) -> FileSystemDatasetClient:
         """Open an existing dataset client or create a new one if it does not exist.
@@ -134,6 +141,11 @@ class FileSystemDatasetClient(DatasetClient):
             )
 
         name = name or cls._DEFAULT_NAME
+
+        # Check if the client is already cached by name.
+        if name in _cache_by_name:
+            return _cache_by_name[name]
+
         dataset_path = storage_dir / cls._STORAGE_SUBDIR / name
         metadata_path = dataset_path / METADATA_FILENAME
 
@@ -178,25 +190,40 @@ class FileSystemDatasetClient(DatasetClient):
             )
             await client._update_metadata()
 
+        # Cache the client by name.
+        _cache_by_name[name] = client
+
         return client
 
     @override
     async def drop(self) -> None:
-        # If the dataset directory exists, remove it recursively.
-        if self._path_to_dataset.exists():
+        # If the client directory exists, remove it recursively.
+        if self.path_to_dataset.exists():
             async with self._lock:
-                await asyncio.to_thread(shutil.rmtree, self._path_to_dataset)
+                await asyncio.to_thread(shutil.rmtree, self.path_to_dataset)
+
+        # Remove the client from the cache.
+        if self.name in _cache_by_name:
+            del _cache_by_name[self.name]
 
     @override
     async def push_data(self, data: list[Any] | dict[str, Any]) -> None:
+        new_item_count = self.item_count
+
         # If data is a list, push each item individually.
         if isinstance(data, list):
             for item in data:
-                await self._push_item(item)
+                new_item_count += 1
+                await self._push_item(item, new_item_count)
         else:
-            await self._push_item(data)
+            new_item_count += 1
+            await self._push_item(data, new_item_count)
 
-        await self._update_metadata(update_accessed_at=True, update_modified_at=True)
+        await self._update_metadata(
+            update_accessed_at=True,
+            update_modified_at=True,
+            new_item_count=new_item_count,
+        )
 
     @override
     async def get_data(
@@ -223,8 +250,8 @@ class FileSystemDatasetClient(DatasetClient):
             )
 
         # If the dataset directory does not exist, log a warning and return an empty page.
-        if not self._path_to_dataset.exists():
-            logger.warning(f'Dataset directory not found: {self._path_to_dataset}')
+        if not self.path_to_dataset.exists():
+            logger.warning(f'Dataset directory not found: {self.path_to_dataset}')
             return DatasetItemsListPage(
                 count=0,
                 offset=offset,
@@ -298,8 +325,8 @@ class FileSystemDatasetClient(DatasetClient):
             )
 
         # If the dataset directory does not exist, log a warning and return immediately.
-        if not self._path_to_dataset.exists():
-            logger.warning(f'Dataset directory not found: {self._path_to_dataset}')
+        if not self.path_to_dataset.exists():
+            logger.warning(f'Dataset directory not found: {self.path_to_dataset}')
             return
 
         # Get the list of sorted data files.
@@ -334,33 +361,31 @@ class FileSystemDatasetClient(DatasetClient):
     async def _update_metadata(
         self,
         *,
+        new_item_count: int | None = None,
         update_accessed_at: bool = False,
         update_modified_at: bool = False,
     ) -> None:
         """Update the dataset metadata file with current information.
 
         Args:
+            new_item_count: If provided, update the item count to this value.
             update_accessed_at: If True, update the `accessed_at` timestamp to the current time.
             update_modified_at: If True, update the `modified_at` timestamp to the current time.
         """
         now = datetime.now(timezone.utc)
-        metadata = DatasetMetadata(
-            id=self._id,
-            name=self._name,
-            created_at=self._created_at,
-            accessed_at=now if update_accessed_at else self._accessed_at,
-            modified_at=now if update_modified_at else self._modified_at,
-            item_count=self._item_count,
-        )
+
+        self._metadata.accessed_at = now if update_accessed_at else self.accessed_at
+        self._metadata.modified_at = now if update_modified_at else self.modified_at
+        self._metadata.item_count = new_item_count if new_item_count else self.item_count
 
         # Ensure the parent directory for the metadata file exists.
-        await asyncio.to_thread(self._path_to_metadata.parent.mkdir, parents=True, exist_ok=True)
+        await asyncio.to_thread(self.path_to_metadata.parent.mkdir, parents=True, exist_ok=True)
 
         # Dump the serialized metadata to the file.
-        data = await json_dumps(metadata.model_dump())
-        await asyncio.to_thread(self._path_to_metadata.write_text, data, encoding='utf-8')
+        data = await json_dumps(self._metadata.model_dump())
+        await asyncio.to_thread(self.path_to_metadata.write_text, data, encoding='utf-8')
 
-    async def _push_item(self, item: dict[str, Any]) -> None:
+    async def _push_item(self, item: dict[str, Any], item_id: int) -> None:
         """Push a single item to the dataset.
 
         This method increments the item count, writes the item as a JSON file with a zero-padded filename,
@@ -368,13 +393,12 @@ class FileSystemDatasetClient(DatasetClient):
         """
         # Acquire the lock to perform file operations safely.
         async with self._lock:
-            self._item_count += 1
             # Generate the filename for the new item using zero-padded numbering.
-            filename = f'{str(self._item_count).zfill(self._LOCAL_ENTRY_NAME_DIGITS)}.json'
-            file_path = self._path_to_dataset / filename
+            filename = f'{str(item_id).zfill(self._LOCAL_ENTRY_NAME_DIGITS)}.json'
+            file_path = self.path_to_dataset / filename
 
             # Ensure the dataset directory exists.
-            await asyncio.to_thread(self._path_to_dataset.mkdir, parents=True, exist_ok=True)
+            await asyncio.to_thread(self.path_to_dataset.mkdir, parents=True, exist_ok=True)
 
             # Dump the serialized item to the file.
             data = await json_dumps(item)
@@ -389,12 +413,12 @@ class FileSystemDatasetClient(DatasetClient):
         # Retrieve and sort all JSON files in the dataset directory numerically.
         files = await asyncio.to_thread(
             sorted,
-            self._path_to_dataset.glob('*.json'),
+            self.path_to_dataset.glob('*.json'),
             key=lambda f: int(f.stem) if f.stem.isdigit() else 0,
         )
 
         # Remove the metadata file from the list if present.
-        if self._path_to_metadata in files:
-            files.remove(self._path_to_metadata)
+        if self.path_to_metadata in files:
+            files.remove(self.path_to_metadata)
 
         return files
