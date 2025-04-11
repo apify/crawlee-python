@@ -143,7 +143,6 @@ ignore = [
     "PLR0911",  # Too many return statements
     "PLR0913",  # Too many arguments in function definition
     "PLR0915",  # Too many statements
-    "PTH",      # flake8-use-pathlib
     "PYI034",   # `__aenter__` methods in classes like `{name}` usually return `self` at runtime
     "PYI036",   # The second argument in `__aexit__` should be annotated with `object` or `BaseException | None`
     "S102",     # Use of `exec` detected

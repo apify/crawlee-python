@@ -5,7 +5,7 @@ from collections import deque
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, TypedDict, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from cachetools import LRUCache
 from typing_extensions import override
@@ -27,18 +27,11 @@ if TYPE_CHECKING:
     from crawlee import Request
     from crawlee.configuration import Configuration
     from crawlee.storage_clients import StorageClient
+    from crawlee.storages._types import CachedRequest
 
 logger = getLogger(__name__)
 
 T = TypeVar('T')
-
-
-class CachedRequest(TypedDict):
-    id: str
-    was_already_handled: bool
-    hydrated: Request | None
-    lock_expires_at: datetime | None
-    forefront: bool
 
 
 @docs_group('Classes')
@@ -96,7 +89,6 @@ class RequestQueue(Storage, RequestManager):
 
         # Get resource clients from storage client
         self._resource_client = storage_client.request_queue(self._id)
-        self._resource_collection_client = storage_client.request_queues()
 
         self._request_lock_time = timedelta(minutes=3)
         self._queue_paused_for_migration = False
