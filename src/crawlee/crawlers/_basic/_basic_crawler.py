@@ -714,9 +714,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         dst = path.open('w', newline='')
 
         if path.suffix == '.csv':
-            await export_csv_to_stream(dataset.iterate(), dst)
+            await export_csv_to_stream(dataset.iterate_items(), dst)
         elif path.suffix == '.json':
-            await export_json_to_stream(dataset.iterate(), dst)
+            await export_json_to_stream(dataset.iterate_items(), dst)
         else:
             raise ValueError(f'Unsupported file extension: {path.suffix}')
 

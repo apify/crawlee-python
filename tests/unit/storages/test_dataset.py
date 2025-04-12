@@ -129,7 +129,7 @@ async def test_iterate_items(dataset: Dataset) -> None:
     idx = 0
     await dataset.push_data([{'id': i} for i in range(desired_item_count)])
 
-    async for item in dataset.iterate():
+    async for item in dataset.iterate_items():
         assert item['id'] == idx
         idx += 1
 

@@ -456,7 +456,7 @@ async def test_adaptive_crawler_exceptions_in_sub_crawlers(*, error_in_pw_crawle
     await crawler.run(test_urls[:1])
 
     dataset = await crawler.get_dataset()
-    stored_results = [item async for item in dataset.iterate()]
+    stored_results = [item async for item in dataset.iterate_items()]
 
     if error_in_pw_crawler:
         assert stored_results == []
