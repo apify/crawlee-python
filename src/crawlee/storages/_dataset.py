@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 # - drop
 # - push_data
 # - get_data
-# - iterate
+# - iterate_items
 # - export_to
 # - export_to_json
 # - export_to_csv
@@ -219,7 +219,7 @@ class Dataset(Storage):
             view=view,
         )
 
-    async def iterate(
+    async def iterate_items(
         self,
         *,
         offset: int = 0,
@@ -254,7 +254,7 @@ class Dataset(Storage):
             An asynchronous iterator of dictionary objects, each representing a dataset item after applying
             the specified filters and transformations.
         """
-        async for item in self._client.iterate(
+        async for item in self._client.iterate_items(
             offset=offset,
             limit=limit,
             clean=clean,
@@ -313,7 +313,7 @@ class Dataset(Storage):
     ) -> None:
         kvs = await KeyValueStore.open(id=to_key_value_store_id, name=to_key_value_store_name)
         dst = StringIO()
-        await export_json_to_stream(self.iterate(), dst, **kwargs)
+        await export_json_to_stream(self.iterate_items(), dst, **kwargs)
         await kvs.set_value(key, dst.getvalue(), 'application/json')
 
     async def export_to_csv(
@@ -325,5 +325,5 @@ class Dataset(Storage):
     ) -> None:
         kvs = await KeyValueStore.open(id=to_key_value_store_id, name=to_key_value_store_name)
         dst = StringIO()
-        await export_csv_to_stream(self.iterate(), dst, **kwargs)
+        await export_csv_to_stream(self.iterate_items(), dst, **kwargs)
         await kvs.set_value(key, dst.getvalue(), 'text/csv')

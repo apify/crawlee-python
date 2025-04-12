@@ -19,14 +19,14 @@ pytestmark = pytest.mark.only
 
 @pytest.fixture
 async def kvs_client(tmp_path: Path) -> AsyncGenerator[FileSystemKeyValueStoreClient, None]:
-    """A fixture for a file system key-value store client."""
+    """Fixture that provides a fresh file system key-value store client using a temporary directory."""
     client = await FileSystemKeyValueStoreClient.open(name='test_kvs', storage_dir=tmp_path)
     yield client
     await client.drop()
 
 
 async def test_open_creates_new_kvs(tmp_path: Path) -> None:
-    """Test that open() creates a new key-value store with proper metadata when it doesn't exist."""
+    """Test that open() creates a new key-value store with proper metadata and files on disk."""
     client = await FileSystemKeyValueStoreClient.open(name='new_kvs', storage_dir=tmp_path)
 
     # Verify client properties
@@ -48,7 +48,7 @@ async def test_open_creates_new_kvs(tmp_path: Path) -> None:
 
 
 async def test_open_existing_kvs(kvs_client: FileSystemKeyValueStoreClient, tmp_path: Path) -> None:
-    """Test that open() loads an existing key-value store correctly."""
+    """Test that open() loads an existing key-value store with matching properties."""
     # Open the same key-value store again
     reopened_client = await FileSystemKeyValueStoreClient.open(name=kvs_client.name, storage_dir=tmp_path)
 
@@ -61,13 +61,13 @@ async def test_open_existing_kvs(kvs_client: FileSystemKeyValueStoreClient, tmp_
 
 
 async def test_open_with_id_raises_error(tmp_path: Path) -> None:
-    """Test that open() raises an error when an ID is provided."""
+    """Test that open() raises an error when an ID is provided (unsupported for file system client)."""
     with pytest.raises(ValueError, match='not supported for file system storage client'):
         await FileSystemKeyValueStoreClient.open(id='some-id', storage_dir=tmp_path)
 
 
 async def test_set_get_value_string(kvs_client: FileSystemKeyValueStoreClient) -> None:
-    """Test setting and getting a string value."""
+    """Test setting and getting a string value with correct file creation and metadata."""
     # Set a value
     test_key = 'test-key'
     test_value = 'Hello, world!'
@@ -100,7 +100,7 @@ async def test_set_get_value_string(kvs_client: FileSystemKeyValueStoreClient) -
 
 
 async def test_set_get_value_json(kvs_client: FileSystemKeyValueStoreClient) -> None:
-    """Test setting and getting a JSON value."""
+    """Test setting and getting a JSON value with correct serialization and deserialization."""
     # Set a value
     test_key = 'test-json'
     test_value = {'name': 'John', 'age': 30, 'items': [1, 2, 3]}
@@ -115,7 +115,7 @@ async def test_set_get_value_json(kvs_client: FileSystemKeyValueStoreClient) -> 
 
 
 async def test_set_get_value_bytes(kvs_client: FileSystemKeyValueStoreClient) -> None:
-    """Test setting and getting binary data."""
+    """Test setting and getting binary data without corruption and with correct content type."""
     # Set a value
     test_key = 'test-binary'
     test_value = b'\x00\x01\x02\x03\x04'
@@ -131,7 +131,7 @@ async def test_set_get_value_bytes(kvs_client: FileSystemKeyValueStoreClient) ->
 
 
 async def test_set_value_explicit_content_type(kvs_client: FileSystemKeyValueStoreClient) -> None:
-    """Test setting a value with an explicit content type."""
+    """Test that an explicitly provided content type overrides the automatically inferred one."""
     test_key = 'test-explicit-content-type'
     test_value = 'Hello, world!'
     explicit_content_type = 'text/html; charset=utf-8'
@@ -144,13 +144,13 @@ async def test_set_value_explicit_content_type(kvs_client: FileSystemKeyValueSto
 
 
 async def test_get_nonexistent_value(kvs_client: FileSystemKeyValueStoreClient) -> None:
-    """Test getting a value that doesn't exist."""
+    """Test that attempting to get a non-existent key returns None."""
     record = await kvs_client.get_value(key='nonexistent-key')
     assert record is None
 
 
 async def test_overwrite_value(kvs_client: FileSystemKeyValueStoreClient) -> None:
-    """Test overwriting an existing value."""
+    """Test that an existing value can be overwritten and the updated value is retrieved correctly."""
     test_key = 'test-overwrite'
 
     # Set initial value
@@ -168,7 +168,7 @@ async def test_overwrite_value(kvs_client: FileSystemKeyValueStoreClient) -> Non
 
 
 async def test_delete_value(kvs_client: FileSystemKeyValueStoreClient) -> None:
-    """Test deleting a value."""
+    """Test that deleting a value removes its files from disk and makes it irretrievable."""
     test_key = 'test-delete'
     test_value = 'Delete me'
 
@@ -194,19 +194,19 @@ async def test_delete_value(kvs_client: FileSystemKeyValueStoreClient) -> None:
 
 
 async def test_delete_nonexistent_value(kvs_client: FileSystemKeyValueStoreClient) -> None:
-    """Test deleting a value that doesn't exist."""
+    """Test that attempting to delete a non-existent key is a no-op and doesn't raise errors."""
     # Should not raise an error
     await kvs_client.delete_value(key='nonexistent-key')
 
 
 async def test_iterate_keys_empty_store(kvs_client: FileSystemKeyValueStoreClient) -> None:
-    """Test iterating over keys in an empty store."""
+    """Test that iterating over an empty store yields no keys."""
     keys = [key async for key in kvs_client.iterate_keys()]
     assert len(keys) == 0
 
 
 async def test_iterate_keys(kvs_client: FileSystemKeyValueStoreClient) -> None:
-    """Test iterating over keys."""
+    """Test that all keys can be iterated over and are returned in sorted order."""
     # Add some values
     await kvs_client.set_value(key='key1', value='value1')
     await kvs_client.set_value(key='key2', value='value2')
@@ -219,7 +219,7 @@ async def test_iterate_keys(kvs_client: FileSystemKeyValueStoreClient) -> None:
 
 
 async def test_iterate_keys_with_limit(kvs_client: FileSystemKeyValueStoreClient) -> None:
-    """Test iterating over keys with a limit."""
+    """Test that the limit parameter returns only the specified number of keys."""
     # Add some values
     await kvs_client.set_value(key='key1', value='value1')
     await kvs_client.set_value(key='key2', value='value2')
@@ -231,7 +231,7 @@ async def test_iterate_keys_with_limit(kvs_client: FileSystemKeyValueStoreClient
 
 
 async def test_iterate_keys_with_exclusive_start_key(kvs_client: FileSystemKeyValueStoreClient) -> None:
-    """Test iterating over keys with an exclusive start key."""
+    """Test that exclusive_start_key parameter returns only keys after it alphabetically."""
     # Add some values with alphabetical keys
     await kvs_client.set_value(key='a-key', value='value-a')
     await kvs_client.set_value(key='b-key', value='value-b')
@@ -248,7 +248,7 @@ async def test_iterate_keys_with_exclusive_start_key(kvs_client: FileSystemKeyVa
 
 
 async def test_drop(tmp_path: Path) -> None:
-    """Test dropping a key-value store."""
+    """Test that drop removes the entire store directory from disk."""
     # Create a store and add a value
     client = await FileSystemKeyValueStoreClient.open(name='to_drop', storage_dir=tmp_path)
     await client.set_value(key='test', value='test-value')
@@ -265,7 +265,7 @@ async def test_drop(tmp_path: Path) -> None:
 
 
 async def test_metadata_updates(kvs_client: FileSystemKeyValueStoreClient) -> None:
-    """Test that metadata is updated correctly after operations."""
+    """Test that read/write operations properly update accessed_at and modified_at timestamps."""
     # Record initial timestamps
     initial_created = kvs_client.created_at
     initial_accessed = kvs_client.accessed_at
@@ -297,29 +297,13 @@ async def test_metadata_updates(kvs_client: FileSystemKeyValueStoreClient) -> No
 
 
 async def test_get_public_url_not_supported(kvs_client: FileSystemKeyValueStoreClient) -> None:
-    """Test that get_public_url raises NotImplementedError."""
+    """Test that get_public_url raises NotImplementedError for the file system implementation."""
     with pytest.raises(NotImplementedError, match='Public URLs are not supported'):
         await kvs_client.get_public_url(key='any-key')
 
 
-async def test_infer_mime_type(kvs_client: FileSystemKeyValueStoreClient) -> None:
-    """Test MIME type inference for different value types."""
-    # Test string
-    assert kvs_client._infer_mime_type('text') == 'text/plain; charset=utf-8'
-
-    # Test JSON
-    assert kvs_client._infer_mime_type({'key': 'value'}) == 'application/json; charset=utf-8'
-    assert kvs_client._infer_mime_type([1, 2, 3]) == 'application/json; charset=utf-8'
-
-    # Test binary
-    assert kvs_client._infer_mime_type(b'binary data') == 'application/octet-stream'
-
-    # Test other types
-    assert kvs_client._infer_mime_type(123) == 'application/octet-stream'
-
-
 async def test_concurrent_operations(kvs_client: FileSystemKeyValueStoreClient) -> None:
-    """Test concurrent operations on the key-value store."""
+    """Test that multiple concurrent set operations can be performed safely with correct results."""
 
     # Create multiple tasks to set different values concurrently
     async def set_value(key: str, value: str) -> None:

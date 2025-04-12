@@ -14,81 +14,74 @@ if TYPE_CHECKING:
     from crawlee.storage_clients.models import DatasetItemsListPage
 
 
-# Properties:
-# - id
-# - name
-# - created_at
-# - accessed_at
-# - modified_at
-# - item_count
-
-# Methods:
-# - open
-# - drop
-# - push_data
-# - get_data
-# - iterate
-
-
 @docs_group('Abstract classes')
 class DatasetClient(ABC):
-    """An abstract class for dataset resource clients.
+    """An abstract class for dataset storage clients.
 
-    These clients are specific to the type of resource they manage and operate under a designated storage
-    client, like a memory storage client.
+    Dataset clients provide an interface for accessing and manipulating dataset storage. They handle
+    operations like adding and getting dataset items across different storage backends.
+
+    Storage clients are specific to the type of storage they manage (`Dataset`, `KeyValueStore`,
+    `RequestQueue`), and can operate with various storage systems including memory, file system,
+    databases, and cloud storage solutions.
+
+    This abstract class defines the interface that all specific dataset clients must implement.
     """
 
     @property
     @abstractmethod
     def id(self) -> str:
-        """The ID of the dataset."""
+        """The ID of the dataet, a unique identifier, typically a UUID or similar value."""
 
     @property
     @abstractmethod
     def name(self) -> str | None:
-        """The name of the dataset."""
+        """The optional human-readable name of the dataset."""
 
     @property
     @abstractmethod
     def created_at(self) -> datetime:
-        """The time at which the dataset was created."""
+        """Timestamp when the dataset was first created, remains unchanged."""
 
     @property
     @abstractmethod
     def accessed_at(self) -> datetime:
-        """The time at which the dataset was last accessed."""
+        """Timestamp of last access to the dataset, updated on read or write operations."""
 
     @property
     @abstractmethod
     def modified_at(self) -> datetime:
-        """The time at which the dataset was last modified."""
+        """Timestamp of last modification of the dataset, updated when new data are added."""
 
     @property
     @abstractmethod
     def item_count(self) -> int:
-        """The number of items in the dataset."""
+        """Total count of data items stored in the dataset."""
 
     @classmethod
     @abstractmethod
     async def open(
         cls,
         *,
-        id: str | None,
-        name: str | None,
-        storage_dir: Path,
+        id: str | None = None,
+        name: str | None = None,
+        storage_dir: Path | None = None,
     ) -> DatasetClient:
         """Open existing or create a new dataset client.
 
-        If a dataset with the given name already exists, the appropriate dataset client is returned.
+        If a dataset with the given name or ID already exists, the appropriate dataset client is returned.
         Otherwise, a new dataset is created and client for it is returned.
 
+        The backend method for the `Dataset.open` call.
+
         Args:
-            id: The ID of the dataset.
-            name: The name of the dataset.
-            storage_dir: The path to the storage directory. If the client persists data, it should use this directory.
+            id: The ID of the dataset. If not provided, an ID may be generated.
+            name: The name of the dataset. If not provided a default name may be used.
+            storage_dir: The path to the storage directory. If the client persists data,
+                it should use this directory. May be ignored by non-persistent implementations.
 
         Returns:
-            A dataset client.
+            A dataset client instance.
         """
 
     @abstractmethod
@@ -99,7 +92,7 @@ class DatasetClient(ABC):
         """
 
     @abstractmethod
-    async def push_data(self, *, data: list[Any] | dict[str, Any]) -> None:
+    async def push_data(self, data: list[Any] | dict[str, Any]) -> None:
         """Push data to the dataset.
 
         The backend method for the `Dataset.push_data` call.
@@ -121,13 +114,13 @@ class DatasetClient(ABC):
         flatten: list[str] | None = None,
         view: str | None = None,
     ) -> DatasetItemsListPage:
-        """Get data from the dataset.
+        """Get data from the dataset with various filtering options.
 
         The backend method for the `Dataset.get_data` call.
         """
 
     @abstractmethod
-    async def iterate(
+    async def iterate_items(
         self,
         *,
         offset: int = 0,
@@ -140,9 +133,9 @@ class DatasetClient(ABC):
         skip_empty: bool = False,
         skip_hidden: bool = False,
     ) -> AsyncIterator[dict]:
-        """Iterate over the dataset.
+        """Iterate over the dataset items with filtering options.
 
-        The backend method for the `Dataset.iterate` call.
+        The backend method for the `Dataset.iterate_items` call.
         """
         # This syntax is to make mypy properly work with abstract AsyncIterator.
         # https://mypy.readthedocs.io/en/stable/more_types.html#asynchronous-iterators

@@ -10,82 +10,73 @@ if TYPE_CHECKING:
     from datetime import datetime
     from pathlib import Path
 
-    from crawlee.storage_clients.models import (
-        KeyValueStoreRecord,
-        KeyValueStoreRecordMetadata,
-    )
-
-# Properties:
-# - id
-# - name
-# - created_at
-# - accessed_at
-# - modified_at
-
-# Methods:
-# - open
-# - drop
-# - get_value
-# - set_value
-# - delete_value
-# - iterate_keys
-# - get_public_url
+    from crawlee.storage_clients.models import KeyValueStoreRecord, KeyValueStoreRecordMetadata
 
 
 @docs_group('Abstract classes')
 class KeyValueStoreClient(ABC):
-    """An abstract class for key-value store (KVS) resource clients.
+    """An abstract class for key-value store (KVS) storage clients.
 
-    These clients are specific to the type of resource they manage and operate under a designated storage
-    client, like a memory storage client.
+    Key-value stores clients provide an interface for accessing and manipulating KVS storage. They handle
+    operations like getting, setting, deleting KVS values across different storage backends.
+
+    Storage clients are specific to the type of storage they manage (`Dataset`, `KeyValueStore`,
+    `RequestQueue`), and can operate with various storage systems including memory, file system,
+    databases, and cloud storage solutions.
+
+    This abstract class defines the interface that all specific KVS clients must implement.
     """
 
     @property
     @abstractmethod
     def id(self) -> str:
-        """The ID of the key-value store."""
+        """The unique identifier of the key-value store (typically a UUID)."""
 
     @property
     @abstractmethod
     def name(self) -> str | None:
-        """The name of the key-value store."""
+        """The optional human-readable name for the KVS."""
 
     @property
     @abstractmethod
     def created_at(self) -> datetime:
-        """The time at which the key-value store was created."""
+        """Timestamp when the KVS was first created, remains unchanged."""
 
     @property
     @abstractmethod
     def accessed_at(self) -> datetime:
-        """The time at which the key-value store was last accessed."""
+        """Timestamp of last access to the KVS, updated on read or write operations."""
 
     @property
     @abstractmethod
     def modified_at(self) -> datetime:
-        """The time at which the key-value store was last modified."""
+        """Timestamp of last modification of the KVS, updated when new data are added, updated or deleted."""
 
     @classmethod
     @abstractmethod
     async def open(
         cls,
         *,
-        id: str | None,
-        name: str | None,
-        storage_dir: Path,
+        id: str | None = None,
+        name: str | None = None,
+        storage_dir: Path | None = None,
     ) -> KeyValueStoreClient:
         """Open existing or create a new key-value store client.
 
-        If a key-value store with the given name already exists, the appropriate key-value store client is returned.
-        Otherwise, a new key-value store is created and client for it is returned.
+        If a key-value store with the given name or ID already exists, the appropriate
+        key-value store client is returned. Otherwise, a new key-value store is created
+        and a client for it is returned.
+
+        The backend method for the `KeyValueStoreClient.open` call.
 
         Args:
-            id: The ID of the key-value store.
-            name: The name of the key-value store.
-            storage_dir: The path to the storage directory. If the client persists data, it should use this directory.
+            id: The ID of the key-value store. If not provided, an ID may be generated.
+            name: The name of the key-value store. If not provided a default name may be used.
+            storage_dir: The path to the storage directory. If the client persists data,
+                it should use this directory. May be ignored by non-persistent implementations.
 
         Returns:
-            A key-value store client.
+            A key-value store client instance.
         """
 
     @abstractmethod

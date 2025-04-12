@@ -1,15 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from datetime import datetime
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 
-from crawlee._consts import METADATA_FILENAME
-from crawlee.storage_clients._file_system._dataset_client import FileSystemDatasetClient
+from crawlee.storage_clients._memory._dataset_client import MemoryDatasetClient, _cache_by_name
 from crawlee.storage_clients.models import DatasetItemsListPage
 
 if TYPE_CHECKING:
@@ -19,16 +16,19 @@ pytestmark = pytest.mark.only
 
 
 @pytest.fixture
-async def dataset_client(tmp_path: Path) -> AsyncGenerator[FileSystemDatasetClient, None]:
-    """A fixture for a file system dataset client."""
-    client = await FileSystemDatasetClient.open(name='test_dataset', storage_dir=tmp_path)
+async def dataset_client() -> AsyncGenerator[MemoryDatasetClient, None]:
+    """Fixture that provides a fresh memory dataset client for each test."""
+    # Clear any existing dataset clients in the cache
+    _cache_by_name.clear()
+
+    client = await MemoryDatasetClient.open(name='test_dataset')
     yield client
     await client.drop()
 
 
-async def test_open_creates_new_dataset(tmp_path: Path) -> None:
-    """Test that open() creates a new dataset with proper metadata when it doesn't exist."""
-    client = await FileSystemDatasetClient.open(name='new_dataset', storage_dir=tmp_path)
+async def test_open_creates_new_dataset() -> None:
+    """Test that open() creates a new dataset with proper metadata and adds it to the cache."""
+    client = await MemoryDatasetClient.open(name='new_dataset')
 
     # Verify client properties
     assert client.id is not None
@@ -38,22 +38,14 @@ async def test_open_creates_new_dataset(tmp_path: Path) -> None:
     assert isinstance(client.accessed_at, datetime)
     assert isinstance(client.modified_at, datetime)
 
-    # Verify files were created
-    assert client.path_to_dataset.exists()
-    assert client.path_to_metadata.exists()
-
-    # Verify metadata content
-    with client.path_to_metadata.open() as f:
-        metadata = json.load(f)
-        assert metadata['id'] == client.id
-        assert metadata['name'] == 'new_dataset'
-        assert metadata['item_count'] == 0
+    # Verify the client was cached
+    assert 'new_dataset' in _cache_by_name
 
 
-async def test_open_existing_dataset(dataset_client: FileSystemDatasetClient, tmp_path: Path) -> None:
-    """Test that open() loads an existing dataset correctly."""
+async def test_open_existing_dataset(dataset_client: MemoryDatasetClient) -> None:
+    """Test that open() loads an existing dataset with matching properties."""
     # Open the same dataset again
-    reopened_client = await FileSystemDatasetClient.open(name=dataset_client.name, storage_dir=tmp_path)
+    reopened_client = await MemoryDatasetClient.open(name=dataset_client.name)
 
     # Verify client properties
     assert dataset_client.id == reopened_client.id
@@ -64,51 +56,47 @@ async def test_open_existing_dataset(dataset_client: FileSystemDatasetClient, tm
     assert id(dataset_client) == id(reopened_client)
 
 
-async def test_open_with_id_raises_error(tmp_path: Path) -> None:
-    """Test that open() raises an error when an ID is provided."""
-    with pytest.raises(ValueError, match='not supported for file system storage client'):
-        await FileSystemDatasetClient.open(id='some-id', storage_dir=tmp_path)
+async def test_open_with_id_and_name() -> None:
+    """Test that open() can be used with both id and name parameters."""
+    client = await MemoryDatasetClient.open(id='some-id', name='some-name')
+    assert client.id == 'some-id'
+    assert client.name == 'some-name'
 
 
-async def test_push_data_single_item(dataset_client: FileSystemDatasetClient) -> None:
-    """Test pushing a single item to the dataset."""
+async def test_push_data_single_item(dataset_client: MemoryDatasetClient) -> None:
+    """Test pushing a single item to the dataset and verifying it was stored correctly."""
     item = {'key': 'value', 'number': 42}
     await dataset_client.push_data(item)
 
     # Verify item count was updated
     assert dataset_client.item_count == 1
 
-    all_files = list(dataset_client.path_to_dataset.glob('*.json'))
-    assert len(all_files) == 2  # 1 data file + 1 metadata file
-
-    # Verify item was persisted
-    data_files = [item for item in all_files if item.name != METADATA_FILENAME]
-    assert len(data_files) == 1
-
-    # Verify file content
-    with Path(data_files[0]).open() as f:
-        saved_item = json.load(f)
-        assert saved_item == item
+    # Verify item was stored
+    result = await dataset_client.get_data()
+    assert result.count == 1
+    assert result.items[0] == item
 
 
-async def test_push_data_multiple_items(dataset_client: FileSystemDatasetClient) -> None:
-    """Test pushing multiple items to the dataset."""
-    items = [{'id': 1, 'name': 'Item 1'}, {'id': 2, 'name': 'Item 2'}, {'id': 3, 'name': 'Item 3'}]
+async def test_push_data_multiple_items(dataset_client: MemoryDatasetClient) -> None:
+    """Test pushing multiple items to the dataset and verifying they were stored correctly."""
+    items = [
+        {'id': 1, 'name': 'Item 1'},
+        {'id': 2, 'name': 'Item 2'},
+        {'id': 3, 'name': 'Item 3'},
+    ]
     await dataset_client.push_data(items)
 
     # Verify item count was updated
     assert dataset_client.item_count == 3
 
-    all_files = list(dataset_client.path_to_dataset.glob('*.json'))
-    assert len(all_files) == 4  # 3 data files + 1 metadata file
-
-    # Verify items were saved to files
-    data_files = [f for f in all_files if f.name != METADATA_FILENAME]
-    assert len(data_files) == 3
+    # Verify items were stored
+    result = await dataset_client.get_data()
+    assert result.count == 3
+    assert result.items == items
 
 
-async def test_get_data_empty_dataset(dataset_client: FileSystemDatasetClient) -> None:
-    """Test getting data from an empty dataset."""
+async def test_get_data_empty_dataset(dataset_client: MemoryDatasetClient) -> None:
+    """Test that getting data from an empty dataset returns empty results with correct metadata."""
     result = await dataset_client.get_data()
 
     assert isinstance(result, DatasetItemsListPage)
@@ -117,10 +105,14 @@ async def test_get_data_empty_dataset(dataset_client: FileSystemDatasetClient) -
     assert result.items == []
 
 
-async def test_get_data_with_items(dataset_client: FileSystemDatasetClient) -> None:
-    """Test getting data from a dataset with items."""
+async def test_get_data_with_items(dataset_client: MemoryDatasetClient) -> None:
+    """Test that all items pushed to the dataset can be retrieved with correct metadata."""
     # Add some items
-    items = [{'id': 1, 'name': 'Item 1'}, {'id': 2, 'name': 'Item 2'}, {'id': 3, 'name': 'Item 3'}]
+    items = [
+        {'id': 1, 'name': 'Item 1'},
+        {'id': 2, 'name': 'Item 2'},
+        {'id': 3, 'name': 'Item 3'},
+    ]
     await dataset_client.push_data(items)
 
     # Get all items
@@ -134,8 +126,8 @@ async def test_get_data_with_items(dataset_client: FileSystemDatasetClient) -> N
     assert result.items[2]['id'] == 3
 
 
-async def test_get_data_with_pagination(dataset_client: FileSystemDatasetClient) -> None:
-    """Test getting data with pagination."""
+async def test_get_data_with_pagination(dataset_client: MemoryDatasetClient) -> None:
+    """Test that offset and limit parameters work correctly for dataset pagination."""
     # Add some items
     items = [{'id': i} for i in range(1, 11)]  # 10 items
     await dataset_client.push_data(items)
@@ -161,8 +153,8 @@ async def test_get_data_with_pagination(dataset_client: FileSystemDatasetClient)
     assert result.items[-1]['id'] == 5
 
 
-async def test_get_data_descending_order(dataset_client: FileSystemDatasetClient) -> None:
-    """Test getting data in descending order."""
+async def test_get_data_descending_order(dataset_client: MemoryDatasetClient) -> None:
+    """Test that the desc parameter correctly reverses the order of returned items."""
     # Add some items
     items = [{'id': i} for i in range(1, 6)]  # 5 items
     await dataset_client.push_data(items)
@@ -175,8 +167,8 @@ async def test_get_data_descending_order(dataset_client: FileSystemDatasetClient
     assert result.items[-1]['id'] == 1
 
 
-async def test_get_data_skip_empty(dataset_client: FileSystemDatasetClient) -> None:
-    """Test getting data with skip_empty option."""
+async def test_get_data_skip_empty(dataset_client: MemoryDatasetClient) -> None:
+    """Test that the skip_empty parameter correctly filters out empty items."""
     # Add some items including an empty one
     items = [
         {'id': 1, 'name': 'Item 1'},
@@ -195,28 +187,28 @@ async def test_get_data_skip_empty(dataset_client: FileSystemDatasetClient) -> N
     assert all(item != {} for item in result.items)
 
 
-async def test_iterate(dataset_client: FileSystemDatasetClient) -> None:
-    """Test iterating over dataset items."""
+async def test_iterate(dataset_client: MemoryDatasetClient) -> None:
+    """Test that iterate_items yields each item in the dataset in the correct order."""
     # Add some items
     items = [{'id': i} for i in range(1, 6)]  # 5 items
     await dataset_client.push_data(items)
 
     # Iterate over all items
-    collected_items = [item async for item in dataset_client.iterate()]
+    collected_items = [item async for item in dataset_client.iterate_items()]
 
     assert len(collected_items) == 5
     assert collected_items[0]['id'] == 1
     assert collected_items[-1]['id'] == 5
 
 
-async def test_iterate_with_options(dataset_client: FileSystemDatasetClient) -> None:
-    """Test iterating with various options."""
+async def test_iterate_with_options(dataset_client: MemoryDatasetClient) -> None:
+    """Test that iterate_items respects offset, limit, and desc parameters."""
     # Add some items
     items = [{'id': i} for i in range(1, 11)]  # 10 items
     await dataset_client.push_data(items)
 
     # Test with offset and limit
-    collected_items = [item async for item in dataset_client.iterate(offset=3, limit=3)]
+    collected_items = [item async for item in dataset_client.iterate_items(offset=3, limit=3)]
 
     assert len(collected_items) == 3
     assert collected_items[0]['id'] == 4
@@ -224,7 +216,7 @@ async def test_iterate_with_options(dataset_client: FileSystemDatasetClient) -> 
 
     # Test with descending order
     collected_items = []
-    async for item in dataset_client.iterate(desc=True, limit=3):
+    async for item in dataset_client.iterate_items(desc=True, limit=3):
         collected_items.append(item)
 
     assert len(collected_items) == 3
@@ -232,24 +224,28 @@ async def test_iterate_with_options(dataset_client: FileSystemDatasetClient) -> 
     assert collected_items[-1]['id'] == 8
 
 
-async def test_drop(tmp_path: Path) -> None:
-    """Test dropping a dataset."""
-    # Create a dataset and add an item
-    client = await FileSystemDatasetClient.open(name='to_drop', storage_dir=tmp_path)
-    await client.push_data({'test': 'data'})
+async def test_drop(dataset_client: MemoryDatasetClient) -> None:
+    """Test that drop removes the dataset from cache and resets its state."""
+    # Add an item to the dataset
+    await dataset_client.push_data({'test': 'data'})
 
-    # Verify the dataset directory exists
-    assert client.path_to_dataset.exists()
+    # Verify the dataset exists in the cache
+    assert dataset_client.name in _cache_by_name
 
     # Drop the dataset
-    await client.drop()
+    await dataset_client.drop()
 
-    # Verify the dataset directory was removed
-    assert not client.path_to_dataset.exists()
+    # Verify the dataset was removed from the cache
+    assert dataset_client.name not in _cache_by_name
+
+    # Verify the dataset is empty
+    assert dataset_client.item_count == 0
+    result = await dataset_client.get_data()
+    assert result.count == 0
 
 
-async def test_metadata_updates(dataset_client: FileSystemDatasetClient) -> None:
-    """Test that metadata is updated correctly after operations."""
+async def test_metadata_updates(dataset_client: MemoryDatasetClient) -> None:
+    """Test that read/write operations properly update accessed_at and modified_at timestamps."""
     # Record initial timestamps
     initial_created = dataset_client.created_at
     initial_accessed = dataset_client.accessed_at

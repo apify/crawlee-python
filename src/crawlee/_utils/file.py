@@ -103,6 +103,31 @@ async def json_dumps(obj: Any) -> str:
     return await asyncio.to_thread(json.dumps, obj, ensure_ascii=False, indent=2, default=str)
 
 
+def infer_mime_type(value: Any) -> str:
+    """Infer the MIME content type from the value.
+
+    Args:
+        value: The value to infer the content type from.
+
+    Returns:
+        The inferred MIME content type.
+    """
+    # If the value is bytes (or bytearray), return binary content type.
+    if isinstance(value, (bytes, bytearray)):
+        return 'application/octet-stream'
+
+    # If the value is a dict or list, assume JSON.
+    if isinstance(value, (dict, list)):
+        return 'application/json; charset=utf-8'
+
+    # If the value is a string, assume plain text.
+    if isinstance(value, str):
+        return 'text/plain; charset=utf-8'
+
+    # Default fallback.
+    return 'application/octet-stream'
+
+
 async def export_json_to_stream(
     iterator: AsyncIterator[dict],
     dst: TextIO,

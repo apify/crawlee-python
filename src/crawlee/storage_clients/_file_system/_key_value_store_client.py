@@ -5,12 +5,14 @@ import json
 import shutil
 from datetime import datetime, timezone
 from logging import getLogger
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
 from typing_extensions import override
 
 from crawlee._utils.crypto import crypto_random_object_id
+from crawlee._utils.file import infer_mime_type
 from crawlee.storage_clients._base import KeyValueStoreClient
 from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
 
@@ -18,7 +20,7 @@ from ._utils import METADATA_FILENAME, json_dumps
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
-    from pathlib import Path
+
 
 logger = getLogger(__name__)
 
@@ -27,13 +29,18 @@ _cache_by_name = dict[str, 'FileSystemKeyValueStoreClient']()
 
 
 class FileSystemKeyValueStoreClient(KeyValueStoreClient):
-    """A file system key-value store (KVS) implementation."""
+    """A file system implementation of the key-value store client.
+
+    This client persists data to the file system, making it suitable for scenarios where data needs
+    to survive process restarts. Each key-value pair is stored as a separate file, with its metadata
+    in an accompanying file.
+    """
 
     _DEFAULT_NAME = 'default'
-    """The name of the unnamed KVS."""
+    """The default name for the unnamed key-value store."""
 
     _STORAGE_SUBDIR = 'key_value_stores'
-    """The name of the subdirectory where KVSs are stored."""
+    """The name of the subdirectory where key-value stores are stored."""
 
     def __init__(
         self,
@@ -59,7 +66,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
         self._storage_dir = storage_dir
 
-        # Internal attributes.
+        # Internal attributes
         self._lock = asyncio.Lock()
         """A lock to ensure that only one file operation is performed at a time."""
 
@@ -105,21 +112,8 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         *,
         id: str | None = None,
         name: str | None = None,
-        storage_dir: Path,
+        storage_dir: Path | None = None,
     ) -> FileSystemKeyValueStoreClient:
-        """Open an existing key-value store client or create a new one if it does not exist.
-
-        If the key-value store directory exists, this method reconstructs the client from the metadata file.
-        Otherwise, a new key-value store client is created with a new unique ID.
-
-        Args:
-            id: The key-value store ID.
-            name: The key-value store name; if not provided, defaults to the default name.
-            storage_dir: The base directory for storage.
-
-        Returns:
-           A new instance of the file system key-value store client.
-        """
         if id:
             raise ValueError(
                 'Opening a key-value store by "id" is not supported for file system storage client, use "name" instead.'
@@ -131,6 +125,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         if name in _cache_by_name:
             return _cache_by_name[name]
 
+        storage_dir = storage_dir or Path.cwd()
         kvs_path = storage_dir / cls._STORAGE_SUBDIR / name
         metadata_path = kvs_path / METADATA_FILENAME
 
@@ -257,7 +252,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
     @override
     async def set_value(self, *, key: str, value: Any, content_type: str | None = None) -> None:
-        content_type = content_type or self._infer_mime_type(value)
+        content_type = content_type or infer_mime_type(value)
 
         # Serialize the value to bytes.
         if 'application/json' in content_type:
@@ -272,8 +267,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
         record_path = self.path_to_kvs / key
 
-        # Get the metadata.
-        # Calculate the size of the value in bytes
+        # Prepare the metadata
         size = len(value_bytes)
         record_metadata = KeyValueStoreRecordMetadata(key=key, content_type=content_type, size=size)
         record_metadata_filepath = record_path.with_name(f'{record_path.name}.{METADATA_FILENAME}')
@@ -283,10 +277,10 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             # Ensure the key-value store directory exists.
             await asyncio.to_thread(self.path_to_kvs.mkdir, parents=True, exist_ok=True)
 
-            # Dump the value to the file.
+            # Write the value to the file.
             await asyncio.to_thread(record_path.write_bytes, value_bytes)
 
-            # Dump the record metadata to the file.
+            # Write the record metadata to the file.
             await asyncio.to_thread(
                 record_metadata_filepath.write_text,
                 record_metadata_content,
@@ -332,7 +326,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
         count = 0
         async with self._lock:
-            # Get all files in the KVS directory
+            # Get all files in the KVS directory, sorted alphabetically
             files = sorted(await asyncio.to_thread(list, self.path_to_kvs.glob('*')))
 
             for file_path in files:
@@ -387,8 +381,10 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         """
         now = datetime.now(timezone.utc)
 
-        self._metadata.accessed_at = now if update_accessed_at else self._metadata.accessed_at
-        self._metadata.modified_at = now if update_modified_at else self._metadata.modified_at
+        if update_accessed_at:
+            self._metadata.accessed_at = now
+        if update_modified_at:
+            self._metadata.modified_at = now
 
         # Ensure the parent directory for the metadata file exists.
         await asyncio.to_thread(self.path_to_metadata.parent.mkdir, parents=True, exist_ok=True)
@@ -396,27 +392,3 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         # Dump the serialized metadata to the file.
         data = await json_dumps(self._metadata.model_dump())
         await asyncio.to_thread(self.path_to_metadata.write_text, data, encoding='utf-8')
-
-    def _infer_mime_type(self, value: Any) -> str:
-        """Infer the MIME content type from the value.
-
-        Args:
-            value: The value to infer the content type from.
-
-        Returns:
-            The inferred MIME content type.
-        """
-        # If the value is bytes (or bytearray), return binary content type.
-        if isinstance(value, (bytes, bytearray)):
-            return 'application/octet-stream'
-
-        # If the value is a dict or list, assume JSON.
-        if isinstance(value, (dict, list)):
-            return 'application/json; charset=utf-8'
-
-        # If the value is a string, assume plain text.
-        if isinstance(value, str):
-            return 'text/plain; charset=utf-8'
-
-        # Default fallback.
-        return 'application/octet-stream'

@@ -5,6 +5,7 @@ import json
 import shutil
 from datetime import datetime, timezone
 from logging import getLogger
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pydantic import ValidationError
@@ -18,7 +19,6 @@ from ._utils import METADATA_FILENAME, json_dumps
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
-    from pathlib import Path
     from typing import Any
 
 logger = getLogger(__name__)
@@ -28,14 +28,15 @@ _cache_by_name = dict[str, 'FileSystemDatasetClient']()
 
 
 class FileSystemDatasetClient(DatasetClient):
-    """A file system storage implementation of the dataset client.
+    """A file system implementation of the dataset client.
 
-    This client stores dataset items as individual JSON files in a subdirectory.
-    The metadata of the dataset (timestamps, item count, etc.) is stored in a metadata file.
+    This client persists data to the file system, making it suitable for scenarios where data needs
+    to survive process restarts. Each dataset item is stored as a separate JSON file with a numeric
+    filename, allowing for easy ordering and pagination.
     """
 
     _DEFAULT_NAME = 'default'
-    """The name of the unnamed dataset."""
+    """The default name for the dataset when no name is provided."""
 
     _STORAGE_SUBDIR = 'datasets'
     """The name of the subdirectory where datasets are stored."""
@@ -69,7 +70,7 @@ class FileSystemDatasetClient(DatasetClient):
 
         self._storage_dir = storage_dir
 
-        # Internal attributes.
+        # Internal attributes
         self._lock = asyncio.Lock()
         """A lock to ensure that only one file operation is performed at a time."""
 
@@ -120,21 +121,8 @@ class FileSystemDatasetClient(DatasetClient):
         *,
         id: str | None = None,
         name: str | None = None,
-        storage_dir: Path,
+        storage_dir: Path | None = None,
     ) -> FileSystemDatasetClient:
-        """Open an existing dataset client or create a new one if it does not exist.
-
-        If the dataset directory exists, this method reconstructs the client from the metadata file.
-        Otherwise, a new dataset client is created with a new unique ID.
-
-        Args:
-            id: The dataset ID.
-            name: The dataset name; if not provided, defaults to the default name.
-            storage_dir: The base directory for storage.
-
-        Returns:
-           A new instance of the file system dataset client.
-        """
         if id:
             raise ValueError(
                 'Opening a dataset by "id" is not supported for file system storage client, use "name" instead.'
@@ -144,8 +132,11 @@ class FileSystemDatasetClient(DatasetClient):
 
         # Check if the client is already cached by name.
         if name in _cache_by_name:
-            return _cache_by_name[name]
+            client = _cache_by_name[name]
+            await client._update_metadata(update_accessed_at=True)  # noqa: SLF001
+            return client
 
+        storage_dir = storage_dir or Path.cwd()
         dataset_path = storage_dir / cls._STORAGE_SUBDIR / name
         metadata_path = dataset_path / METADATA_FILENAME
 
@@ -242,11 +233,21 @@ class FileSystemDatasetClient(DatasetClient):
         view: str | None = None,
     ) -> DatasetItemsListPage:
         # Check for unsupported arguments and log a warning if found.
-        unsupported_args = [clean, fields, omit, unwind, skip_hidden, flatten, view]
-        invalid = [arg for arg in unsupported_args if arg not in (False, None)]
-        if invalid:
+        unsupported_args = {
+            'clean': clean,
+            'fields': fields,
+            'omit': omit,
+            'unwind': unwind,
+            'skip_hidden': skip_hidden,
+            'flatten': flatten,
+            'view': view,
+        }
+        unsupported = {k: v for k, v in unsupported_args.items() if v not in (False, None)}
+
+        if unsupported:
             logger.warning(
-                f'The arguments {invalid} of get_data are not supported by the {self.__class__.__name__} client.'
+                f'The arguments {list(unsupported.keys())} of get_data are not supported by the '
+                f'{self.__class__.__name__} client.'
             )
 
         # If the dataset directory does not exist, log a warning and return an empty page.
@@ -303,7 +304,7 @@ class FileSystemDatasetClient(DatasetClient):
         )
 
     @override
-    async def iterate(
+    async def iterate_items(
         self,
         *,
         offset: int = 0,
@@ -317,11 +318,19 @@ class FileSystemDatasetClient(DatasetClient):
         skip_hidden: bool = False,
     ) -> AsyncIterator[dict]:
         # Check for unsupported arguments and log a warning if found.
-        unsupported_args = [clean, fields, omit, unwind, skip_hidden]
-        invalid = [arg for arg in unsupported_args if arg not in (False, None)]
-        if invalid:
+        unsupported_args = {
+            'clean': clean,
+            'fields': fields,
+            'omit': omit,
+            'unwind': unwind,
+            'skip_hidden': skip_hidden,
+        }
+        unsupported = {k: v for k, v in unsupported_args.items() if v not in (False, None)}
+
+        if unsupported:
             logger.warning(
-                f'The arguments {invalid} of iterate_items are not supported by the {self.__class__.__name__} client.'
+                f'The arguments {list(unsupported.keys())} of iterate are not supported '
+                f'by the {self.__class__.__name__} client.'
             )
 
         # If the dataset directory does not exist, log a warning and return immediately.
@@ -374,9 +383,12 @@ class FileSystemDatasetClient(DatasetClient):
         """
         now = datetime.now(timezone.utc)
 
-        self._metadata.accessed_at = now if update_accessed_at else self.accessed_at
-        self._metadata.modified_at = now if update_modified_at else self.modified_at
-        self._metadata.item_count = new_item_count if new_item_count else self.item_count
+        if update_accessed_at:
+            self._metadata.accessed_at = now
+        if update_modified_at:
+            self._metadata.modified_at = now
+        if new_item_count is not None:
+            self._metadata.item_count = new_item_count
 
         # Ensure the parent directory for the metadata file exists.
         await asyncio.to_thread(self.path_to_metadata.parent.mkdir, parents=True, exist_ok=True)
@@ -388,8 +400,12 @@ class FileSystemDatasetClient(DatasetClient):
     async def _push_item(self, item: dict[str, Any], item_id: int) -> None:
         """Push a single item to the dataset.
 
-        This method increments the item count, writes the item as a JSON file with a zero-padded filename,
-        and updates the metadata.
+        This method writes the item as a JSON file with a zero-padded numeric filename
+        that reflects its position in the dataset sequence.
+
+        Args:
+            item: The data item to add to the dataset.
+            item_id: The sequential ID to use for this item's filename.
         """
         # Acquire the lock to perform file operations safely.
         async with self._lock:
@@ -407,8 +423,11 @@ class FileSystemDatasetClient(DatasetClient):
     async def _get_sorted_data_files(self) -> list[Path]:
         """Retrieve and return a sorted list of data files in the dataset directory.
 
-        The files are sorted numerically based on the filename (without extension).
-        The metadata file is excluded.
+        The files are sorted numerically based on the filename (without extension),
+        which corresponds to the order items were added to the dataset.
+
+        Returns:
+            A list of `Path` objects pointing to data files, sorted by numeric filename.
         """
         # Retrieve and sort all JSON files in the dataset directory numerically.
         files = await asyncio.to_thread(

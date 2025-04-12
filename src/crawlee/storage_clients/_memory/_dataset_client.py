@@ -8,7 +8,7 @@ from typing_extensions import override
 
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee.storage_clients._base import DatasetClient
-from crawlee.storage_clients.models import DatasetItemsListPage
+from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -16,12 +16,16 @@ if TYPE_CHECKING:
 
 logger = getLogger(__name__)
 
+_cache_by_name = dict[str, 'MemoryDatasetClient']()
+"""A dictionary to cache clients by their names."""
+
 
 class MemoryDatasetClient(DatasetClient):
     """A memory implementation of the dataset client.
 
-    This client stores dataset items in memory using a dictionary.
-    No data is persisted to the file system.
+    This client stores dataset items in memory using a list. No data is persisted, which means
+    all data is lost when the process terminates. This implementation is mainly useful for testing
+    and development purposes where persistence is not required.
     """
 
     _DEFAULT_NAME = 'default'
@@ -37,62 +41,76 @@ class MemoryDatasetClient(DatasetClient):
         modified_at: datetime,
         item_count: int,
     ) -> None:
-        """Initialize a new instance of the memory-only dataset client.
+        """Initialize a new instance.
 
         Preferably use the `MemoryDatasetClient.open` class method to create a new instance.
         """
-        self._id = id
-        self._name = name
-        self._created_at = created_at
-        self._accessed_at = accessed_at
-        self._modified_at = modified_at
-        self._item_count = item_count
+        self._metadata = DatasetMetadata(
+            id=id,
+            name=name,
+            created_at=created_at,
+            accessed_at=accessed_at,
+            modified_at=modified_at,
+            item_count=item_count,
+        )
 
-        # Dictionary to hold dataset items; keys are zero-padded strings.
+        # List to hold dataset items
         self._records = list[dict[str, Any]]()
 
     @override
     @property
     def id(self) -> str:
-        return self._id
+        return self._metadata.id
 
     @override
     @property
-    def name(self) -> str | None:
-        return self._name
+    def name(self) -> str:
+        return self._metadata.name
 
     @override
     @property
     def created_at(self) -> datetime:
-        return self._created_at
+        return self._metadata.created_at
 
     @override
     @property
     def accessed_at(self) -> datetime:
-        return self._accessed_at
+        return self._metadata.accessed_at
 
     @override
     @property
     def modified_at(self) -> datetime:
-        return self._modified_at
+        return self._metadata.modified_at
 
     @override
     @property
     def item_count(self) -> int:
-        return self._item_count
+        return self._metadata.item_count
 
     @override
     @classmethod
     async def open(
         cls,
-        id: str | None,
-        name: str | None,
-        storage_dir: Path,  # Ignored in the memory-only implementation.
+        *,
+        id: str | None = None,
+        name: str | None = None,
+        storage_dir: Path | None = None,
     ) -> MemoryDatasetClient:
+        if storage_dir is not None:
+            logger.warning('The `storage_dir` argument is not used in the memory dataset client.')
+
         name = name or cls._DEFAULT_NAME
+
+        # Check if the client is already cached by name.
+        if name in _cache_by_name:
+            client = _cache_by_name[name]
+            await client._update_metadata(update_accessed_at=True)  # noqa: SLF001
+            return client
+
         dataset_id = id or crypto_random_object_id()
         now = datetime.now(timezone.utc)
-        return cls(
+
+        client = cls(
             id=dataset_id,
             name=name,
             created_at=now,
@@ -101,19 +119,37 @@ class MemoryDatasetClient(DatasetClient):
             item_count=0,
         )
 
+        # Cache the client by name
+        _cache_by_name[name] = client
+
+        return client
+
     @override
     async def drop(self) -> None:
         self._records.clear()
-        self._item_count = 0
+        self._metadata.item_count = 0
+
+        # Remove the client from the cache
+        if self.name in _cache_by_name:
+            del _cache_by_name[self.name]
 
     @override
     async def push_data(self, data: list[Any] | dict[str, Any]) -> None:
+        new_item_count = self.item_count
+
         if isinstance(data, list):
             for item in data:
+                new_item_count += 1
                 await self._push_item(item)
         else:
+            new_item_count += 1
             await self._push_item(data)
-        await self._update_metadata(update_accessed_at=True, update_modified_at=True)
+
+        await self._update_metadata(
+            update_accessed_at=True,
+            update_modified_at=True,
+            new_item_count=new_item_count,
+        )
 
     @override
     async def get_data(
@@ -131,20 +167,40 @@ class MemoryDatasetClient(DatasetClient):
         flatten: list[str] | None = None,
         view: str | None = None,
     ) -> DatasetItemsListPage:
-        unsupported_args = [clean, fields, omit, unwind, skip_hidden, flatten, view]
-        invalid = [arg for arg in unsupported_args if arg not in (False, None)]
-        if invalid:
+        # Check for unsupported arguments and log a warning if found
+        unsupported_args = {
+            'clean': clean,
+            'fields': fields,
+            'omit': omit,
+            'unwind': unwind,
+            'skip_hidden': skip_hidden,
+            'flatten': flatten,
+            'view': view,
+        }
+        unsupported = {k: v for k, v in unsupported_args.items() if v not in (False, None)}
+
+        if unsupported:
             logger.warning(
-                f'The arguments {invalid} of get_data are not supported by the {self.__class__.__name__} client.'
+                f'The arguments {list(unsupported.keys())} of get_data are not supported '
+                f'by the {self.__class__.__name__} client.'
             )
 
         total = len(self._records)
         items = self._records.copy()
+
+        # Apply skip_empty filter if requested
+        if skip_empty:
+            items = [item for item in items if item]
+
+        # Apply sorting
         if desc:
             items = list(reversed(items))
 
+        # Apply pagination
         sliced_items = items[offset : (offset + limit) if limit is not None else total]
+
         await self._update_metadata(update_accessed_at=True)
+
         return DatasetItemsListPage(
             count=len(sliced_items),
             offset=offset,
@@ -155,7 +211,7 @@ class MemoryDatasetClient(DatasetClient):
         )
 
     @override
-    async def iterate(
+    async def iterate_items(
         self,
         *,
         offset: int = 0,
@@ -168,18 +224,32 @@ class MemoryDatasetClient(DatasetClient):
         skip_empty: bool = False,
         skip_hidden: bool = False,
     ) -> AsyncIterator[dict]:
-        unsupported_args = [clean, fields, omit, unwind, skip_hidden]
-        invalid = [arg for arg in unsupported_args if arg not in (False, None)]
-        if invalid:
+        # Check for unsupported arguments and log a warning if found
+        unsupported_args = {
+            'clean': clean,
+            'fields': fields,
+            'omit': omit,
+            'unwind': unwind,
+            'skip_hidden': skip_hidden,
+        }
+        unsupported = {k: v for k, v in unsupported_args.items() if v not in (False, None)}
+
+        if unsupported:
             logger.warning(
-                f'The arguments {invalid} of iterate are not supported by the {self.__class__.__name__} client.'
+                f'The arguments {list(unsupported.keys())} of iterate are not supported '
+                f'by the {self.__class__.__name__} client.'
             )
 
         items = self._records.copy()
+
+        # Apply sorting
         if desc:
             items = list(reversed(items))
 
+        # Apply pagination
         sliced_items = items[offset : (offset + limit) if limit is not None else len(items)]
+
+        # Yield items one by one
         for item in sliced_items:
             if skip_empty and not item:
                 continue
@@ -190,22 +260,30 @@ class MemoryDatasetClient(DatasetClient):
     async def _update_metadata(
         self,
         *,
+        new_item_count: int | None = None,
         update_accessed_at: bool = False,
         update_modified_at: bool = False,
     ) -> None:
-        """Update the dataset metadata file with current information.
+        """Update the dataset metadata with current information.
 
         Args:
+            new_item_count: If provided, update the item count to this value.
             update_accessed_at: If True, update the `accessed_at` timestamp to the current time.
             update_modified_at: If True, update the `modified_at` timestamp to the current time.
         """
         now = datetime.now(timezone.utc)
+
         if update_accessed_at:
-            self._accessed_at = now
+            self._metadata.accessed_at = now
         if update_modified_at:
-            self._modified_at = now
+            self._metadata.modified_at = now
+        if new_item_count:
+            self._metadata.item_count = new_item_count
 
     async def _push_item(self, item: dict[str, Any]) -> None:
-        """Push a single item to the dataset."""
-        self._item_count += 1
+        """Push a single item to the dataset.
+
+        Args:
+            item: The data item to add to the dataset.
+        """
         self._records.append(item)
