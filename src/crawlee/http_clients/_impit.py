@@ -7,7 +7,9 @@ from impit import AsyncClient, Response
 from typing_extensions import override
 
 from crawlee._types import HttpHeaders
+from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
 from crawlee._utils.docs import docs_group
+from crawlee.errors import ProxyError
 from crawlee.fingerprint_suite import HeaderGenerator
 from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
 
@@ -103,12 +105,17 @@ class ImpitHttpClient(HttpClient):
     ) -> HttpCrawlingResult:
         client = self._get_client(proxy_info.url if proxy_info else None)
 
-        response = await client.request(
-            url=request.url,
-            method=request.method,
-            content=request.payload,
-            headers=dict(request.headers) if request.headers else None,
-        )
+        try:
+            response = await client.request(
+                url=request.url,
+                method=request.method,
+                content=request.payload,
+                headers=dict(request.headers) if request.headers else None,
+            )
+        except RuntimeError as exc:
+            if self._is_proxy_error(exc):
+                raise ProxyError from exc
+            raise
 
         if statistics:
             statistics.register_status_code(response.status_code)
@@ -135,12 +142,17 @@ class ImpitHttpClient(HttpClient):
 
         client = self._get_client(proxy_info.url if proxy_info else None)
 
-        response = await client.request(
-            url=url,
-            method=method,
-            headers=dict(headers) if headers else None,
-            content=payload,
-        )
+        try:
+            response = await client.request(
+                url=url,
+                method=method,
+                headers=dict(headers) if headers else None,
+                content=payload,
+            )
+        except RuntimeError as exc:
+            if self._is_proxy_error(exc):
+                raise ProxyError from exc
+            raise
 
         return _ImpitResponse(response)
 
@@ -165,3 +177,11 @@ class ImpitHttpClient(HttpClient):
             self._client_by_proxy_url[proxy_url] = client
 
         return self._client_by_proxy_url[proxy_url]
+
+    @staticmethod
+    def _is_proxy_error(error: RuntimeError) -> bool:
+        """Determine whether the given error is related to a proxy issue.
+
+        Check if the error message contains known proxy-related error keywords.
+        """
+        return any(needle in str(error) for needle in ROTATE_PROXY_ERRORS)
