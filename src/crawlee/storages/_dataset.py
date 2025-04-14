@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, ClassVar, Literal
 
 from typing_extensions import override
 
@@ -29,32 +29,6 @@ if TYPE_CHECKING:
     from ._types import ExportDataCsvKwargs, ExportDataJsonKwargs
 
 logger = logging.getLogger(__name__)
-
-# TODO:
-# - caching / memoization of Dataset
-
-# Properties:
-# - id
-# - name
-# - metadata
-
-# Methods:
-# - open
-# - drop
-# - push_data
-# - get_data
-# - iterate_items
-# - export_to
-# - export_to_json
-# - export_to_csv
-
-# Breaking changes:
-# - from_storage_object method has been removed - Use the open method with name and/or id instead.
-# - get_info -> metadata property
-# - storage_object -> metadata property
-# - set_metadata method has been removed - Do we want to support it (e.g. for renaming)?
-# - write_to_json -> export_to_json
-# - write_to_csv -> export_to_csv
 
 
 @docs_group('Classes')
@@ -89,6 +63,12 @@ class Dataset(Storage):
     dataset = await Dataset.open(name='my_dataset')
     ```
     """
+
+    _cache_by_id: ClassVar[dict[str, Dataset]] = {}
+    """A dictionary to cache datasets by their IDs."""
+
+    _cache_by_name: ClassVar[dict[str, Dataset]] = {}
+    """A dictionary to cache datasets by their names."""
 
     def __init__(self, client: DatasetClient) -> None:
         """Initialize a new instance.
@@ -137,6 +117,12 @@ class Dataset(Storage):
         if id and name:
             raise ValueError('Only one of "id" or "name" can be specified, not both.')
 
+        # Check if dataset is already cached by id or name
+        if id and id in cls._cache_by_id:
+            return cls._cache_by_id[id]
+        if name and name in cls._cache_by_name:
+            return cls._cache_by_name[name]
+
         configuration = service_locator.get_configuration() if configuration is None else configuration
         storage_client = service_locator.get_storage_client() if storage_client is None else storage_client
         purge_on_start = configuration.purge_on_start if purge_on_start is None else purge_on_start
@@ -149,10 +135,24 @@ class Dataset(Storage):
             storage_dir=storage_dir,
         )
 
-        return cls(client)
+        dataset = cls(client)
+
+        # Cache the dataset by id and name if available
+        if dataset.id:
+            cls._cache_by_id[dataset.id] = dataset
+        if dataset.name:
+            cls._cache_by_name[dataset.name] = dataset
+
+        return dataset
 
     @override
     async def drop(self) -> None:
+        # Remove from cache before dropping
+        if self.id in self._cache_by_id:
+            del self._cache_by_id[self.id]
+        if self.name and self.name in self._cache_by_name:
+            del self._cache_by_name[self.name]
+
         await self._client.drop()
 
     async def push_data(self, data: list[Any] | dict[str, Any]) -> None:

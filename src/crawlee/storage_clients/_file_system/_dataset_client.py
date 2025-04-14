@@ -6,7 +6,7 @@ import shutil
 from datetime import datetime, timezone
 from logging import getLogger
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from pydantic import ValidationError
 from typing_extensions import override
@@ -22,9 +22,6 @@ if TYPE_CHECKING:
     from typing import Any
 
 logger = getLogger(__name__)
-
-_cache_by_name = dict[str, 'FileSystemDatasetClient']()
-"""A dictionary to cache clients by their names."""
 
 
 class FileSystemDatasetClient(DatasetClient):
@@ -43,6 +40,9 @@ class FileSystemDatasetClient(DatasetClient):
 
     _LOCAL_ENTRY_NAME_DIGITS = 9
     """Number of digits used for the file names (e.g., 000000019.json)."""
+
+    _cache_by_name: ClassVar[dict[str, FileSystemDatasetClient]] = {}
+    """A dictionary to cache clients by their names."""
 
     def __init__(
         self,
@@ -131,8 +131,8 @@ class FileSystemDatasetClient(DatasetClient):
         name = name or cls._DEFAULT_NAME
 
         # Check if the client is already cached by name.
-        if name in _cache_by_name:
-            client = _cache_by_name[name]
+        if name in cls._cache_by_name:
+            client = cls._cache_by_name[name]
             await client._update_metadata(update_accessed_at=True)  # noqa: SLF001
             return client
 
@@ -182,7 +182,7 @@ class FileSystemDatasetClient(DatasetClient):
             await client._update_metadata()
 
         # Cache the client by name.
-        _cache_by_name[name] = client
+        cls._cache_by_name[name] = client
 
         return client
 
@@ -194,8 +194,8 @@ class FileSystemDatasetClient(DatasetClient):
                 await asyncio.to_thread(shutil.rmtree, self.path_to_dataset)
 
         # Remove the client from the cache.
-        if self.name in _cache_by_name:
-            del _cache_by_name[self.name]
+        if self.name in self.__class__._cache_by_name:  # noqa: SLF001
+            del self.__class__._cache_by_name[self.name]  # noqa: SLF001
 
     @override
     async def push_data(self, data: list[Any] | dict[str, Any]) -> None:

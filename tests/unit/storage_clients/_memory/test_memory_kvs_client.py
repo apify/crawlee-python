@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from crawlee.storage_clients._memory._key_value_store_client import MemoryKeyValueStoreClient, _cache_by_name
+from crawlee.storage_clients._memory._key_value_store_client import MemoryKeyValueStoreClient
 from crawlee.storage_clients.models import KeyValueStoreRecordMetadata
 
 if TYPE_CHECKING:
@@ -19,12 +19,11 @@ pytestmark = pytest.mark.only
 async def kvs_client() -> AsyncGenerator[MemoryKeyValueStoreClient, None]:
     """Fixture that provides a fresh memory key-value store client for each test."""
     # Clear any existing key-value store clients in the cache
-    _cache_by_name.clear()
+    MemoryKeyValueStoreClient._cache_by_name.clear()
 
     client = await MemoryKeyValueStoreClient.open(name='test_kvs')
     yield client
     await client.drop()
-
 
 async def test_open_creates_new_store() -> None:
     """Test that open() creates a new key-value store with proper metadata and adds it to the cache."""
@@ -38,7 +37,7 @@ async def test_open_creates_new_store() -> None:
     assert isinstance(client.modified_at, datetime)
 
     # Verify the client was cached
-    assert 'new_kvs' in _cache_by_name
+    assert 'new_kvs' in MemoryKeyValueStoreClient._cache_by_name
 
 
 async def test_open_existing_store(kvs_client: MemoryKeyValueStoreClient) -> None:
@@ -186,13 +185,13 @@ async def test_drop(kvs_client: MemoryKeyValueStoreClient) -> None:
     await kvs_client.set_value(key='test', value='data')
 
     # Verify the store exists in the cache
-    assert kvs_client.name in _cache_by_name
+    assert kvs_client.name in MemoryKeyValueStoreClient._cache_by_name
 
     # Drop the store
     await kvs_client.drop()
 
     # Verify the store was removed from the cache
-    assert kvs_client.name not in _cache_by_name
+    assert kvs_client.name not in MemoryKeyValueStoreClient._cache_by_name
 
     # Verify the store is empty
     record = await kvs_client.get_value(key='test')

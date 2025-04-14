@@ -21,6 +21,9 @@ pytestmark = pytest.mark.only
 @pytest.fixture
 async def dataset_client(tmp_path: Path) -> AsyncGenerator[FileSystemDatasetClient, None]:
     """A fixture for a file system dataset client."""
+    # Clear any existing dataset clients in the cache
+    FileSystemDatasetClient._cache_by_name.clear()
+
     client = await FileSystemDatasetClient.open(name='test_dataset', storage_dir=tmp_path)
     yield client
     await client.drop()
@@ -232,20 +235,18 @@ async def test_iterate_with_options(dataset_client: FileSystemDatasetClient) -> 
     assert collected_items[-1]['id'] == 8
 
 
-async def test_drop(tmp_path: Path) -> None:
+async def test_drop(dataset_client: FileSystemDatasetClient) -> None:
     """Test dropping a dataset removes the entire dataset directory from disk."""
-    # Create a dataset and add an item
-    client = await FileSystemDatasetClient.open(name='to_drop', storage_dir=tmp_path)
-    await client.push_data({'test': 'data'})
+    await dataset_client.push_data({'test': 'data'})
 
-    # Verify the dataset directory exists
-    assert client.path_to_dataset.exists()
+    assert dataset_client.name in FileSystemDatasetClient._cache_by_name
+    assert dataset_client.path_to_dataset.exists()
 
     # Drop the dataset
-    await client.drop()
+    await dataset_client.drop()
 
-    # Verify the dataset directory was removed
-    assert not client.path_to_dataset.exists()
+    assert dataset_client.name not in FileSystemDatasetClient._cache_by_name
+    assert not dataset_client.path_to_dataset.exists()
 
 
 async def test_metadata_updates(dataset_client: FileSystemDatasetClient) -> None:
