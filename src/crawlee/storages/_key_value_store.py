@@ -14,38 +14,12 @@ from ._base import Storage
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
-    from crawlee._types import JsonSerializable
     from crawlee.configuration import Configuration
     from crawlee.storage_clients import StorageClient
     from crawlee.storage_clients._base import KeyValueStoreClient
 
 T = TypeVar('T')
 
-# TODO:
-# - caching / memoization of KVS
-
-# Properties:
-# - id
-# - name
-# - metadata
-
-# Methods:
-# - open
-# - drop
-# - get_value
-# - set_value
-# - delete_value (new method)
-# - iterate_keys
-# - list_keys (new method)
-# - get_public_url
-
-# Breaking changes:
-# - from_storage_object method has been removed - Use the open method with name and/or id instead.
-# - get_info -> metadata property
-# - storage_object -> metadata property
-# - set_metadata method has been removed - Do we want to support it (e.g. for renaming)?
-# - get_auto_saved_value method has been removed -> It should be managed by the underlying client.
-# - persist_autosaved_values method has been removed -> It should be managed by the underlying client.
 
 @docs_group('Classes')
 class KeyValueStore(Storage):
@@ -82,9 +56,11 @@ class KeyValueStore(Storage):
     ```
     """
 
-    # Cache for persistent (auto-saved) values
-    _general_cache: ClassVar[dict[str, dict[str, dict[str, JsonSerializable]]]] = {}
-    _persist_state_event_started = False
+    _cache_by_id: ClassVar[dict[str, KeyValueStore]] = {}
+    """A dictionary to cache key-value stores by their IDs."""
+
+    _cache_by_name: ClassVar[dict[str, KeyValueStore]] = {}
+    """A dictionary to cache key-value stores by their names."""
 
     def __init__(self, client: KeyValueStoreClient) -> None:
         """Initialize a new instance.
@@ -132,6 +108,12 @@ class KeyValueStore(Storage):
         if id and name:
             raise ValueError('Only one of "id" or "name" can be specified, not both.')
 
+        # Check if key value store is already cached by id or name
+        if id and id in cls._cache_by_id:
+            return cls._cache_by_id[id]
+        if name and name in cls._cache_by_name:
+            return cls._cache_by_name[name]
+
         configuration = service_locator.get_configuration() if configuration is None else configuration
         storage_client = service_locator.get_storage_client() if storage_client is None else storage_client
         purge_on_start = configuration.purge_on_start if purge_on_start is None else purge_on_start
@@ -144,10 +126,24 @@ class KeyValueStore(Storage):
             storage_dir=storage_dir,
         )
 
-        return cls(client)
+        kvs = cls(client)
+
+        # Cache the key value store by id and name if available
+        if kvs.id:
+            cls._cache_by_id[kvs.id] = kvs
+        if kvs.name:
+            cls._cache_by_name[kvs.name] = kvs
+
+        return kvs
 
     @override
     async def drop(self) -> None:
+        # Remove from cache before dropping
+        if self.id in self._cache_by_id:
+            del self._cache_by_id[self.id]
+        if self.name and self.name in self._cache_by_name:
+            del self._cache_by_name[self.name]
+
         await self._client.drop()
 
     @overload

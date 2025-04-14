@@ -20,6 +20,9 @@ pytestmark = pytest.mark.only
 @pytest.fixture
 async def kvs_client(tmp_path: Path) -> AsyncGenerator[FileSystemKeyValueStoreClient, None]:
     """Fixture that provides a fresh file system key-value store client using a temporary directory."""
+    # Clear any existing dataset clients in the cache
+    FileSystemKeyValueStoreClient._cache_by_name.clear()
+
     client = await FileSystemKeyValueStoreClient.open(name='test_kvs', storage_dir=tmp_path)
     yield client
     await client.drop()
@@ -247,21 +250,18 @@ async def test_iterate_keys_with_exclusive_start_key(kvs_client: FileSystemKeyVa
     assert 'b-key' not in keys
 
 
-async def test_drop(tmp_path: Path) -> None:
+async def test_drop(kvs_client: FileSystemKeyValueStoreClient) -> None:
     """Test that drop removes the entire store directory from disk."""
-    # Create a store and add a value
-    client = await FileSystemKeyValueStoreClient.open(name='to_drop', storage_dir=tmp_path)
-    await client.set_value(key='test', value='test-value')
+    await kvs_client.set_value(key='test', value='test-value')
 
-    # Verify the store directory exists
-    kvs_path = client.path_to_kvs
-    assert kvs_path.exists()
+    assert kvs_client.name in FileSystemKeyValueStoreClient._cache_by_name
+    assert kvs_client.path_to_kvs.exists()
 
     # Drop the store
-    await client.drop()
+    await kvs_client.drop()
 
-    # Verify the directory was removed
-    assert not kvs_path.exists()
+    assert kvs_client.name not in FileSystemKeyValueStoreClient._cache_by_name
+    assert not kvs_client.path_to_kvs.exists()
 
 
 async def test_metadata_updates(kvs_client: FileSystemKeyValueStoreClient) -> None:

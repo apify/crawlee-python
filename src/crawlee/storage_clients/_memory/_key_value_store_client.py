@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from datetime import datetime, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from typing_extensions import override
 
@@ -18,9 +18,6 @@ if TYPE_CHECKING:
 
 logger = getLogger(__name__)
 
-_cache_by_name = dict[str, 'MemoryKeyValueStoreClient']()
-"""A dictionary to cache clients by their names."""
-
 
 class MemoryKeyValueStoreClient(KeyValueStoreClient):
     """A memory implementation of the key-value store client.
@@ -32,6 +29,9 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
 
     _DEFAULT_NAME = 'default'
     """The default name for the key-value store when no name is provided."""
+
+    _cache_by_name: ClassVar[dict[str, MemoryKeyValueStoreClient]] = {}
+    """A dictionary to cache clients by their names."""
 
     def __init__(
         self,
@@ -97,8 +97,8 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
         name = name or cls._DEFAULT_NAME
 
         # Check if the client is already cached by name
-        if name in _cache_by_name:
-            client = _cache_by_name[name]
+        if name in cls._cache_by_name:
+            client = cls._cache_by_name[name]
             await client._update_metadata(update_accessed_at=True)  # noqa: SLF001
             return client
 
@@ -115,7 +115,7 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
         )
 
         # Cache the client by name
-        _cache_by_name[name] = client
+        cls._cache_by_name[name] = client
 
         return client
 
@@ -125,8 +125,8 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
         self._store.clear()
 
         # Remove from cache
-        if self.name in _cache_by_name:
-            del _cache_by_name[self.name]
+        if self.name in self.__class__._cache_by_name:
+            del self.__class__._cache_by_name[self.name]
 
     @override
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:

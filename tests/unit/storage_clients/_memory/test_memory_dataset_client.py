@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from crawlee.storage_clients._memory._dataset_client import MemoryDatasetClient, _cache_by_name
+from crawlee.storage_clients._memory._dataset_client import MemoryDatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage
 
 if TYPE_CHECKING:
@@ -19,7 +19,7 @@ pytestmark = pytest.mark.only
 async def dataset_client() -> AsyncGenerator[MemoryDatasetClient, None]:
     """Fixture that provides a fresh memory dataset client for each test."""
     # Clear any existing dataset clients in the cache
-    _cache_by_name.clear()
+    MemoryDatasetClient._cache_by_name.clear()
 
     client = await MemoryDatasetClient.open(name='test_dataset')
     yield client
@@ -39,7 +39,7 @@ async def test_open_creates_new_dataset() -> None:
     assert isinstance(client.modified_at, datetime)
 
     # Verify the client was cached
-    assert 'new_dataset' in _cache_by_name
+    assert 'new_dataset' in MemoryDatasetClient._cache_by_name
 
 
 async def test_open_existing_dataset(dataset_client: MemoryDatasetClient) -> None:
@@ -226,17 +226,16 @@ async def test_iterate_with_options(dataset_client: MemoryDatasetClient) -> None
 
 async def test_drop(dataset_client: MemoryDatasetClient) -> None:
     """Test that drop removes the dataset from cache and resets its state."""
-    # Add an item to the dataset
     await dataset_client.push_data({'test': 'data'})
 
     # Verify the dataset exists in the cache
-    assert dataset_client.name in _cache_by_name
+    assert dataset_client.name in MemoryDatasetClient._cache_by_name
 
     # Drop the dataset
     await dataset_client.drop()
 
     # Verify the dataset was removed from the cache
-    assert dataset_client.name not in _cache_by_name
+    assert dataset_client.name not in MemoryDatasetClient._cache_by_name
 
     # Verify the dataset is empty
     assert dataset_client.item_count == 0

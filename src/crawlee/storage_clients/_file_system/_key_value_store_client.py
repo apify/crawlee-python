@@ -6,7 +6,7 @@ import shutil
 from datetime import datetime, timezone
 from logging import getLogger
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from pydantic import ValidationError
 from typing_extensions import override
@@ -24,9 +24,6 @@ if TYPE_CHECKING:
 
 logger = getLogger(__name__)
 
-_cache_by_name = dict[str, 'FileSystemKeyValueStoreClient']()
-"""A dictionary to cache clients by their names."""
-
 
 class FileSystemKeyValueStoreClient(KeyValueStoreClient):
     """A file system implementation of the key-value store client.
@@ -41,6 +38,9 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
     _STORAGE_SUBDIR = 'key_value_stores'
     """The name of the subdirectory where key-value stores are stored."""
+
+    _cache_by_name: ClassVar[dict[str, FileSystemKeyValueStoreClient]] = {}
+    """A dictionary to cache clients by their names."""
 
     def __init__(
         self,
@@ -122,8 +122,8 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         name = name or cls._DEFAULT_NAME
 
         # Check if the client is already cached by name.
-        if name in _cache_by_name:
-            return _cache_by_name[name]
+        if name in cls._cache_by_name:
+            return cls._cache_by_name[name]
 
         storage_dir = storage_dir or Path.cwd()
         kvs_path = storage_dir / cls._STORAGE_SUBDIR / name
@@ -169,7 +169,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             await client._update_metadata()
 
         # Cache the client by name.
-        _cache_by_name[name] = client
+        cls._cache_by_name[name] = client
 
         return client
 
@@ -181,8 +181,8 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
                 await asyncio.to_thread(shutil.rmtree, self.path_to_kvs)
 
         # Remove the client from the cache.
-        if self.name in _cache_by_name:
-            del _cache_by_name[self.name]
+        if self.name in self.__class__._cache_by_name:  # noqa: SLF001
+            del self.__class__._cache_by_name[self.name]  # noqa: SLF001
 
     @override
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:
