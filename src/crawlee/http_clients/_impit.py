@@ -10,7 +10,6 @@ from crawlee._types import HttpHeaders
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
 from crawlee._utils.docs import docs_group
 from crawlee.errors import ProxyError
-from crawlee.fingerprint_suite import HeaderGenerator
 from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
 
 if TYPE_CHECKING:
@@ -65,8 +64,6 @@ class ImpitHttpClient(HttpClient):
     ```
     """
 
-    _DEFAULT_HEADER_GENERATOR = HeaderGenerator()
-
     def __init__(
         self,
         *,
@@ -82,7 +79,7 @@ class ImpitHttpClient(HttpClient):
             http3: Whether to enable HTTP/3 support.
             verify: SSL certificates used to verify the identity of requested hosts.
             header_generator: Header generator instance to use for generating common headers.
-            async_client_kwargs: Additional keyword arguments for `httpx.AsyncClient`.
+            async_client_kwargs: Additional keyword arguments for `impit.AsyncClient`.
         """
         super().__init__(
             persist_cookies_per_session=persist_cookies_per_session,
