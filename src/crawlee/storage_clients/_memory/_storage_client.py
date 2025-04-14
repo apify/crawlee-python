@@ -21,37 +21,43 @@ class MemoryStorageClient(StorageClient):
     async def open_dataset_client(
         self,
         *,
-        id: str | None,
-        name: str | None,
-        purge_on_start: bool,
-        storage_dir: Path,
+        id: str | None = None,
+        name: str | None = None,
+        purge_on_start: bool = True,
+        storage_dir: Path | None = None
     ) -> MemoryDatasetClient:
-        dataset_client = await MemoryDatasetClient.open(id=id, name=name, storage_dir=storage_dir)
+        client = await MemoryDatasetClient.open(id=id, name=name, storage_dir=storage_dir)
 
         if purge_on_start:
-            await dataset_client.drop()
-            dataset_client = await MemoryDatasetClient.open(id=id, name=name, storage_dir=storage_dir)
+            await client.drop()
+            client = await MemoryDatasetClient.open(id=id, name=name, storage_dir=storage_dir)
 
-        return dataset_client
+        return client
 
     @override
     async def open_key_value_store_client(
         self,
         *,
-        id: str | None,
-        name: str | None,
-        purge_on_start: bool,
-        storage_dir: Path,
+        id: str | None = None,
+        name: str | None = None,
+        purge_on_start: bool = True,
+        storage_dir: Path | None = None
     ) -> MemoryKeyValueStoreClient:
-        return MemoryKeyValueStoreClient()
+        client = await MemoryKeyValueStoreClient.open(id=id, name=name, storage_dir=storage_dir)
+
+        if purge_on_start:
+            await client.drop()
+            client = await MemoryKeyValueStoreClient.open(id=id, name=name, storage_dir=storage_dir)
+
+        return client
 
     @override
     async def open_request_queue_client(
         self,
         *,
-        id: str | None,
-        name: str | None,
-        purge_on_start: bool,
-        storage_dir: Path,
+        id: str | None = None,
+        name: str | None = None,
+        purge_on_start: bool = True,
+        storage_dir: Path | None = None
     ) -> MemoryRequestQueueClient:
-        return MemoryRequestQueueClient()
+        pass
