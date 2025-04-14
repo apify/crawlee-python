@@ -21,10 +21,10 @@ class FileSystemStorageClient(StorageClient):
     async def open_dataset_client(
         self,
         *,
-        id: str | None,
-        name: str | None,
-        purge_on_start: bool,
-        storage_dir: Path,
+        id: str | None = None,
+        name: str | None = None,
+        purge_on_start: bool = True,
+        storage_dir: Path | None = None,
     ) -> FileSystemDatasetClient:
         client = await FileSystemDatasetClient.open(id=id, name=name, storage_dir=storage_dir)
 
@@ -38,10 +38,10 @@ class FileSystemStorageClient(StorageClient):
     async def open_key_value_store_client(
         self,
         *,
-        id: str | None,
-        name: str | None,
-        purge_on_start: bool,
-        storage_dir: Path,
+        id: str | None = None,
+        name: str | None = None,
+        purge_on_start: bool = True,
+        storage_dir: Path | None = None,
     ) -> FileSystemKeyValueStoreClient:
         client = await FileSystemKeyValueStoreClient.open(id=id, name=name, storage_dir=storage_dir)
 
@@ -55,15 +55,9 @@ class FileSystemStorageClient(StorageClient):
     async def open_request_queue_client(
         self,
         *,
-        id: str | None,
-        name: str | None,
-        purge_on_start: bool,
-        storage_dir: Path,
+        id: str | None = None,
+        name: str | None = None,
+        purge_on_start: bool = True,
+        storage_dir: Path | None = None,
     ) -> FileSystemRequestQueueClient:
-        client = await FileSystemRequestQueueClient.open(id=id, name=name, storage_dir=storage_dir)
-
-        if purge_on_start:
-            await client.drop()
-            client = await FileSystemRequestQueueClient.open(id=id, name=name, storage_dir=storage_dir)
-
-        return client
+        pass
