@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from crawlee.storage_clients._memory._key_value_store_client import MemoryKeyValueStoreClient
+from crawlee.storage_clients._memory import MemoryKeyValueStoreClient
 from crawlee.storage_clients.models import KeyValueStoreRecordMetadata
 
 if TYPE_CHECKING:
@@ -30,11 +30,11 @@ async def test_open_creates_new_store() -> None:
     client = await MemoryKeyValueStoreClient.open(name='new_kvs')
 
     # Verify client properties
-    assert client.id is not None
-    assert client.name == 'new_kvs'
-    assert isinstance(client.created_at, datetime)
-    assert isinstance(client.accessed_at, datetime)
-    assert isinstance(client.modified_at, datetime)
+    assert client.metadata.id is not None
+    assert client.metadata.name == 'new_kvs'
+    assert isinstance(client.metadata.created_at, datetime)
+    assert isinstance(client.metadata.accessed_at, datetime)
+    assert isinstance(client.metadata.modified_at, datetime)
 
     # Verify the client was cached
     assert 'new_kvs' in MemoryKeyValueStoreClient._cache_by_name
@@ -43,11 +43,11 @@ async def test_open_creates_new_store() -> None:
 async def test_open_existing_store(kvs_client: MemoryKeyValueStoreClient) -> None:
     """Test that open() loads an existing key-value store with matching properties."""
     # Open the same key-value store again
-    reopened_client = await MemoryKeyValueStoreClient.open(name=kvs_client.name)
+    reopened_client = await MemoryKeyValueStoreClient.open(name=kvs_client.metadata.name)
 
     # Verify client properties
-    assert kvs_client.id == reopened_client.id
-    assert kvs_client.name == reopened_client.name
+    assert kvs_client.metadata.id == reopened_client.metadata.id
+    assert kvs_client.metadata.name == reopened_client.metadata.name
 
     # Verify clients (python) ids
     assert id(kvs_client) == id(reopened_client)
@@ -56,8 +56,8 @@ async def test_open_existing_store(kvs_client: MemoryKeyValueStoreClient) -> Non
 async def test_open_with_id_and_name() -> None:
     """Test that open() can be used with both id and name parameters."""
     client = await MemoryKeyValueStoreClient.open(id='some-id', name='some-name')
-    assert client.id == 'some-id'
-    assert client.name == 'some-name'
+    assert client.metadata.id == 'some-id'
+    assert client.metadata.name == 'some-name'
 
 
 @pytest.mark.parametrize(
@@ -185,13 +185,13 @@ async def test_drop(kvs_client: MemoryKeyValueStoreClient) -> None:
     await kvs_client.set_value(key='test', value='data')
 
     # Verify the store exists in the cache
-    assert kvs_client.name in MemoryKeyValueStoreClient._cache_by_name
+    assert kvs_client.metadata.name in MemoryKeyValueStoreClient._cache_by_name
 
     # Drop the store
     await kvs_client.drop()
 
     # Verify the store was removed from the cache
-    assert kvs_client.name not in MemoryKeyValueStoreClient._cache_by_name
+    assert kvs_client.metadata.name not in MemoryKeyValueStoreClient._cache_by_name
 
     # Verify the store is empty
     record = await kvs_client.get_value(key='test')
@@ -207,9 +207,9 @@ async def test_get_public_url(kvs_client: MemoryKeyValueStoreClient) -> None:
 async def test_metadata_updates(kvs_client: MemoryKeyValueStoreClient) -> None:
     """Test that read/write operations properly update accessed_at and modified_at timestamps."""
     # Record initial timestamps
-    initial_created = kvs_client.created_at
-    initial_accessed = kvs_client.accessed_at
-    initial_modified = kvs_client.modified_at
+    initial_created = kvs_client.metadata.created_at
+    initial_accessed = kvs_client.metadata.accessed_at
+    initial_modified = kvs_client.metadata.modified_at
 
     # Wait a moment to ensure timestamps can change
     await asyncio.sleep(0.01)
@@ -218,11 +218,11 @@ async def test_metadata_updates(kvs_client: MemoryKeyValueStoreClient) -> None:
     await kvs_client.get_value(key='nonexistent')
 
     # Verify timestamps
-    assert kvs_client.created_at == initial_created
-    assert kvs_client.accessed_at > initial_accessed
-    assert kvs_client.modified_at == initial_modified
+    assert kvs_client.metadata.created_at == initial_created
+    assert kvs_client.metadata.accessed_at > initial_accessed
+    assert kvs_client.metadata.modified_at == initial_modified
 
-    accessed_after_get = kvs_client.accessed_at
+    accessed_after_get = kvs_client.metadata.accessed_at
 
     # Wait a moment to ensure timestamps can change
     await asyncio.sleep(0.01)
@@ -231,6 +231,6 @@ async def test_metadata_updates(kvs_client: MemoryKeyValueStoreClient) -> None:
     await kvs_client.set_value(key='new_key', value='new value')
 
     # Verify timestamps again
-    assert kvs_client.created_at == initial_created
-    assert kvs_client.modified_at > initial_modified
-    assert kvs_client.accessed_at > accessed_after_get
+    assert kvs_client.metadata.created_at == initial_created
+    assert kvs_client.metadata.modified_at > initial_modified
+    assert kvs_client.metadata.accessed_at > accessed_after_get

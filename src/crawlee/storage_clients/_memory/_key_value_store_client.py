@@ -55,32 +55,12 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
         )
 
         # Dictionary to hold key-value records with metadata
-        self._store = dict[str, KeyValueStoreRecord]()
+        self._records = dict[str, KeyValueStoreRecord]()
 
     @override
     @property
-    def id(self) -> str:
-        return self._metadata.id
-
-    @override
-    @property
-    def name(self) -> str:
-        return self._metadata.name
-
-    @override
-    @property
-    def created_at(self) -> datetime:
-        return self._metadata.created_at
-
-    @override
-    @property
-    def accessed_at(self) -> datetime:
-        return self._metadata.accessed_at
-
-    @override
-    @property
-    def modified_at(self) -> datetime:
-        return self._metadata.modified_at
+    def metadata(self) -> KeyValueStoreMetadata:
+        return self._metadata
 
     @override
     @classmethod
@@ -122,18 +102,18 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
     @override
     async def drop(self) -> None:
         # Clear all data
-        self._store.clear()
+        self._records.clear()
 
         # Remove from cache
-        if self.name in self.__class__._cache_by_name:
-            del self.__class__._cache_by_name[self.name]
+        if self.metadata.name in self.__class__._cache_by_name:  # noqa: SLF001
+            del self.__class__._cache_by_name[self.metadata.name]  # noqa: SLF001
 
     @override
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:
         await self._update_metadata(update_accessed_at=True)
 
         # Return None if key doesn't exist
-        return self._store.get(key, None)
+        return self._records.get(key, None)
 
     @override
     async def set_value(self, *, key: str, value: Any, content_type: str | None = None) -> None:
@@ -148,14 +128,14 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
             size=size,
         )
 
-        self._store[key] = record
+        self._records[key] = record
 
         await self._update_metadata(update_accessed_at=True, update_modified_at=True)
 
     @override
     async def delete_value(self, *, key: str) -> None:
-        if key in self._store:
-            del self._store[key]
+        if key in self._records:
+            del self._records[key]
             await self._update_metadata(update_accessed_at=True, update_modified_at=True)
 
     @override
@@ -168,7 +148,7 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
         await self._update_metadata(update_accessed_at=True)
 
         # Get all keys, sorted alphabetically
-        keys = sorted(self._store.keys())
+        keys = sorted(self._records.keys())
 
         # Apply exclusive_start_key filter if provided
         if exclusive_start_key is not None:
@@ -180,7 +160,7 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
 
         # Yield metadata for each key
         for key in keys:
-            record = self._store[key]
+            record = self._records[key]
             yield KeyValueStoreRecordMetadata(
                 key=key,
                 content_type=record.content_type,

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from crawlee._consts import METADATA_FILENAME
-from crawlee.storage_clients._file_system._key_value_store_client import FileSystemKeyValueStoreClient
+from crawlee.storage_clients._file_system import FileSystemKeyValueStoreClient
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -33,11 +33,11 @@ async def test_open_creates_new_kvs(tmp_path: Path) -> None:
     client = await FileSystemKeyValueStoreClient.open(name='new_kvs', storage_dir=tmp_path)
 
     # Verify client properties
-    assert client.id is not None
-    assert client.name == 'new_kvs'
-    assert isinstance(client.created_at, datetime)
-    assert isinstance(client.accessed_at, datetime)
-    assert isinstance(client.modified_at, datetime)
+    assert client.metadata.id is not None
+    assert client.metadata.name == 'new_kvs'
+    assert isinstance(client.metadata.created_at, datetime)
+    assert isinstance(client.metadata.accessed_at, datetime)
+    assert isinstance(client.metadata.modified_at, datetime)
 
     # Verify files were created
     assert client.path_to_kvs.exists()
@@ -46,18 +46,18 @@ async def test_open_creates_new_kvs(tmp_path: Path) -> None:
     # Verify metadata content
     with client.path_to_metadata.open() as f:
         metadata = json.load(f)
-        assert metadata['id'] == client.id
+        assert metadata['id'] == client.metadata.id
         assert metadata['name'] == 'new_kvs'
 
 
 async def test_open_existing_kvs(kvs_client: FileSystemKeyValueStoreClient, tmp_path: Path) -> None:
     """Test that open() loads an existing key-value store with matching properties."""
     # Open the same key-value store again
-    reopened_client = await FileSystemKeyValueStoreClient.open(name=kvs_client.name, storage_dir=tmp_path)
+    reopened_client = await FileSystemKeyValueStoreClient.open(name=kvs_client.metadata.name, storage_dir=tmp_path)
 
     # Verify client properties
-    assert kvs_client.id == reopened_client.id
-    assert kvs_client.name == reopened_client.name
+    assert kvs_client.metadata.id == reopened_client.metadata.id
+    assert kvs_client.metadata.name == reopened_client.metadata.name
 
     # Verify clients (python) ids - should be the same object due to caching
     assert id(kvs_client) == id(reopened_client)
@@ -254,22 +254,22 @@ async def test_drop(kvs_client: FileSystemKeyValueStoreClient) -> None:
     """Test that drop removes the entire store directory from disk."""
     await kvs_client.set_value(key='test', value='test-value')
 
-    assert kvs_client.name in FileSystemKeyValueStoreClient._cache_by_name
+    assert kvs_client.metadata.name in FileSystemKeyValueStoreClient._cache_by_name
     assert kvs_client.path_to_kvs.exists()
 
     # Drop the store
     await kvs_client.drop()
 
-    assert kvs_client.name not in FileSystemKeyValueStoreClient._cache_by_name
+    assert kvs_client.metadata.name not in FileSystemKeyValueStoreClient._cache_by_name
     assert not kvs_client.path_to_kvs.exists()
 
 
 async def test_metadata_updates(kvs_client: FileSystemKeyValueStoreClient) -> None:
     """Test that read/write operations properly update accessed_at and modified_at timestamps."""
     # Record initial timestamps
-    initial_created = kvs_client.created_at
-    initial_accessed = kvs_client.accessed_at
-    initial_modified = kvs_client.modified_at
+    initial_created = kvs_client.metadata.created_at
+    initial_accessed = kvs_client.metadata.accessed_at
+    initial_modified = kvs_client.metadata.modified_at
 
     # Wait a moment to ensure timestamps can change
     await asyncio.sleep(0.01)
@@ -278,11 +278,11 @@ async def test_metadata_updates(kvs_client: FileSystemKeyValueStoreClient) -> No
     await kvs_client.get_value(key='nonexistent')
 
     # Verify timestamps
-    assert kvs_client.created_at == initial_created
-    assert kvs_client.accessed_at > initial_accessed
-    assert kvs_client.modified_at == initial_modified
+    assert kvs_client.metadata.created_at == initial_created
+    assert kvs_client.metadata.accessed_at > initial_accessed
+    assert kvs_client.metadata.modified_at == initial_modified
 
-    accessed_after_get = kvs_client.accessed_at
+    accessed_after_get = kvs_client.metadata.accessed_at
 
     # Wait a moment to ensure timestamps can change
     await asyncio.sleep(0.01)
@@ -291,9 +291,9 @@ async def test_metadata_updates(kvs_client: FileSystemKeyValueStoreClient) -> No
     await kvs_client.set_value(key='new-key', value='new-value')
 
     # Verify timestamps again
-    assert kvs_client.created_at == initial_created
-    assert kvs_client.modified_at > initial_modified
-    assert kvs_client.accessed_at > accessed_after_get
+    assert kvs_client.metadata.created_at == initial_created
+    assert kvs_client.metadata.modified_at > initial_modified
+    assert kvs_client.metadata.accessed_at > accessed_after_get
 
 
 async def test_get_public_url_not_supported(kvs_client: FileSystemKeyValueStoreClient) -> None:

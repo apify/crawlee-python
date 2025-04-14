@@ -7,11 +7,10 @@ from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
-    from datetime import datetime
     from pathlib import Path
     from typing import Any
 
-    from crawlee.storage_clients.models import DatasetItemsListPage
+    from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
 
 @docs_group('Abstract classes')
@@ -30,33 +29,8 @@ class DatasetClient(ABC):
 
     @property
     @abstractmethod
-    def id(self) -> str:
-        """The ID of the dataet, a unique identifier, typically a UUID or similar value."""
-
-    @property
-    @abstractmethod
-    def name(self) -> str | None:
-        """The optional human-readable name of the dataset."""
-
-    @property
-    @abstractmethod
-    def created_at(self) -> datetime:
-        """Timestamp when the dataset was first created, remains unchanged."""
-
-    @property
-    @abstractmethod
-    def accessed_at(self) -> datetime:
-        """Timestamp of last access to the dataset, updated on read or write operations."""
-
-    @property
-    @abstractmethod
-    def modified_at(self) -> datetime:
-        """Timestamp of last modification of the dataset, updated when new data are added."""
-
-    @property
-    @abstractmethod
-    def item_count(self) -> int:
-        """Total count of data items stored in the dataset."""
+    def metadata(self) -> DatasetMetadata:
+        """The metadata of the dataset."""
 
     @classmethod
     @abstractmethod

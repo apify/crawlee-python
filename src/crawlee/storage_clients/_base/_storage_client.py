@@ -23,7 +23,7 @@ class StorageClient(ABC):
         purge_on_start: bool = True,
         storage_dir: Path | None = None,
     ) -> DatasetClient:
-        """Open the dataset client."""
+        """Open a dataset client."""
 
     @abstractmethod
     async def open_key_value_store_client(
@@ -34,7 +34,7 @@ class StorageClient(ABC):
         purge_on_start: bool = True,
         storage_dir: Path | None = None,
     ) -> KeyValueStoreClient:
-        """Open the key-value store client."""
+        """Open a key-value store client."""
 
     @abstractmethod
     async def open_request_queue_client(
@@ -45,4 +45,4 @@ class StorageClient(ABC):
         purge_on_start: bool = True,
         storage_dir: Path | None = None,
     ) -> RequestQueueClient:
-        """Open the request queue client."""
+        """Open a request queue client."""

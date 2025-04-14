@@ -4,9 +4,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from crawlee.storage_clients._file_system._dataset_client import FileSystemDatasetClient
-from crawlee.storage_clients._file_system._key_value_store_client import FileSystemKeyValueStoreClient
-from crawlee.storage_clients._file_system._storage_client import FileSystemStorageClient
+from crawlee.storage_clients._file_system import (
+    FileSystemDatasetClient,
+    FileSystemKeyValueStoreClient,
+    FileSystemStorageClient,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -25,7 +27,7 @@ async def test_open_dataset_client(client: FileSystemStorageClient, tmp_path: Pa
 
     # Verify correct client type and properties
     assert isinstance(dataset_client, FileSystemDatasetClient)
-    assert dataset_client.name == 'test-dataset'
+    assert dataset_client.metadata.name == 'test-dataset'
 
     # Verify directory structure was created
     assert dataset_client.path_to_dataset.exists()
@@ -86,7 +88,7 @@ async def test_open_kvs_client(client: FileSystemStorageClient, tmp_path: Path) 
 
     # Verify correct client type and properties
     assert isinstance(kvs_client, FileSystemKeyValueStoreClient)
-    assert kvs_client.name == 'test-kvs'
+    assert kvs_client.metadata.name == 'test-kvs'
 
     # Verify directory structure was created
     assert kvs_client.path_to_kvs.exists()

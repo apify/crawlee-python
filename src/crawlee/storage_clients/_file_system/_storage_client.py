@@ -60,4 +60,10 @@ class FileSystemStorageClient(StorageClient):
         purge_on_start: bool = True,
         storage_dir: Path | None = None,
     ) -> FileSystemRequestQueueClient:
-        pass
+        client = await FileSystemRequestQueueClient.open(id=id, name=name, storage_dir=storage_dir)
+
+        if purge_on_start:
+            await client.drop()
+            client = await FileSystemRequestQueueClient.open(id=id, name=name, storage_dir=storage_dir)
+
+        return client

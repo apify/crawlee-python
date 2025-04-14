@@ -1,22 +1,21 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from datetime import datetime
 from typing import TYPE_CHECKING
 
 from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-    from datetime import datetime
+    from pathlib import Path
 
     from crawlee.storage_clients.models import (
         BatchRequestsOperationResponse,
         ProcessedRequest,
         ProlongRequestLockResponse,
         Request,
-        RequestQueueHead,
         RequestQueueHeadWithLocks,
+        RequestQueueMetadata,
     )
 
 
@@ -30,75 +29,35 @@ class RequestQueueClient(ABC):
 
     @property
     @abstractmethod
-    def id(self) -> str:
-        """The ID of the dataset."""
+    def metadata(self) -> RequestQueueMetadata:
+        """The metadata of the request queue."""
 
-    @property
+    @classmethod
     @abstractmethod
-    def name(self) -> str | None:
-        """The name of the dataset."""
+    async def open(
+        cls,
+        *,
+        id: str | None = None,
+        name: str | None = None,
+        storage_dir: Path | None = None,
+    ) -> RequestQueueClient:
+        """Open a request queue client.
 
-    @property
-    @abstractmethod
-    def created_at(self) -> datetime:
-        """The time at which the dataset was created."""
+        Args:
+            id: ID of the queue to open. If not provided, a new queue will be created with a random ID.
+            name: Name of the queue to open. If not provided, the queue will be unnamed.
+            purge_on_start: If True, the queue will be purged before opening.
+            storage_dir: Directory to store the queue data in. If not provided, uses the default storage directory.
 
-    @property
-    @abstractmethod
-    def accessed_at(self) -> datetime:
-        """The time at which the dataset was last accessed."""
-
-    @property
-    @abstractmethod
-    def modified_at(self) -> datetime:
-        """The time at which the dataset was last modified."""
-
-    @property
-    @abstractmethod
-    def had_multiple_clients(self) -> bool:
-        """TODO."""
-
-    @property
-    @abstractmethod
-    def handled_request_count(self) -> int:
-        """TODO."""
-
-    @property
-    @abstractmethod
-    def pending_request_count(self) -> int:
-        """TODO."""
-
-    @property
-    @abstractmethod
-    def stats(self) -> dict:
-        """TODO."""
-
-    @property
-    @abstractmethod
-    def total_request_count(self) -> int:
-        """TODO."""
-
-    @property
-    @abstractmethod
-    def resource_directory(self) -> str:
-        """TODO."""
+        Returns:
+            A request queue client.
+        """
 
     @abstractmethod
     async def drop(self) -> None:
         """Drop the whole request queue and remove all its values.
 
         The backend method for the `RequestQueue.drop` call.
-        """
-
-    @abstractmethod
-    async def list_head(self, *, limit: int | None = None) -> RequestQueueHead:
-        """Retrieve a given number of requests from the beginning of the queue.
-
-        Args:
-            limit: How many requests to retrieve.
-
-        Returns:
-            The desired number of requests from the beginning of the queue.
         """
 
     @abstractmethod
@@ -117,33 +76,16 @@ class RequestQueueClient(ABC):
         """
 
     @abstractmethod
-    async def add_request(
-        self,
-        request: Request,
-        *,
-        forefront: bool = False,
-    ) -> ProcessedRequest:
-        """Add a request to the queue.
-
-        Args:
-            request: The request to add to the queue.
-            forefront: Whether to add the request to the head or the end of the queue.
-
-        Returns:
-            Request queue operation information.
-        """
-
-    @abstractmethod
-    async def batch_add_requests(
+    async def add_requests_batch(
         self,
         requests: Sequence[Request],
         *,
         forefront: bool = False,
     ) -> BatchRequestsOperationResponse:
-        """Add a batch of requests to the queue.
+        """Add a requests to the queue in batches.
 
         Args:
-            requests: The requests to add to the queue.
+            requests: The batch of requests to add to the queue.
             forefront: Whether to add the requests to the head or the end of the queue.
 
         Returns:
@@ -187,7 +129,7 @@ class RequestQueueClient(ABC):
         """
 
     @abstractmethod
-    async def batch_delete_requests(self, requests: list[Request]) -> BatchRequestsOperationResponse:
+    async def delete_requests_batch(self, requests: list[Request]) -> BatchRequestsOperationResponse:
         """Delete given requests from the queue.
 
         Args:

@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from crawlee.storage_clients._memory._dataset_client import MemoryDatasetClient
-from crawlee.storage_clients._memory._key_value_store_client import MemoryKeyValueStoreClient
-from crawlee.storage_clients._memory._storage_client import MemoryStorageClient
+from crawlee.storage_clients._memory import MemoryDatasetClient, MemoryKeyValueStoreClient, MemoryStorageClient
 
 pytestmark = pytest.mark.only
 
@@ -20,8 +18,8 @@ async def test_open_dataset_client(client: MemoryStorageClient) -> None:
 
     # Verify correct client type and properties
     assert isinstance(dataset_client, MemoryDatasetClient)
-    assert dataset_client.name == 'test-dataset'
-    assert dataset_client.item_count == 0
+    assert dataset_client.metadata.name == 'test-dataset'
+    assert dataset_client.metadata.item_count == 0
 
 
 async def test_dataset_client_purge_on_start(client: MemoryStorageClient) -> None:
@@ -75,7 +73,7 @@ async def test_open_kvs_client(client: MemoryStorageClient) -> None:
 
     # Verify correct client type and properties
     assert isinstance(kvs_client, MemoryKeyValueStoreClient)
-    assert kvs_client.name == 'test-kvs'
+    assert kvs_client.metadata.name == 'test-kvs'
 
 
 async def test_kvs_client_purge_on_start(client: MemoryStorageClient) -> None:

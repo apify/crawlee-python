@@ -59,7 +59,6 @@ class RequestQueueMetadata(StorageMetadata):
     pending_request_count: Annotated[int, Field(alias='pendingRequestCount')]
     stats: Annotated[dict, Field(alias='stats')]
     total_request_count: Annotated[int, Field(alias='totalRequestCount')]
-    resource_directory: Annotated[str, Field(alias='resourceDirectory')]
 
 
 @docs_group('Data structures')
@@ -122,23 +121,17 @@ class RequestQueueHeadState(BaseModel):
 
 
 @docs_group('Data structures')
-class RequestQueueHead(BaseModel):
-    """Model for the request queue head."""
+class RequestQueueHeadWithLocks(BaseModel):
+    """Model for request queue head with locks."""
 
     model_config = ConfigDict(populate_by_name=True)
 
     limit: Annotated[int | None, Field(alias='limit', default=None)]
     had_multiple_clients: Annotated[bool, Field(alias='hadMultipleClients')]
     queue_modified_at: Annotated[datetime, Field(alias='queueModifiedAt')]
-    items: Annotated[list[Request], Field(alias='items', default_factory=list)]
-
-
-@docs_group('Data structures')
-class RequestQueueHeadWithLocks(RequestQueueHead):
-    """Model for request queue head with locks."""
-
     lock_secs: Annotated[int, Field(alias='lockSecs')]
     queue_has_locked_requests: Annotated[bool | None, Field(alias='queueHasLockedRequests')] = None
+    items: Annotated[list[Request], Field(alias='items', default_factory=list)]
 
 
 class _ListPage(BaseModel):

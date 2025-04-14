@@ -7,10 +7,9 @@ from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
-    from datetime import datetime
     from pathlib import Path
 
-    from crawlee.storage_clients.models import KeyValueStoreRecord, KeyValueStoreRecordMetadata
+    from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
 
 
 @docs_group('Abstract classes')
@@ -29,28 +28,8 @@ class KeyValueStoreClient(ABC):
 
     @property
     @abstractmethod
-    def id(self) -> str:
-        """The unique identifier of the key-value store (typically a UUID)."""
-
-    @property
-    @abstractmethod
-    def name(self) -> str | None:
-        """The optional human-readable name for the KVS."""
-
-    @property
-    @abstractmethod
-    def created_at(self) -> datetime:
-        """Timestamp when the KVS was first created, remains unchanged."""
-
-    @property
-    @abstractmethod
-    def accessed_at(self) -> datetime:
-        """Timestamp of last access to the KVS, updated on read or write operations."""
-
-    @property
-    @abstractmethod
-    def modified_at(self) -> datetime:
-        """Timestamp of last modification of the KVS, updated when new data are added, updated or deleted."""
+    def metadata(self) -> KeyValueStoreMetadata:
+        """The metadata of the key-value store."""
 
     @classmethod
     @abstractmethod
