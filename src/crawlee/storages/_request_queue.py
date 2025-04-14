@@ -10,7 +10,7 @@ from typing_extensions import override
 from crawlee import service_locator
 from crawlee._utils.docs import docs_group
 from crawlee.request_loaders import RequestManager
-from crawlee.storage_clients.models import Request, RequestQueueMetadata
+from crawlee.storage_clients.models import Request
 
 from ._base import Storage
 
@@ -21,38 +21,11 @@ if TYPE_CHECKING:
     from crawlee.configuration import Configuration
     from crawlee.storage_clients import StorageClient
     from crawlee.storage_clients._base import RequestQueueClient
-    from crawlee.storage_clients.models import ProcessedRequest
+    from crawlee.storage_clients.models import ProcessedRequest, RequestQueueMetadata
 
 logger = getLogger(__name__)
 
 T = TypeVar('T')
-
-# TODO: implement:
-# - caching / memoization of both KVS & KVS clients
-
-# Properties:
-# - id
-# - name
-# - metadata
-
-# Methods
-# - open
-# - drop
-# - add_request
-# - add_requests_batched
-# - get_handled_count
-# - get_total_count
-# - get_request
-# - fetch_next_request
-# - mark_request_as_handled
-# - reclaim_request
-# - is_empty
-# - is_finished
-
-# Breaking changes:
-# - from_storage_object method has been removed - Use the open method with name and/or id instead.
-# - get_info -> metadata property
-# - storage_object -> metadata property
 
 
 @docs_group('Classes')
@@ -104,29 +77,17 @@ class RequestQueue(Storage, RequestManager):
     @override
     @property
     def id(self) -> str:
-        return self._client.id
+        return self._client.metadata.id
 
     @override
     @property
     def name(self) -> str | None:
-        return self._client.name
+        return self._client.metadata.name
 
     @override
     @property
     def metadata(self) -> RequestQueueMetadata:
-        return RequestQueueMetadata(
-            id=self._client.id,
-            name=self._client.id,
-            accessed_at=self._client.accessed_at,
-            created_at=self._client.created_at,
-            modified_at=self._client.modified_at,
-            had_multiple_clients=self._client.had_multiple_clients,
-            handled_request_count=self._client.handled_request_count,
-            pending_request_count=self._client.pending_request_count,
-            stats=self._client.stats,
-            total_request_count=self._client.total_request_count,
-            resource_directory=self._client.resource_directory,
-        )
+        return self._client.metadata
 
     @override
     @classmethod
@@ -158,7 +119,7 @@ class RequestQueue(Storage, RequestManager):
         return cls(client)
 
     @override
-    async def drop(self, *, timeout: timedelta | None = None) -> None:
+    async def drop(self) -> None:
         await self._client.drop()
 
     @override
@@ -168,7 +129,7 @@ class RequestQueue(Storage, RequestManager):
         *,
         forefront: bool = False,
     ) -> ProcessedRequest:
-        return await self._client.add_request(request, forefront=forefront)
+        return await self._client.add_requests_batch([request], forefront=forefront)
 
     @override
     async def add_requests_batched(
@@ -262,6 +223,17 @@ class RequestQueue(Storage, RequestManager):
             The request or `None` if there are no more pending requests.
         """
         # TODO: implement
+
+    async def get_request(self, request_id: str) -> Request | None:
+        """Retrieve a request by its ID.
+
+        Args:
+            request_id: The ID of the request to retrieve.
+
+        Returns:
+            The request if found, otherwise `None`.
+        """
+        return await self._client.get_request(request_id)
 
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
         """Mark a request as handled after successful processing.

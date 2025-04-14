@@ -10,7 +10,6 @@ from typing_extensions import override
 from crawlee import service_locator
 from crawlee._utils.docs import docs_group
 from crawlee._utils.file import export_csv_to_stream, export_json_to_stream
-from crawlee.storage_clients.models import DatasetMetadata
 
 from ._base import Storage
 from ._key_value_store import KeyValueStore
@@ -24,7 +23,7 @@ if TYPE_CHECKING:
     from crawlee.configuration import Configuration
     from crawlee.storage_clients import StorageClient
     from crawlee.storage_clients._base import DatasetClient
-    from crawlee.storage_clients.models import DatasetItemsListPage
+    from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
     from ._types import ExportDataCsvKwargs, ExportDataJsonKwargs
 
@@ -83,24 +82,17 @@ class Dataset(Storage):
     @override
     @property
     def id(self) -> str:
-        return self._client.id
+        return self._client.metadata.id
 
     @override
     @property
     def name(self) -> str | None:
-        return self._client.name
+        return self._client.metadata.name
 
     @override
     @property
     def metadata(self) -> DatasetMetadata:
-        return DatasetMetadata(
-            id=self._client.id,
-            name=self._client.id,
-            accessed_at=self._client.accessed_at,
-            created_at=self._client.created_at,
-            modified_at=self._client.modified_at,
-            item_count=self._client.item_count,
-        )
+        return self._client.metadata
 
     @override
     @classmethod

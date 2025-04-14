@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from crawlee.storage_clients._memory._dataset_client import MemoryDatasetClient
+from crawlee.storage_clients._memory import MemoryDatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage
 
 if TYPE_CHECKING:
@@ -31,12 +31,12 @@ async def test_open_creates_new_dataset() -> None:
     client = await MemoryDatasetClient.open(name='new_dataset')
 
     # Verify client properties
-    assert client.id is not None
-    assert client.name == 'new_dataset'
-    assert client.item_count == 0
-    assert isinstance(client.created_at, datetime)
-    assert isinstance(client.accessed_at, datetime)
-    assert isinstance(client.modified_at, datetime)
+    assert client.metadata.id is not None
+    assert client.metadata.name == 'new_dataset'
+    assert client.metadata.item_count == 0
+    assert isinstance(client.metadata.created_at, datetime)
+    assert isinstance(client.metadata.accessed_at, datetime)
+    assert isinstance(client.metadata.modified_at, datetime)
 
     # Verify the client was cached
     assert 'new_dataset' in MemoryDatasetClient._cache_by_name
@@ -45,12 +45,12 @@ async def test_open_creates_new_dataset() -> None:
 async def test_open_existing_dataset(dataset_client: MemoryDatasetClient) -> None:
     """Test that open() loads an existing dataset with matching properties."""
     # Open the same dataset again
-    reopened_client = await MemoryDatasetClient.open(name=dataset_client.name)
+    reopened_client = await MemoryDatasetClient.open(name=dataset_client.metadata.name)
 
     # Verify client properties
-    assert dataset_client.id == reopened_client.id
-    assert dataset_client.name == reopened_client.name
-    assert dataset_client.item_count == reopened_client.item_count
+    assert dataset_client.metadata.id == reopened_client.metadata.id
+    assert dataset_client.metadata.name == reopened_client.metadata.name
+    assert dataset_client.metadata.item_count == reopened_client.metadata.item_count
 
     # Verify clients (python) ids
     assert id(dataset_client) == id(reopened_client)
@@ -59,8 +59,8 @@ async def test_open_existing_dataset(dataset_client: MemoryDatasetClient) -> Non
 async def test_open_with_id_and_name() -> None:
     """Test that open() can be used with both id and name parameters."""
     client = await MemoryDatasetClient.open(id='some-id', name='some-name')
-    assert client.id == 'some-id'
-    assert client.name == 'some-name'
+    assert client.metadata.id == 'some-id'
+    assert client.metadata.name == 'some-name'
 
 
 async def test_push_data_single_item(dataset_client: MemoryDatasetClient) -> None:
@@ -69,7 +69,7 @@ async def test_push_data_single_item(dataset_client: MemoryDatasetClient) -> Non
     await dataset_client.push_data(item)
 
     # Verify item count was updated
-    assert dataset_client.item_count == 1
+    assert dataset_client.metadata.item_count == 1
 
     # Verify item was stored
     result = await dataset_client.get_data()
@@ -87,7 +87,7 @@ async def test_push_data_multiple_items(dataset_client: MemoryDatasetClient) -> 
     await dataset_client.push_data(items)
 
     # Verify item count was updated
-    assert dataset_client.item_count == 3
+    assert dataset_client.metadata.item_count == 3
 
     # Verify items were stored
     result = await dataset_client.get_data()
@@ -229,16 +229,16 @@ async def test_drop(dataset_client: MemoryDatasetClient) -> None:
     await dataset_client.push_data({'test': 'data'})
 
     # Verify the dataset exists in the cache
-    assert dataset_client.name in MemoryDatasetClient._cache_by_name
+    assert dataset_client.metadata.name in MemoryDatasetClient._cache_by_name
 
     # Drop the dataset
     await dataset_client.drop()
 
     # Verify the dataset was removed from the cache
-    assert dataset_client.name not in MemoryDatasetClient._cache_by_name
+    assert dataset_client.metadata.name not in MemoryDatasetClient._cache_by_name
 
     # Verify the dataset is empty
-    assert dataset_client.item_count == 0
+    assert dataset_client.metadata.item_count == 0
     result = await dataset_client.get_data()
     assert result.count == 0
 
@@ -246,9 +246,9 @@ async def test_drop(dataset_client: MemoryDatasetClient) -> None:
 async def test_metadata_updates(dataset_client: MemoryDatasetClient) -> None:
     """Test that read/write operations properly update accessed_at and modified_at timestamps."""
     # Record initial timestamps
-    initial_created = dataset_client.created_at
-    initial_accessed = dataset_client.accessed_at
-    initial_modified = dataset_client.modified_at
+    initial_created = dataset_client.metadata.created_at
+    initial_accessed = dataset_client.metadata.accessed_at
+    initial_modified = dataset_client.metadata.modified_at
 
     # Wait a moment to ensure timestamps can change
     await asyncio.sleep(0.01)
@@ -257,11 +257,11 @@ async def test_metadata_updates(dataset_client: MemoryDatasetClient) -> None:
     await dataset_client.get_data()
 
     # Verify timestamps
-    assert dataset_client.created_at == initial_created
-    assert dataset_client.accessed_at > initial_accessed
-    assert dataset_client.modified_at == initial_modified
+    assert dataset_client.metadata.created_at == initial_created
+    assert dataset_client.metadata.accessed_at > initial_accessed
+    assert dataset_client.metadata.modified_at == initial_modified
 
-    accessed_after_get = dataset_client.accessed_at
+    accessed_after_get = dataset_client.metadata.accessed_at
 
     # Wait a moment to ensure timestamps can change
     await asyncio.sleep(0.01)
@@ -270,6 +270,6 @@ async def test_metadata_updates(dataset_client: MemoryDatasetClient) -> None:
     await dataset_client.push_data({'new': 'item'})
 
     # Verify timestamps again
-    assert dataset_client.created_at == initial_created
-    assert dataset_client.modified_at > initial_modified
-    assert dataset_client.accessed_at > accessed_after_get
+    assert dataset_client.metadata.created_at == initial_created
+    assert dataset_client.metadata.modified_at > initial_modified
+    assert dataset_client.metadata.accessed_at > accessed_after_get

@@ -7,7 +7,6 @@ from typing_extensions import override
 
 from crawlee import service_locator
 from crawlee._utils.docs import docs_group
-from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecordMetadata
 
 from ._base import Storage
 
@@ -17,6 +16,7 @@ if TYPE_CHECKING:
     from crawlee.configuration import Configuration
     from crawlee.storage_clients import StorageClient
     from crawlee.storage_clients._base import KeyValueStoreClient
+    from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecordMetadata
 
 T = TypeVar('T')
 
@@ -75,23 +75,17 @@ class KeyValueStore(Storage):
     @override
     @property
     def id(self) -> str:
-        return self._client.id
+        return self._client.metadata.id
 
     @override
     @property
     def name(self) -> str | None:
-        return self._client.name
+        return self._client.metadata.name
 
     @override
     @property
     def metadata(self) -> KeyValueStoreMetadata:
-        return KeyValueStoreMetadata(
-            id=self._client.id,
-            name=self._client.id,
-            accessed_at=self._client.accessed_at,
-            created_at=self._client.created_at,
-            modified_at=self._client.modified_at,
-        )
+        return self._client.metadata
 
     @override
     @classmethod

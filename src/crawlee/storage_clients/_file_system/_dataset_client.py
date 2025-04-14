@@ -76,38 +76,13 @@ class FileSystemDatasetClient(DatasetClient):
 
     @override
     @property
-    def id(self) -> str:
-        return self._metadata.id
-
-    @override
-    @property
-    def name(self) -> str:
-        return self._metadata.name
-
-    @override
-    @property
-    def created_at(self) -> datetime:
-        return self._metadata.created_at
-
-    @override
-    @property
-    def accessed_at(self) -> datetime:
-        return self._metadata.accessed_at
-
-    @override
-    @property
-    def modified_at(self) -> datetime:
-        return self._metadata.modified_at
-
-    @override
-    @property
-    def item_count(self) -> int:
-        return self._metadata.item_count
+    def metadata(self) -> DatasetMetadata:
+        return self._metadata
 
     @property
     def path_to_dataset(self) -> Path:
         """The full path to the dataset directory."""
-        return self._storage_dir / self._STORAGE_SUBDIR / self.name
+        return self._storage_dir / self._STORAGE_SUBDIR / self.metadata.name
 
     @property
     def path_to_metadata(self) -> Path:
@@ -170,12 +145,13 @@ class FileSystemDatasetClient(DatasetClient):
 
         # Otherwise, create a new dataset client.
         else:
+            now = datetime.now(timezone.utc)
             client = cls(
                 id=crypto_random_object_id(),
                 name=name,
-                created_at=datetime.now(timezone.utc),
-                accessed_at=datetime.now(timezone.utc),
-                modified_at=datetime.now(timezone.utc),
+                created_at=now,
+                accessed_at=now,
+                modified_at=now,
                 item_count=0,
                 storage_dir=storage_dir,
             )
@@ -194,12 +170,12 @@ class FileSystemDatasetClient(DatasetClient):
                 await asyncio.to_thread(shutil.rmtree, self.path_to_dataset)
 
         # Remove the client from the cache.
-        if self.name in self.__class__._cache_by_name:  # noqa: SLF001
-            del self.__class__._cache_by_name[self.name]  # noqa: SLF001
+        if self.metadata.name in self.__class__._cache_by_name:  # noqa: SLF001
+            del self.__class__._cache_by_name[self.metadata.name]  # noqa: SLF001
 
     @override
     async def push_data(self, data: list[Any] | dict[str, Any]) -> None:
-        new_item_count = self.item_count
+        new_item_count = self.metadata.item_count
 
         # If data is a list, push each item individually.
         if isinstance(data, list):

@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from crawlee._consts import METADATA_FILENAME
-from crawlee.storage_clients._file_system._dataset_client import FileSystemDatasetClient
+from crawlee.storage_clients._file_system import FileSystemDatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage
 
 if TYPE_CHECKING:
@@ -34,12 +34,12 @@ async def test_open_creates_new_dataset(tmp_path: Path) -> None:
     client = await FileSystemDatasetClient.open(name='new_dataset', storage_dir=tmp_path)
 
     # Verify client properties
-    assert client.id is not None
-    assert client.name == 'new_dataset'
-    assert client.item_count == 0
-    assert isinstance(client.created_at, datetime)
-    assert isinstance(client.accessed_at, datetime)
-    assert isinstance(client.modified_at, datetime)
+    assert client.metadata.id is not None
+    assert client.metadata.name == 'new_dataset'
+    assert client.metadata.item_count == 0
+    assert isinstance(client.metadata.created_at, datetime)
+    assert isinstance(client.metadata.accessed_at, datetime)
+    assert isinstance(client.metadata.modified_at, datetime)
 
     # Verify files were created
     assert client.path_to_dataset.exists()
@@ -48,7 +48,7 @@ async def test_open_creates_new_dataset(tmp_path: Path) -> None:
     # Verify metadata content
     with client.path_to_metadata.open() as f:
         metadata = json.load(f)
-        assert metadata['id'] == client.id
+        assert metadata['id'] == client.metadata.id
         assert metadata['name'] == 'new_dataset'
         assert metadata['item_count'] == 0
 
@@ -56,12 +56,12 @@ async def test_open_creates_new_dataset(tmp_path: Path) -> None:
 async def test_open_existing_dataset(dataset_client: FileSystemDatasetClient, tmp_path: Path) -> None:
     """Test that open() loads an existing dataset correctly."""
     # Open the same dataset again
-    reopened_client = await FileSystemDatasetClient.open(name=dataset_client.name, storage_dir=tmp_path)
+    reopened_client = await FileSystemDatasetClient.open(name=dataset_client.metadata.name, storage_dir=tmp_path)
 
     # Verify client properties
-    assert dataset_client.id == reopened_client.id
-    assert dataset_client.name == reopened_client.name
-    assert dataset_client.item_count == reopened_client.item_count
+    assert dataset_client.metadata.id == reopened_client.metadata.id
+    assert dataset_client.metadata.name == reopened_client.metadata.name
+    assert dataset_client.metadata.item_count == reopened_client.metadata.item_count
 
     # Verify clients (python) ids
     assert id(dataset_client) == id(reopened_client)
@@ -79,7 +79,7 @@ async def test_push_data_single_item(dataset_client: FileSystemDatasetClient) ->
     await dataset_client.push_data(item)
 
     # Verify item count was updated
-    assert dataset_client.item_count == 1
+    assert dataset_client.metadata.item_count == 1
 
     all_files = list(dataset_client.path_to_dataset.glob('*.json'))
     assert len(all_files) == 2  # 1 data file + 1 metadata file
@@ -100,7 +100,7 @@ async def test_push_data_multiple_items(dataset_client: FileSystemDatasetClient)
     await dataset_client.push_data(items)
 
     # Verify item count was updated
-    assert dataset_client.item_count == 3
+    assert dataset_client.metadata.item_count == 3
 
     all_files = list(dataset_client.path_to_dataset.glob('*.json'))
     assert len(all_files) == 4  # 3 data files + 1 metadata file
@@ -239,22 +239,22 @@ async def test_drop(dataset_client: FileSystemDatasetClient) -> None:
     """Test dropping a dataset removes the entire dataset directory from disk."""
     await dataset_client.push_data({'test': 'data'})
 
-    assert dataset_client.name in FileSystemDatasetClient._cache_by_name
+    assert dataset_client.metadata.name in FileSystemDatasetClient._cache_by_name
     assert dataset_client.path_to_dataset.exists()
 
     # Drop the dataset
     await dataset_client.drop()
 
-    assert dataset_client.name not in FileSystemDatasetClient._cache_by_name
+    assert dataset_client.metadata.name not in FileSystemDatasetClient._cache_by_name
     assert not dataset_client.path_to_dataset.exists()
 
 
 async def test_metadata_updates(dataset_client: FileSystemDatasetClient) -> None:
     """Test that metadata timestamps are updated correctly after read and write operations."""
     # Record initial timestamps
-    initial_created = dataset_client.created_at
-    initial_accessed = dataset_client.accessed_at
-    initial_modified = dataset_client.modified_at
+    initial_created = dataset_client.metadata.created_at
+    initial_accessed = dataset_client.metadata.accessed_at
+    initial_modified = dataset_client.metadata.modified_at
 
     # Wait a moment to ensure timestamps can change
     await asyncio.sleep(0.01)
@@ -263,11 +263,11 @@ async def test_metadata_updates(dataset_client: FileSystemDatasetClient) -> None
     await dataset_client.get_data()
 
     # Verify timestamps
-    assert dataset_client.created_at == initial_created
-    assert dataset_client.accessed_at > initial_accessed
-    assert dataset_client.modified_at == initial_modified
+    assert dataset_client.metadata.created_at == initial_created
+    assert dataset_client.metadata.accessed_at > initial_accessed
+    assert dataset_client.metadata.modified_at == initial_modified
 
-    accessed_after_get = dataset_client.accessed_at
+    accessed_after_get = dataset_client.metadata.accessed_at
 
     # Wait a moment to ensure timestamps can change
     await asyncio.sleep(0.01)
@@ -276,6 +276,6 @@ async def test_metadata_updates(dataset_client: FileSystemDatasetClient) -> None
     await dataset_client.push_data({'new': 'item'})
 
     # Verify timestamps again
-    assert dataset_client.created_at == initial_created
-    assert dataset_client.modified_at > initial_modified
-    assert dataset_client.accessed_at > accessed_after_get
+    assert dataset_client.metadata.created_at == initial_created
+    assert dataset_client.metadata.modified_at > initial_modified
+    assert dataset_client.metadata.accessed_at > accessed_after_get
