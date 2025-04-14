@@ -1,156 +1,398 @@
+# TODO: Update crawlee_storage_dir args once the Pydantic bug is fixed
+# https://github.com/apify/crawlee-python/issues/146
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 import pytest
 
-from crawlee import service_locator
-from crawlee.storage_clients.models import StorageMetadata
+from crawlee.configuration import Configuration
+from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
 from crawlee.storages import Dataset, KeyValueStore
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+    from pathlib import Path
+
+    from crawlee.storage_clients import StorageClient
+
+pytestmark = pytest.mark.only
+
+
+@pytest.fixture(params=['memory', 'file_system'])
+def storage_client(request: pytest.FixtureRequest) -> StorageClient:
+    """Parameterized fixture to test with different storage clients."""
+    if request.param == 'memory':
+        return MemoryStorageClient()
+
+    return FileSystemStorageClient()
 
 
 @pytest.fixture
-async def dataset() -> AsyncGenerator[Dataset, None]:
-    dataset = await Dataset.open()
+def configuration(tmp_path: Path) -> Configuration:
+    """Provide a configuration with a temporary storage directory."""
+    return Configuration(crawlee_storage_dir=str(tmp_path))  # type: ignore[call-arg]
+
+
+@pytest.fixture
+async def dataset(
+    storage_client: StorageClient,
+    configuration: Configuration,
+    tmp_path: Path,
+) -> AsyncGenerator[Dataset, None]:
+    """Fixture that provides a dataset instance for each test."""
+    Dataset._cache_by_id.clear()
+    Dataset._cache_by_name.clear()
+
+    dataset = await Dataset.open(
+        name='test_dataset',
+        storage_dir=tmp_path,
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
     yield dataset
     await dataset.drop()
 
 
-async def test_open() -> None:
-    default_dataset = await Dataset.open()
-    default_dataset_by_id = await Dataset.open(id=default_dataset.id)
+async def test_open_creates_new_dataset(
+    storage_client: StorageClient,
+    configuration: Configuration,
+    tmp_path: Path,
+) -> None:
+    """Test that open() creates a new dataset with proper metadata."""
+    dataset = await Dataset.open(
+        name='new_dataset',
+        storage_dir=tmp_path,
+        storage_client=storage_client,
+        configuration=configuration,
+    )
 
-    assert default_dataset is default_dataset_by_id
-
-    dataset_name = 'dummy-name'
-    named_dataset = await Dataset.open(name=dataset_name)
-    assert default_dataset is not named_dataset
-
-    with pytest.raises(RuntimeError, match='Dataset with id "nonexistent-id" does not exist!'):
-        await Dataset.open(id='nonexistent-id')
-
-    # Test that when you try to open a dataset by ID and you use a name of an existing dataset,
-    # it doesn't work
-    with pytest.raises(RuntimeError, match='Dataset with id "dummy-name" does not exist!'):
-        await Dataset.open(id='dummy-name')
-
-
-async def test_consistency_accross_two_clients() -> None:
-    dataset = await Dataset.open(name='my-dataset')
-    await dataset.push_data({'key': 'value'})
-
-    dataset_by_id = await Dataset.open(id=dataset.id)
-    await dataset_by_id.push_data({'key2': 'value2'})
-
-    assert (await dataset.get_data()).items == [{'key': 'value'}, {'key2': 'value2'}]
-    assert (await dataset_by_id.get_data()).items == [{'key': 'value'}, {'key2': 'value2'}]
+    # Verify dataset properties
+    assert dataset.id is not None
+    assert dataset.name == 'new_dataset'
+    assert dataset.metadata.item_count == 0
 
     await dataset.drop()
-    with pytest.raises(RuntimeError, match='Storage with provided ID was not found'):
-        await dataset_by_id.drop()
 
 
-async def test_same_references() -> None:
-    dataset1 = await Dataset.open()
-    dataset2 = await Dataset.open()
-    assert dataset1 is dataset2
+async def test_open_existing_dataset(
+    dataset: Dataset,
+    storage_client: StorageClient,
+    tmp_path: Path,
+) -> None:
+    """Test that open() loads an existing dataset correctly."""
+    # Open the same dataset again
+    reopened_dataset = await Dataset.open(
+        name=dataset.name,
+        storage_dir=tmp_path,
+        storage_client=storage_client,
+    )
 
-    dataset_name = 'non-default'
-    dataset_named1 = await Dataset.open(name=dataset_name)
-    dataset_named2 = await Dataset.open(name=dataset_name)
-    assert dataset_named1 is dataset_named2
+    # Verify dataset properties
+    assert dataset.id == reopened_dataset.id
+    assert dataset.name == reopened_dataset.name
+    assert dataset.metadata.item_count == reopened_dataset.metadata.item_count
 
-
-async def test_drop() -> None:
-    dataset1 = await Dataset.open()
-    await dataset1.drop()
-    dataset2 = await Dataset.open()
-    assert dataset1 is not dataset2
-
-
-async def test_export(dataset: Dataset) -> None:
-    expected_csv = 'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
-    expected_json = [{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}, {'id': 2, 'test': 'test'}]
-    desired_item_count = 3
-    await dataset.push_data([{'id': i, 'test': 'test'} for i in range(desired_item_count)])
-    await dataset.export_to(key='dataset-csv', content_type='csv')
-    await dataset.export_to(key='dataset-json', content_type='json')
-    kvs = await KeyValueStore.open()
-    dataset_csv = await kvs.get_value(key='dataset-csv')
-    dataset_json = await kvs.get_value(key='dataset-json')
-    assert dataset_csv == expected_csv
-    assert dataset_json == expected_json
+    # Verify they are the same object (from cache)
+    assert id(dataset) == id(reopened_dataset)
 
 
-async def test_push_data(dataset: Dataset) -> None:
-    desired_item_count = 2000
-    await dataset.push_data([{'id': i} for i in range(desired_item_count)])
-    dataset_info = await dataset.get_info()
-    assert dataset_info is not None
-    assert dataset_info.item_count == desired_item_count
-    list_page = await dataset.get_data(limit=desired_item_count)
-    assert list_page.items[0]['id'] == 0
-    assert list_page.items[-1]['id'] == desired_item_count - 1
+async def test_open_with_id_and_name(
+    storage_client: StorageClient,
+    configuration: Configuration,
+    tmp_path: Path,
+) -> None:
+    """Test that open() raises an error when both id and name are provided."""
+    with pytest.raises(ValueError, match='Only one of "id" or "name" can be specified'):
+        await Dataset.open(
+            id='some-id',
+            name='some-name',
+            storage_dir=tmp_path,
+            storage_client=storage_client,
+            configuration=configuration,
+        )
 
 
-async def test_push_data_empty(dataset: Dataset) -> None:
-    await dataset.push_data([])
-    dataset_info = await dataset.get_info()
-    assert dataset_info is not None
-    assert dataset_info.item_count == 0
+async def test_push_data_single_item(dataset: Dataset) -> None:
+    """Test pushing a single item to the dataset."""
+    item = {'key': 'value', 'number': 42}
+    await dataset.push_data(item)
+
+    # Verify item was stored
+    result = await dataset.get_data()
+    assert result.count == 1
+    assert result.items[0] == item
 
 
-async def test_push_data_singular(dataset: Dataset) -> None:
-    await dataset.push_data({'id': 1})
-    dataset_info = await dataset.get_info()
-    assert dataset_info is not None
-    assert dataset_info.item_count == 1
-    list_page = await dataset.get_data()
-    assert list_page.items[0]['id'] == 1
+async def test_push_data_multiple_items(dataset: Dataset) -> None:
+    """Test pushing multiple items to the dataset."""
+    items = [
+        {'id': 1, 'name': 'Item 1'},
+        {'id': 2, 'name': 'Item 2'},
+        {'id': 3, 'name': 'Item 3'},
+    ]
+    await dataset.push_data(items)
+
+    # Verify items were stored
+    result = await dataset.get_data()
+    assert result.count == 3
+    assert result.items == items
 
 
-async def test_get_data(dataset: Dataset) -> None:  # We don't test everything, that's done in memory storage tests
-    desired_item_count = 3
-    await dataset.push_data([{'id': i} for i in range(desired_item_count)])
-    list_page = await dataset.get_data()
-    assert list_page.count == desired_item_count
-    assert list_page.desc is False
-    assert list_page.offset == 0
-    assert list_page.items[0]['id'] == 0
-    assert list_page.items[-1]['id'] == desired_item_count - 1
+async def test_get_data_empty_dataset(dataset: Dataset) -> None:
+    """Test getting data from an empty dataset returns empty results."""
+    result = await dataset.get_data()
+
+    assert result.count == 0
+    assert result.total == 0
+    assert result.items == []
+
+
+async def test_get_data_with_pagination(dataset: Dataset) -> None:
+    """Test getting data with offset and limit parameters for pagination."""
+    # Add some items
+    items = [{'id': i} for i in range(1, 11)]  # 10 items
+    await dataset.push_data(items)
+
+    # Test offset
+    result = await dataset.get_data(offset=3)
+    assert result.count == 7
+    assert result.offset == 3
+    assert result.items[0]['id'] == 4
+
+    # Test limit
+    result = await dataset.get_data(limit=5)
+    assert result.count == 5
+    assert result.limit == 5
+    assert result.items[-1]['id'] == 5
+
+    # Test both offset and limit
+    result = await dataset.get_data(offset=2, limit=3)
+    assert result.count == 3
+    assert result.offset == 2
+    assert result.limit == 3
+    assert result.items[0]['id'] == 3
+    assert result.items[-1]['id'] == 5
+
+
+async def test_get_data_descending_order(dataset: Dataset) -> None:
+    """Test getting data in descending order reverses the item order."""
+    # Add some items
+    items = [{'id': i} for i in range(1, 6)]  # 5 items
+    await dataset.push_data(items)
+
+    # Get items in descending order
+    result = await dataset.get_data(desc=True)
+
+    assert result.desc is True
+    assert result.items[0]['id'] == 5
+    assert result.items[-1]['id'] == 1
+
+
+async def test_get_data_skip_empty(dataset: Dataset) -> None:
+    """Test getting data with skip_empty option filters out empty items."""
+    # Add some items including an empty one
+    items = [
+        {'id': 1, 'name': 'Item 1'},
+        {},  # Empty item
+        {'id': 3, 'name': 'Item 3'},
+    ]
+    await dataset.push_data(items)
+
+    # Get all items
+    result = await dataset.get_data()
+    assert result.count == 3
+
+    # Get non-empty items
+    result = await dataset.get_data(skip_empty=True)
+    assert result.count == 2
+    assert all(item != {} for item in result.items)
 
 
 async def test_iterate_items(dataset: Dataset) -> None:
-    desired_item_count = 3
-    idx = 0
-    await dataset.push_data([{'id': i} for i in range(desired_item_count)])
+    """Test iterating over dataset items yields each item in the correct order."""
+    # Add some items
+    items = [{'id': i} for i in range(1, 6)]  # 5 items
+    await dataset.push_data(items)
 
-    async for item in dataset.iterate_items():
-        assert item['id'] == idx
-        idx += 1
+    # Iterate over all items
+    collected_items = [item async for item in dataset.iterate_items()]
 
-    assert idx == desired_item_count
+    assert len(collected_items) == 5
+    assert collected_items[0]['id'] == 1
+    assert collected_items[-1]['id'] == 5
 
 
-async def test_from_storage_object() -> None:
-    storage_client = service_locator.get_storage_client()
+async def test_iterate_items_with_options(dataset: Dataset) -> None:
+    """Test iterating with offset, limit and desc parameters."""
+    # Add some items
+    items = [{'id': i} for i in range(1, 11)]  # 10 items
+    await dataset.push_data(items)
 
-    storage_object = StorageMetadata(
-        id='dummy-id',
-        name='dummy-name',
-        accessed_at=datetime.now(timezone.utc),
-        created_at=datetime.now(timezone.utc),
-        modified_at=datetime.now(timezone.utc),
-        extra_attribute='extra',
+    # Test with offset and limit
+    collected_items = [item async for item in dataset.iterate_items(offset=3, limit=3)]
+
+    assert len(collected_items) == 3
+    assert collected_items[0]['id'] == 4
+    assert collected_items[-1]['id'] == 6
+
+    # Test with descending order
+    collected_items = []
+    async for item in dataset.iterate_items(desc=True, limit=3):
+        collected_items.append(item)
+
+    assert len(collected_items) == 3
+    assert collected_items[0]['id'] == 10
+    assert collected_items[-1]['id'] == 8
+
+
+async def test_drop(
+    storage_client: StorageClient,
+    configuration: Configuration,
+    tmp_path: Path,
+) -> None:
+    """Test dropping a dataset removes it from cache and clears its data."""
+    dataset = await Dataset.open(
+        name='drop_test',
+        storage_dir=tmp_path,
+        storage_client=storage_client,
+        configuration=configuration,
     )
 
-    dataset = Dataset.from_storage_object(storage_client, storage_object)
+    # Add some data
+    await dataset.push_data({'test': 'data'})
 
-    assert dataset.id == storage_object.id
-    assert dataset.name == storage_object.name
-    assert dataset.storage_object == storage_object
-    assert storage_object.model_extra.get('extra_attribute') == 'extra'  # type: ignore[union-attr]
+    # Verify dataset exists in cache
+    assert dataset.id in Dataset._cache_by_id
+    if dataset.name:
+        assert dataset.name in Dataset._cache_by_name
+
+    # Drop the dataset
+    await dataset.drop()
+
+    # Verify dataset was removed from cache
+    assert dataset.id not in Dataset._cache_by_id
+    if dataset.name:
+        assert dataset.name not in Dataset._cache_by_name
+
+    # Verify dataset is empty (by creating a new one with the same name)
+    new_dataset = await Dataset.open(
+        name='drop_test',
+        storage_dir=tmp_path,
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    result = await new_dataset.get_data()
+    assert result.count == 0
+    await new_dataset.drop()
+
+
+async def test_export_to_json(
+    dataset: Dataset,
+    storage_client: StorageClient,
+    tmp_path: Path,
+) -> None:
+    """Test exporting dataset to JSON format."""
+    # Create a key-value store for export
+    kvs = await KeyValueStore.open(
+        name='export_kvs',
+        storage_dir=tmp_path,
+        storage_client=storage_client,
+    )
+
+    # Add some items to the dataset
+    items = [
+        {'id': 1, 'name': 'Item 1'},
+        {'id': 2, 'name': 'Item 2'},
+        {'id': 3, 'name': 'Item 3'},
+    ]
+    await dataset.push_data(items)
+
+    # Export to JSON
+    await dataset.export_to(
+        key='dataset_export.json',
+        content_type='json',
+        to_key_value_store_name='export_kvs',
+    )
+
+    # Retrieve the exported file
+    record = await kvs.get_value(key='dataset_export.json')
+    assert record is not None
+
+    # Verify content has all the items
+    assert '"id": 1' in record
+    assert '"id": 2' in record
+    assert '"id": 3' in record
+
+    await kvs.drop()
+
+
+async def test_export_to_csv(
+    dataset: Dataset,
+    storage_client: StorageClient,
+    tmp_path: Path,
+) -> None:
+    """Test exporting dataset to CSV format."""
+    # Create a key-value store for export
+    kvs = await KeyValueStore.open(
+        name='export_kvs',
+        storage_dir=tmp_path,
+        storage_client=storage_client,
+    )
+
+    # Add some items to the dataset
+    items = [
+        {'id': 1, 'name': 'Item 1'},
+        {'id': 2, 'name': 'Item 2'},
+        {'id': 3, 'name': 'Item 3'},
+    ]
+    await dataset.push_data(items)
+
+    # Export to CSV
+    await dataset.export_to(
+        key='dataset_export.csv',
+        content_type='csv',
+        to_key_value_store_name='export_kvs',
+    )
+
+    # Retrieve the exported file
+    record = await kvs.get_value(key='dataset_export.csv')
+    assert record is not None
+
+    # Verify content has all the items
+    assert 'id,name' in record
+    assert '1,Item 1' in record
+    assert '2,Item 2' in record
+    assert '3,Item 3' in record
+
+    await kvs.drop()
+
+
+async def test_export_to_invalid_content_type(dataset: Dataset) -> None:
+    """Test exporting dataset with invalid content type raises error."""
+    with pytest.raises(ValueError, match='Unsupported content type'):
+        await dataset.export_to(
+            key='invalid_export',
+            content_type='invalid',  # type: ignore[call-overload]  # Intentionally invalid content type
+        )
+
+
+async def test_large_dataset(dataset: Dataset) -> None:
+    """Test handling a large dataset with many items."""
+    items = [{'id': i, 'value': f'value-{i}'} for i in range(100)]
+    await dataset.push_data(items)
+
+    # Test that all items are retrieved
+    result = await dataset.get_data(limit=None)
+    assert result.count == 100
+    assert result.total == 100
+
+    # Test pagination with large datasets
+    result = await dataset.get_data(offset=50, limit=25)
+    assert result.count == 25
+    assert result.offset == 50
+    assert result.items[0]['id'] == 50
+    assert result.items[-1]['id'] == 74

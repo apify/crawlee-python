@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar, Literal
+from typing import TYPE_CHECKING, overload
 
 from typing_extensions import override
 
@@ -17,7 +17,7 @@ from ._key_value_store import KeyValueStore
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
-    from typing import Any
+    from typing import Any, ClassVar, Literal
 
     from typing_extensions import Unpack
 
@@ -267,12 +267,33 @@ class Dataset(Storage):
         ):
             yield item
 
+    @overload
+    async def export_to(
+        self,
+        key: str,
+        content_type: Literal['json'],
+        to_key_value_store_id: str | None = None,
+        to_key_value_store_name: str | None = None,
+        **kwargs: Unpack[ExportDataJsonKwargs],
+    ) -> None: ...
+
+    @overload
+    async def export_to(
+        self,
+        key: str,
+        content_type: Literal['csv'],
+        to_key_value_store_id: str | None = None,
+        to_key_value_store_name: str | None = None,
+        **kwargs: Unpack[ExportDataCsvKwargs],
+    ) -> None: ...
+
     async def export_to(
         self,
         key: str,
         content_type: Literal['json', 'csv'] = 'json',
         to_key_value_store_id: str | None = None,
         to_key_value_store_name: str | None = None,
+        **kwargs: Any,
     ) -> None:
         """Export the entire dataset into a specified file stored under a key in a key-value store.
 
@@ -288,42 +309,16 @@ class Dataset(Storage):
                 Specify only one of ID or name.
             to_key_value_store_name: Name of the key-value store to save the exported file.
                 Specify only one of ID or name.
+            kwargs: Additional parameters for the export operation, specific to the chosen content type.
         """
+        kvs = await KeyValueStore.open(id=to_key_value_store_id, name=to_key_value_store_name)
+        dst = StringIO()
+
         if content_type == 'csv':
-            await self.export_to_csv(
-                key,
-                to_key_value_store_id,
-                to_key_value_store_name,
-            )
+            await export_csv_to_stream(self.iterate_items(), dst, **kwargs)
+            await kvs.set_value(key, dst.getvalue(), 'text/csv')
         elif content_type == 'json':
-            await self.export_to_json(
-                key,
-                to_key_value_store_id,
-                to_key_value_store_name,
-            )
+            await export_json_to_stream(self.iterate_items(), dst, **kwargs)
+            await kvs.set_value(key, dst.getvalue(), 'application/json')
         else:
             raise ValueError('Unsupported content type, expecting CSV or JSON')
-
-    async def export_to_json(
-        self,
-        key: str,
-        to_key_value_store_id: str | None = None,
-        to_key_value_store_name: str | None = None,
-        **kwargs: Unpack[ExportDataJsonKwargs],
-    ) -> None:
-        kvs = await KeyValueStore.open(id=to_key_value_store_id, name=to_key_value_store_name)
-        dst = StringIO()
-        await export_json_to_stream(self.iterate_items(), dst, **kwargs)
-        await kvs.set_value(key, dst.getvalue(), 'application/json')
-
-    async def export_to_csv(
-        self,
-        key: str,
-        to_key_value_store_id: str | None = None,
-        to_key_value_store_name: str | None = None,
-        **kwargs: Unpack[ExportDataCsvKwargs],
-    ) -> None:
-        kvs = await KeyValueStore.open(id=to_key_value_store_id, name=to_key_value_store_name)
-        dst = StringIO()
-        await export_csv_to_stream(self.iterate_items(), dst, **kwargs)
-        await kvs.set_value(key, dst.getvalue(), 'text/csv')
