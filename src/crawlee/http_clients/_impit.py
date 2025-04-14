@@ -168,6 +168,7 @@ class ImpitHttpClient(HttpClient):
                 'http3': self._http3,
                 'verify': self._verify,
                 'follow_redirects': True,
+                'browser': 'firefox',
             }
 
             # Update the default kwargs with any additional user-provided kwargs.

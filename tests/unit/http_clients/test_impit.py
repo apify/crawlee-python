@@ -27,6 +27,12 @@ async def test_http_1(server_url: URL) -> None:
     assert response.http_version == 'HTTP/1.1'
 
 
+async def test_http_2() -> None:
+    http_client = ImpitHttpClient()
+    response = await http_client.send_request('https://apify.com/')
+    assert response.http_version == 'HTTP/2'
+
+
 @pytest.mark.skipif(os.name == 'nt', reason='Skipped on Windows')
 async def test_proxy(
     http_client: ImpitHttpClient,
