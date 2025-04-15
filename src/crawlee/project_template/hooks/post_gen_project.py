@@ -2,7 +2,6 @@ import platform
 import subprocess
 from pathlib import Path
 
-
 # % if cookiecutter.package_manager in ['poetry', 'uv']
 Path('requirements.txt').unlink()
 
@@ -32,8 +31,9 @@ else:
 
 # Install requirements and generate requirements.txt as an impromptu lockfile
 subprocess.check_call([str(path / 'pip'), 'install', '-r', 'requirements.txt'])
-with open('requirements.txt', 'w') as requirements_txt:
-    subprocess.check_call([str(path / 'pip'), 'freeze'], stdout=requirements_txt)
+Path('requirements.txt').write_text(
+    subprocess.check_output([str(path / 'pip'), 'freeze']).decode()
+)
 
 # % if cookiecutter.crawler_type == 'playwright'
 subprocess.check_call([str(path / 'playwright'), 'install'])

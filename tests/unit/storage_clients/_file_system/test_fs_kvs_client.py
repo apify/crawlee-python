@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 from crawlee._consts import METADATA_FILENAME
+from crawlee.configuration import Configuration
+from crawlee.storage_clients import FileSystemStorageClient
 from crawlee.storage_clients._file_system import FileSystemKeyValueStoreClient
 
 if TYPE_CHECKING:
@@ -18,21 +20,32 @@ pytestmark = pytest.mark.only
 
 
 @pytest.fixture
-async def kvs_client(tmp_path: Path) -> AsyncGenerator[FileSystemKeyValueStoreClient, None]:
-    """Fixture that provides a fresh file system key-value store client using a temporary directory."""
-    # Clear any existing dataset clients in the cache
-    FileSystemKeyValueStoreClient._cache_by_name.clear()
+def configuration(tmp_path: Path) -> Configuration:
+    return Configuration(
+        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
+    )
 
-    client = await FileSystemKeyValueStoreClient.open(name='test_kvs', storage_dir=tmp_path)
+
+@pytest.fixture
+async def kvs_client(configuration: Configuration) -> AsyncGenerator[FileSystemKeyValueStoreClient, None]:
+    """A fixture for a file system key-value store client."""
+    client = await FileSystemStorageClient().open_key_value_store_client(
+        name='test_kvs',
+        configuration=configuration,
+    )
     yield client
     await client.drop()
 
 
-async def test_open_creates_new_kvs(tmp_path: Path) -> None:
+async def test_open_creates_new_kvs(configuration: Configuration) -> None:
     """Test that open() creates a new key-value store with proper metadata and files on disk."""
-    client = await FileSystemKeyValueStoreClient.open(name='new_kvs', storage_dir=tmp_path)
+    client = await FileSystemStorageClient().open_key_value_store_client(
+        name='new_kvs',
+        configuration=configuration,
+    )
 
-    # Verify client properties
+    # Verify correct client type and properties
+    assert isinstance(client, FileSystemKeyValueStoreClient)
     assert client.metadata.id is not None
     assert client.metadata.name == 'new_kvs'
     assert isinstance(client.metadata.created_at, datetime)
@@ -50,10 +63,18 @@ async def test_open_creates_new_kvs(tmp_path: Path) -> None:
         assert metadata['name'] == 'new_kvs'
 
 
-async def test_open_existing_kvs(kvs_client: FileSystemKeyValueStoreClient, tmp_path: Path) -> None:
+async def test_open_existing_kvs(
+    kvs_client: FileSystemKeyValueStoreClient,
+    configuration: Configuration,
+) -> None:
     """Test that open() loads an existing key-value store with matching properties."""
+    configuration.purge_on_start = False
+
     # Open the same key-value store again
-    reopened_client = await FileSystemKeyValueStoreClient.open(name=kvs_client.metadata.name, storage_dir=tmp_path)
+    reopened_client = await FileSystemStorageClient().open_key_value_store_client(
+        name=kvs_client.metadata.name,
+        configuration=configuration,
+    )
 
     # Verify client properties
     assert kvs_client.metadata.id == reopened_client.metadata.id
@@ -63,10 +84,60 @@ async def test_open_existing_kvs(kvs_client: FileSystemKeyValueStoreClient, tmp_
     assert id(kvs_client) == id(reopened_client)
 
 
-async def test_open_with_id_raises_error(tmp_path: Path) -> None:
+async def test_kvs_client_purge_on_start(configuration: Configuration) -> None:
+    """Test that purge_on_start=True clears existing data in the key-value store."""
+    configuration.purge_on_start = True
+
+    # Create KVS and add data
+    kvs_client1 = await FileSystemStorageClient().open_key_value_store_client(
+        name='test-purge-kvs',
+        configuration=configuration,
+    )
+    await kvs_client1.set_value(key='test-key', value='initial value')
+
+    # Verify value was set
+    record = await kvs_client1.get_value(key='test-key')
+    assert record is not None
+    assert record.value == 'initial value'
+
+    # Reopen
+    kvs_client2 = await FileSystemStorageClient().open_key_value_store_client(
+        name='test-purge-kvs',
+        configuration=configuration,
+    )
+
+    # Verify value was purged
+    record = await kvs_client2.get_value(key='test-key')
+    assert record is None
+
+
+async def test_kvs_client_no_purge_on_start(configuration: Configuration) -> None:
+    """Test that purge_on_start=False keeps existing data in the key-value store."""
+    configuration.purge_on_start = False
+
+    # Create KVS and add data
+    kvs_client1 = await FileSystemStorageClient().open_key_value_store_client(
+        name='test-no-purge-kvs',
+        configuration=configuration,
+    )
+    await kvs_client1.set_value(key='test-key', value='preserved value')
+
+    # Reopen
+    kvs_client2 = await FileSystemStorageClient().open_key_value_store_client(
+        name='test-no-purge-kvs',
+        configuration=configuration,
+    )
+
+    # Verify value was preserved
+    record = await kvs_client2.get_value(key='test-key')
+    assert record is not None
+    assert record.value == 'preserved value'
+
+
+async def test_open_with_id_raises_error(configuration: Configuration) -> None:
     """Test that open() raises an error when an ID is provided (unsupported for file system client)."""
     with pytest.raises(ValueError, match='not supported for file system storage client'):
-        await FileSystemKeyValueStoreClient.open(id='some-id', storage_dir=tmp_path)
+        await FileSystemStorageClient().open_key_value_store_client(id='some-id', configuration=configuration)
 
 
 async def test_set_get_value_string(kvs_client: FileSystemKeyValueStoreClient) -> None:

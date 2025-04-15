@@ -21,6 +21,8 @@ from ._utils import METADATA_FILENAME, json_dumps
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
+    from crawlee.configuration import Configuration
+
 
 logger = getLogger(__name__)
 
@@ -32,9 +34,6 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
     to survive process restarts. Each key-value pair is stored as a separate file, with its metadata
     in an accompanying file.
     """
-
-    _DEFAULT_NAME = 'default'
-    """The default name for the unnamed key-value store."""
 
     _STORAGE_SUBDIR = 'key_value_stores'
     """The name of the subdirectory where key-value stores are stored."""
@@ -68,7 +67,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
         # Internal attributes
         self._lock = asyncio.Lock()
-        """A lock to ensure that only one file operation is performed at a time."""
+        """A lock to ensure that only one operation is performed at a time."""
 
     @override
     @property
@@ -90,22 +89,24 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
     async def open(
         cls,
         *,
-        id: str | None = None,
-        name: str | None = None,
-        storage_dir: Path | None = None,
+        id: str | None,
+        name: str | None,
+        configuration: Configuration,
     ) -> FileSystemKeyValueStoreClient:
         if id:
             raise ValueError(
                 'Opening a key-value store by "id" is not supported for file system storage client, use "name" instead.'
             )
 
-        name = name or cls._DEFAULT_NAME
+        name = name or configuration.default_dataset_id
 
         # Check if the client is already cached by name.
         if name in cls._cache_by_name:
-            return cls._cache_by_name[name]
+            client = cls._cache_by_name[name]
+            await client._update_metadata(update_accessed_at=True)  # noqa: SLF001
+            return client
 
-        storage_dir = storage_dir or Path.cwd()
+        storage_dir = Path(configuration.storage_dir)
         kvs_path = storage_dir / cls._STORAGE_SUBDIR / name
         metadata_path = kvs_path / METADATA_FILENAME
 
