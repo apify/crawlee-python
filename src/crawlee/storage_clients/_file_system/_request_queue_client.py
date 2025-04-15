@@ -6,7 +6,7 @@ import shutil
 from datetime import datetime, timezone
 from logging import getLogger
 from pathlib import Path
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from pydantic import ValidationError
 from typing_extensions import override
@@ -16,6 +16,9 @@ from crawlee.storage_clients._base import RequestQueueClient
 from crawlee.storage_clients.models import RequestQueueMetadata
 
 from ._utils import METADATA_FILENAME, json_dumps
+
+if TYPE_CHECKING:
+    from crawlee.configuration import Configuration
 
 logger = getLogger(__name__)
 
@@ -27,9 +30,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
     to survive process restarts. Each request is stored as a separate file, allowing for proper request
     handling and tracking across crawler runs.
     """
-
-    _DEFAULT_NAME = 'default'
-    """The default name for the unnamed request queue."""
 
     _STORAGE_SUBDIR = 'request_queues'
     """The name of the subdirectory where request queues are stored."""
@@ -73,7 +73,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
         # Internal attributes
         self._lock = asyncio.Lock()
-        """A lock to ensure that only one file operation is performed at a time."""
+        """A lock to ensure that only one operation is performed at a time."""
 
     @override
     @property
@@ -95,16 +95,16 @@ class FileSystemRequestQueueClient(RequestQueueClient):
     async def open(
         cls,
         *,
-        id: str | None = None,
-        name: str | None = None,
-        storage_dir: Path | None = None,
+        id: str | None,
+        name: str | None,
+        configuration: Configuration,
     ) -> FileSystemRequestQueueClient:
         if id:
             raise ValueError(
                 'Opening a dataset by "id" is not supported for file system storage client, use "name" instead.'
             )
 
-        name = name or cls._DEFAULT_NAME
+        name = name or configuration.default_dataset_id
 
         # Check if the client is already cached by name.
         if name in cls._cache_by_name:
@@ -112,7 +112,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             await client._update_metadata(update_accessed_at=True)  # noqa: SLF001
             return client
 
-        storage_dir = storage_dir or Path.cwd()
+        storage_dir = Path(configuration.storage_dir)
         rq_path = storage_dir / cls._STORAGE_SUBDIR / name
         metadata_path = rq_path / METADATA_FILENAME
 

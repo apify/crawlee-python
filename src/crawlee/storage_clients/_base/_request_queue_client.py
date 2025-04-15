@@ -7,8 +7,8 @@ from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-    from pathlib import Path
 
+    from crawlee.configuration import Configuration
     from crawlee.storage_clients.models import (
         BatchRequestsOperationResponse,
         ProcessedRequest,
@@ -37,17 +37,16 @@ class RequestQueueClient(ABC):
     async def open(
         cls,
         *,
-        id: str | None = None,
-        name: str | None = None,
-        storage_dir: Path | None = None,
+        id: str | None,
+        name: str | None,
+        configuration: Configuration,
     ) -> RequestQueueClient:
         """Open a request queue client.
 
         Args:
             id: ID of the queue to open. If not provided, a new queue will be created with a random ID.
             name: Name of the queue to open. If not provided, the queue will be unnamed.
-            purge_on_start: If True, the queue will be purged before opening.
-            storage_dir: Directory to store the queue data in. If not provided, uses the default storage directory.
+            configuration: The configuration object.
 
         Returns:
             A request queue client.

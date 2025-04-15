@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from crawlee.configuration import Configuration
+from crawlee.storage_clients import MemoryStorageClient
 from crawlee.storage_clients._memory import MemoryDatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage
 
@@ -18,19 +20,17 @@ pytestmark = pytest.mark.only
 @pytest.fixture
 async def dataset_client() -> AsyncGenerator[MemoryDatasetClient, None]:
     """Fixture that provides a fresh memory dataset client for each test."""
-    # Clear any existing dataset clients in the cache
-    MemoryDatasetClient._cache_by_name.clear()
-
-    client = await MemoryDatasetClient.open(name='test_dataset')
+    client = await MemoryStorageClient().open_dataset_client(name='test_dataset')
     yield client
     await client.drop()
 
 
 async def test_open_creates_new_dataset() -> None:
     """Test that open() creates a new dataset with proper metadata and adds it to the cache."""
-    client = await MemoryDatasetClient.open(name='new_dataset')
+    client = await MemoryStorageClient().open_dataset_client(name='new_dataset')
 
-    # Verify client properties
+    # Verify correct client type and properties
+    assert isinstance(client, MemoryDatasetClient)
     assert client.metadata.id is not None
     assert client.metadata.name == 'new_dataset'
     assert client.metadata.item_count == 0
@@ -44,8 +44,13 @@ async def test_open_creates_new_dataset() -> None:
 
 async def test_open_existing_dataset(dataset_client: MemoryDatasetClient) -> None:
     """Test that open() loads an existing dataset with matching properties."""
+    configuration = Configuration(purge_on_start=False)
+
     # Open the same dataset again
-    reopened_client = await MemoryDatasetClient.open(name=dataset_client.metadata.name)
+    reopened_client = await MemoryStorageClient().open_dataset_client(
+        name=dataset_client.metadata.name,
+        configuration=configuration,
+    )
 
     # Verify client properties
     assert dataset_client.metadata.id == reopened_client.metadata.id
@@ -56,9 +61,61 @@ async def test_open_existing_dataset(dataset_client: MemoryDatasetClient) -> Non
     assert id(dataset_client) == id(reopened_client)
 
 
+async def test_dataset_client_purge_on_start() -> None:
+    """Test that purge_on_start=True clears existing data in the dataset."""
+    configuration = Configuration(purge_on_start=True)
+
+    # Create dataset and add data
+    dataset_client1 = await MemoryStorageClient().open_dataset_client(
+        name='test_purge_dataset',
+        configuration=configuration,
+    )
+    await dataset_client1.push_data({'item': 'initial data'})
+
+    # Verify data was added
+    items = await dataset_client1.get_data()
+    assert len(items.items) == 1
+
+    # Reopen
+    dataset_client2 = await MemoryStorageClient().open_dataset_client(
+        name='test_purge_dataset',
+        configuration=configuration,
+    )
+
+    # Verify data was purged
+    items = await dataset_client2.get_data()
+    assert len(items.items) == 0
+
+
+async def test_dataset_client_no_purge_on_start() -> None:
+    """Test that purge_on_start=False keeps existing data in the dataset."""
+    configuration = Configuration(purge_on_start=False)
+
+    # Create dataset and add data
+    dataset_client1 = await MemoryStorageClient().open_dataset_client(
+        name='test_no_purge_dataset',
+        configuration=configuration,
+    )
+    await dataset_client1.push_data({'item': 'preserved data'})
+
+    # Reopen
+    dataset_client2 = await MemoryStorageClient().open_dataset_client(
+        name='test_no_purge_dataset',
+        configuration=configuration,
+    )
+
+    # Verify data was preserved
+    items = await dataset_client2.get_data()
+    assert len(items.items) == 1
+    assert items.items[0]['item'] == 'preserved data'
+
+
 async def test_open_with_id_and_name() -> None:
     """Test that open() can be used with both id and name parameters."""
-    client = await MemoryDatasetClient.open(id='some-id', name='some-name')
+    client = await MemoryStorageClient().open_dataset_client(
+        id='some-id',
+        name='some-name',
+    )
     assert client.metadata.id == 'some-id'
     assert client.metadata.name == 'some-name'
 

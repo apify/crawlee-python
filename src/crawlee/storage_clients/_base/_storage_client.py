@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    from crawlee.configuration import Configuration
 
     from ._dataset_client import DatasetClient
     from ._key_value_store_client import KeyValueStoreClient
@@ -20,8 +20,7 @@ class StorageClient(ABC):
         *,
         id: str | None = None,
         name: str | None = None,
-        purge_on_start: bool = True,
-        storage_dir: Path | None = None,
+        configuration: Configuration | None = None,
     ) -> DatasetClient:
         """Open a dataset client."""
 
@@ -31,8 +30,7 @@ class StorageClient(ABC):
         *,
         id: str | None = None,
         name: str | None = None,
-        purge_on_start: bool = True,
-        storage_dir: Path | None = None,
+        configuration: Configuration | None = None,
     ) -> KeyValueStoreClient:
         """Open a key-value store client."""
 
@@ -42,7 +40,6 @@ class StorageClient(ABC):
         *,
         id: str | None = None,
         name: str | None = None,
-        purge_on_start: bool = True,
-        storage_dir: Path | None = None,
+        configuration: Configuration | None = None,
     ) -> RequestQueueClient:
         """Open a request queue client."""

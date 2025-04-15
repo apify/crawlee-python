@@ -14,7 +14,8 @@ from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreR
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
-    from pathlib import Path
+
+    from crawlee.configuration import Configuration
 
 logger = getLogger(__name__)
 
@@ -26,9 +27,6 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
     which means all data is lost when the process terminates. This implementation is mainly useful
     for testing and development purposes where persistence is not required.
     """
-
-    _DEFAULT_NAME = 'default'
-    """The default name for the key-value store when no name is provided."""
 
     _cache_by_name: ClassVar[dict[str, MemoryKeyValueStoreClient]] = {}
     """A dictionary to cache clients by their names."""
@@ -67,14 +65,11 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
     async def open(
         cls,
         *,
-        id: str | None = None,
-        name: str | None = None,
-        storage_dir: Path | None = None,
+        id: str | None,
+        name: str | None,
+        configuration: Configuration,
     ) -> MemoryKeyValueStoreClient:
-        if storage_dir is not None:
-            logger.warning('The `storage_dir` argument is not used in the memory key-value store client.')
-
-        name = name or cls._DEFAULT_NAME
+        name = name or configuration.default_key_value_store_id
 
         # Check if the client is already cached by name
         if name in cls._cache_by_name:

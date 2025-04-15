@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 from crawlee._consts import METADATA_FILENAME
+from crawlee.configuration import Configuration
+from crawlee.storage_clients import FileSystemStorageClient
 from crawlee.storage_clients._file_system import FileSystemDatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage
 
@@ -19,21 +21,32 @@ pytestmark = pytest.mark.only
 
 
 @pytest.fixture
-async def dataset_client(tmp_path: Path) -> AsyncGenerator[FileSystemDatasetClient, None]:
-    """A fixture for a file system dataset client."""
-    # Clear any existing dataset clients in the cache
-    FileSystemDatasetClient._cache_by_name.clear()
+def configuration(tmp_path: Path) -> Configuration:
+    return Configuration(
+        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
+    )
 
-    client = await FileSystemDatasetClient.open(name='test_dataset', storage_dir=tmp_path)
+
+@pytest.fixture
+async def dataset_client(configuration: Configuration) -> AsyncGenerator[FileSystemDatasetClient, None]:
+    """A fixture for a file system dataset client."""
+    client = await FileSystemStorageClient().open_dataset_client(
+        name='test_dataset',
+        configuration=configuration,
+    )
     yield client
     await client.drop()
 
 
-async def test_open_creates_new_dataset(tmp_path: Path) -> None:
+async def test_open_creates_new_dataset(configuration: Configuration) -> None:
     """Test that open() creates a new dataset with proper metadata when it doesn't exist."""
-    client = await FileSystemDatasetClient.open(name='new_dataset', storage_dir=tmp_path)
+    client = await FileSystemStorageClient().open_dataset_client(
+        name='new_dataset',
+        configuration=configuration,
+    )
 
-    # Verify client properties
+    # Verify correct client type and properties
+    assert isinstance(client, FileSystemDatasetClient)
     assert client.metadata.id is not None
     assert client.metadata.name == 'new_dataset'
     assert client.metadata.item_count == 0
@@ -53,10 +66,18 @@ async def test_open_creates_new_dataset(tmp_path: Path) -> None:
         assert metadata['item_count'] == 0
 
 
-async def test_open_existing_dataset(dataset_client: FileSystemDatasetClient, tmp_path: Path) -> None:
+async def test_open_existing_dataset(
+    dataset_client: FileSystemDatasetClient,
+    configuration: Configuration,
+) -> None:
     """Test that open() loads an existing dataset correctly."""
+    configuration.purge_on_start = False
+
     # Open the same dataset again
-    reopened_client = await FileSystemDatasetClient.open(name=dataset_client.metadata.name, storage_dir=tmp_path)
+    reopened_client = await FileSystemStorageClient().open_dataset_client(
+        name=dataset_client.metadata.name,
+        configuration=configuration,
+    )
 
     # Verify client properties
     assert dataset_client.metadata.id == reopened_client.metadata.id
@@ -67,10 +88,59 @@ async def test_open_existing_dataset(dataset_client: FileSystemDatasetClient, tm
     assert id(dataset_client) == id(reopened_client)
 
 
-async def test_open_with_id_raises_error(tmp_path: Path) -> None:
+async def test_dataset_client_purge_on_start(configuration: Configuration) -> None:
+    """Test that purge_on_start=True clears existing data in the dataset."""
+    configuration.purge_on_start = True
+
+    # Create dataset and add data
+    dataset_client1 = await FileSystemStorageClient().open_dataset_client(
+        name='test-purge-dataset',
+        configuration=configuration,
+    )
+    await dataset_client1.push_data({'item': 'initial data'})
+
+    # Verify data was added
+    items = await dataset_client1.get_data()
+    assert len(items.items) == 1
+
+    # Reopen
+    dataset_client2 = await FileSystemStorageClient().open_dataset_client(
+        name='test-purge-dataset',
+        configuration=configuration,
+    )
+
+    # Verify data was purged
+    items = await dataset_client2.get_data()
+    assert len(items.items) == 0
+
+
+async def test_dataset_client_no_purge_on_start(configuration: Configuration) -> None:
+    """Test that purge_on_start=False keeps existing data in the dataset."""
+    configuration.purge_on_start = False
+
+    # Create dataset and add data
+    dataset_client1 = await FileSystemStorageClient().open_dataset_client(
+        name='test-no-purge-dataset',
+        configuration=configuration,
+    )
+    await dataset_client1.push_data({'item': 'preserved data'})
+
+    # Reopen
+    dataset_client2 = await FileSystemStorageClient().open_dataset_client(
+        name='test-no-purge-dataset',
+        configuration=configuration,
+    )
+
+    # Verify data was preserved
+    items = await dataset_client2.get_data()
+    assert len(items.items) == 1
+    assert items.items[0]['item'] == 'preserved data'
+
+
+async def test_open_with_id_raises_error(configuration: Configuration) -> None:
     """Test that open() raises an error when an ID is provided."""
     with pytest.raises(ValueError, match='not supported for file system storage client'):
-        await FileSystemDatasetClient.open(id='some-id', storage_dir=tmp_path)
+        await FileSystemStorageClient().open_dataset_client(id='some-id', configuration=configuration)
 
 
 async def test_push_data_single_item(dataset_client: FileSystemDatasetClient) -> None:

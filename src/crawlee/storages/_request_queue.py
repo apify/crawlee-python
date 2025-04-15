@@ -109,11 +109,11 @@ class RequestQueue(Storage, RequestManager):
         purge_on_start = configuration.purge_on_start if purge_on_start is None else purge_on_start
         storage_dir = Path(configuration.storage_dir) if storage_dir is None else storage_dir
 
+        # TODO
         client = await storage_client.open_request_queue_client(
             id=id,
             name=name,
-            purge_on_start=purge_on_start,
-            storage_dir=storage_dir,
+            configuration=configuration,
         )
 
         return cls(client)

@@ -1,17 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from typing_extensions import override
 
+from crawlee.configuration import Configuration
 from crawlee.storage_clients._base import StorageClient
 
 from ._dataset_client import MemoryDatasetClient
 from ._key_value_store_client import MemoryKeyValueStoreClient
 from ._request_queue_client import MemoryRequestQueueClient
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class MemoryStorageClient(StorageClient):
@@ -23,14 +19,14 @@ class MemoryStorageClient(StorageClient):
         *,
         id: str | None = None,
         name: str | None = None,
-        purge_on_start: bool = True,
-        storage_dir: Path | None = None
+        configuration: Configuration | None = None,
     ) -> MemoryDatasetClient:
-        client = await MemoryDatasetClient.open(id=id, name=name, storage_dir=storage_dir)
+        configuration = configuration or Configuration.get_global_configuration()
+        client = await MemoryDatasetClient.open(id=id, name=name, configuration=configuration)
 
-        if purge_on_start:
+        if configuration.purge_on_start:
             await client.drop()
-            client = await MemoryDatasetClient.open(id=id, name=name, storage_dir=storage_dir)
+            client = await MemoryDatasetClient.open(id=id, name=name, configuration=configuration)
 
         return client
 
@@ -40,14 +36,14 @@ class MemoryStorageClient(StorageClient):
         *,
         id: str | None = None,
         name: str | None = None,
-        purge_on_start: bool = True,
-        storage_dir: Path | None = None
+        configuration: Configuration | None = None,
     ) -> MemoryKeyValueStoreClient:
-        client = await MemoryKeyValueStoreClient.open(id=id, name=name, storage_dir=storage_dir)
+        configuration = configuration or Configuration.get_global_configuration()
+        client = await MemoryKeyValueStoreClient.open(id=id, name=name, configuration=configuration)
 
-        if purge_on_start:
+        if configuration.purge_on_start:
             await client.drop()
-            client = await MemoryKeyValueStoreClient.open(id=id, name=name, storage_dir=storage_dir)
+            client = await MemoryKeyValueStoreClient.open(id=id, name=name, configuration=configuration)
 
         return client
 
@@ -57,7 +53,13 @@ class MemoryStorageClient(StorageClient):
         *,
         id: str | None = None,
         name: str | None = None,
-        purge_on_start: bool = True,
-        storage_dir: Path | None = None
+        configuration: Configuration | None = None,
     ) -> MemoryRequestQueueClient:
-        pass
+        configuration = configuration or Configuration.get_global_configuration()
+        client = await MemoryRequestQueueClient.open(id=id, name=name, configuration=configuration)
+
+        if configuration.purge_on_start:
+            await client.drop()
+            client = await MemoryRequestQueueClient.open(id=id, name=name, configuration=configuration)
+
+        return client

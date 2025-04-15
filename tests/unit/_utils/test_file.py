@@ -104,7 +104,7 @@ async def test_force_remove(tmp_path: Path) -> None:
     assert test_file_path.exists() is False
 
     # Remove the file if it exists
-    with open(test_file_path, 'a', encoding='utf-8'):
+    with test_file_path.open('a', encoding='utf-8'):
         pass
     assert test_file_path.exists() is True
     await force_remove(test_file_path)
@@ -123,11 +123,11 @@ async def test_force_rename(tmp_path: Path) -> None:
     # Will remove dst_dir if it exists (also covers normal case)
     # Create the src_dir with a file in it
     src_dir.mkdir()
-    with open(src_file, 'a', encoding='utf-8'):
+    with src_file.open('a', encoding='utf-8'):
         pass
     # Create the dst_dir with a file in it
     dst_dir.mkdir()
-    with open(dst_file, 'a', encoding='utf-8'):
+    with dst_file.open('a', encoding='utf-8'):
         pass
     assert src_file.exists() is True
     assert dst_file.exists() is True

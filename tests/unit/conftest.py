@@ -93,8 +93,6 @@ def _set_crawler_log_level(pytestconfig: pytest.Config, monkeypatch: pytest.Monk
         monkeypatch.setattr(_log_config, 'get_configured_log_level', lambda: getattr(logging, loglevel.upper()))
 
 
-
-
 @pytest.fixture
 async def proxy_info(unused_tcp_port: int) -> ProxyInfo:
     username = 'user'

@@ -21,6 +21,8 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator
     from typing import Any
 
+    from crawlee.configuration import Configuration
+
 logger = getLogger(__name__)
 
 
@@ -32,14 +34,11 @@ class FileSystemDatasetClient(DatasetClient):
     filename, allowing for easy ordering and pagination.
     """
 
-    _DEFAULT_NAME = 'default'
-    """The default name for the dataset when no name is provided."""
-
     _STORAGE_SUBDIR = 'datasets'
     """The name of the subdirectory where datasets are stored."""
 
-    _LOCAL_ENTRY_NAME_DIGITS = 9
-    """Number of digits used for the file names (e.g., 000000019.json)."""
+    _ITEM_FILENAME_DIGITS = 9
+    """Number of digits used for the dataset item file names (e.g., 000000019.json)."""
 
     _cache_by_name: ClassVar[dict[str, FileSystemDatasetClient]] = {}
     """A dictionary to cache clients by their names."""
@@ -72,7 +71,7 @@ class FileSystemDatasetClient(DatasetClient):
 
         # Internal attributes
         self._lock = asyncio.Lock()
-        """A lock to ensure that only one file operation is performed at a time."""
+        """A lock to ensure that only one operation is performed at a time."""
 
     @override
     @property
@@ -94,16 +93,16 @@ class FileSystemDatasetClient(DatasetClient):
     async def open(
         cls,
         *,
-        id: str | None = None,
-        name: str | None = None,
-        storage_dir: Path | None = None,
+        id: str | None,
+        name: str | None,
+        configuration: Configuration,
     ) -> FileSystemDatasetClient:
         if id:
             raise ValueError(
                 'Opening a dataset by "id" is not supported for file system storage client, use "name" instead.'
             )
 
-        name = name or cls._DEFAULT_NAME
+        name = name or configuration.default_dataset_id
 
         # Check if the client is already cached by name.
         if name in cls._cache_by_name:
@@ -111,7 +110,7 @@ class FileSystemDatasetClient(DatasetClient):
             await client._update_metadata(update_accessed_at=True)  # noqa: SLF001
             return client
 
-        storage_dir = storage_dir or Path.cwd()
+        storage_dir = Path(configuration.storage_dir)
         dataset_path = storage_dir / cls._STORAGE_SUBDIR / name
         metadata_path = dataset_path / METADATA_FILENAME
 
@@ -386,7 +385,7 @@ class FileSystemDatasetClient(DatasetClient):
         # Acquire the lock to perform file operations safely.
         async with self._lock:
             # Generate the filename for the new item using zero-padded numbering.
-            filename = f'{str(item_id).zfill(self._LOCAL_ENTRY_NAME_DIGITS)}.json'
+            filename = f'{str(item_id).zfill(self._ITEM_FILENAME_DIGITS)}.json'
             file_path = self.path_to_dataset / filename
 
             # Ensure the dataset directory exists.

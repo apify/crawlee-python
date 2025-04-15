@@ -660,14 +660,12 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self,
         default_value: dict[str, JsonSerializable] | None = None,
     ) -> dict[str, JsonSerializable]:
-        kvs = await self.get_key_value_store()
-        # TODO:
-        # return some kvs value
+        # TODO: implement
+        return {}
 
     async def _save_crawler_state(self) -> None:
-        kvs = await self.get_key_value_store()
-        # TODO:
-        # some kvs call
+        pass
+        # TODO: implement
 
     async def get_data(
         self,
@@ -697,16 +695,16 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         dataset_id: str | None = None,
         dataset_name: str | None = None,
     ) -> None:
-        """Export data from a `Dataset`.
+        """Export all items from a Dataset to a JSON or CSV file.
 
-        This helper method simplifies the process of exporting data from a `Dataset`. It opens the specified
-        one and then exports the data based on the provided parameters. If you need to pass options
-        specific to the output format, use the `export_data_csv` or `export_data_json` method instead.
+        This method simplifies the process of exporting data collected during crawling. It automatically
+        determines the export format based on the file extension (`.json` or `.csv`) and handles
+        the conversion of `Dataset` items to the appropriate format.
 
         Args:
-            path: The destination path.
-            dataset_id: The ID of the `Dataset`.
-            dataset_name: The name of the `Dataset`.
+            path: The destination file path. Must end with '.json' or '.csv'.
+            dataset_id: The ID of the Dataset to export from. If None, uses `name` parameter instead.
+            dataset_name: The name of the Dataset to export from. If None, uses `id` parameter instead.
         """
         dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
 
