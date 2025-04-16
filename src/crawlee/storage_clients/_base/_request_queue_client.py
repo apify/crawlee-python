@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-    from datetime import timedelta
 
     from crawlee.configuration import Configuration
     from crawlee.storage_clients.models import (
@@ -139,6 +139,27 @@ class RequestQueueClient(ABC):
         Returns:
             The updated request
         """
+
+    @abstractmethod
+    async def fetch_next_request(self) -> Request | None:
+        """Fetch the next request from the queue."""
+
+    @abstractmethod
+    async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
+        """Mark a request as handled."""
+
+    @abstractmethod
+    async def reclaim_request(
+        self,
+        request: Request,
+        *,
+        forefront: bool = False,
+    ) -> ProcessedRequest | None:
+        """Reclaim a request back to the queue."""
+
+    @abstractmethod
+    async def is_empty(self) -> bool:
+        """Check if the request queue is empty."""
 
     @abstractmethod
     async def is_finished(self) -> bool:

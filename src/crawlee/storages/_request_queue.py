@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from datetime import timedelta
 from logging import getLogger
 from pathlib import Path
@@ -11,7 +10,7 @@ from typing_extensions import override
 from crawlee import service_locator
 from crawlee._utils.docs import docs_group
 from crawlee.request_loaders import RequestManager
-from crawlee.storage_clients.models import Request
+from crawlee.storage_clients.models import ProcessedRequest, Request, RequestQueueMetadata
 
 from ._base import Storage
 
@@ -62,9 +61,6 @@ class RequestQueue(Storage, RequestManager):
     ```
     """
 
-    _MAX_CACHED_REQUESTS = 1_000_000
-    """Maximum number of requests that can be cached."""
-
     def __init__(self, client: RequestQueueClient) -> None:
         """Initialize a new instance.
 
@@ -74,10 +70,6 @@ class RequestQueue(Storage, RequestManager):
             client: An instance of a key-value store client.
         """
         self._client = client
-
-        # Internal attributes
-        self._add_requests_tasks = list[asyncio.Task]()
-        self._assumed_total_count = 0
 
     @override
     @property
@@ -114,7 +106,6 @@ class RequestQueue(Storage, RequestManager):
         purge_on_start = configuration.purge_on_start if purge_on_start is None else purge_on_start
         storage_dir = Path(configuration.storage_dir) if storage_dir is None else storage_dir
 
-        # TODO
         client = await storage_client.open_request_queue_client(
             id=id,
             name=name,
@@ -125,6 +116,7 @@ class RequestQueue(Storage, RequestManager):
 
     @override
     async def drop(self) -> None:
+        """Drop the request queue."""
         await self._client.drop()
 
     @override
@@ -134,6 +126,15 @@ class RequestQueue(Storage, RequestManager):
         *,
         forefront: bool = False,
     ) -> ProcessedRequest:
+        """Add a request to the queue.
+
+        Args:
+            request: The request to add to the queue.
+            forefront: Whether to add the request to the front of the queue.
+
+        Returns:
+            Information about the request operation.
+        """
         request = self._transform_request(request)
         response = await self._client.add_requests([request], forefront=forefront)
         return response.processed_requests[0]
@@ -149,6 +150,19 @@ class RequestQueue(Storage, RequestManager):
         wait_for_all_requests_to_be_added: bool = False,
         wait_for_all_requests_to_be_added_timeout: timedelta | None = None,
     ) -> AddRequestsResponse:
+        """Add multiple requests to the queue.
+
+        Args:
+            requests: The requests to add to the queue.
+            forefront: Whether to add the requests to the front of the queue.
+            batch_size: How many requests to send at once.
+            wait_time_between_batches: How long to wait between batches.
+            wait_for_all_requests_to_be_added: Whether to wait for all requests to be added.
+            wait_for_all_requests_to_be_added_timeout: How long to wait for all requests to be added.
+
+        Returns:
+            Information about the batch operation.
+        """
         transformed_requests = self._transform_requests(requests)
 
         return await self._client.add_requests(
@@ -159,6 +173,17 @@ class RequestQueue(Storage, RequestManager):
             wait_for_all_requests_to_be_added=wait_for_all_requests_to_be_added,
             wait_for_all_requests_to_be_added_timeout=wait_for_all_requests_to_be_added_timeout,
         )
+
+    async def get_request(self, request_id: str) -> Request | None:
+        """Retrieve a request by its ID.
+
+        Args:
+            request_id: The ID of the request to retrieve.
+
+        Returns:
+            The request if found, otherwise `None`.
+        """
+        return await self._client.get_request(request_id)
 
     async def fetch_next_request(self) -> Request | None:
         """Return the next request in the queue to be processed.
@@ -175,18 +200,7 @@ class RequestQueue(Storage, RequestManager):
         Returns:
             The request or `None` if there are no more pending requests.
         """
-        # TODO: implement
-
-    async def get_request(self, request_id: str) -> Request | None:
-        """Retrieve a request by its ID.
-
-        Args:
-            request_id: The ID of the request to retrieve.
-
-        Returns:
-            The request if found, otherwise `None`.
-        """
-        return await self._client.get_request(request_id)
+        return await self._client.fetch_next_request()
 
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
         """Mark a request as handled after successful processing.
@@ -199,7 +213,7 @@ class RequestQueue(Storage, RequestManager):
         Returns:
             Information about the queue operation. `None` if the given request was not in progress.
         """
-        # TODO: implement
+        return await self._client.mark_request_as_handled(request)
 
     async def reclaim_request(
         self,
@@ -218,7 +232,7 @@ class RequestQueue(Storage, RequestManager):
         Returns:
             Information about the queue operation. `None` if the given request was not in progress.
         """
-        # TODO: implement
+        return await self._client.reclaim_request(request, forefront=forefront)
 
     async def is_empty(self) -> bool:
         """Check whether the queue is empty.
@@ -226,7 +240,7 @@ class RequestQueue(Storage, RequestManager):
         Returns:
             `True` if the next call to `RequestQueue.fetch_next_request` would return `None`, otherwise `False`.
         """
-        # TODO: implement
+        return await self._client.is_empty()
 
     async def is_finished(self) -> bool:
         """Check whether the queue is finished.
@@ -237,4 +251,4 @@ class RequestQueue(Storage, RequestManager):
         Returns:
             `True` if all requests were already handled and there are no more left. `False` otherwise.
         """
-        # TODO: implement
+        return await self._client.is_finished()
