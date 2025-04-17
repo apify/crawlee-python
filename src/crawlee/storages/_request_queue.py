@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from datetime import timedelta
 from logging import getLogger
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, ClassVar, TypeVar
 
 from typing_extensions import override
 
@@ -61,6 +61,12 @@ class RequestQueue(Storage, RequestManager):
     ```
     """
 
+    _cache_by_id: ClassVar[dict[str, RequestQueue]] = {}
+    """A dictionary to cache request queues by their IDs."""
+
+    _cache_by_name: ClassVar[dict[str, RequestQueue]] = {}
+    """A dictionary to cache request queues by their names."""
+
     _MAX_CACHED_REQUESTS = 1_000_000
     """Maximum number of requests that can be cached."""
 
@@ -73,10 +79,6 @@ class RequestQueue(Storage, RequestManager):
             client: An instance of a key-value store client.
         """
         self._client = client
-
-        # Internal attributes
-        self._add_requests_tasks = list[asyncio.Task]()
-        self._assumed_total_count = 0
 
         self._add_requests_tasks = list[asyncio.Task]()
         """A list of tasks for adding requests to the queue."""
@@ -109,6 +111,12 @@ class RequestQueue(Storage, RequestManager):
         if id and name:
             raise ValueError('Only one of "id" or "name" can be specified, not both.')
 
+        # Check if key value store is already cached by id or name
+        if id and id in cls._cache_by_id:
+            return cls._cache_by_id[id]
+        if name and name in cls._cache_by_name:
+            return cls._cache_by_name[name]
+
         configuration = service_locator.get_configuration() if configuration is None else configuration
         storage_client = service_locator.get_storage_client() if storage_client is None else storage_client
 
@@ -122,6 +130,12 @@ class RequestQueue(Storage, RequestManager):
 
     @override
     async def drop(self) -> None:
+        # Remove from cache before dropping
+        if self.id in self._cache_by_id:
+            del self._cache_by_id[self.id]
+        if self.name and self.name in self._cache_by_name:
+            del self._cache_by_name[self.name]
+
         await self._client.drop()
 
     @override
@@ -132,7 +146,7 @@ class RequestQueue(Storage, RequestManager):
         forefront: bool = False,
     ) -> ProcessedRequest:
         request = self._transform_request(request)
-        response = await self._client.add_requests([request], forefront=forefront)
+        response = await self._client.add_batch_of_requests([request], forefront=forefront)
         return response.processed_requests[0]
 
     @override
@@ -151,8 +165,7 @@ class RequestQueue(Storage, RequestManager):
 
         async def _process_batch(batch: Sequence[Request]) -> None:
             request_count = len(batch)
-            response = await self._client.add_requests(batch, forefront=forefront)
-            self._assumed_total_count += request_count
+            response = await self._client.add_batch_of_requests(batch, forefront=forefront)
             logger.debug(f'Added {request_count} requests to the queue, response: {response}')
 
         # Wait for the first batch to be added
@@ -260,7 +273,7 @@ class RequestQueue(Storage, RequestManager):
         Returns:
             The request or `None` if there are no more pending requests.
         """
-        # TODO: implement
+        return await self._client.fetch_next_request()
 
     async def get_request(self, request_id: str) -> Request | None:
         """Retrieve a request by its ID.
@@ -284,7 +297,7 @@ class RequestQueue(Storage, RequestManager):
         Returns:
             Information about the queue operation. `None` if the given request was not in progress.
         """
-        # TODO: implement
+        return await self._client.mark_request_as_handled(request)
 
     async def reclaim_request(
         self,
@@ -303,23 +316,33 @@ class RequestQueue(Storage, RequestManager):
         Returns:
             Information about the queue operation. `None` if the given request was not in progress.
         """
-        # TODO: implement
+        return await self._client.reclaim_request(request, forefront=forefront)
 
     async def is_empty(self) -> bool:
-        """Check whether the queue is empty.
+        """Check if the request queue is empty.
+
+        An empty queue means that there are no requests in the queue.
 
         Returns:
-            `True` if the next call to `RequestQueue.fetch_next_request` would return `None`, otherwise `False`.
+            True if the request queue is empty, False otherwise.
         """
-        # TODO: implement
+        return await self._client.is_empty()
 
     async def is_finished(self) -> bool:
-        """Check whether the queue is finished.
+        """Check if the request queue is finished.
 
-        Due to the nature of distributed storage used by the queue, the function might occasionally return a false
-        negative, but it will never return a false positive.
+        Finished means that all requests in the queue have been processed (the queue is empty) and there
+        are no more tasks that could add additional requests to the queue.
 
         Returns:
-            `True` if all requests were already handled and there are no more left. `False` otherwise.
+            True if the request queue is finished, False otherwise.
         """
-        # TODO: implement
+        if self._add_requests_tasks:
+            logger.debug('Background add requests tasks are still in progress.')
+            return False
+
+        if await self.is_empty():
+            logger.debug('The request queue is empty.')
+            return True
+
+        return False

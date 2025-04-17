@@ -319,3 +319,22 @@ class InternalRequest(BaseModel):
     def to_request(self) -> Request:
         """Convert the internal request back to a `Request` object."""
         return self.request
+
+
+class CachedRequest(BaseModel):
+    """Pydantic model for cached request information."""
+
+    id: str
+    """The ID of the request."""
+
+    was_already_handled: bool
+    """Whether the request was already handled."""
+
+    hydrated: Request | None = None
+    """The hydrated request object (the original one)."""
+
+    lock_expires_at: datetime | None = None
+    """The expiration time of the lock on the request."""
+
+    forefront: bool = False
+    """Whether the request was added to the forefront of the queue."""

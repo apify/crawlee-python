@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from crawlee._utils.docs import docs_group
@@ -14,7 +13,6 @@ if TYPE_CHECKING:
         AddRequestsResponse,
         ProcessedRequest,
         Request,
-        RequestQueueHead,
         RequestQueueMetadata,
     )
 
@@ -60,37 +58,11 @@ class RequestQueueClient(ABC):
         """
 
     @abstractmethod
-    async def list_head(
-        self,
-        *,
-        lock_time: timedelta | None = None,
-        limit: int | None = None,
-    ) -> RequestQueueHead:
-        """Retrieve requests from the beginning of the queue.
-
-        Fetches the first requests in the queue. If `lock_time` is provided, the requests will be locked
-        for the specified duration, preventing them from being processed by other clients until the lock expires.
-        This locking functionality may not be supported by all request queue client implementations.
-
-        Args:
-            lock_time: Duration for which to lock the retrieved requests, if supported by the client.
-                If None, requests will not be locked.
-            limit: Maximum number of requests to retrieve.
-
-        Returns:
-            A collection of requests from the beginning of the queue, including lock information if applicable.
-        """
-
-    @abstractmethod
-    async def add_requests(
+    async def add_batch_of_requests(
         self,
         requests: Sequence[Request],
         *,
         forefront: bool = False,
-        batch_size: int = 1000,
-        wait_time_between_batches: timedelta = timedelta(seconds=1),
-        wait_for_all_requests_to_be_added: bool = False,
-        wait_for_all_requests_to_be_added_timeout: timedelta | None = None,
     ) -> AddRequestsResponse:
         """Add batch of requests to the queue.
 
@@ -124,29 +96,58 @@ class RequestQueueClient(ABC):
         """
 
     @abstractmethod
-    async def update_request(
+    async def fetch_next_request(self) -> Request | None:
+        """Return the next request in the queue to be processed.
+
+        Once you successfully finish processing of the request, you need to call `RequestQueue.mark_request_as_handled`
+        to mark the request as handled in the queue. If there was some error in processing the request, call
+        `RequestQueue.reclaim_request` instead, so that the queue will give the request to some other consumer
+        in another call to the `fetch_next_request` method.
+
+        Note that the `None` return value does not mean the queue processing finished, it means there are currently
+        no pending requests. To check whether all requests in queue were finished, use `RequestQueue.is_finished`
+        instead.
+
+        Returns:
+            The request or `None` if there are no more pending requests.
+        """
+
+    @abstractmethod
+    async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
+        """Mark a request as handled after successful processing.
+
+        Handled requests will never again be returned by the `RequestQueue.fetch_next_request` method.
+
+        Args:
+            request: The request to mark as handled.
+
+        Returns:
+            Information about the queue operation. `None` if the given request was not in progress.
+        """
+
+    @abstractmethod
+    async def reclaim_request(
         self,
         request: Request,
         *,
         forefront: bool = False,
-    ) -> ProcessedRequest:
-        """Update a request in the queue.
+    ) -> ProcessedRequest | None:
+        """Reclaim a failed request back to the queue.
+
+        The request will be returned for processing later again by another call to `RequestQueue.fetch_next_request`.
 
         Args:
-            request: The updated request.
-            forefront: Whether to put the updated request in the beginning or the end of the queue.
+            request: The request to return to the queue.
+            forefront: Whether to add the request to the head or the end of the queue.
 
         Returns:
-            The updated request
+            Information about the queue operation. `None` if the given request was not in progress.
         """
 
     @abstractmethod
-    async def is_finished(self) -> bool:
-        """Check if the request queue is finished.
-
-        Finished means that all requests in the queue have been processed (the queue is empty) and there
-        are no more tasks that could add additional requests to the queue.
+    async def is_empty(self) -> bool:
+        """Check if the request queue is empty.
 
         Returns:
-            True if the request queue is finished, False otherwise.
+            True if the request queue is empty, False otherwise.
         """
