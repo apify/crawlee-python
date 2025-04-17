@@ -43,6 +43,8 @@ class RobotsTxtFile:
             response = await http_client.send_request(url, proxy_info=proxy_info)
             if is_status_code_client_error(response.status_code):
                 robots.allow_all = True  # type: ignore[attr-defined] # allow_all is a valid RobotFileParser
+            body = response.read()
+            robots.parse(body.decode('utf-8').splitlines())
         return RobotsTxtFile(robots)
 
     def is_allowed(self, url: str, user_agent: str = '*') -> bool:
