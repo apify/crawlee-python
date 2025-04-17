@@ -134,11 +134,7 @@ async def export_json_to_stream(
     **kwargs: Unpack[ExportDataJsonKwargs],
 ) -> None:
     items = [item async for item in iterator]
-
-    if items:
-        json.dump(items, dst, **kwargs)
-    else:
-        logger.warning('Attempting to export an empty dataset - no file will be created')
+    json.dump(items, dst, **kwargs)
 
 
 async def export_csv_to_stream(

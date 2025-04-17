@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import timedelta
 from logging import getLogger
 from pathlib import Path
@@ -21,7 +22,7 @@ if TYPE_CHECKING:
     from crawlee.configuration import Configuration
     from crawlee.storage_clients import StorageClient
     from crawlee.storage_clients._base import RequestQueueClient
-    from crawlee.storage_clients.models import ProcessedRequest, RequestQueueMetadata
+    from crawlee.storage_clients.models import AddRequestsResponse, ProcessedRequest, RequestQueueMetadata
 
 logger = getLogger(__name__)
 
@@ -73,6 +74,10 @@ class RequestQueue(Storage, RequestManager):
             client: An instance of a key-value store client.
         """
         self._client = client
+
+        # Internal attributes
+        self._add_requests_tasks = list[asyncio.Task]()
+        self._assumed_total_count = 0
 
     @override
     @property
@@ -129,20 +134,31 @@ class RequestQueue(Storage, RequestManager):
         *,
         forefront: bool = False,
     ) -> ProcessedRequest:
-        return await self._client.add_requests_batch([request], forefront=forefront)
+        request = self._transform_request(request)
+        response = await self._client.add_requests([request], forefront=forefront)
+        return response.processed_requests[0]
 
     @override
-    async def add_requests_batched(
+    async def add_requests(
         self,
         requests: Sequence[str | Request],
         *,
+        forefront: bool = False,
         batch_size: int = 1000,
         wait_time_between_batches: timedelta = timedelta(seconds=1),
         wait_for_all_requests_to_be_added: bool = False,
         wait_for_all_requests_to_be_added_timeout: timedelta | None = None,
-    ) -> None:
-        # TODO: implement
-        pass
+    ) -> AddRequestsResponse:
+        transformed_requests = self._transform_requests(requests)
+
+        return await self._client.add_requests(
+            transformed_requests,
+            forefront=forefront,
+            batch_size=batch_size,
+            wait_time_between_batches=wait_time_between_batches,
+            wait_for_all_requests_to_be_added=wait_for_all_requests_to_be_added,
+            wait_for_all_requests_to_be_added_timeout=wait_for_all_requests_to_be_added_timeout,
+        )
 
     async def fetch_next_request(self) -> Request | None:
         """Return the next request in the queue to be processed.

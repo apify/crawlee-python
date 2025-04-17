@@ -5,11 +5,13 @@ from typing import TYPE_CHECKING
 
 from crawlee import Request
 from crawlee._utils.docs import docs_group
+from crawlee.request_loaders import RequestManagerTandem
+from crawlee.storages import RequestQueue
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from crawlee.request_loaders import RequestManager, RequestManagerTandem
+    from crawlee.request_loaders import RequestManager
     from crawlee.storage_clients.models import ProcessedRequest
 
 
@@ -56,9 +58,6 @@ class RequestLoader(ABC):
             request_manager: Request manager to combine the loader with.
                 If None is given, the default request queue is used.
         """
-        from crawlee.request_loaders import RequestManagerTandem
-        from crawlee.storages import RequestQueue
-
         if request_manager is None:
             request_manager = await RequestQueue.open()
 
