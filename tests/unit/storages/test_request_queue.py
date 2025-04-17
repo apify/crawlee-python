@@ -3,13 +3,17 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
+from unittest.mock import MagicMock, AsyncMock
 
 import pytest
 from pydantic import ValidationError
 
 from crawlee import Request, service_locator
 from crawlee._request import RequestState
-from crawlee.storage_clients.models import StorageMetadata
+from crawlee.storage_clients import StorageClient, MemoryStorageClient
+from crawlee.storage_clients._memory import RequestQueueClient
+from crawlee.storage_clients.models import StorageMetadata, BatchRequestsOperationResponse, ProcessedRequest, \
+    UnprocessedRequest
 from crawlee.storages import RequestQueue
 
 if TYPE_CHECKING:
@@ -286,3 +290,61 @@ async def test_from_storage_object() -> None:
     assert request_queue.name == storage_object.name
     assert request_queue.storage_object == storage_object
     assert storage_object.model_extra.get('extra_attribute') == 'extra'  # type: ignore[union-attr]
+
+
+
+async def test_add_batched_requests_with_retry(tmp_path, request_queue) -> None:
+    batch_add_requests_call_counter = iter(range(1,10))
+    service_locator.get_storage_client()
+    initial_request_count = 5
+    expected_added_requests = 4
+    requests = [f'https://example.com/{i}' for i in range(initial_request_count)]
+
+    class MockedRequestQueueClient(RequestQueueClient):
+        """Patched memory storage client that simulates unprocessed requests."""
+
+        async def batch_add_requests(self, batch: Sequence[Request]):
+            """Mocked client behavior that simulates unprocessed requests.
+
+            It processes all except last two at first run, then all except last and then none.
+            Overall if tried with the same batch it will process al except the last one.
+            """
+            call_count = next(batch_add_requests_call_counter)
+            if call_count == 1:
+                # Process all but last two
+                response = await super().batch_add_requests(batch[:-2])
+                response.unprocessed_requests = [UnprocessedRequest(url=r.url, unique_key=r.unique_key, method=r.method) for r in batch[-2:]]
+                return response
+            elif call_count == 2:
+                # Process all but last
+                return await super().batch_add_requests(batch[:-1])
+            else:
+                # Do not process any
+                return await super().batch_add_requests([])
+
+
+    mocked_storage_client = AsyncMock(spec=StorageClient)
+    mocked_storage_client.request_queue = MagicMock(
+        return_value=
+        MockedRequestQueueClient(id="default", memory_storage_client= service_locator.get_storage_client()))
+
+
+    request_queue = RequestQueue(id = "some_id", name="some_name",storage_client=mocked_storage_client)
+    request_count = len(requests)
+
+    # Add the requests to the RQ in batches
+    await request_queue.add_requests_batched(requests, wait_for_all_requests_to_be_added=True)
+
+    # Ensure the batch was processed correctly
+    assert await request_queue.get_total_count() == expected_added_requests
+
+    # Fetch and validate each request in the queue
+    for original_request in requests:
+        next_request = await request_queue.fetch_next_request()
+        assert next_request is not None
+
+        expected_url = original_request if isinstance(original_request, str) else original_request.url
+        assert next_request.url == expected_url
+
+    # Confirm the queue is empty after processing all requests
+    assert await request_queue.is_empty() is True
