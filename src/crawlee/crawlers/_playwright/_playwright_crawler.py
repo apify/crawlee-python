@@ -304,8 +304,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
                     if robots_txt_file and not robots_txt_file.is_allowed(url):
                         # TODO: https://github.com/apify/crawlee-python/issues/1160
-                        # add processing with on_skiped_request hook
-                        context.log.warning(f'Skipping URL "{url}" due to robots.txt rules.')
+                        # add processing with on_skipped_request hook
                         continue
 
                     request_option = RequestOptions({'url': url, 'user_data': {**base_user_data}, 'label': label})
