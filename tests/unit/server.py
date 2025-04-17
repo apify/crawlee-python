@@ -11,7 +11,14 @@ from urllib.parse import parse_qs
 from uvicorn.server import Server
 from yarl import URL
 
-from tests.unit.server_endpoints import GENERIC_RESPONSE, HELLO_WORLD, INCAPSULA, SECONDARY_INDEX, START_ENQUEUE
+from tests.unit.server_endpoints import (
+    GENERIC_RESPONSE,
+    HELLO_WORLD,
+    INCAPSULA,
+    ROBOTS_TXT,
+    SECONDARY_INDEX,
+    START_ENQUEUE,
+)
 
 if TYPE_CHECKING:
     from socket import socket
@@ -370,24 +377,7 @@ async def dynamic_content(scope: dict[str, Any], send: Send) -> None:
 
 async def robots_txt(send: Send) -> None:
     """Handle requests for the robots.txt file."""
-    body = b'\n'.join(
-        [
-            b'User-agent: *',
-            b'Disallow: *deny_all/',
-            b'crawl-delay: 10',
-            b'',
-            b'User-agent: Googlebot',
-            b'Disallow: *deny_googlebot/',
-            b'crawl-delay: 1',
-            b'',
-            b'user-agent: Mozilla',
-            b'crawl-delay: 2',
-            b'',
-            b'sitemap: http://not-exists.com/sitemap_1.xml',
-            b'sitemap: http://not-exists.com/sitemap_2.xml',
-        ]
-    )
-    await send_html_response(send, body)
+    await send_html_response(send, ROBOTS_TXT)
 
 
 class TestServer(Server):
