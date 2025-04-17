@@ -288,7 +288,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             configure_logging: If True, the crawler will set up logging infrastructure automatically.
             statistics_log_format: If 'table', displays crawler statistics as formatted tables in logs. If 'inline',
                 outputs statistics as plain text log messages.
-            respect_robots_txt_file: If True, the crawler will respect the robots.txt file of the target website.
+            respect_robots_txt_file: If set to `True`, the crawler will automatically try to fetch the robots.txt file
+                for each domain, and skip those that are not allowed. This also prevents disallowed URLs to be added
+                via `EnqueueLinksFunction`
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
             _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
