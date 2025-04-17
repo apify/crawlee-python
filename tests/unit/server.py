@@ -120,6 +120,8 @@ async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
         await hello_world_json(send)
     elif path.startswith('/xml'):
         await hello_world_xml(send)
+    elif path.startswith('/robots.txt'):
+        await robots_txt(send)
     else:
         await hello_world(send)
 
@@ -364,6 +366,28 @@ async def dynamic_content(scope: dict[str, Any], send: Send) -> None:
     content = query_params.get('content', '')
 
     await send_html_response(send, html_content=content.encode())
+
+
+async def robots_txt(send: Send) -> None:
+    """Handle requests for the robots.txt file."""
+    body = b'\n'.join(
+        [
+            b'User-agent: *',
+            b'Disallow: *deny_all/',
+            b'crawl-delay: 10',
+            b'',
+            b'User-agent: Googlebot',
+            b'Disallow: *deny_googlebot/',
+            b'crawl-delay: 1',
+            b'',
+            b'user-agent: Mozilla',
+            b'crawl-delay: 2',
+            b'',
+            b'sitemap: http://not-exists.com/sitemap_1.xml',
+            b'sitemap: http://not-exists.com/sitemap_2.xml',
+        ]
+    )
+    await send_html_response(send, body)
 
 
 class TestServer(Server):
