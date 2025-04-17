@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Improve validation errors in Crawlee CLI ([#1140](https://github.com/apify/crawlee-python/pull/1140)) ([f2d33df](https://github.com/apify/crawlee-python/commit/f2d33dff178a3d3079eb3807feb9645a25cc7a93)) by [@vdusek](https://github.com/vdusek), closes [#1138](https://github.com/apify/crawlee-python/issues/1138)
+- Disable logger propagation to prevent duplicate logs ([#1156](https://github.com/apify/crawlee-python/pull/1156)) ([0b3648d](https://github.com/apify/crawlee-python/commit/0b3648d5d399f0af23520f7fb8ee635d38b512c4)) by [@vdusek](https://github.com/vdusek)
 
 
 <!-- git-cliff-unreleased-end -->
