@@ -380,7 +380,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._additional_context_managers = _additional_context_managers or []
 
         # Internal, not explicitly configurable components
-        self.robots_txt_file_cache: LRUCache[str, RobotsTxtFile] = LRUCache(maxsize=1000)
+        self._robots_txt_file_cache: LRUCache[str, RobotsTxtFile] = LRUCache(maxsize=1000)
         self._tld_extractor = TLDExtract(cache_dir=tempfile.TemporaryDirectory().name)
         self._snapshotter = Snapshotter.from_config(config)
         self._autoscaled_pool = AutoscaledPool(
@@ -1317,9 +1317,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if not self._respect_robots_txt_file:
             return None
         origin_url = str(URL(url).origin())
-        robots_txt_file = self.robots_txt_file_cache[origin_url]
+        robots_txt_file = self._robots_txt_file_cache.get(origin_url)
         if robots_txt_file:
             return robots_txt_file
         robots_txt_file = await RobotsTxtFile.find(url, self._http_client)
-        self.robots_txt_file_cache[origin_url] = robots_txt_file
+        self._robots_txt_file_cache[origin_url] = robots_txt_file
         return robots_txt_file
