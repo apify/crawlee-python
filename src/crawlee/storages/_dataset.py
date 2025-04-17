@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from io import StringIO
-from pathlib import Path
 from typing import TYPE_CHECKING, overload
 
 from typing_extensions import override
@@ -101,8 +100,6 @@ class Dataset(Storage):
         *,
         id: str | None = None,
         name: str | None = None,
-        purge_on_start: bool | None = None,
-        storage_dir: Path | None = None,
         configuration: Configuration | None = None,
         storage_client: StorageClient | None = None,
     ) -> Dataset:
@@ -117,10 +114,7 @@ class Dataset(Storage):
 
         configuration = service_locator.get_configuration() if configuration is None else configuration
         storage_client = service_locator.get_storage_client() if storage_client is None else storage_client
-        purge_on_start = configuration.purge_on_start if purge_on_start is None else purge_on_start
-        storage_dir = Path(configuration.storage_dir) if storage_dir is None else storage_dir
 
-        # TODO
         client = await storage_client.open_dataset_client(
             id=id,
             name=name,

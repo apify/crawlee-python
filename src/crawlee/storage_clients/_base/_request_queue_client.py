@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from crawlee._utils.docs import docs_group
@@ -10,11 +11,10 @@ if TYPE_CHECKING:
 
     from crawlee.configuration import Configuration
     from crawlee.storage_clients.models import (
-        BatchRequestsOperationResponse,
+        AddRequestsResponse,
         ProcessedRequest,
-        ProlongRequestLockResponse,
         Request,
-        RequestQueueHeadWithLocks,
+        RequestQueueHead,
         RequestQueueMetadata,
     )
 
@@ -60,35 +60,56 @@ class RequestQueueClient(ABC):
         """
 
     @abstractmethod
-    async def list_and_lock_head(self, *, lock_secs: int, limit: int | None = None) -> RequestQueueHeadWithLocks:
-        """Fetch and lock a specified number of requests from the start of the queue.
+    async def list_head(
+        self,
+        *,
+        lock_time: timedelta | None = None,
+        limit: int | None = None,
+    ) -> RequestQueueHead:
+        """Retrieve requests from the beginning of the queue.
 
-        Retrieve and locks the first few requests of a queue for the specified duration. This prevents the requests
-        from being fetched by another client until the lock expires.
+        Fetches the first requests in the queue. If `lock_time` is provided, the requests will be locked
+        for the specified duration, preventing them from being processed by other clients until the lock expires.
+        This locking functionality may not be supported by all request queue client implementations.
 
         Args:
-            lock_secs: Duration for which the requests are locked, in seconds.
-            limit: Maximum number of requests to retrieve and lock.
+            lock_time: Duration for which to lock the retrieved requests, if supported by the client.
+                If None, requests will not be locked.
+            limit: Maximum number of requests to retrieve.
 
         Returns:
-            The desired number of locked requests from the beginning of the queue.
+            A collection of requests from the beginning of the queue, including lock information if applicable.
         """
 
     @abstractmethod
-    async def add_requests_batch(
+    async def add_requests(
         self,
         requests: Sequence[Request],
         *,
         forefront: bool = False,
-    ) -> BatchRequestsOperationResponse:
-        """Add a requests to the queue in batches.
+        batch_size: int = 1000,
+        wait_time_between_batches: timedelta = timedelta(seconds=1),
+        wait_for_all_requests_to_be_added: bool = False,
+        wait_for_all_requests_to_be_added_timeout: timedelta | None = None,
+    ) -> AddRequestsResponse:
+        """Add batch of requests to the queue.
+
+        This method adds a batch of requests to the queue. Each request is processed based on its uniqueness
+        (determined by `unique_key`). Duplicates will be identified but not re-added to the queue.
 
         Args:
-            requests: The batch of requests to add to the queue.
-            forefront: Whether to add the requests to the head or the end of the queue.
+            requests: The collection of requests to add to the queue.
+            forefront: Whether to put the added requests at the beginning (True) or the end (False) of the queue.
+                When True, the requests will be processed sooner than previously added requests.
+            batch_size: The maximum number of requests to add in a single batch.
+            wait_time_between_batches: The time to wait between adding batches of requests.
+            wait_for_all_requests_to_be_added: If True, the method will wait until all requests are added
+                to the queue before returning.
+            wait_for_all_requests_to_be_added_timeout: The maximum time to wait for all requests to be added.
 
         Returns:
-            Request queue batch operation information.
+            A response object containing information about which requests were successfully
+            processed and which failed (if any).
         """
 
     @abstractmethod
@@ -120,47 +141,12 @@ class RequestQueueClient(ABC):
         """
 
     @abstractmethod
-    async def delete_request(self, request_id: str) -> None:
-        """Delete a request from the queue.
+    async def is_finished(self) -> bool:
+        """Check if the request queue is finished.
 
-        Args:
-            request_id: ID of the request to delete.
-        """
+        Finished means that all requests in the queue have been processed (the queue is empty) and there
+        are no more tasks that could add additional requests to the queue.
 
-    @abstractmethod
-    async def delete_requests_batch(self, requests: list[Request]) -> BatchRequestsOperationResponse:
-        """Delete given requests from the queue.
-
-        Args:
-            requests: The requests to delete from the queue.
-        """
-
-    @abstractmethod
-    async def prolong_request_lock(
-        self,
-        request_id: str,
-        *,
-        forefront: bool = False,
-        lock_secs: int,
-    ) -> ProlongRequestLockResponse:
-        """Prolong the lock on a specific request in the queue.
-
-        Args:
-            request_id: The identifier of the request whose lock is to be prolonged.
-            forefront: Whether to put the request in the beginning or the end of the queue after lock expires.
-            lock_secs: The additional amount of time, in seconds, that the request will remain locked.
-        """
-
-    @abstractmethod
-    async def delete_request_lock(
-        self,
-        request_id: str,
-        *,
-        forefront: bool = False,
-    ) -> None:
-        """Delete the lock on a specific request in the queue.
-
-        Args:
-            request_id: ID of the request to delete the lock.
-            forefront: Whether to put the request in the beginning or the end of the queue after the lock is deleted.
+        Returns:
+            True if the request queue is finished, False otherwise.
         """

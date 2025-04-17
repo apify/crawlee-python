@@ -49,7 +49,7 @@ class RequestManagerTandem(RequestManager):
         return await self._read_write_manager.add_request(request, forefront=forefront)
 
     @override
-    async def add_requests_batched(
+    async def add_requests(
         self,
         requests: Sequence[str | Request],
         *,
@@ -58,7 +58,7 @@ class RequestManagerTandem(RequestManager):
         wait_for_all_requests_to_be_added: bool = False,
         wait_for_all_requests_to_be_added_timeout: timedelta | None = None,
     ) -> None:
-        return await self._read_write_manager.add_requests_batched(
+        return await self._read_write_manager.add_requests(
             requests,
             batch_size=batch_size,
             wait_time_between_batches=wait_time_between_batches,
