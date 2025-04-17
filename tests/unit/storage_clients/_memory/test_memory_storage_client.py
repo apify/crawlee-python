@@ -11,6 +11,7 @@ from crawlee import Request, service_locator
 from crawlee._consts import METADATA_FILENAME
 from crawlee.configuration import Configuration
 from crawlee.storage_clients import MemoryStorageClient
+from crawlee.storage_clients.models import BatchRequestsOperationResponse
 
 
 async def test_write_metadata(tmp_path: Path) -> None:
@@ -267,3 +268,21 @@ async def test_parametrized_storage_path_overrides_env_var() -> None:
         Configuration(crawlee_storage_dir='./parametrized_storage_dir'),  # type: ignore[call-arg]
     )
     assert ms.storage_dir == './parametrized_storage_dir'
+
+
+async def test_batch_requests_operation_response() -> None:
+    """Test that `BatchRequestsOperationResponse` creation from example responses."""
+    process_request = {
+        'requestId': 'EAaArVRs5qV39C9',
+        'uniqueKey': 'https://example.com',
+        'wasAlreadyHandled': False,
+        'wasAlreadyPresent': True,
+    }
+    unprocess_request_full = {'uniqueKey': 'https://example2.com', 'method': 'GET', 'url': 'https://example2.com'}
+    unprocess_request_minimal = {'uniqueKey': 'https://example3.com'}
+    BatchRequestsOperationResponse.model_validate(
+        {
+            'processedRequests': [process_request],
+            'unprocessedRequests': [unprocess_request_full, unprocess_request_minimal],
+        }
+    )
