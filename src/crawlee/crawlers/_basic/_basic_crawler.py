@@ -17,8 +17,10 @@ from typing import TYPE_CHECKING, Any, Callable, Generic, Literal, Union, cast
 from urllib.parse import ParseResult, urlparse
 from weakref import WeakKeyDictionary
 
+from cachetools import LRUCache
 from tldextract import TLDExtract
 from typing_extensions import NotRequired, TypedDict, TypeVar, Unpack, assert_never
+from yarl import URL
 
 from crawlee import EnqueueStrategy, Glob, service_locator
 from crawlee._autoscaling import AutoscaledPool, Snapshotter, SystemStatus
@@ -32,6 +34,7 @@ from crawlee._types import (
     SendRequestFunction,
 )
 from crawlee._utils.docs import docs_group
+from crawlee._utils.robots import RobotsTxtFile
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
 from crawlee._utils.web import is_status_code_client_error, is_status_code_server_error
@@ -158,6 +161,9 @@ class _BasicCrawlerOptions(TypedDict):
     """A logger instance, typically provided by a subclass, for consistent logging labels. Intended for use by
     subclasses rather than direct instantiation of `BasicCrawler`."""
 
+    respect_robots_txt_file: NotRequired[bool]
+    """"""
+
 
 class _BasicCrawlerOptionsGeneric(Generic[TCrawlingContext, TStatisticsState], TypedDict):
     """Generic options the `BasicCrawler` constructor."""
@@ -238,6 +244,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         keep_alive: bool = False,
         configure_logging: bool = True,
         statistics_log_format: Literal['table', 'inline'] = 'table',
+        respect_robots_txt_file: bool = False,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         _additional_context_managers: Sequence[AbstractAsyncContextManager] | None = None,
         _logger: logging.Logger | None = None,
@@ -280,6 +287,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             configure_logging: If True, the crawler will set up logging infrastructure automatically.
             statistics_log_format: If 'table', displays crawler statistics as formatted tables in logs. If 'inline',
                 outputs statistics as plain text log messages.
+            respect_robots_txt_file: If True, the crawler will respect the robots.txt file of the target website.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
             _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
@@ -335,6 +343,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._max_requests_per_crawl = max_requests_per_crawl
         self._max_session_rotations = max_session_rotations
         self._max_crawl_depth = max_crawl_depth
+        self._respect_robots_txt_file = respect_robots_txt_file
 
         # Timeouts
         self._request_handler_timeout = request_handler_timeout
@@ -371,6 +380,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._additional_context_managers = _additional_context_managers or []
 
         # Internal, not explicitly configurable components
+        self.robots_txt_file_cache: LRUCache[str, RobotsTxtFile] = LRUCache(maxsize=1000)
         self._tld_extractor = TLDExtract(cache_dir=tempfile.TemporaryDirectory().name)
         self._snapshotter = Snapshotter.from_config(config)
         self._autoscaled_pool = AutoscaledPool(
@@ -1265,3 +1275,22 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             raise RequestCollisionError(
                 f'The Session (id: {request.session_id}) bound to the Request is no longer available in SessionPool'
             )
+
+    async def _is_allowed_based_on_robots_txt_file(self, url: str) -> bool:
+        """Check if the URL is allowed based on the robots.txt file."""
+        if not self._respect_robots_txt_file:
+            return True
+        robots_txt_file = await self._get_robots_txt_file_for_url(url)
+        return not robots_txt_file or robots_txt_file.is_allowed(url)
+
+    async def _get_robots_txt_file_for_url(self, url: str) -> RobotsTxtFile | None:
+        """Get the RobotsTxtFile for a given URL."""
+        if not self._respect_robots_txt_file:
+            return None
+        origin_url = str(URL(url).origin())
+        robots_txt_file = self.robots_txt_file_cache[origin_url]
+        if robots_txt_file:
+            return robots_txt_file
+        robots_txt_file = await RobotsTxtFile.find(url, None, self._http_client)
+        self.robots_txt_file_cache[origin_url] = robots_txt_file
+        return robots_txt_file
