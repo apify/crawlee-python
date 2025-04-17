@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.6.7 - **not yet released**
+## [0.6.7](https://github.com/apify/crawlee-python/releases/tag/v0.6.7) (2025-04-17)
 
 ### 🚀 Features
 
@@ -15,7 +14,6 @@ All notable changes to this project will be documented in this file.
 - Disable logger propagation to prevent duplicate logs ([#1156](https://github.com/apify/crawlee-python/pull/1156)) ([0b3648d](https://github.com/apify/crawlee-python/commit/0b3648d5d399f0af23520f7fb8ee635d38b512c4)) by [@vdusek](https://github.com/vdusek)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.6.6](https://github.com/apify/crawlee-python/releases/tag/v0.6.6) (2025-04-03)
 
 ### 🚀 Features
