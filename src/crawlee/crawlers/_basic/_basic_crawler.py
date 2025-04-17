@@ -666,7 +666,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 skipped.append(request)
 
         if skipped:
-            # add processing with on_skiped_request callback or handler?
+            # TODO: https://github.com/apify/crawlee-python/issues/1160
+            # add processing with on_skiped_request hook
             self._logger.warning('Some requests were skipped because they were disallowed based on the robots.txt file')
 
         request_manager = await self.get_request_manager()
@@ -1116,7 +1117,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 logger=self._logger,
                 max_retries=3,
             )
-            # add processing with on_skiped_request callback or handler?
+            # TODO: https://github.com/apify/crawlee-python/issues/1160
+            # add processing with on_skiped_request hook
             return
 
         if request.session_id:
