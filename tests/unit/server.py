@@ -11,7 +11,14 @@ from urllib.parse import parse_qs
 from uvicorn.server import Server
 from yarl import URL
 
-from tests.unit.server_endpoints import GENERIC_RESPONSE, HELLO_WORLD, INCAPSULA, SECONDARY_INDEX, START_ENQUEUE
+from tests.unit.server_endpoints import (
+    GENERIC_RESPONSE,
+    HELLO_WORLD,
+    INCAPSULA,
+    ROBOTS_TXT,
+    SECONDARY_INDEX,
+    START_ENQUEUE,
+)
 
 if TYPE_CHECKING:
     from socket import socket
@@ -120,6 +127,8 @@ async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
         await hello_world_json(send)
     elif path.startswith('/xml'):
         await hello_world_xml(send)
+    elif path.startswith('/robots.txt'):
+        await robots_txt(send)
     else:
         await hello_world(send)
 
@@ -364,6 +373,11 @@ async def dynamic_content(scope: dict[str, Any], send: Send) -> None:
     content = query_params.get('content', '')
 
     await send_html_response(send, html_content=content.encode())
+
+
+async def robots_txt(send: Send) -> None:
+    """Handle requests for the robots.txt file."""
+    await send_html_response(send, ROBOTS_TXT)
 
 
 class TestServer(Server):
