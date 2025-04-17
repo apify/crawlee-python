@@ -655,10 +655,24 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             wait_for_all_requests_to_be_added: If True, wait for all requests to be added before returning.
             wait_for_all_requests_to_be_added_timeout: Timeout for waiting for all requests to be added.
         """
+        allowed_requests = []
+        skipped = []
+
+        for request in requests:
+            check_url = request.url if isinstance(request, Request) else request
+            if await self._is_allowed_based_on_robots_txt_file(check_url):
+                allowed_requests.append(request)
+            else:
+                skipped.append(request)
+
+        if skipped:
+            # add processing with on_skiped_request callback or handler?
+            self._logger.warning('Some requests were skipped because they were disallowed based on the robots.txt file')
+
         request_manager = await self.get_request_manager()
 
         await request_manager.add_requests_batched(
-            requests=requests,
+            requests=allowed_requests,
             batch_size=batch_size,
             wait_time_between_batches=wait_time_between_batches,
             wait_for_all_requests_to_be_added=wait_for_all_requests_to_be_added,
@@ -1088,6 +1102,21 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         )
 
         if request is None:
+            return
+
+        if not (await self._is_allowed_based_on_robots_txt_file(request.url)):
+            self._logger.warning(
+                f'Skipping request {request.url} ({request.id}) because it is disallowed based on robots.txt'
+            )
+            await wait_for(
+                lambda: request_manager.mark_request_as_handled(request),
+                timeout=self._internal_timeout,
+                timeout_message='Marking request as handled timed out after '
+                f'{self._internal_timeout.total_seconds()} seconds',
+                logger=self._logger,
+                max_retries=3,
+            )
+            # add processing with on_skiped_request callback or handler?
             return
 
         if request.session_id:
