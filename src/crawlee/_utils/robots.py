@@ -19,18 +19,36 @@ class RobotsTxtFile:
 
     @staticmethod
     async def from_content(url: str, content: str) -> RobotsTxtFile:
+        """Create a RobotsTxtFile instance from the given content.
+
+        Args:
+            url: the URL of the robots.txt file
+            content: the content of the robots.txt file
+        """
         robots = Protego.parse(content)
         return RobotsTxtFile(url, robots)
 
     @staticmethod
     async def find(url: str, http_client: HttpClient, proxy_info: ProxyInfo | None = None) -> RobotsTxtFile:
-        """Find the robots.txt file for a given URL."""
+        """Determine the location of a robots.txt file for a URL and fetch it.
+
+        Args:
+            url: the URL to fetch robots.txt for
+            proxy_info: a `ProxyInfo` to be used for fetching the robots.txt file
+            http_client: the HTTP client to use for fetching the robots.txt file
+        """
         robots_url = URL(url).with_path('/robots.txt')
         return await RobotsTxtFile.load(str(robots_url), http_client, proxy_info)
 
     @staticmethod
     async def load(url: str, http_client: HttpClient, proxy_info: ProxyInfo | None = None) -> RobotsTxtFile:
-        """Load the robots.txt file for a given URL."""
+        """Load the robots.txt file for a given URL.
+
+        Args:
+            url: the URL to fetch robots.txt for
+            proxy_info: a `ProxyInfo` to be used for fetching the robots.txt file
+            http_client: the HTTP client to use for fetching the robots.txt file
+        """
         response = await http_client.send_request(url, proxy_info=proxy_info)
         body = b'User-agent: *\nAllow: /' if is_status_code_client_error(response.status_code) else response.read()
 
@@ -39,17 +57,26 @@ class RobotsTxtFile:
         return RobotsTxtFile(url, robots)
 
     def is_allowed(self, url: str, user_agent: str = '*') -> bool:
-        """Check if the given URL is allowed for the given user agent."""
+        """Check if the given URL is allowed for the given user agent.
+
+        Args:
+            url: the URL to check
+            user_agent: the user agent to check for
+        """
         check_url = URL(url)
         if check_url.origin() != self._original_url:
             return True
         return bool(self._robots.can_fetch(str(check_url), user_agent))
 
     def get_sitemaps(self) -> list[str]:
-        """Get the list of sitemaps from the robots.txt file."""
+        """Get the list of sitemaps urls from the robots.txt file."""
         return list(self._robots.sitemaps)
 
     def get_crawl_delay(self, user_agent: str = '*') -> int | None:
-        """Get the crawl delay for the given user agent."""
+        """Get the crawl delay for the given user agent.
+
+        Args:
+            user_agent: the user-agent to check for
+        """
         crawl_delay = self._robots.crawl_delay(user_agent)
         return int(crawl_delay) if crawl_delay is not None else None

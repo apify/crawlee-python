@@ -162,7 +162,8 @@ class _BasicCrawlerOptions(TypedDict):
     subclasses rather than direct instantiation of `BasicCrawler`."""
 
     respect_robots_txt_file: NotRequired[bool]
-    """"""
+    """If set to `true`, the crawler will automatically try to fetch the robots.txt file for each domain,
+    and skip those that are not allowed. This also prevents disallowed URLs to be added via `EnqueueLinksFunction`."""
 
 
 class _BasicCrawlerOptionsGeneric(Generic[TCrawlingContext, TStatisticsState], TypedDict):
@@ -1308,14 +1309,22 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             )
 
     async def _is_allowed_based_on_robots_txt_file(self, url: str) -> bool:
-        """Check if the URL is allowed based on the robots.txt file."""
+        """Check if the URL is allowed based on the robots.txt file.
+
+        Args:
+            url: The URL to check.
+        """
         if not self._respect_robots_txt_file:
             return True
         robots_txt_file = await self._get_robots_txt_file_for_url(url)
         return not robots_txt_file or robots_txt_file.is_allowed(url)
 
     async def _get_robots_txt_file_for_url(self, url: str) -> RobotsTxtFile | None:
-        """Get the RobotsTxtFile for a given URL."""
+        """Get the RobotsTxtFile for a given URL.
+
+        Args:
+            url: URL on the basis of which the RobotsTxtFile will be obtained.
+        """
         if not self._respect_robots_txt_file:
             return None
         origin_url = str(URL(url).origin())
