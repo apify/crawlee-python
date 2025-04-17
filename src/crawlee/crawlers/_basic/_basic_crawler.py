@@ -648,7 +648,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         """
         request_manager = await self.get_request_manager()
 
-        await request_manager.add_requests_batched(
+        await request_manager.add_requests(
             requests=requests,
             batch_size=batch_size,
             wait_time_between_batches=wait_time_between_batches,
@@ -976,7 +976,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 ):
                     requests.append(dst_request)
 
-            await request_manager.add_requests_batched(requests)
+            await request_manager.add_requests(requests)
 
         for push_data_call in result.push_data_calls:
             await self._push_data(**push_data_call)

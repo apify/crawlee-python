@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 
 async def test_processes_requests_from_explicit_queue() -> None:
     queue = await RequestQueue.open()
-    await queue.add_requests_batched(['http://a.com/', 'http://b.com/', 'http://c.com/'])
+    await queue.add_requests(['http://a.com/', 'http://b.com/', 'http://c.com/'])
 
     crawler = BasicCrawler(request_manager=queue)
     calls = list[str]()
@@ -56,7 +56,7 @@ async def test_processes_requests_from_explicit_queue() -> None:
 
 async def test_processes_requests_from_request_source_tandem() -> None:
     request_queue = await RequestQueue.open()
-    await request_queue.add_requests_batched(['http://a.com/', 'http://b.com/', 'http://c.com/'])
+    await request_queue.add_requests(['http://a.com/', 'http://b.com/', 'http://c.com/'])
 
     request_list = RequestList(['http://a.com/', 'http://d.com', 'http://e.com'])
 

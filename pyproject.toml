@@ -92,8 +92,8 @@ crawlee = "crawlee._cli:cli"
 
 [dependency-groups]
 dev = [
-    "apify_client",  # For e2e tests.
-    "build~=1.2.2",  # For e2e tests.
+    "apify-client", # For e2e tests.
+    "build~=1.2.2", # For e2e tests.
     "mypy~=1.15.0",
     "pre-commit~=4.2.0",
     "proxy-py~=2.4.0",
@@ -104,7 +104,7 @@ dev = [
     "pytest-xdist~=3.6.0",
     "pytest~=8.3.0",
     "ruff~=0.11.0",
-    "setuptools~=79.0.0",                    # setuptools are used by pytest, but not explicitly required
+    "setuptools", # setuptools are used by pytest, but not explicitly required
     "sortedcontainers-stubs~=2.4.0",
     "types-beautifulsoup4~=4.12.0.20240229",
     "types-cachetools~=5.5.0.20240820",

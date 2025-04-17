@@ -26,10 +26,6 @@ class RequestLoader(ABC):
     """
 
     @abstractmethod
-    async def get_total_count(self) -> int:
-        """Return an offline approximation of the total number of requests in the source (i.e. pending + handled)."""
-
-    @abstractmethod
     async def is_empty(self) -> bool:
         """Return True if there are no more requests in the source (there might still be unfinished requests)."""
 
@@ -44,10 +40,6 @@ class RequestLoader(ABC):
     @abstractmethod
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
         """Mark a request as handled after a successful processing (or after giving up retrying)."""
-
-    @abstractmethod
-    async def get_handled_count(self) -> int:
-        """Return the number of handled requests."""
 
     async def to_tandem(self, request_manager: RequestManager | None = None) -> RequestManagerTandem:
         """Combine the loader with a request manager to support adding and reclaiming requests.

@@ -158,7 +158,7 @@ async def test_add_batched_requests(
     request_count = len(requests)
 
     # Add the requests to the RQ in batches
-    await request_queue.add_requests_batched(requests, wait_for_all_requests_to_be_added=True)
+    await request_queue.add_requests(requests, wait_for_all_requests_to_be_added=True)
 
     # Ensure the batch was processed correctly
     assert await request_queue.get_total_count() == request_count

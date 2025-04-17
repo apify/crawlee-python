@@ -1,16 +1,16 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import timedelta
 from logging import getLogger
-from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
 
 from typing_extensions import override
 
-from crawlee import service_locator
+from crawlee import Request, service_locator
 from crawlee._utils.docs import docs_group
+from crawlee._utils.wait import wait_for_all_tasks_for_finish
 from crawlee.request_loaders import RequestManager
-from crawlee.storage_clients.models import Request
 
 from ._base import Storage
 
@@ -74,6 +74,13 @@ class RequestQueue(Storage, RequestManager):
         """
         self._client = client
 
+        # Internal attributes
+        self._add_requests_tasks = list[asyncio.Task]()
+        self._assumed_total_count = 0
+
+        self._add_requests_tasks = list[asyncio.Task]()
+        """A list of tasks for adding requests to the queue."""
+
     @override
     @property
     def id(self) -> str:
@@ -96,8 +103,6 @@ class RequestQueue(Storage, RequestManager):
         *,
         id: str | None = None,
         name: str | None = None,
-        purge_on_start: bool | None = None,
-        storage_dir: Path | None = None,
         configuration: Configuration | None = None,
         storage_client: StorageClient | None = None,
     ) -> RequestQueue:
@@ -106,10 +111,7 @@ class RequestQueue(Storage, RequestManager):
 
         configuration = service_locator.get_configuration() if configuration is None else configuration
         storage_client = service_locator.get_storage_client() if storage_client is None else storage_client
-        purge_on_start = configuration.purge_on_start if purge_on_start is None else purge_on_start
-        storage_dir = Path(configuration.storage_dir) if storage_dir is None else storage_dir
 
-        # TODO
         client = await storage_client.open_request_queue_client(
             id=id,
             name=name,
@@ -129,20 +131,56 @@ class RequestQueue(Storage, RequestManager):
         *,
         forefront: bool = False,
     ) -> ProcessedRequest:
-        return await self._client.add_requests_batch([request], forefront=forefront)
+        request = self._transform_request(request)
+        response = await self._client.add_requests([request], forefront=forefront)
+        return response.processed_requests[0]
 
     @override
-    async def add_requests_batched(
+    async def add_requests(
         self,
         requests: Sequence[str | Request],
         *,
+        forefront: bool = False,
         batch_size: int = 1000,
         wait_time_between_batches: timedelta = timedelta(seconds=1),
         wait_for_all_requests_to_be_added: bool = False,
         wait_for_all_requests_to_be_added_timeout: timedelta | None = None,
     ) -> None:
-        # TODO: implement
-        pass
+        transformed_requests = self._transform_requests(requests)
+        wait_time_secs = wait_time_between_batches.total_seconds()
+
+        async def _process_batch(batch: Sequence[Request]) -> None:
+            request_count = len(batch)
+            response = await self._client.add_requests(batch, forefront=forefront)
+            self._assumed_total_count += request_count
+            logger.debug(f'Added {request_count} requests to the queue, response: {response}')
+
+        # Wait for the first batch to be added
+        first_batch = transformed_requests[:batch_size]
+        if first_batch:
+            await _process_batch(first_batch)
+
+        async def _process_remaining_batches() -> None:
+            for i in range(batch_size, len(transformed_requests), batch_size):
+                batch = transformed_requests[i : i + batch_size]
+                await _process_batch(batch)
+                if i + batch_size < len(transformed_requests):
+                    await asyncio.sleep(wait_time_secs)
+
+        # Create and start the task to process remaining batches in the background
+        remaining_batches_task = asyncio.create_task(
+            _process_remaining_batches(), name='request_queue_process_remaining_batches_task'
+        )
+        self._add_requests_tasks.append(remaining_batches_task)
+        remaining_batches_task.add_done_callback(lambda _: self._add_requests_tasks.remove(remaining_batches_task))
+
+        # Wait for all tasks to finish if requested
+        if wait_for_all_requests_to_be_added:
+            await wait_for_all_tasks_for_finish(
+                (remaining_batches_task,),
+                logger=logger,
+                timeout=wait_for_all_requests_to_be_added_timeout,
+            )
 
         # Wait for the first batch to be added
         first_batch = transformed_requests[:batch_size]

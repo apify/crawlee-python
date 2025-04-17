@@ -10,7 +10,7 @@ async def main() -> None:
     request_queue = await RequestQueue.open(name='my-request-queue')
 
     # Interact with the request queue directly, e.g. add a batch of requests.
-    await request_queue.add_requests_batched(
+    await request_queue.add_requests(
         ['https://apify.com/', 'https://crawlee.dev/']
     )
 
