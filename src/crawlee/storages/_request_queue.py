@@ -276,14 +276,17 @@ class RequestQueue(Storage, RequestManager):
                     f'{response.unprocessed_requests}'
                 )
             else:
-                logger.debug(f'Retry to add requests.')
+                logger.debug('Retry to add requests.')
                 unprocessed_requests_unique_keys = {request.unique_key for request in response.unprocessed_requests}
                 retry_batch = [request for request in batch if request.unique_key in unprocessed_requests_unique_keys]
-                await self._process_batch(retry_batch, attempt+1)
+                await self._process_batch(retry_batch, attempt + 1)
 
         request_count = len(batch) - len(response.unprocessed_requests)
         self._assumed_total_count += request_count
-        logger.debug(f'Added {request_count} requests to the queue. Processed requests: {response.processed_requests}')
+        if request_count:
+            logger.debug(
+                f'Added {request_count} requests to the queue. Processed requests: {response.processed_requests}'
+            )
 
     async def get_request(self, request_id: str) -> Request | None:
         """Retrieve a request from the queue.
