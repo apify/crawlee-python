@@ -274,7 +274,7 @@ module.exports = {
             // eslint-disable-next-line max-len
             { name: 'og:description', content: `Crawlee helps you build and maintain your Python crawlers. It's open source and modern, with type hints for Python to help you catch bugs early.` },
         ],
-        image: 'img/crawlee-og.png',
+        image: 'img/crawlee-python-og.png',
         footer: {
             links: [
                 {
