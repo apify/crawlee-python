@@ -1320,6 +1320,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         robots_txt_file = self.robots_txt_file_cache[origin_url]
         if robots_txt_file:
             return robots_txt_file
-        robots_txt_file = await RobotsTxtFile.find(url, None, self._http_client)
+        robots_txt_file = await RobotsTxtFile.find(url, self._http_client)
         self.robots_txt_file_cache[origin_url] = robots_txt_file
         return robots_txt_file
