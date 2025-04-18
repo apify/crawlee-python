@@ -381,6 +381,7 @@ async def test_save_cookies_after_handler_processing(server_url: URL) -> None:
 
         @crawler.router.default_handler
         async def request_handler(context: PlaywrightCrawlingContext) -> None:
+            # Simulate cookies installed from an external source in the browser
             await context.page.context.add_cookies([{'name': 'check', 'value': 'test', 'url': str(server_url)}])
 
             if context.session:
