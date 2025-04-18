@@ -137,7 +137,6 @@ class PlaywrightHttpClient(HttpClient):
         if isinstance(headers, dict) or headers is None:
             headers = HttpHeaders(headers or {})
 
-        # Создаем новый контекст для каждого запроса
         client = await self._get_client(proxy_info, session)
         headers = self._combine_headers(headers)
 
@@ -145,7 +144,6 @@ class PlaywrightHttpClient(HttpClient):
             url_or_request=url, method=method.lower(), headers=dict(headers) if headers else None, data=payload
         )
 
-        # Обновляем cookie в сессии
         if self._persist_cookies_per_session and session:
             await self._store_cookies_in_session(client, session)
 
