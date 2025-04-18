@@ -372,6 +372,32 @@ async def test_isolation_cookies(*, use_incognito_pages: bool, server_url: URL) 
         assert sessions_cookies[clean_session_id] == response_cookies[clean_session_id] == {'a': '1'}
 
 
+async def test_save_cookies_after_handler_processing(server_url: URL) -> None:
+    """Test that cookies are saved correctly."""
+    async with SessionPool(max_pool_size=1) as session_pool:
+        crawler = PlaywrightCrawler(session_pool=session_pool)
+
+        session_ids = []
+
+        @crawler.router.default_handler
+        async def request_handler(context: PlaywrightCrawlingContext) -> None:
+            await context.page.context.add_cookies([{'name': 'check', 'value': 'test', 'url': str(server_url)}])
+
+            if context.session:
+                session_ids.append(context.session.id)
+
+        await crawler.run([str(server_url)])
+
+        assert len(session_ids) == 1
+
+        check_session = await session_pool.get_session()
+
+        assert check_session.id == session_ids[0]
+        session_cookies = {cookie['name']: cookie['value'] for cookie in check_session.cookies.get_cookies_as_dicts()}
+
+        assert session_cookies == {'check': 'test'}
+
+
 async def test_custom_fingerprint_uses_generator_options(server_url: URL) -> None:
     min_width = 300
     max_width = 600
