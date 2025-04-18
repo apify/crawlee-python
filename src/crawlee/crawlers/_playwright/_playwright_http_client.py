@@ -30,15 +30,7 @@ class PlaywrightHttpClient(HttpClient):
 
     See the `HttpClient` class for more common information about HTTP clients.
 
-    ### Usage
-
-    ```python
-    from crawlee.crawlers import HttpCrawler  # or any other HTTP client-based crawler
-    from crawlee.http_clients import PlaywrightHttpClient
-
-    http_client = PlaywrightHttpClient()
-    crawler = HttpCrawler(http_client=http_client)
-    ```
+    Note: This class is pre-designated for use in `PlaywrightCrawler` only
     """
 
     def __init__(self) -> None:
