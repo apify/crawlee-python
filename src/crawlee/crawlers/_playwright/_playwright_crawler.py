@@ -19,8 +19,9 @@ from crawlee.sessions._cookies import PlaywrightCookieParam
 from crawlee.statistics import StatisticsState
 
 from ._playwright_crawling_context import PlaywrightCrawlingContext
+from ._playwright_http_client import PlaywrightHttpClient, browser_page_context_var
 from ._playwright_pre_nav_crawling_context import PlaywrightPreNavCrawlingContext
-from ._utils import block_requests, infinite_scroll, prepare_send_request_function
+from ._utils import block_requests, infinite_scroll
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=PlaywrightCrawlingContext)
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
@@ -168,7 +169,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         kwargs.setdefault('_logger', logging.getLogger(__name__))
         self._pre_navigation_hooks: list[Callable[[PlaywrightPreNavCrawlingContext], Awaitable[None]]] = []
 
-        self._use_http_client = bool(kwargs.get('http_client'))
+        kwargs['http_client'] = PlaywrightHttpClient() if not kwargs.get('http_client') else kwargs['http_client']
 
         super().__init__(**kwargs)
 
@@ -182,15 +183,11 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         # Create a new browser page
         crawlee_page = await self._browser_pool.new_page(proxy_info=context.proxy_info)
 
-        send_request = (
-            context.send_request if self._use_http_client else prepare_send_request_function(crawlee_page.page)
-        )
-
         pre_navigation_context = PlaywrightPreNavCrawlingContext(
             request=context.request,
             session=context.session,
             add_requests=context.add_requests,
-            send_request=send_request,
+            send_request=context.send_request,
             push_data=context.push_data,
             use_state=context.use_state,
             proxy_info=context.proxy_info,
@@ -200,9 +197,12 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             block_requests=partial(block_requests, page=crawlee_page.page),
         )
 
-        for hook in self._pre_navigation_hooks:
-            await hook(pre_navigation_context)
-
+        try:
+            context_http_client_var = browser_page_context_var.set(crawlee_page.page)
+            for hook in self._pre_navigation_hooks:
+                await hook(pre_navigation_context)
+        finally:
+            browser_page_context_var.reset(context_http_client_var)
         yield pre_navigation_context
 
     async def _navigate(
@@ -244,27 +244,27 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
             extract_links = self._create_extract_links_function(context)
 
-            send_request = (
-                context.send_request if self._use_http_client else prepare_send_request_function(context.page)
-            )
-
-            error = yield PlaywrightCrawlingContext(
-                request=context.request,
-                session=context.session,
-                add_requests=context.add_requests,
-                send_request=send_request,
-                push_data=context.push_data,
-                use_state=context.use_state,
-                proxy_info=context.proxy_info,
-                get_key_value_store=context.get_key_value_store,
-                log=context.log,
-                page=context.page,
-                infinite_scroll=lambda: infinite_scroll(context.page),
-                response=response,
-                extract_links=extract_links,
-                enqueue_links=self._create_enqueue_links_function(context, extract_links),
-                block_requests=partial(block_requests, page=context.page),
-            )
+            try:
+                context_http_client_var = browser_page_context_var.set(context.page)
+                error = yield PlaywrightCrawlingContext(
+                    request=context.request,
+                    session=context.session,
+                    add_requests=context.add_requests,
+                    send_request=context.send_request,
+                    push_data=context.push_data,
+                    use_state=context.use_state,
+                    proxy_info=context.proxy_info,
+                    get_key_value_store=context.get_key_value_store,
+                    log=context.log,
+                    page=context.page,
+                    infinite_scroll=lambda: infinite_scroll(context.page),
+                    response=response,
+                    extract_links=extract_links,
+                    enqueue_links=self._create_enqueue_links_function(context, extract_links),
+                    block_requests=partial(block_requests, page=context.page),
+                )
+            finally:
+                browser_page_context_var.reset(context_http_client_var)
 
             # Collect data in case of errors, before the page object is closed.
             if error:
