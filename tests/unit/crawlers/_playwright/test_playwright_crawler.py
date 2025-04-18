@@ -22,7 +22,7 @@ from crawlee.fingerprint_suite import (
 from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_values
 from crawlee.fingerprint_suite._consts import BROWSER_TYPE_HEADER_KEYWORD
 from crawlee.proxy_configuration import ProxyConfiguration
-from crawlee.sessions import SessionPool
+from crawlee.sessions import Session, SessionPool
 from crawlee.statistics import Statistics
 from crawlee.statistics._error_snapshotter import ErrorSnapshotter
 from tests.unit.server_endpoints import GENERIC_RESPONSE, HELLO_WORLD
@@ -304,6 +304,7 @@ async def test_proxy_set() -> None:
 )
 async def test_isolation_cookies(*, use_incognito_pages: bool, server_url: URL) -> None:
     sessions_ids: list[str] = []
+    sessions: dict[str, Session] = {}
     sessions_cookies: dict[str, dict[str, str]] = {}
     response_cookies: dict[str, dict[str, str]] = {}
 
@@ -319,13 +320,11 @@ async def test_isolation_cookies(*, use_incognito_pages: bool, server_url: URL) 
             return
 
         sessions_ids.append(context.session.id)
+        sessions[context.session.id] = context.session
 
         if context.request.unique_key not in {'1', '2'}:
             return
 
-        sessions_cookies[context.session.id] = {
-            cookie['name']: cookie['value'] for cookie in context.session.cookies.get_cookies_as_dicts()
-        }
         response_data = json.loads(await context.response.text())
         response_cookies[context.session.id] = response_data.get('cookies')
 
@@ -343,10 +342,19 @@ async def test_isolation_cookies(*, use_incognito_pages: bool, server_url: URL) 
         ]
     )
 
-    assert len(sessions_cookies) == 2
     assert len(response_cookies) == 2
+    assert len(sessions) == 2
 
     assert sessions_ids[0] == sessions_ids[1]
+
+    sessions_cookies = {
+        sessions_id: {
+            cookie['name']: cookie['value'] for cookie in sessions[sessions_id].cookies.get_cookies_as_dicts()
+        }
+        for sessions_id in sessions_ids
+    }
+
+    assert len(sessions_cookies) == 2
 
     cookie_session_id = sessions_ids[0]
     clean_session_id = sessions_ids[2]
