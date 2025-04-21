@@ -11,7 +11,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from crawlee import ConcurrencySettings, HttpHeaders, Request, RequestTransformAction
+from crawlee import ConcurrencySettings, HttpHeaders, Request, RequestTransformAction, SkippedReason
 from crawlee.crawlers import PlaywrightCrawler
 from crawlee.fingerprint_suite import (
     DefaultFingerprintGenerator,
@@ -580,4 +580,27 @@ async def test_respect_robots_txt(server_url: URL) -> None:
     assert visited == {
         str(server_url / 'start_enqueue'),
         str(server_url / 'sub_index'),
+    }
+
+
+async def test_on_skipped_request(server_url: URL) -> None:
+    crawler = PlaywrightCrawler(respect_robots_txt_file=True)
+    skip = mock.Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        await context.enqueue_links()
+
+    @crawler.on_skipped_request
+    async def skipped_hook(url: str, _reason: SkippedReason) -> None:
+        skip(url)
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+    skipped = {call[0][0] for call in skip.call_args_list}
+
+    assert skipped == {
+        str(server_url / 'page_1'),
+        str(server_url / 'page_2'),
+        str(server_url / 'page_3'),
     }
