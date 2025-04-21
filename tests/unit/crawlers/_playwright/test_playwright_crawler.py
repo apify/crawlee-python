@@ -563,3 +563,21 @@ async def test_error_snapshot_through_statistics(server_url: URL) -> None:
     assert crawler.statistics.error_tracker.total == 3 * max_retries
     assert crawler.statistics.error_tracker.unique_error_count == 2
     assert len(kvs_content) == 4
+
+
+async def test_respect_robots_txt(server_url: URL) -> None:
+    crawler = PlaywrightCrawler(respect_robots_txt_file=True)
+    visit = mock.Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        visit(context.request.url)
+        await context.enqueue_links()
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+    visited = {call[0][0] for call in visit.call_args_list}
+
+    assert visited == {
+        str(server_url / 'start_enqueue'),
+        str(server_url / 'sub_index'),
+    }

@@ -159,11 +159,19 @@ class AbstractHttpCrawler(
             requests = list[Request]()
             base_user_data = user_data or {}
 
+            robots_txt_file = await self._get_robots_txt_file_for_url(context.request.url)
+
             for link in self._parser.find_links(parsed_content, selector=selector):
                 url = link
                 if not is_url_absolute(url):
                     base_url = context.request.loaded_url or context.request.url
                     url = convert_to_absolute_url(base_url, url)
+
+                if robots_txt_file and not robots_txt_file.is_allowed(url):
+                    # TODO: https://github.com/apify/crawlee-python/issues/1160
+                    # add processing with on_skiped_request hook
+                    context.log.warning(f'Skipping URL "{url}" due to robots.txt rules.')
+                    continue
 
                 request_options = RequestOptions(url=url, user_data={**base_user_data}, label=label)
 
