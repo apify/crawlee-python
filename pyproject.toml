@@ -41,7 +41,7 @@ dependencies = [
     "httpx[brotli,http2,zstd]>=0.27.0",
     "more-itertools>=10.2.0",
     "psutil>=6.0.0",
-    "pydantic-settings>=2.2.0,<2.7.0",
+    "pydantic-settings>=2.9.1,<2.10.0",
     "pydantic>=2.8.0,!=2.10.0,!=2.10.1,!=2.10.2",
     "pyee>=9.0.0",
     "sortedcollections>=2.1.0",
