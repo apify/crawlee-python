@@ -52,4 +52,4 @@ app = Litestar(route_handlers=[main])
 
 # Start the Uvicorn server using the `PORT` environment variable provided by GCP
 # This is crucial - Cloud Run expects your app to listen on this specific port
-uvicorn.run(app, host='127.0.0.1', port=int(os.environ.get('PORT', '8080')))
+uvicorn.run(app, host='0.0.0.0', port=int(os.environ.get('PORT', '8080')))
