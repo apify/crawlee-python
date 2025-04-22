@@ -39,7 +39,6 @@ def configuration(tmp_path: Path) -> Configuration:
 async def dataset(
     storage_client: StorageClient,
     configuration: Configuration,
-    tmp_path: Path,
 ) -> AsyncGenerator[Dataset, None]:
     """Fixture that provides a dataset instance for each test."""
     Dataset._cache_by_id.clear()
@@ -47,7 +46,6 @@ async def dataset(
 
     dataset = await Dataset.open(
         name='test_dataset',
-        storage_dir=tmp_path,
         storage_client=storage_client,
         configuration=configuration,
     )
@@ -59,12 +57,10 @@ async def dataset(
 async def test_open_creates_new_dataset(
     storage_client: StorageClient,
     configuration: Configuration,
-    tmp_path: Path,
 ) -> None:
     """Test that open() creates a new dataset with proper metadata."""
     dataset = await Dataset.open(
         name='new_dataset',
-        storage_dir=tmp_path,
         storage_client=storage_client,
         configuration=configuration,
     )
@@ -80,13 +76,11 @@ async def test_open_creates_new_dataset(
 async def test_open_existing_dataset(
     dataset: Dataset,
     storage_client: StorageClient,
-    tmp_path: Path,
 ) -> None:
     """Test that open() loads an existing dataset correctly."""
     # Open the same dataset again
     reopened_dataset = await Dataset.open(
         name=dataset.name,
-        storage_dir=tmp_path,
         storage_client=storage_client,
     )
 
@@ -102,14 +96,12 @@ async def test_open_existing_dataset(
 async def test_open_with_id_and_name(
     storage_client: StorageClient,
     configuration: Configuration,
-    tmp_path: Path,
 ) -> None:
     """Test that open() raises an error when both id and name are provided."""
     with pytest.raises(ValueError, match='Only one of "id" or "name" can be specified'):
         await Dataset.open(
             id='some-id',
             name='some-name',
-            storage_dir=tmp_path,
             storage_client=storage_client,
             configuration=configuration,
         )
@@ -251,12 +243,10 @@ async def test_iterate_items_with_options(dataset: Dataset) -> None:
 async def test_drop(
     storage_client: StorageClient,
     configuration: Configuration,
-    tmp_path: Path,
 ) -> None:
     """Test dropping a dataset removes it from cache and clears its data."""
     dataset = await Dataset.open(
         name='drop_test',
-        storage_dir=tmp_path,
         storage_client=storage_client,
         configuration=configuration,
     )
@@ -280,7 +270,6 @@ async def test_drop(
     # Verify dataset is empty (by creating a new one with the same name)
     new_dataset = await Dataset.open(
         name='drop_test',
-        storage_dir=tmp_path,
         storage_client=storage_client,
         configuration=configuration,
     )
@@ -293,13 +282,11 @@ async def test_drop(
 async def test_export_to_json(
     dataset: Dataset,
     storage_client: StorageClient,
-    tmp_path: Path,
 ) -> None:
     """Test exporting dataset to JSON format."""
     # Create a key-value store for export
     kvs = await KeyValueStore.open(
         name='export_kvs',
-        storage_dir=tmp_path,
         storage_client=storage_client,
     )
 
@@ -333,13 +320,11 @@ async def test_export_to_json(
 async def test_export_to_csv(
     dataset: Dataset,
     storage_client: StorageClient,
-    tmp_path: Path,
 ) -> None:
     """Test exporting dataset to CSV format."""
     # Create a key-value store for export
     kvs = await KeyValueStore.open(
         name='export_kvs',
-        storage_dir=tmp_path,
         storage_client=storage_client,
     )
 

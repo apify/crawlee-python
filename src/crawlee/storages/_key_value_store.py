@@ -99,7 +99,7 @@ class KeyValueStore(Storage):
         if id and name:
             raise ValueError('Only one of "id" or "name" can be specified, not both.')
 
-        # Check if key value store is already cached by id or name
+        # Check if key-value store is already cached by id or name
         if id and id in cls._cache_by_id:
             return cls._cache_by_id[id]
         if name and name in cls._cache_by_name:
@@ -116,7 +116,7 @@ class KeyValueStore(Storage):
 
         kvs = cls(client)
 
-        # Cache the key value store by id and name if available
+        # Cache the key-value store by id and name if available
         if kvs.id:
             cls._cache_by_id[kvs.id] = kvs
         if kvs.name:

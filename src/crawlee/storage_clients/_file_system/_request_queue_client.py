@@ -104,10 +104,10 @@ class FileSystemRequestQueueClient(RequestQueueClient):
     ) -> FileSystemRequestQueueClient:
         if id:
             raise ValueError(
-                'Opening a dataset by "id" is not supported for file system storage client, use "name" instead.'
+                'Opening a request queue by "id" is not supported for file system storage client, use "name" instead.'
             )
 
-        name = name or configuration.default_dataset_id
+        name = name or configuration.default_request_queue_id
 
         # Check if the client is already cached by name.
         if name in cls._cache_by_name:
@@ -123,7 +123,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         if rq_path.exists():
             # If metadata file is missing, raise an error.
             if not metadata_path.exists():
-                raise ValueError(f'Metadata file not found for RQ "{name}"')
+                raise ValueError(f'Metadata file not found for request queue "{name}"')
 
             file = await asyncio.to_thread(open, metadata_path)
             try:
@@ -133,7 +133,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             try:
                 metadata = RequestQueueMetadata(**file_content)
             except ValidationError as exc:
-                raise ValueError(f'Invalid metadata file for RQ "{name}"') from exc
+                raise ValueError(f'Invalid metadata file for request queue "{name}"') from exc
 
             client = cls(
                 id=metadata.id,
@@ -184,6 +184,8 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         # Remove the client from the cache.
         if self.metadata.name in self.__class__._cache_by_name:  # noqa: SLF001
             del self.__class__._cache_by_name[self.metadata.name]  # noqa: SLF001
+
+    # TODO: continue
 
     @override
     async def add_batch_of_requests(

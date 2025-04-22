@@ -40,7 +40,6 @@ def configuration(tmp_path: Path) -> Configuration:
 async def kvs(
     storage_client: StorageClient,
     configuration: Configuration,
-    tmp_path: Path,
 ) -> AsyncGenerator[KeyValueStore, None]:
     """Fixture that provides a key-value store instance for each test."""
     KeyValueStore._cache_by_id.clear()
@@ -48,7 +47,6 @@ async def kvs(
 
     kvs = await KeyValueStore.open(
         name='test_kvs',
-        storage_dir=tmp_path,
         storage_client=storage_client,
         configuration=configuration,
     )
@@ -60,12 +58,10 @@ async def kvs(
 async def test_open_creates_new_kvs(
     storage_client: StorageClient,
     configuration: Configuration,
-    tmp_path: Path,
 ) -> None:
     """Test that open() creates a new key-value store with proper metadata."""
     kvs = await KeyValueStore.open(
         name='new_kvs',
-        storage_dir=tmp_path,
         storage_client=storage_client,
         configuration=configuration,
     )
@@ -80,13 +76,11 @@ async def test_open_creates_new_kvs(
 async def test_open_existing_kvs(
     kvs: KeyValueStore,
     storage_client: StorageClient,
-    tmp_path: Path,
 ) -> None:
     """Test that open() loads an existing key-value store correctly."""
     # Open the same key-value store again
     reopened_kvs = await KeyValueStore.open(
         name=kvs.name,
-        storage_dir=tmp_path,
         storage_client=storage_client,
     )
 
@@ -101,14 +95,12 @@ async def test_open_existing_kvs(
 async def test_open_with_id_and_name(
     storage_client: StorageClient,
     configuration: Configuration,
-    tmp_path: Path,
 ) -> None:
     """Test that open() raises an error when both id and name are provided."""
     with pytest.raises(ValueError, match='Only one of "id" or "name" can be specified'):
         await KeyValueStore.open(
             id='some-id',
             name='some-name',
-            storage_dir=tmp_path,
             storage_client=storage_client,
             configuration=configuration,
         )
@@ -262,12 +254,10 @@ async def test_iterate_keys_with_limit(kvs: KeyValueStore) -> None:
 async def test_drop(
     storage_client: StorageClient,
     configuration: Configuration,
-    tmp_path: Path,
 ) -> None:
     """Test dropping a key-value store removes it from cache and clears its data."""
     kvs = await KeyValueStore.open(
         name='drop_test',
-        storage_dir=tmp_path,
         storage_client=storage_client,
         configuration=configuration,
     )
@@ -291,7 +281,6 @@ async def test_drop(
     # Verify key-value store is empty (by creating a new one with the same name)
     new_kvs = await KeyValueStore.open(
         name='drop_test',
-        storage_dir=tmp_path,
         storage_client=storage_client,
         configuration=configuration,
     )
