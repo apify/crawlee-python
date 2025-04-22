@@ -7,6 +7,8 @@ import signal
 import sys
 import tempfile
 import threading
+import traceback
+import re
 from asyncio import CancelledError
 from collections.abc import AsyncGenerator, Awaitable, Iterable, Sequence
 from contextlib import AsyncExitStack, suppress
@@ -945,7 +947,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             context.session.mark_bad()
 
     async def _handle_failed_request(self, context: TCrawlingContext | BasicCrawlingContext, error: Exception) -> None:
-        self._logger.exception('Request failed and reached maximum retries', exc_info=error)
+        error_message = self.get_message_from_error(error)
+        self._logger.error(f'Request failed and reached maximum retries\n {error_message}')
+        #self._logger.exception('Request failed and reached maximum retries', exc_info=error)
         await self._statistics.error_tracker.add(error=error, context=context)
 
         if self._failed_request_handler:
@@ -953,6 +957,22 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 await self._failed_request_handler(context, error)
             except Exception as e:
                 raise UserDefinedErrorHandlerError('Exception thrown in user-defined failed request handler') from e
+
+    def get_message_from_error(self,error:Exception):
+        error_lines = traceback.format_exception(error)
+        relevant_lines = []
+
+        if isinstance(error, asyncio.exceptions.TimeoutError) and "Request handler timed out" in error_lines[-1]:
+            # Try to extract only the relevant lines from the timeout error.
+            # Most relevant lines will be sandwiched between the crawlee-python lines and asyncio lines.
+            asyncio_pattern = r"[\\/]{1}asyncio[\\/]{1}"
+            file_pattern = r' File ".*\.py"'
+            for line in error_lines:
+                if re.findall(file_pattern, line) and not re.findall(asyncio_pattern, line):
+                    relevant_lines.append(line)
+
+
+        return "\n".join(relevant_lines or error_lines)
 
     def _prepare_send_request_function(
         self,

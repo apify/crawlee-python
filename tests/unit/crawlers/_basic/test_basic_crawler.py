@@ -1291,3 +1291,18 @@ async def test_handle_error_bound_session_to_request() -> None:
     await crawler.run(requests)
 
     assert error_handler_mock.call_count == 1
+
+
+
+async def test_logs_final_statistics(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+    # Set the log level to INFO to capture the final statistics log.
+    caplog.set_level(logging.INFO)
+
+    crawler = BasicCrawler(request_handler_timeout=timedelta(seconds=1))
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        await asyncio.sleep(10) # aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+    await crawler.run([Request.from_url('http://a.com/')])
