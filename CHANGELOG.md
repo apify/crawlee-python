@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.6.8 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Update `UnprocessedRequest` to match actual data ([#1155](https://github.com/apify/crawlee-python/pull/1155)) ([a15a1f3](https://github.com/apify/crawlee-python/commit/a15a1f3528c7cbcf78d3bda5a236bcee1d492764)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1150](https://github.com/apify/crawlee-python/issues/1150)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.6.7](https://github.com/apify/crawlee-python/releases/tag/v0.6.7) (2025-04-17)
 
 ### 🚀 Features
