@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from itertools import count
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
@@ -349,7 +349,9 @@ async def test_add_batched_requests_with_retry(request_queue: RequestQueue) -> N
     request_queue = RequestQueue(id='default', name='some_name', storage_client=mocked_storage_client)
 
     # Add the requests to the RQ in batches
-    await request_queue.add_requests_batched(requests, wait_for_all_requests_to_be_added=True)
+    await request_queue.add_requests_batched(
+        requests, wait_for_all_requests_to_be_added=True, wait_time_between_batches=timedelta(0)
+    )
 
     # Ensure the batch was processed correctly
     assert await request_queue.get_total_count() == expected_added_requests
