@@ -279,7 +279,7 @@ async def test_batch_requests_operation_response() -> None:
         'wasAlreadyPresent': True,
     }
     unprocess_request_full = {'uniqueKey': 'https://example2.com', 'method': 'GET', 'url': 'https://example2.com'}
-    unprocess_request_minimal = {'uniqueKey': 'https://example3.com'}
+    unprocess_request_minimal = {'uniqueKey': 'https://example3.com', 'url': 'https://example3.com'}
     BatchRequestsOperationResponse.model_validate(
         {
             'processedRequests': [process_request],

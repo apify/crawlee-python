@@ -225,7 +225,7 @@ class UnprocessedRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     unique_key: Annotated[str, Field(alias='uniqueKey')]
-    url: Annotated[str | None, BeforeValidator(validate_http_url), Field()] = None
+    url: Annotated[str, BeforeValidator(validate_http_url), Field()]
     method: Annotated[HttpMethod | None, Field()] = None
 
 
