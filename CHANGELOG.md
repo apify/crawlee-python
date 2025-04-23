@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Update `UnprocessedRequest` to match actual data ([#1155](https://github.com/apify/crawlee-python/pull/1155)) ([a15a1f3](https://github.com/apify/crawlee-python/commit/a15a1f3528c7cbcf78d3bda5a236bcee1d492764)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1150](https://github.com/apify/crawlee-python/issues/1150)
+- Fix the order in which cookies are saved to the `SessionCookies` and the handler is executed for `PlaywrightCrawler` ([#1163](https://github.com/apify/crawlee-python/pull/1163)) ([82ff69a](https://github.com/apify/crawlee-python/commit/82ff69acd8e409f56be56dd061aae0f854ec25b4)) by [@Mantisus](https://github.com/Mantisus)
 
 
 <!-- git-cliff-unreleased-end -->
