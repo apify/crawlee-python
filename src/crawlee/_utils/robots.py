@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from protego import Protego  # type: ignore[import-untyped]
+from protego import Protego
 from yarl import URL
 
 from crawlee._utils.web import is_status_code_client_error
