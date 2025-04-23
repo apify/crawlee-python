@@ -336,7 +336,7 @@ async def test_add_batched_requests_with_retry(request_queue: RequestQueue) -> N
             """
             call_count = next(batch_add_requests_call_counter)
             if call_count == 1:
-                # Process all but last three        @staticmethod
+                # Process all but last three
                 return await self._batch_add_requests_without_last_n(requests, n=3)
             # Process all but last
             return await self._batch_add_requests_without_last_n(requests, n=1)
