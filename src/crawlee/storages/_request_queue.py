@@ -237,21 +237,15 @@ class RequestQueue(Storage, RequestManager):
         transformed_requests = self._transform_requests(requests)
         wait_time_secs = wait_time_between_batches.total_seconds()
 
-        async def _process_batch(batch: Sequence[Request]) -> None:
-            request_count = len(batch)
-            response = await self._resource_client.batch_add_requests(batch)
-            self._assumed_total_count += request_count
-            logger.debug(f'Added {request_count} requests to the queue, response: {response}')
-
         # Wait for the first batch to be added
         first_batch = transformed_requests[:batch_size]
         if first_batch:
-            await _process_batch(first_batch)
+            await self._process_batch(first_batch, base_retry_wait=wait_time_between_batches)
 
         async def _process_remaining_batches() -> None:
             for i in range(batch_size, len(transformed_requests), batch_size):
                 batch = transformed_requests[i : i + batch_size]
-                await _process_batch(batch)
+                await self._process_batch(batch, base_retry_wait=wait_time_between_batches)
                 if i + batch_size < len(transformed_requests):
                     await asyncio.sleep(wait_time_secs)
 
@@ -268,6 +262,31 @@ class RequestQueue(Storage, RequestManager):
                 (remaining_batches_task,),
                 logger=logger,
                 timeout=wait_for_all_requests_to_be_added_timeout,
+            )
+
+    async def _process_batch(self, batch: Sequence[Request], base_retry_wait: timedelta, attempt: int = 1) -> None:
+        max_attempts = 5
+        response = await self._resource_client.batch_add_requests(batch)
+
+        if response.unprocessed_requests:
+            logger.debug(f'Following requests were not processed: {response.unprocessed_requests}.')
+            if attempt > max_attempts:
+                logger.warning(
+                    f'Following requests were not processed even after {max_attempts} attempts:\n'
+                    f'{response.unprocessed_requests}'
+                )
+            else:
+                logger.debug('Retry to add requests.')
+                unprocessed_requests_unique_keys = {request.unique_key for request in response.unprocessed_requests}
+                retry_batch = [request for request in batch if request.unique_key in unprocessed_requests_unique_keys]
+                await asyncio.sleep((base_retry_wait * attempt).total_seconds())
+                await self._process_batch(retry_batch, base_retry_wait=base_retry_wait, attempt=attempt + 1)
+
+        request_count = len(batch) - len(response.unprocessed_requests)
+        self._assumed_total_count += request_count
+        if request_count:
+            logger.debug(
+                f'Added {request_count} requests to the queue. Processed requests: {response.processed_requests}'
             )
 
     async def get_request(self, request_id: str) -> Request | None:
