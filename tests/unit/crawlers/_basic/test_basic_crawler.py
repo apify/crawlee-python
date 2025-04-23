@@ -1294,14 +1294,24 @@ async def test_handle_error_bound_session_to_request() -> None:
 
 
 
-async def test_logs_supres_log(
+async def test_reduced_logs_from_timed_out_request_handler(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
-    # Set the log level to INFO to capture the final statistics log.
-    caplog.set_level(logging.INFO)
 
-    crawler = BasicCrawler(request_handler_timeout=timedelta(seconds=1))
+    caplog.set_level(logging.INFO)
+    crawler = BasicCrawler(configure_logging=False, request_handler_timeout=timedelta(seconds=1))
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        await asyncio.sleep(10) # --------------------------------------------------------------------------------This is the only relevant line
+        await asyncio.sleep(10) # Some very custom comment
 
     await crawler.run([Request.from_url('http://a.com/')])
+
+    for record in caplog.records:
+        if record.funcName == '_handle_failed_request':
+            full_message = (record.message or '') + (record.exc_text or '')
+            assert Counter(full_message)['\n'] < 20
+            assert '# Some very custom comment' in full_message
+            break
+    else:
+        raise AssertionError('Expected log message about request handler error was not found.')
+
+

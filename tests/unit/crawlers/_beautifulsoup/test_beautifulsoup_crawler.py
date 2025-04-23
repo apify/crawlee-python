@@ -1,12 +1,7 @@
 from __future__ import annotations
 
-import asyncio
-import logging
-from datetime import timedelta
 from typing import TYPE_CHECKING
 from unittest import mock
-
-import pytest
 
 from crawlee import ConcurrencySettings, HttpHeaders, RequestTransformAction
 from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
@@ -147,23 +142,3 @@ async def test_handle_blocked_request(server_url: URL, http_client: HttpClient) 
 
 def test_default_logger() -> None:
     assert BeautifulSoupCrawler().log.name == 'BeautifulSoupCrawler'
-
-
-
-async def test_logs_final_statistics(
-    server_url: URL, caplog: pytest.LogCaptureFixture) -> None:
-    # Set the log level to INFO to capture the final statistics log.
-    caplog.set_level(logging.INFO)
-
-    crawler = BeautifulSoupCrawler(request_handler_timeout=timedelta(seconds=1))
-
-    @crawler.pre_navigation_hook
-    async def hook(some):
-        await asyncio.sleep(0)
-
-    @crawler.router.default_handler
-    async def handler(context: BeautifulSoupCrawlingContext) -> None:
-        await asyncio.sleep(10) # aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-
-
-    await crawler.run([str(server_url)])
