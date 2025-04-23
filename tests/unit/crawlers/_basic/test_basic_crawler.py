@@ -1308,7 +1308,7 @@ async def test_reduced_logs_from_timed_out_request_handler(
     for record in caplog.records:
         if record.funcName == '_handle_failed_request':
             full_message = (record.message or '') + (record.exc_text or '')
-            assert Counter(full_message)['\n'] < 20
+            assert Counter(full_message)['\n'] < 10
             assert '# Some very custom comment' in full_message
             break
     else:

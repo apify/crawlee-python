@@ -975,12 +975,16 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             )
 
             # Remove asyncio internal stack trace lines.
-            asyncio_pattern = r'[\\/]{1}asyncio[\\/]{1}'
-            filtered_error_lines = [line for line in filtered_error_lines if not re.findall(asyncio_pattern, line)]
+            ignore_pattern = (
+                r'([\\/]{1}asyncio[\\/]{1})|'  # internal asyncio lines
+                r'(Traceback \(most recent call last\))|'  # common part of the stack trace formatting
+                r'(asyncio\.exceptions\.CancelledError)'  # internal asyncio exception
+            )
+            filtered_error_lines = [line for line in filtered_error_lines if not re.findall(ignore_pattern, line)]
             filtered_error_lines.append(full_error_lines[-1])
-            return '\n'.join(filtered_error_lines)
+            return ''.join(filtered_error_lines)
 
-        return '\n'.join(full_error_lines)
+        return ''.join(full_error_lines)
 
     def _get_only_inner_most_exception(self, error: BaseException) -> BaseException:
         """Get innermost exception by following __cause__ and __context__ attributes of exception."""
