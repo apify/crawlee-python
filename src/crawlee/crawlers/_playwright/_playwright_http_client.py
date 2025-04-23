@@ -58,6 +58,10 @@ class PlaywrightHttpClient(HttpClient):
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> HttpResponse:
+        # `proxy_info` are not used because `APIRequestContext` inherits the proxy from `BrowserContext`
+        # TODO: Use `session` to restore all the fingerprint headers according to the `BrowserContext`, after resolved
+        # https://github.com/apify/crawlee-python/issues/1055
+
         if isinstance(headers, dict) or headers is None:
             headers = HttpHeaders(headers or {})
 
