@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextvars
+from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
 from typing_extensions import override
@@ -10,6 +11,8 @@ from crawlee.crawlers._playwright._types import PlaywrightHttpResponse
 from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
     from playwright.async_api import Page
 
     from crawlee import Request
@@ -19,7 +22,17 @@ if TYPE_CHECKING:
     from crawlee.statistics import Statistics
 
 
-browser_page_context_var: contextvars.ContextVar[Page | None] = contextvars.ContextVar('browser_context', default=None)
+_browser_page_context_var: contextvars.ContextVar[Page | None] = contextvars.ContextVar('browser_context', default=None)
+
+
+@asynccontextmanager
+async def browser_page_context(page: Page) -> AsyncGenerator[None, None]:
+    """Asynchronous context manager for setting the current Playwright page in the context variable."""
+    token = _browser_page_context_var.set(page)
+    try:
+        yield
+    finally:
+        _browser_page_context_var.reset(token)
 
 
 class PlaywrightHttpClient(HttpClient):
@@ -65,7 +78,7 @@ class PlaywrightHttpClient(HttpClient):
         if isinstance(headers, dict) or headers is None:
             headers = HttpHeaders(headers or {})
 
-        browser_context = browser_page_context_var.get()
+        browser_context = _browser_page_context_var.get()
 
         if browser_context is None:
             raise RuntimeError('Unable to create an `APIRequestContext` outside the browser context')

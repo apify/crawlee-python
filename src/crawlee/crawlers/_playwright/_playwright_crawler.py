@@ -19,7 +19,7 @@ from crawlee.sessions._cookies import PlaywrightCookieParam
 from crawlee.statistics import StatisticsState
 
 from ._playwright_crawling_context import PlaywrightCrawlingContext
-from ._playwright_http_client import PlaywrightHttpClient, browser_page_context_var
+from ._playwright_http_client import PlaywrightHttpClient, browser_page_context
 from ._playwright_pre_nav_crawling_context import PlaywrightPreNavCrawlingContext
 from ._utils import block_requests, infinite_scroll
 
@@ -197,12 +197,9 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             block_requests=partial(block_requests, page=crawlee_page.page),
         )
 
-        try:
-            context_http_client_var = browser_page_context_var.set(crawlee_page.page)
+        async with browser_page_context(crawlee_page.page):
             for hook in self._pre_navigation_hooks:
                 await hook(pre_navigation_context)
-        finally:
-            browser_page_context_var.reset(context_http_client_var)
         yield pre_navigation_context
 
     async def _navigate(
@@ -244,8 +241,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
             extract_links = self._create_extract_links_function(context)
 
-            try:
-                context_http_client_var = browser_page_context_var.set(context.page)
+            async with browser_page_context(context.page):
                 error = yield PlaywrightCrawlingContext(
                     request=context.request,
                     session=context.session,
@@ -263,8 +259,6 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                     enqueue_links=self._create_enqueue_links_function(context, extract_links),
                     block_requests=partial(block_requests, page=context.page),
                 )
-            finally:
-                browser_page_context_var.reset(context_http_client_var)
 
             # Collect data in case of errors, before the page object is closed.
             if error:
