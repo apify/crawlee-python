@@ -948,7 +948,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     async def _handle_failed_request(self, context: TCrawlingContext | BasicCrawlingContext, error: Exception) -> None:
         error_message = self._get_message_from_error(error)
-        #self._logger.exception('Request failed and reached maximum retries', exc_info=error)
         self._logger.error(f'Request failed and reached maximum retries\n {error_message}')
         await self._statistics.error_tracker.add(error=error, context=context)
 
@@ -958,21 +957,24 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             except Exception as e:
                 raise UserDefinedErrorHandlerError('Exception thrown in user-defined failed request handler') from e
 
-    def _get_message_from_error(self,error:Exception) ->str:
+    def _get_message_from_error(self, error: Exception) -> str:
         """Get error message summary from exception.
 
         Custom processing to reduce the irrelevant traceback clutter in some cases.
         """
         full_error_lines = traceback.format_exception(type(error), value=error, tb=error.__traceback__, chain=True)
 
-        if (isinstance(error, asyncio.exceptions.TimeoutError) and
-            self._request_handler_timeout_text in full_error_lines[-1]):
+        if (
+            isinstance(error, asyncio.exceptions.TimeoutError)
+            and self._request_handler_timeout_text in full_error_lines[-1]
+        ):
             # Get only innermost error
             inner_error = self._get_only_inner_most_exception(error)
-            filtered_error_lines =  traceback.format_exception(
-                type(inner_error), value=inner_error, tb=inner_error.__traceback__, chain=True)
+            filtered_error_lines = traceback.format_exception(
+                type(inner_error), value=inner_error, tb=inner_error.__traceback__, chain=True
+            )
 
-            #Remove asyncio internal stack trace lines.
+            # Remove asyncio internal stack trace lines.
             asyncio_pattern = r'[\\/]{1}asyncio[\\/]{1}'
             filtered_error_lines = [line for line in filtered_error_lines if not re.findall(asyncio_pattern, line)]
             filtered_error_lines.append(full_error_lines[-1])
@@ -988,7 +990,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             return self._get_only_inner_most_exception(error.__context__)
         # No __cause__ and no __context__, this is as deep as it can get.
         return error
-
 
     def _prepare_send_request_function(
         self,
@@ -1246,7 +1247,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             lambda: self._context_pipeline(context, self.router),
             timeout=self._request_handler_timeout,
             timeout_message=f'{self._request_handler_timeout_text}'
-                            f' {self._request_handler_timeout.total_seconds()} seconds',
+            f' {self._request_handler_timeout.total_seconds()} seconds',
             logger=self._logger,
         )
 
