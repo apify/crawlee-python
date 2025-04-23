@@ -162,7 +162,7 @@ class _BasicCrawlerOptions(TypedDict):
     subclasses rather than direct instantiation of `BasicCrawler`."""
 
     respect_robots_txt_file: NotRequired[bool]
-    """If set to `true`, the crawler will automatically try to fetch the robots.txt file for each domain,
+    """If set to `True`, the crawler will automatically try to fetch the robots.txt file for each domain,
     and skip those that are not allowed. This also prevents disallowed URLs to be added via `EnqueueLinksFunction`."""
 
 
