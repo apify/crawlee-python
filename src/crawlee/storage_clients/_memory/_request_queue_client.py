@@ -8,7 +8,7 @@ from decimal import Decimal
 from logging import getLogger
 from typing import TYPE_CHECKING
 
-from sortedcollections import ValueSortedDict  # type: ignore[import-untyped]
+from sortedcollections import ValueSortedDict
 from typing_extensions import override
 
 from crawlee._types import StorageTypes

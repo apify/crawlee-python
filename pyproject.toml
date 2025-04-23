@@ -237,7 +237,9 @@ module = [
     "functions_framework",          # Example code shows deploy on Google Cloud.
     "jaro",                         # Untyped and stubs not available
     "loguru",                       # Example code shows integration of loguru and crawlee for JSON logging.
+    "protego",                      # Untyped and stubs not available
     "sklearn.linear_model",         # Untyped and stubs not available
+    "sortedcollections",            # Untyped and stubs not available
     "cookiecutter.*",               # Untyped and stubs not available
     "inquirer.*",                   # Untyped and stubs not available
 ]
