@@ -64,7 +64,7 @@ module.exports = {
                     type: 'category',
                     label: 'Deploy to Google Cloud',
                     items: [
-                        'deployment/gcp-functions',
+                        'deployment/gcp-cloud-run-functions',
                         'deployment/gcp-cloud-run',
                     ],
                 },

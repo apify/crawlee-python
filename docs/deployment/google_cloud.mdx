@@ -1,7 +1,7 @@
 ---
-id: gcp-functions
-title: Deploy to GCP Cloud Functions
-description: Prepare your crawler to run in Cloud functions on Google Cloud Platform
+id: gcp-cloud-run-functions
+title: Cloud Run functions
+description: Prepare your crawler to run in Cloud Run functions on Google Cloud Platform.
 ---
 
 import ApiLink from '@site/src/components/ApiLink';
@@ -16,7 +16,7 @@ For the project foundation, use <ApiLink to="class/BeautifulSoupCrawler">Beautif
 
 Add [functions-framework](https://pypi.org/project/functions-framework/) to your dependencies file `requirements.txt`. If you're using a project manager like `poetry` or `uv`, export your dependencies to `requirements.txt`.
 
-Update the project code to make it compatible with Cloud Functions and return data in JSON format. Also add an entry point that Cloud Functions will use to run the project.
+Update the project code to make it compatible with [Cloud Functions](https://cloud.google.com/functions) and return data in JSON format. Also add an entry point that Cloud Functions will use to run the project.
 
 <CodeBlock className="language-python">
     {GoogleFunctions.replace(/^.*?\n/, '')}
