@@ -978,6 +978,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             ignore_pattern = (
                 r'([\\/]{1}asyncio[\\/]{1})|'  # internal asyncio lines
                 r'(Traceback \(most recent call last\))|'  # common part of the stack trace formatting
+                r'(\^\^)|'  # highlight markers used in Python versions >3.10
                 r'(asyncio\.exceptions\.CancelledError)'  # internal asyncio exception
             )
             filtered_error_lines = [line for line in filtered_error_lines if not re.findall(ignore_pattern, line)]
