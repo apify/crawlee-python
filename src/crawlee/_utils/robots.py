@@ -21,7 +21,7 @@ class RobotsTxtFile:
 
     @classmethod
     async def from_content(cls, url: str, content: str) -> Self:
-        """Create a RobotsTxtFile instance from the given content.
+        """Create a `RobotsTxtFile` instance from the given content.
 
         Args:
             url: the URL of the robots.txt file
