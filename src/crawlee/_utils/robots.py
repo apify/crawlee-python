@@ -24,8 +24,8 @@ class RobotsTxtFile:
         """Create a `RobotsTxtFile` instance from the given content.
 
         Args:
-            url: the URL of the robots.txt file
-            content: the content of the robots.txt file
+            url: The URL associated with the robots.txt file.
+            content: The raw string content of the robots.txt file to be parsed.
         """
         robots = Protego.parse(content)
         return cls(url, robots)
@@ -35,9 +35,9 @@ class RobotsTxtFile:
         """Determine the location of a robots.txt file for a URL and fetch it.
 
         Args:
-            url: the URL to fetch robots.txt for
-            proxy_info: a `ProxyInfo` to be used for fetching the robots.txt file
-            http_client: the HTTP client to use for fetching the robots.txt file
+            url: The URL whose domain will be used to find the corresponding robots.txt file.
+            http_client: Optional `ProxyInfo` to be used when fetching the robots.txt file. If None, no proxy is used.
+            proxy_info: The `HttpClient` instance used to perform the network request for fetching the robots.txt file.
         """
         robots_url = URL(url).with_path('/robots.txt')
         return await cls.load(str(robots_url), http_client, proxy_info)
@@ -47,9 +47,9 @@ class RobotsTxtFile:
         """Load the robots.txt file for a given URL.
 
         Args:
-            url: the URL to fetch robots.txt for
-            proxy_info: a `ProxyInfo` to be used for fetching the robots.txt file
-            http_client: the HTTP client to use for fetching the robots.txt file
+            url: The direct URL of the robots.txt file to be loaded.
+            http_client: The `HttpClient` instance used to perform the network request for fetching the robots.txt file.
+            proxy_info: Optional `ProxyInfo` to be used when fetching the robots.txt file. If None, no proxy is used.
         """
         response = await http_client.send_request(url, proxy_info=proxy_info)
         body = b'User-agent: *\nAllow: /' if is_status_code_client_error(response.status_code) else response.read()
@@ -62,8 +62,8 @@ class RobotsTxtFile:
         """Check if the given URL is allowed for the given user agent.
 
         Args:
-            url: the URL to check
-            user_agent: the user agent to check for
+            url: The URL to check against the robots.txt rules.
+            user_agent: The user-agent string to check permissions for. Defaults to '*' which matches any user-agent.
         """
         check_url = URL(url)
         if check_url.origin() != self._original_url:
@@ -78,7 +78,8 @@ class RobotsTxtFile:
         """Get the crawl delay for the given user agent.
 
         Args:
-            user_agent: the user-agent to check for
+            user_agent: The user-agent string to check the crawl delay for. Defaults to '*' which matches any
+                user-agent.
         """
         crawl_delay = self._robots.crawl_delay(user_agent)
         return int(crawl_delay) if crawl_delay is not None else None

@@ -1315,7 +1315,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         """Check if the URL is allowed based on the robots.txt file.
 
         Args:
-            url: The URL to check.
+            url: The URL to verify against robots.txt rules. Returns True if crawling this URL is permitted.
         """
         if not self._respect_robots_txt_file:
             return True
@@ -1326,7 +1326,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         """Get the RobotsTxtFile for a given URL.
 
         Args:
-            url: URL on the basis of which the RobotsTxtFile will be obtained.
+            url: The URL whose domain will be used to locate and fetch the corresponding robots.txt file.
         """
         if not self._respect_robots_txt_file:
             return None
