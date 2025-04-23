@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import signal
 import sys
@@ -56,7 +57,6 @@ from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 from ._context_pipeline import ContextPipeline
 
 if TYPE_CHECKING:
-    import re
     from contextlib import AbstractAsyncContextManager
 
     from crawlee._types import ConcurrencySettings, HttpMethod, JsonSerializable
@@ -213,6 +213,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     """
 
     _CRAWLEE_STATE_KEY = 'CRAWLEE_STATE'
+    _request_handler_timeout_text = "Request handler timed out after"
 
     def __init__(
         self,
@@ -948,8 +949,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     async def _handle_failed_request(self, context: TCrawlingContext | BasicCrawlingContext, error: Exception) -> None:
         error_message = self.get_message_from_error(error)
-        self._logger.error(f'Request failed and reached maximum retries\n {error_message}')
         #self._logger.exception('Request failed and reached maximum retries', exc_info=error)
+        self._logger.error(f'Request failed and reached maximum retries\n {error_message}')
         await self._statistics.error_tracker.add(error=error, context=context)
 
         if self._failed_request_handler:
@@ -958,21 +959,61 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             except Exception as e:
                 raise UserDefinedErrorHandlerError('Exception thrown in user-defined failed request handler') from e
 
-    def get_message_from_error(self,error:Exception):
-        error_lines = traceback.format_exception(error)
+    def get_message_from_error(self,error:Exception) ->str:
+        """Get error message summary from exception.
+
+        Custom processing to reduce the irrelevant traceback clutter in some cases."""
+
+        full_error_lines = traceback.format_exception(error)
+        filtered_error_lines = None
+
+        if (isinstance(error, asyncio.exceptions.TimeoutError) and
+            self._request_handler_timeout_text in full_error_lines[-1]):
+            # Get only innermost error
+            filtered_error_lines =  traceback.format_exception(self._get_only_inner_most_exception(error))
+            # Try to filter out irrelevant information for timeout errors user defined request handler function.
+            #filtered_error_lines = self._reduce_stack_trace_for_request_handler_timeout_errors(filtered_error_lines)
+
+        return "\n".join(filtered_error_lines or full_error_lines)
+
+    def _get_only_inner_most_exception(self, error:Exception) -> Exception:
+        """Get innermost exception by following __cause__ and __context__ attributes of exception."""
+        if error.__cause__:
+            return self._get_only_inner_most_exception(error.__cause__)
+        if error.__context__:
+            return self._get_only_inner_most_exception(error.__context__)
+        # No __cause__ and no __context__, this is as deep as it can get.
+        return error
+
+
+    def _reduce_stack_trace_for_request_handler_timeout_errors(self, error_lines: list[str]) -> list[str]:
+        """Reduce stack trace for request handler timeout errors if suitable.
+
+        Hacky way of manipulating stack trace to remove all irrelevant parts in case of timeout error in user defined
+        request handler. Most relevant lines will be sandwiched between the line containing the marker and asyncio
+        first line - keep only those relevant lines and drop the rest.
+
+        This will not reduce stack trace for errors elsewhere in the context pipeline.
+        """
         relevant_lines = []
+        marker = "final_context_consumer"
+        # Ensure the marker still exists in the code
+        assert marker in inspect.signature(ContextPipeline.__call__).parameters
+        asyncio_pattern = r"[\\/]{1}asyncio[\\/]{1}"
+        marker_pattern = rf'await {marker}\('
+        marker_found = False
+        for line in error_lines:
+            if marker_found:
+                if re.findall(asyncio_pattern, line):
+                    relevant_lines.append(error_lines[-1])
+                    return relevant_lines
+                relevant_lines.append(line)
 
-        if isinstance(error, asyncio.exceptions.TimeoutError) and "Request handler timed out" in error_lines[-1]:
-            # Try to extract only the relevant lines from the timeout error.
-            # Most relevant lines will be sandwiched between the crawlee-python lines and asyncio lines.
-            asyncio_pattern = r"[\\/]{1}asyncio[\\/]{1}"
-            file_pattern = r' File ".*\.py"'
-            for line in error_lines:
-                if re.findall(file_pattern, line) and not re.findall(asyncio_pattern, line):
-                    relevant_lines.append(line)
+            if re.findall(marker_pattern, line):
+                marker_found = True
 
-
-        return "\n".join(relevant_lines or error_lines)
+        # Lines did not have expected content for reduction. Return all.
+        return error_lines
 
     def _prepare_send_request_function(
         self,
@@ -1229,7 +1270,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         await wait_for(
             lambda: self._context_pipeline(context, self.router),
             timeout=self._request_handler_timeout,
-            timeout_message=f'Request handler timed out after {self._request_handler_timeout.total_seconds()} seconds',
+            timeout_message=f'{self._request_handler_timeout_text}'
+                            f' {self._request_handler_timeout.total_seconds()} seconds',
             logger=self._logger,
         )
 

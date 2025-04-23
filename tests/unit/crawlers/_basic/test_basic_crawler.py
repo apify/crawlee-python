@@ -1294,15 +1294,14 @@ async def test_handle_error_bound_session_to_request() -> None:
 
 
 
-async def test_logs_final_statistics(
+async def test_logs_supres_log(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
     # Set the log level to INFO to capture the final statistics log.
     caplog.set_level(logging.INFO)
 
     crawler = BasicCrawler(request_handler_timeout=timedelta(seconds=1))
-
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        await asyncio.sleep(10) # aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        await asyncio.sleep(10) # --------------------------------------------------------------------------------This is the only relevant line
 
     await crawler.run([Request.from_url('http://a.com/')])
