@@ -233,10 +233,6 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             # Set the loaded URL to the actual URL after redirection.
             context.request.loaded_url = context.page.url
 
-            if context.session:
-                pw_cookies = await self._get_cookies(context.page)
-                context.session.cookies.set_cookies_from_playwright_format(pw_cookies)
-
             extract_links = self._create_extract_links_function(context)
 
             error = yield PlaywrightCrawlingContext(
@@ -256,6 +252,10 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 enqueue_links=self._create_enqueue_links_function(context, extract_links),
                 block_requests=partial(block_requests, page=context.page),
             )
+
+            if context.session:
+                pw_cookies = await self._get_cookies(context.page)
+                context.session.cookies.set_cookies_from_playwright_format(pw_cookies)
 
             # Collect data in case of errors, before the page object is closed.
             if error:
