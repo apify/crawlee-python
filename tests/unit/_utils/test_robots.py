@@ -29,7 +29,7 @@ async def test_extract_sitemaps_urls(server_url: URL, http_client: HttpClient) -
     assert set(robots.get_sitemaps()) == {'http://not-exists.com/sitemap_1.xml', 'http://not-exists.com/sitemap_2.xml'}
 
 
-async def test_parse_from_context() -> None:
+async def test_parse_from_content() -> None:
     content = """User-agent: *
         Disallow: *deny_all/
         crawl-delay: 10
