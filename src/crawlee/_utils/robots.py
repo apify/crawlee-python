@@ -8,6 +8,8 @@ from yarl import URL
 from crawlee._utils.web import is_status_code_client_error
 
 if TYPE_CHECKING:
+    from typing_extensions import Self
+
     from crawlee.http_clients import HttpClient
     from crawlee.proxy_configuration import ProxyInfo
 
@@ -17,8 +19,8 @@ class RobotsTxtFile:
         self._robots = robots
         self._original_url = URL(url).origin()
 
-    @staticmethod
-    async def from_content(url: str, content: str) -> RobotsTxtFile:
+    @classmethod
+    async def from_content(cls, url: str, content: str) -> Self:
         """Create a RobotsTxtFile instance from the given content.
 
         Args:
@@ -26,10 +28,10 @@ class RobotsTxtFile:
             content: the content of the robots.txt file
         """
         robots = Protego.parse(content)
-        return RobotsTxtFile(url, robots)
+        return cls(url, robots)
 
-    @staticmethod
-    async def find(url: str, http_client: HttpClient, proxy_info: ProxyInfo | None = None) -> RobotsTxtFile:
+    @classmethod
+    async def find(cls, url: str, http_client: HttpClient, proxy_info: ProxyInfo | None = None) -> Self:
         """Determine the location of a robots.txt file for a URL and fetch it.
 
         Args:
@@ -38,10 +40,10 @@ class RobotsTxtFile:
             http_client: the HTTP client to use for fetching the robots.txt file
         """
         robots_url = URL(url).with_path('/robots.txt')
-        return await RobotsTxtFile.load(str(robots_url), http_client, proxy_info)
+        return await cls.load(str(robots_url), http_client, proxy_info)
 
-    @staticmethod
-    async def load(url: str, http_client: HttpClient, proxy_info: ProxyInfo | None = None) -> RobotsTxtFile:
+    @classmethod
+    async def load(cls, url: str, http_client: HttpClient, proxy_info: ProxyInfo | None = None) -> Self:
         """Load the robots.txt file for a given URL.
 
         Args:
@@ -54,7 +56,7 @@ class RobotsTxtFile:
 
         robots = Protego.parse(body.decode('utf-8'))
 
-        return RobotsTxtFile(url, robots)
+        return cls(url, robots)
 
     def is_allowed(self, url: str, user_agent: str = '*') -> bool:
         """Check if the given URL is allowed for the given user agent.
