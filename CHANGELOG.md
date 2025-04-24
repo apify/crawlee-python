@@ -3,7 +3,21 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 0.6.7 - **not yet released**
+## 0.6.8 - **not yet released**
+
+### 🚀 Features
+
+- Handle unprocessed requests in `add_requests_batched` ([#1159](https://github.com/apify/crawlee-python/pull/1159)) ([7851175](https://github.com/apify/crawlee-python/commit/7851175304d63e455223b25853021cfbe15d68bd)) by [@Pijukatel](https://github.com/Pijukatel), closes [#456](https://github.com/apify/crawlee-python/issues/456)
+
+### 🐛 Bug Fixes
+
+- Update `UnprocessedRequest` to match actual data ([#1155](https://github.com/apify/crawlee-python/pull/1155)) ([a15a1f3](https://github.com/apify/crawlee-python/commit/a15a1f3528c7cbcf78d3bda5a236bcee1d492764)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1150](https://github.com/apify/crawlee-python/issues/1150)
+- Fix the order in which cookies are saved to the `SessionCookies` and the handler is executed for `PlaywrightCrawler` ([#1163](https://github.com/apify/crawlee-python/pull/1163)) ([82ff69a](https://github.com/apify/crawlee-python/commit/82ff69acd8e409f56be56dd061aae0f854ec25b4)) by [@Mantisus](https://github.com/Mantisus)
+- Call `failed_request_handler` for `SessionError` when session rotation count exceeds maximum ([#1147](https://github.com/apify/crawlee-python/pull/1147)) ([b3637b6](https://github.com/apify/crawlee-python/commit/b3637b68ec7eae9de7f1b923fa2f68885da64b90)) by [@Mantisus](https://github.com/Mantisus)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.6.7](https://github.com/apify/crawlee-python/releases/tag/v0.6.7) (2025-04-17)
 
 ### 🚀 Features
 
@@ -12,9 +26,9 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Improve validation errors in Crawlee CLI ([#1140](https://github.com/apify/crawlee-python/pull/1140)) ([f2d33df](https://github.com/apify/crawlee-python/commit/f2d33dff178a3d3079eb3807feb9645a25cc7a93)) by [@vdusek](https://github.com/vdusek), closes [#1138](https://github.com/apify/crawlee-python/issues/1138)
+- Disable logger propagation to prevent duplicate logs ([#1156](https://github.com/apify/crawlee-python/pull/1156)) ([0b3648d](https://github.com/apify/crawlee-python/commit/0b3648d5d399f0af23520f7fb8ee635d38b512c4)) by [@vdusek](https://github.com/vdusek)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.6.6](https://github.com/apify/crawlee-python/releases/tag/v0.6.6) (2025-04-03)
 
 ### 🚀 Features
