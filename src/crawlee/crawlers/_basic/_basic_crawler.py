@@ -1122,7 +1122,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 max_retries=3,
             )
             # TODO: https://github.com/apify/crawlee-python/issues/1160
-            # add processing with on_skiped_request hook
+            # add processing with on_skipped_request hook
             return
 
         if request.session_id:
