@@ -235,6 +235,7 @@ module = [
     "flask",                        # Example code shows deploy on Google Cloud.
     "functions_framework",          # Example code shows deploy on Google Cloud.
     "jaro",                         # Untyped and stubs not available
+    "litestar",                     # Example code shows deploy on Google Cloud Run.
     "loguru",                       # Example code shows integration of loguru and crawlee for JSON logging.
     "sklearn.linear_model",         # Untyped and stubs not available
     "cookiecutter.*",               # Untyped and stubs not available
