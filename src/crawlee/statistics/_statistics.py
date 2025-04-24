@@ -108,9 +108,9 @@ class Statistics(Generic[TStatisticsState]):
     def replace_state_model(self, state_model: type[TNewStatisticsState]) -> Statistics[TNewStatisticsState]:
         """Create near copy of the `Statistics` with replaced `state_model`."""
         new_statistics: Statistics[TNewStatisticsState] = Statistics(
-            persistence_enabled=self._state._persistence_enabled,
-            persist_state_kvs_name=self._state._persist_state_kvs_name,
-            persist_state_key=self._state._persist_state_key,
+            persistence_enabled=self._state._persistence_enabled,  # noqa: SLF001
+            persist_state_kvs_name=self._state._persist_state_kvs_name,  # noqa: SLF001
+            persist_state_key=self._state._persist_state_key,  # noqa: SLF001
             log_message=self._log_message,
             periodic_message_logger=self._periodic_message_logger,
             state_model=state_model,
