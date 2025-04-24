@@ -384,7 +384,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         # Internal, not explicitly configurable components
         self._robots_txt_file_cache: LRUCache[str, RobotsTxtFile] = LRUCache(maxsize=1000)
-        self._robots_txt_locks_cache: LRUCache[str, asyncio.Lock] = LRUCache(maxsize=100)
+        self._robots_txt_lock = asyncio.Lock()
         self._tld_extractor = TLDExtract(cache_dir=tempfile.TemporaryDirectory().name)
         self._snapshotter = Snapshotter.from_config(config)
         self._autoscaled_pool = AutoscaledPool(
@@ -1333,12 +1333,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if robots_txt_file:
             return robots_txt_file
 
-        txt_file_lock = self._robots_txt_locks_cache.get(origin_url)
-        if txt_file_lock is None:
-            txt_file_lock = asyncio.Lock()
-            self._robots_txt_locks_cache[origin_url] = txt_file_lock
-
-        async with txt_file_lock:
+        async with self._robots_txt_lock:
             # Check again if the robots.txt file is already cached after acquiring the lock
             robots_txt_file = self._robots_txt_file_cache.get(origin_url)
             if robots_txt_file:
