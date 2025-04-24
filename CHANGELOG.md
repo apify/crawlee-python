@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Handle unprocessed requests in `add_requests_batched` ([#1159](https://github.com/apify/crawlee-python/pull/1159)) ([7851175](https://github.com/apify/crawlee-python/commit/7851175304d63e455223b25853021cfbe15d68bd)) by [@Pijukatel](https://github.com/Pijukatel), closes [#456](https://github.com/apify/crawlee-python/issues/456)
+- Add  `respect_robots_txt_file` option ([#1162](https://github.com/apify/crawlee-python/pull/1162)) ([c23f365](https://github.com/apify/crawlee-python/commit/c23f365bfd263b4357edf82c14a7c6ff8dee45e4)) by [@Mantisus](https://github.com/Mantisus)
 
 ### 🐛 Bug Fixes
 
