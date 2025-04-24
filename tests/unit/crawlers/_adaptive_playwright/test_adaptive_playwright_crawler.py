@@ -89,7 +89,7 @@ class _SimpleRenderingTypePredictor(RenderingTypePredictor):
         return RenderingTypePrediction(next(self._rendering_types), next(self._detection_probability_recommendation))
 
     @override
-    def store_result(self, request: Request, crawl_type: RenderingType) -> None:
+    def store_result(self, request: Request, rendering_type: RenderingType) -> None:
         pass
 
 
@@ -464,13 +464,13 @@ async def test_adaptive_crawler_exceptions_in_sub_crawlers(*, error_in_pw_crawle
         assert stored_results == [saved_data]
 
 
-def test_adaptive_playwright_crawler_statistics_in_init() -> None:
+async def test_adaptive_playwright_crawler_statistics_in_init() -> None:
     """Tests that adaptive crawler uses created AdaptivePlaywrightCrawlerStatistics from inputted Statistics."""
     persistence_enabled = True
     persist_state_kvs_name = 'some name'
     persist_state_key = 'come key'
     log_message = 'some message'
-    periodic_message_logger = logging.getLogger('some logger')  # Accessing private member to create copy like-object.
+    periodic_message_logger = logging.getLogger('some logger')
     log_interval = timedelta(minutes=2)
     statistics = Statistics.with_default_state(
         persistence_enabled=persistence_enabled,
@@ -482,11 +482,14 @@ def test_adaptive_playwright_crawler_statistics_in_init() -> None:
     )
 
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(statistics=statistics)
+    await crawler.run([])  # ensure that statistics get initialized
 
     assert type(crawler._statistics.state) is AdaptivePlaywrightCrawlerStatisticState
-    assert crawler._statistics._persistence_enabled == persistence_enabled
-    assert crawler._statistics._persist_state_kvs_name == persist_state_kvs_name
-    assert crawler._statistics._persist_state_key == persist_state_key
+
+    assert crawler._statistics._state._persistence_enabled == persistence_enabled
+    assert crawler._statistics._state._persist_state_kvs_name == persist_state_kvs_name
+    assert crawler._statistics._state._persist_state_key == persist_state_key
+
     assert crawler._statistics._log_message == log_message
     assert crawler._statistics._periodic_message_logger == periodic_message_logger
 

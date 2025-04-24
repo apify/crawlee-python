@@ -67,10 +67,11 @@ class _NonPersistentStatistics(Statistics):
 
     def __init__(self) -> None:
         super().__init__(state_model=StatisticsState)
-        self._active = True
 
     async def __aenter__(self) -> Self:
         self._active = True
+        await self._state.initialize()
+        self._after_initialize()
         return self
 
     async def __aexit__(
@@ -201,7 +202,12 @@ class AdaptivePlaywrightCrawler(
         static_crawler.pre_navigation_hook(adaptive_pre_navigation_hook_static)
         playwright_crawler.pre_navigation_hook(adaptive_pre_navigation_hook_pw)
 
-        self._additional_context_managers = [*self._additional_context_managers, playwright_crawler._browser_pool]  # noqa: SLF001 # Intentional access to private member.
+        self._additional_context_managers = [
+            *self._additional_context_managers,
+            static_crawler.statistics,
+            playwright_crawler.statistics,
+            playwright_crawler._browser_pool,  # noqa: SLF001 # Intentional access to private member.
+        ]
 
         # Sub crawler pipeline related
         self._pw_context_pipeline = playwright_crawler._context_pipeline  # noqa:SLF001  # Intentional access to private member.
@@ -375,6 +381,8 @@ class AdaptivePlaywrightCrawler(
                     self.track_rendering_type_mispredictions()
 
         context.log.debug(f'Running browser request handler for {context.request.url}')
+
+        old_state_copy = None
 
         if should_detect_rendering_type:
             # Save copy of global state from `use_state` before it can be mutated by browser crawl.
