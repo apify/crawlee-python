@@ -1,0 +1,21 @@
+---
+id: respect-robots-txt-file
+title: Respect robots.txt file
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import RespectRobotsTxt from '!!raw-loader!roa-loader!./code_examples/respect_robots_txt_file.py';
+
+This example demonstrates how to configure your crawler to respect the rules established by websites for crawlers as described in the [robots.txt](https://www.robotstxt.org/robotstxt.html) file.
+
+To configure `Crawlee` to follow the `robots.txt` file, set the parameter `respect_robots_txt_file=True` in <ApiLink to="class/BasicCrawlerOptions">`BasicCrawlerOptions`</ApiLink>. In this case, `Crawlee` will skip any URLs forbidden in the website's robots.txt file.
+
+As an example, let's look at the website `https://news.ycombinator.com/` and its corresponding [robots.txt](https://news.ycombinator.com/robots.txt) file. Since the file has a rule `Disallow: /login`, the URL `https://news.ycombinator.com/login` will be automatically skipped.
+
+The code below demonstrates this behavior using the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>:
+
+<RunnableCodeBlock className="language-python" language="python">
+    {RespectRobotsTxt}
+</RunnableCodeBlock>
