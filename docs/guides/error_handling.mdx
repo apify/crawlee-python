@@ -1,0 +1,44 @@
+---
+id: error-handling
+title: Error handling
+description: How to handle errors that occur during web crawling.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import HandleProxyError from '!!raw-loader!roa-loader!./code_examples/error_handling/handle_proxy_error.py';
+import ChangeHandleErrorStatus from '!!raw-loader!roa-loader!./code_examples/error_handling/change_handle_error_status.py';
+import DisableRetry from '!!raw-loader!roa-loader!./code_examples/error_handling/disable_retry.py';
+
+This guide demonstrates techniques for handling common errors encountered during web crawling operations.
+
+## Handling proxy errors
+
+Low-quality proxies can cause problems even with high settings for `max_request_retries` and `max_session_rotations` in <ApiLink to="class/BasicCrawlerOptions">`BasicCrawlerOptions`</ApiLink>. If you can't get data because of proxy errors, you might want to try again. You can do this using <ApiLink to="class/BasicCrawler#failed_request_handler">`failed_request_handler`</ApiLink>:
+
+<RunnableCodeBlock className="language-python" language="python">
+    {HandleProxyError}
+</RunnableCodeBlock>
+
+You can use this same approach when testing different proxy providers. To better manage this process, you can count proxy errors and [stop the crawler](../examples/crawler-stop) if you get too many.
+
+## Changing how error status codes are handled
+
+By default, when <ApiLink to="class/Session">`Sessions`</ApiLink> get status codes like [401](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/401), [403](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/403), or [429](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/429), Crawlee marks the <ApiLink to="class/Session">`Session`</ApiLink> as `retire` and switches to a new one. This might not be what you want, especially when working with [authentication](./logging-in-with-a-crawler). You can learn more in the [Session management guide](./session-management).
+
+Here's an example of how to change this behavior:
+
+<RunnableCodeBlock className="language-python" language="python">
+    {ChangeHandleErrorStatus}
+</RunnableCodeBlock>
+
+## Turning off retries for non-network errors
+
+Sometimes you might get unexpected errors when parsing data, like when a website has an unusual structure. Crawlee normally tries again based on your `max_request_retries` setting, but sometimes you don't want that.
+
+Here's how to turn off retries for non-network errors using <ApiLink to="class/BasicCrawler#error_handler">`error_handler`</ApiLink>, which runs before Crawlee tries again:
+
+<RunnableCodeBlock className="language-python" language="python">
+    {DisableRetry}
+</RunnableCodeBlock>

@@ -41,3 +41,20 @@ GENERIC_RESPONSE = b"""\
 <body>
     Insightful content
 </body></html>"""
+
+
+ROBOTS_TXT = b"""\
+User-agent: *
+Disallow: *deny_all/
+Disallow: /page_
+crawl-delay: 10
+
+User-agent: Googlebot
+Disallow: *deny_googlebot/
+crawl-delay: 1
+
+user-agent: Mozilla
+crawl-delay: 2
+
+sitemap: http://not-exists.com/sitemap_1.xml
+sitemap: http://not-exists.com/sitemap_2.xml"""

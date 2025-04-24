@@ -23,7 +23,7 @@ from crawlee.fingerprint_suite._browserforge_adapter import get_available_header
 from crawlee.fingerprint_suite._consts import BROWSER_TYPE_HEADER_KEYWORD
 from crawlee.http_clients import HttpxHttpClient
 from crawlee.proxy_configuration import ProxyConfiguration
-from crawlee.sessions import SessionPool
+from crawlee.sessions import Session, SessionPool
 from crawlee.statistics import Statistics
 from crawlee.statistics._error_snapshotter import ErrorSnapshotter
 from tests.unit.server_endpoints import GENERIC_RESPONSE, HELLO_WORLD
@@ -305,6 +305,7 @@ async def test_proxy_set() -> None:
 )
 async def test_isolation_cookies(*, use_incognito_pages: bool, server_url: URL) -> None:
     sessions_ids: list[str] = []
+    sessions: dict[str, Session] = {}
     sessions_cookies: dict[str, dict[str, str]] = {}
     response_cookies: dict[str, dict[str, str]] = {}
 
@@ -320,13 +321,11 @@ async def test_isolation_cookies(*, use_incognito_pages: bool, server_url: URL) 
             return
 
         sessions_ids.append(context.session.id)
+        sessions[context.session.id] = context.session
 
         if context.request.unique_key not in {'1', '2'}:
             return
 
-        sessions_cookies[context.session.id] = {
-            cookie['name']: cookie['value'] for cookie in context.session.cookies.get_cookies_as_dicts()
-        }
         response_data = json.loads(await context.response.text())
         response_cookies[context.session.id] = response_data.get('cookies')
 
@@ -344,10 +343,19 @@ async def test_isolation_cookies(*, use_incognito_pages: bool, server_url: URL) 
         ]
     )
 
-    assert len(sessions_cookies) == 2
     assert len(response_cookies) == 2
+    assert len(sessions) == 2
 
     assert sessions_ids[0] == sessions_ids[1]
+
+    sessions_cookies = {
+        sessions_id: {
+            cookie['name']: cookie['value'] for cookie in sessions[sessions_id].cookies.get_cookies_as_dicts()
+        }
+        for sessions_id in sessions_ids
+    }
+
+    assert len(sessions_cookies) == 2
 
     cookie_session_id = sessions_ids[0]
     clean_session_id = sessions_ids[2]
@@ -371,6 +379,33 @@ async def test_isolation_cookies(*, use_incognito_pages: bool, server_url: URL) 
         # PlaywrightContext makes cookies shared by all sessions that work with it.
         # So in this case a clean session contains the same cookies
         assert sessions_cookies[clean_session_id] == response_cookies[clean_session_id] == {'a': '1'}
+
+
+async def test_save_cookies_after_handler_processing(server_url: URL) -> None:
+    """Test that cookies are saved correctly."""
+    async with SessionPool(max_pool_size=1) as session_pool:
+        crawler = PlaywrightCrawler(session_pool=session_pool)
+
+        session_ids = []
+
+        @crawler.router.default_handler
+        async def request_handler(context: PlaywrightCrawlingContext) -> None:
+            # Simulate cookies installed from an external source in the browser
+            await context.page.context.add_cookies([{'name': 'check', 'value': 'test', 'url': str(server_url)}])
+
+            if context.session:
+                session_ids.append(context.session.id)
+
+        await crawler.run([str(server_url)])
+
+        assert len(session_ids) == 1
+
+        check_session = await session_pool.get_session()
+
+        assert check_session.id == session_ids[0]
+        session_cookies = {cookie['name']: cookie['value'] for cookie in check_session.cookies.get_cookies_as_dicts()}
+
+        assert session_cookies == {'check': 'test'}
 
 
 async def test_custom_fingerprint_uses_generator_options(server_url: URL) -> None:
@@ -564,6 +599,24 @@ async def test_error_snapshot_through_statistics(server_url: URL) -> None:
     assert crawler.statistics.error_tracker.total == 3 * max_retries
     assert crawler.statistics.error_tracker.unique_error_count == 2
     assert len(kvs_content) == 4
+
+
+async def test_respect_robots_txt(server_url: URL) -> None:
+    crawler = PlaywrightCrawler(respect_robots_txt_file=True)
+    visit = mock.Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        visit(context.request.url)
+        await context.enqueue_links()
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+    visited = {call[0][0] for call in visit.call_args_list}
+
+    assert visited == {
+        str(server_url / 'start_enqueue'),
+        str(server_url / 'sub_index'),
+    }
 
 
 async def test_send_request(server_url: URL) -> None:
