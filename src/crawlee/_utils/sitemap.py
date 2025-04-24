@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 VALID_CHANGE_FREQS = {'always', 'hourly', 'daily', 'weekly', 'monthly', 'yearly', 'never'}
+SITEMAP_HEADERS = {'accept': 'text/plain, application/xhtml+xml, application/xml;q=0.9, */*;q=0.8'}
 
 
 @dataclass()
@@ -309,7 +310,7 @@ async def _fetch_and_process_sitemap(
     try:
         while retries_left > 0:
             retries_left -= 1
-            async with client.stream('GET', sitemap_url) as response:
+            async with client.stream('GET', sitemap_url, headers=SITEMAP_HEADERS) as response:
                 response.raise_for_status()
 
                 # Determine content type and compression
