@@ -232,10 +232,6 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             # Set the loaded URL to the actual URL after redirection.
             context.request.loaded_url = context.page.url
 
-            if context.session:
-                pw_cookies = await self._get_cookies(context.page)
-                context.session.cookies.set_cookies_from_playwright_format(pw_cookies)
-
             extract_links = self._create_extract_links_function(context)
 
             error = yield PlaywrightCrawlingContext(
@@ -255,6 +251,10 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 enqueue_links=self._create_enqueue_links_function(context, extract_links),
                 block_requests=partial(block_requests, page=context.page),
             )
+
+            if context.session:
+                pw_cookies = await self._get_cookies(context.page)
+                context.session.cookies.set_cookies_from_playwright_format(pw_cookies)
 
             # Collect data in case of errors, before the page object is closed.
             if error:
@@ -290,6 +290,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
             elements = await context.page.query_selector_all(selector)
 
+            robots_txt_file = await self._get_robots_txt_file_for_url(context.request.url)
+
             for element in elements:
                 url = await element.get_attribute('href')
 
@@ -299,6 +301,11 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                     if not is_url_absolute(url):
                         base_url = context.request.loaded_url or context.request.url
                         url = convert_to_absolute_url(base_url, url)
+
+                    if robots_txt_file and not robots_txt_file.is_allowed(url):
+                        # TODO: https://github.com/apify/crawlee-python/issues/1160
+                        # add processing with on_skipped_request hook
+                        continue
 
                     request_option = RequestOptions({'url': url, 'user_data': {**base_user_data}, 'label': label})
 
