@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 import signal
 import sys
 import tempfile
@@ -54,8 +53,13 @@ from crawlee.statistics import Statistics, StatisticsState
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 from ._context_pipeline import ContextPipeline
+from ._logging_utils import (
+    get_one_line_error_summary_if_possible,
+    reduce_asyncio_timeout_error_to_relevant_traceback_parts,
+)
 
 if TYPE_CHECKING:
+    import re
     from contextlib import AbstractAsyncContextManager
 
     from crawlee._types import ConcurrencySettings, HttpMethod, JsonSerializable
@@ -894,6 +898,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         if self._should_retry_request(context, error):
             request.retry_count += 1
+            self.log.warning(
+                f'Retrying request to {context.request.url} due to {error.__class__.__name__}. '
+                f'{get_one_line_error_summary_if_possible(error)}'
+            )
             await self._statistics.error_tracker.add(error=error, context=context)
 
             if self._error_handler:
@@ -947,8 +955,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             context.session.mark_bad()
 
     async def _handle_failed_request(self, context: TCrawlingContext | BasicCrawlingContext, error: Exception) -> None:
-        error_message = self._get_message_from_error(error)
-        self._logger.error(f'Request failed and reached maximum retries\n {error_message}')
+        self._logger.error(
+            f'Request to {context.request.url} failed and reached maximum retries\n '
+            f'{self._get_message_from_error(error)}'
+        )
         await self._statistics.error_tracker.add(error=error, context=context)
 
         if self._failed_request_handler:
@@ -962,30 +972,17 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         Custom processing to reduce the irrelevant traceback clutter in some cases.
         """
-        full_error_lines = traceback.format_exception(type(error), value=error, tb=error.__traceback__, chain=True)
+        traceback_parts = traceback.format_exception(type(error), value=error, tb=error.__traceback__, chain=True)
 
         if (
             isinstance(error, asyncio.exceptions.TimeoutError)
-            and self._request_handler_timeout_text in full_error_lines[-1]
+            and self._request_handler_timeout_text in traceback_parts[-1]
         ):
-            # Get only innermost error
-            inner_error = self._get_only_inner_most_exception(error)
-            filtered_error_lines = traceback.format_exception(
-                type(inner_error), value=inner_error, tb=inner_error.__traceback__, chain=True
-            )
+            filtered_traceback_parts = reduce_asyncio_timeout_error_to_relevant_traceback_parts(error)
+            filtered_traceback_parts.append(traceback_parts[-1].strip('\n'))
+            return ''.join(filtered_traceback_parts)
 
-            # Remove asyncio internal stack trace lines.
-            ignore_pattern = (
-                r'([\\/]{1}asyncio[\\/]{1})|'  # internal asyncio lines
-                r'(Traceback \(most recent call last\))|'  # common part of the stack trace formatting
-                r'(\^\^)|'  # highlight markers used in Python versions >3.10
-                r'(asyncio\.exceptions\.CancelledError)'  # internal asyncio exception
-            )
-            filtered_error_lines = [line for line in filtered_error_lines if not re.findall(ignore_pattern, line)]
-            filtered_error_lines.append(full_error_lines[-1])
-            return ''.join(filtered_error_lines)
-
-        return ''.join(full_error_lines)
+        return ''.join(traceback_parts)
 
     def _get_only_inner_most_exception(self, error: BaseException) -> BaseException:
         """Get innermost exception by following __cause__ and __context__ attributes of exception."""

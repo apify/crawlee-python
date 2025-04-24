@@ -1301,7 +1301,7 @@ async def test_reduced_logs_from_timed_out_request_handler(
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        await asyncio.sleep(10)  # Some very custom comment
+        await asyncio.sleep(10)  # INJECTED DELAY
 
     await crawler.run([Request.from_url('http://a.com/')])
 
@@ -1309,7 +1309,7 @@ async def test_reduced_logs_from_timed_out_request_handler(
         if record.funcName == '_handle_failed_request':
             full_message = (record.message or '') + (record.exc_text or '')
             assert Counter(full_message)['\n'] < 10
-            assert '# Some very custom comment' in full_message
+            assert '# INJECTED DELAY' in full_message
             break
     else:
         raise AssertionError('Expected log message about request handler error was not found.')
