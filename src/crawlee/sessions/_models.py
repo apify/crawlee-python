@@ -5,12 +5,11 @@ from typing import Annotated, Any
 
 from pydantic import (
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     GetPydanticSchema,
     PlainSerializer,
-    PlainValidator,
-    TypeAdapter,
     computed_field,
 )
 
@@ -36,17 +35,6 @@ class SessionModel(BaseModel):
     blocked_status_codes: Annotated[list[int], Field(alias='blockedStatusCodes')]
 
 
-session_list_adapter = TypeAdapter(list[SessionModel])
-
-
-def load_sessions(value: Any) -> Any:
-    try:
-        list_result = session_list_adapter.validate_python(value)
-        return {session.id: Session.from_model(session) for session in list_result}
-    except ValueError:
-        return value
-
-
 class SessionPoolModel(BaseModel):
     """Model for a SessionPool object."""
 
@@ -58,18 +46,21 @@ class SessionPoolModel(BaseModel):
         dict[
             str,
             Annotated[
-                Session,
-                GetPydanticSchema(lambda _, handler: handler(SessionModel)),
-            ],
+                Session, GetPydanticSchema(lambda _, handler: handler(Any))
+            ],  # handler(Any) is fine - we validate manually in the BeforeValidator
         ],
         Field(alias='sessions'),
         PlainSerializer(
-            lambda value: session_list_adapter.dump_python(
-                [session.get_state(as_dict=False) for session in value.values()]
-            ),
-            return_type=list[SessionModel],
+            lambda value: [session.get_state().model_dump(by_alias=True) for session in value.values()],
+            return_type=list,
         ),
-        PlainValidator(load_sessions),
+        BeforeValidator(
+            lambda value: {
+                session.id: session
+                for item in value
+                if (session := Session.from_model(SessionModel.model_validate(item, by_alias=True)))
+            }
+        ),
     ]
 
     @computed_field(alias='sessionCount')  # type: ignore[prop-decorator]
