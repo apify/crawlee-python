@@ -973,16 +973,16 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         Custom processing to reduce the irrelevant traceback clutter in some cases.
         """
         traceback_parts = traceback.format_exception(type(error), value=error, tb=error.__traceback__, chain=True)
+        used_traceback_parts = traceback_parts
 
         if (
             isinstance(error, asyncio.exceptions.TimeoutError)
             and self._request_handler_timeout_text in traceback_parts[-1]
         ):
-            filtered_traceback_parts = reduce_asyncio_timeout_error_to_relevant_traceback_parts(error)
-            filtered_traceback_parts.append(traceback_parts[-1].strip('\n'))
-            return ''.join(filtered_traceback_parts)
+            used_traceback_parts = reduce_asyncio_timeout_error_to_relevant_traceback_parts(error)
+            used_traceback_parts.append(traceback_parts[-1])
 
-        return ''.join(traceback_parts)
+        return ''.join(used_traceback_parts).strip('\n')
 
     def _get_only_inner_most_exception(self, error: BaseException) -> BaseException:
         """Get innermost exception by following __cause__ and __context__ attributes of exception."""

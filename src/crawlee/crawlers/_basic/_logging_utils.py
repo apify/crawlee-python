@@ -36,15 +36,29 @@ def _strip_pep657_highlighting(traceback_part: str) -> str:
 def reduce_asyncio_timeout_error_to_relevant_traceback_parts(
     timeout_error: asyncio.exceptions.TimeoutError,
 ) -> list[str]:
-    """Reduce the asyncio timeout traceback to most relevant parts."""
-    innermost_error = _get_only_innermost_exception(timeout_error)
-    traceback_parts = traceback.format_exception(
+    innermost_error_traceback_parts = _get_traceback_parts_for_innermost_exception(timeout_error)
+    return _get_filtered_traceback_parts_for_asyncio_timeout_error(innermost_error_traceback_parts)
+
+
+def _get_traceback_parts_for_innermost_exception(error: Exception) -> list[str]:
+    innermost_error = _get_only_innermost_exception(error)
+    return traceback.format_exception(
         type(innermost_error), value=innermost_error, tb=innermost_error.__traceback__, chain=True
     )
-    return _get_filtered_traceback_parts_for_asyncio_timeout_error(traceback_parts)
 
 
 def get_one_line_error_summary_if_possible(error: Exception) -> str:
     if isinstance(error, asyncio.exceptions.TimeoutError):
-        return reduce_asyncio_timeout_error_to_relevant_traceback_parts(error)[-1].strip('\n ').replace('\n', ', ')
-    return ''
+        most_relevant_part = reduce_asyncio_timeout_error_to_relevant_traceback_parts(error)[-1]
+    else:
+        traceback_parts = _get_traceback_parts_for_innermost_exception(error)
+        # Commonly last traceback part is type of the error and second last part is the relevant file.
+        # If there are not enough traceback parts, then we are not sure how to summarize the error.
+        relevant_traceback_part_index_from_end = 2
+        most_relevant_part = (
+            _get_traceback_parts_for_innermost_exception(error)[-relevant_traceback_part_index_from_end]
+            if len(traceback_parts) >= relevant_traceback_part_index_from_end
+            else ''
+        )
+
+    return most_relevant_part.strip('\n ').replace('\n', ', ')
