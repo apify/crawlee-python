@@ -29,7 +29,7 @@ def _get_filtered_traceback_parts_for_asyncio_timeout_error(traceback_parts: lis
 
 def _strip_pep657_highlighting(traceback_part: str) -> str:
     """Remove PEP 657 highlighting from the traceback."""
-    highlight_pattern = r'(\n\s*~*\^+\n)$'
+    highlight_pattern = r'(\n\s*~*\^+~*\n)$'
     return re.sub(highlight_pattern, '\n', traceback_part)
 
 
@@ -55,7 +55,7 @@ def get_one_line_error_summary_if_possible(error: Exception) -> str:
         # Commonly last traceback part is type of the error and second last part is the relevant file.
         # If there are not enough traceback parts, then we are not sure how to summarize the error.
         relevant_traceback_part_index_from_end = 2
-        most_relevant_part = (
+        most_relevant_part = _strip_pep657_highlighting(
             _get_traceback_parts_for_innermost_exception(error)[-relevant_traceback_part_index_from_end]
             if len(traceback_parts) >= relevant_traceback_part_index_from_end
             else ''
