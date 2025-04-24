@@ -28,11 +28,21 @@ logger = getLogger(__name__)
 
 
 class FileSystemKeyValueStoreClient(KeyValueStoreClient):
-    """A file system implementation of the key-value store client.
+    """File system implementation of the key-value store client.
 
-    This client persists data to the file system, making it suitable for scenarios where data needs
-    to survive process restarts. Each key-value pair is stored as a separate file, with its metadata
-    in an accompanying file.
+    This client persists data to the file system, making it suitable for scenarios where data needs to
+    survive process restarts. Keys are mapped to file paths in a directory structure following the pattern:
+
+    ```
+    {STORAGE_DIR}/key_value_stores/{STORE_ID}/{KEY}
+    ```
+
+    Binary data is stored as-is, while JSON and text data are stored in human-readable format.
+    The implementation automatically handles serialization based on the content type and
+    maintains metadata about each record.
+
+    This implementation is ideal for long-running crawlers where persistence is important and
+    for development environments where you want to easily inspect the stored data between runs.
     """
 
     _STORAGE_SUBDIR = 'key_value_stores'

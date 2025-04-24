@@ -21,11 +21,15 @@ logger = getLogger(__name__)
 
 
 class MemoryKeyValueStoreClient(KeyValueStoreClient):
-    """A memory implementation of the key-value store client.
+    """Memory implementation of the key-value store client.
 
-    This client stores key-value store pairs in memory using a dictionary. No data is persisted,
-    which means all data is lost when the process terminates. This implementation is mainly useful
-    for testing and development purposes where persistence is not required.
+    This client stores data in memory as Python dictionaries. No data is persisted between
+    process runs, meaning all stored data is lost when the program terminates. This implementation
+    is primarily useful for testing, development, and short-lived crawler operations where
+    persistence is not required.
+
+    The memory implementation provides fast access to data but is limited by available memory and
+    does not support data sharing across different processes.
     """
 
     _cache_by_name: ClassVar[dict[str, MemoryKeyValueStoreClient]] = {}

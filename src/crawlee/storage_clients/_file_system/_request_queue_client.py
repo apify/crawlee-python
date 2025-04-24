@@ -29,9 +29,20 @@ logger = getLogger(__name__)
 class FileSystemRequestQueueClient(RequestQueueClient):
     """A file system implementation of the request queue client.
 
-    This client persists requests to the file system, making it suitable for scenarios where data needs
-    to survive process restarts. Each request is stored as a separate file, allowing for proper request
-    handling and tracking across crawler runs.
+    This client persists requests to the file system as individual JSON files, making it suitable for scenarios
+    where data needs to survive process restarts. Each request is stored as a separate file in a directory
+    structure following the pattern:
+
+    ```
+    {STORAGE_DIR}/request_queues/{QUEUE_ID}/{REQUEST_ID}.json
+    ```
+
+    The implementation uses file timestamps for FIFO ordering of regular requests and maintains in-memory sets
+    for tracking in-progress and forefront requests. File system storage provides durability at the cost of
+    slower I/O operations compared to memory-based storage.
+
+    This implementation is ideal for long-running crawlers where persistence is important and for situations
+    where you need to resume crawling after process termination.
     """
 
     _STORAGE_SUBDIR = 'request_queues'
@@ -78,6 +89,12 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         self._lock = asyncio.Lock()
         """A lock to ensure that only one operation is performed at a time."""
 
+        self._in_progress = set[str]()
+        """A set of request IDs that are currently being processed."""
+
+        self._forefront_requests = set[str]()
+        """A set of request IDs that should be prioritized (added with forefront=True)."""
+
     @override
     @property
     def metadata(self) -> RequestQueueMetadata:
@@ -120,7 +137,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         metadata_path = rq_path / METADATA_FILENAME
 
         # If the RQ directory exists, reconstruct the client from the metadata file.
-        if rq_path.exists():
+        if rq_path.exists() and not configuration.purge_on_start:
             # If metadata file is missing, raise an error.
             if not metadata_path.exists():
                 raise ValueError(f'Metadata file not found for request queue "{name}"')
@@ -149,10 +166,40 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 storage_dir=storage_dir,
             )
 
-            await client._update_metadata(update_accessed_at=True)
+            # Recalculate request counts from actual files to ensure consistency
+            handled_count = 0
+            pending_count = 0
+            request_files = await asyncio.to_thread(list, rq_path.glob('*.json'))
+            for request_file in request_files:
+                if request_file.name == METADATA_FILENAME:
+                    continue
+
+                try:
+                    file = await asyncio.to_thread(open, request_file)
+                    try:
+                        data = json.load(file)
+                        if data.get('handled_at') is not None:
+                            handled_count += 1
+                        else:
+                            pending_count += 1
+                    finally:
+                        await asyncio.to_thread(file.close)
+                except (json.JSONDecodeError, ValidationError):
+                    logger.warning(f'Failed to parse request file: {request_file}')
+
+            await client._update_metadata(
+                update_accessed_at=True,
+                new_handled_request_count=handled_count,
+                new_pending_request_count=pending_count,
+                new_total_request_count=handled_count + pending_count,
+            )
 
         # Otherwise, create a new dataset client.
         else:
+            # If purge_on_start is true and the directory exists, remove it
+            if configuration.purge_on_start and rq_path.exists():
+                await asyncio.to_thread(shutil.rmtree, rq_path)
+
             now = datetime.now(timezone.utc)
             client = cls(
                 id=crypto_random_object_id(),
@@ -185,8 +232,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         if self.metadata.name in self.__class__._cache_by_name:  # noqa: SLF001
             del self.__class__._cache_by_name[self.metadata.name]  # noqa: SLF001
 
-    # TODO: continue
-
     @override
     async def add_batch_of_requests(
         self,
@@ -204,15 +249,13 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             Response containing information about the added requests.
         """
         async with self._lock:
+            new_total_request_count = self._metadata.total_request_count
+            new_pending_request_count = self._metadata.pending_request_count
+
             processed_requests = []
 
             # Create the requests directory if it doesn't exist
-            requests_dir = self.path_to_rq / 'requests'
-            await asyncio.to_thread(requests_dir.mkdir, parents=True, exist_ok=True)
-
-            # Create the in_progress directory if it doesn't exist
-            in_progress_dir = self.path_to_rq / 'in_progress'
-            await asyncio.to_thread(in_progress_dir.mkdir, parents=True, exist_ok=True)
+            await asyncio.to_thread(self.path_to_rq.mkdir, parents=True, exist_ok=True)
 
             for request in requests:
                 # Ensure the request has an ID
@@ -223,8 +266,12 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 existing_request = None
 
                 # List all request files and check for matching unique_key
-                request_files = await asyncio.to_thread(list, requests_dir.glob('*.json'))
+                request_files = await asyncio.to_thread(list, self.path_to_rq.glob('*.json'))
                 for request_file in request_files:
+                    # Skip metadata file
+                    if request_file.name == METADATA_FILENAME:
+                        continue
+
                     file = await asyncio.to_thread(open, request_file)
                     try:
                         file_content = json.load(file)
@@ -242,10 +289,10 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 )
 
                 # If the request is already in the queue and handled, don't add it again
-                if was_already_handled:
+                if was_already_handled and existing_request:
                     processed_requests.append(
                         ProcessedRequest(
-                            id=request.id,
+                            id=existing_request.id,
                             unique_key=request.unique_key,
                             was_already_present=True,
                             was_already_handled=True,
@@ -253,33 +300,70 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     )
                     continue
 
+                # If forefront and existing request is not handled, mark it as forefront
+                if forefront and was_already_present and not was_already_handled and existing_request:
+                    self._forefront_requests.add(existing_request.id)
+                    processed_requests.append(
+                        ProcessedRequest(
+                            id=existing_request.id,
+                            unique_key=request.unique_key,
+                            was_already_present=True,
+                            was_already_handled=False,
+                        )
+                    )
+                    continue
+
                 # If the request is already in the queue but not handled, update it
-                if was_already_present:
+                if was_already_present and existing_request:
                     # Update the existing request file
-                    request_path = requests_dir / f'{request.id}.json'
-                    request_data = await json_dumps(request.model_dump())
-                    await asyncio.to_thread(request_path.write_text, request_data, encoding='utf-8')
-                else:
-                    # Add the new request to the queue
-                    request_path = requests_dir / f'{request.id}.json'
-                    request_data = await json_dumps(request.model_dump())
+                    request_path = self.path_to_rq / f'{existing_request.id}.json'
+                    request_data = await json_dumps(existing_request.model_dump())
                     await asyncio.to_thread(request_path.write_text, request_data, encoding='utf-8')
 
-                    # Update metadata counts
-                    self._metadata.total_request_count += 1
-                    self._metadata.pending_request_count += 1
+                    processed_requests.append(
+                        ProcessedRequest(
+                            id=existing_request.id,
+                            unique_key=request.unique_key,
+                            was_already_present=True,
+                            was_already_handled=False,
+                        )
+                    )
+                    continue
+
+                # Add the new request to the queue
+                request_path = self.path_to_rq / f'{request.id}.json'
+
+                # Create a data dictionary from the request and remove handled_at if it's None
+                request_dict = request.model_dump()
+                if request_dict.get('handled_at') is None:
+                    request_dict.pop('handled_at', None)
+
+                request_data = await json_dumps(request_dict)
+                await asyncio.to_thread(request_path.write_text, request_data, encoding='utf-8')
+
+                # Update metadata counts
+                new_total_request_count += 1
+                new_pending_request_count += 1
+
+                # If forefront, add to the forefront set
+                if forefront:
+                    self._forefront_requests.add(request.id)
 
                 processed_requests.append(
                     ProcessedRequest(
                         id=request.id,
                         unique_key=request.unique_key,
-                        was_already_present=was_already_present,
+                        was_already_present=False,
                         was_already_handled=False,
                     )
                 )
 
-            # Update metadata
-            await self._update_metadata(update_modified_at=True)
+            await self._update_metadata(
+                update_modified_at=True,
+                update_accessed_at=True,
+                new_total_request_count=new_total_request_count,
+                new_pending_request_count=new_pending_request_count,
+            )
 
             return AddRequestsResponse(
                 processed_requests=processed_requests,
@@ -296,24 +380,17 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         Returns:
             The retrieved request, or None, if it did not exist.
         """
-        # First check in-progress directory
-        in_progress_dir = self.path_to_rq / 'in_progress'
-        in_progress_path = in_progress_dir / f'{request_id}.json'
+        request_path = self.path_to_rq / f'{request_id}.json'
 
-        # Then check regular requests directory
-        requests_dir = self.path_to_rq / 'requests'
-        request_path = requests_dir / f'{request_id}.json'
-
-        for path in [in_progress_path, request_path]:
-            if await asyncio.to_thread(path.exists):
-                file = await asyncio.to_thread(open, path)
-                try:
-                    file_content = json.load(file)
-                    return Request(**file_content)
-                except (json.JSONDecodeError, ValidationError) as e:
-                    logger.warning(f'Failed to parse request file {path}: {e!s}')
-                finally:
-                    await asyncio.to_thread(file.close)
+        if await asyncio.to_thread(request_path.exists):
+            file = await asyncio.to_thread(open, request_path)
+            try:
+                file_content = json.load(file)
+                return Request(**file_content)
+            except (json.JSONDecodeError, ValidationError) as exc:
+                logger.warning(f'Failed to parse request file {request_path}: {exc!s}')
+            finally:
+                await asyncio.to_thread(file.close)
 
         return None
 
@@ -330,18 +407,55 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             The request or `None` if there are no more pending requests.
         """
         async with self._lock:
-            # Create the requests and in_progress directories if they don't exist
-            requests_dir = self.path_to_rq / 'requests'
-            in_progress_dir = self.path_to_rq / 'in_progress'
-
-            await asyncio.to_thread(requests_dir.mkdir, parents=True, exist_ok=True)
-            await asyncio.to_thread(in_progress_dir.mkdir, parents=True, exist_ok=True)
+            # Create the requests directory if it doesn't exist
+            await asyncio.to_thread(self.path_to_rq.mkdir, parents=True, exist_ok=True)
 
             # List all request files
-            request_files = await asyncio.to_thread(list, requests_dir.glob('*.json'))
+            request_files = await asyncio.to_thread(list, self.path_to_rq.glob('*.json'))
 
-            # Find a request that's not handled
+            # First check for forefront requests
+            forefront_requests = []
+            regular_requests = []
+
+            # Get file creation times for sorting regular requests in FIFO order
+            request_file_times = {}
+
+            # Separate requests into forefront and regular
             for request_file in request_files:
+                # Skip metadata file
+                if request_file.name == METADATA_FILENAME:
+                    continue
+
+                # Extract request ID from filename
+                request_id = request_file.stem
+
+                # Skip if already in progress
+                if request_id in self._in_progress:
+                    continue
+
+                # Get file creation/modification time for FIFO ordering
+                try:
+                    file_stat = await asyncio.to_thread(request_file.stat)
+                    request_file_times[request_file] = file_stat.st_mtime
+                except Exception:
+                    # If we can't get the time, use 0 (oldest)
+                    request_file_times[request_file] = 0
+
+                if request_id in self._forefront_requests:
+                    forefront_requests.append(request_file)
+                else:
+                    regular_requests.append(request_file)
+
+            # Sort regular requests by creation time (FIFO order)
+            regular_requests.sort(key=lambda f: request_file_times[f])
+
+            # Prioritize forefront requests
+            prioritized_files = forefront_requests + regular_requests
+
+            # Process files in prioritized order
+            for request_file in prioritized_files:
+                request_id = request_file.stem
+
                 file = await asyncio.to_thread(open, request_file)
                 try:
                     file_content = json.load(file)
@@ -352,19 +466,17 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     # Create request object
                     request = Request(**file_content)
 
-                    # Move to in-progress
-                    in_progress_path = in_progress_dir / f'{request.id}.json'
+                    # Mark as in-progress in memory
+                    self._in_progress.add(request.id)
 
-                    # If already in in-progress, skip
-                    if await asyncio.to_thread(in_progress_path.exists):
-                        continue
+                    # Remove from forefront set if it was there
+                    self._forefront_requests.discard(request.id)
 
-                    # Write to in-progress directory
-                    request_data = await json_dumps(request.model_dump())
-                    await asyncio.to_thread(in_progress_path.write_text, request_data, encoding='utf-8')
+                    # Update accessed timestamp
+                    await self._update_metadata(update_accessed_at=True)
 
-                except (json.JSONDecodeError, ValidationError) as e:
-                    logger.warning(f'Failed to parse request file {request_file}: {e!s}')
+                except (json.JSONDecodeError, ValidationError) as exc:
+                    logger.warning(f'Failed to parse request file {request_file}: {exc!s}')
                 else:
                     return request
                 finally:
@@ -386,32 +498,32 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         """
         async with self._lock:
             # Check if the request is in progress
-            in_progress_dir = self.path_to_rq / 'in_progress'
-            in_progress_path = in_progress_dir / f'{request.id}.json'
-
-            if not await asyncio.to_thread(in_progress_path.exists):
+            if request.id not in self._in_progress:
                 return None
+
+            # Remove from in-progress set
+            self._in_progress.discard(request.id)
 
             # Update the request object - set handled_at timestamp
             if request.handled_at is None:
                 request.handled_at = datetime.now(timezone.utc)
 
             # Write the updated request back to the requests directory
-            requests_dir = self.path_to_rq / 'requests'
-            request_path = requests_dir / f'{request.id}.json'
+            request_path = self.path_to_rq / f'{request.id}.json'
+
+            if not await asyncio.to_thread(request_path.exists):
+                return None
 
             request_data = await json_dumps(request.model_dump())
             await asyncio.to_thread(request_path.write_text, request_data, encoding='utf-8')
 
-            # Remove the in-progress file
-            await asyncio.to_thread(in_progress_path.unlink, missing_ok=True)
-
-            # Update metadata counts
-            self._metadata.handled_request_count += 1
-            self._metadata.pending_request_count -= 1
-
             # Update metadata timestamps
-            await self._update_metadata(update_modified_at=True)
+            await self._update_metadata(
+                update_modified_at=True,
+                update_accessed_at=True,
+                new_handled_request_count=self._metadata.handled_request_count + 1,
+                new_pending_request_count=self._metadata.pending_request_count - 1,
+            )
 
             return ProcessedRequest(
                 id=request.id,
@@ -440,30 +552,31 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         """
         async with self._lock:
             # Check if the request is in progress
-            in_progress_dir = self.path_to_rq / 'in_progress'
-            in_progress_path = in_progress_dir / f'{request.id}.json'
-
-            if not await asyncio.to_thread(in_progress_path.exists):
+            if request.id not in self._in_progress:
                 return None
 
-            # Remove the in-progress file
-            await asyncio.to_thread(in_progress_path.unlink, missing_ok=True)
+            # Remove from in-progress set
+            self._in_progress.discard(request.id)
 
-            # If forefront is true, we need to handle this specially
-            # Since we can't reorder files, we'll add a 'priority' field to the request
+            # If forefront is true, mark this request as priority
             if forefront:
-                # Update the priority of the request to indicate it should be processed first
-                request.priority = 1  # Higher priority
+                self._forefront_requests.add(request.id)
+            else:
+                # Make sure it's not in the forefront set if it was previously added there
+                self._forefront_requests.discard(request.id)
 
-            # Write the updated request back to the requests directory
-            requests_dir = self.path_to_rq / 'requests'
-            request_path = requests_dir / f'{request.id}.json'
+            # To simulate changing the file timestamp for FIFO ordering,
+            # we'll update the file with current timestamp
+            request_path = self.path_to_rq / f'{request.id}.json'
+
+            if not await asyncio.to_thread(request_path.exists):
+                return None
 
             request_data = await json_dumps(request.model_dump())
             await asyncio.to_thread(request_path.write_text, request_data, encoding='utf-8')
 
             # Update metadata timestamps
-            await self._update_metadata(update_modified_at=True)
+            await self._update_metadata(update_modified_at=True, update_accessed_at=True)
 
             return ProcessedRequest(
                 id=request.id,
@@ -479,15 +592,21 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         Returns:
             True if the queue is empty, False otherwise.
         """
+        # Update accessed timestamp when checking if queue is empty
+        await self._update_metadata(update_accessed_at=True)
+
         # Create the requests directory if it doesn't exist
-        requests_dir = self.path_to_rq / 'requests'
-        await asyncio.to_thread(requests_dir.mkdir, parents=True, exist_ok=True)
+        await asyncio.to_thread(self.path_to_rq.mkdir, parents=True, exist_ok=True)
 
         # List all request files
-        request_files = await asyncio.to_thread(list, requests_dir.glob('*.json'))
+        request_files = await asyncio.to_thread(list, self.path_to_rq.glob('*.json'))
 
         # Check each file to see if there are any unhandled requests
         for request_file in request_files:
+            # Skip metadata file
+            if request_file.name == METADATA_FILENAME:
+                continue
+
             file = await asyncio.to_thread(open, request_file)
             try:
                 file_content = json.load(file)
@@ -505,21 +624,45 @@ class FileSystemRequestQueueClient(RequestQueueClient):
     async def _update_metadata(
         self,
         *,
+        new_handled_request_count: int | None = None,
+        new_pending_request_count: int | None = None,
+        new_total_request_count: int | None = None,
+        update_had_multiple_clients: bool = False,
         update_accessed_at: bool = False,
         update_modified_at: bool = False,
     ) -> None:
         """Update the dataset metadata file with current information.
 
         Args:
+            new_handled_request_count: If provided, update the handled_request_count to this value.
+            new_pending_request_count: If provided, update the pending_request_count to this value.
+            new_total_request_count: If provided, update the total_request_count to this value.
+            update_had_multiple_clients: If True, set had_multiple_clients to True.
             update_accessed_at: If True, update the `accessed_at` timestamp to the current time.
             update_modified_at: If True, update the `modified_at` timestamp to the current time.
         """
+        # Always create a new timestamp to ensure it's truly updated
         now = datetime.now(timezone.utc)
 
+        # Update timestamps according to parameters
         if update_accessed_at:
             self._metadata.accessed_at = now
+
         if update_modified_at:
             self._metadata.modified_at = now
+
+        # Update request counts if provided
+        if new_handled_request_count is not None:
+            self._metadata.handled_request_count = new_handled_request_count
+
+        if new_pending_request_count is not None:
+            self._metadata.pending_request_count = new_pending_request_count
+
+        if new_total_request_count is not None:
+            self._metadata.total_request_count = new_total_request_count
+
+        if update_had_multiple_clients:
+            self._metadata.had_multiple_clients = True
 
         # Ensure the parent directory for the metadata file exists.
         await asyncio.to_thread(self.path_to_metadata.parent.mkdir, parents=True, exist_ok=True)

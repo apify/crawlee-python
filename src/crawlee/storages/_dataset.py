@@ -31,34 +31,38 @@ logger = logging.getLogger(__name__)
 
 @docs_group('Classes')
 class Dataset(Storage):
-    """Dataset is an append-only structured storage, ideal for tabular data similar to database tables.
+    """Dataset is a storage for managing structured tabular data.
 
-    The `Dataset` class is designed to store structured data, where each entry (row) maintains consistent attributes
-    (columns) across the dataset. It operates in an append-only mode, allowing new records to be added, but not
-    modified or deleted. This makes it particularly useful for storing results from web crawling operations.
+    The dataset class provides a high-level interface for storing and retrieving structured data
+    with consistent schema, similar to database tables or spreadsheets. It abstracts the underlying
+    storage implementation details, offering a consistent API regardless of where the data is
+    physically stored.
 
-    Data can be stored either locally or in the cloud. It depends on the setup of underlying storage client.
-    By default a `MemoryStorageClient` is used, but it can be changed to a different one.
+    Dataset operates in an append-only mode, allowing new records to be added but not modified
+    or deleted after creation. This makes it particularly suitable for storing crawling results
+    and other data that should be immutable once collected.
 
-    By default, data is stored using the following path structure:
-    ```
-    {CRAWLEE_STORAGE_DIR}/datasets/{DATASET_ID}/{INDEX}.json
-    ```
-    - `{CRAWLEE_STORAGE_DIR}`: The root directory for all storage data specified by the environment variable.
-    - `{DATASET_ID}`: Specifies the dataset, either "default" or a custom dataset ID.
-    - `{INDEX}`: Represents the zero-based index of the record within the dataset.
-
-    To open a dataset, use the `open` class method by specifying an `id`, `name`, or `configuration`. If none are
-    provided, the default dataset for the current crawler run is used. Attempting to open a dataset by `id` that does
-    not exist will raise an error; however, if accessed by `name`, the dataset will be created if it doesn't already
-    exist.
+    The class provides methods for adding data, retrieving data with various filtering options,
+    and exporting data to different formats. You can create a dataset using the `open` class method,
+    specifying either a name or ID. The underlying storage implementation is determined by
+    the configured storage client.
 
     ### Usage
 
     ```python
     from crawlee.storages import Dataset
 
+    # Open a dataset
     dataset = await Dataset.open(name='my_dataset')
+
+    # Add data
+    await dataset.push_data({'title': 'Example Product', 'price': 99.99})
+
+    # Retrieve filtered data
+    results = await dataset.get_data(limit=10, desc=True)
+
+    # Export data
+    await dataset.export_to('results.json', content_type='json')
     ```
     """
 

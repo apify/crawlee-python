@@ -22,36 +22,32 @@ T = TypeVar('T')
 
 @docs_group('Classes')
 class KeyValueStore(Storage):
-    """Represents a key-value based storage for reading and writing data records or files.
+    """Key-value store is a storage for reading and writing data records with unique key identifiers.
 
-    Each data record is identified by a unique key and associated with a specific MIME content type. This class is
-    commonly used in crawler runs to store inputs and outputs, typically in JSON format, but it also supports other
-    content types.
+    The key-value store class acts as a high-level interface for storing, retrieving, and managing data records
+    identified by unique string keys. It abstracts away the underlying storage implementation details,
+    allowing you to work with the same API regardless of whether data is stored in memory, on disk,
+    or in the cloud.
 
-    Data can be stored either locally or in the cloud. It depends on the setup of underlying storage client.
-    By default a `MemoryStorageClient` is used, but it can be changed to a different one.
+    Each data record is associated with a specific MIME content type, allowing storage of various
+    data formats such as JSON, text, images, HTML snapshots or any binary data. This class is
+    commonly used to store inputs, outputs, and other artifacts of crawler operations.
 
-    By default, data is stored using the following path structure:
-    ```
-    {CRAWLEE_STORAGE_DIR}/key_value_stores/{STORE_ID}/{KEY}.{EXT}
-    ```
-    - `{CRAWLEE_STORAGE_DIR}`: The root directory for all storage data specified by the environment variable.
-    - `{STORE_ID}`: The identifier for the key-value store, either "default" or as specified by
-      `CRAWLEE_DEFAULT_KEY_VALUE_STORE_ID`.
-    - `{KEY}`: The unique key for the record.
-    - `{EXT}`: The file extension corresponding to the MIME type of the content.
-
-    To open a key-value store, use the `open` class method, providing an `id`, `name`, or optional `configuration`.
-    If none are specified, the default store for the current crawler run is used. Attempting to open a store by `id`
-    that does not exist will raise an error; however, if accessed by `name`, the store will be created if it does not
-    already exist.
+    You can instantiate a key-value store using the `open` class method, which will create a store
+    with the specified name or id. The underlying storage implementation is determined by the configured
+    storage client.
 
     ### Usage
 
     ```python
     from crawlee.storages import KeyValueStore
 
-    kvs = await KeyValueStore.open(name='my_kvs')
+    # Open a named key-value store
+    kvs = await KeyValueStore.open(name='my-store')
+
+    # Store and retrieve data
+    await kvs.set_value('product-1234.json', [{'name': 'Smartphone', 'price': 799.99}])
+    product = await kvs.get_value('product-1234')
     ```
     """
 

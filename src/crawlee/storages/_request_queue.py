@@ -30,34 +30,43 @@ T = TypeVar('T')
 
 @docs_group('Classes')
 class RequestQueue(Storage, RequestManager):
-    """Represents a queue storage for managing HTTP requests in web crawling operations.
+    """Request queue is a storage for managing HTTP requests.
 
-    The `RequestQueue` class handles a queue of HTTP requests, each identified by a unique URL, to facilitate structured
-    web crawling. It supports both breadth-first and depth-first crawling strategies, allowing for recursive crawling
-    starting from an initial set of URLs. Each URL in the queue is uniquely identified by a `unique_key`, which can be
-    customized to allow the same URL to be added multiple times under different keys.
+    The request queue class serves as a high-level interface for organizing and managing HTTP requests
+    during web crawling. It provides methods for adding, retrieving, and manipulating requests throughout
+    the crawling lifecycle, abstracting away the underlying storage implementation details.
 
-    Data can be stored either locally or in the cloud. It depends on the setup of underlying storage client.
-    By default a `MemoryStorageClient` is used, but it can be changed to a different one.
+    Request queue maintains the state of each URL to be crawled, tracking whether it has been processed,
+    is currently being handled, or is waiting in the queue. Each URL in the queue is uniquely identified
+    by a `unique_key` property, which prevents duplicate processing unless explicitly configured otherwise.
 
-    By default, data is stored using the following path structure:
-    ```
-    {CRAWLEE_STORAGE_DIR}/request_queues/{QUEUE_ID}/{REQUEST_ID}.json
-    ```
-    - `{CRAWLEE_STORAGE_DIR}`: The root directory for all storage data specified by the environment variable.
-    - `{QUEUE_ID}`: The identifier for the request queue, either "default" or as specified.
-    - `{REQUEST_ID}`: The unique identifier for each request in the queue.
+    The class supports both breadth-first and depth-first crawling strategies through its `forefront` parameter
+    when adding requests. It also provides mechanisms for error handling and request reclamation when
+    processing fails.
 
-    The `RequestQueue` supports both creating new queues and opening existing ones by `id` or `name`. Named queues
-    persist indefinitely, while unnamed queues expire after 7 days unless specified otherwise. The queue supports
-    mutable operations, allowing URLs to be added and removed as needed.
+    You can open a request queue using the `open` class method, specifying either a name or ID to identify
+    the queue. The underlying storage implementation is determined by the configured storage client.
 
     ### Usage
 
     ```python
     from crawlee.storages import RequestQueue
 
-    rq = await RequestQueue.open(name='my_rq')
+    # Open a request queue
+    rq = await RequestQueue.open(name='my_queue')
+
+    # Add a request
+    await rq.add_request('https://example.com')
+
+    # Process requests
+    request = await rq.fetch_next_request()
+    if request:
+        try:
+            # Process the request
+            # ...
+            await rq.mark_request_as_handled(request)
+        except Exception:
+            await rq.reclaim_request(request)
     ```
     """
 
@@ -221,31 +230,33 @@ class RequestQueue(Storage, RequestManager):
         instead.
 
         Returns:
-            The request or `None` if there are no more pending requests.
+            The next request to process, or `None` if there are no more pending requests.
         """
         return await self._client.fetch_next_request()
 
     async def get_request(self, request_id: str) -> Request | None:
-        """Retrieve a request by its ID.
+        """Retrieve a specific request from the queue by its ID.
 
         Args:
             request_id: The ID of the request to retrieve.
 
         Returns:
-            The request if found, otherwise `None`.
+            The request with the specified ID, or `None` if no such request exists.
         """
         return await self._client.get_request(request_id)
 
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
         """Mark a request as handled after successful processing.
 
-        Handled requests will never again be returned by the `RequestQueue.fetch_next_request` method.
+        This method should be called after a request has been successfully processed.
+        Once marked as handled, the request will be removed from the queue and will
+        not be returned in subsequent calls to `fetch_next_request` method.
 
         Args:
             request: The request to mark as handled.
 
         Returns:
-            Information about the queue operation. `None` if the given request was not in progress.
+            Information about the queue operation.
         """
         return await self._client.mark_request_as_handled(request)
 
@@ -255,23 +266,28 @@ class RequestQueue(Storage, RequestManager):
         *,
         forefront: bool = False,
     ) -> ProcessedRequest | None:
-        """Reclaim a failed request back to the queue.
+        """Reclaim a failed request back to the queue for later processing.
 
-        The request will be returned for processing later again by another call to `RequestQueue.fetch_next_request`.
+        If a request fails during processing, this method can be used to return it to the queue.
+        The request will be returned for processing again in a subsequent call
+        to `RequestQueue.fetch_next_request`.
 
         Args:
             request: The request to return to the queue.
-            forefront: Whether to add the request to the head or the end of the queue.
+            forefront: If true, the request will be added to the beginning of the queue.
+                Otherwise, it will be added to the end.
 
         Returns:
-            Information about the queue operation. `None` if the given request was not in progress.
+            Information about the queue operation.
         """
         return await self._client.reclaim_request(request, forefront=forefront)
 
     async def is_empty(self) -> bool:
         """Check if the request queue is empty.
 
-        An empty queue means that there are no requests in the queue.
+        An empty queue means that there are no requests currently in the queue, either pending or being processed.
+        However, this does not necessarily mean that the crawling operation is finished, as there still might be
+        tasks that could add additional requests to the queue.
 
         Returns:
             True if the request queue is empty, False otherwise.
@@ -281,11 +297,12 @@ class RequestQueue(Storage, RequestManager):
     async def is_finished(self) -> bool:
         """Check if the request queue is finished.
 
-        Finished means that all requests in the queue have been processed (the queue is empty) and there
-        are no more tasks that could add additional requests to the queue.
+        A finished queue means that all requests in the queue have been processed (the queue is empty) and there
+        are no more tasks that could add additional requests to the queue. This is the definitive way to check
+        if a crawling operation is complete.
 
         Returns:
-            True if the request queue is finished, False otherwise.
+            True if the request queue is finished (empty and no pending add operations), False otherwise.
         """
         if self._add_requests_tasks:
             logger.debug('Background add requests tasks are still in progress.')
@@ -305,6 +322,7 @@ class RequestQueue(Storage, RequestManager):
         attempt: int = 1,
         forefront: bool = False,
     ) -> None:
+        """Process a batch of requests with automatic retry mechanism."""
         max_attempts = 5
         response = await self._client.add_batch_of_requests(batch, forefront=forefront)
 

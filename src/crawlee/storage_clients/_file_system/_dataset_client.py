@@ -27,11 +27,21 @@ logger = getLogger(__name__)
 
 
 class FileSystemDatasetClient(DatasetClient):
-    """A file system implementation of the dataset client.
+    """File system implementation of the dataset client.
 
-    This client persists data to the file system, making it suitable for scenarios where data needs
-    to survive process restarts. Each dataset item is stored as a separate JSON file with a numeric
-    filename, allowing for easy ordering and pagination.
+    This client persists dataset items to the file system as individual JSON files within a structured
+    directory hierarchy following the pattern:
+
+    ```
+    {STORAGE_DIR}/datasets/{DATASET_ID}/{ITEM_ID}.json
+    ```
+
+    Each item is stored as a separate file, which allows for durability and the ability to
+    recover after process termination. Dataset operations like filtering, sorting, and pagination are
+    implemented by processing the stored files according to the requested parameters.
+
+    This implementation is ideal for long-running crawlers where data persistence is important,
+    and for development environments where you want to easily inspect the collected data between runs.
     """
 
     _STORAGE_SUBDIR = 'datasets'

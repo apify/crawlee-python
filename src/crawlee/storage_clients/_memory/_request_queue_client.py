@@ -24,11 +24,15 @@ logger = getLogger(__name__)
 
 
 class MemoryRequestQueueClient(RequestQueueClient):
-    """A memory implementation of the request queue client.
+    """Memory implementation of the request queue client.
 
-    This client stores requests in memory using a list. No data is persisted, which means
-    all requests are lost when the process terminates. This implementation is mainly useful
-    for testing and development purposes where persistence is not required.
+    This client stores requests in memory using a Python list and dictionary. No data is persisted between
+    process runs, which means all requests are lost when the program terminates. This implementation
+    is primarily useful for testing, development, and short-lived crawler runs where persistence
+    is not required.
+
+    This client provides fast access to request data but is limited by available memory and
+    does not support data sharing across different processes.
     """
 
     _cache_by_name: ClassVar[dict[str, MemoryRequestQueueClient]] = {}
@@ -50,7 +54,7 @@ class MemoryRequestQueueClient(RequestQueueClient):
     ) -> None:
         """Initialize a new instance.
 
-        Preferably use the `FileSystemRequestQueueClient.open` class method to create a new instance.
+        Preferably use the `MemoryRequestQueueClient.open` class method to create a new instance.
         """
         self._metadata = RequestQueueMetadata(
             id=id,
@@ -192,8 +196,7 @@ class MemoryRequestQueueClient(RequestQueueClient):
                 )
             )
 
-        # Update metadata
-        await self._update_metadata(update_modified_at=True)
+        await self._update_metadata(update_accessed_at=True, update_modified_at=True)
 
         return AddRequestsResponse(
             processed_requests=processed_requests,
@@ -333,6 +336,8 @@ class MemoryRequestQueueClient(RequestQueueClient):
         Returns:
             True if the queue is empty, False otherwise.
         """
+        await self._update_metadata(update_accessed_at=True)
+
         # Queue is empty if there are no pending requests
         pending_requests = [r for r in self._records if r.handled_at is None]
         return len(pending_requests) == 0

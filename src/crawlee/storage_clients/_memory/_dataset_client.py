@@ -19,11 +19,16 @@ logger = getLogger(__name__)
 
 
 class MemoryDatasetClient(DatasetClient):
-    """A memory implementation of the dataset client.
+    """Memory implementation of the dataset client.
 
-    This client stores dataset items in memory using a list. No data is persisted, which means
-    all data is lost when the process terminates. This implementation is mainly useful for testing
-    and development purposes where persistence is not required.
+    This client stores dataset items in memory using Python lists and dictionaries. No data is persisted
+    between process runs, meaning all stored data is lost when the program terminates. This implementation
+    is primarily useful for testing, development, and short-lived crawler operations where persistent
+    storage is not required.
+
+    The memory implementation provides fast access to data but is limited by available memory and
+    does not support data sharing across different processes. It supports all dataset operations including
+    sorting, filtering, and pagination, but performs them entirely in memory.
     """
 
     _cache_by_name: ClassVar[dict[str, MemoryDatasetClient]] = {}
