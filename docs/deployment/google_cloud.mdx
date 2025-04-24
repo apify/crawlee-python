@@ -10,13 +10,15 @@ import CodeBlock from '@theme/CodeBlock';
 
 import GoogleFunctions from '!!raw-loader!./code_examples/google/google_example.py';
 
+[Google Cloud Run Functions](https://cloud.google.com/functions) is a serverless execution environment for running simple HTTP-based web scrapers. This service is best suited for lightweight crawlers that don't require browser rendering capabilities and can be executed via HTTP requests.
+
 ## Updating the project
 
 For the project foundation, use <ApiLink to="class/BeautifulSoupCrawler">BeautifulSoupCrawler</ApiLink> as described in this [example](../examples/beautifulsoup-crawler).
 
-Add [functions-framework](https://pypi.org/project/functions-framework/) to your dependencies file `requirements.txt`. If you're using a project manager like `poetry` or `uv`, export your dependencies to `requirements.txt`.
+Add [`functions-framework`]((https://pypi.org/project/functions-framework/)) to your dependencies file `requirements.txt`. If you're using a project manager like `poetry` or `uv`, export your dependencies to `requirements.txt`.
 
-Update the project code to make it compatible with [Cloud Functions](https://cloud.google.com/functions) and return data in JSON format. Also add an entry point that Cloud Functions will use to run the project.
+Update the project code to make it compatible with Cloud Functions and return data in JSON format. Also add an entry point that Cloud Functions will use to run the project.
 
 <CodeBlock className="language-python">
     {GoogleFunctions.replace(/^.*?\n/, '')}
