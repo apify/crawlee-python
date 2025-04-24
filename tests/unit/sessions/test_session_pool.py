@@ -139,8 +139,7 @@ async def test_session_pool_persist(event_manager: EventManager, kvs_name: str |
         assert sp_model.retired_session_count == sp.retired_session_count
 
         # Check if all the sessions are correctly persisted
-        for session_model in sp_model.sessions:
-            kvs_session = Session.from_model(model=session_model)
+        for kvs_session in sp_model.sessions.values():
             session = await sp.get_session_by_id(kvs_session.id)
             assert kvs_session == session
 
