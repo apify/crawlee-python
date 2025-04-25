@@ -17,8 +17,10 @@ from typing import TYPE_CHECKING, Any, Callable, Generic, Literal, Union, cast
 from urllib.parse import ParseResult, urlparse
 from weakref import WeakKeyDictionary
 
+from cachetools import LRUCache
 from tldextract import TLDExtract
 from typing_extensions import NotRequired, TypedDict, TypeVar, Unpack, assert_never
+from yarl import URL
 
 from crawlee import EnqueueStrategy, Glob, service_locator
 from crawlee._autoscaling import AutoscaledPool, Snapshotter, SystemStatus
@@ -33,6 +35,7 @@ from crawlee._types import (
 )
 from crawlee._utils.docs import docs_group
 from crawlee._utils.file import export_csv_to_stream, export_json_to_stream
+from crawlee._utils.robots import RobotsTxtFile
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
 from crawlee._utils.web import is_status_code_client_error, is_status_code_server_error
@@ -159,6 +162,10 @@ class _BasicCrawlerOptions(TypedDict):
     """A logger instance, typically provided by a subclass, for consistent logging labels. Intended for use by
     subclasses rather than direct instantiation of `BasicCrawler`."""
 
+    respect_robots_txt_file: NotRequired[bool]
+    """If set to `True`, the crawler will automatically try to fetch the robots.txt file for each domain,
+    and skip those that are not allowed. This also prevents disallowed URLs to be added via `EnqueueLinksFunction`."""
+
 
 class _BasicCrawlerOptionsGeneric(Generic[TCrawlingContext, TStatisticsState], TypedDict):
     """Generic options the `BasicCrawler` constructor."""
@@ -239,6 +246,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         keep_alive: bool = False,
         configure_logging: bool = True,
         statistics_log_format: Literal['table', 'inline'] = 'table',
+        respect_robots_txt_file: bool = False,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         _additional_context_managers: Sequence[AbstractAsyncContextManager] | None = None,
         _logger: logging.Logger | None = None,
@@ -281,6 +289,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             configure_logging: If True, the crawler will set up logging infrastructure automatically.
             statistics_log_format: If 'table', displays crawler statistics as formatted tables in logs. If 'inline',
                 outputs statistics as plain text log messages.
+            respect_robots_txt_file: If set to `True`, the crawler will automatically try to fetch the robots.txt file
+                for each domain, and skip those that are not allowed. This also prevents disallowed URLs to be added
+                via `EnqueueLinksFunction`
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
             _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
@@ -336,6 +347,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._max_requests_per_crawl = max_requests_per_crawl
         self._max_session_rotations = max_session_rotations
         self._max_crawl_depth = max_crawl_depth
+        self._respect_robots_txt_file = respect_robots_txt_file
 
         # Timeouts
         self._request_handler_timeout = request_handler_timeout
@@ -372,6 +384,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._additional_context_managers = _additional_context_managers or []
 
         # Internal, not explicitly configurable components
+        self._robots_txt_file_cache: LRUCache[str, RobotsTxtFile] = LRUCache(maxsize=1000)
+        self._robots_txt_lock = asyncio.Lock()
         self._tld_extractor = TLDExtract(cache_dir=tempfile.TemporaryDirectory().name)
         self._snapshotter = Snapshotter.from_config(config)
         self._autoscaled_pool = AutoscaledPool(
@@ -646,10 +660,25 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             wait_for_all_requests_to_be_added: If True, wait for all requests to be added before returning.
             wait_for_all_requests_to_be_added_timeout: Timeout for waiting for all requests to be added.
         """
+        allowed_requests = []
+        skipped = []
+
+        for request in requests:
+            check_url = request.url if isinstance(request, Request) else request
+            if await self._is_allowed_based_on_robots_txt_file(check_url):
+                allowed_requests.append(request)
+            else:
+                skipped.append(request)
+
+        if skipped:
+            # TODO: https://github.com/apify/crawlee-python/issues/1160
+            # add processing with on_skipped_request hook
+            self._logger.warning('Some requests were skipped because they were disallowed based on the robots.txt file')
+
         request_manager = await self.get_request_manager()
 
         await request_manager.add_requests(
-            requests=requests,
+            requests=allowed_requests,
             batch_size=batch_size,
             wait_time_between_batches=wait_time_between_batches,
             wait_for_all_requests_to_be_added=wait_for_all_requests_to_be_added,
@@ -1035,6 +1064,22 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if request is None:
             return
 
+        if not (await self._is_allowed_based_on_robots_txt_file(request.url)):
+            self._logger.warning(
+                f'Skipping request {request.url} ({request.id}) because it is disallowed based on robots.txt'
+            )
+            await wait_for(
+                lambda: request_manager.mark_request_as_handled(request),
+                timeout=self._internal_timeout,
+                timeout_message='Marking request as handled timed out after '
+                f'{self._internal_timeout.total_seconds()} seconds',
+                logger=self._logger,
+                max_retries=3,
+            )
+            # TODO: https://github.com/apify/crawlee-python/issues/1160
+            # add processing with on_skipped_request hook
+            return
+
         if request.session_id:
             session = await self._get_session_by_id(request.session_id)
         else:
@@ -1218,3 +1263,46 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             raise RequestCollisionError(
                 f'The Session (id: {request.session_id}) bound to the Request is no longer available in SessionPool'
             )
+
+    async def _is_allowed_based_on_robots_txt_file(self, url: str) -> bool:
+        """Check if the URL is allowed based on the robots.txt file.
+
+        Args:
+            url: The URL to verify against robots.txt rules. Returns True if crawling this URL is permitted.
+        """
+        if not self._respect_robots_txt_file:
+            return True
+        robots_txt_file = await self._get_robots_txt_file_for_url(url)
+        return not robots_txt_file or robots_txt_file.is_allowed(url)
+
+    async def _get_robots_txt_file_for_url(self, url: str) -> RobotsTxtFile | None:
+        """Get the RobotsTxtFile for a given URL.
+
+        Args:
+            url: The URL whose domain will be used to locate and fetch the corresponding robots.txt file.
+        """
+        if not self._respect_robots_txt_file:
+            return None
+        origin_url = str(URL(url).origin())
+        robots_txt_file = self._robots_txt_file_cache.get(origin_url)
+        if robots_txt_file:
+            return robots_txt_file
+
+        async with self._robots_txt_lock:
+            # Check again if the robots.txt file is already cached after acquiring the lock
+            robots_txt_file = self._robots_txt_file_cache.get(origin_url)
+            if robots_txt_file:
+                return robots_txt_file
+
+            # If not cached, fetch the robots.txt file
+            robots_txt_file = await self._find_txt_file_for_url(url)
+            self._robots_txt_file_cache[origin_url] = robots_txt_file
+            return robots_txt_file
+
+    async def _find_txt_file_for_url(self, url: str) -> RobotsTxtFile:
+        """Find the robots.txt file for a given URL.
+
+        Args:
+            url: The URL whose domain will be used to locate and fetch the corresponding robots.txt file.
+        """
+        return await RobotsTxtFile.find(url, self._http_client)
