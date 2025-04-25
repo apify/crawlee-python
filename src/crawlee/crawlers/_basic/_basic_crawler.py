@@ -1340,6 +1340,14 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 return robots_txt_file
 
             # If not cached, fetch the robots.txt file
-            robots_txt_file = await RobotsTxtFile.find(url, self._http_client)
+            robots_txt_file = await self._find_txt_file_for_url(url)
             self._robots_txt_file_cache[origin_url] = robots_txt_file
             return robots_txt_file
+
+    async def _find_txt_file_for_url(self, url: str) -> RobotsTxtFile:
+        """Find the robots.txt file for a given URL.
+
+        Args:
+            url: The URL whose domain will be used to locate and fetch the corresponding robots.txt file.
+        """
+        return await RobotsTxtFile.find(url, self._http_client)
