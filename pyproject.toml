@@ -183,8 +183,9 @@ indent-style = "space"
 "**/docs/examples/code_examples/*crawler_with_error_snapshotter.py" = [
     "PLR2004", # Magic value used in comparison. Ignored for simplicity and readability of example code.
 ]
-
-
+"**/docs/guides/code_examples/running_in_web_server/server.py" = [
+    "TC002", # uv false positive. Import actually needed during runtime.
+]
 
 [tool.ruff.lint.flake8-quotes]
 docstring-quotes = "double"
@@ -233,6 +234,8 @@ module = [
     "apify",                        # Example code shows integration of apify and crawlee.
     "apify_fingerprint_datapoints", # Untyped and stubs not available
     "camoufox",                     # Example code shows integration of camoufox and crawlee.
+    "fastapi",                      # Example code shows running in webserver.
+    "starlette.*",                  # Example code shows running in webserver.
     "flask",                        # Example code shows deploy on Google Cloud.
     "functions_framework",          # Example code shows deploy on Google Cloud.
     "jaro",                         # Untyped and stubs not available
@@ -244,7 +247,14 @@ module = [
     "cookiecutter.*",               # Untyped and stubs not available
     "inquirer.*",                   # Untyped and stubs not available
 ]
+disable_error_code = ["misc"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "running_in_web_server.*"  # False positive when fastapi not available
+]
+disable_error_code = ["misc"]
 
 [tool.basedpyright]
 pythonVersion = "3.9"
