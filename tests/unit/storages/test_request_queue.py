@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-pytestmark = pytest.mark.only
+
 
 
 @pytest.fixture(params=['memory', 'file_system'])

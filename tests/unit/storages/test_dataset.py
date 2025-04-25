@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
     from crawlee.storage_clients import StorageClient
 
-pytestmark = pytest.mark.only
+
 
 
 @pytest.fixture(params=['memory', 'file_system'])

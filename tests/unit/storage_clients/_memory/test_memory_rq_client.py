@@ -14,7 +14,7 @@ from crawlee.storage_clients._memory import MemoryRequestQueueClient
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
-pytestmark = pytest.mark.only
+
 
 
 @pytest.fixture

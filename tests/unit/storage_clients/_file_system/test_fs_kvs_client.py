@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
     from pathlib import Path
 
-pytestmark = pytest.mark.only
+
 
 
 @pytest.fixture
