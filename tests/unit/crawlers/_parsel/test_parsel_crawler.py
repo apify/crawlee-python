@@ -239,3 +239,21 @@ async def test_xml(server_url: URL, http_client: HttpClient) -> None:
 
 def test_default_logger() -> None:
     assert ParselCrawler().log.name == 'ParselCrawler'
+
+
+async def test_respect_robots_txt(server_url: URL, http_client: HttpClient) -> None:
+    crawler = ParselCrawler(http_client=http_client, respect_robots_txt_file=True)
+    visit = mock.Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        visit(context.request.url)
+        await context.enqueue_links()
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+    visited = {call[0][0] for call in visit.call_args_list}
+
+    assert visited == {
+        str(server_url / 'start_enqueue'),
+        str(server_url / 'sub_index'),
+    }

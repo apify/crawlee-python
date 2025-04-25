@@ -12,13 +12,14 @@ from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
-from unittest.mock import AsyncMock, Mock, call
+from unittest.mock import AsyncMock, Mock, call, patch
 
 import pytest
 
 from crawlee import ConcurrencySettings, Glob, service_locator
 from crawlee._request import Request
 from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpHeaders
+from crawlee._utils.robots import RobotsTxtFile
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
 from crawlee.errors import RequestCollisionError, SessionError, UserDefinedErrorHandlerError
@@ -1310,6 +1311,18 @@ async def test_handles_session_error_in_failed_request_handler() -> None:
     await crawler.run(requests)
 
     assert set(requests) == handler_requests
+
+
+async def test_lock_with_get_robots_txt_file_for_url(server_url: URL) -> None:
+    crawler = BasicCrawler(respect_robots_txt_file=True)
+
+    with patch('crawlee.crawlers._basic._basic_crawler.RobotsTxtFile.find', wraps=RobotsTxtFile.find) as spy:
+        await asyncio.gather(
+            *[asyncio.create_task(crawler._get_robots_txt_file_for_url(str(server_url))) for _ in range(10)]
+        )
+
+        # Check that the lock was acquired only once
+        assert spy.call_count == 1
 
 
 async def test_reduced_logs_from_timed_out_request_handler(
