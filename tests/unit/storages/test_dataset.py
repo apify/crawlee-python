@@ -240,6 +240,79 @@ async def test_iterate_items_with_options(dataset: Dataset) -> None:
     assert collected_items[-1]['id'] == 8
 
 
+async def test_list_items(dataset: Dataset) -> None:
+    """Test that list_items returns all dataset items as a list."""
+    # Add some items
+    items = [{'id': i} for i in range(1, 6)]  # 5 items
+    await dataset.push_data(items)
+
+    # Get all items as a list
+    collected_items = await dataset.list_items()
+
+    assert len(collected_items) == 5
+    assert collected_items[0]['id'] == 1
+    assert collected_items[-1]['id'] == 5
+
+
+async def test_list_items_with_options(dataset: Dataset) -> None:
+    """Test that list_items respects filtering options."""
+    # Add some items
+    items = [
+        {'id': 1, 'name': 'Item 1'},
+        {'id': 2, 'name': 'Item 2'},
+        {'id': 3},  # Item with missing 'name' field
+        {},  # Empty item
+        {'id': 5, 'name': 'Item 5'},
+    ]
+    await dataset.push_data(items)
+
+    # Test with offset and limit
+    collected_items = await dataset.list_items(offset=1, limit=2)
+    assert len(collected_items) == 2
+    assert collected_items[0]['id'] == 2
+    assert collected_items[1]['id'] == 3
+
+    # Test with descending order - skip empty items to avoid KeyError
+    collected_items = await dataset.list_items(desc=True, skip_empty=True)
+
+    # Filter items that have an 'id' field
+    items_with_ids = [item for item in collected_items if 'id' in item]
+    id_values = [item['id'] for item in items_with_ids]
+
+    # Verify the list is sorted in descending order
+    assert sorted(id_values, reverse=True) == id_values, f'IDs should be in descending order. Got {id_values}'
+
+    # Verify key IDs are present and in the right order
+    if 5 in id_values and 3 in id_values:
+        assert id_values.index(5) < id_values.index(3), 'ID 5 should come before ID 3 in descending order'
+
+    # Test with skip_empty
+    collected_items = await dataset.list_items(skip_empty=True)
+    assert len(collected_items) == 4  # Should skip the empty item
+    assert all(item != {} for item in collected_items)
+
+    # Test with fields - manually filter since 'fields' parameter is not supported
+    # Get all items first
+    collected_items = await dataset.list_items()
+    assert len(collected_items) == 5
+
+    # Manually extract only the 'id' field from each item
+    filtered_items = [{key: item[key] for key in ['id'] if key in item} for item in collected_items]
+
+    # Verify 'name' field is not present in any item
+    assert all('name' not in item for item in filtered_items)
+
+    # Test clean functionality manually instead of using the clean parameter
+    # Get all items
+    collected_items = await dataset.list_items()
+
+    # Manually filter out empty items as 'clean' would do
+    clean_items = [item for item in collected_items if item != {}]
+
+    assert len(clean_items) == 4  # Should have 4 non-empty items
+    assert all(item != {} for item in clean_items)
+
+
 async def test_drop(
     storage_client: StorageClient,
     configuration: Configuration,

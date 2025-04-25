@@ -257,6 +257,56 @@ class Dataset(Storage):
         ):
             yield item
 
+    async def list_items(
+        self,
+        *,
+        offset: int = 0,
+        limit: int | None = 999_999_999_999,
+        clean: bool = False,
+        desc: bool = False,
+        fields: list[str] | None = None,
+        omit: list[str] | None = None,
+        unwind: str | None = None,
+        skip_empty: bool = False,
+        skip_hidden: bool = False,
+    ) -> list[dict]:
+        """Retrieve a list of all items from the dataset according to specified filters and sorting.
+
+        This method collects all dataset items into a list while applying various filters such as
+        skipping empty items, hiding specific fields, and sorting. It supports pagination via `offset` and `limit`
+        parameters, and can modify the appearance of dataset items using `fields`, `omit`, `unwind`, `skip_empty`, and
+        `skip_hidden` parameters.
+
+        Args:
+            offset: Skips the specified number of items at the start.
+            limit: The maximum number of items to retrieve. Unlimited if None.
+            clean: Return only non-empty items and excludes hidden fields. Shortcut for skip_hidden and skip_empty.
+            desc: Set to True to sort results in descending order.
+            fields: Fields to include in each item. Sorts fields as specified if provided.
+            omit: Fields to exclude from each item.
+            unwind: Unwinds items by a specified array field, turning each element into a separate item.
+            skip_empty: Excludes empty items from the results if True.
+            skip_hidden: Excludes fields starting with '#' if True.
+
+        Returns:
+            A list of dictionary objects, each representing a dataset item after applying
+            the specified filters and transformations.
+        """
+        return [
+            item
+            async for item in self.iterate_items(
+                offset=offset,
+                limit=limit,
+                clean=clean,
+                desc=desc,
+                fields=fields,
+                omit=omit,
+                unwind=unwind,
+                skip_empty=skip_empty,
+                skip_hidden=skip_hidden,
+            )
+        ]
+
     @overload
     async def export_to(
         self,
