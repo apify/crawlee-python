@@ -108,6 +108,16 @@ class RequestQueue(Storage, RequestManager):
         return self._client.metadata
 
     @override
+    @property
+    async def handled_count(self) -> int:
+        return self._client.metadata.handled_request_count
+
+    @override
+    @property
+    async def total_count(self) -> int:
+        return self._client.metadata.total_request_count
+
+    @override
     @classmethod
     async def open(
         cls,

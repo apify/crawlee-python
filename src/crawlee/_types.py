@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from crawlee.sessions import Session
     from crawlee.storage_clients.models import DatasetItemsListPage
     from crawlee.storages import KeyValueStore
-    from crawlee.storages._dataset import ExportToKwargs, GetDataKwargs
+    from crawlee.storages._types import ExportToKwargs, GetDataKwargs
 
     # Workaround for https://github.com/pydantic/pydantic/issues/9445
     J = TypeVar('J', bound='JsonSerializable')

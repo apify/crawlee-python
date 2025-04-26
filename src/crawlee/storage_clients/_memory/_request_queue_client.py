@@ -4,7 +4,6 @@ from datetime import datetime, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, ClassVar
 
-from sortedcollections import ValueSortedDict
 from typing_extensions import override
 
 from crawlee import Request

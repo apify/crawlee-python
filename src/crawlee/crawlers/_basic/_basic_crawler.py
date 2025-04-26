@@ -646,6 +646,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self,
         requests: Sequence[str | Request],
         *,
+        forefront: bool = False,
         batch_size: int = 1000,
         wait_time_between_batches: timedelta = timedelta(0),
         wait_for_all_requests_to_be_added: bool = False,
@@ -655,6 +656,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         Args:
             requests: A list of requests to add to the queue.
+            forefront: If True, add requests to the forefront of the queue.
             batch_size: The number of requests to add in one batch.
             wait_time_between_batches: Time to wait between adding batches.
             wait_for_all_requests_to_be_added: If True, wait for all requests to be added before returning.
@@ -679,6 +681,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         await request_manager.add_requests(
             requests=allowed_requests,
+            forefront=forefront,
             batch_size=batch_size,
             wait_time_between_batches=wait_time_between_batches,
             wait_for_all_requests_to_be_added=wait_for_all_requests_to_be_added,
@@ -689,12 +692,12 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self,
         default_value: dict[str, JsonSerializable] | None = None,
     ) -> dict[str, JsonSerializable]:
-        # TODO: implement
-        return {}
+        kvs = await self.get_key_value_store()
+        return await kvs.get_auto_saved_value(self._CRAWLEE_STATE_KEY, default_value)
 
     async def _save_crawler_state(self) -> None:
-        pass
-        # TODO: implement
+        store = await self.get_key_value_store()
+        await store.persist_autosaved_values()
 
     async def get_data(
         self,

@@ -1,17 +1,20 @@
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, overload
 
 from typing_extensions import override
 
 from crawlee import service_locator
 from crawlee._utils.docs import docs_group
+from crawlee.events._types import Event, EventPersistStateData
 
 from ._base import Storage
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
+    from crawlee._types import JsonSerializable
     from crawlee.configuration import Configuration
     from crawlee.storage_clients import StorageClient
     from crawlee.storage_clients._base import KeyValueStoreClient
@@ -57,6 +60,9 @@ class KeyValueStore(Storage):
     _cache_by_name: ClassVar[dict[str, KeyValueStore]] = {}
     """A dictionary to cache key-value stores by their names."""
 
+    _autosave_cache: ClassVar[dict[str, dict[str, dict[str, JsonSerializable]]]] = {}
+    """A dictionary to cache auto-saved values."""
+
     def __init__(self, client: KeyValueStoreClient) -> None:
         """Initialize a new instance.
 
@@ -66,6 +72,8 @@ class KeyValueStore(Storage):
             client: An instance of a key-value store client.
         """
         self._client = client
+        self._autosave_lock = asyncio.Lock()
+        self._persist_state_event_started = False
 
     @override
     @property
@@ -128,6 +136,10 @@ class KeyValueStore(Storage):
         if self.name and self.name in self._cache_by_name:
             del self._cache_by_name[self.name]
 
+        # Clear cache with persistent values
+        self._clear_cache()
+
+        # Drop the key-value store client
         await self._client.drop()
 
     @overload
@@ -219,6 +231,43 @@ class KeyValueStore(Storage):
             )
         ]
 
+    async def get_auto_saved_value(
+        self,
+        key: str,
+        default_value: dict[str, JsonSerializable] | None = None,
+    ) -> dict[str, JsonSerializable]:
+        """Get a value from KVS that will be automatically saved on changes.
+
+        Args:
+            key: Key of the record, to store the value.
+            default_value: Value to be used if the record does not exist yet. Should be a dictionary.
+
+        Returns:
+            Return the value of the key.
+        """
+        default_value = {} if default_value is None else default_value
+
+        async with self._autosave_lock:
+            if key in self._cache:
+                return self._cache[key]
+
+            value = await self.get_value(key, default_value)
+
+            if not isinstance(value, dict):
+                raise TypeError(
+                    f'Expected dictionary for persist state value at key "{key}, but got {type(value).__name__}'
+                )
+
+            self._cache[key] = value
+
+        self._ensure_persist_event()
+        return value
+
+    async def persist_autosaved_values(self) -> None:
+        """Force persistent values to be saved without waiting for an event in Event Manager."""
+        if self._persist_state_event_started:
+            await self._persist_save()
+
     async def get_public_url(self, key: str) -> str:
         """Get the public URL for the given key.
 
@@ -229,3 +278,35 @@ class KeyValueStore(Storage):
             The public URL for the given key.
         """
         return await self._client.get_public_url(key=key)
+
+    @property
+    def _cache(self) -> dict[str, dict[str, JsonSerializable]]:
+        """Cache dictionary for storing auto-saved values indexed by store ID."""
+        if self.id not in self._autosave_cache:
+            self._autosave_cache[self.id] = {}
+        return self._autosave_cache[self.id]
+
+    async def _persist_save(self, _event_data: EventPersistStateData | None = None) -> None:
+        """Save cache with persistent values. Can be used in Event Manager."""
+        for key, value in self._cache.items():
+            await self.set_value(key, value)
+
+    def _ensure_persist_event(self) -> None:
+        """Ensure persist state event handling if not already done."""
+        if self._persist_state_event_started:
+            return
+
+        event_manager = service_locator.get_event_manager()
+        event_manager.on(event=Event.PERSIST_STATE, listener=self._persist_save)
+        self._persist_state_event_started = True
+
+    def _clear_cache(self) -> None:
+        """Clear cache with persistent values."""
+        self._cache.clear()
+
+    def _drop_persist_state_event(self) -> None:
+        """Off event manager listener and drop event status."""
+        if self._persist_state_event_started:
+            event_manager = service_locator.get_event_manager()
+            event_manager.off(event=Event.PERSIST_STATE, listener=self._persist_save)
+        self._persist_state_event_started = False

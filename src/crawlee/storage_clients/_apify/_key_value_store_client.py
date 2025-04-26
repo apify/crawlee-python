@@ -194,13 +194,11 @@ class ApifyKeyValueStoreClient(KeyValueStoreClient):
 
         key_value_store = self.metadata
 
-        if key_value_store and isinstance(getattr(key_value_store, 'model_extra', None), dict):
+        if key_value_store and key_value_store.model_extra:
             url_signing_secret_key = key_value_store.model_extra.get('urlSigningSecretKey')
             if url_signing_secret_key:
-                # Note: This would require importing create_hmac_signature from apify._crypto
-                # public_url = public_url.with_query(signature=create_hmac_signature(url_signing_secret_key, key))
-                # For now, I'll leave this part commented as we may need to add the proper import
                 pass
+                # public_url = public_url.with_query(signature=create_hmac_signature(url_signing_secret_key, key))
 
         return str(public_url)
 

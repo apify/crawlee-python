@@ -43,3 +43,7 @@ class StorageClient(ABC):
         configuration: Configuration | None = None,
     ) -> RequestQueueClient:
         """Open a request queue client."""
+
+    def get_rate_limit_errors(self) -> dict[int, int]:
+        """Return statistics about rate limit errors encountered by the HTTP client in storage client."""
+        return {}

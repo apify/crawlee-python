@@ -25,6 +25,16 @@ class RequestLoader(ABC):
         - Managing state information such as the total and handled request counts.
     """
 
+    @property
+    @abstractmethod
+    async def handled_count(self) -> int:
+        """The number of requests that have been handled."""
+
+    @property
+    @abstractmethod
+    async def total_count(self) -> int:
+        """The total number of requests in the loader."""
+
     @abstractmethod
     async def is_empty(self) -> bool:
         """Return True if there are no more requests in the source (there might still be unfinished requests)."""
