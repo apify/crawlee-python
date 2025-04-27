@@ -53,6 +53,5 @@ website/package-lock.json
 # Default directory for memory storage
 storage/
 
-# sandbox for testing changes
-sandbox/
+crawleeTesting/
 tests/unit/test_monitor.py

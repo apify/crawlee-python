@@ -49,6 +49,7 @@ dependencies = [
     "tldextract>=5.1.0",
     "typing-extensions>=4.1.0",
     "yarl>=1.18.0",
+    "beautifulsoup4>=4.13.3",
 ]
 
 [project.optional-dependencies]
