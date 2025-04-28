@@ -36,6 +36,7 @@ class PersistentObject(Generic[TStateModel]):
         persist_state_key: str,
         persistence_enabled: bool = False,
         persist_state_kvs_name: str | None = None,
+        persist_state_kvs_id: str | None = None,
         logger: logging.Logger,
     ) -> None:
         """Initialize a new persistent object.
@@ -46,7 +47,9 @@ class PersistentObject(Generic[TStateModel]):
             persist_state_key: The key under which the state is stored in the KeyValueStore
             persistence_enabled: Flag to enable or disable state persistence
             persist_state_kvs_name: The name of the KeyValueStore to use for persistence.
-                                    If None, the default store will be used.
+                                    If neither a name nor and id are supplied, the default store will be used.
+            persist_state_kvs_id: The identifier of the KeyValueStore to use for persistence.
+                                    If neither a name nor and id are supplied, the default store will be used.
             logger: A logger instance for logging operations related to state persistence
         """
         self._default_state = default_state
@@ -55,6 +58,7 @@ class PersistentObject(Generic[TStateModel]):
         self._persistence_enabled = persistence_enabled
         self._persist_state_key = persist_state_key
         self._persist_state_kvs_name = persist_state_kvs_name
+        self._persist_state_kvs_id = persist_state_kvs_id
         self._key_value_store: KeyValueStore | None = None
         self._log = logger
 
@@ -71,7 +75,9 @@ class PersistentObject(Generic[TStateModel]):
             self._state = self._default_state.model_copy(deep=True)
             return self.get()
 
-        self._key_value_store = await KeyValueStore.open(name=self._persist_state_kvs_name)
+        self._key_value_store = await KeyValueStore.open(
+            name=self._persist_state_kvs_name, id=self._persist_state_kvs_id
+        )
 
         await self._load_saved_state()
 
