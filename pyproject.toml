@@ -184,7 +184,7 @@ indent-style = "space"
     "PLR2004", # Magic value used in comparison. Ignored for simplicity and readability of example code.
 ]
 "**/docs/guides/code_examples/running_in_web_server/server.py" = [
-    "TC002", # uv false positive. Import actually needed during runtime.
+    "TC002", # ruff false positive. Import actually needed during runtime.
 ]
 
 [tool.ruff.lint.flake8-quotes]
