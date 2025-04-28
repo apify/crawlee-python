@@ -279,7 +279,12 @@ class AbstractHttpCrawler(
         """
         status_code = context.http_response.status_code
         if self._retry_on_blocked:
-            self._raise_for_session_blocked_status_code(context.session, status_code)
+            try:
+                self._raise_for_session_blocked_status_code(context.session, status_code)
+            except SessionError:
+                context.log.warning(context.http_response.status_code)
+                context.log.warning(context.http_response.headers)
+                raise
         self._raise_for_error_status_code(status_code)
         yield context
 
