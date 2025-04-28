@@ -52,7 +52,7 @@ def get_one_line_error_summary_if_possible(error: Exception) -> str:
         most_relevant_part = reduce_asyncio_timeout_error_to_relevant_traceback_parts(error)[-1]
     else:
         traceback_parts = _get_traceback_parts_for_innermost_exception(error)
-        # Commonly last traceback part is type of the error and second last part is the relevant file.
+        # Commonly last traceback part is type of the error, and the second last part is the relevant file.
         # If there are not enough traceback parts, then we are not sure how to summarize the error.
         relevant_traceback_part_index_from_end = 2
         most_relevant_part = _strip_pep657_highlighting(
