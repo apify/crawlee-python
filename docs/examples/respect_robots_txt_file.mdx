@@ -7,7 +7,7 @@ import ApiLink from '@site/src/components/ApiLink';
 import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
 import RespectRobotsTxt from '!!raw-loader!roa-loader!./code_examples/respect_robots_txt_file.py';
-import OnSkippedRequest from '!!raw-loader!roa-loader!./code_examples/on_skipped_request.py';
+import OnSkippedRequest from '!!raw-loader!roa-loader!./code_examples/respect_robots_on_skipped_request.py';
 
 This example demonstrates how to configure your crawler to respect the rules established by websites for crawlers as described in the [robots.txt](https://www.robotstxt.org/robotstxt.html) file.
 
@@ -27,6 +27,6 @@ If you want to process URLs skipped according to the `robots.txt` rules, for exa
 
 Let's update the code by adding the `on_skipped_request` handler:
 
-<RunnableCodeBlock className="language-python" language="python" filename="on_skipped_request.py">
+<RunnableCodeBlock className="language-python" language="python" filename="respect_robots_on_skipped_request.py">
     {OnSkippedRequest}
 </RunnableCodeBlock>
