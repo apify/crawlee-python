@@ -247,7 +247,6 @@ module = [
     "cookiecutter.*",               # Untyped and stubs not available
     "inquirer.*",                   # Untyped and stubs not available
 ]
-disable_error_code = ["misc"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
