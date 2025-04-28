@@ -21,6 +21,7 @@ from crawlee.fingerprint_suite import (
 )
 from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_values
 from crawlee.fingerprint_suite._consts import BROWSER_TYPE_HEADER_KEYWORD
+from crawlee.http_clients import HttpxHttpClient
 from crawlee.proxy_configuration import ProxyConfiguration
 from crawlee.sessions import Session, SessionPool
 from crawlee.statistics import Statistics
@@ -83,9 +84,8 @@ async def test_enqueue_links(redirect_server_url: URL, server_url: URL) -> None:
     }
 
 
-async def test_enqueue_links_with_incompatible_kwargs_raises_error() -> None:
+async def test_enqueue_links_with_incompatible_kwargs_raises_error(server_url: URL) -> None:
     """Call `enqueue_links` with arguments that can't be used together."""
-    requests = ['https://www.something.com']
     crawler = PlaywrightCrawler(max_request_retries=1)
     exceptions = []
 
@@ -100,7 +100,7 @@ async def test_enqueue_links_with_incompatible_kwargs_raises_error() -> None:
         except Exception as e:
             exceptions.append(e)
 
-    await crawler.run(requests)
+    await crawler.run([str(server_url)])
 
     assert len(exceptions) == 1
     assert type(exceptions[0]) is ValueError
@@ -616,3 +616,53 @@ async def test_respect_robots_txt(server_url: URL) -> None:
         str(server_url / 'start_enqueue'),
         str(server_url / 'sub_index'),
     }
+
+
+async def test_send_request(server_url: URL) -> None:
+    """Check that the persist context works with fingerprints."""
+    check_data: dict[str, Any] = {}
+
+    crawler = PlaywrightCrawler()
+
+    @crawler.pre_navigation_hook
+    async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
+        send_request_response = await context.send_request(str(server_url / 'user-agent'))
+        check_data['pre_send_request'] = dict(json.loads(send_request_response.read()))
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        response = await context.response.text()
+        check_data['default'] = dict(json.loads(response))
+        send_request_response = await context.send_request(str(server_url / 'user-agent'))
+        check_data['send_request'] = dict(json.loads(send_request_response.read()))
+
+    await crawler.run([str(server_url / 'user-agent')])
+
+    assert check_data['default'].get('user-agent') is not None
+    assert check_data['send_request'].get('user-agent') is not None
+    assert check_data['pre_send_request'] == check_data['send_request']
+
+    assert check_data['default'] == check_data['send_request']
+
+
+async def test_send_request_with_client(server_url: URL) -> None:
+    """Check that the persist context works with fingerprints."""
+    check_data: dict[str, Any] = {}
+
+    crawler = PlaywrightCrawler(
+        http_client=HttpxHttpClient(header_generator=None, headers={'user-agent': 'My User-Agent'})
+    )
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        response = await context.response.text()
+        check_data['default'] = dict(json.loads(response))
+        send_request_response = await context.send_request(str(server_url / 'user-agent'))
+        check_data['send_request'] = dict(json.loads(send_request_response.read()))
+
+    await crawler.run([str(server_url / 'user-agent')])
+
+    assert check_data['default'].get('user-agent') is not None
+    assert check_data['send_request']['user-agent'] == 'My User-Agent'
+
+    assert check_data['default'] != check_data['send_request']
