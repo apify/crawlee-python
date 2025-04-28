@@ -17,8 +17,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-
-
 @pytest.fixture
 def configuration(tmp_path: Path) -> Configuration:
     return Configuration(

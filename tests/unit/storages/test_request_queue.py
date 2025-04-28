@@ -18,9 +18,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-
-
-
 @pytest.fixture(params=['memory', 'file_system'])
 def storage_client(request: pytest.FixtureRequest) -> StorageClient:
     """Parameterized fixture to test with different storage clients."""

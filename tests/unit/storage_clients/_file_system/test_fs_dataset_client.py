@@ -18,8 +18,6 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
 
-
-
 @pytest.fixture
 def configuration(tmp_path: Path) -> Configuration:
     return Configuration(

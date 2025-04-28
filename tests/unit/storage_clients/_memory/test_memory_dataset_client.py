@@ -15,8 +15,6 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
 
-
-
 @pytest.fixture
 async def dataset_client() -> AsyncGenerator[MemoryDatasetClient, None]:
     """Fixture that provides a fresh memory dataset client for each test."""

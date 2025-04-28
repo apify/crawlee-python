@@ -15,8 +15,6 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
 
-
-
 @pytest.fixture
 async def rq_client() -> AsyncGenerator[MemoryRequestQueueClient, None]:
     """Fixture that provides a fresh memory request queue client for each test."""
@@ -166,7 +164,7 @@ async def test_add_batch_of_requests_with_duplicates(rq_client: MemoryRequestQue
     duplicate_requests = [
         Request.from_url(url='https://example.com/1-dup', unique_key='key1'),  # Same as first (handled)
         Request.from_url(url='https://example.com/2-dup', unique_key='key2'),  # Same as second (not handled)
-        Request.from_url(url='https://example.com/3', unique_key='key3'),      # New request
+        Request.from_url(url='https://example.com/3', unique_key='key3'),  # New request
     ]
     response = await rq_client.add_batch_of_requests(duplicate_requests)
 
@@ -475,7 +473,7 @@ async def test_unique_key_generation(rq_client: MemoryRequestQueueClient) -> Non
     # Add requests without explicit unique keys
     requests = [
         Request.from_url(url='https://example.com/1'),
-        Request.from_url(url='https://example.com/1', always_enqueue=True)
+        Request.from_url(url='https://example.com/1', always_enqueue=True),
     ]
     response = await rq_client.add_batch_of_requests(requests)
 

@@ -15,8 +15,6 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
 
-
-
 @pytest.fixture
 async def kvs_client() -> AsyncGenerator[MemoryKeyValueStoreClient, None]:
     """Fixture that provides a fresh memory key-value store client for each test."""
