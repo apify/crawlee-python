@@ -1,8 +1,14 @@
 from __future__ import annotations
 
-from typing import Protocol
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Protocol
 
+from crawlee import HttpHeaders
 from crawlee._utils.docs import docs_group
+
+if TYPE_CHECKING:
+    from playwright.async_api import APIResponse, Response
+    from typing_extensions import Self
 
 
 @docs_group('Functions')
@@ -22,3 +28,26 @@ class BlockRequestsFunction(Protocol):
             url_patterns: List of URL patterns to block. If None, uses default patterns.
             extra_url_patterns: Additional URL patterns to append to the main patterns list.
         """
+
+
+@dataclass(frozen=True)
+class PlaywrightHttpResponse:
+    """Wrapper class for playwright `Response` and `APIResponse` objects to implement `HttpResponse` protocol."""
+
+    http_version: str
+    status_code: int
+    headers: HttpHeaders
+    _content: bytes
+
+    def read(self) -> bytes:
+        return self._content
+
+    @classmethod
+    async def from_playwright_response(cls, response: Response | APIResponse, protocol: str) -> Self:
+        headers = HttpHeaders(response.headers)
+        status_code = response.status
+        # Used http protocol version cannot be obtained from `Response` and has to be passed as additional argument.
+        http_version = protocol
+        _content = await response.body()
+
+        return cls(http_version=http_version, status_code=status_code, headers=headers, _content=_content)

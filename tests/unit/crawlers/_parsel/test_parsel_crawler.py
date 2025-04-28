@@ -65,7 +65,6 @@ async def test_enqueue_links(redirect_server_url: URL, server_url: URL, http_cli
 
 async def test_enqueue_links_with_incompatible_kwargs_raises_error(server_url: URL) -> None:
     """Call `enqueue_links` with arguments that can't be used together."""
-    requests = ['https://www.test.io/']
     crawler = ParselCrawler(max_request_retries=1)
     exceptions = []
 
@@ -76,7 +75,7 @@ async def test_enqueue_links_with_incompatible_kwargs_raises_error(server_url: U
         except Exception as e:
             exceptions.append(e)
 
-    await crawler.run(requests)
+    await crawler.run([str(server_url)])
 
     assert len(exceptions) == 1
     assert type(exceptions[0]) is ValueError
@@ -239,3 +238,21 @@ async def test_xml(server_url: URL, http_client: HttpClient) -> None:
 
 def test_default_logger() -> None:
     assert ParselCrawler().log.name == 'ParselCrawler'
+
+
+async def test_respect_robots_txt(server_url: URL, http_client: HttpClient) -> None:
+    crawler = ParselCrawler(http_client=http_client, respect_robots_txt_file=True)
+    visit = mock.Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        visit(context.request.url)
+        await context.enqueue_links()
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+    visited = {call[0][0] for call in visit.call_args_list}
+
+    assert visited == {
+        str(server_url / 'start_enqueue'),
+        str(server_url / 'sub_index'),
+    }
