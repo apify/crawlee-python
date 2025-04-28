@@ -75,9 +75,6 @@ class KeyValueStore(Storage):
         ]
     ] = {}
 
-    _general_cache: ClassVar[dict[str, dict[str, dict[str, JsonSerializable]]]] = {}
-    _persist_state_event_started = False
-
     def __init__(self, id: str, name: str | None, storage_client: StorageClient) -> None:
         self._id = id
         self._name = name
