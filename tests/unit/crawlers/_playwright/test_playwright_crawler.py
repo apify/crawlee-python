@@ -84,9 +84,8 @@ async def test_enqueue_links(redirect_server_url: URL, server_url: URL) -> None:
     }
 
 
-async def test_enqueue_links_with_incompatible_kwargs_raises_error() -> None:
+async def test_enqueue_links_with_incompatible_kwargs_raises_error(server_url: URL) -> None:
     """Call `enqueue_links` with arguments that can't be used together."""
-    requests = ['https://www.something.com']
     crawler = PlaywrightCrawler(max_request_retries=1)
     exceptions = []
 
@@ -101,7 +100,7 @@ async def test_enqueue_links_with_incompatible_kwargs_raises_error() -> None:
         except Exception as e:
             exceptions.append(e)
 
-    await crawler.run(requests)
+    await crawler.run([str(server_url)])
 
     assert len(exceptions) == 1
     assert type(exceptions[0]) is ValueError
