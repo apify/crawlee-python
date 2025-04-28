@@ -1323,3 +1323,25 @@ async def test_lock_with_get_robots_txt_file_for_url(server_url: URL) -> None:
 
         # Check that the lock was acquired only once
         assert spy.call_count == 1
+
+
+async def test_reduced_logs_from_timed_out_request_handler(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO)
+    crawler = BasicCrawler(configure_logging=False, request_handler_timeout=timedelta(seconds=1))
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        await asyncio.sleep(10)  # INJECTED DELAY
+
+    await crawler.run([Request.from_url('http://a.com/')])
+
+    for record in caplog.records:
+        if record.funcName == '_handle_failed_request':
+            full_message = (record.message or '') + (record.exc_text or '')
+            assert Counter(full_message)['\n'] < 10
+            assert '# INJECTED DELAY' in full_message
+            break
+    else:
+        raise AssertionError('Expected log message about request handler error was not found.')
