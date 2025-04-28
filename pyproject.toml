@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "crawlee"
-version = "0.6.8"
+version = "0.6.9"
 description = "Crawlee for Python"
 authors = [{ name = "Apify Technologies s.r.o.", email = "support@apify.com" }]
 license = { file = "LICENSE" }
@@ -105,7 +105,7 @@ dev = [
     "pytest-xdist~=3.6.0",
     "pytest~=8.3.0",
     "ruff~=0.11.0",
-    "setuptools~=79.0.0",                    # setuptools are used by pytest, but not explicitly required
+    "setuptools",  # setuptools are used by pytest, but not explicitly required
     "sortedcontainers-stubs~=2.4.0",
     "types-beautifulsoup4~=4.12.0.20240229",
     "types-cachetools~=5.5.0.20240820",

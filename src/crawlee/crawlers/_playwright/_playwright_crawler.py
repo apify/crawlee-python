@@ -11,15 +11,18 @@ from typing_extensions import NotRequired, TypedDict, TypeVar
 from crawlee._request import Request, RequestOptions
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.docs import docs_group
+from crawlee._utils.robots import RobotsTxtFile
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee.browsers import BrowserPool
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
 from crawlee.fingerprint_suite import DefaultFingerprintGenerator, FingerprintGenerator, HeaderGeneratorOptions
+from crawlee.http_clients import HttpxHttpClient
 from crawlee.sessions._cookies import PlaywrightCookieParam
 from crawlee.statistics import StatisticsState
 
 from ._playwright_crawling_context import PlaywrightCrawlingContext
+from ._playwright_http_client import PlaywrightHttpClient, browser_page_context
 from ._playwright_pre_nav_crawling_context import PlaywrightPreNavCrawlingContext
 from ._utils import block_requests, infinite_scroll
 
@@ -169,6 +172,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         kwargs.setdefault('_logger', logging.getLogger(__name__))
         self._pre_navigation_hooks: list[Callable[[PlaywrightPreNavCrawlingContext], Awaitable[None]]] = []
 
+        kwargs['http_client'] = PlaywrightHttpClient() if not kwargs.get('http_client') else kwargs['http_client']
+
         super().__init__(**kwargs)
 
     async def _open_page(
@@ -195,9 +200,9 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             block_requests=partial(block_requests, page=crawlee_page.page),
         )
 
-        for hook in self._pre_navigation_hooks:
-            await hook(pre_navigation_context)
-
+        async with browser_page_context(crawlee_page.page):
+            for hook in self._pre_navigation_hooks:
+                await hook(pre_navigation_context)
         yield pre_navigation_context
 
     async def _navigate(
@@ -235,23 +240,24 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
             extract_links = self._create_extract_links_function(context)
 
-            error = yield PlaywrightCrawlingContext(
-                request=context.request,
-                session=context.session,
-                add_requests=context.add_requests,
-                send_request=context.send_request,
-                push_data=context.push_data,
-                use_state=context.use_state,
-                proxy_info=context.proxy_info,
-                get_key_value_store=context.get_key_value_store,
-                log=context.log,
-                page=context.page,
-                infinite_scroll=lambda: infinite_scroll(context.page),
-                response=response,
-                extract_links=extract_links,
-                enqueue_links=self._create_enqueue_links_function(context, extract_links),
-                block_requests=partial(block_requests, page=context.page),
-            )
+            async with browser_page_context(context.page):
+                error = yield PlaywrightCrawlingContext(
+                    request=context.request,
+                    session=context.session,
+                    add_requests=context.add_requests,
+                    send_request=context.send_request,
+                    push_data=context.push_data,
+                    use_state=context.use_state,
+                    proxy_info=context.proxy_info,
+                    get_key_value_store=context.get_key_value_store,
+                    log=context.log,
+                    page=context.page,
+                    infinite_scroll=lambda: infinite_scroll(context.page),
+                    response=response,
+                    extract_links=extract_links,
+                    enqueue_links=self._create_enqueue_links_function(context, extract_links),
+                    block_requests=partial(block_requests, page=context.page),
+                )
 
             if context.session:
                 pw_cookies = await self._get_cookies(context.page)
@@ -447,6 +453,16 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
     async def _update_cookies(self, page: Page, cookies: list[PlaywrightCookieParam]) -> None:
         """Update the cookies in the page context."""
         await page.context.add_cookies([{**cookie} for cookie in cookies])
+
+    async def _find_txt_file_for_url(self, url: str) -> RobotsTxtFile:
+        """Find the robots.txt file for a given URL.
+
+        Args:
+            url: The URL whose domain will be used to locate and fetch the corresponding robots.txt file.
+        """
+        http_client = HttpxHttpClient() if isinstance(self._http_client, PlaywrightHttpClient) else self._http_client
+
+        return await RobotsTxtFile.find(url, http_client=http_client)
 
 
 class _PlaywrightCrawlerAdditionalOptions(TypedDict):

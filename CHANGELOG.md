@@ -3,7 +3,15 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 0.6.8 - **not yet released**
+## 0.6.9 - **not yet released**
+
+### 🚀 Features
+
+- Add an internal `HttpClient` to be used in `send_request` for `PlaywrightCrawler` using `APIRequestContext` bound to the browser context ([#1134](https://github.com/apify/crawlee-python/pull/1134)) ([e794f49](https://github.com/apify/crawlee-python/commit/e794f4985d3a018ee76d634fe2b2c735fb450272)) by [@Mantisus](https://github.com/Mantisus), closes [#928](https://github.com/apify/crawlee-python/issues/928)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.6.8](https://github.com/apify/crawlee-python/releases/tag/v0.6.8) (2025-04-25)
 
 ### 🚀 Features
 
@@ -17,7 +25,6 @@ All notable changes to this project will be documented in this file.
 - Call `failed_request_handler` for `SessionError` when session rotation count exceeds maximum ([#1147](https://github.com/apify/crawlee-python/pull/1147)) ([b3637b6](https://github.com/apify/crawlee-python/commit/b3637b68ec7eae9de7f1b923fa2f68885da64b90)) by [@Mantisus](https://github.com/Mantisus)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.6.7](https://github.com/apify/crawlee-python/releases/tag/v0.6.7) (2025-04-17)
 
 ### 🚀 Features
