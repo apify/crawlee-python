@@ -17,7 +17,7 @@ As an example, let's look at the website `https://news.ycombinator.com/` and its
 
 The code below demonstrates this behavior using the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>:
 
-<RunnableCodeBlock className="language-python" language="python" filename="respect_robots_txt_file.py">
+<RunnableCodeBlock className="language-python" language="python">
     {RespectRobotsTxt}
 </RunnableCodeBlock>
 
@@ -27,6 +27,6 @@ If you want to process URLs skipped according to the `robots.txt` rules, for exa
 
 Let's update the code by adding the `on_skipped_request` handler:
 
-<RunnableCodeBlock className="language-python" language="python" filename="respect_robots_on_skipped_request.py">
+<RunnableCodeBlock className="language-python" language="python">
     {OnSkippedRequest}
 </RunnableCodeBlock>
