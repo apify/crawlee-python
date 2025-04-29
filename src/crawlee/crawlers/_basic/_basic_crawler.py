@@ -35,6 +35,7 @@ from crawlee._types import (
     SendRequestFunction,
 )
 from crawlee._utils.docs import docs_group
+from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.robots import RobotsTxtFile
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
@@ -49,6 +50,7 @@ from crawlee.errors import (
     SessionError,
     UserDefinedErrorHandlerError,
 )
+from crawlee.events._types import Event
 from crawlee.http_clients import HttpxHttpClient
 from crawlee.router import Router
 from crawlee.sessions import SessionPool
@@ -400,6 +402,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             is_task_ready_function=self.__is_task_ready_function,
             run_task_function=self.__run_task_function,
         )
+        self._crawler_state_rec_task = RecurringTask(func=self._crawler_state_task, delay=timedelta(seconds=5))
 
         # State flags
         self._keep_alive = keep_alive
@@ -1391,3 +1394,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             url: The URL whose domain will be used to locate and fetch the corresponding robots.txt file.
         """
         return await RobotsTxtFile.find(url, self._http_client)
+
+    async def _crawler_state_task(self) -> None:
+        """Emit a persist state event with the given migration status."""
+        event_manager = service_locator.get_event_manager()
+        event_manager.emit(event=Event.CRAWLER_STATUS, event_data=None)

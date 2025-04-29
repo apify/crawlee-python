@@ -31,6 +31,9 @@ class Event(str, Enum):
     PAGE_CREATED = 'pageCreated'
     PAGE_CLOSED = 'pageClosed'
 
+    # State events
+    CRAWLER_STATUS = 'crawlerStatus'
+
 
 @docs_group('Event payloads')
 class EventPersistStateData(BaseModel):
