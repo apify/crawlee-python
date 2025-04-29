@@ -27,7 +27,7 @@ async def test_error_tracker_counts(error_tracker: ErrorTracker, expected_unique
         ValueError(
             'Another value error efg'
         ),  # Same type, but too different message to previous, considered different.
-        ValueError(),  # Same type but don'y have message, considered different.
+        ValueError(),  # Same type but don't have message, considered different.
     ]:
         try:
             raise error  # Errors raised on same line
