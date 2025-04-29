@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from datetime import datetime, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
@@ -31,9 +31,6 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
     The memory implementation provides fast access to data but is limited by available memory and
     does not support data sharing across different processes.
     """
-
-    _cache_by_name: ClassVar[dict[str, MemoryKeyValueStoreClient]] = {}
-    """A dictionary to cache clients by their names."""
 
     def __init__(
         self,
@@ -75,17 +72,11 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
     ) -> MemoryKeyValueStoreClient:
         name = name or configuration.default_key_value_store_id
 
-        # Check if the client is already cached by name
-        if name in cls._cache_by_name:
-            client = cls._cache_by_name[name]
-            await client._update_metadata(update_accessed_at=True)  # noqa: SLF001
-            return client
-
         # If specific id is provided, use it; otherwise, generate a new one
         id = id or crypto_random_object_id()
         now = datetime.now(timezone.utc)
 
-        client = cls(
+        return cls(
             id=id,
             name=name,
             created_at=now,
@@ -93,19 +84,10 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
             modified_at=now,
         )
 
-        # Cache the client by name
-        cls._cache_by_name[name] = client
-
-        return client
-
     @override
     async def drop(self) -> None:
         # Clear all data
         self._records.clear()
-
-        # Remove from cache
-        if self.metadata.name in self.__class__._cache_by_name:  # noqa: SLF001
-            del self.__class__._cache_by_name[self.metadata.name]  # noqa: SLF001
 
     @override
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:

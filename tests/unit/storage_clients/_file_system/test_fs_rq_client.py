@@ -65,32 +65,6 @@ async def test_open_creates_new_rq(configuration: Configuration) -> None:
         assert metadata['name'] == 'new_request_queue'
 
 
-async def test_open_existing_rq(
-    rq_client: FileSystemRequestQueueClient,
-    configuration: Configuration,
-) -> None:
-    """Test that open() loads an existing request queue correctly."""
-    configuration.purge_on_start = False
-
-    # Add a request to the original client
-    await rq_client.add_batch_of_requests([Request.from_url('https://example.com')])
-
-    # Open the same request queue again
-    reopened_client = await FileSystemStorageClient().open_request_queue_client(
-        name=rq_client.metadata.name,
-        configuration=configuration,
-    )
-
-    # Verify client properties
-    assert rq_client.metadata.id == reopened_client.metadata.id
-    assert rq_client.metadata.name == reopened_client.metadata.name
-    assert rq_client.metadata.total_request_count == 1
-    assert rq_client.metadata.pending_request_count == 1
-
-    # Verify clients (python) ids - should be the same object due to caching
-    assert id(rq_client) == id(reopened_client)
-
-
 async def test_rq_client_purge_on_start(configuration: Configuration) -> None:
     """Test that purge_on_start=True clears existing data in the request queue."""
     configuration.purge_on_start = True
@@ -408,9 +382,6 @@ async def test_drop(configuration: Configuration) -> None:
     # Verify the directory was removed
     assert not rq_path.exists()
 
-    # Verify the client was removed from the cache
-    assert client.metadata.name not in FileSystemRequestQueueClient._cache_by_name
-
 
 async def test_file_persistence(configuration: Configuration) -> None:
     """Test that requests are persisted to files and can be recovered after a 'restart'."""
@@ -442,9 +413,6 @@ async def test_file_persistence(configuration: Configuration) -> None:
     # Verify files exist
     request_files = list(storage_path.glob('*.json'))
     assert len(request_files) > 0, 'Request files should exist'
-
-    # Clear cache to simulate process restart
-    FileSystemRequestQueueClient._cache_by_name.clear()
 
     # Create a new client with same name (which will load from files)
     client2 = await FileSystemStorageClient().open_request_queue_client(

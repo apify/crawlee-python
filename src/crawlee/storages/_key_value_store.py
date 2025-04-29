@@ -54,24 +54,23 @@ class KeyValueStore(Storage):
     ```
     """
 
-    _cache_by_id: ClassVar[dict[str, KeyValueStore]] = {}
-    """A dictionary to cache key-value stores by their IDs."""
-
-    _cache_by_name: ClassVar[dict[str, KeyValueStore]] = {}
-    """A dictionary to cache key-value stores by their names."""
+    _cache: ClassVar[dict[str, KeyValueStore]] = {}
+    """A dictionary to cache key-value stores."""
 
     _autosave_cache: ClassVar[dict[str, dict[str, dict[str, JsonSerializable]]]] = {}
     """A dictionary to cache auto-saved values."""
 
-    def __init__(self, client: KeyValueStoreClient) -> None:
+    def __init__(self, client: KeyValueStoreClient, cache_key: str) -> None:
         """Initialize a new instance.
 
         Preferably use the `KeyValueStore.open` constructor to create a new instance.
 
         Args:
             client: An instance of a key-value store client.
+            cache_key: A unique key to identify the key-value store in the cache.
         """
         self._client = client
+        self._cache_key = cache_key
         self._autosave_lock = asyncio.Lock()
         self._persist_state_event_started = False
 
@@ -103,14 +102,18 @@ class KeyValueStore(Storage):
         if id and name:
             raise ValueError('Only one of "id" or "name" can be specified, not both.')
 
-        # Check if key-value store is already cached by id or name
-        if id and id in cls._cache_by_id:
-            return cls._cache_by_id[id]
-        if name and name in cls._cache_by_name:
-            return cls._cache_by_name[name]
-
         configuration = service_locator.get_configuration() if configuration is None else configuration
         storage_client = service_locator.get_storage_client() if storage_client is None else storage_client
+
+        cache_key = cls.compute_cache_key(
+            id=id,
+            name=name,
+            configuration=configuration,
+            storage_client=storage_client,
+        )
+
+        if cache_key in cls._cache:
+            return cls._cache[cache_key]
 
         client = await storage_client.open_key_value_store_client(
             id=id,
@@ -118,23 +121,15 @@ class KeyValueStore(Storage):
             configuration=configuration,
         )
 
-        kvs = cls(client)
-
-        # Cache the key-value store by id and name if available
-        if kvs.id:
-            cls._cache_by_id[kvs.id] = kvs
-        if kvs.name:
-            cls._cache_by_name[kvs.name] = kvs
-
+        kvs = cls(client, cache_key)
+        cls._cache[cache_key] = kvs
         return kvs
 
     @override
     async def drop(self) -> None:
         # Remove from cache before dropping
-        if self.id in self._cache_by_id:
-            del self._cache_by_id[self.id]
-        if self.name and self.name in self._cache_by_name:
-            del self._cache_by_name[self.name]
+        if self._cache_key in self._cache:
+            del self._cache[self._cache_key]
 
         # Clear cache with persistent values
         self._clear_cache()
@@ -248,8 +243,8 @@ class KeyValueStore(Storage):
         default_value = {} if default_value is None else default_value
 
         async with self._autosave_lock:
-            if key in self._cache:
-                return self._cache[key]
+            if key in self._autosave_cache:
+                return self._autosave_cache[key]
 
             value = await self.get_value(key, default_value)
 
@@ -258,7 +253,7 @@ class KeyValueStore(Storage):
                     f'Expected dictionary for persist state value at key "{key}, but got {type(value).__name__}'
                 )
 
-            self._cache[key] = value
+            self._autosave_cache[key] = value
 
         self._ensure_persist_event()
         return value
@@ -280,15 +275,15 @@ class KeyValueStore(Storage):
         return await self._client.get_public_url(key=key)
 
     @property
-    def _cache(self) -> dict[str, dict[str, JsonSerializable]]:
-        """Cache dictionary for storing auto-saved values indexed by store ID."""
-        if self.id not in self._autosave_cache:
-            self._autosave_cache[self.id] = {}
-        return self._autosave_cache[self.id]
+    def _autosave_cache_instance(self) -> dict[str, dict[str, JsonSerializable]]:
+        """Cache dictionary for storing auto-saved values indexed by store cache key."""
+        if self._cache_key not in self._autosave_cache:
+            self._autosave_cache[self._cache_key] = {}
+        return self._autosave_cache[self._cache_key]
 
     async def _persist_save(self, _event_data: EventPersistStateData | None = None) -> None:
         """Save cache with persistent values. Can be used in Event Manager."""
-        for key, value in self._cache.items():
+        for key, value in self._autosave_cache_instance.items():
             await self.set_value(key, value)
 
     def _ensure_persist_event(self) -> None:
@@ -302,7 +297,7 @@ class KeyValueStore(Storage):
 
     def _clear_cache(self) -> None:
         """Clear cache with persistent values."""
-        self._cache.clear()
+        self._autosave_cache_instance.clear()
 
     def _drop_persist_state_event(self) -> None:
         """Off event manager listener and drop event status."""

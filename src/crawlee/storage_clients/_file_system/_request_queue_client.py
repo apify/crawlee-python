@@ -6,7 +6,7 @@ import shutil
 from datetime import datetime, timezone
 from logging import getLogger
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 from pydantic import ValidationError
 from typing_extensions import override
@@ -47,9 +47,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
     _STORAGE_SUBDIR = 'request_queues'
     """The name of the subdirectory where request queues are stored."""
-
-    _cache_by_name: ClassVar[dict[str, FileSystemRequestQueueClient]] = {}
-    """A dictionary to cache clients by their names."""
 
     def __init__(
         self,
@@ -125,12 +122,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             )
 
         name = name or configuration.default_request_queue_id
-
-        # Check if the client is already cached by name.
-        if name in cls._cache_by_name:
-            client = cls._cache_by_name[name]
-            await client._update_metadata(update_accessed_at=True)  # noqa: SLF001
-            return client
 
         storage_dir = Path(configuration.storage_dir)
         rq_path = storage_dir / cls._STORAGE_SUBDIR / name
@@ -216,9 +207,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             )
             await client._update_metadata()
 
-        # Cache the client by name.
-        cls._cache_by_name[name] = client
-
         return client
 
     @override
@@ -227,10 +215,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         if self.path_to_rq.exists():
             async with self._lock:
                 await asyncio.to_thread(shutil.rmtree, self.path_to_rq)
-
-        # Remove the client from the cache.
-        if self.metadata.name in self.__class__._cache_by_name:  # noqa: SLF001
-            del self.__class__._cache_by_name[self.metadata.name]  # noqa: SLF001
 
     @override
     async def add_batch_of_requests(

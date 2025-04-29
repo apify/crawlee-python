@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
@@ -30,9 +30,6 @@ class MemoryDatasetClient(DatasetClient):
     does not support data sharing across different processes. It supports all dataset operations including
     sorting, filtering, and pagination, but performs them entirely in memory.
     """
-
-    _cache_by_name: ClassVar[dict[str, MemoryDatasetClient]] = {}
-    """A dictionary to cache clients by their names."""
 
     def __init__(
         self,
@@ -76,16 +73,10 @@ class MemoryDatasetClient(DatasetClient):
     ) -> MemoryDatasetClient:
         name = name or configuration.default_dataset_id
 
-        # Check if the client is already cached by name.
-        if name in cls._cache_by_name:
-            client = cls._cache_by_name[name]
-            await client._update_metadata(update_accessed_at=True)  # noqa: SLF001
-            return client
-
         dataset_id = id or crypto_random_object_id()
         now = datetime.now(timezone.utc)
 
-        client = cls(
+        return cls(
             id=dataset_id,
             name=name,
             created_at=now,
@@ -94,19 +85,10 @@ class MemoryDatasetClient(DatasetClient):
             item_count=0,
         )
 
-        # Cache the client by name
-        cls._cache_by_name[name] = client
-
-        return client
-
     @override
     async def drop(self) -> None:
         self._records.clear()
         self._metadata.item_count = 0
-
-        # Remove the client from the cache
-        if self.metadata.name in self.__class__._cache_by_name:  # noqa: SLF001
-            del self.__class__._cache_by_name[self.metadata.name]  # noqa: SLF001
 
     @override
     async def push_data(self, data: list[Any] | dict[str, Any]) -> None:

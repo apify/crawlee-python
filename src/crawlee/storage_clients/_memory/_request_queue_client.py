@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
@@ -34,9 +34,6 @@ class MemoryRequestQueueClient(RequestQueueClient):
     This client provides fast access to request data but is limited by available memory and
     does not support data sharing across different processes.
     """
-
-    _cache_by_name: ClassVar[dict[str, MemoryRequestQueueClient]] = {}
-    """A dictionary to cache clients by their names."""
 
     def __init__(
         self,
@@ -91,17 +88,11 @@ class MemoryRequestQueueClient(RequestQueueClient):
     ) -> MemoryRequestQueueClient:
         name = name or configuration.default_request_queue_id
 
-        # Check if the client is already cached by name
-        if name in cls._cache_by_name:
-            client = cls._cache_by_name[name]
-            await client._update_metadata(update_accessed_at=True)  # noqa: SLF001
-            return client
-
         # If specific id is provided, use it; otherwise, generate a new one
         id = id or crypto_random_object_id()
         now = datetime.now(timezone.utc)
 
-        client = cls(
+        return cls(
             id=crypto_random_object_id(),
             name=name,
             created_at=now,
@@ -114,20 +105,11 @@ class MemoryRequestQueueClient(RequestQueueClient):
             total_request_count=0,
         )
 
-        # Cache the client by name
-        cls._cache_by_name[name] = client
-
-        return client
-
     @override
     async def drop(self) -> None:
         # Clear all data
         self._records.clear()
         self._in_progress.clear()
-
-        # Remove from cache
-        if self.metadata.name in self.__class__._cache_by_name:  # noqa: SLF001
-            del self.__class__._cache_by_name[self.metadata.name]  # noqa: SLF001
 
     @override
     async def add_batch_of_requests(

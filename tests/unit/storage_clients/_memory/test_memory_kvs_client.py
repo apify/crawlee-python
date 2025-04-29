@@ -35,26 +35,6 @@ async def test_open_creates_new_kvs() -> None:
     assert isinstance(client.metadata.accessed_at, datetime)
     assert isinstance(client.metadata.modified_at, datetime)
 
-    # Verify the client was cached
-    assert 'new_kvs' in MemoryKeyValueStoreClient._cache_by_name
-
-
-async def test_open_existing_kvs(kvs_client: MemoryKeyValueStoreClient) -> None:
-    """Test that open() loads an existing key-value store with matching properties."""
-    configuration = Configuration(purge_on_start=False)
-    # Open the same key-value store again
-    reopened_client = await MemoryStorageClient().open_key_value_store_client(
-        name=kvs_client.metadata.name,
-        configuration=configuration,
-    )
-
-    # Verify client properties
-    assert kvs_client.metadata.id == reopened_client.metadata.id
-    assert kvs_client.metadata.name == reopened_client.metadata.name
-
-    # Verify clients (python) ids
-    assert id(kvs_client) == id(reopened_client)
-
 
 async def test_kvs_client_purge_on_start() -> None:
     """Test that purge_on_start=True clears existing data in the KVS."""
@@ -81,29 +61,6 @@ async def test_kvs_client_purge_on_start() -> None:
     # Verify value was purged
     record = await kvs_client2.get_value(key='test-key')
     assert record is None
-
-
-async def test_kvs_client_no_purge_on_start() -> None:
-    """Test that purge_on_start=False keeps existing data in the KVS."""
-    configuration = Configuration(purge_on_start=False)
-
-    # Create KVS and add data
-    kvs_client1 = await MemoryStorageClient().open_key_value_store_client(
-        name='test_no_purge_kvs',
-        configuration=configuration,
-    )
-    await kvs_client1.set_value(key='test-key', value='preserved value')
-
-    # Reopen
-    kvs_client2 = await MemoryStorageClient().open_key_value_store_client(
-        name='test_no_purge_kvs',
-        configuration=configuration,
-    )
-
-    # Verify value was preserved
-    record = await kvs_client2.get_value(key='test-key')
-    assert record is not None
-    assert record.value == 'preserved value'
 
 
 async def test_open_with_id_and_name() -> None:
@@ -240,14 +197,8 @@ async def test_drop(kvs_client: MemoryKeyValueStoreClient) -> None:
     # Add some values to the store
     await kvs_client.set_value(key='test', value='data')
 
-    # Verify the store exists in the cache
-    assert kvs_client.metadata.name in MemoryKeyValueStoreClient._cache_by_name
-
     # Drop the store
     await kvs_client.drop()
-
-    # Verify the store was removed from the cache
-    assert kvs_client.metadata.name not in MemoryKeyValueStoreClient._cache_by_name
 
     # Verify the store is empty
     record = await kvs_client.get_value(key='test')

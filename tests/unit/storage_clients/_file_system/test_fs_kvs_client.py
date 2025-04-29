@@ -61,27 +61,6 @@ async def test_open_creates_new_kvs(configuration: Configuration) -> None:
         assert metadata['name'] == 'new_kvs'
 
 
-async def test_open_existing_kvs(
-    kvs_client: FileSystemKeyValueStoreClient,
-    configuration: Configuration,
-) -> None:
-    """Test that open() loads an existing key-value store with matching properties."""
-    configuration.purge_on_start = False
-
-    # Open the same key-value store again
-    reopened_client = await FileSystemStorageClient().open_key_value_store_client(
-        name=kvs_client.metadata.name,
-        configuration=configuration,
-    )
-
-    # Verify client properties
-    assert kvs_client.metadata.id == reopened_client.metadata.id
-    assert kvs_client.metadata.name == reopened_client.metadata.name
-
-    # Verify clients (python) ids - should be the same object due to caching
-    assert id(kvs_client) == id(reopened_client)
-
-
 async def test_kvs_client_purge_on_start(configuration: Configuration) -> None:
     """Test that purge_on_start=True clears existing data in the key-value store."""
     configuration.purge_on_start = True
@@ -323,13 +302,11 @@ async def test_drop(kvs_client: FileSystemKeyValueStoreClient) -> None:
     """Test that drop removes the entire store directory from disk."""
     await kvs_client.set_value(key='test', value='test-value')
 
-    assert kvs_client.metadata.name in FileSystemKeyValueStoreClient._cache_by_name
     assert kvs_client.path_to_kvs.exists()
 
     # Drop the store
     await kvs_client.drop()
 
-    assert kvs_client.metadata.name not in FileSystemKeyValueStoreClient._cache_by_name
     assert not kvs_client.path_to_kvs.exists()
 
 

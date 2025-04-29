@@ -36,28 +36,6 @@ async def test_open_creates_new_dataset() -> None:
     assert isinstance(client.metadata.accessed_at, datetime)
     assert isinstance(client.metadata.modified_at, datetime)
 
-    # Verify the client was cached
-    assert 'new_dataset' in MemoryDatasetClient._cache_by_name
-
-
-async def test_open_existing_dataset(dataset_client: MemoryDatasetClient) -> None:
-    """Test that open() loads an existing dataset with matching properties."""
-    configuration = Configuration(purge_on_start=False)
-
-    # Open the same dataset again
-    reopened_client = await MemoryStorageClient().open_dataset_client(
-        name=dataset_client.metadata.name,
-        configuration=configuration,
-    )
-
-    # Verify client properties
-    assert dataset_client.metadata.id == reopened_client.metadata.id
-    assert dataset_client.metadata.name == reopened_client.metadata.name
-    assert dataset_client.metadata.item_count == reopened_client.metadata.item_count
-
-    # Verify clients (python) ids
-    assert id(dataset_client) == id(reopened_client)
-
 
 async def test_dataset_client_purge_on_start() -> None:
     """Test that purge_on_start=True clears existing data in the dataset."""
@@ -83,29 +61,6 @@ async def test_dataset_client_purge_on_start() -> None:
     # Verify data was purged
     items = await dataset_client2.get_data()
     assert len(items.items) == 0
-
-
-async def test_dataset_client_no_purge_on_start() -> None:
-    """Test that purge_on_start=False keeps existing data in the dataset."""
-    configuration = Configuration(purge_on_start=False)
-
-    # Create dataset and add data
-    dataset_client1 = await MemoryStorageClient().open_dataset_client(
-        name='test_no_purge_dataset',
-        configuration=configuration,
-    )
-    await dataset_client1.push_data({'item': 'preserved data'})
-
-    # Reopen
-    dataset_client2 = await MemoryStorageClient().open_dataset_client(
-        name='test_no_purge_dataset',
-        configuration=configuration,
-    )
-
-    # Verify data was preserved
-    items = await dataset_client2.get_data()
-    assert len(items.items) == 1
-    assert items.items[0]['item'] == 'preserved data'
 
 
 async def test_open_with_id_and_name() -> None:
@@ -283,14 +238,8 @@ async def test_drop(dataset_client: MemoryDatasetClient) -> None:
     """Test that drop removes the dataset from cache and resets its state."""
     await dataset_client.push_data({'test': 'data'})
 
-    # Verify the dataset exists in the cache
-    assert dataset_client.metadata.name in MemoryDatasetClient._cache_by_name
-
     # Drop the dataset
     await dataset_client.drop()
-
-    # Verify the dataset was removed from the cache
-    assert dataset_client.metadata.name not in MemoryDatasetClient._cache_by_name
 
     # Verify the dataset is empty
     assert dataset_client.metadata.item_count == 0

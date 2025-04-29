@@ -40,8 +40,7 @@ async def kvs(
     configuration: Configuration,
 ) -> AsyncGenerator[KeyValueStore, None]:
     """Fixture that provides a key-value store instance for each test."""
-    KeyValueStore._cache_by_id.clear()
-    KeyValueStore._cache_by_name.clear()
+    KeyValueStore._cache.clear()
 
     kvs = await KeyValueStore.open(
         name='test_kvs',
@@ -264,17 +263,13 @@ async def test_drop(
     await kvs.set_value('test', 'data')
 
     # Verify key-value store exists in cache
-    assert kvs.id in KeyValueStore._cache_by_id
-    if kvs.name:
-        assert kvs.name in KeyValueStore._cache_by_name
+    assert kvs._cache_key in KeyValueStore._cache
 
     # Drop the key-value store
     await kvs.drop()
 
     # Verify key-value store was removed from cache
-    assert kvs.id not in KeyValueStore._cache_by_id
-    if kvs.name:
-        assert kvs.name not in KeyValueStore._cache_by_name
+    assert kvs._cache_key not in KeyValueStore._cache
 
     # Verify key-value store is empty (by creating a new one with the same name)
     new_kvs = await KeyValueStore.open(
@@ -324,3 +319,48 @@ async def test_string_data(kvs: KeyValueStore) -> None:
     await kvs.set_value('json_string', json_string)
     result = await kvs.get_value('json_string')
     assert result == json_string
+
+
+async def test_key_with_special_characters(kvs: KeyValueStore) -> None:
+    """Test storing and retrieving values with keys containing special characters."""
+    # Key with spaces, slashes, and special characters
+    special_key = 'key with spaces/and/slashes!@#$%^&*()'
+    test_value = 'Special key value'
+
+    # Store the value with the special key
+    await kvs.set_value(key=special_key, value=test_value)
+
+    # Retrieve the value and verify it matches
+    result = await kvs.get_value(key=special_key)
+    assert result is not None
+    assert result == test_value
+
+    # Make sure the key is properly listed
+    keys = await kvs.list_keys()
+    key_names = [k.key for k in keys]
+    assert special_key in key_names
+
+    # Test key deletion
+    await kvs.delete_value(key=special_key)
+    assert await kvs.get_value(key=special_key) is None
+
+
+async def test_data_persistence_on_reopen(configuration: Configuration) -> None:
+    """Test that data persists when reopening a KeyValueStore."""
+    kvs1 = await KeyValueStore.open(configuration=configuration)
+
+    await kvs1.set_value('key_123', 'value_123')
+
+    result1 = await kvs1.get_value('key_123')
+    assert result1 == 'value_123'
+
+    kvs2 = await KeyValueStore.open(configuration=configuration)
+
+    result2 = await kvs2.get_value('key_123')
+    assert result2 == 'value_123'
+    assert await kvs1.list_keys() == await kvs2.list_keys()
+
+    await kvs2.set_value('key_456', 'value_456')
+
+    result1 = await kvs1.get_value('key_456')
+    assert result1 == 'value_456'

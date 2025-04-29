@@ -64,28 +64,6 @@ async def test_open_creates_new_dataset(configuration: Configuration) -> None:
         assert metadata['item_count'] == 0
 
 
-async def test_open_existing_dataset(
-    dataset_client: FileSystemDatasetClient,
-    configuration: Configuration,
-) -> None:
-    """Test that open() loads an existing dataset correctly."""
-    configuration.purge_on_start = False
-
-    # Open the same dataset again
-    reopened_client = await FileSystemStorageClient().open_dataset_client(
-        name=dataset_client.metadata.name,
-        configuration=configuration,
-    )
-
-    # Verify client properties
-    assert dataset_client.metadata.id == reopened_client.metadata.id
-    assert dataset_client.metadata.name == reopened_client.metadata.name
-    assert dataset_client.metadata.item_count == reopened_client.metadata.item_count
-
-    # Verify clients (python) ids
-    assert id(dataset_client) == id(reopened_client)
-
-
 async def test_dataset_client_purge_on_start(configuration: Configuration) -> None:
     """Test that purge_on_start=True clears existing data in the dataset."""
     configuration.purge_on_start = True
@@ -307,13 +285,11 @@ async def test_drop(dataset_client: FileSystemDatasetClient) -> None:
     """Test dropping a dataset removes the entire dataset directory from disk."""
     await dataset_client.push_data({'test': 'data'})
 
-    assert dataset_client.metadata.name in FileSystemDatasetClient._cache_by_name
     assert dataset_client.path_to_dataset.exists()
 
     # Drop the dataset
     await dataset_client.drop()
 
-    assert dataset_client.metadata.name not in FileSystemDatasetClient._cache_by_name
     assert not dataset_client.path_to_dataset.exists()
 
 

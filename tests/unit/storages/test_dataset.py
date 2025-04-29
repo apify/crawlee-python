@@ -39,8 +39,7 @@ async def dataset(
     configuration: Configuration,
 ) -> AsyncGenerator[Dataset, None]:
     """Fixture that provides a dataset instance for each test."""
-    Dataset._cache_by_id.clear()
-    Dataset._cache_by_name.clear()
+    Dataset._cache.clear()
 
     dataset = await Dataset.open(
         name='test_dataset',
@@ -326,17 +325,13 @@ async def test_drop(
     await dataset.push_data({'test': 'data'})
 
     # Verify dataset exists in cache
-    assert dataset.id in Dataset._cache_by_id
-    if dataset.name:
-        assert dataset.name in Dataset._cache_by_name
+    assert dataset._cache_key in Dataset._cache
 
     # Drop the dataset
     await dataset.drop()
 
     # Verify dataset was removed from cache
-    assert dataset.id not in Dataset._cache_by_id
-    if dataset.name:
-        assert dataset.name not in Dataset._cache_by_name
+    assert dataset._cache_key not in Dataset._cache
 
     # Verify dataset is empty (by creating a new one with the same name)
     new_dataset = await Dataset.open(

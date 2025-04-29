@@ -39,26 +39,6 @@ async def test_open_creates_new_rq() -> None:
     assert client.metadata.total_request_count == 0
     assert client.metadata.had_multiple_clients is False
 
-    # Verify the client was cached
-    assert 'new_rq' in MemoryRequestQueueClient._cache_by_name
-
-
-async def test_open_existing_rq(rq_client: MemoryRequestQueueClient) -> None:
-    """Test that open() loads an existing request queue with matching properties."""
-    configuration = Configuration(purge_on_start=False)
-    # Open the same request queue again
-    reopened_client = await MemoryStorageClient().open_request_queue_client(
-        name=rq_client.metadata.name,
-        configuration=configuration,
-    )
-
-    # Verify client properties
-    assert rq_client.metadata.id == reopened_client.metadata.id
-    assert rq_client.metadata.name == reopened_client.metadata.name
-
-    # Verify clients (python) ids
-    assert id(rq_client) == id(reopened_client)
-
 
 async def test_rq_client_purge_on_start() -> None:
     """Test that purge_on_start=True clears existing data in the RQ."""
@@ -83,31 +63,6 @@ async def test_rq_client_purge_on_start() -> None:
 
     # Verify queue was purged
     assert await rq_client2.is_empty() is True
-
-
-async def test_rq_client_no_purge_on_start() -> None:
-    """Test that purge_on_start=False keeps existing data in the RQ."""
-    configuration = Configuration(purge_on_start=False)
-
-    # Create RQ and add data
-    rq_client1 = await MemoryStorageClient().open_request_queue_client(
-        name='test_no_purge_rq',
-        configuration=configuration,
-    )
-    request = Request.from_url(url='https://example.com/preserved')
-    await rq_client1.add_batch_of_requests([request])
-
-    # Reopen
-    rq_client2 = await MemoryStorageClient().open_request_queue_client(
-        name='test_no_purge_rq',
-        configuration=configuration,
-    )
-
-    # Verify request was preserved
-    assert await rq_client2.is_empty() is False
-    next_request = await rq_client2.fetch_next_request()
-    assert next_request is not None
-    assert next_request.url == 'https://example.com/preserved'
 
 
 async def test_open_with_id_and_name() -> None:
@@ -418,14 +373,8 @@ async def test_drop(rq_client: MemoryRequestQueueClient) -> None:
     request = Request.from_url(url='https://example.com/test')
     await rq_client.add_batch_of_requests([request])
 
-    # Verify the queue exists in the cache
-    assert rq_client.metadata.name in MemoryRequestQueueClient._cache_by_name
-
     # Drop the queue
     await rq_client.drop()
-
-    # Verify the queue was removed from the cache
-    assert rq_client.metadata.name not in MemoryRequestQueueClient._cache_by_name
 
     # Verify the queue is empty
     assert await rq_client.is_empty() is True

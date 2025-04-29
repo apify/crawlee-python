@@ -66,21 +66,20 @@ class Dataset(Storage):
     ```
     """
 
-    _cache_by_id: ClassVar[dict[str, Dataset]] = {}
-    """A dictionary to cache datasets by their IDs."""
+    _cache: ClassVar[dict[str, Dataset]] = {}
+    """A dictionary to cache datasets."""
 
-    _cache_by_name: ClassVar[dict[str, Dataset]] = {}
-    """A dictionary to cache datasets by their names."""
-
-    def __init__(self, client: DatasetClient) -> None:
+    def __init__(self, client: DatasetClient, cache_key: str) -> None:
         """Initialize a new instance.
 
         Preferably use the `Dataset.open` constructor to create a new instance.
 
         Args:
             client: An instance of a dataset client.
+            cache_key: A unique key to identify the dataset in the cache.
         """
         self._client = client
+        self._cache_key = cache_key
 
     @override
     @property
@@ -110,14 +109,18 @@ class Dataset(Storage):
         if id and name:
             raise ValueError('Only one of "id" or "name" can be specified, not both.')
 
-        # Check if dataset is already cached by id or name
-        if id and id in cls._cache_by_id:
-            return cls._cache_by_id[id]
-        if name and name in cls._cache_by_name:
-            return cls._cache_by_name[name]
-
         configuration = service_locator.get_configuration() if configuration is None else configuration
         storage_client = service_locator.get_storage_client() if storage_client is None else storage_client
+
+        cache_key = cls.compute_cache_key(
+            id=id,
+            name=name,
+            configuration=configuration,
+            storage_client=storage_client,
+        )
+
+        if cache_key in cls._cache:
+            return cls._cache[cache_key]
 
         client = await storage_client.open_dataset_client(
             id=id,
@@ -125,23 +128,15 @@ class Dataset(Storage):
             configuration=configuration,
         )
 
-        dataset = cls(client)
-
-        # Cache the dataset by id and name if available
-        if dataset.id:
-            cls._cache_by_id[dataset.id] = dataset
-        if dataset.name:
-            cls._cache_by_name[dataset.name] = dataset
-
+        dataset = cls(client, cache_key)
+        cls._cache[cache_key] = dataset
         return dataset
 
     @override
     async def drop(self) -> None:
         # Remove from cache before dropping
-        if self.id in self._cache_by_id:
-            del self._cache_by_id[self.id]
-        if self.name and self.name in self._cache_by_name:
-            del self._cache_by_name[self.name]
+        if self._cache_key in self._cache:
+            del self._cache[self._cache_key]
 
         await self._client.drop()
 

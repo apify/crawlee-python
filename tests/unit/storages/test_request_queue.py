@@ -39,8 +39,7 @@ async def rq(
     configuration: Configuration,
 ) -> AsyncGenerator[RequestQueue, None]:
     """Fixture that provides a request queue instance for each test."""
-    RequestQueue._cache_by_id.clear()
-    RequestQueue._cache_by_name.clear()
+    RequestQueue._cache.clear()
 
     rq = await RequestQueue.open(
         name='test_request_queue',
@@ -471,17 +470,13 @@ async def test_drop(
     await rq.add_request('https://example.com')
 
     # Verify request queue exists in cache
-    assert rq.id in RequestQueue._cache_by_id
-    if rq.name:
-        assert rq.name in RequestQueue._cache_by_name
+    assert rq._cache_key in RequestQueue._cache
 
     # Drop the request queue
     await rq.drop()
 
     # Verify request queue was removed from cache
-    assert rq.id not in RequestQueue._cache_by_id
-    if rq.name:
-        assert rq.name not in RequestQueue._cache_by_name
+    assert rq._cache_key not in RequestQueue._cache
 
     # Verify request queue is empty (by creating a new one with the same name)
     new_rq = await RequestQueue.open(

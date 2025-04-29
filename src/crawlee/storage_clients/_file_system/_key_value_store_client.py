@@ -3,10 +3,11 @@ from __future__ import annotations
 import asyncio
 import json
 import shutil
+import urllib.parse
 from datetime import datetime, timezone
 from logging import getLogger
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
 from typing_extensions import override
@@ -47,9 +48,6 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
     _STORAGE_SUBDIR = 'key_value_stores'
     """The name of the subdirectory where key-value stores are stored."""
-
-    _cache_by_name: ClassVar[dict[str, FileSystemKeyValueStoreClient]] = {}
-    """A dictionary to cache clients by their names."""
 
     def __init__(
         self,
@@ -110,12 +108,6 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
         name = name or configuration.default_dataset_id
 
-        # Check if the client is already cached by name.
-        if name in cls._cache_by_name:
-            client = cls._cache_by_name[name]
-            await client._update_metadata(update_accessed_at=True)  # noqa: SLF001
-            return client
-
         storage_dir = Path(configuration.storage_dir)
         kvs_path = storage_dir / cls._STORAGE_SUBDIR / name
         metadata_path = kvs_path / METADATA_FILENAME
@@ -160,9 +152,6 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             )
             await client._update_metadata()
 
-        # Cache the client by name.
-        cls._cache_by_name[name] = client
-
         return client
 
     @override
@@ -172,16 +161,12 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             async with self._lock:
                 await asyncio.to_thread(shutil.rmtree, self.path_to_kvs)
 
-        # Remove the client from the cache.
-        if self.metadata.name in self.__class__._cache_by_name:  # noqa: SLF001
-            del self.__class__._cache_by_name[self.metadata.name]  # noqa: SLF001
-
     @override
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:
         # Update the metadata to record access
         await self._update_metadata(update_accessed_at=True)
 
-        record_path = self.path_to_kvs / key
+        record_path = self.path_to_kvs / self._encode_key(key)
 
         if not record_path.exists():
             return None
@@ -257,7 +242,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             # Fallback: attempt to convert to string and encode.
             value_bytes = str(value).encode('utf-8')
 
-        record_path = self.path_to_kvs / key
+        record_path = self.path_to_kvs / self._encode_key(key)
 
         # Prepare the metadata
         size = len(value_bytes)
@@ -284,7 +269,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
     @override
     async def delete_value(self, *, key: str) -> None:
-        record_path = self.path_to_kvs / key
+        record_path = self.path_to_kvs / self._encode_key(key)
         metadata_path = record_path.with_name(f'{record_path.name}.{METADATA_FILENAME}')
         deleted = False
 
@@ -331,7 +316,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
                     continue
 
                 # Extract the base key name from the metadata filename
-                key_name = file_path.name[: -len(f'.{METADATA_FILENAME}')]
+                key_name = self._decode_key(file_path.name[: -len(f'.{METADATA_FILENAME}')])
 
                 # Apply exclusive_start_key filter if provided
                 if exclusive_start_key is not None and key_name <= exclusive_start_key:
@@ -384,3 +369,11 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         # Dump the serialized metadata to the file.
         data = await json_dumps(self._metadata.model_dump())
         await asyncio.to_thread(self.path_to_metadata.write_text, data, encoding='utf-8')
+
+    def _encode_key(self, key: str) -> str:
+        """Encode a key to make it safe for use in a file path."""
+        return urllib.parse.quote(key, safe='')
+
+    def _decode_key(self, encoded_key: str) -> str:
+        """Decode a key that was encoded to make it safe for use in a file path."""
+        return urllib.parse.unquote(encoded_key)
