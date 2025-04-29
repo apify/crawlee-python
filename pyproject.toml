@@ -105,7 +105,7 @@ dev = [
     "pytest-xdist~=3.6.0",
     "pytest~=8.3.0",
     "ruff~=0.11.0",
-    "setuptools", # setuptools are used by pytest, but not explicitly required
+    "setuptools",  # setuptools are used by pytest, but not explicitly required
     "sortedcontainers-stubs~=2.4.0",
     "types-beautifulsoup4~=4.12.0.20240229",
     "types-cachetools~=5.5.0.20240820",
@@ -183,8 +183,9 @@ indent-style = "space"
 "**/docs/examples/code_examples/*crawler_with_error_snapshotter.py" = [
     "PLR2004", # Magic value used in comparison. Ignored for simplicity and readability of example code.
 ]
-
-
+"**/docs/guides/code_examples/running_in_web_server/server.py" = [
+    "TC002", # ruff false positive. Import actually needed during runtime.
+]
 
 [tool.ruff.lint.flake8-quotes]
 docstring-quotes = "double"
@@ -233,6 +234,8 @@ module = [
     "apify",                        # Example code shows integration of apify and crawlee.
     "apify_fingerprint_datapoints", # Untyped and stubs not available
     "camoufox",                     # Example code shows integration of camoufox and crawlee.
+    "fastapi",                      # Example code shows running in webserver.
+    "starlette.*",                  # Example code shows running in webserver.
     "flask",                        # Example code shows deploy on Google Cloud.
     "functions_framework",          # Example code shows deploy on Google Cloud.
     "jaro",                         # Untyped and stubs not available
@@ -245,6 +248,12 @@ module = [
     "inquirer.*",                   # Untyped and stubs not available
 ]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "running_in_web_server.*"  # False positive when fastapi not available
+]
+disable_error_code = ["misc"]
 
 [tool.basedpyright]
 pythonVersion = "3.9"

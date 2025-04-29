@@ -7,6 +7,7 @@ import signal
 import sys
 import tempfile
 import threading
+import traceback
 from asyncio import CancelledError
 from collections.abc import AsyncGenerator, Awaitable, Iterable, Sequence
 from contextlib import AsyncExitStack, suppress
@@ -56,6 +57,10 @@ from crawlee.statistics import Statistics, StatisticsState
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 from ._context_pipeline import ContextPipeline
+from ._logging_utils import (
+    get_one_line_error_summary_if_possible,
+    reduce_asyncio_timeout_error_to_relevant_traceback_parts,
+)
 
 if TYPE_CHECKING:
     import re
@@ -219,6 +224,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     """
 
     _CRAWLEE_STATE_KEY = 'CRAWLEE_STATE'
+    _request_handler_timeout_text = 'Request handler timed out after'
 
     def __init__(
         self,
@@ -879,6 +885,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         if self._should_retry_request(context, error):
             request.retry_count += 1
+            self.log.warning(
+                f'Retrying request to {context.request.url} due to: {error} \n'
+                f'{get_one_line_error_summary_if_possible(error)}'
+            )
             await self._statistics.error_tracker.add(error=error, context=context)
 
             if self._error_handler:
@@ -932,7 +942,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             context.session.mark_bad()
 
     async def _handle_failed_request(self, context: TCrawlingContext | BasicCrawlingContext, error: Exception) -> None:
-        self._logger.exception('Request failed and reached maximum retries', exc_info=error)
+        self._logger.error(
+            f'Request to {context.request.url} failed and reached maximum retries\n '
+            f'{self._get_message_from_error(error)}'
+        )
         await self._statistics.error_tracker.add(error=error, context=context)
 
         if self._failed_request_handler:
@@ -940,6 +953,32 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 await self._failed_request_handler(context, error)
             except Exception as e:
                 raise UserDefinedErrorHandlerError('Exception thrown in user-defined failed request handler') from e
+
+    def _get_message_from_error(self, error: Exception) -> str:
+        """Get error message summary from exception.
+
+        Custom processing to reduce the irrelevant traceback clutter in some cases.
+        """
+        traceback_parts = traceback.format_exception(type(error), value=error, tb=error.__traceback__, chain=True)
+        used_traceback_parts = traceback_parts
+
+        if (
+            isinstance(error, asyncio.exceptions.TimeoutError)
+            and self._request_handler_timeout_text in traceback_parts[-1]
+        ):
+            used_traceback_parts = reduce_asyncio_timeout_error_to_relevant_traceback_parts(error)
+            used_traceback_parts.append(traceback_parts[-1])
+
+        return ''.join(used_traceback_parts).strip('\n')
+
+    def _get_only_inner_most_exception(self, error: BaseException) -> BaseException:
+        """Get innermost exception by following __cause__ and __context__ attributes of exception."""
+        if error.__cause__:
+            return self._get_only_inner_most_exception(error.__cause__)
+        if error.__context__:
+            return self._get_only_inner_most_exception(error.__context__)
+        # No __cause__ and no __context__, this is as deep as it can get.
+        return error
 
     def _prepare_send_request_function(
         self,
@@ -1210,7 +1249,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         await wait_for(
             lambda: self._context_pipeline(context, self.router),
             timeout=self._request_handler_timeout,
-            timeout_message=f'Request handler timed out after {self._request_handler_timeout.total_seconds()} seconds',
+            timeout_message=f'{self._request_handler_timeout_text}'
+            f' {self._request_handler_timeout.total_seconds()} seconds',
             logger=self._logger,
         )
 
