@@ -26,13 +26,14 @@ class ErrorTracker:
     def __init__(
         self,
         *,
+        snapshot_kvs_name: str | None = None,
         show_error_name: bool = True,
         show_file_and_line_number: bool = True,
         show_error_message: bool = True,
         show_full_message: bool = False,
         save_error_snapshots: bool = False,
     ) -> None:
-        self.error_snapshotter = ErrorSnapshotter() if save_error_snapshots else None
+        self.error_snapshotter = ErrorSnapshotter(snapshot_kvs_name=snapshot_kvs_name) if save_error_snapshots else None
         self.show_error_name = show_error_name
         self.show_file_and_line_number = show_file_and_line_number
         self.show_error_message = show_error_message

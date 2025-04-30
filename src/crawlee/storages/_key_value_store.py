@@ -1,26 +1,36 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
+from logging import getLogger
 from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, overload
 
+from pydantic import RootModel
 from typing_extensions import override
 
 from crawlee import service_locator
+from crawlee._types import JsonSerializable  # noqa: TC001
 from crawlee._utils.docs import docs_group
-from crawlee.events._types import Event, EventPersistStateData
+from crawlee.storage_clients.models import KeyValueStoreMetadata
 
 from ._base import Storage
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
-    from crawlee._types import JsonSerializable
+    from crawlee._utils.recoverable_state import RecoverableState
     from crawlee.configuration import Configuration
     from crawlee.storage_clients import StorageClient
     from crawlee.storage_clients._base import KeyValueStoreClient
     from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecordMetadata
 
 T = TypeVar('T')
+
+logger = getLogger(__name__)
+
+
+class AutosavedValue(RootModel):
+    root: dict[str, JsonSerializable]
 
 
 @docs_group('Classes')
@@ -57,8 +67,13 @@ class KeyValueStore(Storage):
     _cache: ClassVar[dict[str, KeyValueStore]] = {}
     """A dictionary to cache key-value stores."""
 
-    _autosave_cache: ClassVar[dict[str, dict[str, dict[str, JsonSerializable]]]] = {}
-    """A dictionary to cache auto-saved values."""
+    # Cache for recoverable (auto-saved) values
+    _autosaved_values: ClassVar[
+        dict[
+            str,
+            dict[str, RecoverableState[AutosavedValue]],
+        ]
+    ] = {}
 
     def __init__(self, client: KeyValueStoreClient, cache_key: str) -> None:
         """Initialize a new instance.
@@ -132,7 +147,7 @@ class KeyValueStore(Storage):
             del self._cache[self._cache_key]
 
         # Clear cache with persistent values
-        self._clear_cache()
+        await self._clear_cache()
 
         # Drop the key-value store client
         await self._client.drop()
@@ -226,6 +241,17 @@ class KeyValueStore(Storage):
             )
         ]
 
+    async def get_public_url(self, key: str) -> str:
+        """Get the public URL for the given key.
+
+        Args:
+            key: Key of the record for which URL is required.
+
+        Returns:
+            The public URL for the given key.
+        """
+        return await self._client.get_public_url(key=key)
+
     async def get_auto_saved_value(
         self,
         key: str,
@@ -240,68 +266,39 @@ class KeyValueStore(Storage):
         Returns:
             Return the value of the key.
         """
+        from crawlee._utils.recoverable_state import RecoverableState
+
         default_value = {} if default_value is None else default_value
 
         async with self._autosave_lock:
-            if key in self._autosave_cache:
-                return self._autosave_cache[key]
+            cache = self._autosaved_values.setdefault(self.id, {})
 
-            value = await self.get_value(key, default_value)
+            if key in cache:
+                return cache[key].current_value.root
 
-            if not isinstance(value, dict):
-                raise TypeError(
-                    f'Expected dictionary for persist state value at key "{key}, but got {type(value).__name__}'
-                )
+            cache[key] = recoverable_state = RecoverableState(
+                default_state=AutosavedValue(default_value),
+                persistence_enabled=True,
+                persist_state_kvs_id=self.id,
+                persist_state_key=key,
+                logger=logger,
+            )
 
-            self._autosave_cache[key] = value
+            await recoverable_state.initialize()
 
-        self._ensure_persist_event()
-        return value
+        return recoverable_state.current_value.root
 
     async def persist_autosaved_values(self) -> None:
-        """Force persistent values to be saved without waiting for an event in Event Manager."""
-        if self._persist_state_event_started:
-            await self._persist_save()
+        """Force autosaved values to be saved without waiting for an event in Event Manager."""
+        if self.id in self._autosaved_values:
+            cache = self._autosaved_values[self.id]
+            for value in cache.values():
+                await value.persist_state()
 
-    async def get_public_url(self, key: str) -> str:
-        """Get the public URL for the given key.
-
-        Args:
-            key: Key of the record for which URL is required.
-
-        Returns:
-            The public URL for the given key.
-        """
-        return await self._client.get_public_url(key=key)
-
-    @property
-    def _autosave_cache_instance(self) -> dict[str, dict[str, JsonSerializable]]:
-        """Cache dictionary for storing auto-saved values indexed by store cache key."""
-        if self._cache_key not in self._autosave_cache:
-            self._autosave_cache[self._cache_key] = {}
-        return self._autosave_cache[self._cache_key]
-
-    async def _persist_save(self, _event_data: EventPersistStateData | None = None) -> None:
-        """Save cache with persistent values. Can be used in Event Manager."""
-        for key, value in self._autosave_cache_instance.items():
-            await self.set_value(key, value)
-
-    def _ensure_persist_event(self) -> None:
-        """Ensure persist state event handling if not already done."""
-        if self._persist_state_event_started:
-            return
-
-        event_manager = service_locator.get_event_manager()
-        event_manager.on(event=Event.PERSIST_STATE, listener=self._persist_save)
-        self._persist_state_event_started = True
-
-    def _clear_cache(self) -> None:
-        """Clear cache with persistent values."""
-        self._autosave_cache_instance.clear()
-
-    def _drop_persist_state_event(self) -> None:
-        """Off event manager listener and drop event status."""
-        if self._persist_state_event_started:
-            event_manager = service_locator.get_event_manager()
-            event_manager.off(event=Event.PERSIST_STATE, listener=self._persist_save)
-        self._persist_state_event_started = False
+    async def _clear_cache(self) -> None:
+        """Clear cache with autosaved values."""
+        if self.id in self._autosaved_values:
+            cache = self._autosaved_values[self.id]
+            for value in cache.values():
+                await value.teardown()
+            cache.clear()

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from crawlee._utils.docs import docs_group
 
@@ -14,6 +14,8 @@ SupportedBrowserType = Literal['chromium', 'firefox', 'webkit', 'edge']
 
 @docs_group('Data structures')
 class ScreenOptions(BaseModel):
+    model_config = ConfigDict(extra='forbid', populate_by_name=True)
+
     """Defines the screen constrains for the fingerprint generator."""
 
     min_width: Annotated[float | None, Field(alias='minWidth')] = None
@@ -28,14 +30,12 @@ class ScreenOptions(BaseModel):
     max_height: Annotated[float | None, Field(alias='maxHeight')] = None
     """Maximal screen height constraint for the fingerprint generator."""
 
-    class Config:
-        extra = 'forbid'
-        populate_by_name = True
-
 
 @docs_group('Data structures')
 class HeaderGeneratorOptions(BaseModel):
     """Collection of header related attributes that can be used by the fingerprint generator."""
+
+    model_config = ConfigDict(extra='forbid', populate_by_name=True)
 
     browsers: list[SupportedBrowserType] | None = None
     """List of BrowserSpecifications to generate the headers for."""
@@ -56,7 +56,3 @@ class HeaderGeneratorOptions(BaseModel):
 
     strict: bool | None = None
     """If true, the generator will throw an error if it cannot generate headers based on the input."""
-
-    class Config:
-        extra = 'forbid'
-        populate_by_name = True

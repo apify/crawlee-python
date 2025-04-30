@@ -666,7 +666,7 @@ async def test_context_update_kv_store() -> None:
     assert (await store.get_value('foo')) == 'bar'
 
 
-async def test_context_use_state(key_value_store: KeyValueStore) -> None:
+async def test_context_use_state() -> None:
     crawler = BasicCrawler()
 
     @crawler.router.default_handler
@@ -675,9 +675,10 @@ async def test_context_use_state(key_value_store: KeyValueStore) -> None:
 
     await crawler.run(['https://hello.world'])
 
-    store = await crawler.get_key_value_store()
+    kvs = await crawler.get_key_value_store()
+    value = await kvs.get_value(BasicCrawler._CRAWLEE_STATE_KEY)
 
-    assert (await store.get_value(BasicCrawler._CRAWLEE_STATE_KEY)) == {'hello': 'world'}
+    assert value == {'hello': 'world'}
 
 
 async def test_context_handlers_use_state(key_value_store: KeyValueStore) -> None:

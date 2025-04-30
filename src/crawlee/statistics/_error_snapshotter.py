@@ -6,9 +6,10 @@ import re
 import string
 from typing import TYPE_CHECKING
 
+from crawlee.storages import KeyValueStore
+
 if TYPE_CHECKING:
     from crawlee._types import BasicCrawlingContext
-    from crawlee.storages import KeyValueStore
 
 
 class ErrorSnapshotter:
@@ -19,18 +20,8 @@ class ErrorSnapshotter:
     SNAPSHOT_PREFIX = 'ERROR_SNAPSHOT'
     ALLOWED_CHARACTERS = string.ascii_letters + string.digits + '!-_.'
 
-    def __init__(self, kvs: KeyValueStore | None = None) -> None:
-        self._kvs = kvs
-
-    @property
-    def kvs(self) -> KeyValueStore:
-        if not self._kvs:
-            raise RuntimeError('The key value store was not yet set.')
-        return self._kvs
-
-    @kvs.setter
-    def kvs(self, kvs: KeyValueStore) -> None:
-        self._kvs = kvs
+    def __init__(self, *, snapshot_kvs_name: str | None = None) -> None:
+        self._kvs_name = snapshot_kvs_name
 
     async def capture_snapshot(self, error_message: str, file_and_line: str, context: BasicCrawlingContext) -> None:
         """Capture error snapshot and save it to key value store.
@@ -60,11 +51,13 @@ class ErrorSnapshotter:
 
     async def _save_html(self, html: str, base_name: str) -> None:
         file_name = f'{base_name}.html'
-        await self.kvs.set_value(file_name, html, content_type='text/html')
+        kvs = await KeyValueStore.open(name=self._kvs_name)
+        await kvs.set_value(file_name, html, content_type='text/html')
 
     async def _save_screenshot(self, screenshot: bytes, base_name: str) -> None:
         file_name = f'{base_name}.jpg'
-        await self.kvs.set_value(file_name, screenshot, content_type='image/jpeg')
+        kvs = await KeyValueStore.open(name=self._kvs_name)
+        await kvs.set_value(file_name, screenshot, content_type='image/jpeg')
 
     def _sanitize_filename(self, filename: str) -> str:
         return re.sub(f'[^{re.escape(self.ALLOWED_CHARACTERS)}]', '', filename[: self.MAX_FILENAME_LENGTH])
