@@ -19,7 +19,7 @@ from ._base import Storage
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
-    from crawlee._utils.persistent_object import PersistentObject
+    from crawlee._utils.recoverable_state import RecoverableState
     from crawlee.configuration import Configuration
     from crawlee.storage_clients import StorageClient
 
@@ -67,11 +67,11 @@ class KeyValueStore(Storage):
     ```
     """
 
-    # Cache for persistent (auto-saved) values
+    # Cache for recoverable (auto-saved) values
     _autosaved_values: ClassVar[
         dict[
             str,
-            dict[str, PersistentObject[AutosavedValue]],
+            dict[str, RecoverableState[AutosavedValue]],
         ]
     ] = {}
 
@@ -237,7 +237,7 @@ class KeyValueStore(Storage):
         Returns:
             Return the value of the key.
         """
-        from crawlee._utils.persistent_object import PersistentObject
+        from crawlee._utils.recoverable_state import RecoverableState
 
         default_value = {} if default_value is None else default_value
 
@@ -245,9 +245,9 @@ class KeyValueStore(Storage):
             cache = self._autosaved_values.setdefault(self._id, {})
 
             if key in cache:
-                return cache[key].get().root
+                return cache[key].current_value.root
 
-            cache[key] = persistent_object = PersistentObject(
+            cache[key] = recoverable_state = RecoverableState(
                 default_state=AutosavedValue(default_value),
                 persistence_enabled=True,
                 persist_state_kvs_id=self._id,
@@ -255,12 +255,12 @@ class KeyValueStore(Storage):
                 logger=logger,
             )
 
-            await persistent_object.initialize()
+            await recoverable_state.initialize()
 
-        return persistent_object.get().root
+        return recoverable_state.current_value.root
 
     async def _clear_cache(self) -> None:
-        """Clear cache with persistent values."""
+        """Clear cache with autosaved values."""
         if self.id in self._autosaved_values:
             cache = self._autosaved_values[self.id]
             for value in cache.values():
@@ -268,7 +268,7 @@ class KeyValueStore(Storage):
             cache.clear()
 
     async def persist_autosaved_values(self) -> None:
-        """Force persistent values to be saved without waiting for an event in Event Manager."""
+        """Force autosaved values to be saved without waiting for an event in Event Manager."""
         if self.id in self._autosaved_values:
             cache = self._autosaved_values[self.id]
             for value in cache.values():

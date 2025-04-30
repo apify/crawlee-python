@@ -10,7 +10,7 @@ from typing_extensions import Self, TypeVar
 
 from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
-from crawlee._utils.persistent_object import PersistentObject
+from crawlee._utils.recoverable_state import RecoverableState
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee.statistics import FinalStatistics, StatisticsState
 from crawlee.statistics._error_tracker import ErrorTracker
@@ -89,7 +89,7 @@ class Statistics(Generic[TStatisticsState]):
 
         self._requests_in_progress = dict[str, RequestProcessingRecord]()
 
-        self._state = PersistentObject(
+        self._state = RecoverableState(
             default_state=state_model(stats_id=self._id),
             persist_state_key=persist_state_key or f'SDK_CRAWLER_STATISTICS_{self._id}',
             persistence_enabled=persistence_enabled,
@@ -181,7 +181,7 @@ class Statistics(Generic[TStatisticsState]):
         if not self._active:
             raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
-        self._state.get().crawler_finished_at = datetime.now(timezone.utc)
+        self._state.current_value.crawler_finished_at = datetime.now(timezone.utc)
 
         await self._state.teardown()
 
@@ -191,12 +191,12 @@ class Statistics(Generic[TStatisticsState]):
 
     @property
     def state(self) -> TStatisticsState:
-        return self._state.get()
+        return self._state.current_value
 
     @ensure_context
     def register_status_code(self, code: int) -> None:
         """Increment the number of times a status code has been received."""
-        state = self._state.get()
+        state = self._state.current_value
         state.requests_with_status_code.setdefault(str(code), 0)
         state.requests_with_status_code[str(code)] += 1
 
@@ -214,7 +214,7 @@ class Statistics(Generic[TStatisticsState]):
         if record is None:
             return
 
-        state = self._state.get()
+        state = self._state.current_value
         duration = record.finish()
 
         state.requests_finished += 1
@@ -236,7 +236,7 @@ class Statistics(Generic[TStatisticsState]):
         if record is None:
             return
 
-        state = self._state.get()
+        state = self._state.current_value
 
         state.request_total_failed_duration += record.finish()
         state.requests_failed += 1
@@ -251,7 +251,7 @@ class Statistics(Generic[TStatisticsState]):
 
         crawler_runtime = datetime.now(timezone.utc) - self._instance_start
         total_minutes = crawler_runtime.total_seconds() / 60
-        state = self._state.get()
+        state = self._state.current_value
         serialized_state = state.model_dump(by_alias=False)
 
         return FinalStatistics(
@@ -282,7 +282,7 @@ class Statistics(Generic[TStatisticsState]):
             self._periodic_message_logger.info(self._log_message, extra=stats.to_dict())
 
     def _after_initialize(self) -> None:
-        state = self._state.get()
+        state = self._state.current_value
 
         if state.crawler_started_at is None:
             state.crawler_started_at = datetime.now(timezone.utc)
@@ -298,7 +298,7 @@ class Statistics(Generic[TStatisticsState]):
 
     def _save_retry_count_for_request(self, record: RequestProcessingRecord) -> None:
         retry_count = record.retry_count
-        state = self._state.get()
+        state = self._state.current_value
 
         if retry_count:
             state.requests_retries += 1

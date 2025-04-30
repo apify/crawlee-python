@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 from pydantic import BaseModel
 
 from crawlee import service_locator
+from crawlee._utils.context import ensure_context
 from crawlee.events._types import Event, EventPersistStateData
 from crawlee.storages._key_value_store import KeyValueStore
 
@@ -14,8 +15,8 @@ if TYPE_CHECKING:
 TStateModel = TypeVar('TStateModel', bound=BaseModel)
 
 
-class PersistentObject(Generic[TStateModel]):
-    """A class for managing persistent state using a Pydantic model.
+class RecoverableState(Generic[TStateModel]):
+    """A class for managing persistent recoverable state using a Pydantic model.
 
     This class facilitates state persistence to a `KeyValueStore`, allowing data to be saved and retrieved
     across migrations or restarts. It manages the loading, saving, and resetting of state data,
@@ -39,7 +40,7 @@ class PersistentObject(Generic[TStateModel]):
         persist_state_kvs_id: str | None = None,
         logger: logging.Logger,
     ) -> None:
-        """Initialize a new persistent object.
+        """Initialize a new recoverable state object.
 
         Args:
             default_state: The default state model instance to use when no persisted state is found.
@@ -61,19 +62,22 @@ class PersistentObject(Generic[TStateModel]):
         self._persist_state_kvs_id = persist_state_kvs_id
         self._key_value_store: KeyValueStore | None = None
         self._log = logger
+        self.active = False
 
     async def initialize(self) -> TStateModel:
-        """Initialize the persistent object.
+        """Initialize the recoverable state.
 
-        This method must be called before using the persistent object. It loads the saved state
+        This method must be called before using the recoverable state. It loads the saved state
         if persistence is enabled and registers the object to listen for PERSIST_STATE events.
 
         Returns:
             The loaded state model
         """
+        self.active = True
+
         if not self._persistence_enabled:
             self._state = self._default_state.model_copy(deep=True)
-            return self.get()
+            return self.current_value
 
         self._key_value_store = await KeyValueStore.open(
             name=self._persist_state_kvs_name, id=self._persist_state_kvs_id
@@ -84,14 +88,16 @@ class PersistentObject(Generic[TStateModel]):
         event_manager = service_locator.get_event_manager()
         event_manager.on(event=Event.PERSIST_STATE, listener=self.persist_state)
 
-        return self.get()
+        return self.current_value
 
     async def teardown(self) -> None:
-        """Clean up resources used by the persistent object.
+        """Clean up resources used by the recoverable state.
 
         If persistence is enabled, this method deregisters the object from PERSIST_STATE events
         and persists the current state one last time.
         """
+        self.active = False
+
         if not self._persistence_enabled:
             return
 
@@ -99,13 +105,16 @@ class PersistentObject(Generic[TStateModel]):
         event_manager.off(event=Event.PERSIST_STATE, listener=self.persist_state)
         await self.persist_state()
 
-    def get(self) -> TStateModel:
+    @property
+    @ensure_context
+    def current_value(self) -> TStateModel:
         """Get the current state."""
         if self._state is None:
-            raise RuntimeError('Persistent state has not yet been loaded')
+            raise RuntimeError('Recoverable state has not yet been loaded')
 
         return self._state
 
+    @ensure_context
     async def reset(self) -> None:
         """Reset the state to the default values and clear any persisted state.
 
@@ -116,10 +125,11 @@ class PersistentObject(Generic[TStateModel]):
 
         if self._persistence_enabled:
             if self._key_value_store is None:
-                raise RuntimeError('Persistent object has not yet been initialized')
+                raise RuntimeError('Recoverable state has not yet been initialized')
 
             await self._key_value_store.set_value(self._persist_state_key, None)
 
+    @ensure_context
     async def persist_state(self, event_data: EventPersistStateData | None = None) -> None:
         """Persist the current state to the KeyValueStore.
 
@@ -132,7 +142,7 @@ class PersistentObject(Generic[TStateModel]):
         self._log.debug(f'Persisting state of the Statistics (event_data={event_data}).')
 
         if self._key_value_store is None or self._state is None:
-            raise RuntimeError('Persistent object has not yet been initialized')
+            raise RuntimeError('Recoverable state has not yet been initialized')
 
         if self._persistence_enabled:
             await self._key_value_store.set_value(
@@ -141,9 +151,10 @@ class PersistentObject(Generic[TStateModel]):
                 'application/json',
             )
 
+    @ensure_context
     async def _load_saved_state(self) -> None:
         if self._key_value_store is None:
-            raise RuntimeError('Persistent object has not yet been initialized')
+            raise RuntimeError('Recoverable state has not yet been initialized')
 
         stored_state = await self._key_value_store.get_value(self._persist_state_key)
         if stored_state is None:

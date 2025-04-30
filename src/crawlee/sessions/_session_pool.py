@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Callable, Literal, overload
 from crawlee import service_locator
 from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
-from crawlee._utils.persistent_object import PersistentObject
+from crawlee._utils.recoverable_state import RecoverableState
 from crawlee.sessions import Session
 from crawlee.sessions._models import SessionPoolModel
 
@@ -60,7 +60,7 @@ class SessionPool:
         if event_manager:
             service_locator.set_event_manager(event_manager)
 
-        self._state = PersistentObject(
+        self._state = RecoverableState(
             default_state=SessionPoolModel(
                 max_pool_size=max_pool_size,
                 sessions={},
@@ -89,17 +89,17 @@ class SessionPool:
     @property
     def session_count(self) -> int:
         """Get the total number of sessions currently maintained in the pool."""
-        return len(self._state.get().sessions)
+        return len(self._state.current_value.sessions)
 
     @property
     def usable_session_count(self) -> int:
         """Get the number of sessions that are currently usable."""
-        return self._state.get().usable_session_count
+        return self._state.current_value.usable_session_count
 
     @property
     def retired_session_count(self) -> int:
         """Get the number of sessions that are no longer usable."""
-        return self._state.get().retired_session_count
+        return self._state.current_value.retired_session_count
 
     @property
     def active(self) -> bool:
@@ -153,7 +153,7 @@ class SessionPool:
     @ensure_context
     def get_state(self, *, as_dict: bool = False) -> SessionPoolModel | dict:
         """Retrieve the current state of the pool either as a model or as a dictionary."""
-        model = self._state.get().model_copy(deep=True)
+        model = self._state.current_value.model_copy(deep=True)
         if as_dict:
             return model.model_dump()
         return model
@@ -168,7 +168,7 @@ class SessionPool:
         Args:
             session: The session to add to the pool.
         """
-        state = self._state.get()
+        state = self._state.current_value
 
         if session.id in state.sessions:
             logger.warning(f'Session with ID {session.id} already exists in the pool.')
@@ -209,7 +209,7 @@ class SessionPool:
             The session object if found and usable, otherwise `None`.
         """
         await self._fill_sessions_to_max()
-        session = self._state.get().sessions.get(session_id)
+        session = self._state.current_value.sessions.get(session_id)
 
         if not session:
             logger.warning(f'Session with ID {session_id} not found.')
@@ -231,7 +231,7 @@ class SessionPool:
             new_session = self._create_session_function()
         else:
             new_session = Session(**self._session_settings)
-        self._state.get().sessions[new_session.id] = new_session
+        self._state.current_value.sessions[new_session.id] = new_session
         return new_session
 
     async def _fill_sessions_to_max(self) -> None:
@@ -241,12 +241,12 @@ class SessionPool:
 
     def _get_random_session(self) -> Session:
         """Get a random session from the pool."""
-        state = self._state.get()
+        state = self._state.current_value
         if not state.sessions:
             raise ValueError('No sessions available in the pool.')
         return random.choice(list(state.sessions.values()))
 
     def _remove_retired_sessions(self) -> None:
         """Remove all sessions from the pool that are no longer usable."""
-        state = self._state.get()
+        state = self._state.current_value
         state.sessions = {session.id: session for session in state.sessions.values() if session.is_usable}
