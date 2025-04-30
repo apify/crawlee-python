@@ -10,6 +10,8 @@ if TYPE_CHECKING:
     from typing_extensions import NotRequired, Required
 
     from crawlee import Request
+    from crawlee.configuration import Configuration
+    from crawlee.storage_clients import StorageClient
 
 
 class CachedRequest(TypedDict):
@@ -81,11 +83,17 @@ class ExportToKwargs(TypedDict):
     content_type: NotRequired[Literal['json', 'csv']]
     """The format in which to export the data. Either 'json' or 'csv'."""
 
-    to_key_value_store_id: NotRequired[str]
+    to_kvs_id: NotRequired[str]
     """ID of the key-value store to save the exported file."""
 
-    to_key_value_store_name: NotRequired[str]
+    to_kvs_name: NotRequired[str]
     """Name of the key-value store to save the exported file."""
+
+    to_kvs_storage_client: NotRequired[StorageClient]
+    """The storage client to use for saving the exported file."""
+
+    to_kvs_configuration: NotRequired[Configuration]
+    """The configuration to use for saving the exported file."""
 
 
 class ExportDataJsonKwargs(TypedDict):

@@ -368,7 +368,8 @@ async def test_export_to_json(
     await dataset.export_to(
         key='dataset_export.json',
         content_type='json',
-        to_key_value_store_name='export_kvs',
+        to_kvs_name='export_kvs',
+        to_kvs_storage_client=storage_client,
     )
 
     # Retrieve the exported file
@@ -406,7 +407,8 @@ async def test_export_to_csv(
     await dataset.export_to(
         key='dataset_export.csv',
         content_type='csv',
-        to_key_value_store_name='export_kvs',
+        to_kvs_name='export_kvs',
+        to_kvs_storage_client=storage_client,
     )
 
     # Retrieve the exported file

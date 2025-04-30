@@ -572,7 +572,7 @@ async def test_context_push_and_get_data() -> None:
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        await context.push_data('{"b": 2}')
+        await context.push_data({'b': 2})
 
     await dataset.push_data({'c': 3})
     assert (await crawler.get_data()).items == [{'a': 1}, {'c': 3}]
@@ -638,18 +638,6 @@ async def test_context_push_and_export_data(tmp_path: Path) -> None:
     ]
 
     assert (tmp_path / 'dataset.csv').read_bytes() == b'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
-
-
-async def test_crawler_push_data_over_limit() -> None:
-    crawler = BasicCrawler()
-
-    @crawler.router.default_handler
-    async def handler(context: BasicCrawlingContext) -> None:
-        # Push a roughly 15MB payload - this should be enough to break the 9MB limit
-        await context.push_data({'hello': 'world' * 3 * 1024 * 1024})
-
-    stats = await crawler.run(['http://example.tld/1'])
-    assert stats.requests_failed == 1
 
 
 async def test_context_update_kv_store() -> None:

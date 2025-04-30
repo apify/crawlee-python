@@ -307,8 +307,10 @@ class Dataset(Storage):
         self,
         key: str,
         content_type: Literal['json'],
-        to_key_value_store_id: str | None = None,
-        to_key_value_store_name: str | None = None,
+        to_kvs_id: str | None = None,
+        to_kvs_name: str | None = None,
+        to_kvs_storage_client: StorageClient | None = None,
+        to_kvs_configuration: Configuration | None = None,
         **kwargs: Unpack[ExportDataJsonKwargs],
     ) -> None: ...
 
@@ -317,8 +319,10 @@ class Dataset(Storage):
         self,
         key: str,
         content_type: Literal['csv'],
-        to_key_value_store_id: str | None = None,
-        to_key_value_store_name: str | None = None,
+        to_kvs_id: str | None = None,
+        to_kvs_name: str | None = None,
+        to_kvs_storage_client: StorageClient | None = None,
+        to_kvs_configuration: Configuration | None = None,
         **kwargs: Unpack[ExportDataCsvKwargs],
     ) -> None: ...
 
@@ -326,8 +330,10 @@ class Dataset(Storage):
         self,
         key: str,
         content_type: Literal['json', 'csv'] = 'json',
-        to_key_value_store_id: str | None = None,
-        to_key_value_store_name: str | None = None,
+        to_kvs_id: str | None = None,
+        to_kvs_name: str | None = None,
+        to_kvs_storage_client: StorageClient | None = None,
+        to_kvs_configuration: Configuration | None = None,
         **kwargs: Any,
     ) -> None:
         """Export the entire dataset into a specified file stored under a key in a key-value store.
@@ -340,13 +346,20 @@ class Dataset(Storage):
         Args:
             key: The key under which to save the data in the key-value store.
             content_type: The format in which to export the data.
-            to_key_value_store_id: ID of the key-value store to save the exported file.
+            to_kvs_id: ID of the key-value store to save the exported file.
                 Specify only one of ID or name.
-            to_key_value_store_name: Name of the key-value store to save the exported file.
+            to_kvs_name: Name of the key-value store to save the exported file.
                 Specify only one of ID or name.
+            to_kvs_storage_client: Storage client to use for the key-value store.
+            to_kvs_configuration: Configuration for the key-value store.
             kwargs: Additional parameters for the export operation, specific to the chosen content type.
         """
-        kvs = await KeyValueStore.open(id=to_key_value_store_id, name=to_key_value_store_name)
+        kvs = await KeyValueStore.open(
+            id=to_kvs_id,
+            name=to_kvs_name,
+            configuration=to_kvs_configuration,
+            storage_client=to_kvs_storage_client,
+        )
         dst = StringIO()
 
         if content_type == 'csv':
