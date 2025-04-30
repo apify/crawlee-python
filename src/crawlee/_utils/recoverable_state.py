@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 from pydantic import BaseModel
 
 from crawlee import service_locator
-from crawlee._utils.context import ensure_context
 from crawlee.events._types import Event, EventPersistStateData
 from crawlee.storages._key_value_store import KeyValueStore
 
@@ -62,7 +61,6 @@ class RecoverableState(Generic[TStateModel]):
         self._persist_state_kvs_id = persist_state_kvs_id
         self._key_value_store: KeyValueStore | None = None
         self._log = logger
-        self.active = False
 
     async def initialize(self) -> TStateModel:
         """Initialize the recoverable state.
@@ -73,8 +71,6 @@ class RecoverableState(Generic[TStateModel]):
         Returns:
             The loaded state model
         """
-        self.active = True
-
         if not self._persistence_enabled:
             self._state = self._default_state.model_copy(deep=True)
             return self.current_value
@@ -96,8 +92,6 @@ class RecoverableState(Generic[TStateModel]):
         If persistence is enabled, this method deregisters the object from PERSIST_STATE events
         and persists the current state one last time.
         """
-        self.active = False
-
         if not self._persistence_enabled:
             return
 
@@ -106,7 +100,6 @@ class RecoverableState(Generic[TStateModel]):
         await self.persist_state()
 
     @property
-    @ensure_context
     def current_value(self) -> TStateModel:
         """Get the current state."""
         if self._state is None:
@@ -114,7 +107,6 @@ class RecoverableState(Generic[TStateModel]):
 
         return self._state
 
-    @ensure_context
     async def reset(self) -> None:
         """Reset the state to the default values and clear any persisted state.
 
@@ -129,7 +121,6 @@ class RecoverableState(Generic[TStateModel]):
 
             await self._key_value_store.set_value(self._persist_state_key, None)
 
-    @ensure_context
     async def persist_state(self, event_data: EventPersistStateData | None = None) -> None:
         """Persist the current state to the KeyValueStore.
 
@@ -151,7 +142,6 @@ class RecoverableState(Generic[TStateModel]):
                 'application/json',
             )
 
-    @ensure_context
     async def _load_saved_state(self) -> None:
         if self._key_value_store is None:
             raise RuntimeError('Recoverable state has not yet been initialized')
