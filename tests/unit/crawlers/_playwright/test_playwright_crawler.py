@@ -597,7 +597,7 @@ async def test_error_snapshot_through_statistics(server_url: URL) -> None:
     # Three errors twice retried errors, but only 2 unique -> 4 (2 x (html and jpg)) artifacts expected.
     assert crawler.statistics.error_tracker.total == 3 * max_retries
     assert crawler.statistics.error_tracker.unique_error_count == 2
-    assert len(kvs_content) == 4
+    assert len(list(kvs_content.keys())) == 4
 
 
 async def test_respect_robots_txt(server_url: URL) -> None:
