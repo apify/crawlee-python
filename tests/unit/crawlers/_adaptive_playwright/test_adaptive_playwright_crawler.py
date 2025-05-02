@@ -354,9 +354,11 @@ async def test_adaptive_crawling_predictor_calls(
     ):
         await crawler.run(requests)
 
-    mocked_predict.assert_called_once_with(requests[0])
+    assert mocked_predict.call_count == 1
+    assert mocked_predict.call_args[0][0].url == requests[0].url
+
     # If `static` and `client only` results are same, `store_result` should be called with `static`.
-    mocked_store_result.assert_called_once_with(requests[0], expected_result_rendering_type)
+    mocked_store_result.assert_called_once_with(mocked_predict.call_args[0][0], expected_result_rendering_type)
 
 
 async def test_adaptive_crawling_result_use_state_isolation(

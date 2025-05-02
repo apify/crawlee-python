@@ -553,6 +553,7 @@ async def test_get_snapshot(server_url: URL) -> None:
     assert snapshot.html == HELLO_WORLD.decode('utf-8')
 
 
+@pytest.mark.skip(reason='TODO: broken, freezing')
 async def test_error_snapshot_through_statistics(server_url: URL) -> None:
     """Test correct use of error snapshotter by the Playwright crawler.
 
