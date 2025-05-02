@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, Generic, Literal, Union
@@ -292,6 +293,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             kwargs.setdefault('strategy', 'same-hostname')
 
             requests = list[Request]()
+            skipped = list[str]()
             base_user_data = user_data or {}
 
             elements = await context.page.query_selector_all(selector)
@@ -309,8 +311,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                         url = convert_to_absolute_url(base_url, url)
 
                     if robots_txt_file and not robots_txt_file.is_allowed(url):
-                        # TODO: https://github.com/apify/crawlee-python/issues/1160
-                        # add processing with on_skipped_request hook
+                        skipped.append(url)
                         continue
 
                     request_option = RequestOptions({'url': url, 'user_data': {**base_user_data}, 'label': label})
@@ -333,6 +334,12 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                         continue
 
                     requests.append(request)
+
+            if skipped:
+                skipped_tasks = [
+                    asyncio.create_task(self._handle_skipped_request(request, 'robots_txt')) for request in skipped
+                ]
+                await asyncio.gather(*skipped_tasks)
 
             return requests
 

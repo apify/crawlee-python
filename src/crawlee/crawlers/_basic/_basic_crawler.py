@@ -33,6 +33,7 @@ from crawlee._types import (
     HttpHeaders,
     RequestHandlerRunResult,
     SendRequestFunction,
+    SkippedReason,
 )
 from crawlee._utils.docs import docs_group
 from crawlee._utils.robots import RobotsTxtFile
@@ -81,6 +82,7 @@ TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, defau
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
 ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Union[Request, None]]]
 FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
+SkippedRequestCallback = Callable[[str, SkippedReason], Awaitable[None]]
 
 
 class _BasicCrawlerOptions(TypedDict):
@@ -335,9 +337,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             self._router = None
             self.router.default_handler(request_handler)
 
-        # Error & failed request handlers
+        # Error, failed & skipped request handlers
         self._error_handler: ErrorHandler[TCrawlingContext | BasicCrawlingContext] | None = None
         self._failed_request_handler: FailedRequestHandler[TCrawlingContext | BasicCrawlingContext] | None = None
+        self._on_skipped_request: SkippedRequestCallback | None = None
         self._abort_on_error = abort_on_error
 
         # Context of each request with matching result of request handler.
@@ -540,6 +543,14 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._failed_request_handler = handler
         return handler
 
+    def on_skipped_request(self, callback: SkippedRequestCallback) -> SkippedRequestCallback:
+        """Register a function to handle skipped requests.
+
+        The skipped request handler is invoked when a request is skipped due to a collision or other reasons.
+        """
+        self._on_skipped_request = callback
+        return callback
+
     async def run(
         self,
         requests: Sequence[str | Request] | None = None,
@@ -676,8 +687,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 skipped.append(request)
 
         if skipped:
-            # TODO: https://github.com/apify/crawlee-python/issues/1160
-            # add processing with on_skipped_request hook
+            skipped_tasks = [
+                asyncio.create_task(self._handle_skipped_request(request, 'robots_txt')) for request in skipped
+            ]
+            await asyncio.gather(*skipped_tasks)
             self._logger.warning('Some requests were skipped because they were disallowed based on the robots.txt file')
 
         request_manager = await self.get_request_manager()
@@ -996,6 +1009,30 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             except Exception as e:
                 raise UserDefinedErrorHandlerError('Exception thrown in user-defined failed request handler') from e
 
+    async def _handle_skipped_request(
+        self, request: Request | str, reason: SkippedReason, *, need_mark: bool = False
+    ) -> None:
+        if need_mark and isinstance(request, Request):
+            request_manager = await self.get_request_manager()
+
+            await wait_for(
+                lambda: request_manager.mark_request_as_handled(request),
+                timeout=self._internal_timeout,
+                timeout_message='Marking request as handled timed out after '
+                f'{self._internal_timeout.total_seconds()} seconds',
+                logger=self._logger,
+                max_retries=3,
+            )
+            request.state = RequestState.SKIPPED
+
+        url = request.url if isinstance(request, Request) else request
+
+        if self._on_skipped_request:
+            try:
+                await self._on_skipped_request(url, reason)
+            except Exception as e:
+                raise UserDefinedErrorHandlerError('Exception thrown in user-defined skipped request callback') from e
+
     def _get_message_from_error(self, error: Exception) -> str:
         """Get error message summary from exception.
 
@@ -1152,16 +1189,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             self._logger.warning(
                 f'Skipping request {request.url} ({request.id}) because it is disallowed based on robots.txt'
             )
-            await wait_for(
-                lambda: request_manager.mark_request_as_handled(request),
-                timeout=self._internal_timeout,
-                timeout_message='Marking request as handled timed out after '
-                f'{self._internal_timeout.total_seconds()} seconds',
-                logger=self._logger,
-                max_retries=3,
-            )
-            # TODO: https://github.com/apify/crawlee-python/issues/1160
-            # add processing with on_skipped_request hook
+
+            await self._handle_skipped_request(request, 'robots_txt', need_mark=True)
             return
 
         if request.session_id:
