@@ -111,12 +111,6 @@ async def test_kvs_client_no_purge_on_start(configuration: Configuration) -> Non
     assert record.value == 'preserved value'
 
 
-async def test_open_with_id_raises_error(configuration: Configuration) -> None:
-    """Test that open() raises an error when an ID is provided (unsupported for file system client)."""
-    with pytest.raises(ValueError, match='not supported for file system storage client'):
-        await FileSystemStorageClient().open_key_value_store_client(id='some-id', configuration=configuration)
-
-
 async def test_set_get_value_string(kvs_client: FileSystemKeyValueStoreClient) -> None:
     """Test setting and getting a string value with correct file creation and metadata."""
     # Set a value

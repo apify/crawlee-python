@@ -30,7 +30,10 @@ def storage_client(request: pytest.FixtureRequest) -> StorageClient:
 @pytest.fixture
 def configuration(tmp_path: Path) -> Configuration:
     """Provide a configuration with a temporary storage directory."""
-    return Configuration(crawlee_storage_dir=str(tmp_path))  # type: ignore[call-arg]
+    return Configuration(
+        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
+        purge_on_start=True,
+    )
 
 
 @pytest.fixture
@@ -39,10 +42,7 @@ async def dataset(
     configuration: Configuration,
 ) -> AsyncGenerator[Dataset, None]:
     """Fixture that provides a dataset instance for each test."""
-    Dataset._cache.clear()
-
     dataset = await Dataset.open(
-        name='test_dataset',
         storage_client=storage_client,
         configuration=configuration,
     )
@@ -68,6 +68,80 @@ async def test_open_creates_new_dataset(
     assert dataset.metadata.item_count == 0
 
     await dataset.drop()
+
+
+async def test_reopen_default(
+    storage_client: StorageClient,
+    configuration: Configuration,
+) -> None:
+    """Test reopening a dataset with default parameters."""
+    # Create a first dataset instance with default parameters
+    dataset_1 = await Dataset.open(
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Verify default properties
+    assert dataset_1.id is not None
+    assert dataset_1.metadata.item_count == 0
+
+    # Add an item
+    await dataset_1.push_data({'key': 'value'})
+    assert dataset_1.metadata.item_count == 1
+
+    # Reopen the same dataset
+    dataset_2 = await Dataset.open(
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Verify both instances reference the same dataset
+    assert dataset_2.id == dataset_1.id
+    assert dataset_2.name == dataset_1.name
+    assert dataset_2.metadata.item_count == dataset_1.metadata.item_count == 1
+
+    # Verify they are the same object (cached)
+    assert id(dataset_1) == id(dataset_2)
+
+    # Clean up
+    await dataset_1.drop()
+
+
+async def test_open_by_id(
+    storage_client: StorageClient,
+    configuration: Configuration,
+) -> None:
+    """Test opening a dataset by its ID."""
+    # First create a dataset by name
+    dataset1 = await Dataset.open(
+        name='dataset_by_id_test',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Add some data to identify it
+    test_item = {'test': 'opening_by_id', 'timestamp': 12345}
+    await dataset1.push_data(test_item)
+
+    # Open the dataset by ID
+    dataset2 = await Dataset.open(
+        id=dataset1.id,
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Verify it's the same dataset
+    assert dataset2.id == dataset1.id
+    assert dataset2.name == 'dataset_by_id_test'
+
+    # Verify the data is still there
+    data = await dataset2.get_data()
+    assert data.count == 1
+    assert data.items[0]['test'] == 'opening_by_id'
+    assert data.items[0]['timestamp'] == 12345
+
+    # Clean up
+    await dataset2.drop()
 
 
 async def test_open_existing_dataset(
@@ -324,14 +398,8 @@ async def test_drop(
     # Add some data
     await dataset.push_data({'test': 'data'})
 
-    # Verify dataset exists in cache
-    assert dataset._cache_key in Dataset._cache
-
     # Drop the dataset
     await dataset.drop()
-
-    # Verify dataset was removed from cache
-    assert dataset._cache_key not in Dataset._cache
 
     # Verify dataset is empty (by creating a new one with the same name)
     new_dataset = await Dataset.open(
@@ -449,3 +517,57 @@ async def test_large_dataset(dataset: Dataset) -> None:
     assert result.offset == 50
     assert result.items[0]['id'] == 50
     assert result.items[-1]['id'] == 74
+
+
+async def test_purge(
+    storage_client: StorageClient,
+    configuration: Configuration,
+) -> None:
+    """Test purging a dataset removes all data but keeps the dataset itself."""
+    # First create a dataset
+    dataset = await Dataset.open(
+        name='purge_test_dataset',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Add some data
+    initial_items = [
+        {'id': 1, 'name': 'Item 1'},
+        {'id': 2, 'name': 'Item 2'},
+        {'id': 3, 'name': 'Item 3'},
+    ]
+    await dataset.push_data(initial_items)
+
+    # Verify data was added
+    data = await dataset.get_data()
+    assert data.count == 3
+    assert data.total == 3
+    assert dataset.metadata.item_count == 3
+
+    # Record the dataset ID
+    dataset_id = dataset.id
+
+    # Purge the dataset
+    await dataset.purge()
+
+    # Verify the dataset still exists but is empty
+    assert dataset.id == dataset_id  # Same ID preserved
+    assert dataset.name == 'purge_test_dataset'  # Same name preserved
+
+    # Dataset should be empty now
+    data = await dataset.get_data()
+    assert data.count == 0
+    assert data.total == 0
+    assert dataset.metadata.item_count == 0
+
+    # Verify we can add new data after purging
+    new_item = {'id': 4, 'name': 'New Item After Purge'}
+    await dataset.push_data(new_item)
+
+    data = await dataset.get_data()
+    assert data.count == 1
+    assert data.items[0]['name'] == 'New Item After Purge'
+
+    # Clean up
+    await dataset.drop()

@@ -116,96 +116,113 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         name: str | None,
         configuration: Configuration,
     ) -> FileSystemRequestQueueClient:
-        if id:
-            raise ValueError(
-                'Opening a request queue by "id" is not supported for file system storage client, use "name" instead.'
-            )
-
-        name = name or configuration.default_request_queue_id
-
         storage_dir = Path(configuration.storage_dir)
-        rq_path = storage_dir / cls._STORAGE_SUBDIR / name
-        metadata_path = rq_path / METADATA_FILENAME
+        rq_base_path = storage_dir / cls._STORAGE_SUBDIR
 
-        # If the RQ directory exists, reconstruct the client from the metadata file.
-        if rq_path.exists() and not configuration.purge_on_start:
-            # If metadata file is missing, raise an error.
-            if not metadata_path.exists():
-                raise ValueError(f'Metadata file not found for request queue "{name}"')
+        if not rq_base_path.exists():
+            await asyncio.to_thread(rq_base_path.mkdir, parents=True, exist_ok=True)
 
-            file = await asyncio.to_thread(open, metadata_path)
-            try:
-                file_content = json.load(file)
-            finally:
-                await asyncio.to_thread(file.close)
-            try:
-                metadata = RequestQueueMetadata(**file_content)
-            except ValidationError as exc:
-                raise ValueError(f'Invalid metadata file for request queue "{name}"') from exc
+        # Get a new instance by ID.
+        if id:
+            found = False
+            for rq_dir in rq_base_path.iterdir():
+                if not rq_dir.is_dir():
+                    continue
 
-            client = cls(
-                id=metadata.id,
-                name=name,
-                created_at=metadata.created_at,
-                accessed_at=metadata.accessed_at,
-                modified_at=metadata.modified_at,
-                had_multiple_clients=metadata.had_multiple_clients,
-                handled_request_count=metadata.handled_request_count,
-                pending_request_count=metadata.pending_request_count,
-                stats=metadata.stats,
-                total_request_count=metadata.total_request_count,
-                storage_dir=storage_dir,
-            )
-
-            # Recalculate request counts from actual files to ensure consistency
-            handled_count = 0
-            pending_count = 0
-            request_files = await asyncio.to_thread(list, rq_path.glob('*.json'))
-            for request_file in request_files:
-                if request_file.name == METADATA_FILENAME:
+                metadata_path = rq_dir / METADATA_FILENAME
+                if not metadata_path.exists():
                     continue
 
                 try:
-                    file = await asyncio.to_thread(open, request_file)
+                    file = await asyncio.to_thread(metadata_path.open)
                     try:
-                        data = json.load(file)
-                        if data.get('handled_at') is not None:
-                            handled_count += 1
-                        else:
-                            pending_count += 1
+                        file_content = json.load(file)
+                        metadata = RequestQueueMetadata(**file_content)
+                        if metadata.id == id:
+                            client = cls(
+                                id=metadata.id,
+                                name=metadata.name,
+                                created_at=metadata.created_at,
+                                accessed_at=metadata.accessed_at,
+                                modified_at=metadata.modified_at,
+                                had_multiple_clients=metadata.had_multiple_clients,
+                                handled_request_count=metadata.handled_request_count,
+                                pending_request_count=metadata.pending_request_count,
+                                stats=metadata.stats,
+                                total_request_count=metadata.total_request_count,
+                                storage_dir=storage_dir,
+                            )
+                            await client._update_metadata(update_accessed_at=True)
+                            found = True
+                            break
                     finally:
                         await asyncio.to_thread(file.close)
                 except (json.JSONDecodeError, ValidationError):
-                    logger.warning(f'Failed to parse request file: {request_file}')
+                    continue
 
-            await client._update_metadata(
-                update_accessed_at=True,
-                new_handled_request_count=handled_count,
-                new_pending_request_count=pending_count,
-                new_total_request_count=handled_count + pending_count,
-            )
+            if not found:
+                raise ValueError(f'Request queue with ID "{id}" not found')
 
-        # Otherwise, create a new dataset client.
+        # Get a new instance by name.
         else:
-            # If purge_on_start is true and the directory exists, remove it
-            if configuration.purge_on_start and rq_path.exists():
-                await asyncio.to_thread(shutil.rmtree, rq_path)
+            name = name or configuration.default_request_queue_id
 
-            now = datetime.now(timezone.utc)
-            client = cls(
-                id=crypto_random_object_id(),
-                name=name,
-                created_at=now,
-                accessed_at=now,
-                modified_at=now,
-                had_multiple_clients=False,
-                handled_request_count=0,
-                pending_request_count=0,
-                stats={},
-                total_request_count=0,
-                storage_dir=storage_dir,
-            )
-            await client._update_metadata()
+            rq_path = storage_dir / cls._STORAGE_SUBDIR / name
+            metadata_path = rq_path / METADATA_FILENAME
+
+            # If the RQ directory exists, reconstruct the client from the metadata file.
+            if rq_path.exists() and not configuration.purge_on_start:
+                # If metadata file is missing, raise an error.
+                if not metadata_path.exists():
+                    raise ValueError(f'Metadata file not found for request queue "{name}"')
+
+                file = await asyncio.to_thread(open, metadata_path)
+                try:
+                    file_content = json.load(file)
+                finally:
+                    await asyncio.to_thread(file.close)
+                try:
+                    metadata = RequestQueueMetadata(**file_content)
+                except ValidationError as exc:
+                    raise ValueError(f'Invalid metadata file for request queue "{name}"') from exc
+
+                client = cls(
+                    id=metadata.id,
+                    name=name,
+                    created_at=metadata.created_at,
+                    accessed_at=metadata.accessed_at,
+                    modified_at=metadata.modified_at,
+                    had_multiple_clients=metadata.had_multiple_clients,
+                    handled_request_count=metadata.handled_request_count,
+                    pending_request_count=metadata.pending_request_count,
+                    stats=metadata.stats,
+                    total_request_count=metadata.total_request_count,
+                    storage_dir=storage_dir,
+                )
+
+                await client._update_metadata(update_accessed_at=True)
+
+            # Otherwise, create a new dataset client.
+            else:
+                # If purge_on_start is true and the directory exists, remove it
+                if configuration.purge_on_start and rq_path.exists():
+                    await asyncio.to_thread(shutil.rmtree, rq_path)
+
+                now = datetime.now(timezone.utc)
+                client = cls(
+                    id=crypto_random_object_id(),
+                    name=name,
+                    created_at=now,
+                    accessed_at=now,
+                    modified_at=now,
+                    had_multiple_clients=False,
+                    handled_request_count=0,
+                    pending_request_count=0,
+                    stats={},
+                    total_request_count=0,
+                    storage_dir=storage_dir,
+                )
+                await client._update_metadata()
 
         return client
 
@@ -215,6 +232,23 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         if self.path_to_rq.exists():
             async with self._lock:
                 await asyncio.to_thread(shutil.rmtree, self.path_to_rq)
+
+    @override
+    async def purge(self) -> None:
+        async with self._lock:
+            for file_path in self.path_to_rq.glob('*'):
+                if file_path.name == METADATA_FILENAME:
+                    continue
+                await asyncio.to_thread(file_path.unlink)
+
+            # Update metadata counts
+            await self._update_metadata(
+                update_modified_at=True,
+                update_accessed_at=True,
+                new_handled_request_count=0,
+                new_pending_request_count=0,
+                new_total_request_count=0,
+            )
 
     @override
     async def add_batch_of_requests(

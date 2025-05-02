@@ -51,6 +51,14 @@ class Storage(ABC):
     async def drop(self) -> None:
         """Drop the storage, removing it from the underlying storage client and clearing the cache."""
 
+    @abstractmethod
+    async def purge(self) -> None:
+        """Purge the storage, removing all items from the underlying storage client.
+
+        This method does not remove the storage itself, e.g. don't remove the metadata,
+        but clears all items within it.
+        """
+
     @classmethod
     def compute_cache_key(
         cls,

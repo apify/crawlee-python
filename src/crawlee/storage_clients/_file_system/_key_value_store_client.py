@@ -101,56 +101,94 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         name: str | None,
         configuration: Configuration,
     ) -> FileSystemKeyValueStoreClient:
-        if id:
-            raise ValueError(
-                'Opening a key-value store by "id" is not supported for file system storage client, use "name" instead.'
-            )
-
-        name = name or configuration.default_dataset_id
-
         storage_dir = Path(configuration.storage_dir)
-        kvs_path = storage_dir / cls._STORAGE_SUBDIR / name
-        metadata_path = kvs_path / METADATA_FILENAME
+        kvs_base_path = storage_dir / cls._STORAGE_SUBDIR
 
-        # If the key-value store directory exists, reconstruct the client from the metadata file.
-        if kvs_path.exists():
-            # If metadata file is missing, raise an error.
-            if not metadata_path.exists():
-                raise ValueError(f'Metadata file not found for key-value store "{name}"')
+        if not kvs_base_path.exists():
+            await asyncio.to_thread(kvs_base_path.mkdir, parents=True, exist_ok=True)
 
-            file = await asyncio.to_thread(open, metadata_path)
-            try:
-                file_content = json.load(file)
-            finally:
-                await asyncio.to_thread(file.close)
-            try:
-                metadata = KeyValueStoreMetadata(**file_content)
-            except ValidationError as exc:
-                raise ValueError(f'Invalid metadata file for key-value store "{name}"') from exc
+        # Get a new instance by ID.
+        if id:
+            found = False
+            for kvs_dir in kvs_base_path.iterdir():
+                if not kvs_dir.is_dir():
+                    continue
 
-            client = cls(
-                id=metadata.id,
-                name=name,
-                created_at=metadata.created_at,
-                accessed_at=metadata.accessed_at,
-                modified_at=metadata.modified_at,
-                storage_dir=storage_dir,
-            )
+                metadata_path = kvs_dir / METADATA_FILENAME
+                if not metadata_path.exists():
+                    continue
 
-            await client._update_metadata(update_accessed_at=True)
+                try:
+                    file = await asyncio.to_thread(metadata_path.open)
+                    try:
+                        file_content = json.load(file)
+                        metadata = KeyValueStoreMetadata(**file_content)
+                        if metadata.id == id:
+                            client = cls(
+                                id=metadata.id,
+                                name=metadata.name,
+                                created_at=metadata.created_at,
+                                accessed_at=metadata.accessed_at,
+                                modified_at=metadata.modified_at,
+                                storage_dir=storage_dir,
+                            )
+                            await client._update_metadata(update_accessed_at=True)
+                            found = True
+                            break
+                    finally:
+                        await asyncio.to_thread(file.close)
+                except (json.JSONDecodeError, ValidationError):
+                    continue
 
-        # Otherwise, create a new key-value store client.
+            if not found:
+                raise ValueError(f'Key-value store with ID "{id}" not found.')
+
+        # Get a new instance by name.
         else:
-            now = datetime.now(timezone.utc)
-            client = cls(
-                id=crypto_random_object_id(),
-                name=name,
-                created_at=now,
-                accessed_at=now,
-                modified_at=now,
-                storage_dir=storage_dir,
-            )
-            await client._update_metadata()
+            name = name or configuration.default_key_value_store_id
+
+            kvs_path = storage_dir / cls._STORAGE_SUBDIR / name
+            metadata_path = kvs_path / METADATA_FILENAME
+
+            # If the key-value store directory exists, reconstruct the client from the metadata file.
+            if kvs_path.exists():
+                # If metadata file is missing, raise an error.
+                if not metadata_path.exists():
+                    raise ValueError(f'Metadata file not found for key-value store "{name}"')
+
+                file = await asyncio.to_thread(open, metadata_path)
+                try:
+                    file_content = json.load(file)
+                finally:
+                    await asyncio.to_thread(file.close)
+                try:
+                    metadata = KeyValueStoreMetadata(**file_content)
+                except ValidationError as exc:
+                    raise ValueError(f'Invalid metadata file for key-value store "{name}"') from exc
+
+                client = cls(
+                    id=metadata.id,
+                    name=name,
+                    created_at=metadata.created_at,
+                    accessed_at=metadata.accessed_at,
+                    modified_at=metadata.modified_at,
+                    storage_dir=storage_dir,
+                )
+
+                await client._update_metadata(update_accessed_at=True)
+
+            # Otherwise, create a new key-value store client.
+            else:
+                now = datetime.now(timezone.utc)
+                client = cls(
+                    id=crypto_random_object_id(),
+                    name=name,
+                    created_at=now,
+                    accessed_at=now,
+                    modified_at=now,
+                    storage_dir=storage_dir,
+                )
+                await client._update_metadata()
 
         return client
 
@@ -160,6 +198,19 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         if self.path_to_kvs.exists():
             async with self._lock:
                 await asyncio.to_thread(shutil.rmtree, self.path_to_kvs)
+
+    @override
+    async def purge(self) -> None:
+        async with self._lock:
+            for file_path in self.path_to_kvs.glob('*'):
+                if file_path.name == METADATA_FILENAME:
+                    continue
+                await asyncio.to_thread(file_path.unlink)
+
+            await self._update_metadata(
+                update_accessed_at=True,
+                update_modified_at=True,
+            )
 
     @override
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:

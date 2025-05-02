@@ -110,12 +110,6 @@ async def test_rq_client_no_purge_on_start(configuration: Configuration) -> None
     assert rq_client2.metadata.total_request_count == 1
 
 
-async def test_open_with_id_raises_error(configuration: Configuration) -> None:
-    """Test that open() raises an error when an ID is provided."""
-    with pytest.raises(ValueError, match='not supported for file system storage client'):
-        await FileSystemStorageClient().open_request_queue_client(id='some-id', configuration=configuration)
-
-
 @pytest.fixture
 def rq_path(rq_client: FileSystemRequestQueueClient) -> Path:
     """Return the path to the request queue directory."""

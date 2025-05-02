@@ -70,20 +70,24 @@ class RequestQueue(Storage, RequestManager):
     ```
     """
 
-    _cache: ClassVar[dict[str, RequestQueue]] = {}
-    """A dictionary to cache request queues."""
+    _cache_by_id: ClassVar[dict[str, RequestQueue]] = {}
+    """A dictionary to cache request queues by ID."""
 
-    def __init__(self, client: RequestQueueClient, cache_key: str) -> None:
+    _cache_by_name: ClassVar[dict[str, RequestQueue]] = {}
+    """A dictionary to cache request queues by name."""
+
+    _default_instance: ClassVar[RequestQueue | None] = None
+    """Cache for the default request queue instance."""
+
+    def __init__(self, client: RequestQueueClient) -> None:
         """Initialize a new instance.
 
         Preferably use the `RequestQueue.open` constructor to create a new instance.
 
         Args:
             client: An instance of a request queue client.
-            cache_key: A unique key to identify the request queue in the cache.
         """
         self._client = client
-        self._cache_key = cache_key
 
         self._add_requests_tasks = list[asyncio.Task]()
         """A list of tasks for adding requests to the queue."""
@@ -126,18 +130,18 @@ class RequestQueue(Storage, RequestManager):
         if id and name:
             raise ValueError('Only one of "id" or "name" can be specified, not both.')
 
+        # Check for default instance if no id or name provided
+        if id is None and name is None and cls._default_instance is not None:
+            return cls._default_instance
+
+        # Check if the request queue is already cached
+        if id is not None and id in cls._cache_by_id:
+            return cls._cache_by_id[id]
+        if name is not None and name in cls._cache_by_name:
+            return cls._cache_by_name[name]
+
         configuration = service_locator.get_configuration() if configuration is None else configuration
         storage_client = service_locator.get_storage_client() if storage_client is None else storage_client
-
-        cache_key = cls.compute_cache_key(
-            id=id,
-            name=name,
-            configuration=configuration,
-            storage_client=storage_client,
-        )
-
-        if cache_key in cls._cache:
-            return cls._cache[cache_key]
 
         client = await storage_client.open_request_queue_client(
             id=id,
@@ -145,17 +149,33 @@ class RequestQueue(Storage, RequestManager):
             configuration=configuration,
         )
 
-        rq = cls(client, cache_key)
-        cls._cache[cache_key] = rq
-        return rq
+        request_queue = cls(client)
+
+        # Cache the request queue instance by ID and name
+        cls._cache_by_id[request_queue.id] = request_queue
+        if request_queue.name is not None:
+            cls._cache_by_name[request_queue.name] = request_queue
+
+        # Store as default instance if neither id nor name was provided
+        if id is None and name is None:
+            cls._default_instance = request_queue
+
+        return request_queue
 
     @override
     async def drop(self) -> None:
         # Remove from cache before dropping
-        if self._cache_key in self._cache:
-            del self._cache[self._cache_key]
+        if self.id in self._cache_by_id:
+            del self._cache_by_id[self.id]
+
+        if self.name is not None and self.name in self._cache_by_name:
+            del self._cache_by_name[self.name]
 
         await self._client.drop()
+
+    @override
+    async def purge(self) -> None:
+        await self._client.purge()
 
     @override
     async def add_request(

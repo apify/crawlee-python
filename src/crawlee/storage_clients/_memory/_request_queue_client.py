@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from typing_extensions import override
 
@@ -34,6 +34,9 @@ class MemoryRequestQueueClient(RequestQueueClient):
     This client provides fast access to request data but is limited by available memory and
     does not support data sharing across different processes.
     """
+
+    # Class variable to store request queue instances by ID
+    _instances: ClassVar[dict[str, MemoryRequestQueueClient]] = {}
 
     def __init__(
         self,
@@ -88,12 +91,12 @@ class MemoryRequestQueueClient(RequestQueueClient):
     ) -> MemoryRequestQueueClient:
         name = name or configuration.default_request_queue_id
 
-        # If specific id is provided, use it; otherwise, generate a new one
-        id = id or crypto_random_object_id()
+        # Otherwise create a new queue
+        queue_id = id or crypto_random_object_id()
         now = datetime.now(timezone.utc)
 
         return cls(
-            id=crypto_random_object_id(),
+            id=queue_id,
             name=name,
             created_at=now,
             accessed_at=now,
@@ -110,6 +113,32 @@ class MemoryRequestQueueClient(RequestQueueClient):
         # Clear all data
         self._records.clear()
         self._in_progress.clear()
+
+        await self._update_metadata(
+            update_modified_at=True,
+            update_accessed_at=True,
+            new_handled_request_count=0,
+            new_pending_request_count=0,
+            new_total_request_count=0,
+        )
+
+    @override
+    async def purge(self) -> None:
+        """Delete all requests from the queue, but keep the queue itself.
+
+        This method clears all requests including both pending and handled ones,
+        but preserves the queue structure.
+        """
+        self._records.clear()
+        self._in_progress.clear()
+
+        await self._update_metadata(
+            update_modified_at=True,
+            update_accessed_at=True,
+            new_handled_request_count=0,
+            new_pending_request_count=0,
+            new_total_request_count=0,
+        )
 
     @override
     async def add_batch_of_requests(
@@ -329,12 +358,18 @@ class MemoryRequestQueueClient(RequestQueueClient):
         *,
         update_accessed_at: bool = False,
         update_modified_at: bool = False,
+        new_handled_request_count: int | None = None,
+        new_pending_request_count: int | None = None,
+        new_total_request_count: int | None = None,
     ) -> None:
         """Update the request queue metadata with current information.
 
         Args:
             update_accessed_at: If True, update the `accessed_at` timestamp to the current time.
             update_modified_at: If True, update the `modified_at` timestamp to the current time.
+            new_handled_request_count: If provided, set the handled request count to this value.
+            new_pending_request_count: If provided, set the pending request count to this value.
+            new_total_request_count: If provided, set the total request count to this value.
         """
         now = datetime.now(timezone.utc)
 
@@ -342,3 +377,9 @@ class MemoryRequestQueueClient(RequestQueueClient):
             self._metadata.accessed_at = now
         if update_modified_at:
             self._metadata.modified_at = now
+        if new_handled_request_count is not None:
+            self._metadata.handled_request_count = new_handled_request_count
+        if new_pending_request_count is not None:
+            self._metadata.pending_request_count = new_pending_request_count
+        if new_total_request_count is not None:
+            self._metadata.total_request_count = new_total_request_count

@@ -30,7 +30,10 @@ def storage_client(request: pytest.FixtureRequest) -> StorageClient:
 @pytest.fixture
 def configuration(tmp_path: Path) -> Configuration:
     """Provide a configuration with a temporary storage directory."""
-    return Configuration(crawlee_storage_dir=str(tmp_path))  # type: ignore[call-arg]
+    return Configuration(
+        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
+        purge_on_start=True,
+    )
 
 
 @pytest.fixture
@@ -39,10 +42,7 @@ async def rq(
     configuration: Configuration,
 ) -> AsyncGenerator[RequestQueue, None]:
     """Fixture that provides a request queue instance for each test."""
-    RequestQueue._cache.clear()
-
     rq = await RequestQueue.open(
-        name='test_request_queue',
         storage_client=storage_client,
         configuration=configuration,
     )
@@ -103,6 +103,41 @@ async def test_open_with_id_and_name(
             storage_client=storage_client,
             configuration=configuration,
         )
+
+
+async def test_open_by_id(
+    storage_client: StorageClient,
+    configuration: Configuration,
+) -> None:
+    """Test opening a request queue by its ID."""
+    # First create a request queue by name
+    rq1 = await RequestQueue.open(
+        name='rq_by_id_test',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Add a request to identify it
+    await rq1.add_request('https://example.com/open-by-id-test')
+
+    # Open the request queue by ID
+    rq2 = await RequestQueue.open(
+        id=rq1.id,
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Verify it's the same request queue
+    assert rq2.id == rq1.id
+    assert rq2.name == 'rq_by_id_test'
+
+    # Verify the request is still there
+    request = await rq2.fetch_next_request()
+    assert request is not None
+    assert request.url == 'https://example.com/open-by-id-test'
+
+    # Clean up
+    await rq2.drop()
 
 
 async def test_add_request_string_url(rq: RequestQueue) -> None:
@@ -469,14 +504,8 @@ async def test_drop(
     # Add a request
     await rq.add_request('https://example.com')
 
-    # Verify request queue exists in cache
-    assert rq._cache_key in RequestQueue._cache
-
     # Drop the request queue
     await rq.drop()
-
-    # Verify request queue was removed from cache
-    assert rq._cache_key not in RequestQueue._cache
 
     # Verify request queue is empty (by creating a new one with the same name)
     new_rq = await RequestQueue.open(
@@ -490,3 +519,113 @@ async def test_drop(
     assert new_rq.metadata.total_request_count == 0
     assert new_rq.metadata.pending_request_count == 0
     await new_rq.drop()
+
+
+async def test_reopen_default(
+    storage_client: StorageClient,
+    configuration: Configuration,
+) -> None:
+    """Test reopening the default request queue."""
+    # First clean up any class-level caches
+    RequestQueue._cache_by_id.clear()
+    RequestQueue._cache_by_name.clear()
+    RequestQueue._default_instance = None
+
+    # Open the default request queue
+    rq1 = await RequestQueue.open(
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # If a request queue already exists (due to previous test run), purge it to start fresh
+    try:
+        await rq1.purge()
+    except Exception:
+        # If purge fails, try dropping and recreating
+        await rq1.drop()
+        rq1 = await RequestQueue.open(
+            storage_client=storage_client,
+            configuration=configuration,
+        )
+
+    # Verify we're starting fresh
+    assert rq1.metadata.pending_request_count == 0
+
+    # Add a request
+    await rq1.add_request('https://example.com/')
+
+    # Verify the request was added
+    assert rq1.metadata.pending_request_count == 1
+
+    # Open the default request queue again
+    rq2 = await RequestQueue.open(
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Verify they are the same queue
+    assert rq1.id == rq2.id
+    assert rq1.name == rq2.name
+    assert rq1.metadata.total_request_count == rq2.metadata.total_request_count
+    assert rq1.metadata.pending_request_count == rq2.metadata.pending_request_count
+    assert rq1.metadata.handled_request_count == rq2.metadata.handled_request_count
+
+    # Verify the request is accessible
+    request = await rq2.fetch_next_request()
+    assert request is not None
+    assert request.url == 'https://example.com/'
+
+    # Clean up after the test
+    await rq1.drop()
+
+
+async def test_purge(
+    storage_client: StorageClient,
+    configuration: Configuration,
+) -> None:
+    """Test purging a request queue removes all requests but keeps the queue itself."""
+    # First create a request queue
+    rq = await RequestQueue.open(
+        name='purge_test_queue',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Add some requests
+    await rq.add_requests(
+        [
+            'https://example.com/page1',
+            'https://example.com/page2',
+            'https://example.com/page3',
+        ]
+    )
+
+    # Verify requests were added
+    assert rq.metadata.total_request_count == 3
+    assert rq.metadata.pending_request_count == 3
+
+    # Record the queue ID
+    queue_id = rq.id
+
+    # Purge the queue
+    await rq.purge()
+
+    # Verify the queue still exists but is empty
+    assert rq.id == queue_id  # Same ID preserved
+    assert rq.name == 'purge_test_queue'  # Same name preserved
+
+    # Queue should be empty now
+    assert rq.metadata.total_request_count == 0
+    assert rq.metadata.pending_request_count == 0
+    assert rq.metadata.handled_request_count == 0
+    assert await rq.is_empty() is True
+
+    # Verify we can add new requests after purging
+    await rq.add_request('https://example.com/new-after-purge')
+
+    request = await rq.fetch_next_request()
+    assert request is not None
+    assert request.url == 'https://example.com/new-after-purge'
+
+    # Clean up
+    await rq.drop()

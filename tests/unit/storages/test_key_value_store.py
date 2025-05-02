@@ -31,7 +31,10 @@ def storage_client(request: pytest.FixtureRequest) -> StorageClient:
 @pytest.fixture
 def configuration(tmp_path: Path) -> Configuration:
     """Provide a configuration with a temporary storage directory."""
-    return Configuration(crawlee_storage_dir=str(tmp_path))  # type: ignore[call-arg]
+    return Configuration(
+        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
+        purge_on_start=True,
+    )
 
 
 @pytest.fixture
@@ -40,10 +43,7 @@ async def kvs(
     configuration: Configuration,
 ) -> AsyncGenerator[KeyValueStore, None]:
     """Fixture that provides a key-value store instance for each test."""
-    KeyValueStore._cache.clear()
-
     kvs = await KeyValueStore.open(
-        name='test_kvs',
         storage_client=storage_client,
         configuration=configuration,
     )
@@ -101,6 +101,42 @@ async def test_open_with_id_and_name(
             storage_client=storage_client,
             configuration=configuration,
         )
+
+
+async def test_open_by_id(
+    storage_client: StorageClient,
+    configuration: Configuration,
+) -> None:
+    """Test opening a key-value store by its ID."""
+    # First create a key-value store by name
+    kvs1 = await KeyValueStore.open(
+        name='kvs_by_id_test',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Add some data to identify it
+    await kvs1.set_value('test_key', {'test': 'opening_by_id', 'timestamp': 12345})
+
+    # Open the key-value store by ID
+    kvs2 = await KeyValueStore.open(
+        id=kvs1.id,
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Verify it's the same key-value store
+    assert kvs2.id == kvs1.id
+    assert kvs2.name == 'kvs_by_id_test'
+
+    # Verify the data is still there
+    value = await kvs2.get_value('test_key')
+    assert value is not None
+    assert value['test'] == 'opening_by_id'
+    assert value['timestamp'] == 12345
+
+    # Clean up
+    await kvs2.drop()
 
 
 async def test_set_get_value(kvs: KeyValueStore) -> None:
@@ -262,14 +298,8 @@ async def test_drop(
     # Add some data
     await kvs.set_value('test', 'data')
 
-    # Verify key-value store exists in cache
-    assert kvs._cache_key in KeyValueStore._cache
-
     # Drop the key-value store
     await kvs.drop()
-
-    # Verify key-value store was removed from cache
-    assert kvs._cache_key not in KeyValueStore._cache
 
     # Verify key-value store is empty (by creating a new one with the same name)
     new_kvs = await KeyValueStore.open(
@@ -282,6 +312,39 @@ async def test_drop(
     result = await new_kvs.get_value('test')
     assert result is None
     await new_kvs.drop()
+
+
+async def test_reopen_default(
+    storage_client: StorageClient,
+    configuration: Configuration,
+) -> None:
+    """Test reopening the default key-value store."""
+    # Open the default key-value store
+    kvs1 = await KeyValueStore.open(
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Set a value
+    await kvs1.set_value('test_key', 'test_value')
+
+    # Open the default key-value store again
+    kvs2 = await KeyValueStore.open(
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Verify they are the same store
+    assert kvs1.id == kvs2.id
+    assert kvs1.name == kvs2.name
+
+    # Verify the value is accessible
+    value1 = await kvs1.get_value('test_key')
+    value2 = await kvs2.get_value('test_key')
+    assert value1 == value2 == 'test_value'
+
+    # Verify they are the same object
+    assert id(kvs1) == id(kvs2)
 
 
 async def test_complex_data_types(kvs: KeyValueStore) -> None:
@@ -364,3 +427,53 @@ async def test_data_persistence_on_reopen(configuration: Configuration) -> None:
 
     result1 = await kvs1.get_value('key_456')
     assert result1 == 'value_456'
+
+
+async def test_purge(
+    storage_client: StorageClient,
+    configuration: Configuration,
+) -> None:
+    """Test purging a key-value store removes all values but keeps the store itself."""
+    # First create a key-value store
+    kvs = await KeyValueStore.open(
+        name='purge_test_kvs',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Add some values
+    await kvs.set_value('key1', 'value1')
+    await kvs.set_value('key2', 'value2')
+    await kvs.set_value('key3', {'complex': 'value', 'number': 42})
+
+    # Verify values were added
+    keys = await kvs.list_keys()
+    assert len(keys) == 3
+
+    # Record the store ID
+    kvs_id = kvs.id
+
+    # Purge the key-value store
+    await kvs.purge()
+
+    # Verify the store still exists but is empty
+    assert kvs.id == kvs_id  # Same ID preserved
+    assert kvs.name == 'purge_test_kvs'  # Same name preserved
+
+    # Store should be empty now
+    keys = await kvs.list_keys()
+    assert len(keys) == 0
+
+    # Values should no longer be accessible
+    assert await kvs.get_value('key1') is None
+    assert await kvs.get_value('key2') is None
+    assert await kvs.get_value('key3') is None
+
+    # Verify we can add new values after purging
+    await kvs.set_value('new_key', 'new value after purge')
+
+    value = await kvs.get_value('new_key')
+    assert value == 'new value after purge'
+
+    # Clean up
+    await kvs.drop()

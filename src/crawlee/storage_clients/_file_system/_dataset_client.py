@@ -104,67 +104,116 @@ class FileSystemDatasetClient(DatasetClient):
         name: str | None,
         configuration: Configuration,
     ) -> FileSystemDatasetClient:
-        if id:
-            raise ValueError(
-                'Opening a dataset by "id" is not supported for file system storage client, use "name" instead.'
-            )
-
-        name = name or configuration.default_dataset_id
-
         storage_dir = Path(configuration.storage_dir)
-        dataset_path = storage_dir / cls._STORAGE_SUBDIR / name
-        metadata_path = dataset_path / METADATA_FILENAME
+        dataset_base_path = storage_dir / cls._STORAGE_SUBDIR
 
-        # If the dataset directory exists, reconstruct the client from the metadata file.
-        if dataset_path.exists():
-            # If metadata file is missing, raise an error.
-            if not metadata_path.exists():
-                raise ValueError(f'Metadata file not found for dataset "{name}"')
+        if not dataset_base_path.exists():
+            await asyncio.to_thread(dataset_base_path.mkdir, parents=True, exist_ok=True)
 
-            file = await asyncio.to_thread(open, metadata_path)
-            try:
-                file_content = json.load(file)
-            finally:
-                await asyncio.to_thread(file.close)
-            try:
-                metadata = DatasetMetadata(**file_content)
-            except ValidationError as exc:
-                raise ValueError(f'Invalid metadata file for dataset "{name}"') from exc
+        # Get a new instance by ID.
+        if id:
+            found = False
+            for dataset_dir in dataset_base_path.iterdir():
+                if not dataset_dir.is_dir():
+                    continue
 
-            client = cls(
-                id=metadata.id,
-                name=name,
-                created_at=metadata.created_at,
-                accessed_at=metadata.accessed_at,
-                modified_at=metadata.modified_at,
-                item_count=metadata.item_count,
-                storage_dir=storage_dir,
-            )
+                metadata_path = dataset_dir / METADATA_FILENAME
+                if not metadata_path.exists():
+                    continue
 
-            await client._update_metadata(update_accessed_at=True)
+                try:
+                    file = await asyncio.to_thread(metadata_path.open)
+                    try:
+                        file_content = json.load(file)
+                        metadata = DatasetMetadata(**file_content)
+                        if metadata.id == id:
+                            client = cls(
+                                id=metadata.id,
+                                name=metadata.name,
+                                created_at=metadata.created_at,
+                                accessed_at=metadata.accessed_at,
+                                modified_at=metadata.modified_at,
+                                item_count=metadata.item_count,
+                                storage_dir=storage_dir,
+                            )
+                            await client._update_metadata(update_accessed_at=True)
+                            found = True
+                            break
+                    finally:
+                        await asyncio.to_thread(file.close)
+                except (json.JSONDecodeError, ValidationError):
+                    continue
 
-        # Otherwise, create a new dataset client.
+            if not found:
+                raise ValueError(f'Dataset with ID "{id}" not found')
+
+        # Get a new instance by name.
         else:
-            now = datetime.now(timezone.utc)
-            client = cls(
-                id=crypto_random_object_id(),
-                name=name,
-                created_at=now,
-                accessed_at=now,
-                modified_at=now,
-                item_count=0,
-                storage_dir=storage_dir,
-            )
-            await client._update_metadata()
+            name = name or configuration.default_dataset_id
+            dataset_path = dataset_base_path / name
+            metadata_path = dataset_path / METADATA_FILENAME
+
+            # If the dataset directory exists, reconstruct the client from the metadata file.
+            if dataset_path.exists():
+                # If metadata file is missing, raise an error.
+                if not metadata_path.exists():
+                    raise ValueError(f'Metadata file not found for dataset "{name}"')
+
+                file = await asyncio.to_thread(open, metadata_path)
+                try:
+                    file_content = json.load(file)
+                finally:
+                    await asyncio.to_thread(file.close)
+                try:
+                    metadata = DatasetMetadata(**file_content)
+                except ValidationError as exc:
+                    raise ValueError(f'Invalid metadata file for dataset "{name}"') from exc
+
+                client = cls(
+                    id=metadata.id,
+                    name=name,
+                    created_at=metadata.created_at,
+                    accessed_at=metadata.accessed_at,
+                    modified_at=metadata.modified_at,
+                    item_count=metadata.item_count,
+                    storage_dir=storage_dir,
+                )
+
+                await client._update_metadata(update_accessed_at=True)
+
+            # Otherwise, create a new dataset client.
+            else:
+                now = datetime.now(timezone.utc)
+                client = cls(
+                    id=crypto_random_object_id(),
+                    name=name,
+                    created_at=now,
+                    accessed_at=now,
+                    modified_at=now,
+                    item_count=0,
+                    storage_dir=storage_dir,
+                )
+                await client._update_metadata()
 
         return client
 
     @override
     async def drop(self) -> None:
-        # If the client directory exists, remove it recursively.
-        if self.path_to_dataset.exists():
-            async with self._lock:
+        async with self._lock:
+            if self.path_to_dataset.exists():
                 await asyncio.to_thread(shutil.rmtree, self.path_to_dataset)
+
+    @override
+    async def purge(self) -> None:
+        async with self._lock:
+            for file_path in await self._get_sorted_data_files():
+                await asyncio.to_thread(file_path.unlink, missing_ok=True)
+
+            await self._update_metadata(
+                update_accessed_at=True,
+                update_modified_at=True,
+                new_item_count=0,
+            )
 
     @override
     async def push_data(self, data: list[Any] | dict[str, Any]) -> None:

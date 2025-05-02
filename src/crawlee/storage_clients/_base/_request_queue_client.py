@@ -58,6 +58,13 @@ class RequestQueueClient(ABC):
         """
 
     @abstractmethod
+    async def purge(self) -> None:
+        """Purge all items from the request queue.
+
+        The backend method for the `RequestQueue.purge` call.
+        """
+
+    @abstractmethod
     async def add_batch_of_requests(
         self,
         requests: Sequence[Request],

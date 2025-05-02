@@ -65,6 +65,13 @@ class DatasetClient(ABC):
         """
 
     @abstractmethod
+    async def purge(self) -> None:
+        """Purge all items from the dataset.
+
+        The backend method for the `Dataset.purge` call.
+        """
+
+    @abstractmethod
     async def push_data(self, data: list[Any] | dict[str, Any]) -> None:
         """Push data to the dataset.
 

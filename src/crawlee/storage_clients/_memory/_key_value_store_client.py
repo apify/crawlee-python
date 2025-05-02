@@ -72,12 +72,12 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
     ) -> MemoryKeyValueStoreClient:
         name = name or configuration.default_key_value_store_id
 
-        # If specific id is provided, use it; otherwise, generate a new one
-        id = id or crypto_random_object_id()
+        # Otherwise create a new key-value store
+        store_id = id or crypto_random_object_id()
         now = datetime.now(timezone.utc)
 
         return cls(
-            id=id,
+            id=store_id,
             name=name,
             created_at=now,
             accessed_at=now,
@@ -86,8 +86,17 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
 
     @override
     async def drop(self) -> None:
-        # Clear all data
         self._records.clear()
+        await self._update_metadata(update_accessed_at=True, update_modified_at=True)
+
+    @override
+    async def purge(self) -> None:
+        """Delete all stored values from the key-value store, but keep the store itself.
+
+        This method clears all key-value pairs while preserving the store structure.
+        """
+        self._records.clear()
+        await self._update_metadata(update_accessed_at=True, update_modified_at=True)
 
     @override
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:

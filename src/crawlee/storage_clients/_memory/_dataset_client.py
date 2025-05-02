@@ -73,6 +73,7 @@ class MemoryDatasetClient(DatasetClient):
     ) -> MemoryDatasetClient:
         name = name or configuration.default_dataset_id
 
+        # Otherwise create a new dataset
         dataset_id = id or crypto_random_object_id()
         now = datetime.now(timezone.utc)
 
@@ -88,7 +89,24 @@ class MemoryDatasetClient(DatasetClient):
     @override
     async def drop(self) -> None:
         self._records.clear()
-        self._metadata.item_count = 0
+        await self._update_metadata(
+            update_accessed_at=True,
+            update_modified_at=True,
+            new_item_count=0,
+        )
+
+    @override
+    async def purge(self) -> None:
+        """Delete all records from the dataset, but keep the dataset itself.
+
+        This method clears all data items from the dataset while preserving the dataset structure.
+        """
+        self._records.clear()
+        await self._update_metadata(
+            update_accessed_at=True,
+            update_modified_at=True,
+            new_item_count=0,
+        )
 
     @override
     async def push_data(self, data: list[Any] | dict[str, Any]) -> None:
@@ -234,7 +252,7 @@ class MemoryDatasetClient(DatasetClient):
             self._metadata.accessed_at = now
         if update_modified_at:
             self._metadata.modified_at = now
-        if new_item_count:
+        if new_item_count is not None:
             self._metadata.item_count = new_item_count
 
     async def _push_item(self, item: dict[str, Any]) -> None:

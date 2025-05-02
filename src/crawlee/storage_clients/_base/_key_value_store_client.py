@@ -65,6 +65,13 @@ class KeyValueStoreClient(ABC):
         """
 
     @abstractmethod
+    async def purge(self) -> None:
+        """Purge all items from the key-value store.
+
+        The backend method for the `KeyValueStore.purge` call.
+        """
+
+    @abstractmethod
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:
         """Retrieve the given record from the key-value store.
 

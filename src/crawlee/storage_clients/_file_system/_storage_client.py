@@ -25,8 +25,7 @@ class FileSystemStorageClient(StorageClient):
         client = await FileSystemDatasetClient.open(id=id, name=name, configuration=configuration)
 
         if configuration.purge_on_start:
-            await client.drop()
-            client = await FileSystemDatasetClient.open(id=id, name=name, configuration=configuration)
+            await client.purge()
 
         return client
 
@@ -42,8 +41,7 @@ class FileSystemStorageClient(StorageClient):
         client = await FileSystemKeyValueStoreClient.open(id=id, name=name, configuration=configuration)
 
         if configuration.purge_on_start:
-            await client.drop()
-            client = await FileSystemKeyValueStoreClient.open(id=id, name=name, configuration=configuration)
+            await client.purge()
 
         return client
 
@@ -59,7 +57,6 @@ class FileSystemStorageClient(StorageClient):
         client = await FileSystemRequestQueueClient.open(id=id, name=name, configuration=configuration)
 
         if configuration.purge_on_start:
-            await client.drop()
-            client = await FileSystemRequestQueueClient.open(id=id, name=name, configuration=configuration)
+            await client.purge()
 
         return client

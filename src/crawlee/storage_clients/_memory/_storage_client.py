@@ -25,8 +25,7 @@ class MemoryStorageClient(StorageClient):
         client = await MemoryDatasetClient.open(id=id, name=name, configuration=configuration)
 
         if configuration.purge_on_start:
-            await client.drop()
-            client = await MemoryDatasetClient.open(id=id, name=name, configuration=configuration)
+            await client.purge()
 
         return client
 
@@ -42,8 +41,7 @@ class MemoryStorageClient(StorageClient):
         client = await MemoryKeyValueStoreClient.open(id=id, name=name, configuration=configuration)
 
         if configuration.purge_on_start:
-            await client.drop()
-            client = await MemoryKeyValueStoreClient.open(id=id, name=name, configuration=configuration)
+            await client.purge()
 
         return client
 
@@ -59,7 +57,6 @@ class MemoryStorageClient(StorageClient):
         client = await MemoryRequestQueueClient.open(id=id, name=name, configuration=configuration)
 
         if configuration.purge_on_start:
-            await client.drop()
-            client = await MemoryRequestQueueClient.open(id=id, name=name, configuration=configuration)
+            await client.purge()
 
         return client

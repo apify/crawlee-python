@@ -113,12 +113,6 @@ async def test_dataset_client_no_purge_on_start(configuration: Configuration) ->
     assert items.items[0]['item'] == 'preserved data'
 
 
-async def test_open_with_id_raises_error(configuration: Configuration) -> None:
-    """Test that open() raises an error when an ID is provided."""
-    with pytest.raises(ValueError, match='not supported for file system storage client'):
-        await FileSystemStorageClient().open_dataset_client(id='some-id', configuration=configuration)
-
-
 async def test_push_data_single_item(dataset_client: FileSystemDatasetClient) -> None:
     """Test pushing a single item to the dataset."""
     item = {'key': 'value', 'number': 42}
