@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Fix handle error without `args` in `_get_error_message`  for `ErrorTracker` ([#1181](https://github.com/apify/crawlee-python/pull/1181)) ([21944d9](https://github.com/apify/crawlee-python/commit/21944d908b8404d2ad6c182104e7a8c27be12a6e)) by [@Mantisus](https://github.com/Mantisus), closes [#1179](https://github.com/apify/crawlee-python/issues/1179)
+- Temporarily add `certifi&lt;=2025.1.31` dependency ([#1183](https://github.com/apify/crawlee-python/pull/1183)) ([25ff961](https://github.com/apify/crawlee-python/commit/25ff961990f9abc9d0673ba6573dfcf46dd6e53f)) by [@Pijukatel](https://github.com/Pijukatel)
 
 
 <!-- git-cliff-unreleased-end -->
