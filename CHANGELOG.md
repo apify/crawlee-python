@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.6.9 - **not yet released**
+## [0.6.9](https://github.com/apify/crawlee-python/releases/tag/v0.6.9) (2025-05-02)
 
 ### 🚀 Features
 
@@ -17,7 +16,6 @@ All notable changes to this project will be documented in this file.
 - Temporarily add `certifi&lt;=2025.1.31` dependency ([#1183](https://github.com/apify/crawlee-python/pull/1183)) ([25ff961](https://github.com/apify/crawlee-python/commit/25ff961990f9abc9d0673ba6573dfcf46dd6e53f)) by [@Pijukatel](https://github.com/Pijukatel)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.6.8](https://github.com/apify/crawlee-python/releases/tag/v0.6.8) (2025-04-25)
 
 ### 🚀 Features
