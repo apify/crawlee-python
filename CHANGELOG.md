@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 
 - Add an internal `HttpClient` to be used in `send_request` for `PlaywrightCrawler` using `APIRequestContext` bound to the browser context ([#1134](https://github.com/apify/crawlee-python/pull/1134)) ([e794f49](https://github.com/apify/crawlee-python/commit/e794f4985d3a018ee76d634fe2b2c735fb450272)) by [@Mantisus](https://github.com/Mantisus), closes [#928](https://github.com/apify/crawlee-python/issues/928)
 - Make timeout error log cleaner ([#1170](https://github.com/apify/crawlee-python/pull/1170)) ([78ea9d2](https://github.com/apify/crawlee-python/commit/78ea9d23e0b2d73286043b68393e462f636625c9)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1158](https://github.com/apify/crawlee-python/issues/1158)
+- Add `on_skipped_request` decorator, to process links skipped according to `robots.txt` rules ([#1166](https://github.com/apify/crawlee-python/pull/1166)) ([bd16f14](https://github.com/apify/crawlee-python/commit/bd16f14a834eebf485aea6b6a83f2b18bf16b504)) by [@Mantisus](https://github.com/Mantisus), closes [#1160](https://github.com/apify/crawlee-python/issues/1160)
 
 ### 🐛 Bug Fixes
 
