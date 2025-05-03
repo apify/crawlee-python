@@ -151,6 +151,14 @@ async def test_set_get_value(kvs: KeyValueStore) -> None:
     assert result == test_value
 
 
+async def test_set_get_none(kvs: KeyValueStore) -> None:
+    """Test setting and getting None as a value."""
+    test_key = 'none-key'
+    await kvs.set_value(test_key, None)
+    result = await kvs.get_value(test_key)
+    assert result is None
+
+
 async def test_get_value_nonexistent(kvs: KeyValueStore) -> None:
     """Test getting a nonexistent value returns None."""
     result = await kvs.get_value('nonexistent-key')

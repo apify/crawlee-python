@@ -248,14 +248,16 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         # Read the actual value
         value_bytes = await asyncio.to_thread(record_path.read_bytes)
 
+        # Handle None values
+        if metadata.content_type == 'application/x-none':
+            value = None
         # Handle JSON values
-        if 'application/json' in metadata.content_type:
+        elif 'application/json' in metadata.content_type:
             try:
                 value = json.loads(value_bytes.decode('utf-8'))
             except (json.JSONDecodeError, UnicodeDecodeError):
                 logger.warning(f'Failed to decode JSON value for key "{key}"')
                 return None
-
         # Handle text values
         elif metadata.content_type.startswith('text/'):
             try:
@@ -263,7 +265,6 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             except UnicodeDecodeError:
                 logger.warning(f'Failed to decode text value for key "{key}"')
                 return None
-
         # Handle binary values
         else:
             value = value_bytes
@@ -280,18 +281,23 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
     @override
     async def set_value(self, *, key: str, value: Any, content_type: str | None = None) -> None:
-        content_type = content_type or infer_mime_type(value)
-
-        # Serialize the value to bytes.
-        if 'application/json' in content_type:
-            value_bytes = (await json_dumps(value)).encode('utf-8')
-        elif isinstance(value, str):
-            value_bytes = value.encode('utf-8')
-        elif isinstance(value, (bytes, bytearray)):
-            value_bytes = value
+        # Special handling for None values
+        if value is None:
+            content_type = 'application/x-none'  # Special content type to identify None values
+            value_bytes = b''
         else:
-            # Fallback: attempt to convert to string and encode.
-            value_bytes = str(value).encode('utf-8')
+            content_type = content_type or infer_mime_type(value)
+
+            # Serialize the value to bytes.
+            if 'application/json' in content_type:
+                value_bytes = (await json_dumps(value)).encode('utf-8')
+            elif isinstance(value, str):
+                value_bytes = value.encode('utf-8')
+            elif isinstance(value, (bytes, bytearray)):
+                value_bytes = value
+            else:
+                # Fallback: attempt to convert to string and encode.
+                value_bytes = str(value).encode('utf-8')
 
         record_path = self.path_to_kvs / self._encode_key(key)
 
