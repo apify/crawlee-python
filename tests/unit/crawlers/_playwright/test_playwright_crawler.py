@@ -12,6 +12,7 @@ from unittest.mock import Mock
 import pytest
 
 from crawlee import ConcurrencySettings, HttpHeaders, Request, RequestTransformAction, SkippedReason
+from crawlee.configuration import Configuration
 from crawlee.crawlers import PlaywrightCrawler
 from crawlee.fingerprint_suite import (
     DefaultFingerprintGenerator,
@@ -689,3 +690,9 @@ async def test_send_request_with_client(server_url: URL) -> None:
     assert check_data['send_request']['user-agent'] == 'My User-Agent'
 
     assert check_data['default'] != check_data['send_request']
+
+
+async def test_overwrite_configuration() -> None:
+    """Check that the configuration is allowed to be passed to the Playwrightcrawler."""
+    configuration = Configuration(default_dataset_id='my_dataset_id')
+    PlaywrightCrawler(configuration=configuration)
