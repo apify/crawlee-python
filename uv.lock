@@ -693,7 +693,7 @@ requires-dist = [
     { name = "beautifulsoup4", extras = ["lxml"], marker = "extra == 'beautifulsoup'", specifier = ">=4.12.0" },
     { name = "browserforge", specifier = ">=1.2.3" },
     { name = "cachetools", specifier = ">=5.5.0" },
-    { name = "certifi", specifier = "<=2025.1.31" },
+    { name = "certifi", specifier = "<=2025.4.26" },
     { name = "colorama", specifier = ">=0.4.0" },
     { name = "cookiecutter", marker = "extra == 'all'", specifier = ">=2.6.0" },
     { name = "cookiecutter", marker = "extra == 'cli'", specifier = ">=2.6.0" },
