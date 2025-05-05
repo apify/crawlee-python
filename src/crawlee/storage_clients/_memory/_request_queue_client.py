@@ -35,9 +35,6 @@ class MemoryRequestQueueClient(RequestQueueClient):
     does not support data sharing across different processes.
     """
 
-    # Class variable to store request queue instances by ID
-    _instances: ClassVar[dict[str, MemoryRequestQueueClient]] = {}
-
     def __init__(
         self,
         *,

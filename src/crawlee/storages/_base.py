@@ -58,17 +58,3 @@ class Storage(ABC):
         This method does not remove the storage itself, e.g. don't remove the metadata,
         but clears all items within it.
         """
-
-    @classmethod
-    def compute_cache_key(
-        cls,
-        id: str | None = None,
-        name: str | None = None,
-        configuration: Configuration | None = None,
-        storage_client: StorageClient | None = None,
-    ) -> str:
-        """Compute the cache key for the storage.
-
-        The cache key computed based on the storage ID, name, configuration fields, and storage client class.
-        """
-        return f'{id}|{name}|{configuration}|{storage_client.__class__}'

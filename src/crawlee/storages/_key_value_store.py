@@ -73,13 +73,13 @@ class KeyValueStore(Storage):
     _default_instance: ClassVar[KeyValueStore | None] = None
     """Cache for the default key-value store instance."""
 
-    # Cache for recoverable (auto-saved) values
     _autosaved_values: ClassVar[
         dict[
             str,
             dict[str, RecoverableState[AutosavedValue]],
         ]
     ] = {}
+    """Cache for recoverable (auto-saved) values."""
 
     def __init__(self, client: KeyValueStoreClient) -> None:
         """Initialize a new instance.
@@ -155,17 +155,12 @@ class KeyValueStore(Storage):
 
     @override
     async def drop(self) -> None:
-        # Remove from cache before dropping
         if self.id in self._cache_by_id:
             del self._cache_by_id[self.id]
-
         if self.name is not None and self.name in self._cache_by_name:
             del self._cache_by_name[self.name]
 
-        # Clear cache with persistent values
-        await self._clear_cache()
-
-        # Drop the key-value store client
+        await self._clear_cache()  # Clear cache with persistent values.
         await self._client.drop()
 
     @override
