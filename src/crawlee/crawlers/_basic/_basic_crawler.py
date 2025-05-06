@@ -110,7 +110,11 @@ class _BasicCrawlerOptions(TypedDict):
     """HTTP client used by `BasicCrawlingContext.send_request` method."""
 
     max_request_retries: NotRequired[int]
-    """Maximum number of attempts to process a single request."""
+    """Specifies the maximum number of retries allowed for a request if its processing fails.
+    This includes retries due to navigation errors or errors thrown from user-supplied functions
+    (`request_handler`, `pre_navigation_hooks` etc.).
+
+    This limit does not apply to retries triggered by session rotation (see `max_session_rotations`)."""
 
     max_requests_per_crawl: NotRequired[int | None]
     """Maximum number of pages to open during a crawl. The crawl stops upon reaching this limit.
@@ -119,7 +123,10 @@ class _BasicCrawlerOptions(TypedDict):
 
     max_session_rotations: NotRequired[int]
     """Maximum number of session rotations per request. The crawler rotates the session if a proxy error occurs
-    or if the website blocks the request."""
+    or if the website blocks the request.
+
+    The session rotations are not counted towards the `max_request_retries` limit.
+    """
 
     max_crawl_depth: NotRequired[int | None]
     """Specifies the maximum crawl depth. If set, the crawler will stop processing links beyond this depth.
@@ -269,7 +276,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             proxy_configuration: HTTP proxy configuration used when making requests.
             http_client: HTTP client used by `BasicCrawlingContext.send_request` method.
             request_handler: A callable responsible for handling requests.
-            max_request_retries: Maximum number of attempts to process a single request.
+            max_request_retries: Specifies the maximum number of retries allowed for a request if its processing fails.
+                This includes retries due to navigation errors or errors thrown from user-supplied functions
+                (`request_handler`, `pre_navigation_hooks` etc.).
+
+                This limit does not apply to retries triggered by session rotation (see `max_session_rotations`).
             max_requests_per_crawl: Maximum number of pages to open during a crawl. The crawl stops upon reaching
                 this limit. Setting this value can help avoid infinite loops in misconfigured crawlers. `None` means
                 no limit. Due to concurrency settings, the actual number of pages visited may slightly exceed
@@ -277,6 +288,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 `max_requests_per_crawl` is achieved.
             max_session_rotations: Maximum number of session rotations per request. The crawler rotates the session
                 if a proxy error occurs or if the website blocks the request.
+
+                The session rotations are not counted towards the `max_request_retries` limit.
             max_crawl_depth: Specifies the maximum crawl depth. If set, the crawler will stop processing links beyond
                 this depth. The crawl depth starts at 0 for initial requests and increases with each subsequent level
                 of links. Requests at the maximum depth will still be processed, but no new links will be enqueued
