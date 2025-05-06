@@ -24,7 +24,7 @@ class FileSystemStorageClient(StorageClient):
         configuration = configuration or Configuration.get_global_configuration()
         client = await FileSystemDatasetClient.open(id=id, name=name, configuration=configuration)
 
-        if configuration.purge_on_start:
+        if configuration.purge_on_start and client.metadata.name is None:
             await client.purge()
 
         return client
@@ -40,7 +40,7 @@ class FileSystemStorageClient(StorageClient):
         configuration = configuration or Configuration.get_global_configuration()
         client = await FileSystemKeyValueStoreClient.open(id=id, name=name, configuration=configuration)
 
-        if configuration.purge_on_start:
+        if configuration.purge_on_start and client.metadata.name is None:
             await client.purge()
 
         return client
@@ -56,7 +56,7 @@ class FileSystemStorageClient(StorageClient):
         configuration = configuration or Configuration.get_global_configuration()
         client = await FileSystemRequestQueueClient.open(id=id, name=name, configuration=configuration)
 
-        if configuration.purge_on_start:
+        if configuration.purge_on_start and client.metadata.name is None:
             await client.purge()
 
         return client

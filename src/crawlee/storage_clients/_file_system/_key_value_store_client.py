@@ -49,11 +49,14 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
     _STORAGE_SUBDIR = 'key_value_stores'
     """The name of the subdirectory where key-value stores are stored."""
 
+    _STORAGE_SUBSUBDIR_DEFAULT = 'default'
+    """The name of the subdirectory for the default key-value store."""
+
     def __init__(
         self,
         *,
         id: str,
-        name: str,
+        name: str | None,
         created_at: datetime,
         accessed_at: datetime,
         modified_at: datetime,
@@ -85,6 +88,9 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
     @property
     def path_to_kvs(self) -> Path:
         """The full path to the key-value store directory."""
+        if self.metadata.name is None:
+            return self._storage_dir / self._STORAGE_SUBDIR / self._STORAGE_SUBSUBDIR_DEFAULT
+
         return self._storage_dir / self._STORAGE_SUBDIR / self.metadata.name
 
     @property
@@ -145,9 +151,9 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
         # Get a new instance by name.
         else:
-            name = name or configuration.default_key_value_store_id
-
-            kvs_path = storage_dir / cls._STORAGE_SUBDIR / name
+            kvs_path = (
+                kvs_base_path / cls._STORAGE_SUBSUBDIR_DEFAULT if name is None else kvs_base_path / name
+            )
             metadata_path = kvs_path / METADATA_FILENAME
 
             # If the key-value store directory exists, reconstruct the client from the metadata file.

@@ -39,7 +39,7 @@ class MemoryRequestQueueClient(RequestQueueClient):
         self,
         *,
         id: str,
-        name: str,
+        name: str | None,
         created_at: datetime,
         accessed_at: datetime,
         modified_at: datetime,
@@ -86,8 +86,6 @@ class MemoryRequestQueueClient(RequestQueueClient):
         name: str | None,
         configuration: Configuration,
     ) -> MemoryRequestQueueClient:
-        name = name or configuration.default_request_queue_id
-
         # Otherwise create a new queue
         queue_id = id or crypto_random_object_id()
         now = datetime.now(timezone.utc)

@@ -67,7 +67,6 @@ async def test_kvs_client_purge_on_start(configuration: Configuration) -> None:
 
     # Create KVS and add data
     kvs_client1 = await FileSystemStorageClient().open_key_value_store_client(
-        name='test-purge-kvs',
         configuration=configuration,
     )
     await kvs_client1.set_value(key='test-key', value='initial value')
@@ -79,7 +78,6 @@ async def test_kvs_client_purge_on_start(configuration: Configuration) -> None:
 
     # Reopen
     kvs_client2 = await FileSystemStorageClient().open_key_value_store_client(
-        name='test-purge-kvs',
         configuration=configuration,
     )
 

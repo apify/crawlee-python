@@ -70,20 +70,14 @@ async def test_rq_client_purge_on_start(configuration: Configuration) -> None:
     configuration.purge_on_start = True
 
     # Create request queue and add data
-    rq_client1 = await FileSystemStorageClient().open_request_queue_client(
-        name='test-purge-rq',
-        configuration=configuration,
-    )
+    rq_client1 = await FileSystemStorageClient().open_request_queue_client(configuration=configuration)
     await rq_client1.add_batch_of_requests([Request.from_url('https://example.com')])
 
     # Verify request was added
     assert rq_client1.metadata.total_request_count == 1
 
     # Reopen
-    rq_client2 = await FileSystemStorageClient().open_request_queue_client(
-        name='test-purge-rq',
-        configuration=configuration,
-    )
+    rq_client2 = await FileSystemStorageClient().open_request_queue_client(configuration=configuration)
 
     # Verify data was purged
     assert rq_client2.metadata.total_request_count == 0

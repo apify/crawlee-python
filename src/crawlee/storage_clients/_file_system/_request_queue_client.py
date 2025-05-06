@@ -48,11 +48,14 @@ class FileSystemRequestQueueClient(RequestQueueClient):
     _STORAGE_SUBDIR = 'request_queues'
     """The name of the subdirectory where request queues are stored."""
 
+    _STORAGE_SUBSUBDIR_DEFAULT = 'default'
+    """The name of the subdirectory for the default request queue."""
+
     def __init__(
         self,
         *,
         id: str,
-        name: str,
+        name: str | None,
         created_at: datetime,
         accessed_at: datetime,
         modified_at: datetime,
@@ -100,6 +103,9 @@ class FileSystemRequestQueueClient(RequestQueueClient):
     @property
     def path_to_rq(self) -> Path:
         """The full path to the request queue directory."""
+        if self.metadata.name is None:
+            return self._storage_dir / self._STORAGE_SUBDIR / self._STORAGE_SUBSUBDIR_DEFAULT
+
         return self._storage_dir / self._STORAGE_SUBDIR / self.metadata.name
 
     @property
@@ -165,9 +171,9 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
         # Get a new instance by name.
         else:
-            name = name or configuration.default_request_queue_id
-
-            rq_path = storage_dir / cls._STORAGE_SUBDIR / name
+            rq_path = (
+                rq_base_path / cls._STORAGE_SUBSUBDIR_DEFAULT if name is None else rq_base_path / name
+            )
             metadata_path = rq_path / METADATA_FILENAME
 
             # If the RQ directory exists, reconstruct the client from the metadata file.

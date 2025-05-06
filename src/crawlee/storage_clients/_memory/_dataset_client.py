@@ -35,7 +35,7 @@ class MemoryDatasetClient(DatasetClient):
         self,
         *,
         id: str,
-        name: str,
+        name: str | None,
         created_at: datetime,
         accessed_at: datetime,
         modified_at: datetime,
@@ -71,8 +71,6 @@ class MemoryDatasetClient(DatasetClient):
         name: str | None,
         configuration: Configuration,
     ) -> MemoryDatasetClient:
-        name = name or configuration.default_dataset_id
-
         # Otherwise create a new dataset
         dataset_id = id or crypto_random_object_id()
         now = datetime.now(timezone.utc)

@@ -36,7 +36,7 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
         self,
         *,
         id: str,
-        name: str,
+        name: str | None,
         created_at: datetime,
         accessed_at: datetime,
         modified_at: datetime,
@@ -70,8 +70,6 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
         name: str | None,
         configuration: Configuration,
     ) -> MemoryKeyValueStoreClient:
-        name = name or configuration.default_key_value_store_id
-
         # Otherwise create a new key-value store
         store_id = id or crypto_random_object_id()
         now = datetime.now(timezone.utc)

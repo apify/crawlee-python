@@ -47,6 +47,9 @@ class FileSystemDatasetClient(DatasetClient):
     _STORAGE_SUBDIR = 'datasets'
     """The name of the subdirectory where datasets are stored."""
 
+    _STORAGE_SUBSUBDIR_DEFAULT = 'default'
+    """The name of the subdirectory for the default dataset."""
+
     _ITEM_FILENAME_DIGITS = 9
     """Number of digits used for the dataset item file names (e.g., 000000019.json)."""
 
@@ -54,7 +57,7 @@ class FileSystemDatasetClient(DatasetClient):
         self,
         *,
         id: str,
-        name: str,
+        name: str | None,
         created_at: datetime,
         accessed_at: datetime,
         modified_at: datetime,
@@ -88,6 +91,9 @@ class FileSystemDatasetClient(DatasetClient):
     @property
     def path_to_dataset(self) -> Path:
         """The full path to the dataset directory."""
+        if self.metadata.name is None:
+            return self._storage_dir / self._STORAGE_SUBDIR / self._STORAGE_SUBSUBDIR_DEFAULT
+
         return self._storage_dir / self._STORAGE_SUBDIR / self.metadata.name
 
     @property
@@ -149,8 +155,9 @@ class FileSystemDatasetClient(DatasetClient):
 
         # Get a new instance by name.
         else:
-            name = name or configuration.default_dataset_id
-            dataset_path = dataset_base_path / name
+            dataset_path = (
+                dataset_base_path / cls._STORAGE_SUBSUBDIR_DEFAULT if name is None else dataset_base_path / name
+            )
             metadata_path = dataset_path / METADATA_FILENAME
 
             # If the dataset directory exists, reconstruct the client from the metadata file.

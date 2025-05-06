@@ -70,7 +70,6 @@ async def test_dataset_client_purge_on_start(configuration: Configuration) -> No
 
     # Create dataset and add data
     dataset_client1 = await FileSystemStorageClient().open_dataset_client(
-        name='test-purge-dataset',
         configuration=configuration,
     )
     await dataset_client1.push_data({'item': 'initial data'})
@@ -81,7 +80,6 @@ async def test_dataset_client_purge_on_start(configuration: Configuration) -> No
 
     # Reopen
     dataset_client2 = await FileSystemStorageClient().open_dataset_client(
-        name='test-purge-dataset',
         configuration=configuration,
     )
 

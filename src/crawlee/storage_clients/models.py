@@ -28,7 +28,7 @@ class StorageMetadata(BaseModel):
     id: Annotated[str, Field(alias='id')]
     """The unique identifier of the storage."""
 
-    name: Annotated[str, Field(alias='name', default='default')]
+    name: Annotated[str | None, Field(alias='name', default=None)]
     """The name of the storage."""
 
     accessed_at: Annotated[datetime, Field(alias='accessedAt')]
