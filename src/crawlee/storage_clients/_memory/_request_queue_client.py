@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 from typing_extensions import override
 

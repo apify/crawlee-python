@@ -589,7 +589,7 @@ async def test_context_push_and_get_data_handler_error() -> None:
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        await context.push_data('{"b": 2}')
+        await context.push_data({'b': 2})
         raise RuntimeError('Watch me crash')
 
     stats = await crawler.run(['https://a.com'])

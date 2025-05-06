@@ -188,7 +188,7 @@ class PushDataKwargs(TypedDict):
 
 
 class PushDataFunctionCall(PushDataKwargs):
-    data: JsonSerializable
+    data: list[dict[str, Any]] | dict[str, Any]
     dataset_id: str | None
     dataset_name: str | None
 
@@ -269,7 +269,7 @@ class RequestHandlerRunResult:
 
     async def push_data(
         self,
-        data: JsonSerializable,
+        data: list[dict[str, Any]] | dict[str, Any],
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         **kwargs: Unpack[PushDataKwargs],
@@ -514,7 +514,7 @@ class PushDataFunction(Protocol):
 
     def __call__(
         self,
-        data: JsonSerializable,
+        data: list[dict[str, Any]] | dict[str, Any],
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         **kwargs: Unpack[PushDataKwargs],

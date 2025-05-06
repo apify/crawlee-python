@@ -158,7 +158,7 @@ class Dataset(Storage):
     async def purge(self) -> None:
         await self._client.purge()
 
-    async def push_data(self, data: list[Any] | dict[str, Any]) -> None:
+    async def push_data(self, data: list[dict[str, Any]] | dict[str, Any]) -> None:
         """Store an object or an array of objects to the dataset.
 
         The size of the data is limited by the receiving API and therefore `push_data()` will only

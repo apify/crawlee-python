@@ -171,7 +171,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             metadata_path = rq_path / METADATA_FILENAME
 
             # If the RQ directory exists, reconstruct the client from the metadata file.
-            if rq_path.exists() and not configuration.purge_on_start:
+            if rq_path.exists():
                 # If metadata file is missing, raise an error.
                 if not metadata_path.exists():
                     raise ValueError(f'Metadata file not found for request queue "{name}"')
@@ -204,10 +204,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
             # Otherwise, create a new dataset client.
             else:
-                # If purge_on_start is true and the directory exists, remove it
-                if configuration.purge_on_start and rq_path.exists():
-                    await asyncio.to_thread(shutil.rmtree, rq_path)
-
                 now = datetime.now(timezone.utc)
                 client = cls(
                     id=crypto_random_object_id(),

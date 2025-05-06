@@ -216,7 +216,7 @@ class FileSystemDatasetClient(DatasetClient):
             )
 
     @override
-    async def push_data(self, data: list[Any] | dict[str, Any]) -> None:
+    async def push_data(self, data: list[dict[str, Any]] | dict[str, Any]) -> None:
         new_item_count = self.metadata.item_count
 
         # If data is a list, push each item individually.

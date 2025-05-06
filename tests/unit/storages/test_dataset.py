@@ -14,6 +14,7 @@ from crawlee.storages import Dataset, KeyValueStore
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
     from pathlib import Path
+    from typing import Any
 
     from crawlee.storage_clients import StorageClient
 
@@ -328,7 +329,7 @@ async def test_list_items(dataset: Dataset) -> None:
 async def test_list_items_with_options(dataset: Dataset) -> None:
     """Test that list_items respects filtering options."""
     # Add some items
-    items = [
+    items: list[dict[str, Any]] = [
         {'id': 1, 'name': 'Item 1'},
         {'id': 2, 'name': 'Item 2'},
         {'id': 3},  # Item with missing 'name' field

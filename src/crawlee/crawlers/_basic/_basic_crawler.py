@@ -758,7 +758,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     async def _push_data(
         self,
-        data: JsonSerializable,
+        data: list[dict[str, Any]] | dict[str, Any],
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         **kwargs: Unpack[PushDataKwargs],
