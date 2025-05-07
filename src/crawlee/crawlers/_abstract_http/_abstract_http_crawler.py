@@ -156,7 +156,7 @@ class AbstractHttpCrawler(
             *,
             selector: str = 'a',
             label: str | None = None,
-            user_data: JsonSerializable = None,
+            user_data: dict[str, JsonSerializable] | None = None,
             transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
             | None = None,
             **kwargs: Unpack[EnqueueLinksKwargs],
@@ -226,7 +226,7 @@ class AbstractHttpCrawler(
             *,
             selector: str | None = None,
             label: str | None = None,
-            user_data: JsonSerializable = None,
+            user_data: dict[str, JsonSerializable] | None = None,
             transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
             | None = None,
             requests: Sequence[str | Request] | None = None,

@@ -129,7 +129,7 @@ class RequestOptions(TypedDict):
     keep_url_fragment: NotRequired[bool]
     use_extended_unique_key: NotRequired[bool]
     always_enqueue: NotRequired[bool]
-    user_data: NotRequired[JsonSerializable]
+    user_data: NotRequired[dict[str, JsonSerializable]]
     no_retry: NotRequired[bool]
 
 
