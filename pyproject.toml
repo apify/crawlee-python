@@ -143,6 +143,7 @@ ignore = [
     "ISC001",   # This rule may cause conflicts when used with the formatter
     "FIX",      # flake8-fixme
     "PLR0911",  # Too many return statements
+    "PLR0912",  # Too many branches
     "PLR0913",  # Too many arguments in function definition
     "PLR0915",  # Too many statements
     "PYI034",   # `__aenter__` methods in classes like `{name}` usually return `self` at runtime
@@ -203,9 +204,6 @@ builtins-ignorelist = ["id"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["crawlee"]
-
-[tool.ruff.lint.pylint]
-max-branches = 18
 
 [tool.pytest.ini_options]
 addopts = "-ra"

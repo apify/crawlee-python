@@ -96,6 +96,9 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         """A list of request IDs that should be prioritized (added with forefront=True).
         Most recent forefront requests are added at the beginning of the list."""
 
+        self._sequence_counter = 0
+        """A counter to track the order of requests added to the queue."""
+
     @override
     @property
     def metadata(self) -> RequestQueueMetadata:
@@ -277,10 +280,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             await asyncio.to_thread(self.path_to_rq.mkdir, parents=True, exist_ok=True)
 
             for request in requests:
-                # Ensure the request has an ID
-                if not request.id:
-                    request.id = crypto_random_object_id()
-
                 # Check if the request is already in the queue by unique_key
                 existing_request = None
 
@@ -356,6 +355,11 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 request_dict = request.model_dump()
                 if request_dict.get('handled_at') is None:
                     request_dict.pop('handled_at', None)
+
+                # Add sequence number to ensure FIFO ordering
+                sequence_number = self._sequence_counter
+                self._sequence_counter += 1
+                request_dict['_sequence'] = sequence_number
 
                 request_data = await json_dumps(request_dict)
                 await asyncio.to_thread(request_path.write_text, request_data, encoding='utf-8')
@@ -471,10 +475,10 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
             # List all request files for regular (non-forefront) requests
             request_files = await asyncio.to_thread(list, self.path_to_rq.glob('*.json'))
-            regular_requests = []
 
-            # Get file creation times for sorting regular requests in FIFO order
-            request_file_times = {}
+            # Dictionary to store request files by their sequence number
+            request_sequences = {}
+            requests_without_sequence = []
 
             # Filter out metadata files and in-progress requests
             for request_file in request_files:
@@ -489,25 +493,34 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 if request_id in self._in_progress or request_id in self._forefront_requests:
                     continue
 
-                # Get file creation/modification time for FIFO ordering
+                # Read the file to get the sequence number
                 try:
-                    file_stat = await asyncio.to_thread(request_file.stat)
-                    request_file_times[request_file] = file_stat.st_mtime
-                except Exception:
-                    # If we can't get the time, use 0 (oldest)
-                    request_file_times[request_file] = 0
+                    file = await asyncio.to_thread(open, request_file)
+                    try:
+                        file_content = json.load(file)
+                        # Skip if already handled
+                        if file_content.get('handled_at') is not None:
+                            continue
 
-                regular_requests.append(request_file)
+                        # Use sequence number for ordering if available
+                        sequence_number = file_content.get('_sequence')
+                        if sequence_number is not None:
+                            request_sequences[sequence_number] = request_file
+                        else:
+                            # For backward compatibility with existing files
+                            requests_without_sequence.append(request_file)
+                    finally:
+                        await asyncio.to_thread(file.close)
+                except (json.JSONDecodeError, ValidationError) as exc:
+                    logger.warning(f'Failed to parse request file {request_file}: {exc!s}')
 
-            # Sort regular requests by creation time (FIFO order)
-            regular_requests.sort(key=lambda f: request_file_times[f])
-
-            # Process regular requests in FIFO order
-            for request_file in regular_requests:
+            # Process requests with sequence numbers first, in FIFO order
+            for sequence in sorted(request_sequences.keys()):
+                request_file = request_sequences[sequence]
                 file = await asyncio.to_thread(open, request_file)
                 try:
                     file_content = json.load(file)
-                    # Skip if already handled
+                    # Skip if already handled (double-check)
                     if file_content.get('handled_at') is not None:
                         continue
 
@@ -525,6 +538,45 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     return request
                 finally:
                     await asyncio.to_thread(file.close)
+
+            # Process requests without sequence numbers using file timestamps (backward compatibility)
+            if requests_without_sequence:
+                # Get file creation times for sorting
+                request_file_times = {}
+                for request_file in requests_without_sequence:
+                    try:
+                        file_stat = await asyncio.to_thread(request_file.stat)
+                        request_file_times[request_file] = file_stat.st_mtime
+                    except Exception:  # noqa: PERF203
+                        # If we can't get the time, use 0 (oldest)
+                        request_file_times[request_file] = 0
+
+                # Sort by creation time
+                requests_without_sequence.sort(key=lambda f: request_file_times[f])
+
+                # Process requests without sequence in file timestamp order
+                for request_file in requests_without_sequence:
+                    file = await asyncio.to_thread(open, request_file)
+                    try:
+                        file_content = json.load(file)
+                        # Skip if already handled
+                        if file_content.get('handled_at') is not None:
+                            continue
+
+                        # Create request object
+                        request = Request(**file_content)
+
+                        # Mark as in-progress in memory
+                        self._in_progress.add(request.id)
+
+                        # Update accessed timestamp
+                        await self._update_metadata(update_accessed_at=True)
+                    except (json.JSONDecodeError, ValidationError) as exc:
+                        logger.warning(f'Failed to parse request file {request_file}: {exc!s}')
+                    else:
+                        return request
+                    finally:
+                        await asyncio.to_thread(file.close)
 
             return None
 
