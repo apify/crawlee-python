@@ -2,20 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.6.9 - **not yet released**
+## [0.6.9](https://github.com/apify/crawlee-python/releases/tag/v0.6.9) (2025-05-02)
 
 ### 🚀 Features
 
 - Add an internal `HttpClient` to be used in `send_request` for `PlaywrightCrawler` using `APIRequestContext` bound to the browser context ([#1134](https://github.com/apify/crawlee-python/pull/1134)) ([e794f49](https://github.com/apify/crawlee-python/commit/e794f4985d3a018ee76d634fe2b2c735fb450272)) by [@Mantisus](https://github.com/Mantisus), closes [#928](https://github.com/apify/crawlee-python/issues/928)
 - Make timeout error log cleaner ([#1170](https://github.com/apify/crawlee-python/pull/1170)) ([78ea9d2](https://github.com/apify/crawlee-python/commit/78ea9d23e0b2d73286043b68393e462f636625c9)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1158](https://github.com/apify/crawlee-python/issues/1158)
+- Add `on_skipped_request` decorator, to process links skipped according to `robots.txt` rules ([#1166](https://github.com/apify/crawlee-python/pull/1166)) ([bd16f14](https://github.com/apify/crawlee-python/commit/bd16f14a834eebf485aea6b6a83f2b18bf16b504)) by [@Mantisus](https://github.com/Mantisus), closes [#1160](https://github.com/apify/crawlee-python/issues/1160)
 
 ### 🐛 Bug Fixes
 
 - Fix handle error without `args` in `_get_error_message`  for `ErrorTracker` ([#1181](https://github.com/apify/crawlee-python/pull/1181)) ([21944d9](https://github.com/apify/crawlee-python/commit/21944d908b8404d2ad6c182104e7a8c27be12a6e)) by [@Mantisus](https://github.com/Mantisus), closes [#1179](https://github.com/apify/crawlee-python/issues/1179)
+- Temporarily add `certifi&lt;=2025.1.31` dependency ([#1183](https://github.com/apify/crawlee-python/pull/1183)) ([25ff961](https://github.com/apify/crawlee-python/commit/25ff961990f9abc9d0673ba6573dfcf46dd6e53f)) by [@Pijukatel](https://github.com/Pijukatel)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.6.8](https://github.com/apify/crawlee-python/releases/tag/v0.6.8) (2025-04-25)
 
 ### 🚀 Features

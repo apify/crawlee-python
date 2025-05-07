@@ -50,6 +50,8 @@ RequestTransformAction: TypeAlias = Literal['skip', 'unchanged']
 EnqueueStrategy: TypeAlias = Literal['all', 'same-domain', 'same-hostname', 'same-origin']
 """Enqueue strategy to be used for determining which links to extract and enqueue."""
 
+SkippedReason: TypeAlias = Literal['robots_txt']
+
 
 def _normalize_headers(headers: Mapping[str, str]) -> dict[str, str]:
     """Convert all header keys to lowercase, strips whitespace, and returns them sorted by key."""
