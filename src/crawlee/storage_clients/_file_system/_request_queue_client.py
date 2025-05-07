@@ -92,8 +92,9 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         self._in_progress = set[str]()
         """A set of request IDs that are currently being processed."""
 
-        self._forefront_requests = set[str]()
-        """A set of request IDs that should be prioritized (added with forefront=True)."""
+        self._forefront_requests = list[str]()
+        """A list of request IDs that should be prioritized (added with forefront=True).
+        Most recent forefront requests are added at the beginning of the list."""
 
     @override
     @property
@@ -320,7 +321,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
                 # If forefront and existing request is not handled, mark it as forefront
                 if forefront and was_already_present and not was_already_handled and existing_request:
-                    self._forefront_requests.add(existing_request.id)
+                    self._forefront_requests.insert(0, existing_request.id)
                     processed_requests.append(
                         ProcessedRequest(
                             id=existing_request.id,
@@ -363,9 +364,9 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 new_total_request_count += 1
                 new_pending_request_count += 1
 
-                # If forefront, add to the forefront set
+                # If forefront, add to the forefront list
                 if forefront:
-                    self._forefront_requests.add(request.id)
+                    self._forefront_requests.insert(0, request.id)
 
                 processed_requests.append(
                     ProcessedRequest(
@@ -487,8 +488,9 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     # Mark as in-progress in memory
                     self._in_progress.add(request.id)
 
-                    # Remove from forefront set if it was there
-                    self._forefront_requests.discard(request.id)
+                    # Remove from forefront list if it was there
+                    if request.id in self._forefront_requests:
+                        self._forefront_requests.remove(request.id)
 
                     # Update accessed timestamp
                     await self._update_metadata(update_accessed_at=True)
@@ -578,10 +580,10 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
             # If forefront is true, mark this request as priority
             if forefront:
-                self._forefront_requests.add(request.id)
-            else:
-                # Make sure it's not in the forefront set if it was previously added there
-                self._forefront_requests.discard(request.id)
+                self._forefront_requests.insert(0, request.id)
+            # Make sure it's not in the forefront list if it was previously added there
+            elif request.id in self._forefront_requests:
+                self._forefront_requests.remove(request.id)
 
             # To simulate changing the file timestamp for FIFO ordering,
             # we'll update the file with current timestamp
