@@ -1269,23 +1269,30 @@ async def test_lock_with_get_robots_txt_file_for_url(server_url: URL) -> None:
         assert spy.call_count == 1
 
 
-async def test_reduced_logs_from_timed_out_request_handler(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
+async def test_reduced_logs_from_timed_out_request_handler(caplog: pytest.LogCaptureFixture) -> None:
     caplog.set_level(logging.INFO)
-    crawler = BasicCrawler(configure_logging=False, request_handler_timeout=timedelta(seconds=1))
+    crawler = BasicCrawler(
+        configure_logging=False,
+        request_handler_timeout=timedelta(seconds=1),
+    )
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
+        # Intentionally add a delay longer than the timeout to trigger the timeout mechanism
         await asyncio.sleep(10)  # INJECTED DELAY
 
-    await crawler.run([Request.from_url('http://a.com/')])
+    # Capture all logs from the 'crawlee' logger at INFO level or higher
+    with caplog.at_level(logging.INFO, logger='crawlee'):
+        await crawler.run([Request.from_url('http://a.com/')])
 
+    # Check for the timeout message in any of the logs
+    found_timeout_message = False
     for record in caplog.records:
-        if record.funcName == '_handle_failed_request':
+        if record.message and 'timed out after 1.0 seconds' in record.message:
             full_message = (record.message or '') + (record.exc_text or '')
             assert Counter(full_message)['\n'] < 10
             assert '# INJECTED DELAY' in full_message
+            found_timeout_message = True
             break
-    else:
-        raise AssertionError('Expected log message about request handler error was not found.')
+
+    assert found_timeout_message, 'Expected log message about request handler error was not found.'
