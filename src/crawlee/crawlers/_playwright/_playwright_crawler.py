@@ -37,7 +37,13 @@ if TYPE_CHECKING:
     from typing_extensions import Unpack
 
     from crawlee import RequestTransformAction
-    from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, EnqueueLinksKwargs, ExtractLinksFunction
+    from crawlee._types import (
+        BasicCrawlingContext,
+        EnqueueLinksFunction,
+        EnqueueLinksKwargs,
+        ExtractLinksFunction,
+        JsonSerializable,
+    )
     from crawlee.browsers._types import BrowserType
 
 
@@ -281,7 +287,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             *,
             selector: str = 'a',
             label: str | None = None,
-            user_data: dict | None = None,
+            user_data: JsonSerializable = None,
             transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
             | None = None,
             **kwargs: Unpack[EnqueueLinksKwargs],
@@ -314,7 +320,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                         skipped.append(url)
                         continue
 
-                    request_option = RequestOptions({'url': url, 'user_data': {**base_user_data}, 'label': label})
+                    request_option = RequestOptions({'url': url, 'user_data': base_user_data, 'label': label})
 
                     if transform_request_function:
                         transform_request_option = transform_request_function(request_option)
@@ -352,7 +358,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             *,
             selector: str | None = None,
             label: str | None = None,
-            user_data: dict | None = None,
+            user_data: JsonSerializable = None,
             transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
             | None = None,
             requests: Sequence[str | Request] | None = None,

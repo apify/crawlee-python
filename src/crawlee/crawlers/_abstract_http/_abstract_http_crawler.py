@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from abc import ABC
-from typing import TYPE_CHECKING, Any, Callable, Generic, Union
+from typing import TYPE_CHECKING, Callable, Generic, Union
 
 from pydantic import ValidationError
 from typing_extensions import TypeVar
@@ -23,7 +23,13 @@ if TYPE_CHECKING:
     from typing_extensions import Unpack
 
     from crawlee import RequestTransformAction
-    from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, EnqueueLinksKwargs, ExtractLinksFunction
+    from crawlee._types import (
+        BasicCrawlingContext,
+        EnqueueLinksFunction,
+        EnqueueLinksKwargs,
+        ExtractLinksFunction,
+        JsonSerializable,
+    )
 
     from ._abstract_http_parser import AbstractHttpParser
 
@@ -150,7 +156,7 @@ class AbstractHttpCrawler(
             *,
             selector: str = 'a',
             label: str | None = None,
-            user_data: dict[str, Any] | None = None,
+            user_data: JsonSerializable = None,
             transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
             | None = None,
             **kwargs: Unpack[EnqueueLinksKwargs],
@@ -173,7 +179,7 @@ class AbstractHttpCrawler(
                     skipped.append(url)
                     continue
 
-                request_options = RequestOptions(url=url, user_data={**base_user_data}, label=label)
+                request_options = RequestOptions(url=url, user_data=base_user_data, label=label)
 
                 if transform_request_function:
                     transform_request_options = transform_request_function(request_options)
@@ -220,7 +226,7 @@ class AbstractHttpCrawler(
             *,
             selector: str | None = None,
             label: str | None = None,
-            user_data: dict[str, Any] | None = None,
+            user_data: JsonSerializable = None,
             transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
             | None = None,
             requests: Sequence[str | Request] | None = None,

@@ -346,7 +346,7 @@ class EnqueueLinksFunction(Protocol):
         *,
         selector: str | None = None,
         label: str | None = None,
-        user_data: dict[str, Any] | None = None,
+        user_data: JsonSerializable = None,
         transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> Coroutine[None, None, None]: ...
@@ -361,7 +361,7 @@ class EnqueueLinksFunction(Protocol):
         *,
         selector: str | None = None,
         label: str | None = None,
-        user_data: dict[str, Any] | None = None,
+        user_data: JsonSerializable = None,
         transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
         requests: Sequence[str | Request] | None = None,
         **kwargs: Unpack[EnqueueLinksKwargs],
@@ -398,7 +398,7 @@ class ExtractLinksFunction(Protocol):
         *,
         selector: str = 'a',
         label: str | None = None,
-        user_data: dict[str, Any] | None = None,
+        user_data: JsonSerializable = None,
         transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> Coroutine[None, None, list[Request]]:
