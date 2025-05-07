@@ -151,9 +151,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
         # Get a new instance by name.
         else:
-            kvs_path = (
-                kvs_base_path / cls._STORAGE_SUBSUBDIR_DEFAULT if name is None else kvs_base_path / name
-            )
+            kvs_path = kvs_base_path / cls._STORAGE_SUBSUBDIR_DEFAULT if name is None else kvs_base_path / name
             metadata_path = kvs_path / METADATA_FILENAME
 
             # If the key-value store directory exists, reconstruct the client from the metadata file.
@@ -235,7 +233,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             return None
 
         # Read the metadata file
-        async with self._lock:
+        async with self._lock:  # DEADLOCK
             file = await asyncio.to_thread(open, record_metadata_filepath)
             try:
                 metadata_content = json.load(file)
@@ -364,41 +362,42 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         if not self.path_to_kvs.exists():
             return
 
-        count = 0
+        # List and sort all files *inside* a brief lock, then release it immediately:
         async with self._lock:
-            # Get all files in the KVS directory, sorted alphabetically
             files = sorted(await asyncio.to_thread(list, self.path_to_kvs.glob('*')))
 
-            for file_path in files:
-                # Skip the main metadata file
-                if file_path.name == METADATA_FILENAME:
-                    continue
+        count = 0
 
-                # Only process metadata files for records
-                if not file_path.name.endswith(f'.{METADATA_FILENAME}'):
-                    continue
+        for file_path in files:
+            # Skip the main metadata file
+            if file_path.name == METADATA_FILENAME:
+                continue
 
-                # Extract the base key name from the metadata filename
-                key_name = self._decode_key(file_path.name[: -len(f'.{METADATA_FILENAME}')])
+            # Only process metadata files for records
+            if not file_path.name.endswith(f'.{METADATA_FILENAME}'):
+                continue
 
-                # Apply exclusive_start_key filter if provided
-                if exclusive_start_key is not None and key_name <= exclusive_start_key:
-                    continue
+            # Extract the base key name from the metadata filename
+            key_name = self._decode_key(file_path.name[: -len(f'.{METADATA_FILENAME}')])
 
-                # Try to read and parse the metadata file
-                try:
-                    metadata_content = await asyncio.to_thread(file_path.read_text, encoding='utf-8')
-                    metadata_dict = json.loads(metadata_content)
-                    record_metadata = KeyValueStoreRecordMetadata(**metadata_dict)
+            # Apply exclusive_start_key filter if provided
+            if exclusive_start_key is not None and key_name <= exclusive_start_key:
+                continue
 
-                    yield record_metadata
+            # Try to read and parse the metadata file
+            try:
+                metadata_content = await asyncio.to_thread(file_path.read_text, encoding='utf-8')
+                metadata_dict = json.loads(metadata_content)
+                record_metadata = KeyValueStoreRecordMetadata(**metadata_dict)
 
-                    count += 1
-                    if limit and count >= limit:
-                        break
+                yield record_metadata
 
-                except (json.JSONDecodeError, ValidationError) as e:
-                    logger.warning(f'Failed to parse metadata file {file_path}: {e}')
+                count += 1
+                if limit and count >= limit:
+                    break
+
+            except (json.JSONDecodeError, ValidationError) as e:
+                logger.warning(f'Failed to parse metadata file {file_path}: {e}')
 
         # Update accessed_at timestamp
         await self._update_metadata(update_accessed_at=True)

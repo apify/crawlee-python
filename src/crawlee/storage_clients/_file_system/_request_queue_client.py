@@ -171,9 +171,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
         # Get a new instance by name.
         else:
-            rq_path = (
-                rq_base_path / cls._STORAGE_SUBSUBDIR_DEFAULT if name is None else rq_base_path / name
-            )
+            rq_path = rq_base_path / cls._STORAGE_SUBSUBDIR_DEFAULT if name is None else rq_base_path / name
             metadata_path = rq_path / METADATA_FILENAME
 
             # If the RQ directory exists, reconstruct the client from the metadata file.
