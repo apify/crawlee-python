@@ -429,17 +429,54 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             # Create the requests directory if it doesn't exist
             await asyncio.to_thread(self.path_to_rq.mkdir, parents=True, exist_ok=True)
 
-            # List all request files
-            request_files = await asyncio.to_thread(list, self.path_to_rq.glob('*.json'))
+            # First check forefront requests in the exact order they were added
+            for request_id in list(self._forefront_requests):
+                # Skip if already in progress
+                if request_id in self._in_progress:
+                    continue
 
-            # First check for forefront requests
-            forefront_requests = []
+                request_path = self.path_to_rq / f'{request_id}.json'
+
+                # Skip if file doesn't exist
+                if not await asyncio.to_thread(request_path.exists):
+                    self._forefront_requests.remove(request_id)
+                    continue
+
+                file = await asyncio.to_thread(open, request_path)
+                try:
+                    file_content = json.load(file)
+                    # Skip if already handled
+                    if file_content.get('handled_at') is not None:
+                        self._forefront_requests.remove(request_id)
+                        continue
+
+                    # Create request object
+                    request = Request(**file_content)
+
+                    # Mark as in-progress in memory
+                    self._in_progress.add(request.id)
+
+                    # Remove from forefront list
+                    self._forefront_requests.remove(request.id)
+
+                    # Update accessed timestamp
+                    await self._update_metadata(update_accessed_at=True)
+                except (json.JSONDecodeError, ValidationError) as exc:
+                    logger.warning(f'Failed to parse request file {request_path}: {exc!s}')
+                    self._forefront_requests.remove(request_id)
+                else:
+                    return request
+                finally:
+                    await asyncio.to_thread(file.close)
+
+            # List all request files for regular (non-forefront) requests
+            request_files = await asyncio.to_thread(list, self.path_to_rq.glob('*.json'))
             regular_requests = []
 
             # Get file creation times for sorting regular requests in FIFO order
             request_file_times = {}
 
-            # Separate requests into forefront and regular
+            # Filter out metadata files and in-progress requests
             for request_file in request_files:
                 # Skip metadata file
                 if request_file.name == METADATA_FILENAME:
@@ -448,8 +485,8 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 # Extract request ID from filename
                 request_id = request_file.stem
 
-                # Skip if already in progress
-                if request_id in self._in_progress:
+                # Skip if already in progress or in forefront
+                if request_id in self._in_progress or request_id in self._forefront_requests:
                     continue
 
                 # Get file creation/modification time for FIFO ordering
@@ -460,21 +497,13 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     # If we can't get the time, use 0 (oldest)
                     request_file_times[request_file] = 0
 
-                if request_id in self._forefront_requests:
-                    forefront_requests.append(request_file)
-                else:
-                    regular_requests.append(request_file)
+                regular_requests.append(request_file)
 
             # Sort regular requests by creation time (FIFO order)
             regular_requests.sort(key=lambda f: request_file_times[f])
 
-            # Prioritize forefront requests
-            prioritized_files = forefront_requests + regular_requests
-
-            # Process files in prioritized order
-            for request_file in prioritized_files:
-                request_id = request_file.stem
-
+            # Process regular requests in FIFO order
+            for request_file in regular_requests:
                 file = await asyncio.to_thread(open, request_file)
                 try:
                     file_content = json.load(file)
@@ -488,13 +517,8 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     # Mark as in-progress in memory
                     self._in_progress.add(request.id)
 
-                    # Remove from forefront list if it was there
-                    if request.id in self._forefront_requests:
-                        self._forefront_requests.remove(request.id)
-
                     # Update accessed timestamp
                     await self._update_metadata(update_accessed_at=True)
-
                 except (json.JSONDecodeError, ValidationError) as exc:
                     logger.warning(f'Failed to parse request file {request_file}: {exc!s}')
                 else:
