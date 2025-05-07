@@ -274,6 +274,57 @@ async def test_add_requests_with_forefront(rq: RequestQueue) -> None:
     assert next_request.url == 'https://example.com/priority'
 
 
+async def test_add_requests_mixed_forefront(rq: RequestQueue) -> None:
+    """Test the ordering when adding requests with mixed forefront values."""
+    # Add normal requests
+    await rq.add_request('https://example.com/normal1')
+    await rq.add_request('https://example.com/normal2')
+
+    # Add a batch with forefront=True
+    await rq.add_requests(
+        ['https://example.com/priority1', 'https://example.com/priority2'],
+        forefront=True,
+    )
+
+    # Add another normal request
+    await rq.add_request('https://example.com/normal3')
+
+    # Add another priority request
+    await rq.add_request('https://example.com/priority3', forefront=True)
+
+    # Wait for background tasks
+    await asyncio.sleep(0.1)
+
+    # The expected order should be:
+    # 1. priority3 (most recent forefront)
+    # 2. priority1 (from batch, forefront)
+    # 3. priority2 (from batch, forefront)
+    # 4. normal1 (oldest normal)
+    # 5. normal2
+    # 6. normal3 (newest normal)
+
+    requests = []
+    while True:
+        req = await rq.fetch_next_request()
+        if req is None:
+            break
+        requests.append(req)
+        await rq.mark_request_as_handled(req)
+
+    assert len(requests) == 6
+    assert requests[0].url == 'https://example.com/priority3'
+
+    # The next two should be from the forefront batch (exact order within batch may vary)
+    batch_urls = {requests[1].url, requests[2].url}
+    assert 'https://example.com/priority1' in batch_urls
+    assert 'https://example.com/priority2' in batch_urls
+
+    # Then the normal requests in order
+    assert requests[3].url == 'https://example.com/normal1'
+    assert requests[4].url == 'https://example.com/normal2'
+    assert requests[5].url == 'https://example.com/normal3'
+
+
 async def test_fetch_next_request_and_mark_handled(rq: RequestQueue) -> None:
     """Test fetching and marking requests as handled."""
     # Add some requests
