@@ -29,13 +29,21 @@ async def atomic_write_text(path: Path, data: str) -> None:
     tmp = path.with_suffix(path.suffix + '.tmp')
     # write to .tmp
     await asyncio.to_thread(tmp.write_text, data, encoding='utf-8')
-    # atomic replace
-    await asyncio.to_thread(os.replace, tmp, path)
+
+    try:
+        await asyncio.to_thread(os.replace, tmp, path)
+    except FileNotFoundError:
+        # If the .tmp vanished, fall back to a straight write
+        await asyncio.to_thread(path.write_text, data, encoding='utf-8')
 
 
 async def atomic_write_bytes(path: Path, data: bytes) -> None:
     tmp = path.with_suffix(path.suffix + '.tmp')
     # write to .tmp
     await asyncio.to_thread(tmp.write_bytes, data)
-    # atomic replace
-    await asyncio.to_thread(os.replace, tmp, path)
+
+    try:
+        await asyncio.to_thread(os.replace, tmp, path)
+    except FileNotFoundError:
+        # If the .tmp vanished, fall back to a straight write
+        await asyncio.to_thread(path.write_bytes, data)
