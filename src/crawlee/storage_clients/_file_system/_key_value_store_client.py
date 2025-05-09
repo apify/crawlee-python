@@ -17,7 +17,7 @@ from crawlee._utils.file import infer_mime_type
 from crawlee.storage_clients._base import KeyValueStoreClient
 from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
 
-from ._utils import METADATA_FILENAME, json_dumps
+from ._utils import METADATA_FILENAME, atomic_write_bytes, atomic_write_text, json_dumps
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -219,7 +219,8 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
     @override
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:
         # Update the metadata to record access
-        await self._update_metadata(update_accessed_at=True)
+        async with self._lock:
+            await self._update_metadata(update_accessed_at=True)
 
         record_path = self.path_to_kvs / self._encode_key(key)
 
@@ -233,8 +234,13 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             return None
 
         # Read the metadata file
-        async with self._lock:  # DEADLOCK
-            file = await asyncio.to_thread(open, record_metadata_filepath)
+        async with self._lock:
+            try:
+                file = await asyncio.to_thread(open, record_metadata_filepath)
+            except FileNotFoundError:
+                logger.warning(f'Metadata file disappeared for key "{key}", aborting get_value')
+                return None
+
             try:
                 metadata_content = json.load(file)
             except json.JSONDecodeError:
@@ -250,7 +256,11 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             return None
 
         # Read the actual value
-        value_bytes = await asyncio.to_thread(record_path.read_bytes)
+        try:
+            value_bytes = await asyncio.to_thread(record_path.read_bytes)
+        except FileNotFoundError:
+            logger.warning(f'Value file disappeared for key "{key}"')
+            return None
 
         # Handle None values
         if metadata.content_type == 'application/x-none':
@@ -316,14 +326,10 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             await asyncio.to_thread(self.path_to_kvs.mkdir, parents=True, exist_ok=True)
 
             # Write the value to the file.
-            await asyncio.to_thread(record_path.write_bytes, value_bytes)
+            await atomic_write_bytes(record_path, value_bytes)
 
             # Write the record metadata to the file.
-            await asyncio.to_thread(
-                record_metadata_filepath.write_text,
-                record_metadata_content,
-                encoding='utf-8',
-            )
+            await atomic_write_text(record_metadata_filepath, record_metadata_content)
 
             # Update the KVS metadata to record the access and modification.
             await self._update_metadata(update_accessed_at=True, update_modified_at=True)
@@ -387,20 +393,30 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             # Try to read and parse the metadata file
             try:
                 metadata_content = await asyncio.to_thread(file_path.read_text, encoding='utf-8')
+            except FileNotFoundError:
+                logger.warning(f'Metadata file disappeared for key "{key_name}", skipping it.')
+                continue
+
+            try:
                 metadata_dict = json.loads(metadata_content)
+            except json.JSONDecodeError:
+                logger.warning(f'Failed to decode metadata file for key "{key_name}", skipping it.')
+                continue
+
+            try:
                 record_metadata = KeyValueStoreRecordMetadata(**metadata_dict)
+            except ValidationError:
+                logger.warning(f'Invalid metadata schema for key "{key_name}", skipping it.')
 
-                yield record_metadata
+            yield record_metadata
 
-                count += 1
-                if limit and count >= limit:
-                    break
-
-            except (json.JSONDecodeError, ValidationError) as e:
-                logger.warning(f'Failed to parse metadata file {file_path}: {e}')
+            count += 1
+            if limit and count >= limit:
+                break
 
         # Update accessed_at timestamp
-        await self._update_metadata(update_accessed_at=True)
+        async with self._lock:
+            await self._update_metadata(update_accessed_at=True)
 
     @override
     async def get_public_url(self, *, key: str) -> str:
@@ -430,7 +446,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
         # Dump the serialized metadata to the file.
         data = await json_dumps(self._metadata.model_dump())
-        await asyncio.to_thread(self.path_to_metadata.write_text, data, encoding='utf-8')
+        await atomic_write_text(self.path_to_metadata, data)
 
     def _encode_key(self, key: str) -> str:
         """Encode a key to make it safe for use in a file path."""

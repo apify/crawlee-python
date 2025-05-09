@@ -16,7 +16,7 @@ from crawlee._utils.crypto import crypto_random_object_id
 from crawlee.storage_clients._base import RequestQueueClient
 from crawlee.storage_clients.models import AddRequestsResponse, ProcessedRequest, RequestQueueMetadata
 
-from ._utils import METADATA_FILENAME, json_dumps
+from ._utils import METADATA_FILENAME, atomic_write_text, json_dumps
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -336,7 +336,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     # Update the existing request file
                     request_path = self.path_to_rq / f'{existing_request.id}.json'
                     request_data = await json_dumps(existing_request.model_dump())
-                    await asyncio.to_thread(request_path.write_text, request_data, encoding='utf-8')
+                    await atomic_write_text(request_path, request_data)
 
                     processed_requests.append(
                         ProcessedRequest(
@@ -362,7 +362,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 request_dict['_sequence'] = sequence_number
 
                 request_data = await json_dumps(request_dict)
-                await asyncio.to_thread(request_path.write_text, request_data, encoding='utf-8')
+                await atomic_write_text(request_path, request_data)
 
                 # Update metadata counts
                 new_total_request_count += 1
@@ -405,15 +405,24 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         """
         request_path = self.path_to_rq / f'{request_id}.json'
 
-        if await asyncio.to_thread(request_path.exists):
+        try:
             file = await asyncio.to_thread(open, request_path)
-            try:
-                file_content = json.load(file)
-                return Request(**file_content)
-            except (json.JSONDecodeError, ValidationError) as exc:
-                logger.warning(f'Failed to parse request file {request_path}: {exc!s}')
-            finally:
-                await asyncio.to_thread(file.close)
+        except FileNotFoundError:
+            logger.warning(f'Request file "{request_path}" not found.')
+            return None
+
+        try:
+            file_content = json.load(file)
+        except json.JSONDecodeError as exc:
+            logger.warning(f'Failed to parse request file {request_path}: {exc!s}')
+            return None
+        finally:
+            await asyncio.to_thread(file.close)
+
+        try:
+            return Request(**file_content)
+        except ValidationError as exc:
+            logger.warning(f'Failed to validate request file {request_path}: {exc!s}')
 
         return None
 
@@ -611,7 +620,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 return None
 
             request_data = await json_dumps(request.model_dump())
-            await asyncio.to_thread(request_path.write_text, request_data, encoding='utf-8')
+            await atomic_write_text(request_path, request_data)
 
             # Update metadata timestamps
             await self._update_metadata(
@@ -669,7 +678,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 return None
 
             request_data = await json_dumps(request.model_dump())
-            await asyncio.to_thread(request_path.write_text, request_data, encoding='utf-8')
+            await atomic_write_text(request_path, request_data)
 
             # Update metadata timestamps
             await self._update_metadata(update_modified_at=True, update_accessed_at=True)
@@ -704,16 +713,22 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 if request_file.name == METADATA_FILENAME:
                     continue
 
-                file = await asyncio.to_thread(open, request_file)
+                try:
+                    file = await asyncio.to_thread(open, request_file)
+                except FileNotFoundError:
+                    logger.warning(f'Request file "{request_file}" not found.')
+                    continue
+
                 try:
                     file_content = json.load(file)
-                    # If any request is not handled, the queue is not empty
-                    if file_content.get('handled_at') is None:
-                        return False
-                except (json.JSONDecodeError, ValidationError):
+                except json.JSONDecodeError:
                     logger.warning(f'Failed to parse request file: {request_file}')
                 finally:
                     await asyncio.to_thread(file.close)
+
+                # If any request is not handled, the queue is not empty
+                if file_content.get('handled_at') is None:
+                    return False
 
         # If we got here, all requests are handled or there are no requests
         return True
@@ -766,4 +781,4 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
         # Dump the serialized metadata to the file.
         data = await json_dumps(self._metadata.model_dump())
-        await asyncio.to_thread(self.path_to_metadata.write_text, data, encoding='utf-8')
+        await atomic_write_text(self.path_to_metadata, data)

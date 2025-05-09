@@ -30,10 +30,10 @@ type-check:
 	uv run mypy
 
 unit-tests:
-	uv run pytest --verbose --cov=src/crawlee tests/unit
+	uv run pytest --numprocesses=auto --verbose --cov=src/crawlee tests/unit
 
 unit-tests-cov:
-	uv run pytest --verbose --cov=src/crawlee --cov-report=html tests/unit
+	uv run pytest --numprocesses=auto --verbose --cov=src/crawlee --cov-report=html tests/unit
 
 e2e-templates-tests $(args):
 	uv run pytest --numprocesses=$(E2E_TESTS_CONCURRENCY) --verbose tests/e2e/project_template "$(args)"

@@ -15,7 +15,7 @@ from crawlee._utils.crypto import crypto_random_object_id
 from crawlee.storage_clients._base import DatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
-from ._utils import METADATA_FILENAME, json_dumps
+from ._utils import METADATA_FILENAME, atomic_write_text, json_dumps
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -224,22 +224,22 @@ class FileSystemDatasetClient(DatasetClient):
 
     @override
     async def push_data(self, data: list[dict[str, Any]] | dict[str, Any]) -> None:
-        new_item_count = self.metadata.item_count
-
-        # If data is a list, push each item individually.
-        if isinstance(data, list):
-            for item in data:
+        async with self._lock:
+            new_item_count = self._metadata.item_count
+            if isinstance(data, list):
+                for item in data:
+                    new_item_count += 1
+                    await self._push_item(item, new_item_count)
+            else:
                 new_item_count += 1
-                await self._push_item(item, new_item_count)
-        else:
-            new_item_count += 1
-            await self._push_item(data, new_item_count)
+                await self._push_item(data, new_item_count)
 
-        await self._update_metadata(
-            update_accessed_at=True,
-            update_modified_at=True,
-            new_item_count=new_item_count,
-        )
+            # now update metadata under the same lock
+            await self._update_metadata(
+                update_accessed_at=True,
+                update_modified_at=True,
+                new_item_count=new_item_count,
+            )
 
     @override
     async def get_data(
@@ -288,7 +288,13 @@ class FileSystemDatasetClient(DatasetClient):
             )
 
         # Get the list of sorted data files.
-        data_files = await self._get_sorted_data_files()
+        async with self._lock:
+            try:
+                data_files = await self._get_sorted_data_files()
+            except FileNotFoundError:
+                # directory was dropped mid-check
+                return DatasetItemsListPage(count=0, offset=offset, limit=limit or 0, total=0, desc=desc, items=[])
+
         total = len(data_files)
 
         # Reverse the order if descending order is requested.
@@ -305,9 +311,14 @@ class FileSystemDatasetClient(DatasetClient):
         for file_path in selected_files:
             try:
                 file_content = await asyncio.to_thread(file_path.read_text, encoding='utf-8')
+            except FileNotFoundError:
+                logger.warning(f'File disappeared during iterate_items(): {file_path}, skipping')
+                continue
+
+            try:
                 item = json.loads(file_content)
-            except Exception:
-                logger.exception(f'Error reading {file_path}, skipping the item.')
+            except json.JSONDecodeError:
+                logger.exception(f'Corrupt JSON in {file_path}, skipping')
                 continue
 
             # Skip empty items if requested.
@@ -316,7 +327,8 @@ class FileSystemDatasetClient(DatasetClient):
 
             items.append(item)
 
-        await self._update_metadata(update_accessed_at=True)
+        async with self._lock:
+            await self._update_metadata(update_accessed_at=True)
 
         # Return a paginated list page of dataset items.
         return DatasetItemsListPage(
@@ -364,7 +376,11 @@ class FileSystemDatasetClient(DatasetClient):
             return
 
         # Get the list of sorted data files.
-        data_files = await self._get_sorted_data_files()
+        async with self._lock:
+            try:
+                data_files = await self._get_sorted_data_files()
+            except FileNotFoundError:
+                return
 
         # Reverse the order if descending order is requested.
         if desc:
@@ -379,9 +395,14 @@ class FileSystemDatasetClient(DatasetClient):
         for file_path in selected_files:
             try:
                 file_content = await asyncio.to_thread(file_path.read_text, encoding='utf-8')
+            except FileNotFoundError:
+                logger.warning(f'File disappeared during iterate_items(): {file_path}, skipping')
+                continue
+
+            try:
                 item = json.loads(file_content)
-            except Exception:
-                logger.exception(f'Error reading {file_path}, skipping the item.')
+            except json.JSONDecodeError:
+                logger.exception(f'Corrupt JSON in {file_path}, skipping')
                 continue
 
             # Skip empty items if requested.
@@ -390,7 +411,8 @@ class FileSystemDatasetClient(DatasetClient):
 
             yield item
 
-        await self._update_metadata(update_accessed_at=True)
+        async with self._lock:
+            await self._update_metadata(update_accessed_at=True)
 
     async def _update_metadata(
         self,
@@ -420,7 +442,7 @@ class FileSystemDatasetClient(DatasetClient):
 
         # Dump the serialized metadata to the file.
         data = await json_dumps(self._metadata.model_dump())
-        await asyncio.to_thread(self.path_to_metadata.write_text, data, encoding='utf-8')
+        await atomic_write_text(self.path_to_metadata, data)
 
     async def _push_item(self, item: dict[str, Any], item_id: int) -> None:
         """Push a single item to the dataset.
@@ -432,18 +454,16 @@ class FileSystemDatasetClient(DatasetClient):
             item: The data item to add to the dataset.
             item_id: The sequential ID to use for this item's filename.
         """
-        # Acquire the lock to perform file operations safely.
-        async with self._lock:
-            # Generate the filename for the new item using zero-padded numbering.
-            filename = f'{str(item_id).zfill(self._ITEM_FILENAME_DIGITS)}.json'
-            file_path = self.path_to_dataset / filename
+        # Generate the filename for the new item using zero-padded numbering.
+        filename = f'{str(item_id).zfill(self._ITEM_FILENAME_DIGITS)}.json'
+        file_path = self.path_to_dataset / filename
 
-            # Ensure the dataset directory exists.
-            await asyncio.to_thread(self.path_to_dataset.mkdir, parents=True, exist_ok=True)
+        # Ensure the dataset directory exists.
+        await asyncio.to_thread(self.path_to_dataset.mkdir, parents=True, exist_ok=True)
 
-            # Dump the serialized item to the file.
-            data = await json_dumps(item)
-            await asyncio.to_thread(file_path.write_text, data, encoding='utf-8')
+        # Dump the serialized item to the file.
+        data = await json_dumps(item)
+        await atomic_write_text(file_path, data)
 
     async def _get_sorted_data_files(self) -> list[Path]:
         """Retrieve and return a sorted list of data files in the dataset directory.
