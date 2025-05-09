@@ -688,31 +688,32 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         Returns:
             True if the queue is empty, False otherwise.
         """
-        # Update accessed timestamp when checking if queue is empty
-        await self._update_metadata(update_accessed_at=True)
+        async with self._lock:
+            # Update accessed timestamp when checking if queue is empty
+            await self._update_metadata(update_accessed_at=True)
 
-        # Create the requests directory if it doesn't exist
-        await asyncio.to_thread(self.path_to_rq.mkdir, parents=True, exist_ok=True)
+            # Create the requests directory if it doesn't exist
+            await asyncio.to_thread(self.path_to_rq.mkdir, parents=True, exist_ok=True)
 
-        # List all request files
-        request_files = await asyncio.to_thread(list, self.path_to_rq.glob('*.json'))
+            # List all request files
+            request_files = await asyncio.to_thread(list, self.path_to_rq.glob('*.json'))
 
-        # Check each file to see if there are any unhandled requests
-        for request_file in request_files:
-            # Skip metadata file
-            if request_file.name == METADATA_FILENAME:
-                continue
+            # Check each file to see if there are any unhandled requests
+            for request_file in request_files:
+                # Skip metadata file
+                if request_file.name == METADATA_FILENAME:
+                    continue
 
-            file = await asyncio.to_thread(open, request_file)
-            try:
-                file_content = json.load(file)
-                # If any request is not handled, the queue is not empty
-                if file_content.get('handled_at') is None:
-                    return False
-            except (json.JSONDecodeError, ValidationError):
-                logger.warning(f'Failed to parse request file: {request_file}')
-            finally:
-                await asyncio.to_thread(file.close)
+                file = await asyncio.to_thread(open, request_file)
+                try:
+                    file_content = json.load(file)
+                    # If any request is not handled, the queue is not empty
+                    if file_content.get('handled_at') is None:
+                        return False
+                except (json.JSONDecodeError, ValidationError):
+                    logger.warning(f'Failed to parse request file: {request_file}')
+                finally:
+                    await asyncio.to_thread(file.close)
 
         # If we got here, all requests are handled or there are no requests
         return True
