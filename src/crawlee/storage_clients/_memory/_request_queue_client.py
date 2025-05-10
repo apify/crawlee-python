@@ -9,11 +9,7 @@ from typing_extensions import override
 from crawlee import Request
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee.storage_clients._base import RequestQueueClient
-from crawlee.storage_clients.models import (
-    AddRequestsResponse,
-    ProcessedRequest,
-    RequestQueueMetadata,
-)
+from crawlee.storage_clients.models import AddRequestsResponse, ProcessedRequest, RequestQueueMetadata
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

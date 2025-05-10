@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import sys
 from datetime import datetime, timezone
-from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
@@ -16,8 +15,6 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
     from crawlee.configuration import Configuration
-
-logger = getLogger(__name__)
 
 
 class MemoryKeyValueStoreClient(KeyValueStoreClient):

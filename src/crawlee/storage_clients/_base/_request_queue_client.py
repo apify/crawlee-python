@@ -8,13 +8,9 @@ from crawlee._utils.docs import docs_group
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from crawlee import Request
     from crawlee.configuration import Configuration
-    from crawlee.storage_clients.models import (
-        AddRequestsResponse,
-        ProcessedRequest,
-        Request,
-        RequestQueueMetadata,
-    )
+    from crawlee.storage_clients.models import AddRequestsResponse, ProcessedRequest, RequestQueueMetadata
 
 
 @docs_group('Abstract classes')

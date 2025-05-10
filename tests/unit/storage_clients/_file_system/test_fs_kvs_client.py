@@ -61,6 +61,41 @@ async def test_open_creates_new_kvs(configuration: Configuration) -> None:
         assert metadata['name'] == 'new_kvs'
 
 
+async def test_open_kvs_by_id(configuration: Configuration) -> None:
+    """Test opening a key-value store by ID after creating it by name."""
+    storage_client = FileSystemStorageClient()
+
+    # First create a key-value store by name
+    original_client = await storage_client.open_key_value_store_client(
+        name='open-by-id-test',
+        configuration=configuration,
+    )
+
+    # Get the ID from the created client
+    kvs_id = original_client.metadata.id
+
+    # Add some data to verify it persists
+    await original_client.set_value(key='test-key', value='test-value')
+
+    # Now try to open the same key-value store using just the ID
+    reopened_client = await storage_client.open_key_value_store_client(
+        id=kvs_id,
+        configuration=configuration,
+    )
+
+    # Verify it's the same key-value store
+    assert reopened_client.metadata.id == kvs_id
+    assert reopened_client.metadata.name == 'open-by-id-test'
+
+    # Verify the data is still there
+    record = await reopened_client.get_value(key='test-key')
+    assert record is not None
+    assert record.value == 'test-value'
+
+    # Clean up
+    await reopened_client.drop()
+
+
 async def test_kvs_client_purge_on_start(configuration: Configuration) -> None:
     """Test that purge_on_start=True clears existing data in the key-value store."""
     configuration.purge_on_start = True

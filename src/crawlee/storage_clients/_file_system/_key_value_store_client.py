@@ -12,12 +12,11 @@ from typing import TYPE_CHECKING, Any
 from pydantic import ValidationError
 from typing_extensions import override
 
+from crawlee._consts import METADATA_FILENAME
 from crawlee._utils.crypto import crypto_random_object_id
-from crawlee._utils.file import infer_mime_type
+from crawlee._utils.file import atomic_write_bytes, atomic_write_text, infer_mime_type, json_dumps
 from crawlee.storage_clients._base import KeyValueStoreClient
 from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
-
-from ._utils import METADATA_FILENAME, atomic_write_bytes, atomic_write_text, json_dumps
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
