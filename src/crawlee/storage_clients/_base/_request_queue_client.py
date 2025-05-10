@@ -8,13 +8,11 @@ from crawlee._utils.docs import docs_group
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from crawlee.configuration import Configuration
     from crawlee.storage_clients.models import (
-        BatchRequestsOperationResponse,
+        AddRequestsResponse,
         ProcessedRequest,
-        ProlongRequestLockResponse,
         Request,
-        RequestQueueHead,
-        RequestQueueHeadWithLocks,
         RequestQueueMetadata,
     )
 
@@ -27,91 +25,70 @@ class RequestQueueClient(ABC):
     client, like a memory storage client.
     """
 
+    @property
     @abstractmethod
-    async def get(self) -> RequestQueueMetadata | None:
-        """Get metadata about the request queue being managed by this client.
+    def metadata(self) -> RequestQueueMetadata:
+        """The metadata of the request queue."""
 
-        Returns:
-            An object containing the request queue's details, or None if the request queue does not exist.
-        """
-
+    @classmethod
     @abstractmethod
-    async def update(
-        self,
+    async def open(
+        cls,
         *,
-        name: str | None = None,
-    ) -> RequestQueueMetadata:
-        """Update the request queue metadata.
+        id: str | None,
+        name: str | None,
+        configuration: Configuration,
+    ) -> RequestQueueClient:
+        """Open a request queue client.
 
         Args:
-            name: New new name for the request queue.
+            id: ID of the queue to open. If not provided, a new queue will be created with a random ID.
+            name: Name of the queue to open. If not provided, the queue will be unnamed.
+            configuration: The configuration object.
 
         Returns:
-            An object reflecting the updated request queue metadata.
+            A request queue client.
         """
 
     @abstractmethod
-    async def delete(self) -> None:
-        """Permanently delete the request queue managed by this client."""
+    async def drop(self) -> None:
+        """Drop the whole request queue and remove all its values.
 
-    @abstractmethod
-    async def list_head(self, *, limit: int | None = None) -> RequestQueueHead:
-        """Retrieve a given number of requests from the beginning of the queue.
-
-        Args:
-            limit: How many requests to retrieve.
-
-        Returns:
-            The desired number of requests from the beginning of the queue.
+        The backend method for the `RequestQueue.drop` call.
         """
 
     @abstractmethod
-    async def list_and_lock_head(self, *, lock_secs: int, limit: int | None = None) -> RequestQueueHeadWithLocks:
-        """Fetch and lock a specified number of requests from the start of the queue.
+    async def purge(self) -> None:
+        """Purge all items from the request queue.
 
-        Retrieve and locks the first few requests of a queue for the specified duration. This prevents the requests
-        from being fetched by another client until the lock expires.
-
-        Args:
-            lock_secs: Duration for which the requests are locked, in seconds.
-            limit: Maximum number of requests to retrieve and lock.
-
-        Returns:
-            The desired number of locked requests from the beginning of the queue.
+        The backend method for the `RequestQueue.purge` call.
         """
 
     @abstractmethod
-    async def add_request(
-        self,
-        request: Request,
-        *,
-        forefront: bool = False,
-    ) -> ProcessedRequest:
-        """Add a request to the queue.
-
-        Args:
-            request: The request to add to the queue.
-            forefront: Whether to add the request to the head or the end of the queue.
-
-        Returns:
-            Request queue operation information.
-        """
-
-    @abstractmethod
-    async def batch_add_requests(
+    async def add_batch_of_requests(
         self,
         requests: Sequence[Request],
         *,
         forefront: bool = False,
-    ) -> BatchRequestsOperationResponse:
-        """Add a batch of requests to the queue.
+    ) -> AddRequestsResponse:
+        """Add batch of requests to the queue.
+
+        This method adds a batch of requests to the queue. Each request is processed based on its uniqueness
+        (determined by `unique_key`). Duplicates will be identified but not re-added to the queue.
 
         Args:
-            requests: The requests to add to the queue.
-            forefront: Whether to add the requests to the head or the end of the queue.
+            requests: The collection of requests to add to the queue.
+            forefront: Whether to put the added requests at the beginning (True) or the end (False) of the queue.
+                When True, the requests will be processed sooner than previously added requests.
+            batch_size: The maximum number of requests to add in a single batch.
+            wait_time_between_batches: The time to wait between adding batches of requests.
+            wait_for_all_requests_to_be_added: If True, the method will wait until all requests are added
+                to the queue before returning.
+            wait_for_all_requests_to_be_added_timeout: The maximum time to wait for all requests to be added.
 
         Returns:
-            Request queue batch operation information.
+            A response object containing information about which requests were successfully
+            processed and which failed (if any).
         """
 
     @abstractmethod
@@ -126,64 +103,58 @@ class RequestQueueClient(ABC):
         """
 
     @abstractmethod
-    async def update_request(
+    async def fetch_next_request(self) -> Request | None:
+        """Return the next request in the queue to be processed.
+
+        Once you successfully finish processing of the request, you need to call `RequestQueue.mark_request_as_handled`
+        to mark the request as handled in the queue. If there was some error in processing the request, call
+        `RequestQueue.reclaim_request` instead, so that the queue will give the request to some other consumer
+        in another call to the `fetch_next_request` method.
+
+        Note that the `None` return value does not mean the queue processing finished, it means there are currently
+        no pending requests. To check whether all requests in queue were finished, use `RequestQueue.is_finished`
+        instead.
+
+        Returns:
+            The request or `None` if there are no more pending requests.
+        """
+
+    @abstractmethod
+    async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
+        """Mark a request as handled after successful processing.
+
+        Handled requests will never again be returned by the `RequestQueue.fetch_next_request` method.
+
+        Args:
+            request: The request to mark as handled.
+
+        Returns:
+            Information about the queue operation. `None` if the given request was not in progress.
+        """
+
+    @abstractmethod
+    async def reclaim_request(
         self,
         request: Request,
         *,
         forefront: bool = False,
-    ) -> ProcessedRequest:
-        """Update a request in the queue.
+    ) -> ProcessedRequest | None:
+        """Reclaim a failed request back to the queue.
+
+        The request will be returned for processing later again by another call to `RequestQueue.fetch_next_request`.
 
         Args:
-            request: The updated request.
-            forefront: Whether to put the updated request in the beginning or the end of the queue.
+            request: The request to return to the queue.
+            forefront: Whether to add the request to the head or the end of the queue.
 
         Returns:
-            The updated request
+            Information about the queue operation. `None` if the given request was not in progress.
         """
 
     @abstractmethod
-    async def delete_request(self, request_id: str) -> None:
-        """Delete a request from the queue.
+    async def is_empty(self) -> bool:
+        """Check if the request queue is empty.
 
-        Args:
-            request_id: ID of the request to delete.
-        """
-
-    @abstractmethod
-    async def prolong_request_lock(
-        self,
-        request_id: str,
-        *,
-        forefront: bool = False,
-        lock_secs: int,
-    ) -> ProlongRequestLockResponse:
-        """Prolong the lock on a specific request in the queue.
-
-        Args:
-            request_id: The identifier of the request whose lock is to be prolonged.
-            forefront: Whether to put the request in the beginning or the end of the queue after lock expires.
-            lock_secs: The additional amount of time, in seconds, that the request will remain locked.
-        """
-
-    @abstractmethod
-    async def delete_request_lock(
-        self,
-        request_id: str,
-        *,
-        forefront: bool = False,
-    ) -> None:
-        """Delete the lock on a specific request in the queue.
-
-        Args:
-            request_id: ID of the request to delete the lock.
-            forefront: Whether to put the request in the beginning or the end of the queue after the lock is deleted.
-        """
-
-    @abstractmethod
-    async def batch_delete_requests(self, requests: list[Request]) -> BatchRequestsOperationResponse:
-        """Delete given requests from the queue.
-
-        Args:
-            requests: The requests to delete from the queue.
+        Returns:
+            True if the request queue is empty, False otherwise.
         """

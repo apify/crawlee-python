@@ -2,18 +2,26 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import io
+import csv
 import json
 import mimetypes
 import os
 import re
 import shutil
 from enum import Enum
+from logging import getLogger
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
     from pathlib import Path
-    from typing import Any
+    from typing import Any, TextIO
+
+    from typing_extensions import Unpack
+
+    from crawlee.storages._types import ExportDataCsvKwargs, ExportDataJsonKwargs
+
+logger = getLogger(__name__)
 
 
 class ContentType(Enum):
@@ -83,21 +91,6 @@ def determine_file_extension(content_type: str) -> str | None:
     return ext[1:] if ext is not None else ext
 
 
-def is_file_or_bytes(value: Any) -> bool:
-    """Determine if the input value is a file-like object or bytes.
-
-    This function checks whether the provided value is an instance of bytes, bytearray, or io.IOBase (file-like).
-    The method is simplified for common use cases and may not cover all edge cases.
-
-    Args:
-        value: The value to be checked.
-
-    Returns:
-        True if the value is either a file-like object or bytes, False otherwise.
-    """
-    return isinstance(value, (bytes, bytearray, io.IOBase))
-
-
 async def json_dumps(obj: Any) -> str:
     """Serialize an object to a JSON-formatted string with specific settings.
 
@@ -108,3 +101,57 @@ async def json_dumps(obj: Any) -> str:
         A string containing the JSON representation of the input object.
     """
     return await asyncio.to_thread(json.dumps, obj, ensure_ascii=False, indent=2, default=str)
+
+
+def infer_mime_type(value: Any) -> str:
+    """Infer the MIME content type from the value.
+
+    Args:
+        value: The value to infer the content type from.
+
+    Returns:
+        The inferred MIME content type.
+    """
+    # If the value is bytes (or bytearray), return binary content type.
+    if isinstance(value, (bytes, bytearray)):
+        return 'application/octet-stream'
+
+    # If the value is a dict or list, assume JSON.
+    if isinstance(value, (dict, list)):
+        return 'application/json; charset=utf-8'
+
+    # If the value is a string, assume plain text.
+    if isinstance(value, str):
+        return 'text/plain; charset=utf-8'
+
+    # Default fallback.
+    return 'application/octet-stream'
+
+
+async def export_json_to_stream(
+    iterator: AsyncIterator[dict],
+    dst: TextIO,
+    **kwargs: Unpack[ExportDataJsonKwargs],
+) -> None:
+    items = [item async for item in iterator]
+    json.dump(items, dst, **kwargs)
+
+
+async def export_csv_to_stream(
+    iterator: AsyncIterator[dict],
+    dst: TextIO,
+    **kwargs: Unpack[ExportDataCsvKwargs],
+) -> None:
+    writer = csv.writer(dst, **kwargs)
+    write_header = True
+
+    # Iterate over the dataset and write to CSV.
+    async for item in iterator:
+        if not item:
+            continue
+
+        if write_header:
+            writer.writerow(item.keys())
+            write_header = False
+
+        writer.writerow(item.values())
