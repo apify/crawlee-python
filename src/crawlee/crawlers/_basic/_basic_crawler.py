@@ -67,7 +67,7 @@ if TYPE_CHECKING:
     import re
     from contextlib import AbstractAsyncContextManager
 
-    from crawlee._types import ConcurrencySettings, HttpMethod, JsonSerializable, PushDataKwargs
+    from crawlee._types import ConcurrencySettings, GetDataKwargs, HttpMethod, JsonSerializable, PushDataKwargs
     from crawlee.configuration import Configuration
     from crawlee.events import EventManager
     from crawlee.http_clients import HttpClient, HttpResponse
@@ -77,7 +77,6 @@ if TYPE_CHECKING:
     from crawlee.statistics import FinalStatistics
     from crawlee.storage_clients import StorageClient
     from crawlee.storage_clients.models import DatasetItemsListPage
-    from crawlee.storages._types import GetDataKwargs
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)

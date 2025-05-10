@@ -64,6 +64,41 @@ async def test_open_creates_new_dataset(configuration: Configuration) -> None:
         assert metadata['item_count'] == 0
 
 
+async def test_open_dataset_by_id(configuration: Configuration) -> None:
+    """Test opening a dataset by ID after creating it by name."""
+    storage_client = FileSystemStorageClient()
+
+    # First create a dataset by name
+    original_client = await storage_client.open_dataset_client(
+        name='open-by-id-test',
+        configuration=configuration,
+    )
+
+    # Get the ID from the created client
+    dataset_id = original_client.metadata.id
+
+    # Add some data to verify it persists
+    await original_client.push_data({'test_item': 'test_value'})
+
+    # Now try to open the same dataset using just the ID
+    reopened_client = await storage_client.open_dataset_client(
+        id=dataset_id,
+        configuration=configuration,
+    )
+
+    # Verify it's the same dataset
+    assert reopened_client.metadata.id == dataset_id
+    assert reopened_client.metadata.name == 'open-by-id-test'
+
+    # Verify the data is still there
+    data = await reopened_client.get_data()
+    assert len(data.items) == 1
+    assert data.items[0]['test_item'] == 'test_value'
+
+    # Clean up
+    await reopened_client.drop()
+
+
 async def test_dataset_client_purge_on_start(configuration: Configuration) -> None:
     """Test that purge_on_start=True clears existing data in the dataset."""
     configuration.purge_on_start = True

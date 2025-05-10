@@ -11,11 +11,11 @@ from typing import TYPE_CHECKING
 from pydantic import ValidationError
 from typing_extensions import override
 
+from crawlee._consts import METADATA_FILENAME
 from crawlee._utils.crypto import crypto_random_object_id
+from crawlee._utils.file import atomic_write_text, json_dumps
 from crawlee.storage_clients._base import DatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
-
-from ._utils import METADATA_FILENAME, atomic_write_text, json_dumps
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
