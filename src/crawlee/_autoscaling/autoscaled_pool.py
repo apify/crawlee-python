@@ -142,7 +142,8 @@ class AutoscaledPool:
 
             logger.info('Waiting for remaining tasks to finish')
 
-            for task in run.worker_tasks:
+            tasks_to_wait = list(run.worker_tasks)
+            for task in tasks_to_wait:
                 if not task.done():
                     with suppress(BaseException):
                         await task

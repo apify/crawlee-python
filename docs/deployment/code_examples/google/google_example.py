@@ -6,22 +6,21 @@ from datetime import timedelta
 import functions_framework
 from flask import Request, Response
 
-from crawlee import service_locator
 from crawlee.crawlers import (
     BeautifulSoupCrawler,
     BeautifulSoupCrawlingContext,
 )
-
-# highlight-start
-# Disable writing storage data to the file system
-configuration = service_locator.get_configuration()
-configuration.persist_storage = False
-configuration.write_metadata = False
-# highlight-end
+from crawlee.storage_clients import MemoryStorageClient
 
 
 async def main() -> str:
+    # highlight-start
+    # Disable writing storage data to the file system
+    storage_client = MemoryStorageClient()
+    # highlight-end
+
     crawler = BeautifulSoupCrawler(
+        storage_client=storage_client,
         max_request_retries=1,
         request_handler_timeout=timedelta(seconds=30),
         max_requests_per_crawl=10,

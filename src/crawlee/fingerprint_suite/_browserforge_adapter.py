@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import os.path
 from collections.abc import Iterable
 from copy import deepcopy
 from functools import reduce
 from operator import or_
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from browserforge.bayesian_network import extract_json
@@ -253,9 +253,9 @@ class BrowserforgeHeaderGenerator:
 
 def get_available_header_network() -> dict:
     """Get header network that contains possible header values."""
-    if os.path.isfile(DATA_DIR / 'header-network.zip'):
+    if Path(DATA_DIR / 'header-network.zip').is_file():
         return extract_json(DATA_DIR / 'header-network.zip')
-    if os.path.isfile(DATA_DIR / 'header-network-definition.zip'):
+    if Path(DATA_DIR / 'header-network-definition.zip').is_file():
         return extract_json(DATA_DIR / 'header-network-definition.zip')
     raise FileNotFoundError('Missing header-network file.')
 
