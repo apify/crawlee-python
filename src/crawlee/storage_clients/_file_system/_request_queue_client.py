@@ -12,11 +12,11 @@ from pydantic import ValidationError
 from typing_extensions import override
 
 from crawlee import Request
+from crawlee._consts import METADATA_FILENAME
 from crawlee._utils.crypto import crypto_random_object_id
+from crawlee._utils.file import atomic_write_text, json_dumps
 from crawlee.storage_clients._base import RequestQueueClient
 from crawlee.storage_clients.models import AddRequestsResponse, ProcessedRequest, RequestQueueMetadata
-
-from ._utils import METADATA_FILENAME, atomic_write_text, json_dumps
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

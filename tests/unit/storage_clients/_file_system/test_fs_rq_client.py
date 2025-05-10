@@ -36,6 +36,41 @@ async def rq_client(configuration: Configuration) -> AsyncGenerator[FileSystemRe
     await client.drop()
 
 
+async def test_open_request_queue_by_id(configuration: Configuration) -> None:
+    """Test opening a request queue by ID after creating it by name."""
+    storage_client = FileSystemStorageClient()
+
+    # First create a request queue by name
+    original_client = await storage_client.open_request_queue_client(
+        name='open-by-id-test',
+        configuration=configuration,
+    )
+
+    # Get the ID from the created client
+    rq_id = original_client.metadata.id
+
+    # Add a request to verify it persists
+    await original_client.add_batch_of_requests([Request.from_url('https://example.com/test')])
+
+    # Now try to open the same request queue using just the ID
+    reopened_client = await storage_client.open_request_queue_client(
+        id=rq_id,
+        configuration=configuration,
+    )
+
+    # Verify it's the same request queue
+    assert reopened_client.metadata.id == rq_id
+    assert reopened_client.metadata.name == 'open-by-id-test'
+
+    # Verify the request is still there
+    request = await reopened_client.fetch_next_request()
+    assert request is not None
+    assert request.url == 'https://example.com/test'
+
+    # Clean up
+    await reopened_client.drop()
+
+
 async def test_open_creates_new_rq(configuration: Configuration) -> None:
     """Test that open() creates a new request queue with proper metadata and files on disk."""
     client = await FileSystemStorageClient().open_request_queue_client(

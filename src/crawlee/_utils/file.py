@@ -1,106 +1,20 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import csv
 import json
-import mimetypes
 import os
-import re
-import shutil
-from enum import Enum
-from logging import getLogger
+import tempfile
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
-    from pathlib import Path
     from typing import Any, TextIO
 
     from typing_extensions import Unpack
 
-    from crawlee.storages._types import ExportDataCsvKwargs, ExportDataJsonKwargs
-
-logger = getLogger(__name__)
-
-
-class ContentType(Enum):
-    JSON = r'^application/json'
-    TEXT = r'^text/'
-    XML = r'^application/.*xml$'
-
-    def matches(self, content_type: str) -> bool:
-        """Check if the content type matches the enum's pattern."""
-        return bool(re.search(self.value, content_type, re.IGNORECASE))
-
-
-def is_content_type(content_type_enum: ContentType, content_type: str) -> bool:
-    """Check if the provided content type string matches the specified ContentType."""
-    return content_type_enum.matches(content_type)
-
-
-async def force_remove(filename: str | Path) -> None:
-    """Remove a file, suppressing the FileNotFoundError if it does not exist.
-
-    JS-like rm(filename, { force: true }).
-
-    Args:
-        filename: The path to the file to be removed.
-    """
-    with contextlib.suppress(FileNotFoundError):
-        await asyncio.to_thread(os.remove, filename)
-
-
-async def force_rename(src_dir: str | Path, dst_dir: str | Path) -> None:
-    """Rename a directory, ensuring that the destination directory is removed if it exists.
-
-    Args:
-        src_dir: The source directory path.
-        dst_dir: The destination directory path.
-    """
-    # Make sure source directory exists
-    if await asyncio.to_thread(os.path.exists, src_dir):
-        # Remove destination directory if it exists
-        if await asyncio.to_thread(os.path.exists, dst_dir):
-            await asyncio.to_thread(shutil.rmtree, dst_dir, ignore_errors=True)
-        await asyncio.to_thread(os.rename, src_dir, dst_dir)
-
-
-def determine_file_extension(content_type: str) -> str | None:
-    """Determine the file extension for a given MIME content type.
-
-    Args:
-        content_type: The MIME content type string.
-
-    Returns:
-        A string representing the determined file extension without a leading dot,
-            or None if no extension could be determined.
-    """
-    # e.g. mimetypes.guess_extension('application/json ') does not work...
-    actual_content_type = content_type.split(';')[0].strip()
-
-    # mimetypes.guess_extension returns 'xsl' in this case, because 'application/xxx' is "structured"
-    # ('text/xml' would be "unstructured" and return 'xml') we have to explicitly override it here
-    if actual_content_type == 'application/xml':
-        return 'xml'
-
-    # Determine the extension from the mime type
-    ext = mimetypes.guess_extension(actual_content_type)
-
-    # Remove the leading dot if extension successfully parsed
-    return ext[1:] if ext is not None else ext
-
-
-async def json_dumps(obj: Any) -> str:
-    """Serialize an object to a JSON-formatted string with specific settings.
-
-    Args:
-        obj: The object to serialize.
-
-    Returns:
-        A string containing the JSON representation of the input object.
-    """
-    return await asyncio.to_thread(json.dumps, obj, ensure_ascii=False, indent=2, default=str)
+    from crawlee._types import ExportDataCsvKwargs, ExportDataJsonKwargs
 
 
 def infer_mime_type(value: Any) -> str:
@@ -126,6 +40,75 @@ def infer_mime_type(value: Any) -> str:
 
     # Default fallback.
     return 'application/octet-stream'
+
+
+async def json_dumps(obj: Any) -> str:
+    """Serialize an object to a JSON-formatted string with specific settings.
+
+    Args:
+        obj: The object to serialize.
+
+    Returns:
+        A string containing the JSON representation of the input object.
+    """
+    return await asyncio.to_thread(json.dumps, obj, ensure_ascii=False, indent=2, default=str)
+
+
+async def atomic_write_text(path: Path, data: str) -> None:
+    dir_path = path.parent
+
+    def _sync_write_text() -> str:
+        # create a temp file in the target dir, return its name
+        fd, tmp_path = tempfile.mkstemp(
+            suffix=f'{path.suffix}.tmp',
+            prefix=f'{path.name}.',
+            dir=str(dir_path),
+        )
+        try:
+            with os.fdopen(fd, 'w', encoding='utf-8') as tmp_file:
+                tmp_file.write(data)
+        except:
+            Path(tmp_path).unlink(missing_ok=True)
+            raise
+        return tmp_path
+
+    tmp_path = await asyncio.to_thread(_sync_write_text)
+
+    try:
+        await asyncio.to_thread(os.replace, tmp_path, str(path))
+    except (FileNotFoundError, PermissionError):
+        # fallback if tmp went missing
+        await asyncio.to_thread(path.write_text, data, encoding='utf-8')
+    finally:
+        await asyncio.to_thread(Path(tmp_path).unlink, missing_ok=True)
+
+
+async def atomic_write_bytes(path: Path, data: bytes) -> None:
+    dir_path = path.parent
+
+    def _sync_write_bytes() -> str:
+        fd, tmp_path = tempfile.mkstemp(
+            suffix=f'{path.suffix}.tmp',
+            prefix=f'{path.name}.',
+            dir=str(dir_path),
+        )
+        try:
+            with os.fdopen(fd, 'wb') as tmp_file:
+                tmp_file.write(data)
+        except:
+            Path(tmp_path).unlink(missing_ok=True)
+            raise
+        return tmp_path
+
+    tmp_path = await asyncio.to_thread(_sync_write_bytes)
+
+    try:
+        await asyncio.to_thread(os.replace, tmp_path, str(path))
+    except (FileNotFoundError, PermissionError):
+        # fallback if tmp went missing
+        await asyncio.to_thread(path.write_bytes, data)
+    finally:
+        await asyncio.to_thread(Path(tmp_path).unlink, missing_ok=True)
 
 
 async def export_json_to_stream(

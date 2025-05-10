@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-import json
-from datetime import datetime, timedelta
-from decimal import Decimal
+from datetime import datetime
 from typing import Annotated, Any, Generic
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 from typing_extensions import TypeVar
 
-from crawlee import Request
 from crawlee._types import HttpMethod
 from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import validate_http_url
@@ -113,74 +110,8 @@ class KeyValueStoreRecord(KeyValueStoreRecordMetadata, Generic[KvsValueType]):
 
 
 @docs_group('Data structures')
-class KeyValueStoreListKeysPage(BaseModel):
-    """Model for listing keys in the key-value store."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-    count: Annotated[int, Field(alias='count')]
-    """The number of keys returned on this page."""
-
-    limit: Annotated[int, Field(alias='limit')]
-    """The maximum number of keys to return."""
-
-    is_truncated: Annotated[bool, Field(alias='isTruncated')]
-    """Indicates whether there are more keys to retrieve."""
-
-    exclusive_start_key: Annotated[str | None, Field(alias='exclusiveStartKey', default=None)]
-    """The key from which to start this page of results."""
-
-    next_exclusive_start_key: Annotated[str | None, Field(alias='nextExclusiveStartKey', default=None)]
-    """The key from which to start the next page of results."""
-
-    items: Annotated[list[KeyValueStoreRecordMetadata], Field(alias='items', default_factory=list)]
-    """The list of KVS items metadata returned on this page."""
-
-
-@docs_group('Data structures')
-class RequestQueueHeadState(BaseModel):
-    """Model for the request queue head state."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-    was_limit_reached: Annotated[bool, Field(alias='wasLimitReached')]
-    prev_limit: Annotated[int, Field(alias='prevLimit')]
-    queue_modified_at: Annotated[datetime, Field(alias='queueModifiedAt')]
-    query_started_at: Annotated[datetime, Field(alias='queryStartedAt')]
-    had_multiple_clients: Annotated[bool, Field(alias='hadMultipleClients')]
-
-
-@docs_group('Data structures')
-class RequestQueueHead(BaseModel):
-    """Model for request queue head.
-
-    Represents a collection of requests retrieved from the beginning of a queue,
-    including metadata about the queue's state and lock information for the requests.
-    """
-
-    model_config = ConfigDict(populate_by_name=True)
-
-    limit: Annotated[int | None, Field(alias='limit', default=None)]
-    """The maximum number of requests that were requested from the queue."""
-
-    had_multiple_clients: Annotated[bool, Field(alias='hadMultipleClients', default=False)]
-    """Indicates whether the queue has been accessed by multiple clients (consumers)."""
-
-    queue_modified_at: Annotated[datetime, Field(alias='queueModifiedAt')]
-    """The timestamp when the queue was last modified."""
-
-    lock_time: Annotated[timedelta | None, Field(alias='lockSecs', default=None)]
-    """The duration for which the returned requests are locked and cannot be processed by other clients."""
-
-    queue_has_locked_requests: Annotated[bool | None, Field(alias='queueHasLockedRequests', default=False)]
-    """Indicates whether the queue contains any locked requests."""
-
-    items: Annotated[list[Request], Field(alias='items', default_factory=list[Request])]
-    """The list of request objects retrieved from the beginning of the queue."""
-
-
-class _ListPage(BaseModel):
-    """Model for a single page of storage items returned from a collection list method."""
+class DatasetItemsListPage(BaseModel):
+    """Model for a single page of dataset items returned from a collection list method."""
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -199,46 +130,8 @@ class _ListPage(BaseModel):
     desc: Annotated[bool, Field(default=False)]
     """Indicates if the returned list is in descending order."""
 
-
-@docs_group('Data structures')
-class DatasetListPage(_ListPage):
-    """Model for a single page of dataset items returned from a collection list method."""
-
-    items: Annotated[list[DatasetMetadata], Field(default_factory=list)]
-    """The list of dataset items returned on this page."""
-
-
-@docs_group('Data structures')
-class KeyValueStoreListPage(_ListPage):
-    """Model for a single page of key-value store items returned from a collection list method."""
-
-    items: Annotated[list[KeyValueStoreMetadata], Field(default_factory=list)]
-    """The list of key-value store items returned on this page."""
-
-
-@docs_group('Data structures')
-class RequestQueueListPage(_ListPage):
-    """Model for a single page of request queue items returned from a collection list method."""
-
-    items: Annotated[list[RequestQueueMetadata], Field(default_factory=list)]
-    """The list of request queue items returned on this page."""
-
-
-@docs_group('Data structures')
-class DatasetItemsListPage(_ListPage):
-    """Model for a single page of dataset items returned from a collection list method."""
-
     items: Annotated[list[dict], Field(default_factory=list)]
     """The list of dataset items returned on this page."""
-
-
-@docs_group('Data structures')
-class ProlongRequestLockResponse(BaseModel):
-    """Response to prolong request lock calls."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-    lock_expires_at: Annotated[datetime, Field(alias='lockExpiresAt')]
 
 
 @docs_group('Data structures')
@@ -281,60 +174,3 @@ class AddRequestsResponse(BaseModel):
 
     unprocessed_requests: Annotated[list[UnprocessedRequest], Field(alias='unprocessedRequests')]
     """Requests that could not be processed, typically due to validation errors or other issues."""
-
-
-class InternalRequest(BaseModel):
-    """Internal representation of a queue request with additional metadata for ordering and storage."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-    id: str
-
-    unique_key: str
-
-    order_no: Decimal | None = None
-    """Order number for maintaining request sequence in queue.
-    Used for restoring correct request order when recovering queue from storage."""
-
-    handled_at: datetime | None
-
-    request: Annotated[
-        Request,
-        Field(alias='json_'),
-        BeforeValidator(lambda v: json.loads(v) if isinstance(v, str) else v),
-    ]
-    """Original Request object. The alias 'json_' is required for backward compatibility with legacy code."""
-
-    @classmethod
-    def from_request(cls, request: Request, id: str, order_no: Decimal | None) -> InternalRequest:
-        """Create an internal request from a `Request` object."""
-        return cls(
-            unique_key=request.unique_key,
-            id=id,
-            handled_at=request.handled_at,
-            order_no=order_no,
-            request=request,
-        )
-
-    def to_request(self) -> Request:
-        """Convert the internal request back to a `Request` object."""
-        return self.request
-
-
-class CachedRequest(BaseModel):
-    """Pydantic model for cached request information."""
-
-    id: str
-    """The ID of the request."""
-
-    was_already_handled: bool
-    """Whether the request was already handled."""
-
-    hydrated: Request | None = None
-    """The hydrated request object (the original one)."""
-
-    lock_expires_at: datetime | None = None
-    """The expiration time of the lock on the request."""
-
-    forefront: bool = False
-    """Whether the request was added to the forefront of the queue."""

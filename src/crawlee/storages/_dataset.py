@@ -19,12 +19,11 @@ if TYPE_CHECKING:
 
     from typing_extensions import Unpack
 
+    from crawlee._types import ExportDataCsvKwargs, ExportDataJsonKwargs
     from crawlee.configuration import Configuration
     from crawlee.storage_clients import StorageClient
     from crawlee.storage_clients._base import DatasetClient
     from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
-
-    from ._types import ExportDataCsvKwargs, ExportDataJsonKwargs
 
 logger = logging.getLogger(__name__)
 

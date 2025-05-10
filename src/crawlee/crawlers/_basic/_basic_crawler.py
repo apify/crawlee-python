@@ -74,6 +74,7 @@ if TYPE_CHECKING:
         ConcurrencySettings,
         EnqueueLinksFunction,
         ExtractLinksFunction,
+        GetDataKwargs,
         HttpMethod,
         JsonSerializable,
         PushDataKwargs,
@@ -87,7 +88,6 @@ if TYPE_CHECKING:
     from crawlee.statistics import FinalStatistics
     from crawlee.storage_clients import StorageClient
     from crawlee.storage_clients.models import DatasetItemsListPage
-    from crawlee.storages._types import GetDataKwargs
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
