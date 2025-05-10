@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Annotated, Any, Generic
 
@@ -26,10 +26,19 @@ class StorageMetadata(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra='allow')
 
     id: Annotated[str, Field(alias='id')]
-    name: Annotated[str | None, Field(alias='name', default='')]
+    """The unique identifier of the storage."""
+
+    name: Annotated[str | None, Field(alias='name', default=None)]
+    """The name of the storage."""
+
     accessed_at: Annotated[datetime, Field(alias='accessedAt')]
+    """The timestamp when the storage was last accessed."""
+
     created_at: Annotated[datetime, Field(alias='createdAt')]
+    """The timestamp when the storage was created."""
+
     modified_at: Annotated[datetime, Field(alias='modifiedAt')]
+    """The timestamp when the storage was last modified."""
 
 
 @docs_group('Data structures')
@@ -39,6 +48,7 @@ class DatasetMetadata(StorageMetadata):
     model_config = ConfigDict(populate_by_name=True)
 
     item_count: Annotated[int, Field(alias='itemCount')]
+    """The number of items in the dataset."""
 
 
 @docs_group('Data structures')
@@ -46,8 +56,6 @@ class KeyValueStoreMetadata(StorageMetadata):
     """Model for a key-value store metadata."""
 
     model_config = ConfigDict(populate_by_name=True)
-
-    user_id: Annotated[str, Field(alias='userId')]
 
 
 @docs_group('Data structures')
@@ -57,24 +65,19 @@ class RequestQueueMetadata(StorageMetadata):
     model_config = ConfigDict(populate_by_name=True)
 
     had_multiple_clients: Annotated[bool, Field(alias='hadMultipleClients')]
+    """Indicates whether the queue has been accessed by multiple clients (consumers)."""
+
     handled_request_count: Annotated[int, Field(alias='handledRequestCount')]
+    """The number of requests that have been handled from the queue."""
+
     pending_request_count: Annotated[int, Field(alias='pendingRequestCount')]
+    """The number of requests that are still pending in the queue."""
+
     stats: Annotated[dict, Field(alias='stats')]
+    """Statistics about the request queue, TODO?"""
+
     total_request_count: Annotated[int, Field(alias='totalRequestCount')]
-    user_id: Annotated[str, Field(alias='userId')]
-    resource_directory: Annotated[str, Field(alias='resourceDirectory')]
-
-
-@docs_group('Data structures')
-class KeyValueStoreRecord(BaseModel, Generic[KvsValueType]):
-    """Model for a key-value store record."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-    key: Annotated[str, Field(alias='key')]
-    value: Annotated[KvsValueType, Field(alias='value')]
-    content_type: Annotated[str | None, Field(alias='contentType', default=None)]
-    filename: Annotated[str | None, Field(alias='filename', default=None)]
+    """The total number of requests that have been added to the queue."""
 
 
 @docs_group('Data structures')
@@ -84,17 +87,29 @@ class KeyValueStoreRecordMetadata(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     key: Annotated[str, Field(alias='key')]
+    """The key of the record.
+
+    A unique identifier for the record in the key-value store.
+    """
+
     content_type: Annotated[str, Field(alias='contentType')]
+    """The MIME type of the record.
+
+    Describe the format and type of data stored in the record, following the MIME specification.
+    """
+
+    size: Annotated[int, Field(alias='size')]
+    """The size of the record in bytes."""
 
 
 @docs_group('Data structures')
-class KeyValueStoreKeyInfo(BaseModel):
-    """Model for a key-value store key info."""
+class KeyValueStoreRecord(KeyValueStoreRecordMetadata, Generic[KvsValueType]):
+    """Model for a key-value store record."""
 
     model_config = ConfigDict(populate_by_name=True)
 
-    key: Annotated[str, Field(alias='key')]
-    size: Annotated[int, Field(alias='size')]
+    value: Annotated[KvsValueType, Field(alias='value')]
+    """The value of the record."""
 
 
 @docs_group('Data structures')
@@ -104,11 +119,22 @@ class KeyValueStoreListKeysPage(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     count: Annotated[int, Field(alias='count')]
+    """The number of keys returned on this page."""
+
     limit: Annotated[int, Field(alias='limit')]
+    """The maximum number of keys to return."""
+
     is_truncated: Annotated[bool, Field(alias='isTruncated')]
-    items: Annotated[list[KeyValueStoreKeyInfo], Field(alias='items', default_factory=list)]
+    """Indicates whether there are more keys to retrieve."""
+
     exclusive_start_key: Annotated[str | None, Field(alias='exclusiveStartKey', default=None)]
+    """The key from which to start this page of results."""
+
     next_exclusive_start_key: Annotated[str | None, Field(alias='nextExclusiveStartKey', default=None)]
+    """The key from which to start the next page of results."""
+
+    items: Annotated[list[KeyValueStoreRecordMetadata], Field(alias='items', default_factory=list)]
+    """The list of KVS items metadata returned on this page."""
 
 
 @docs_group('Data structures')
@@ -126,22 +152,31 @@ class RequestQueueHeadState(BaseModel):
 
 @docs_group('Data structures')
 class RequestQueueHead(BaseModel):
-    """Model for the request queue head."""
+    """Model for request queue head.
+
+    Represents a collection of requests retrieved from the beginning of a queue,
+    including metadata about the queue's state and lock information for the requests.
+    """
 
     model_config = ConfigDict(populate_by_name=True)
 
     limit: Annotated[int | None, Field(alias='limit', default=None)]
-    had_multiple_clients: Annotated[bool, Field(alias='hadMultipleClients')]
+    """The maximum number of requests that were requested from the queue."""
+
+    had_multiple_clients: Annotated[bool, Field(alias='hadMultipleClients', default=False)]
+    """Indicates whether the queue has been accessed by multiple clients (consumers)."""
+
     queue_modified_at: Annotated[datetime, Field(alias='queueModifiedAt')]
-    items: Annotated[list[Request], Field(alias='items', default_factory=list)]
+    """The timestamp when the queue was last modified."""
 
+    lock_time: Annotated[timedelta | None, Field(alias='lockSecs', default=None)]
+    """The duration for which the returned requests are locked and cannot be processed by other clients."""
 
-@docs_group('Data structures')
-class RequestQueueHeadWithLocks(RequestQueueHead):
-    """Model for request queue head with locks."""
+    queue_has_locked_requests: Annotated[bool | None, Field(alias='queueHasLockedRequests', default=False)]
+    """Indicates whether the queue contains any locked requests."""
 
-    lock_secs: Annotated[int, Field(alias='lockSecs')]
-    queue_has_locked_requests: Annotated[bool | None, Field(alias='queueHasLockedRequests')] = None
+    items: Annotated[list[Request], Field(alias='items', default_factory=list[Request])]
+    """The list of request objects retrieved from the beginning of the queue."""
 
 
 class _ListPage(BaseModel):
@@ -230,13 +265,22 @@ class UnprocessedRequest(BaseModel):
 
 
 @docs_group('Data structures')
-class BatchRequestsOperationResponse(BaseModel):
-    """Response to batch request deletion calls."""
+class AddRequestsResponse(BaseModel):
+    """Model for a response to add requests to a queue.
+
+    Contains detailed information about the processing results when adding multiple requests
+    to a queue. This includes which requests were successfully processed and which ones
+    encountered issues during processing.
+    """
 
     model_config = ConfigDict(populate_by_name=True)
 
     processed_requests: Annotated[list[ProcessedRequest], Field(alias='processedRequests')]
+    """Successfully processed requests, including information about whether they were
+    already present in the queue and whether they had been handled previously."""
+
     unprocessed_requests: Annotated[list[UnprocessedRequest], Field(alias='unprocessedRequests')]
+    """Requests that could not be processed, typically due to validation errors or other issues."""
 
 
 class InternalRequest(BaseModel):
@@ -275,3 +319,22 @@ class InternalRequest(BaseModel):
     def to_request(self) -> Request:
         """Convert the internal request back to a `Request` object."""
         return self.request
+
+
+class CachedRequest(BaseModel):
+    """Pydantic model for cached request information."""
+
+    id: str
+    """The ID of the request."""
+
+    was_already_handled: bool
+    """Whether the request was already handled."""
+
+    hydrated: Request | None = None
+    """The hydrated request object (the original one)."""
+
+    lock_expires_at: datetime | None = None
+    """The expiration time of the lock on the request."""
+
+    forefront: bool = False
+    """Whether the request was added to the forefront of the queue."""

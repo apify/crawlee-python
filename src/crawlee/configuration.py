@@ -118,21 +118,7 @@ class Configuration(BaseSettings):
             )
         ),
     ] = True
-    """Whether to purge the storage on the start. This option is utilized by the `MemoryStorageClient`."""
-
-    write_metadata: Annotated[bool, Field(alias='crawlee_write_metadata')] = True
-    """Whether to write the storage metadata. This option is utilized by the `MemoryStorageClient`."""
-
-    persist_storage: Annotated[
-        bool,
-        Field(
-            validation_alias=AliasChoices(
-                'apify_persist_storage',
-                'crawlee_persist_storage',
-            )
-        ),
-    ] = True
-    """Whether to persist the storage. This option is utilized by the `MemoryStorageClient`."""
+    """Whether to purge the storage on the start. This option is utilized by the storage clients."""
 
     persist_state_interval: Annotated[
         timedelta_ms,
@@ -239,7 +225,7 @@ class Configuration(BaseSettings):
             ),
         ),
     ] = './storage'
-    """The path to the storage directory. This option is utilized by the `MemoryStorageClient`."""
+    """The path to the storage directory. This option is utilized by the storage clients."""
 
     headless: Annotated[
         bool,

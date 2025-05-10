@@ -22,7 +22,7 @@ except ModuleNotFoundError as exc:
 cli = typer.Typer(no_args_is_help=True)
 
 template_directory = importlib.resources.files('crawlee') / 'project_template'
-with open(str(template_directory / 'cookiecutter.json')) as f:
+with (template_directory / 'cookiecutter.json').open() as f:
     cookiecutter_json = json.load(f)
 
 crawler_choices = cookiecutter_json['crawler_type']

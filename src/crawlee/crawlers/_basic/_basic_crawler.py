@@ -36,6 +36,7 @@ from crawlee._types import (
     SkippedReason,
 )
 from crawlee._utils.docs import docs_group
+from crawlee._utils.file import export_csv_to_stream, export_json_to_stream
 from crawlee._utils.robots import RobotsTxtFile
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
@@ -66,7 +67,7 @@ if TYPE_CHECKING:
     import re
     from contextlib import AbstractAsyncContextManager
 
-    from crawlee._types import ConcurrencySettings, HttpMethod, JsonSerializable
+    from crawlee._types import ConcurrencySettings, HttpMethod, JsonSerializable, PushDataKwargs
     from crawlee.configuration import Configuration
     from crawlee.events import EventManager
     from crawlee.http_clients import HttpClient, HttpResponse
@@ -76,7 +77,7 @@ if TYPE_CHECKING:
     from crawlee.statistics import FinalStatistics
     from crawlee.storage_clients import StorageClient
     from crawlee.storage_clients.models import DatasetItemsListPage
-    from crawlee.storages._dataset import ExportDataCsvKwargs, ExportDataJsonKwargs, GetDataKwargs, PushDataKwargs
+    from crawlee.storages._types import GetDataKwargs
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
@@ -675,6 +676,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self,
         requests: Sequence[str | Request],
         *,
+        forefront: bool = False,
         batch_size: int = 1000,
         wait_time_between_batches: timedelta = timedelta(0),
         wait_for_all_requests_to_be_added: bool = False,
@@ -684,6 +686,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         Args:
             requests: A list of requests to add to the queue.
+            forefront: If True, add requests to the forefront of the queue.
             batch_size: The number of requests to add in one batch.
             wait_time_between_batches: Time to wait between adding batches.
             wait_for_all_requests_to_be_added: If True, wait for all requests to be added before returning.
@@ -708,17 +711,21 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         request_manager = await self.get_request_manager()
 
-        await request_manager.add_requests_batched(
+        await request_manager.add_requests(
             requests=allowed_requests,
+            forefront=forefront,
             batch_size=batch_size,
             wait_time_between_batches=wait_time_between_batches,
             wait_for_all_requests_to_be_added=wait_for_all_requests_to_be_added,
             wait_for_all_requests_to_be_added_timeout=wait_for_all_requests_to_be_added_timeout,
         )
 
-    async def _use_state(self, default_value: dict[str, JsonSerializable] | None = None) -> dict[str, JsonSerializable]:
-        store = await self.get_key_value_store()
-        return await store.get_auto_saved_value(self._CRAWLEE_STATE_KEY, default_value)
+    async def _use_state(
+        self,
+        default_value: dict[str, JsonSerializable] | None = None,
+    ) -> dict[str, JsonSerializable]:
+        kvs = await self.get_key_value_store()
+        return await kvs.get_auto_saved_value(self._CRAWLEE_STATE_KEY, default_value)
 
     async def _save_crawler_state(self) -> None:
         store = await self.get_key_value_store()
@@ -752,81 +759,32 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         dataset_id: str | None = None,
         dataset_name: str | None = None,
     ) -> None:
-        """Export data from a `Dataset`.
+        """Export all items from a Dataset to a JSON or CSV file.
 
-        This helper method simplifies the process of exporting data from a `Dataset`. It opens the specified
-        one and then exports the data based on the provided parameters. If you need to pass options
-        specific to the output format, use the `export_data_csv` or `export_data_json` method instead.
+        This method simplifies the process of exporting data collected during crawling. It automatically
+        determines the export format based on the file extension (`.json` or `.csv`) and handles
+        the conversion of `Dataset` items to the appropriate format.
 
         Args:
-            path: The destination path.
-            dataset_id: The ID of the `Dataset`.
-            dataset_name: The name of the `Dataset`.
+            path: The destination file path. Must end with '.json' or '.csv'.
+            dataset_id: The ID of the Dataset to export from. If None, uses `name` parameter instead.
+            dataset_name: The name of the Dataset to export from. If None, uses `id` parameter instead.
         """
         dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
 
         path = path if isinstance(path, Path) else Path(path)
-        destination = path.open('w', newline='')
+        dst = path.open('w', newline='')
 
         if path.suffix == '.csv':
-            await dataset.write_to_csv(destination)
+            await export_csv_to_stream(dataset.iterate_items(), dst)
         elif path.suffix == '.json':
-            await dataset.write_to_json(destination)
+            await export_json_to_stream(dataset.iterate_items(), dst)
         else:
             raise ValueError(f'Unsupported file extension: {path.suffix}')
 
-    async def export_data_csv(
-        self,
-        path: str | Path,
-        *,
-        dataset_id: str | None = None,
-        dataset_name: str | None = None,
-        **kwargs: Unpack[ExportDataCsvKwargs],
-    ) -> None:
-        """Export data from a `Dataset` to a CSV file.
-
-        This helper method simplifies the process of exporting data from a `Dataset` in csv format. It opens
-        the specified one and then exports the data based on the provided parameters.
-
-        Args:
-            path: The destination path.
-            content_type: The output format.
-            dataset_id: The ID of the `Dataset`.
-            dataset_name: The name of the `Dataset`.
-            kwargs: Extra configurations for dumping/writing in csv format.
-        """
-        dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
-        path = path if isinstance(path, Path) else Path(path)
-
-        return await dataset.write_to_csv(path.open('w', newline=''), **kwargs)
-
-    async def export_data_json(
-        self,
-        path: str | Path,
-        *,
-        dataset_id: str | None = None,
-        dataset_name: str | None = None,
-        **kwargs: Unpack[ExportDataJsonKwargs],
-    ) -> None:
-        """Export data from a `Dataset` to a JSON file.
-
-        This helper method simplifies the process of exporting data from a `Dataset` in json format. It opens the
-        specified one and then exports the data based on the provided parameters.
-
-        Args:
-            path: The destination path
-            dataset_id: The ID of the `Dataset`.
-            dataset_name: The name of the `Dataset`.
-            kwargs: Extra configurations for dumping/writing in json format.
-        """
-        dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
-        path = path if isinstance(path, Path) else Path(path)
-
-        return await dataset.write_to_json(path.open('w', newline=''), **kwargs)
-
     async def _push_data(
         self,
-        data: JsonSerializable,
+        data: list[dict[str, Any]] | dict[str, Any],
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         **kwargs: Unpack[PushDataKwargs],
@@ -1139,7 +1097,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 ):
                     requests.append(dst_request)
 
-            await request_manager.add_requests_batched(requests)
+            await request_manager.add_requests(requests)
 
         for push_data_call in result.push_data_calls:
             await self._push_data(**push_data_call)

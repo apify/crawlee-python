@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from crawlee.sessions import Session
     from crawlee.storage_clients.models import DatasetItemsListPage
     from crawlee.storages import KeyValueStore
-    from crawlee.storages._dataset import ExportToKwargs, GetDataKwargs
+    from crawlee.storages._types import ExportToKwargs, GetDataKwargs
 
     # Workaround for https://github.com/pydantic/pydantic/issues/9445
     J = TypeVar('J', bound='JsonSerializable')
@@ -190,7 +190,7 @@ class PushDataKwargs(TypedDict):
 
 
 class PushDataFunctionCall(PushDataKwargs):
-    data: JsonSerializable
+    data: list[dict[str, Any]] | dict[str, Any]
     dataset_id: str | None
     dataset_name: str | None
 
@@ -271,16 +271,12 @@ class RequestHandlerRunResult:
 
     async def push_data(
         self,
-        data: JsonSerializable,
+        data: list[dict[str, Any]] | dict[str, Any],
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         **kwargs: Unpack[PushDataKwargs],
     ) -> None:
         """Track a call to the `push_data` context helper."""
-        from crawlee.storages._dataset import Dataset
-
-        await Dataset.check_and_serialize(data)
-
         self.push_data_calls.append(
             PushDataFunctionCall(
                 data=data,
@@ -520,7 +516,7 @@ class PushDataFunction(Protocol):
 
     def __call__(
         self,
-        data: JsonSerializable,
+        data: list[dict[str, Any]] | dict[str, Any],
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         **kwargs: Unpack[PushDataKwargs],

@@ -354,9 +354,11 @@ async def test_adaptive_crawling_predictor_calls(
     ):
         await crawler.run(requests)
 
-    mocked_predict.assert_called_once_with(requests[0])
+    assert mocked_predict.call_count == 1
+    assert mocked_predict.call_args[0][0].url == requests[0].url
+
     # If `static` and `client only` results are same, `store_result` should be called with `static`.
-    mocked_store_result.assert_called_once_with(requests[0], expected_result_rendering_type)
+    mocked_store_result.assert_called_once_with(mocked_predict.call_args[0][0], expected_result_rendering_type)
 
 
 async def test_adaptive_crawling_result_use_state_isolation(
@@ -498,10 +500,10 @@ async def test_adaptive_playwright_crawler_timeout_in_sub_crawler(test_urls: lis
     """Tests that timeout in static sub crawler forces fall back to browser sub crawler.
 
     Create situation where static sub crawler blocks(should time out), such error should start browser sub
-    crawler."""
-
+    crawler.
+    """
     static_only_predictor_no_detection = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
-    request_handler_timeout = timedelta(seconds=0.1)
+    request_handler_timeout = timedelta(seconds=1)
 
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
         max_request_retries=1,
@@ -520,9 +522,9 @@ async def test_adaptive_playwright_crawler_timeout_in_sub_crawler(test_urls: lis
         except AdaptiveContextError:
             mocked_static_handler()
             # Relax timeout for the fallback browser request to avoid flakiness in test
-            crawler._request_handler_timeout = timedelta(seconds=5)
+            crawler._request_handler_timeout = timedelta(seconds=10)
             # Sleep for time obviously larger than top crawler timeout.
-            await asyncio.sleep(request_handler_timeout.total_seconds() * 2)
+            await asyncio.sleep(request_handler_timeout.total_seconds() * 3)
 
     await crawler.run(test_urls[:1])
 
