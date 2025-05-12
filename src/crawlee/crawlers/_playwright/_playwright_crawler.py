@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Callable, Generic, Literal, Union
 from pydantic import ValidationError
 from typing_extensions import NotRequired, TypedDict, TypeVar
 
+from crawlee import service_locator
 from crawlee._request import Request, RequestOptions
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.docs import docs_group
@@ -120,6 +121,10 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 This option should not be used if `browser_pool` is provided.
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
         """
+        configuration = kwargs.pop('configuration', None)
+        if configuration is not None:
+            service_locator.set_configuration(configuration)
+
         if browser_pool:
             # Raise an exception if browser_pool is provided together with other browser-related arguments.
             if any(
