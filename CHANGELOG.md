@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.6.10 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Allow config change on `PlaywrightCrawler` ([#1186](https://github.com/apify/crawlee-python/pull/1186)) ([f17bf31](https://github.com/apify/crawlee-python/commit/f17bf31456b702631aa7e0c26d4f07fd5eb7d1bd)) by [@mylank](https://github.com/mylank), closes [#1185](https://github.com/apify/crawlee-python/issues/1185)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.6.9](https://github.com/apify/crawlee-python/releases/tag/v0.6.9) (2025-05-02)
 
 ### 🚀 Features
