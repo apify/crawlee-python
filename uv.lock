@@ -624,6 +624,7 @@ version = "0.6.10"
 source = { editable = "." }
 dependencies = [
     { name = "apify-fingerprint-datapoints" },
+    { name = "beautifulsoup4" },
     { name = "browserforge" },
     { name = "cachetools" },
     { name = "certifi" },
@@ -710,6 +711,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "apify-fingerprint-datapoints", specifier = ">=0.0.2" },
+    { name = "beautifulsoup4", specifier = ">=4.13.3" },
     { name = "beautifulsoup4", extras = ["lxml"], marker = "extra == 'all'", specifier = ">=4.12.0" },
     { name = "beautifulsoup4", extras = ["lxml"], marker = "extra == 'beautifulsoup'", specifier = ">=4.12.0" },
     { name = "browserforge", specifier = ">=1.2.3" },

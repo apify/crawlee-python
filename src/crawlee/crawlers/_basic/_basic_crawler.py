@@ -51,6 +51,7 @@ from crawlee.errors import (
     UserDefinedErrorHandlerError,
 )
 from crawlee.http_clients import HttpxHttpClient
+from crawlee.monitor import Monitor
 from crawlee.router import Router
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics, StatisticsState
@@ -615,11 +616,20 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             with suppress(NotImplementedError):  # event loop signal handlers are not supported on Windows
                 asyncio.get_running_loop().add_signal_handler(signal.SIGINT, sigint_handler)
 
+        monitor = Monitor(
+            cast('Statistics[StatisticsState]', self._statistics),
+            self._autoscaled_pool,
+            self._request_manager,  # assuming this is valid
+        )
+
+        await monitor.start()
+
         try:
             await run_task
         except CancelledError:
             pass
         finally:
+            await monitor.stop()
             if threading.current_thread() is threading.main_thread():
                 with suppress(NotImplementedError):
                     asyncio.get_running_loop().remove_signal_handler(signal.SIGINT)
