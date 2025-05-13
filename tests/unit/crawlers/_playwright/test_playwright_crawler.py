@@ -11,7 +11,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from crawlee import ConcurrencySettings, HttpHeaders, Request, RequestTransformAction
+from crawlee import ConcurrencySettings, HttpHeaders, Request, RequestTransformAction, SkippedReason, service_locator
+from crawlee.configuration import Configuration
 from crawlee.crawlers import PlaywrightCrawler
 from crawlee.fingerprint_suite import (
     DefaultFingerprintGenerator,
@@ -21,8 +22,12 @@ from crawlee.fingerprint_suite import (
 )
 from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_values
 from crawlee.fingerprint_suite._consts import BROWSER_TYPE_HEADER_KEYWORD
+from crawlee.http_clients import HttpxHttpClient
 from crawlee.proxy_configuration import ProxyConfiguration
-from crawlee.sessions import SessionPool
+from crawlee.sessions import Session, SessionPool
+from crawlee.statistics import Statistics
+from crawlee.statistics._error_snapshotter import ErrorSnapshotter
+from tests.unit.server_endpoints import GENERIC_RESPONSE, HELLO_WORLD
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -80,9 +85,8 @@ async def test_enqueue_links(redirect_server_url: URL, server_url: URL) -> None:
     }
 
 
-async def test_enqueue_links_with_incompatible_kwargs_raises_error() -> None:
+async def test_enqueue_links_with_incompatible_kwargs_raises_error(server_url: URL) -> None:
     """Call `enqueue_links` with arguments that can't be used together."""
-    requests = ['https://www.something.com']
     crawler = PlaywrightCrawler(max_request_retries=1)
     exceptions = []
 
@@ -97,7 +101,7 @@ async def test_enqueue_links_with_incompatible_kwargs_raises_error() -> None:
         except Exception as e:
             exceptions.append(e)
 
-    await crawler.run(requests)
+    await crawler.run([str(server_url)])
 
     assert len(exceptions) == 1
     assert type(exceptions[0]) is ValueError
@@ -301,6 +305,7 @@ async def test_proxy_set() -> None:
 )
 async def test_isolation_cookies(*, use_incognito_pages: bool, server_url: URL) -> None:
     sessions_ids: list[str] = []
+    sessions: dict[str, Session] = {}
     sessions_cookies: dict[str, dict[str, str]] = {}
     response_cookies: dict[str, dict[str, str]] = {}
 
@@ -316,13 +321,11 @@ async def test_isolation_cookies(*, use_incognito_pages: bool, server_url: URL) 
             return
 
         sessions_ids.append(context.session.id)
+        sessions[context.session.id] = context.session
 
         if context.request.unique_key not in {'1', '2'}:
             return
 
-        sessions_cookies[context.session.id] = {
-            cookie['name']: cookie['value'] for cookie in context.session.cookies.get_cookies_as_dicts()
-        }
         response_data = json.loads(await context.response.text())
         response_cookies[context.session.id] = response_data.get('cookies')
 
@@ -340,10 +343,19 @@ async def test_isolation_cookies(*, use_incognito_pages: bool, server_url: URL) 
         ]
     )
 
-    assert len(sessions_cookies) == 2
     assert len(response_cookies) == 2
+    assert len(sessions) == 2
 
     assert sessions_ids[0] == sessions_ids[1]
+
+    sessions_cookies = {
+        sessions_id: {
+            cookie['name']: cookie['value'] for cookie in sessions[sessions_id].cookies.get_cookies_as_dicts()
+        }
+        for sessions_id in sessions_ids
+    }
+
+    assert len(sessions_cookies) == 2
 
     cookie_session_id = sessions_ids[0]
     clean_session_id = sessions_ids[2]
@@ -367,6 +379,33 @@ async def test_isolation_cookies(*, use_incognito_pages: bool, server_url: URL) 
         # PlaywrightContext makes cookies shared by all sessions that work with it.
         # So in this case a clean session contains the same cookies
         assert sessions_cookies[clean_session_id] == response_cookies[clean_session_id] == {'a': '1'}
+
+
+async def test_save_cookies_after_handler_processing(server_url: URL) -> None:
+    """Test that cookies are saved correctly."""
+    async with SessionPool(max_pool_size=1) as session_pool:
+        crawler = PlaywrightCrawler(session_pool=session_pool)
+
+        session_ids = []
+
+        @crawler.router.default_handler
+        async def request_handler(context: PlaywrightCrawlingContext) -> None:
+            # Simulate cookies installed from an external source in the browser
+            await context.page.context.add_cookies([{'name': 'check', 'value': 'test', 'url': str(server_url)}])
+
+            if context.session:
+                session_ids.append(context.session.id)
+
+        await crawler.run([str(server_url)])
+
+        assert len(session_ids) == 1
+
+        check_session = await session_pool.get_session()
+
+        assert check_session.id == session_ids[0]
+        session_cookies = {cookie['name']: cookie['value'] for cookie in check_session.cookies.get_cookies_as_dicts()}
+
+        assert session_cookies == {'check': 'test'}
 
 
 async def test_custom_fingerprint_uses_generator_options(server_url: URL) -> None:
@@ -492,3 +531,170 @@ async def test_launch_with_user_data_dir_and_fingerprint(tmp_path: Path, server_
 
     assert fingerprints['window.navigator.userAgent']
     assert 'headless' not in fingerprints['window.navigator.userAgent'].lower()
+
+
+async def test_get_snapshot(server_url: URL) -> None:
+    crawler = PlaywrightCrawler()
+
+    snapshot = None
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        nonlocal snapshot
+        snapshot = await context.get_snapshot()
+
+    await crawler.run([str(server_url)])
+
+    assert snapshot is not None
+    assert snapshot.html is not None
+    assert snapshot.screenshot is not None
+    # Check at least jpeg start and end expected bytes. Content is not relevant for the test.
+    assert snapshot.screenshot.startswith(b'\xff\xd8')
+    assert snapshot.screenshot.endswith(b'\xff\xd9')
+    assert snapshot.html == HELLO_WORLD.decode('utf-8')
+
+
+async def test_error_snapshot_through_statistics(server_url: URL) -> None:
+    """Test correct use of error snapshotter by the Playwright crawler.
+
+    In this test the crawler will visit 4 pages.
+    - 2 x page endpoints will return the same error
+    - homepage endpoint will return unique error
+    - headers endpoint will return no error
+    """
+    max_retries = 2
+    crawler = PlaywrightCrawler(
+        statistics=Statistics.with_default_state(save_error_snapshots=True), max_request_retries=max_retries
+    )
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        if 'page' in context.request.url:
+            raise RuntimeError('page error')
+        if 'headers' in context.request.url:
+            return
+        raise RuntimeError('home error')
+
+    await crawler.run(
+        [str(server_url), str(server_url / 'page_1'), str(server_url / 'page_2'), str(server_url / 'headers')]
+    )
+
+    kvs = await crawler.get_key_value_store()
+    kvs_content = {}
+
+    async for key_info in kvs.iterate_keys():
+        kvs_content[key_info.key] = await kvs.get_value(key_info.key)
+
+        assert set(key_info.key).issubset(ErrorSnapshotter.ALLOWED_CHARACTERS)
+        if key_info.key.endswith('.jpg'):
+            # Check at least jpeg start and end expected bytes. Content is not relevant for the test.
+            assert kvs_content[key_info.key].startswith(b'\xff\xd8')
+            assert kvs_content[key_info.key].endswith(b'\xff\xd9')
+        elif 'page' in key_info.key:
+            assert kvs_content[key_info.key] == GENERIC_RESPONSE.decode('utf-8')
+        else:
+            assert kvs_content[key_info.key] == HELLO_WORLD.decode('utf-8')
+
+    # Three errors twice retried errors, but only 2 unique -> 4 (2 x (html and jpg)) artifacts expected.
+    assert crawler.statistics.error_tracker.total == 3 * max_retries
+    assert crawler.statistics.error_tracker.unique_error_count == 2
+    assert len(list(kvs_content.keys())) == 4
+
+
+async def test_respect_robots_txt(server_url: URL) -> None:
+    crawler = PlaywrightCrawler(respect_robots_txt_file=True)
+    visit = mock.Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        visit(context.request.url)
+        await context.enqueue_links()
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+    visited = {call[0][0] for call in visit.call_args_list}
+
+    assert visited == {
+        str(server_url / 'start_enqueue'),
+        str(server_url / 'sub_index'),
+    }
+
+
+async def test_on_skipped_request(server_url: URL) -> None:
+    crawler = PlaywrightCrawler(respect_robots_txt_file=True)
+    skip = mock.Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        await context.enqueue_links()
+
+    @crawler.on_skipped_request
+    async def skipped_hook(url: str, _reason: SkippedReason) -> None:
+        skip(url)
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+    skipped = {call[0][0] for call in skip.call_args_list}
+
+    assert skipped == {
+        str(server_url / 'page_1'),
+        str(server_url / 'page_2'),
+        str(server_url / 'page_3'),
+    }
+
+
+async def test_send_request(server_url: URL) -> None:
+    """Check that the persist context works with fingerprints."""
+    check_data: dict[str, Any] = {}
+
+    crawler = PlaywrightCrawler()
+
+    @crawler.pre_navigation_hook
+    async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
+        send_request_response = await context.send_request(str(server_url / 'user-agent'))
+        check_data['pre_send_request'] = dict(json.loads(send_request_response.read()))
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        response = await context.response.text()
+        check_data['default'] = dict(json.loads(response))
+        send_request_response = await context.send_request(str(server_url / 'user-agent'))
+        check_data['send_request'] = dict(json.loads(send_request_response.read()))
+
+    await crawler.run([str(server_url / 'user-agent')])
+
+    assert check_data['default'].get('user-agent') is not None
+    assert check_data['send_request'].get('user-agent') is not None
+    assert check_data['pre_send_request'] == check_data['send_request']
+
+    assert check_data['default'] == check_data['send_request']
+
+
+async def test_send_request_with_client(server_url: URL) -> None:
+    """Check that the persist context works with fingerprints."""
+    check_data: dict[str, Any] = {}
+
+    crawler = PlaywrightCrawler(
+        http_client=HttpxHttpClient(header_generator=None, headers={'user-agent': 'My User-Agent'})
+    )
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        response = await context.response.text()
+        check_data['default'] = dict(json.loads(response))
+        send_request_response = await context.send_request(str(server_url / 'user-agent'))
+        check_data['send_request'] = dict(json.loads(send_request_response.read()))
+
+    await crawler.run([str(server_url / 'user-agent')])
+
+    assert check_data['default'].get('user-agent') is not None
+    assert check_data['send_request']['user-agent'] == 'My User-Agent'
+
+    assert check_data['default'] != check_data['send_request']
+
+
+async def test_overwrite_configuration() -> None:
+    """Check that the configuration is allowed to be passed to the Playwrightcrawler."""
+    configuration = Configuration(default_dataset_id='my_dataset_id')
+    PlaywrightCrawler(configuration=configuration)
+    used_configuration = service_locator.get_configuration()
+    assert used_configuration is configuration

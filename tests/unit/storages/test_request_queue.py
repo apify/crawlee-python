@@ -1,15 +1,23 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from itertools import count
 from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from pydantic import ValidationError
 
 from crawlee import Request, service_locator
 from crawlee._request import RequestState
-from crawlee.storage_clients.models import StorageMetadata
+from crawlee.storage_clients import MemoryStorageClient, StorageClient
+from crawlee.storage_clients._memory import RequestQueueClient
+from crawlee.storage_clients.models import (
+    BatchRequestsOperationResponse,
+    StorageMetadata,
+    UnprocessedRequest,
+)
 from crawlee.storages import RequestQueue
 
 if TYPE_CHECKING:
@@ -286,3 +294,74 @@ async def test_from_storage_object() -> None:
     assert request_queue.name == storage_object.name
     assert request_queue.storage_object == storage_object
     assert storage_object.model_extra.get('extra_attribute') == 'extra'  # type: ignore[union-attr]
+
+
+async def test_add_batched_requests_with_retry(request_queue: RequestQueue) -> None:
+    """Test that unprocessed requests are retried.
+
+    Unprocessed requests should not count in `get_total_count`
+    Test creates situation where in `batch_add_requests` call in first batch 3 requests are unprocessed.
+    On each following `batch_add_requests` call the last request in batch remains unprocessed.
+    In this test `batch_add_requests` is called once with batch of 10 requests. With retries only 1 request should
+    remain unprocessed."""
+
+    batch_add_requests_call_counter = count(start=1)
+    service_locator.get_storage_client()
+    initial_request_count = 10
+    expected_added_requests = 9
+    requests = [f'https://example.com/{i}' for i in range(initial_request_count)]
+
+    class MockedRequestQueueClient(RequestQueueClient):
+        """Patched memory storage client that simulates unprocessed requests."""
+
+        async def _batch_add_requests_without_last_n(
+            self, batch: Sequence[Request], n: int = 0
+        ) -> BatchRequestsOperationResponse:
+            response = await super().batch_add_requests(batch[:-n])
+            response.unprocessed_requests = [
+                UnprocessedRequest(url=r.url, unique_key=r.unique_key, method=r.method) for r in batch[-n:]
+            ]
+            return response
+
+        async def batch_add_requests(
+            self,
+            requests: Sequence[Request],
+            *,
+            forefront: bool = False,  # noqa: ARG002
+        ) -> BatchRequestsOperationResponse:
+            """Mocked client behavior that simulates unprocessed requests.
+
+            It processes all except last three at first run, then all except last none.
+            Overall if tried with the same batch it will process all except the last one.
+            """
+            call_count = next(batch_add_requests_call_counter)
+            if call_count == 1:
+                # Process all but last three
+                return await self._batch_add_requests_without_last_n(requests, n=3)
+            # Process all but last
+            return await self._batch_add_requests_without_last_n(requests, n=1)
+
+    mocked_storage_client = AsyncMock(spec=StorageClient)
+    mocked_storage_client.request_queue = MagicMock(
+        return_value=MockedRequestQueueClient(id='default', memory_storage_client=MemoryStorageClient.from_config())
+    )
+
+    request_queue = RequestQueue(id='default', name='some_name', storage_client=mocked_storage_client)
+
+    # Add the requests to the RQ in batches
+    await request_queue.add_requests_batched(
+        requests, wait_for_all_requests_to_be_added=True, wait_time_between_batches=timedelta(0)
+    )
+
+    # Ensure the batch was processed correctly
+    assert await request_queue.get_total_count() == expected_added_requests
+    # Fetch and validate each request in the queue
+    for original_request in requests[:expected_added_requests]:
+        next_request = await request_queue.fetch_next_request()
+        assert next_request is not None
+
+        expected_url = original_request if isinstance(original_request, str) else original_request.url
+        assert next_request.url == expected_url
+
+    # Confirm the queue is empty after processing all requests
+    assert await request_queue.is_empty() is True

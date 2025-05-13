@@ -7,6 +7,6 @@ from crawlee.crawlers import ParselCrawler
 # % block instantiation
 crawler = ParselCrawler(
     request_handler=router,
-    max_requests_per_crawl=50,
+    max_requests_per_crawl=10,
     {{ self.http_client_instantiation() }})
 # % endblock
