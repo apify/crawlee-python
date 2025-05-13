@@ -14,7 +14,7 @@ async def test_predictor_state_persistence() -> None:
         adaptive_statistics.state.rendering_type_mispredictions = 2
         adaptive_statistics.state.http_only_request_handler_runs = 3
 
-        persistence_state_key = adaptive_statistics._persist_state_key
+        persistence_state_key = adaptive_statistics._state._persist_state_key
     # adaptive_statistics are persisted after leaving the context
 
     # new_adaptive_statistics are initialized from the persisted values.

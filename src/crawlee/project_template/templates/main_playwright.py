@@ -8,6 +8,6 @@ from crawlee.crawlers import PlaywrightCrawler
 crawler = PlaywrightCrawler(
     request_handler=router,
     headless=True,
-    max_requests_per_crawl=50,
+    max_requests_per_crawl=10,
     {{ self.http_client_instantiation() }})
 # % endblock

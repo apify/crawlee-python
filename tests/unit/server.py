@@ -11,6 +11,15 @@ from urllib.parse import parse_qs
 from uvicorn.server import Server
 from yarl import URL
 
+from tests.unit.server_endpoints import (
+    GENERIC_RESPONSE,
+    HELLO_WORLD,
+    INCAPSULA,
+    ROBOTS_TXT,
+    SECONDARY_INDEX,
+    START_ENQUEUE,
+)
+
 if TYPE_CHECKING:
     from socket import socket
 
@@ -118,6 +127,8 @@ async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
         await hello_world_json(send)
     elif path.startswith('/xml'):
         await hello_world_xml(send)
+    elif path.startswith('/robots.txt'):
+        await robots_txt(send)
     else:
         await hello_world(send)
 
@@ -158,11 +169,7 @@ async def hello_world(send: Send) -> None:
     """Handle basic requests with a simple HTML response."""
     await send_html_response(
         send,
-        b"""<html>
-        <head>
-            <title>Hello, world!</title>
-        </head>
-    </html>""",
+        HELLO_WORLD,
     )
 
 
@@ -256,15 +263,7 @@ async def start_enqueue_endpoint(send: Send) -> None:
     """Handle requests for the main page with links."""
     await send_html_response(
         send,
-        b"""<html>
-        <head>
-            <title>Hello</title>
-        </head>
-        <body>
-            <a href="/sub_index" class="foo">Link 1</a>
-            <a href="/page_1">Link 2</a>
-        </body>
-    </html>""",
+        START_ENQUEUE,
     )
 
 
@@ -272,15 +271,7 @@ async def secondary_index_endpoint(send: Send) -> None:
     """Handle requests for the secondary page with links."""
     await send_html_response(
         send,
-        b"""<html>
-        <head>
-            <title>Hello</title>
-        </head>
-        <body>
-            <a href="/page_3">Link 3</a>
-            <a href="/page_2">Link 4</a>
-        </body>
-    </html>""",
+        SECONDARY_INDEX,
     )
 
 
@@ -288,15 +279,7 @@ async def incapsula_endpoint(send: Send) -> None:
     """Handle requests for a page with an incapsula iframe."""
     await send_html_response(
         send,
-        b"""<html>
-        <head>
-            <title>Hello</title>
-        </head>
-        <body>
-            <iframe src=Test_Incapsula_Resource>
-            </iframe>
-        </body>
-    </html>""",
+        INCAPSULA,
     )
 
 
@@ -304,14 +287,7 @@ async def generic_response_endpoint(send: Send) -> None:
     """Handle requests with a generic HTML response."""
     await send_html_response(
         send,
-        b"""<html>
-        <head>
-            <title>Hello</title>
-        </head>
-        <body>
-            Insightful content
-        </body>
-    </html>""",
+        GENERIC_RESPONSE,
     )
 
 
@@ -397,6 +373,11 @@ async def dynamic_content(scope: dict[str, Any], send: Send) -> None:
     content = query_params.get('content', '')
 
     await send_html_response(send, html_content=content.encode())
+
+
+async def robots_txt(send: Send) -> None:
+    """Handle requests for the robots.txt file."""
+    await send_html_response(send, ROBOTS_TXT)
 
 
 class TestServer(Server):

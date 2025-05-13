@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from enum import Enum
@@ -48,6 +49,8 @@ RequestTransformAction: TypeAlias = Literal['skip', 'unchanged']
 
 EnqueueStrategy: TypeAlias = Literal['all', 'same-domain', 'same-hostname', 'same-origin']
 """Enqueue strategy to be used for determining which links to extract and enqueue."""
+
+SkippedReason: TypeAlias = Literal['robots_txt']
 
 
 def _normalize_headers(headers: Mapping[str, str]) -> dict[str, str]:
@@ -559,6 +562,33 @@ class SendRequestFunction(Protocol):
         """
 
 
+@docs_group('Data structures')
+@dataclasses.dataclass
+class PageSnapshot:
+    """Snapshot of a crawled page."""
+
+    screenshot: bytes | None = None
+    """Screenshot of the page format."""
+
+    html: str | None = None
+    """HTML content of the page."""
+
+    def __bool__(self) -> bool:
+        return bool(self.screenshot or self.html)
+
+
+@docs_group('Functions')
+class GetPageSnapshot(Protocol):
+    """A function for getting snapshot of a page."""
+
+    def __call__(self) -> Coroutine[None, None, PageSnapshot]:
+        """Get page snapshot.
+
+        Returns:
+            Snapshot of a page.
+        """
+
+
 @docs_group('Functions')
 class UseStateFunction(Protocol):
     """A function for managing state within the crawling context.
@@ -618,6 +648,10 @@ class BasicCrawlingContext:
 
     log: logging.Logger
     """Logger instance."""
+
+    async def get_snapshot(self) -> PageSnapshot:
+        """Get snapshot of crawled page."""
+        return PageSnapshot()
 
     def __hash__(self) -> int:
         """Return hash of the context. Each context is considered unique."""
