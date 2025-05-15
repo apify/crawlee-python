@@ -14,7 +14,7 @@ from typing_extensions import override
 from crawlee import Request
 from crawlee._consts import METADATA_FILENAME
 from crawlee._utils.crypto import crypto_random_object_id
-from crawlee._utils.file import atomic_write_text, json_dumps
+from crawlee._utils.file import atomic_write, json_dumps
 from crawlee.storage_clients._base import RequestQueueClient
 from crawlee.storage_clients.models import AddRequestsResponse, ProcessedRequest, RequestQueueMetadata
 
@@ -336,7 +336,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     # Update the existing request file
                     request_path = self.path_to_rq / f'{existing_request.id}.json'
                     request_data = await json_dumps(existing_request.model_dump())
-                    await atomic_write_text(request_path, request_data)
+                    await atomic_write(request_path, request_data)
 
                     processed_requests.append(
                         ProcessedRequest(
@@ -362,7 +362,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 request_dict['_sequence'] = sequence_number
 
                 request_data = await json_dumps(request_dict)
-                await atomic_write_text(request_path, request_data)
+                await atomic_write(request_path, request_data)
 
                 # Update metadata counts
                 new_total_request_count += 1
@@ -620,7 +620,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 return None
 
             request_data = await json_dumps(request.model_dump())
-            await atomic_write_text(request_path, request_data)
+            await atomic_write(request_path, request_data)
 
             # Update metadata timestamps
             await self._update_metadata(
@@ -678,7 +678,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 return None
 
             request_data = await json_dumps(request.model_dump())
-            await atomic_write_text(request_path, request_data)
+            await atomic_write(request_path, request_data)
 
             # Update metadata timestamps
             await self._update_metadata(update_modified_at=True, update_accessed_at=True)
@@ -781,4 +781,4 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
         # Dump the serialized metadata to the file.
         data = await json_dumps(self._metadata.model_dump())
-        await atomic_write_text(self.path_to_metadata, data)
+        await atomic_write(self.path_to_metadata, data)

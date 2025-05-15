@@ -312,9 +312,9 @@ async def test_iterate_keys_with_exclusive_start_key(kvs_client: FileSystemKeyVa
     """Test that exclusive_start_key parameter returns only keys after it alphabetically."""
     # Add some values with alphabetical keys
     await kvs_client.set_value(key='a-key', value='value-a')
-    await kvs_client.set_value(key='b-key', value='value-b')
-    await kvs_client.set_value(key='c-key', value='value-c')
     await kvs_client.set_value(key='d-key', value='value-d')
+    await kvs_client.set_value(key='c-key', value='value-c')
+    await kvs_client.set_value(key='b-key', value='value-b')
 
     # Iterate with exclusive start key
     keys = [key.key async for key in kvs_client.iterate_keys(exclusive_start_key='b-key')]

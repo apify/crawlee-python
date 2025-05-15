@@ -547,7 +547,6 @@ async def test_crawler_get_storages() -> None:
     assert isinstance(kvs, KeyValueStore)
 
 
-# THIS
 async def test_crawler_run_requests() -> None:
     crawler = BasicCrawler()
     seen_urls = list[str]()
