@@ -14,7 +14,7 @@ from typing_extensions import override
 
 from crawlee._consts import METADATA_FILENAME
 from crawlee._utils.crypto import crypto_random_object_id
-from crawlee._utils.file import atomic_write_bytes, atomic_write_text, infer_mime_type, json_dumps
+from crawlee._utils.file import atomic_write, infer_mime_type, json_dumps
 from crawlee.storage_clients._base import KeyValueStoreClient
 from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
 
@@ -325,10 +325,10 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             await asyncio.to_thread(self.path_to_kvs.mkdir, parents=True, exist_ok=True)
 
             # Write the value to the file.
-            await atomic_write_bytes(record_path, value_bytes)
+            await atomic_write(record_path, value_bytes, is_binary=True)
 
             # Write the record metadata to the file.
-            await atomic_write_text(record_metadata_filepath, record_metadata_content)
+            await atomic_write(record_metadata_filepath, record_metadata_content)
 
             # Update the KVS metadata to record the access and modification.
             await self._update_metadata(update_accessed_at=True, update_modified_at=True)
@@ -445,7 +445,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
         # Dump the serialized metadata to the file.
         data = await json_dumps(self._metadata.model_dump())
-        await atomic_write_text(self.path_to_metadata, data)
+        await atomic_write(self.path_to_metadata, data)
 
     def _encode_key(self, key: str) -> str:
         """Encode a key to make it safe for use in a file path."""

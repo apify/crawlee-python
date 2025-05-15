@@ -13,7 +13,7 @@ from typing_extensions import override
 
 from crawlee._consts import METADATA_FILENAME
 from crawlee._utils.crypto import crypto_random_object_id
-from crawlee._utils.file import atomic_write_text, json_dumps
+from crawlee._utils.file import atomic_write, json_dumps
 from crawlee.storage_clients._base import DatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
@@ -442,7 +442,7 @@ class FileSystemDatasetClient(DatasetClient):
 
         # Dump the serialized metadata to the file.
         data = await json_dumps(self._metadata.model_dump())
-        await atomic_write_text(self.path_to_metadata, data)
+        await atomic_write(self.path_to_metadata, data)
 
     async def _push_item(self, item: dict[str, Any], item_id: int) -> None:
         """Push a single item to the dataset.
@@ -463,7 +463,7 @@ class FileSystemDatasetClient(DatasetClient):
 
         # Dump the serialized item to the file.
         data = await json_dumps(item)
-        await atomic_write_text(file_path, data)
+        await atomic_write(file_path, data)
 
     async def _get_sorted_data_files(self) -> list[Path]:
         """Retrieve and return a sorted list of data files in the dataset directory.

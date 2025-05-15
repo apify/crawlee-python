@@ -167,7 +167,7 @@ async def test_iterate_keys(kvs_client: MemoryKeyValueStoreClient) -> None:
 async def test_iterate_keys_with_exclusive_start_key(kvs_client: MemoryKeyValueStoreClient) -> None:
     """Test that exclusive_start_key parameter returns only keys after it alphabetically."""
     # Set some values
-    for key in ['a_key', 'b_key', 'c_key', 'd_key', 'e_key']:
+    for key in ['b_key', 'c_key', 'a_key', 'e_key', 'd_key']:
         await kvs_client.set_value(key=key, value=f'value for {key}')
 
     # Get keys starting after 'b_key'
@@ -181,7 +181,7 @@ async def test_iterate_keys_with_exclusive_start_key(kvs_client: MemoryKeyValueS
 async def test_iterate_keys_with_limit(kvs_client: MemoryKeyValueStoreClient) -> None:
     """Test that the limit parameter returns only the specified number of keys."""
     # Set some values
-    for key in ['a_key', 'b_key', 'c_key', 'd_key', 'e_key']:
+    for key in ['a_key', 'e_key', 'c_key', 'b_key', 'd_key']:
         await kvs_client.set_value(key=key, value=f'value for {key}')
 
     # Get first 3 keys
