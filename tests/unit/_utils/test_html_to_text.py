@@ -196,4 +196,4 @@ def test_html_to_text_parsel() -> None:
 
 
 def test_html_to_text_beautifulsoup() -> None:
-    assert html_to_text_beautifulsoup(BeautifulSoup(_EXAMPLE_HTML)) == _EXPECTED_TEXT
+    assert html_to_text_beautifulsoup(BeautifulSoup(_EXAMPLE_HTML, features='lxml')) == _EXPECTED_TEXT

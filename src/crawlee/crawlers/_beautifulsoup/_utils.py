@@ -27,7 +27,7 @@ def html_to_text(source: str | Tag) -> str:
         Newline separated plain text without tags.
     """
     if isinstance(source, str):
-        soup = BeautifulSoup(source)
+        soup = BeautifulSoup(source, features='lxml')
     elif isinstance(source, BeautifulSoup):
         soup = source
     else:
