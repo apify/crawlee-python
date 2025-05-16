@@ -328,6 +328,7 @@ async def test_send_request_works(server_url: URL) -> None:
 @dataclass
 class AddRequestsTestInput:
     start_url: str
+    loaded_url: str
     requests: Sequence[str | Request]
     expected_urls: Sequence[str]
     kwargs: EnqueueLinksKwargs
@@ -337,6 +338,7 @@ STRATEGY_TEST_URLS = (
     'https://someplace.com/',
     'http://someplace.com/index.html',
     'https://blog.someplace.com/index.html',
+    'https://redirect.someplace.com',
     'https://other.place.com/index.html',
 )
 
@@ -356,6 +358,7 @@ INCLUDE_TEST_URLS = (
         pytest.param(
             AddRequestsTestInput(
                 start_url='https://a.com/',
+                loaded_url='https://a.com/',
                 requests=[
                     'https://a.com/',
                     Request.from_url('http://b.com/'),
@@ -370,52 +373,109 @@ INCLUDE_TEST_URLS = (
         pytest.param(
             AddRequestsTestInput(
                 start_url=STRATEGY_TEST_URLS[0],
+                loaded_url=STRATEGY_TEST_URLS[0],
                 requests=STRATEGY_TEST_URLS,
                 kwargs=EnqueueLinksKwargs(),
                 expected_urls=STRATEGY_TEST_URLS[1:],
             ),
-            id='enqueue_strategy_1',
+            id='enqueue_strategy_default',
         ),
         pytest.param(
             AddRequestsTestInput(
                 start_url=STRATEGY_TEST_URLS[0],
+                loaded_url=STRATEGY_TEST_URLS[0],
                 requests=STRATEGY_TEST_URLS,
                 kwargs=EnqueueLinksKwargs(strategy='all'),
                 expected_urls=STRATEGY_TEST_URLS[1:],
             ),
-            id='enqueue_strategy_2',
+            id='enqueue_strategy_all',
         ),
         pytest.param(
             AddRequestsTestInput(
                 start_url=STRATEGY_TEST_URLS[0],
-                requests=STRATEGY_TEST_URLS,
+                loaded_url=STRATEGY_TEST_URLS[0],
+                requests=STRATEGY_TEST_URLS[:4],
                 kwargs=EnqueueLinksKwargs(strategy='same-domain'),
-                expected_urls=STRATEGY_TEST_URLS[1:3],
+                expected_urls=STRATEGY_TEST_URLS[1:4],
             ),
-            id='enqueue_strategy_3',
+            id='enqueue_strategy_same_domain',
         ),
         pytest.param(
             AddRequestsTestInput(
                 start_url=STRATEGY_TEST_URLS[0],
-                requests=STRATEGY_TEST_URLS,
+                loaded_url=STRATEGY_TEST_URLS[0],
+                requests=STRATEGY_TEST_URLS[:4],
                 kwargs=EnqueueLinksKwargs(strategy='same-hostname'),
                 expected_urls=[STRATEGY_TEST_URLS[1]],
             ),
-            id='enqueue_strategy_4',
+            id='enqueue_strategy_same_hostname',
         ),
         pytest.param(
             AddRequestsTestInput(
                 start_url=STRATEGY_TEST_URLS[0],
+                loaded_url=STRATEGY_TEST_URLS[0],
+                requests=STRATEGY_TEST_URLS[:4],
+                kwargs=EnqueueLinksKwargs(strategy='same-origin'),
+                expected_urls=[],
+            ),
+            id='enqueue_strategy_same_origin',
+        ),
+        # Enqueue strategy with redirect
+        pytest.param(
+            AddRequestsTestInput(
+                start_url=STRATEGY_TEST_URLS[3],
+                loaded_url=STRATEGY_TEST_URLS[0],
+                requests=STRATEGY_TEST_URLS,
+                kwargs=EnqueueLinksKwargs(),
+                expected_urls=STRATEGY_TEST_URLS[:3] + STRATEGY_TEST_URLS[4:],
+            ),
+            id='redirect_enqueue_strategy_default',
+        ),
+        pytest.param(
+            AddRequestsTestInput(
+                start_url=STRATEGY_TEST_URLS[3],
+                loaded_url=STRATEGY_TEST_URLS[0],
+                requests=STRATEGY_TEST_URLS,
+                kwargs=EnqueueLinksKwargs(strategy='all'),
+                expected_urls=STRATEGY_TEST_URLS[:3] + STRATEGY_TEST_URLS[4:],
+            ),
+            id='redirect_enqueue_strategy_all',
+        ),
+        pytest.param(
+            AddRequestsTestInput(
+                start_url=STRATEGY_TEST_URLS[3],
+                loaded_url=STRATEGY_TEST_URLS[0],
+                requests=STRATEGY_TEST_URLS,
+                kwargs=EnqueueLinksKwargs(strategy='same-domain'),
+                expected_urls=STRATEGY_TEST_URLS[:3],
+            ),
+            id='redirect_enqueue_strategy_same_domain',
+        ),
+        pytest.param(
+            AddRequestsTestInput(
+                start_url=STRATEGY_TEST_URLS[3],
+                loaded_url=STRATEGY_TEST_URLS[0],
+                requests=STRATEGY_TEST_URLS,
+                kwargs=EnqueueLinksKwargs(strategy='same-hostname'),
+                expected_urls=[],
+            ),
+            id='redirect_enqueue_strategy_same_hostname',
+        ),
+        pytest.param(
+            AddRequestsTestInput(
+                start_url=STRATEGY_TEST_URLS[3],
+                loaded_url=STRATEGY_TEST_URLS[0],
                 requests=STRATEGY_TEST_URLS,
                 kwargs=EnqueueLinksKwargs(strategy='same-origin'),
                 expected_urls=[],
             ),
-            id='enqueue_strategy_5',
+            id='redirect_enqueue_strategy_same_origin',
         ),
         # Include/exclude
         pytest.param(
             AddRequestsTestInput(
                 start_url=INCLUDE_TEST_URLS[0],
+                loaded_url=INCLUDE_TEST_URLS[0],
                 requests=INCLUDE_TEST_URLS,
                 kwargs=EnqueueLinksKwargs(include=[Glob('https://someplace.com/**/cats')]),
                 expected_urls=[INCLUDE_TEST_URLS[1], INCLUDE_TEST_URLS[4]],
@@ -425,6 +485,7 @@ INCLUDE_TEST_URLS = (
         pytest.param(
             AddRequestsTestInput(
                 start_url=INCLUDE_TEST_URLS[0],
+                loaded_url=INCLUDE_TEST_URLS[0],
                 requests=INCLUDE_TEST_URLS,
                 kwargs=EnqueueLinksKwargs(exclude=[Glob('https://someplace.com/**/cats')]),
                 expected_urls=[INCLUDE_TEST_URLS[2], INCLUDE_TEST_URLS[3]],
@@ -434,6 +495,7 @@ INCLUDE_TEST_URLS = (
         pytest.param(
             AddRequestsTestInput(
                 start_url=INCLUDE_TEST_URLS[0],
+                loaded_url=INCLUDE_TEST_URLS[0],
                 requests=INCLUDE_TEST_URLS,
                 kwargs=EnqueueLinksKwargs(
                     include=[Glob('https://someplace.com/**/cats')], exclude=[Glob('https://**/archive/**')]
@@ -451,6 +513,7 @@ async def test_enqueue_strategy(test_input: AddRequestsTestInput) -> None:
 
     @crawler.router.handler('start')
     async def start_handler(context: BasicCrawlingContext) -> None:
+        context.request.loaded_url = test_input.loaded_url
         await context.add_requests(
             test_input.requests,
             **test_input.kwargs,
