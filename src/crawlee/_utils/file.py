@@ -128,7 +128,7 @@ async def atomic_write(
 
 
 async def export_json_to_stream(
-    iterator: AsyncIterator[dict],
+    iterator: AsyncIterator[dict[str, Any]],
     dst: TextIO,
     **kwargs: Unpack[ExportDataJsonKwargs],
 ) -> None:
@@ -137,7 +137,7 @@ async def export_json_to_stream(
 
 
 async def export_csv_to_stream(
-    iterator: AsyncIterator[dict],
+    iterator: AsyncIterator[dict[str, Any]],
     dst: TextIO,
     **kwargs: Unpack[ExportDataCsvKwargs],
 ) -> None:

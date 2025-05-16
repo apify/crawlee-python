@@ -99,8 +99,8 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         self._sequence_counter = 0
         """A counter to track the order of requests added to the queue."""
 
-    @override
     @property
+    @override
     def metadata(self) -> RequestQueueMetadata:
         return self._metadata
 

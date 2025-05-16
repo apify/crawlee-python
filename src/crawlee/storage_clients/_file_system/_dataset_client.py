@@ -6,7 +6,7 @@ import shutil
 from datetime import datetime, timezone
 from logging import getLogger
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
 from typing_extensions import override
@@ -19,7 +19,6 @@ from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
-    from typing import Any
 
     from crawlee.configuration import Configuration
 
@@ -83,8 +82,8 @@ class FileSystemDatasetClient(DatasetClient):
         self._lock = asyncio.Lock()
         """A lock to ensure that only one operation is performed at a time."""
 
-    @override
     @property
+    @override
     def metadata(self) -> DatasetMetadata:
         return self._metadata
 
@@ -258,7 +257,7 @@ class FileSystemDatasetClient(DatasetClient):
         view: str | None = None,
     ) -> DatasetItemsListPage:
         # Check for unsupported arguments and log a warning if found.
-        unsupported_args = {
+        unsupported_args: dict[str, Any] = {
             'clean': clean,
             'fields': fields,
             'omit': omit,
@@ -307,7 +306,7 @@ class FileSystemDatasetClient(DatasetClient):
             selected_files = selected_files[:limit]
 
         # Read and parse each data file.
-        items = []
+        items = list[dict[str, Any]]()
         for file_path in selected_files:
             try:
                 file_content = await asyncio.to_thread(file_path.read_text, encoding='utf-8')
@@ -353,9 +352,9 @@ class FileSystemDatasetClient(DatasetClient):
         unwind: str | None = None,
         skip_empty: bool = False,
         skip_hidden: bool = False,
-    ) -> AsyncIterator[dict]:
+    ) -> AsyncIterator[dict[str, Any]]:
         # Check for unsupported arguments and log a warning if found.
-        unsupported_args = {
+        unsupported_args: dict[str, Any] = {
             'clean': clean,
             'fields': fields,
             'omit': omit,

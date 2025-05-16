@@ -84,18 +84,18 @@ class Dataset(Storage):
         """
         self._client = client
 
-    @override
     @property
+    @override
     def id(self) -> str:
         return self._client.metadata.id
 
-    @override
     @property
+    @override
     def name(self) -> str | None:
         return self._client.metadata.name
 
-    @override
     @property
+    @override
     def metadata(self) -> DatasetMetadata:
         return self._client.metadata
 
@@ -233,7 +233,7 @@ class Dataset(Storage):
         unwind: str | None = None,
         skip_empty: bool = False,
         skip_hidden: bool = False,
-    ) -> AsyncIterator[dict]:
+    ) -> AsyncIterator[dict[str, Any]]:
         """Iterate over items in the dataset according to specified filters and sorting.
 
         This method allows for asynchronously iterating through dataset items while applying various filters such as
@@ -281,7 +281,7 @@ class Dataset(Storage):
         unwind: str | None = None,
         skip_empty: bool = False,
         skip_hidden: bool = False,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Retrieve a list of all items from the dataset according to specified filters and sorting.
 
         This method collects all dataset items into a list while applying various filters such as

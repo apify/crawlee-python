@@ -92,28 +92,28 @@ class RequestQueue(Storage, RequestManager):
         self._add_requests_tasks = list[asyncio.Task]()
         """A list of tasks for adding requests to the queue."""
 
-    @override
     @property
+    @override
     def id(self) -> str:
         return self._client.metadata.id
 
-    @override
     @property
+    @override
     def name(self) -> str | None:
         return self._client.metadata.name
 
-    @override
     @property
+    @override
     def metadata(self) -> RequestQueueMetadata:
         return self._client.metadata
 
-    @override
     @property
+    @override
     async def handled_count(self) -> int:
         return self._client.metadata.handled_request_count
 
-    @override
     @property
+    @override
     async def total_count(self) -> int:
         return self._client.metadata.total_request_count
 
