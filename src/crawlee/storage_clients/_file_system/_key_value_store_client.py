@@ -79,8 +79,8 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         self._lock = asyncio.Lock()
         """A lock to ensure that only one operation is performed at a time."""
 
-    @override
     @property
+    @override
     def metadata(self) -> KeyValueStoreMetadata:
         return self._metadata
 

@@ -68,8 +68,8 @@ class MemoryRequestQueueClient(RequestQueueClient):
         # Dictionary to track in-progress requests (fetched but not yet handled or reclaimed)
         self._in_progress = dict[str, Request]()
 
-    @override
     @property
+    @override
     def metadata(self) -> RequestQueueMetadata:
         return self._metadata
 

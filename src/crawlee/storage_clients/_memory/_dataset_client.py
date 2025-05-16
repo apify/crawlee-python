@@ -57,8 +57,8 @@ class MemoryDatasetClient(DatasetClient):
         # List to hold dataset items
         self._records = list[dict[str, Any]]()
 
-    @override
     @property
+    @override
     def metadata(self) -> DatasetMetadata:
         return self._metadata
 
@@ -141,7 +141,7 @@ class MemoryDatasetClient(DatasetClient):
         view: str | None = None,
     ) -> DatasetItemsListPage:
         # Check for unsupported arguments and log a warning if found
-        unsupported_args = {
+        unsupported_args: dict[str, Any] = {
             'clean': clean,
             'fields': fields,
             'omit': omit,
@@ -196,9 +196,9 @@ class MemoryDatasetClient(DatasetClient):
         unwind: str | None = None,
         skip_empty: bool = False,
         skip_hidden: bool = False,
-    ) -> AsyncIterator[dict]:
+    ) -> AsyncIterator[dict[str, Any]]:
         # Check for unsupported arguments and log a warning if found
-        unsupported_args = {
+        unsupported_args: dict[str, Any] = {
             'clean': clean,
             'fields': fields,
             'omit': omit,

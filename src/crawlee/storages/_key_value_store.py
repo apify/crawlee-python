@@ -93,18 +93,18 @@ class KeyValueStore(Storage):
         self._autosave_lock = asyncio.Lock()
         self._persist_state_event_started = False
 
-    @override
     @property
+    @override
     def id(self) -> str:
         return self._client.metadata.id
 
-    @override
     @property
+    @override
     def name(self) -> str | None:
         return self._client.metadata.name
 
-    @override
     @property
+    @override
     def metadata(self) -> KeyValueStoreMetadata:
         return self._client.metadata
 

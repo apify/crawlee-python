@@ -53,8 +53,8 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
         # Dictionary to hold key-value records with metadata
         self._records = dict[str, KeyValueStoreRecord]()
 
-    @override
     @property
+    @override
     def metadata(self) -> KeyValueStoreMetadata:
         return self._metadata
 
