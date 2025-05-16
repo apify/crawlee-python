@@ -112,7 +112,7 @@ class DatasetClient(ABC):
         unwind: str | None = None,
         skip_empty: bool = False,
         skip_hidden: bool = False,
-    ) -> AsyncIterator[dict]:
+    ) -> AsyncIterator[dict[str, Any]]:
         """Iterate over the dataset items with filtering options.
 
         The backend method for the `Dataset.iterate_items` call.

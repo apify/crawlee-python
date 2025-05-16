@@ -54,13 +54,13 @@ class RequestList(RequestLoader):
     def name(self) -> str | None:
         return self._name
 
-    @override
     @property
+    @override
     async def handled_count(self) -> int:
         return self._handled_count
 
-    @override
     @property
+    @override
     async def total_count(self) -> int:
         return self._assumed_total_count
 
