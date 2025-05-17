@@ -12,6 +12,9 @@ _install_import_hook(__name__)
 with _try_import(__name__, 'CurlImpersonateHttpClient'):
     from ._curl_impersonate import CurlImpersonateHttpClient
 
+with _try_import(__name__, 'ImpitHttpClient'):
+    from ._impit import ImpitHttpClient
+
 
 __all__ = [
     'CurlImpersonateHttpClient',
@@ -19,4 +22,5 @@ __all__ = [
     'HttpCrawlingResult',
     'HttpResponse',
     'HttpxHttpClient',
+    'ImpitHttpClient',
 ]
