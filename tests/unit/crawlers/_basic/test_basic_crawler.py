@@ -304,7 +304,7 @@ async def test_handles_error_in_failed_request_handler() -> None:
     ('method', 'path', 'payload'),
     [
         pytest.param('GET', 'get', None, id='get send_request'),
-        pytest.param('POST', 'post', 'Hello, world!', id='post send_request'),
+        pytest.param('POST', 'post', b'Hello, world!', id='post send_request'),
     ],
 )
 async def test_send_request_works(server_url: URL, method: HttpMethod, path: str, payload: None | bytes) -> None:
@@ -323,7 +323,7 @@ async def test_send_request_works(server_url: URL, method: HttpMethod, path: str
 
     response_body = response_data.get('body')
     assert response_body is not None
-    assert response_body.get('data') == payload
+    assert response_body.get('data') == (payload.decode() if payload else None)
 
     response_headers = response_data.get('headers')
     assert response_headers is not None
