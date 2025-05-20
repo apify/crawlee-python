@@ -513,6 +513,7 @@ async def test_enqueue_strategy(test_input: AddRequestsTestInput) -> None:
 
     @crawler.router.handler('start')
     async def start_handler(context: BasicCrawlingContext) -> None:
+        # Assign test value to loaded_url - BasicCrawler does not do any navigation by itself
         context.request.loaded_url = test_input.loaded_url
         await context.add_requests(
             test_input.requests,
