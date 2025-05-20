@@ -419,7 +419,17 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
     @override
     async def get_public_url(self, *, key: str) -> str:
-        raise NotImplementedError('Public URLs are not supported for file system key-value stores.')
+        """Return a file:// URL for the given key.
+
+        Args:
+            key: The key to get the public URL for.
+
+        Returns:
+            A file:// URL pointing to the file on the local filesystem.
+        """
+        record_path = self.path_to_kvs / self._encode_key(key)
+        absolute_path = record_path.absolute()
+        return absolute_path.as_uri()
 
     async def _update_metadata(
         self,
