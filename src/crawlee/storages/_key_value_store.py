@@ -91,7 +91,6 @@ class KeyValueStore(Storage):
         """
         self._client = client
         self._autosave_lock = asyncio.Lock()
-        self._persist_state_event_started = False
 
     @property
     @override
