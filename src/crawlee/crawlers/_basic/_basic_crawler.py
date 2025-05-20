@@ -1132,7 +1132,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                     and self._check_enqueue_strategy(
                         add_requests_call.get('strategy', 'all'),
                         target_url=urlparse(dst_request.url),
-                        origin_url=urlparse(origin),
+                        origin_url=urlparse(context.request.url),
                     )
                     and self._check_url_patterns(
                         dst_request.url,
