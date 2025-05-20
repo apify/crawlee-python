@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import urllib.parse
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -369,10 +370,30 @@ async def test_metadata_updates(kvs_client: FileSystemKeyValueStoreClient) -> No
     assert kvs_client.metadata.accessed_at > accessed_after_get
 
 
-async def test_get_public_url_not_supported(kvs_client: FileSystemKeyValueStoreClient) -> None:
-    """Test that get_public_url raises NotImplementedError for the file system implementation."""
-    with pytest.raises(NotImplementedError, match='Public URLs are not supported'):
-        await kvs_client.get_public_url(key='any-key')
+async def test_get_public_url(kvs_client: FileSystemKeyValueStoreClient) -> None:
+    """Test that get_public_url returns a valid file:// URL for the given key."""
+    # Set a value first to ensure the file exists
+    test_key = 'test-url-key'
+    test_value = 'Test URL value'
+    await kvs_client.set_value(key=test_key, value=test_value)
+
+    # Get the URL
+    url = await kvs_client.get_public_url(key=test_key)
+
+    # Verify it's a valid file:// URL
+    assert url.startswith('file:///')
+
+    # The encoded key name should be in the URL
+    encoded_key = urllib.parse.quote(test_key, safe='')
+    assert encoded_key in url
+
+    # Verify the path in the URL points to the actual file
+    file_path = kvs_client.path_to_kvs / encoded_key
+    assert file_path.exists()
+
+    # Verify file content without using urlopen (avoiding blocking IO)
+    content = file_path.read_text(encoding='utf-8')
+    assert content == test_value
 
 
 async def test_concurrent_operations(kvs_client: FileSystemKeyValueStoreClient) -> None:

@@ -610,7 +610,7 @@ class GetDataKwargs(TypedDict):
     """The maximum number of items to retrieve. Unlimited if None."""
 
     clean: NotRequired[bool]
-    """Return only non-empty items and excludes hidden fields. Shortcut for skip_hidden and skip_empty."""
+    """Return only non-empty items and excludes hidden fields. Shortcut for `skip_hidden` and `skip_empty`."""
 
     desc: NotRequired[bool]
     """Set to True to sort results in descending order."""
