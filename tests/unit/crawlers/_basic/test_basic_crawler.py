@@ -18,7 +18,7 @@ import pytest
 
 from crawlee import ConcurrencySettings, Glob, service_locator
 from crawlee._request import Request
-from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpHeaders
+from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpHeaders, HttpMethod
 from crawlee._utils.robots import RobotsTxtFile
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
@@ -300,29 +300,36 @@ async def test_handles_error_in_failed_request_handler() -> None:
         await crawler.run(['http://a.com/', 'http://b.com/', 'http://c.com/'])
 
 
-async def test_send_request_works(server_url: URL) -> None:
+@pytest.mark.parametrize(
+    ('method', 'path', 'payload'),
+    [
+        pytest.param('GET', 'get', None, id='get send_request'),
+        pytest.param('POST', 'post', b'Hello, world!', id='post send_request'),
+    ],
+)
+async def test_send_request_works(server_url: URL, method: HttpMethod, path: str, payload: None | bytes) -> None:
     response_data: dict[str, Any] = {}
 
     crawler = BasicCrawler(max_request_retries=3)
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        response = await context.send_request(str(server_url))
+        response = await context.send_request(str(server_url / path), method=method, payload=payload)
 
-        response_data['body'] = response.read()
+        response_data['body'] = json.loads(response.read())
         response_data['headers'] = response.headers
 
     await crawler.run(['http://a.com/', 'http://b.com/', 'http://c.com/'])
 
     response_body = response_data.get('body')
     assert response_body is not None
-    assert b'Hello, world!' in response_body
+    assert response_body.get('data') == (payload.decode() if payload else None)
 
     response_headers = response_data.get('headers')
     assert response_headers is not None
     content_type = response_headers.get('content-type')
     assert content_type is not None
-    assert content_type == 'text/html; charset=utf-8'
+    assert content_type == 'application/json'
 
 
 @dataclass

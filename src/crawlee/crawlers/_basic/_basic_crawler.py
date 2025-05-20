@@ -31,6 +31,7 @@ from crawlee._types import (
     BasicCrawlingContext,
     GetKeyValueStoreFromRequestHandlerFunction,
     HttpHeaders,
+    HttpPayload,
     RequestHandlerRunResult,
     SendRequestFunction,
     SkippedReason,
@@ -1081,11 +1082,13 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             url: str,
             *,
             method: HttpMethod = 'GET',
+            payload: HttpPayload | None = None,
             headers: HttpHeaders | dict[str, str] | None = None,
         ) -> HttpResponse:
             return await self._http_client.send_request(
                 url=url,
                 method=method,
+                payload=payload,
                 headers=headers,
                 session=session,
                 proxy_info=proxy_info,
