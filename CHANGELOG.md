@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 
 - Allow config change on `PlaywrightCrawler` ([#1186](https://github.com/apify/crawlee-python/pull/1186)) ([f17bf31](https://github.com/apify/crawlee-python/commit/f17bf31456b702631aa7e0c26d4f07fd5eb7d1bd)) by [@mylank](https://github.com/mylank), closes [#1185](https://github.com/apify/crawlee-python/issues/1185)
 - Add `payload` to `SendRequestFunction` to support `POST` request ([#1202](https://github.com/apify/crawlee-python/pull/1202)) ([e7449f2](https://github.com/apify/crawlee-python/commit/e7449f206c580cb8383a66e4c9ff5f67c5ce8409)) by [@Mantisus](https://github.com/Mantisus)
+- Fix match check for specified enqueue strategy for requests with redirect ([#1199](https://github.com/apify/crawlee-python/pull/1199)) ([d84c30c](https://github.com/apify/crawlee-python/commit/d84c30cbd7c94d6525d3b6e8e86b379050454c0e)) by [@Mantisus](https://github.com/Mantisus), closes [#1198](https://github.com/apify/crawlee-python/issues/1198)
 
 
 <!-- git-cliff-unreleased-end -->
