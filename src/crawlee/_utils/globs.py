@@ -73,7 +73,7 @@ def _translate(
     return rf'(?s:{res})\Z'
 
 
-def _fnmatch_translate(pat: str, star: str, question_mark: str) -> list[str]:  # noqa: PLR0912
+def _fnmatch_translate(pat: str, star: str, question_mark: str) -> list[str]:
     """Copy of fnmatch._translate from Python 3.13."""
     res = list[str]()
     add = res.append

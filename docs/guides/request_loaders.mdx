@@ -52,12 +52,12 @@ class BaseStorage {
 
 class RequestLoader {
     <<abstract>>
+    + handled_count
+    + total_count
     + fetch_next_request()
     + mark_request_as_handled()
     + is_empty()
     + is_finished()
-    + get_handled_count()
-    + get_total_count()
     + to_tandem()
 }
 

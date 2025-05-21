@@ -6,7 +6,7 @@ from crawlee import service_locator
 from crawlee.configuration import Configuration
 from crawlee.errors import ServiceConflictError
 from crawlee.events import LocalEventManager
-from crawlee.storage_clients import MemoryStorageClient
+from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
 
 
 def test_default_configuration() -> None:
@@ -72,21 +72,21 @@ def test_event_manager_conflict() -> None:
 
 def test_default_storage_client() -> None:
     default_storage_client = service_locator.get_storage_client()
-    assert isinstance(default_storage_client, MemoryStorageClient)
+    assert isinstance(default_storage_client, FileSystemStorageClient)
 
 
 def test_custom_storage_client() -> None:
-    custom_storage_client = MemoryStorageClient.from_config()
+    custom_storage_client = MemoryStorageClient()
     service_locator.set_storage_client(custom_storage_client)
     storage_client = service_locator.get_storage_client()
     assert storage_client is custom_storage_client
 
 
 def test_storage_client_overwrite() -> None:
-    custom_storage_client = MemoryStorageClient.from_config()
+    custom_storage_client = MemoryStorageClient()
     service_locator.set_storage_client(custom_storage_client)
 
-    another_custom_storage_client = MemoryStorageClient.from_config()
+    another_custom_storage_client = MemoryStorageClient()
     service_locator.set_storage_client(another_custom_storage_client)
 
     assert custom_storage_client != another_custom_storage_client
@@ -95,7 +95,7 @@ def test_storage_client_overwrite() -> None:
 
 def test_storage_client_conflict() -> None:
     service_locator.get_storage_client()
-    custom_storage_client = MemoryStorageClient.from_config()
+    custom_storage_client = MemoryStorageClient()
 
     with pytest.raises(ServiceConflictError, match='StorageClient is already in use.'):
         service_locator.set_storage_client(custom_storage_client)
