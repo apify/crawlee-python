@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import warnings
 from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, Generic, Literal, Union
 
@@ -34,11 +35,20 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable, Mapping, Sequence
     from pathlib import Path
 
-    from playwright.async_api import Page
+    from playwright.async_api import Page, Route
+    from playwright.async_api import Request as PlaywrightRequest
     from typing_extensions import Unpack
 
     from crawlee import RequestTransformAction
-    from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, EnqueueLinksKwargs, ExtractLinksFunction
+    from crawlee._types import (
+        BasicCrawlingContext,
+        EnqueueLinksFunction,
+        EnqueueLinksKwargs,
+        ExtractLinksFunction,
+        HttpHeaders,
+        HttpMethod,
+        HttpPayload,
+    )
     from crawlee.browsers._types import BrowserType
 
 
@@ -210,6 +220,17 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 await hook(pre_navigation_context)
         yield pre_navigation_context
 
+    def _prepare_request_handler(
+        self,
+        method: HttpMethod = 'GET',
+        headers: HttpHeaders | dict[str, str] | None = None,
+        payload: HttpPayload | None = None,
+    ) -> Callable:
+        async def route_handler(route: Route, _: PlaywrightRequest) -> None:
+            await route.continue_(method=method, headers=dict(headers) if headers else None, post_data=payload)
+
+        return route_handler
+
     async def _navigate(
         self,
         context: PlaywrightPreNavCrawlingContext,
@@ -235,6 +256,24 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             if context.request.headers:
                 await context.page.set_extra_http_headers(context.request.headers.model_dump())
             # Navigate to the URL and get response.
+            if context.request.method != 'GET':
+                # Call the notification only once
+                warnings.warn(
+                    'Using other request methods than GET or adding payloads has a high impact on performance'
+                    ' in recent versions of Playwright. Use only when necessary.',
+                    category=UserWarning,
+                    stacklevel=2,
+                )
+
+                route_handler = self._prepare_request_handler(
+                    method=context.request.method,
+                    headers=context.request.headers,
+                    payload=context.request.payload,
+                )
+
+                # Set route_handler only for current request
+                await context.page.route(context.request.url, route_handler)
+
             response = await context.page.goto(context.request.url)
 
             if response is None:
