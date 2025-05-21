@@ -226,6 +226,14 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         headers: HttpHeaders | dict[str, str] | None = None,
         payload: HttpPayload | None = None,
     ) -> Callable:
+        """Create a route handler for Playwright to support non-GET methods with custom parameters.
+
+        Args:
+            method: HTTP method to use for the request.
+            headers: Custom HTTP headers to send with the request.
+            payload: Request body data for POST/PUT requests.
+        """
+
         async def route_handler(route: Route, _: PlaywrightRequest) -> None:
             await route.continue_(method=method, headers=dict(headers) if headers else None, post_data=payload)
 
