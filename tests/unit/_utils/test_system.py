@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import gc
+import os
 import time
 from multiprocessing import Array, Process, Value
 from typing import TYPE_CHECKING
+
+import psutil
 
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.system import get_cpu_info, get_memory_info
@@ -58,7 +61,10 @@ def _parent_function(ratio: Synchronized) -> None:
     for child in nonsharing_children:
         child.join()
 
-    ratio.value = memory_when_sharing_children.current_size / memory_when_nonsharing_children.current_size
+    # DEBUG in CI
+    current_process = psutil.Process(os.getpid())
+
+    ratio.value = repr(current_process.memory_full_info()).encode("utf-8")
 
 
 def test_memory_measurement_of_shared_memory() -> None:
@@ -74,10 +80,11 @@ def test_memory_measurement_of_shared_memory() -> None:
     # The threshold for memory usage ratio of unshared_used_memory processes and shared_used_memory processes
     good_enough_threshold = 0.5
 
-    shared_vs_nonshared_used_memory_ratio: Synchronized = Value('d', 0.0)
+    shared_vs_nonshared_used_memory_ratio: Synchronized = Value('c', b' '*10000)
 
     process = Process(target=_parent_function, args=(shared_vs_nonshared_used_memory_ratio,))
     process.start()
     process.join()
 
+    raise Exception(shared_vs_nonshared_used_memory_ratio.value.decode("utf-8"))
     assert shared_vs_nonshared_used_memory_ratio.value < good_enough_threshold
