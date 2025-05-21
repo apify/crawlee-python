@@ -24,6 +24,43 @@ def test_get_cpu_info_returns_valid_values() -> None:
     assert 0 <= cpu_info.used_ratio <= 1
 
 
+def _get_test_array() -> SynchronizedArray[int]:
+    """Prepare a suitable array size for a test.
+
+    Too small array will make this test useless as we need this array to occupy obvious part of process memory and
+    not be hidden in the noise of used memory size.
+    """
+    return Array('i', range(1000000))
+
+
+def _child_function(shared_value: SynchronizedArray | None = None) -> SynchronizedArray:
+    array = _get_test_array() if shared_value is None else shared_value
+    time.sleep(3)
+    return array
+
+
+def _parent_function(ratio: Synchronized) -> None:
+    shared_array = _get_test_array()
+
+    sharing_children = [Process(target=_child_function, args=(shared_array,)) for _ in range(10)]
+    for child in sharing_children:
+        child.start()
+    memory_when_sharing_children = get_memory_info()
+    for child in sharing_children:
+        child.join()
+    del sharing_children
+    gc.collect()
+
+    nonsharing_children = [Process(target=_child_function) for _ in range(10)]
+    for child in nonsharing_children:
+        child.start()
+    memory_when_nonsharing_children = get_memory_info()
+    for child in nonsharing_children:
+        child.join()
+
+    ratio.value = memory_when_sharing_children.current_size / memory_when_nonsharing_children.current_size
+
+
 def test_memory_measurement_of_shared_memory() -> None:
     """Test that memory usage estimation is not overestimating memory usage by counting shared memory multiple times.
 
@@ -39,41 +76,7 @@ def test_memory_measurement_of_shared_memory() -> None:
 
     shared_vs_nonshared_used_memory_ratio: Synchronized = Value('d', 0.0)
 
-    def get_test_array() -> SynchronizedArray[int]:
-        """Prepare a suitable array size for a test.
-
-        Too small array will make this test useless as we need this array to occupy obvious part of process memory and
-        not be hidden in the noise of used memory size.
-        """
-        return Array('i', range(1000000))
-
-    def child_process(shared_value: SynchronizedArray | None = None) -> SynchronizedArray:
-        array = get_test_array() if shared_value is None else shared_value
-        time.sleep(3)
-        return array
-
-    def parent_process(ratio: Synchronized) -> None:
-        shared_array = get_test_array()
-
-        sharing_children = [Process(target=child_process, args=(shared_array,)) for _ in range(10)]
-        for child in sharing_children:
-            child.start()
-        memory_when_sharing_children = get_memory_info()
-        for child in sharing_children:
-            child.join()
-        del sharing_children
-        gc.collect()
-
-        nonsharing_children = [Process(target=child_process) for _ in range(10)]
-        for child in nonsharing_children:
-            child.start()
-        memory_when_nonsharing_children = get_memory_info()
-        for child in nonsharing_children:
-            child.join()
-
-        ratio.value = memory_when_sharing_children.current_size / memory_when_nonsharing_children.current_size
-
-    process = Process(target=parent_process, args=(shared_vs_nonshared_used_memory_ratio,))
+    process = Process(target=_parent_function, args=(shared_vs_nonshared_used_memory_ratio,))
     process.start()
     process.join()
 
