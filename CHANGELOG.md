@@ -3,7 +3,32 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 0.6.8 - **not yet released**
+## 0.6.10 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Allow config change on `PlaywrightCrawler` ([#1186](https://github.com/apify/crawlee-python/pull/1186)) ([f17bf31](https://github.com/apify/crawlee-python/commit/f17bf31456b702631aa7e0c26d4f07fd5eb7d1bd)) by [@mylank](https://github.com/mylank), closes [#1185](https://github.com/apify/crawlee-python/issues/1185)
+- Add `payload` to `SendRequestFunction` to support `POST` request ([#1202](https://github.com/apify/crawlee-python/pull/1202)) ([e7449f2](https://github.com/apify/crawlee-python/commit/e7449f206c580cb8383a66e4c9ff5f67c5ce8409)) by [@Mantisus](https://github.com/Mantisus)
+- Fix match check for specified enqueue strategy for requests with redirect ([#1199](https://github.com/apify/crawlee-python/pull/1199)) ([d84c30c](https://github.com/apify/crawlee-python/commit/d84c30cbd7c94d6525d3b6e8e86b379050454c0e)) by [@Mantisus](https://github.com/Mantisus), closes [#1198](https://github.com/apify/crawlee-python/issues/1198)
+- Set `WindowsSelectorEventLoopPolicy` only for curl-impersonate template without `playwright` ([#1209](https://github.com/apify/crawlee-python/pull/1209)) ([f3b839f](https://github.com/apify/crawlee-python/commit/f3b839ffc2ccc1b889b6d5928f35f57b725e27f1)) by [@Mantisus](https://github.com/Mantisus), closes [#1204](https://github.com/apify/crawlee-python/issues/1204)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.6.9](https://github.com/apify/crawlee-python/releases/tag/v0.6.9) (2025-05-02)
+
+### 🚀 Features
+
+- Add an internal `HttpClient` to be used in `send_request` for `PlaywrightCrawler` using `APIRequestContext` bound to the browser context ([#1134](https://github.com/apify/crawlee-python/pull/1134)) ([e794f49](https://github.com/apify/crawlee-python/commit/e794f4985d3a018ee76d634fe2b2c735fb450272)) by [@Mantisus](https://github.com/Mantisus), closes [#928](https://github.com/apify/crawlee-python/issues/928)
+- Make timeout error log cleaner ([#1170](https://github.com/apify/crawlee-python/pull/1170)) ([78ea9d2](https://github.com/apify/crawlee-python/commit/78ea9d23e0b2d73286043b68393e462f636625c9)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1158](https://github.com/apify/crawlee-python/issues/1158)
+- Add `on_skipped_request` decorator, to process links skipped according to `robots.txt` rules ([#1166](https://github.com/apify/crawlee-python/pull/1166)) ([bd16f14](https://github.com/apify/crawlee-python/commit/bd16f14a834eebf485aea6b6a83f2b18bf16b504)) by [@Mantisus](https://github.com/Mantisus), closes [#1160](https://github.com/apify/crawlee-python/issues/1160)
+
+### 🐛 Bug Fixes
+
+- Fix handle error without `args` in `_get_error_message`  for `ErrorTracker` ([#1181](https://github.com/apify/crawlee-python/pull/1181)) ([21944d9](https://github.com/apify/crawlee-python/commit/21944d908b8404d2ad6c182104e7a8c27be12a6e)) by [@Mantisus](https://github.com/Mantisus), closes [#1179](https://github.com/apify/crawlee-python/issues/1179)
+- Temporarily add `certifi&lt;=2025.1.31` dependency ([#1183](https://github.com/apify/crawlee-python/pull/1183)) ([25ff961](https://github.com/apify/crawlee-python/commit/25ff961990f9abc9d0673ba6573dfcf46dd6e53f)) by [@Pijukatel](https://github.com/Pijukatel)
+
+
+## [0.6.8](https://github.com/apify/crawlee-python/releases/tag/v0.6.8) (2025-04-25)
 
 ### 🚀 Features
 
@@ -17,7 +42,6 @@ All notable changes to this project will be documented in this file.
 - Call `failed_request_handler` for `SessionError` when session rotation count exceeds maximum ([#1147](https://github.com/apify/crawlee-python/pull/1147)) ([b3637b6](https://github.com/apify/crawlee-python/commit/b3637b68ec7eae9de7f1b923fa2f68885da64b90)) by [@Mantisus](https://github.com/Mantisus)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.6.7](https://github.com/apify/crawlee-python/releases/tag/v0.6.7) (2025-04-17)
 
 ### 🚀 Features

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from abc import ABC
 from typing import TYPE_CHECKING, Any, Callable, Generic, Union
@@ -157,6 +158,7 @@ class AbstractHttpCrawler(
             kwargs.setdefault('strategy', 'same-hostname')
 
             requests = list[Request]()
+            skipped = list[str]()
             base_user_data = user_data or {}
 
             robots_txt_file = await self._get_robots_txt_file_for_url(context.request.url)
@@ -168,8 +170,7 @@ class AbstractHttpCrawler(
                     url = convert_to_absolute_url(base_url, url)
 
                 if robots_txt_file and not robots_txt_file.is_allowed(url):
-                    # TODO: https://github.com/apify/crawlee-python/issues/1160
-                    # add processing with on_skipped_request hook
+                    skipped.append(url)
                     continue
 
                 request_options = RequestOptions(url=url, user_data={**base_user_data}, label=label)
@@ -192,6 +193,12 @@ class AbstractHttpCrawler(
                     continue
 
                 requests.append(request)
+
+            if skipped:
+                skipped_tasks = [
+                    asyncio.create_task(self._handle_skipped_request(request, 'robots_txt')) for request in skipped
+                ]
+                await asyncio.gather(*skipped_tasks)
             return requests
 
         return extract_links

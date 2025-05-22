@@ -9,10 +9,11 @@ from typing import TYPE_CHECKING, ClassVar, Literal, overload
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.docs import docs_group
 from crawlee.sessions._cookies import CookieParam, SessionCookies
-from crawlee.sessions._models import SessionModel
 
 if TYPE_CHECKING:
     from http.cookiejar import CookieJar
+
+    from crawlee.sessions._models import SessionModel
 
 logger = getLogger(__name__)
 
@@ -146,6 +147,8 @@ class Session:
 
     def get_state(self, *, as_dict: bool = False) -> SessionModel | dict:
         """Retrieve the current state of the session either as a model or as a dictionary."""
+        from ._models import SessionModel
+
         model = SessionModel(
             id=self._id,
             max_age=self._max_age,
@@ -157,7 +160,7 @@ class Session:
             max_usage_count=self._max_usage_count,
             error_score=self._error_score,
             cookies=self._cookies.get_cookies_as_dicts(),
-            blocked_status_codes=self._blocked_status_codes,
+            blocked_status_codes=list(self._blocked_status_codes),
         )
         if as_dict:
             return model.model_dump()

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "crawlee"
-version = "0.6.8"
+version = "0.6.10"
 description = "Crawlee for Python"
 authors = [{ name = "Apify Technologies s.r.o.", email = "support@apify.com" }]
 license = { file = "LICENSE" }
@@ -36,6 +36,7 @@ dependencies = [
     "apify_fingerprint_datapoints>=0.0.2",
     "browserforge>=1.2.3",
     "cachetools>=5.5.0",
+    "certifi<=2025.1.31",  # Not a direct dependency. Temporarily pinned. Dependency can be removed after: https://github.com/apify/crawlee-python/issues/1182
     "colorama>=0.4.0",
     "eval-type-backport>=0.2.0",
     "httpx[brotli,http2,zstd]>=0.27.0",
@@ -105,7 +106,7 @@ dev = [
     "pytest-xdist~=3.6.0",
     "pytest~=8.3.0",
     "ruff~=0.11.0",
-    "setuptools~=79.0.0",                    # setuptools are used by pytest, but not explicitly required
+    "setuptools",  # setuptools are used by pytest, but not explicitly required
     "sortedcontainers-stubs~=2.4.0",
     "types-beautifulsoup4~=4.12.0.20240229",
     "types-cachetools~=5.5.0.20240820",
@@ -183,8 +184,9 @@ indent-style = "space"
 "**/docs/examples/code_examples/*crawler_with_error_snapshotter.py" = [
     "PLR2004", # Magic value used in comparison. Ignored for simplicity and readability of example code.
 ]
-
-
+"**/docs/guides/code_examples/running_in_web_server/server.py" = [
+    "TC002", # ruff false positive. Import actually needed during runtime.
+]
 
 [tool.ruff.lint.flake8-quotes]
 docstring-quotes = "double"
@@ -233,6 +235,8 @@ module = [
     "apify",                        # Example code shows integration of apify and crawlee.
     "apify_fingerprint_datapoints", # Untyped and stubs not available
     "camoufox",                     # Example code shows integration of camoufox and crawlee.
+    "fastapi",                      # Example code shows running in webserver.
+    "starlette.*",                  # Example code shows running in webserver.
     "flask",                        # Example code shows deploy on Google Cloud.
     "functions_framework",          # Example code shows deploy on Google Cloud.
     "jaro",                         # Untyped and stubs not available
@@ -245,6 +249,12 @@ module = [
     "inquirer.*",                   # Untyped and stubs not available
 ]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "running_in_web_server.*"  # False positive when fastapi not available
+]
+disable_error_code = ["misc"]
 
 [tool.basedpyright]
 pythonVersion = "3.9"

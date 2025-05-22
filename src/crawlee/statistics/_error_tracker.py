@@ -26,13 +26,14 @@ class ErrorTracker:
     def __init__(
         self,
         *,
+        snapshot_kvs_name: str | None = None,
         show_error_name: bool = True,
         show_file_and_line_number: bool = True,
         show_error_message: bool = True,
         show_full_message: bool = False,
         save_error_snapshots: bool = False,
     ) -> None:
-        self.error_snapshotter = ErrorSnapshotter() if save_error_snapshots else None
+        self.error_snapshotter = ErrorSnapshotter(snapshot_kvs_name=snapshot_kvs_name) if save_error_snapshots else None
         self.show_error_name = show_error_name
         self.show_file_and_line_number = show_file_and_line_number
         self.show_error_message = show_error_message
@@ -124,9 +125,11 @@ class ErrorTracker:
 
     def _get_error_message(self, error: Exception) -> str:
         if self.show_error_message:
+            error_content = error.args[0] if error.args else error.__context__
+            error_content = str(error_content) if error_content else error.__class__.__name__
             if self.show_full_message:
-                return str(error.args[0])
-            return str(error.args[0]).split('\n')[0]
+                return error_content
+            return error_content.split('\n')[0]
         return ''
 
     @property

@@ -50,6 +50,8 @@ RequestTransformAction: TypeAlias = Literal['skip', 'unchanged']
 EnqueueStrategy: TypeAlias = Literal['all', 'same-domain', 'same-hostname', 'same-origin']
 """Enqueue strategy to be used for determining which links to extract and enqueue."""
 
+SkippedReason: TypeAlias = Literal['robots_txt']
+
 
 def _normalize_headers(headers: Mapping[str, str]) -> dict[str, str]:
     """Convert all header keys to lowercase, strips whitespace, and returns them sorted by key."""
@@ -546,6 +548,7 @@ class SendRequestFunction(Protocol):
         url: str,
         *,
         method: HttpMethod = 'GET',
+        payload: HttpPayload | None = None,
         headers: HttpHeaders | dict[str, str] | None = None,
     ) -> Coroutine[None, None, HttpResponse]:
         """Call send request function.
@@ -554,6 +557,7 @@ class SendRequestFunction(Protocol):
             url: The URL to send the request to.
             method: The HTTP method to use.
             headers: The headers to include in the request.
+            payload: The payload to include in the request.
 
         Returns:
             The HTTP response received from the server.
