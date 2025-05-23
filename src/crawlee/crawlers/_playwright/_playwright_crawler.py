@@ -4,6 +4,7 @@ import asyncio
 import logging
 from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, Generic, Literal, Union
+from urllib.parse import urlparse
 
 from pydantic import ValidationError
 from typing_extensions import NotRequired, TypedDict, TypeVar
@@ -295,8 +296,6 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
             The `PlaywrightCrawler` implementation of the `ExtractLinksFunction` function.
             """
-            kwargs.setdefault('strategy', 'same-hostname')
-
             requests = list[Request]()
             skipped = list[str]()
             base_user_data = user_data or {}
@@ -305,7 +304,15 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
             robots_txt_file = await self._get_robots_txt_file_for_url(context.request.url)
 
+            strategy = kwargs.get('strategy', 'same-hostname')
+            include_blobs = kwargs.get('include')
+            exclude_blobs = kwargs.get('exclude')
+            limit_requests = kwargs.get('limit')
+
             for element in elements:
+                if limit_requests and len(requests) >= limit_requests:
+                    break
+
                 url = await element.get_attribute('href')
 
                 if url:
@@ -319,26 +326,31 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                         skipped.append(url)
                         continue
 
-                    request_option = RequestOptions({'url': url, 'user_data': {**base_user_data}, 'label': label})
+                    if self._check_enqueue_strategy(
+                        strategy,
+                        target_url=urlparse(url),
+                        origin_url=urlparse(context.request.url),
+                    ) and self._check_url_patterns(url, include_blobs, exclude_blobs):
+                        request_option = RequestOptions({'url': url, 'user_data': {**base_user_data}, 'label': label})
 
-                    if transform_request_function:
-                        transform_request_option = transform_request_function(request_option)
-                        if transform_request_option == 'skip':
+                        if transform_request_function:
+                            transform_request_option = transform_request_function(request_option)
+                            if transform_request_option == 'skip':
+                                continue
+                            if transform_request_option != 'unchanged':
+                                request_option = transform_request_option
+
+                        try:
+                            request = Request.from_url(**request_option)
+                        except ValidationError as exc:
+                            context.log.debug(
+                                f'Skipping URL "{url}" due to invalid format: {exc}. '
+                                'This may be caused by a malformed URL or unsupported URL scheme. '
+                                'Please ensure the URL is correct and retry.'
+                            )
                             continue
-                        if transform_request_option != 'unchanged':
-                            request_option = transform_request_option
 
-                    try:
-                        request = Request.from_url(**request_option)
-                    except ValidationError as exc:
-                        context.log.debug(
-                            f'Skipping URL "{url}" due to invalid format: {exc}. '
-                            'This may be caused by a malformed URL or unsupported URL scheme. '
-                            'Please ensure the URL is correct and retry.'
-                        )
-                        continue
-
-                    requests.append(request)
+                        requests.append(request)
 
             if skipped:
                 skipped_tasks = [
