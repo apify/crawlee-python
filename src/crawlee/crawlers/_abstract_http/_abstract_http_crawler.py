@@ -4,6 +4,7 @@ import asyncio
 import logging
 from abc import ABC
 from typing import TYPE_CHECKING, Any, Callable, Generic, Union
+from urllib.parse import urlparse
 
 from pydantic import ValidationError
 from typing_extensions import TypeVar
@@ -155,15 +156,21 @@ class AbstractHttpCrawler(
             | None = None,
             **kwargs: Unpack[EnqueueLinksKwargs],
         ) -> list[Request]:
-            kwargs.setdefault('strategy', 'same-hostname')
-
             requests = list[Request]()
             skipped = list[str]()
             base_user_data = user_data or {}
 
             robots_txt_file = await self._get_robots_txt_file_for_url(context.request.url)
 
+            strategy = kwargs.get('strategy', 'same-hostname')
+            include_blobs = kwargs.get('include')
+            exclude_blobs = kwargs.get('exclude')
+            limit_requests = kwargs.get('limit')
+
             for link in self._parser.find_links(parsed_content, selector=selector):
+                if limit_requests and len(requests) >= limit_requests:
+                    break
+
                 url = link
                 if not is_url_absolute(url):
                     base_url = context.request.loaded_url or context.request.url
@@ -173,26 +180,31 @@ class AbstractHttpCrawler(
                     skipped.append(url)
                     continue
 
-                request_options = RequestOptions(url=url, user_data={**base_user_data}, label=label)
+                if self._check_enqueue_strategy(
+                    strategy,
+                    target_url=urlparse(url),
+                    origin_url=urlparse(context.request.url),
+                ) and self._check_url_patterns(url, include_blobs, exclude_blobs):
+                    request_options = RequestOptions(url=url, user_data={**base_user_data}, label=label)
 
-                if transform_request_function:
-                    transform_request_options = transform_request_function(request_options)
-                    if transform_request_options == 'skip':
+                    if transform_request_function:
+                        transform_request_options = transform_request_function(request_options)
+                        if transform_request_options == 'skip':
+                            continue
+                        if transform_request_options != 'unchanged':
+                            request_options = transform_request_options
+
+                    try:
+                        request = Request.from_url(**request_options)
+                    except ValidationError as exc:
+                        context.log.debug(
+                            f'Skipping URL "{url}" due to invalid format: {exc}. '
+                            'This may be caused by a malformed URL or unsupported URL scheme. '
+                            'Please ensure the URL is correct and retry.'
+                        )
                         continue
-                    if transform_request_options != 'unchanged':
-                        request_options = transform_request_options
 
-                try:
-                    request = Request.from_url(**request_options)
-                except ValidationError as exc:
-                    context.log.debug(
-                        f'Skipping URL "{url}" due to invalid format: {exc}. '
-                        'This may be caused by a malformed URL or unsupported URL scheme. '
-                        'Please ensure the URL is correct and retry.'
-                    )
-                    continue
-
-                requests.append(request)
+                    requests.append(request)
 
             if skipped:
                 skipped_tasks = [

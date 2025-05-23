@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from unittest import mock
 
-from crawlee import ConcurrencySettings, HttpHeaders, RequestTransformAction, SkippedReason
+from crawlee import ConcurrencySettings, Glob, HttpHeaders, RequestTransformAction, SkippedReason
 from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 
 if TYPE_CHECKING:
@@ -183,3 +183,18 @@ async def test_on_skipped_request(server_url: URL, http_client: HttpClient) -> N
         str(server_url / 'page_2'),
         str(server_url / 'page_3'),
     }
+
+
+async def test_extract_links(server_url: URL, http_client: HttpClient) -> None:
+    crawler = BeautifulSoupCrawler(http_client=http_client)
+    extracted_links: list[str] = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
+        links = await context.extract_links(exclude=[Glob(f'{server_url}sub_index')])
+        extracted_links.extend(request.url for request in links)
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+    assert len(extracted_links) == 1
+    assert extracted_links[0] == str(server_url / 'page_1')
