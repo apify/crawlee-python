@@ -35,12 +35,21 @@ if TYPE_CHECKING:
     from yarl import URL
 
     from crawlee._request import RequestOptions
+    from crawlee._types import HttpMethod, HttpPayload
     from crawlee.browsers._types import BrowserType
     from crawlee.crawlers import PlaywrightCrawlingContext, PlaywrightPreNavCrawlingContext
 
 
-async def test_basic_request(server_url: URL) -> None:
-    requests = [str(server_url)]
+@pytest.mark.parametrize(
+    ('method', 'path', 'payload'),
+    [
+        pytest.param('GET', 'get', None, id='get request'),
+        pytest.param('POST', 'post', None, id='post request'),
+        pytest.param('POST', 'post', b'Hello, world!', id='post request with payload'),
+    ],
+)
+async def test_basic_request(method: HttpMethod, path: str, payload: HttpPayload, server_url: URL) -> None:
+    requests = [Request.from_url(str(server_url / path), method=method, payload=payload)]
     crawler = PlaywrightCrawler()
     result: dict = {}
 
@@ -49,14 +58,11 @@ async def test_basic_request(server_url: URL) -> None:
         assert context.page is not None
         result['request_url'] = context.request.url
         result['page_url'] = context.page.url
-        result['page_title'] = await context.page.title()
         result['page_content'] = await context.page.content()
 
     await crawler.run(requests)
-
-    assert result.get('request_url') == result.get('page_url') == requests[0]
-    assert 'Hello, world!' in result.get('page_title', '')
-    assert '<html' in result.get('page_content', '')  # there is some HTML content
+    assert result.get('request_url') == result.get('page_url') == requests[0].url
+    assert (payload.decode() if payload else '') in result.get('page_content', '')
 
 
 async def test_enqueue_links(redirect_server_url: URL, server_url: URL) -> None:
