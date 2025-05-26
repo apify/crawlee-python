@@ -220,13 +220,15 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 await hook(pre_navigation_context)
         yield pre_navigation_context
 
-    def _prepare_request_handler(
+    def _prepare_request_interceptor(
         self,
         method: HttpMethod = 'GET',
         headers: HttpHeaders | dict[str, str] | None = None,
         payload: HttpPayload | None = None,
     ) -> Callable:
-        """Create a route handler for Playwright to support non-GET methods with custom parameters.
+        """Create a request interceptor for Playwright to support non-GET methods with custom parameters.
+
+        The interceptor modifies requests by adding custom headers and payload before they are sent.
 
         Args:
             method: HTTP method to use for the request.
@@ -273,7 +275,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                     stacklevel=2,
                 )
 
-                route_handler = self._prepare_request_handler(
+                route_handler = self._prepare_request_interceptor(
                     method=context.request.method,
                     headers=context.request.headers,
                     payload=context.request.payload,
