@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - Fix match check for specified enqueue strategy for requests with redirect ([#1199](https://github.com/apify/crawlee-python/pull/1199)) ([d84c30c](https://github.com/apify/crawlee-python/commit/d84c30cbd7c94d6525d3b6e8e86b379050454c0e)) by [@Mantisus](https://github.com/Mantisus), closes [#1198](https://github.com/apify/crawlee-python/issues/1198)
 - Set `WindowsSelectorEventLoopPolicy` only for curl-impersonate template without `playwright` ([#1209](https://github.com/apify/crawlee-python/pull/1209)) ([f3b839f](https://github.com/apify/crawlee-python/commit/f3b839ffc2ccc1b889b6d5928f35f57b725e27f1)) by [@Mantisus](https://github.com/Mantisus), closes [#1204](https://github.com/apify/crawlee-python/issues/1204)
 - Add support non-GET requests for `PlaywrightCrawler` ([#1208](https://github.com/apify/crawlee-python/pull/1208)) ([dbb9f44](https://github.com/apify/crawlee-python/commit/dbb9f44c71af15e1f86766fa0ba68281dd85fd9e)) by [@Mantisus](https://github.com/Mantisus), closes [#1201](https://github.com/apify/crawlee-python/issues/1201)
+- Respect `EnqueueLinksKwargs` for `extract_links` function ([#1213](https://github.com/apify/crawlee-python/pull/1213)) ([c9907d6](https://github.com/apify/crawlee-python/commit/c9907d6ff4c3a4a719b279cea77694c00a5a963d)) by [@Mantisus](https://github.com/Mantisus), closes [#1212](https://github.com/apify/crawlee-python/issues/1212)
 
 
 <!-- git-cliff-unreleased-end -->
