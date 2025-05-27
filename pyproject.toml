@@ -103,7 +103,7 @@ dev = [
     "pytest-asyncio~=0.26.0",
     "pytest-cov~=6.1.0",
     "pytest-only~=2.1.0",
-    "pytest-xdist~=3.6.0",
+    "pytest-xdist~=3.7.0",
     "pytest~=8.3.0",
     "ruff~=0.11.0",
     "setuptools",  # setuptools are used by pytest, but not explicitly required
