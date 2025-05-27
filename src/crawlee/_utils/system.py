@@ -89,7 +89,7 @@ def get_memory_info() -> MemoryInfo:
         # Ignore any NoSuchProcess exception that might occur if a child process ends before we retrieve
         # its memory usage.
         with suppress(psutil.NoSuchProcess):
-            # In the case of children try to estimate memory usage from USS to avoid overestimation due to shared memory
+            # In the case of children try to estimate memory usage from PSS to avoid overestimation due to shared memory
             current_size_bytes += _get_used_memory(child.memory_full_info())
 
     total_size_bytes = psutil.virtual_memory().total
@@ -110,7 +110,7 @@ def _get_used_memory(memory_full_info: Any) -> int:
     """
     try:
         # Overwhelming majority use-case (Linux, macOS, Windows)
-        if memory_full_info.rss ==0:
+        if memory_full_info.pss ==0:
             raise Exception()
 
         return int(memory_full_info.pss)

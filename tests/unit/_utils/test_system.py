@@ -4,11 +4,15 @@ import gc
 import os
 import sys
 import time
-from multiprocessing import Array, Process, Value, Event
+from multiprocessing import Array, Process, Value, Event, Barrier, heap
+from multiprocessing.shared_memory import SharedMemory
+from multiprocessing.managers import SharedMemoryManager
 from random import randint
 from typing import TYPE_CHECKING
 
+import psutil
 import pytest
+from anyio import sleep
 
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.system import get_cpu_info, get_memory_info
@@ -41,67 +45,81 @@ def test_memory_estimation_does_not_overestimate_due_to_shared_memory() -> None:
     are running."""
 
     # The threshold for memory usage ratio of unshared_used_memory processes and shared_used_memory processes
-    good_enough_threshold = 0.5
 
     def parent_process() -> None:
-        sleep_time_for_measurement = 10
+        extra_memory_size = 1024*1024*10  # 1 MB shared memory
+        children_count = 1
 
-        def get_test_list() -> SynchronizedArray[int]:
-            return list(randint(1,10000) for _ in range(1_000_000))
 
-        def get_test_array() -> SynchronizedArray[int]:
-            return Array('i', get_test_list())
-
-        def no_extra_memory_child(ready_event: Event, measured: Event) -> None:
-            ready_event.set()
+        def no_extra_memory_child(ready: Barrier, measured: Barrier) -> None:
+            ready.wait()
             measured.wait()
             return None
 
-        def extra_memory_child(ready_event: Event, measured: Event) -> SynchronizedArray[int]:
-            array = get_test_list()
-            ready_event.set()
+        def extra_memory_child(ready: Barrier, measured: Barrier) -> None:
+            current_process = psutil.Process(os.getpid())
+            before = current_process.memory_full_info()
+            memory = SharedMemory(size=extra_memory_size, create=True)
+            during = current_process.memory_full_info()
+            memory.buf[:] = bytearray([1 for _ in range(extra_memory_size)])
+            during2 = current_process.memory_full_info()
+            ready.wait()
             measured.wait()
-            return array[-1]
+            memory.close()
+            memory.unlink()
+            after = current_process.memory_full_info()
+            print("")
 
-        def shared_extra_memory_child(ready_event: Event, measured: Event, shared_array: SynchronizedArray[int]) -> SynchronizedArray[int]:
-            ready_event.set()
+        def shared_extra_memory_child(ready: Barrier, measured: Barrier, memory: SharedMemory) -> None:
+            ready.wait()
             measured.wait()
-            return shared_array[-1]
 
-        def get_additional_memory_estimation_while_running_processes(*,target: callable, count: int = 1, process_args: list | None = None) -> ByteSize:
-            extra_args = process_args or []
+
+        def get_additional_memory_estimation_while_running_processes(*,target: callable, count: int = 1, use_shared_memory: bool = False) -> ByteSize:
             ready_events = []
             processes = []
-            measured_event = Event()
+            ready = Barrier(parties=count+1)
+            measured_event = Barrier(parties=count+1)
             memory_before = get_memory_info().current_size
+            shared_memory = None
+
+            if use_shared_memory:
+                shared_memory = SharedMemory(size=extra_memory_size, create=True)
+                shared_memory.buf[:] = bytearray([1 for _ in range(extra_memory_size)])
+                extra_args = [shared_memory]
+            else:
+                extra_args = []
 
             for _ in range(count):
                 ready_event = Event()
                 ready_events.append(ready_event)
-                p = Process(target=target, args=[ready_event, measured_event] + extra_args)
+                p = Process(target=target, args=[ready, measured_event] + extra_args)
                 p.start()
                 processes.append(p)
-                ready_event.wait()
+
+            ready.wait()
 
             memory_during = get_memory_info().current_size
-            measured_event.set()
+            measured_event.wait()
 
             for p in processes:
                 p.join()
 
+            if shared_memory:
+                shared_memory.close()
+                shared_memory.unlink()
+
             return (memory_during - memory_before).to_mb()/count
 
-        children_count = 10
-        shared_array = get_test_array()
-        additional_memory_size_estimate = ByteSize(sys.getsizeof(shared_array[0]) * len(shared_array)).to_mb()
 
 
         additional_memory_simple_child = get_additional_memory_estimation_while_running_processes(
             target=no_extra_memory_child, count=children_count)
-        additional_memory_extra_memory_child = get_additional_memory_estimation_while_running_processes(
-            target=extra_memory_child, count=children_count)
         additional_memory_shared_extra_memory_child = get_additional_memory_estimation_while_running_processes(
-            target=shared_extra_memory_child, count=children_count, process_args=[shared_array])
+            target=shared_extra_memory_child, count=children_count, use_shared_memory=True) - additional_memory_simple_child
+        additional_memory_extra_memory_child = get_additional_memory_estimation_while_running_processes(
+            target=extra_memory_child, count=children_count) - additional_memory_simple_child
+
 
         """
         # This is not exact measurement, just estimation. Allow for some tolerance.
