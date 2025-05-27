@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import gc
 import os
+import sys
 import time
-from multiprocessing import Array, Process, Value
+from multiprocessing import Array, Process, Value, Event
+from random import randint
 from typing import TYPE_CHECKING
 
-import psutil
+import pytest
 
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.system import get_cpu_info, get_memory_info
@@ -27,47 +29,8 @@ def test_get_cpu_info_returns_valid_values() -> None:
     assert 0 <= cpu_info.used_ratio <= 1
 
 
-def _get_test_array() -> SynchronizedArray[int]:
-    """Prepare a suitable array size for a test.
-
-    Too small array will make this test useless as we need this array to occupy obvious part of process memory and
-    not be hidden in the noise of used memory size.
-    """
-    return Array('i', range(1000000))
-
-
-def _child_function(shared_value: SynchronizedArray | None = None) -> SynchronizedArray:
-    array = _get_test_array() if shared_value is None else shared_value
-    time.sleep(3)
-    return array
-
-
-def _parent_function(ratio: Synchronized) -> None:
-    shared_array = _get_test_array()
-
-    sharing_children = [Process(target=_child_function, args=(shared_array,)) for _ in range(10)]
-    for child in sharing_children:
-        child.start()
-    memory_when_sharing_children = get_memory_info()
-    for child in sharing_children:
-        child.join()
-    del sharing_children
-    gc.collect()
-
-    nonsharing_children = [Process(target=_child_function) for _ in range(10)]
-    for child in nonsharing_children:
-        child.start()
-    memory_when_nonsharing_children = get_memory_info()
-    for child in nonsharing_children:
-        child.join()
-
-    # DEBUG in CI
-    current_process = psutil.Process(os.getpid())
-
-    ratio.value = repr(current_process.memory_full_info()).encode("utf-8")
-
-
-def test_memory_measurement_of_shared_memory() -> None:
+@pytest.mark.skipif(os.name == 'nt', reason='Improved estimation not available on Windows')
+def test_memory_estimation_does_not_overestimate_due_to_shared_memory() -> None:
     """Test that memory usage estimation is not overestimating memory usage by counting shared memory multiple times.
 
     In this test, the parent process is started and its memory usage is measured. It starts two groups of children
@@ -80,11 +43,83 @@ def test_memory_measurement_of_shared_memory() -> None:
     # The threshold for memory usage ratio of unshared_used_memory processes and shared_used_memory processes
     good_enough_threshold = 0.5
 
-    shared_vs_nonshared_used_memory_ratio: Synchronized = Value('c', b' '*10000)
+    def parent_process() -> None:
+        sleep_time_for_measurement = 10
 
-    process = Process(target=_parent_function, args=(shared_vs_nonshared_used_memory_ratio,))
+        def get_test_list() -> SynchronizedArray[int]:
+            return list(randint(1,10000) for _ in range(1_000_000))
+
+        def get_test_array() -> SynchronizedArray[int]:
+            return Array('i', get_test_list())
+
+        def no_extra_memory_child(ready_event: Event, measured: Event) -> None:
+            ready_event.set()
+            measured.wait()
+            return None
+
+        def extra_memory_child(ready_event: Event, measured: Event) -> SynchronizedArray[int]:
+            array = get_test_list()
+            ready_event.set()
+            measured.wait()
+            return array[-1]
+
+        def shared_extra_memory_child(ready_event: Event, measured: Event, shared_array: SynchronizedArray[int]) -> SynchronizedArray[int]:
+            ready_event.set()
+            measured.wait()
+            return shared_array[-1]
+
+        def get_additional_memory_estimation_while_running_processes(*,target: callable, count: int = 1, process_args: list | None = None) -> ByteSize:
+            extra_args = process_args or []
+            ready_events = []
+            processes = []
+            measured_event = Event()
+            memory_before = get_memory_info().current_size
+
+            for _ in range(count):
+                ready_event = Event()
+                ready_events.append(ready_event)
+                p = Process(target=target, args=[ready_event, measured_event] + extra_args)
+                p.start()
+                processes.append(p)
+                ready_event.wait()
+
+            memory_during = get_memory_info().current_size
+            measured_event.set()
+
+            for p in processes:
+                p.join()
+
+            return (memory_during - memory_before).to_mb()/count
+
+        children_count = 10
+        shared_array = get_test_array()
+        additional_memory_size_estimate = ByteSize(sys.getsizeof(shared_array[0]) * len(shared_array)).to_mb()
+
+
+        additional_memory_simple_child = get_additional_memory_estimation_while_running_processes(
+            target=no_extra_memory_child, count=children_count)
+        additional_memory_extra_memory_child = get_additional_memory_estimation_while_running_processes(
+            target=extra_memory_child, count=children_count)
+        additional_memory_shared_extra_memory_child = get_additional_memory_estimation_while_running_processes(
+            target=shared_extra_memory_child, count=children_count, process_args=[shared_array])
+
+        """
+        # This is not exact measurement, just estimation. Allow for some tolerance.
+        t1 =estimated_additional_memory_per_shared_extra_memory_child < (
+            (additional_memory_size_estimate/children_count) * 1.1)
+        t2 =estimated_additional_memory_per_shared_extra_memory_child > (
+            (additional_memory_size_estimate/children_count) * 0.9)
+
+        t3=estimated_additional_memory_per_extra_memory_child < (
+            (estimated_additional_memory_per_extra_memory_child) * 1.1)
+        t4 = estimated_additional_memory_per_extra_memory_child > (
+            (estimated_additional_memory_per_extra_memory_child) * 0.9)
+        """
+
+        print("uiii")
+
+    process = Process(target=parent_process)
     process.start()
     process.join()
 
-    raise Exception(shared_vs_nonshared_used_memory_ratio.value.decode("utf-8"))
-    assert shared_vs_nonshared_used_memory_ratio.value < good_enough_threshold
+

@@ -82,7 +82,7 @@ def get_memory_info() -> MemoryInfo:
     # Retrieve the Resident Set Size (RSS) of the current process. RSS is the portion of memory
     # occupied by a process that is held in RAM.
     # Use RSS as a conservative estimate that can be overestimating due to including shared memory as opposed to USS.
-    current_size_bytes = int(current_process.memory_full_info().rss)
+    current_size_bytes = int(_get_used_memory(current_process.memory_full_info()))
 
     # Sum memory usage by all children processes, try to exclude shared memory from the sum if allowed by OS.
     for child in current_process.children(recursive=True):
@@ -110,7 +110,10 @@ def _get_used_memory(memory_full_info: Any) -> int:
     """
     try:
         # Overwhelming majority use-case (Linux, macOS, Windows)
-        return int(memory_full_info.uss)
+        if memory_full_info.rss ==0:
+            raise Exception()
+
+        return int(memory_full_info.pss)
     except AttributeError:
         # Very rare use-case
         # Memory usage estimation can overestimate memory usage due to shared memory inclusion.
