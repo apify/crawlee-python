@@ -11,7 +11,15 @@ from unittest.mock import Mock
 
 import pytest
 
-from crawlee import ConcurrencySettings, HttpHeaders, Request, RequestTransformAction, SkippedReason, service_locator
+from crawlee import (
+    ConcurrencySettings,
+    Glob,
+    HttpHeaders,
+    Request,
+    RequestTransformAction,
+    SkippedReason,
+    service_locator,
+)
 from crawlee.configuration import Configuration
 from crawlee.crawlers import PlaywrightCrawler
 from crawlee.fingerprint_suite import (
@@ -704,3 +712,18 @@ async def test_overwrite_configuration() -> None:
     PlaywrightCrawler(configuration=configuration)
     used_configuration = service_locator.get_configuration()
     assert used_configuration is configuration
+
+
+async def test_extract_links(server_url: URL) -> None:
+    crawler = PlaywrightCrawler()
+    extracted_links: list[str] = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        links = await context.extract_links(exclude=[Glob(f'{server_url}sub_index')])
+        extracted_links.extend(request.url for request in links)
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+    assert len(extracted_links) == 1
+    assert extracted_links[0] == str(server_url / 'page_1')
