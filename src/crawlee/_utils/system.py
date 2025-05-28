@@ -103,18 +103,14 @@ def get_memory_info() -> MemoryInfo:
 def _get_used_memory(memory_full_info: Any) -> int:
     """Get the most suitable available used memory metric.
 
-    `Unique Set Size (USS)` is the memory which is unique to a process and which would be freed if the process was
-        terminated right now. It should be available on Linux, macOS, Windows.
+    `Proportional Set Size (PSS)`, is the amount of memory shared with other processes, accounted in a way that the
+    amount is divided evenly between the processes that share it. Available on Linux. Suitable for avoiding
+    overestimation by counting the same shared memory used by children processes multiple times.
     `Resident Set Size (RSS)` is the non-swapped physical memory a process has used; it includes shared memory. It
         should be available everywhere.
     """
     try:
-        # Overwhelming majority use-case (Linux, macOS, Windows)
-        if memory_full_info.pss ==0:
-            raise Exception()
-
+        # Linux
         return int(memory_full_info.pss)
     except AttributeError:
-        # Very rare use-case
-        # Memory usage estimation can overestimate memory usage due to shared memory inclusion.
         return int(memory_full_info.rss)
