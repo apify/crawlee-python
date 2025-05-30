@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-import gzip
+import base64
 import json
 import threading
 import time
@@ -106,8 +106,9 @@ async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
         'status': echo_status,
         'headers': echo_headers,
         'user-agent': echo_user_agent,
-        'get_sitemap.gz': get_sitemap_gz_endpoint,
-        'get_sitemap': get_sitemap_endpoint,
+        'get_sitemap.txt': get_sitemap_endpoint,
+        'get_sitemap.xml': get_sitemap_endpoint,
+        'get_sitemap.xml.gz': get_sitemap_endpoint,
         'get': get_echo,
         'post': post_echo,
         'dynamic_content': dynamic_content,
@@ -376,38 +377,22 @@ async def robots_txt(_scope: dict[str, Any], _receive: Receive, send: Send) -> N
 async def get_sitemap_endpoint(scope: dict[str, Any], _receive: Receive, send: Send) -> None:
     """Handle requests to serve XML sitemap content received in the request."""
     query_params = get_query_params(scope.get('query_string', b''))
-    content = query_params.get('content', '')
+
+    in_content = query_params.get('content', '')
+    in_base64 = query_params.get('base64', '')
+    c_type = query_params.get('c_type', 'application/xml; charset=utf-8')
+
+    out_content = base64.b64decode(in_base64) if in_base64 else in_content.encode()
 
     await send(
         {
             'type': 'http.response.start',
             'status': 200,
-            'headers': [[b'content-type', b'application/xml; charset=utf-8']],
+            'headers': [[b'content-type', c_type.encode()]],
         }
     )
 
-    await send({'type': 'http.response.body', 'body': content.encode()})
-
-
-async def get_sitemap_gz_endpoint(scope: dict[str, Any], _receive: Receive, send: Send) -> None:
-    """Handle requests to serve gzipped XML sitemap content received in the request."""
-    query_params = get_query_params(scope.get('query_string', b''))
-    content = query_params.get('content', '')
-
-    # Compress the content using gzip
-    compressed_content = gzip.compress(content.encode())
-
-    await send(
-        {
-            'type': 'http.response.start',
-            'status': 200,
-            'headers': [
-                [b'content-type', b'application/xml; charset=utf-8'],
-                [b'content-encoding', b'gzip'],
-            ],
-        }
-    )
-    await send({'type': 'http.response.body', 'body': compressed_content})
+    await send({'type': 'http.response.body', 'body': out_content})
 
 
 class TestServer(Server):

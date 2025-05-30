@@ -194,7 +194,7 @@ class _XmlSitemapParser:
 
 def _get_parser(content_type: str = '', url: str | None = None) -> _XmlSitemapParser | _TxtSitemapParser:
     """Create appropriate parser based on content type and URL."""
-    if 'text/plain' in content_type.lower() or (url and url.endswith('.txt')):
+    if 'text/plain' in content_type.lower() or (url and URL(url).path.endswith('.txt')):
         return _TxtSitemapParser()
     # Default to XML parser for most cases
     return _XmlSitemapParser()
@@ -315,21 +315,20 @@ async def _fetch_and_process_sitemap(
 
                 # Determine content type and compression
                 content_type = response.headers.get('content-type', '')
-                is_gzipped = (
-                    'application/gzip' in content_type
-                    or 'application/x-gzip' in content_type
-                    or sitemap_url.endswith('.gz')
-                )
 
                 # Create appropriate parser
                 parser = _get_parser(content_type, sitemap_url)
-                decompressor = zlib.decompressobj(zlib.MAX_WBITS | 16) if is_gzipped else None
-
+                decompressor = None
                 try:
                     # Process chunks as they arrive
+                    first_chunk = True
                     async for raw_chunk in response.aiter_bytes(chunk_size=8192):
-                        chunk = decompressor.decompress(raw_chunk) if decompressor else raw_chunk
+                        # Check if the first chunk is a valid gzip header
+                        if first_chunk and raw_chunk.startswith(b'\x1f\x8b'):
+                            decompressor = zlib.decompressobj(zlib.MAX_WBITS | 16)
+                            first_chunk = False
 
+                        chunk = decompressor.decompress(raw_chunk) if decompressor else raw_chunk
                         text_chunk = chunk.decode('utf-8', errors='replace')
                         async for item in parser.process_chunk(text_chunk):
                             async for result in _process_sitemap_item(
