@@ -356,7 +356,6 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             links_iterator: Iterator[str] = iter(
                 [url for element in elements if (url := await element.get_attribute('href')) is not None]
             )
-
             links_iterator = to_absolute_url_iterator(context.request.loaded_url or context.request.url, links_iterator)
 
             if robots_txt_file:
@@ -386,11 +385,10 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
                 requests.append(request)
 
-            if skipped:
-                skipped_tasks = [
-                    asyncio.create_task(self._handle_skipped_request(request, 'robots_txt')) for request in skipped
-                ]
-                await asyncio.gather(*skipped_tasks)
+            skipped_tasks = [
+                asyncio.create_task(self._handle_skipped_request(request, 'robots_txt')) for request in skipped
+            ]
+            await asyncio.gather(*skipped_tasks)
 
             return requests
 
