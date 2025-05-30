@@ -24,7 +24,6 @@ import KvsWithCrawlerExample from '!!raw-loader!roa-loader!./code_examples/stora
 import KvsWithCrawlerExplicitExample from '!!raw-loader!roa-loader!./code_examples/storages/kvs_with_crawler_explicit_example.py';
 
 import CleaningDoNotPurgeExample from '!!raw-loader!roa-loader!./code_examples/storages/cleaning_do_not_purge_example.py';
-import CleaningPurgeExplicitlyExample from '!!raw-loader!roa-loader!./code_examples/storages/cleaning_purge_explicitly_example.py';
 
 Crawlee offers multiple storage types for managing and persisting your crawling data. Request-oriented storages, such as the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, help you store and deduplicate URLs, while result-oriented storages, like <ApiLink to="class/Dataset">`Dataset`</ApiLink> and <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, focus on storing and retrieving scraping results. This guide helps you choose the storage type that suits your needs.
 
@@ -209,12 +208,6 @@ Default storages are purged before the crawler starts, unless explicitly configu
 </RunnableCodeBlock>
 
 If you do not explicitly interact with storages in your code, the purging will occur automatically when the <ApiLink to="class/BasicCrawler#run">`BasicCrawler.run`</ApiLink> method is invoked.
-
-If you need to purge storages earlier, you can call <ApiLink to="class/MemoryStorageClient#purge_on_start">`MemoryStorageClient.purge_on_start`</ApiLink> directly if you are using the default storage client. This method triggers the purging process for the underlying storage implementation you are currently using.
-
-<RunnableCodeBlock className="language-python" language="python">
-    {CleaningPurgeExplicitlyExample}
-</RunnableCodeBlock>
 
 ## Conclusion
 
