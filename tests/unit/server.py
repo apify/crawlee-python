@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import threading
 import time
@@ -23,9 +24,9 @@ from tests.unit.server_endpoints import (
 if TYPE_CHECKING:
     from socket import socket
 
-
 Receive = Callable[[], Awaitable[dict[str, Any]]]
 Send = Callable[[dict[str, Any]], Coroutine[None, None, None]]
+PathHandler = Callable[[dict[str, Any], Receive, Send], Coroutine[None, None, None]]
 
 
 def get_headers_dict(scope: dict[str, Any]) -> dict[str, str]:
@@ -92,55 +93,48 @@ async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
         send: The ASGI send function.
     """
     assert scope['type'] == 'http'
-    path = scope['path']
-
+    paths: dict[str, PathHandler] = {
+        'start_enqueue': start_enqueue_endpoint,
+        'sub_index': secondary_index_endpoint,
+        'incapsula': incapsula_endpoint,
+        'page_1': generic_response_endpoint,
+        'page_2': generic_response_endpoint,
+        'page_3': generic_response_endpoint,
+        'set_cookies': set_cookies,
+        'set_complex_cookies': set_complex_cookies,
+        'cookies': get_cookies,
+        'status': echo_status,
+        'headers': echo_headers,
+        'user-agent': echo_user_agent,
+        'get_sitemap.txt': get_sitemap_endpoint,
+        'get_sitemap.xml': get_sitemap_endpoint,
+        'get_sitemap.xml.gz': get_sitemap_endpoint,
+        'get': get_echo,
+        'post': post_echo,
+        'dynamic_content': dynamic_content,
+        'redirect': redirect_to_url,
+        'json': hello_world_json,
+        'xml': hello_world_xml,
+        'robots.txt': robots_txt,
+    }
+    path_parts = URL(scope['path']).parts
+    path = path_parts[1] if len(path_parts) > 1 else path_parts[0]
     # Route requests to appropriate handlers
-    if path.startswith('/start_enqueue'):
-        await start_enqueue_endpoint(send)
-    elif path.startswith('/sub_index'):
-        await secondary_index_endpoint(send)
-    elif path.startswith('/incapsula'):
-        await incapsula_endpoint(send)
-    elif path.startswith(('/page_1', '/page_2', '/page_3')):
-        await generic_response_endpoint(send)
-    elif path.startswith('/set_cookies'):
-        await set_cookies(scope, send)
-    elif path.startswith('/set_complex_cookies'):
-        await set_complex_cookies(send)
-    elif path.startswith('/cookies'):
-        await get_cookies(scope, send)
-    elif path.startswith('/status/'):
-        await echo_status(scope, send)
-    elif path.startswith('/headers'):
-        await echo_headers(scope, send)
-    elif path.startswith('/user-agent'):
-        await echo_user_agent(scope, send)
-    elif path.startswith('/get'):
-        await get_echo(scope, send)
-    elif path.startswith('/post'):
-        await post_echo(scope, receive, send)
-    elif path.startswith('/dynamic_content'):
-        await dynamic_content(scope, send)
-    elif path.startswith('/redirect'):
-        await redirect_to_url(scope, send)
-    elif path.startswith('/json'):
-        await hello_world_json(send)
-    elif path.startswith('/xml'):
-        await hello_world_xml(send)
-    elif path.startswith('/robots.txt'):
-        await robots_txt(send)
+    if path in paths:
+        path_func = paths[path]
+        await path_func(scope, receive, send)
     else:
-        await hello_world(send)
+        await hello_world(scope, receive, send)
 
 
-async def get_cookies(scope: dict[str, Any], send: Send) -> None:
+async def get_cookies(scope: dict[str, Any], _receive: Receive, send: Send) -> None:
     """Handle requests to retrieve cookies sent in the request."""
     headers = get_headers_dict(scope)
     cookies = get_cookies_from_headers(headers)
     await send_json_response(send, {'cookies': cookies})
 
 
-async def set_cookies(scope: dict[str, Any], send: Send) -> None:
+async def set_cookies(scope: dict[str, Any], _receive: Receive, send: Send) -> None:
     """Handle requests to set cookies from query parameters and redirect."""
 
     query_params = get_query_params(scope.get('query_string', b''))
@@ -165,7 +159,7 @@ async def set_cookies(scope: dict[str, Any], send: Send) -> None:
     await send({'type': 'http.response.body', 'body': b'Redirecting to get_cookies...'})
 
 
-async def hello_world(send: Send) -> None:
+async def hello_world(_scope: dict[str, Any], _receive: Receive, send: Send) -> None:
     """Handle basic requests with a simple HTML response."""
     await send_html_response(
         send,
@@ -173,7 +167,7 @@ async def hello_world(send: Send) -> None:
     )
 
 
-async def hello_world_json(send: Send) -> None:
+async def hello_world_json(_scope: dict[str, Any], _receive: Receive, send: Send) -> None:
     """Handle basic requests with a simple JSON response."""
     await send_json_response(
         send,
@@ -181,7 +175,7 @@ async def hello_world_json(send: Send) -> None:
     )
 
 
-async def hello_world_xml(send: Send) -> None:
+async def hello_world_xml(_scope: dict[str, Any], _receive: Receive, send: Send) -> None:
     """Handle basic requests with a simple XML response."""
     await send_html_response(
         send,
@@ -240,7 +234,7 @@ async def post_echo(scope: dict[str, Any], receive: Receive, send: Send) -> None
     await send_json_response(send, response)
 
 
-async def echo_status(scope: dict[str, Any], send: Send) -> None:
+async def echo_status(scope: dict[str, Any], _receive: Receive, send: Send) -> None:
     """Echo the status code from the URL path."""
     status_code = int(scope['path'].replace('/status/', ''))
     await send(
@@ -253,13 +247,13 @@ async def echo_status(scope: dict[str, Any], send: Send) -> None:
     await send({'type': 'http.response.body', 'body': b''})
 
 
-async def echo_headers(scope: dict[str, Any], send: Send) -> None:
+async def echo_headers(scope: dict[str, Any], _receive: Receive, send: Send) -> None:
     """Echo back the request headers as JSON."""
     headers = get_headers_dict(scope)
     await send_json_response(send, headers)
 
 
-async def start_enqueue_endpoint(send: Send) -> None:
+async def start_enqueue_endpoint(_scope: dict[str, Any], _receive: Receive, send: Send) -> None:
     """Handle requests for the main page with links."""
     await send_html_response(
         send,
@@ -267,7 +261,7 @@ async def start_enqueue_endpoint(send: Send) -> None:
     )
 
 
-async def secondary_index_endpoint(send: Send) -> None:
+async def secondary_index_endpoint(_scope: dict[str, Any], _receive: Receive, send: Send) -> None:
     """Handle requests for the secondary page with links."""
     await send_html_response(
         send,
@@ -275,7 +269,7 @@ async def secondary_index_endpoint(send: Send) -> None:
     )
 
 
-async def incapsula_endpoint(send: Send) -> None:
+async def incapsula_endpoint(_scope: dict[str, Any], _receive: Receive, send: Send) -> None:
     """Handle requests for a page with an incapsula iframe."""
     await send_html_response(
         send,
@@ -283,7 +277,7 @@ async def incapsula_endpoint(send: Send) -> None:
     )
 
 
-async def generic_response_endpoint(send: Send) -> None:
+async def generic_response_endpoint(_scope: dict[str, Any], _receive: Receive, send: Send) -> None:
     """Handle requests with a generic HTML response."""
     await send_html_response(
         send,
@@ -291,7 +285,7 @@ async def generic_response_endpoint(send: Send) -> None:
     )
 
 
-async def redirect_to_url(scope: dict[str, Any], send: Send) -> None:
+async def redirect_to_url(scope: dict[str, Any], _receive: Receive, send: Send) -> None:
     """Handle requests that should redirect to a specified full URL."""
     query_params = get_query_params(scope.get('query_string', b''))
 
@@ -311,14 +305,14 @@ async def redirect_to_url(scope: dict[str, Any], send: Send) -> None:
     await send({'type': 'http.response.body', 'body': f'Redirecting to {target_url}...'.encode()})
 
 
-async def echo_user_agent(scope: dict[str, Any], send: Send) -> None:
+async def echo_user_agent(scope: dict[str, Any], _receive: Receive, send: Send) -> None:
     """Echo back the user agent header as a response."""
     headers = get_headers_dict(scope)
     user_agent = headers.get('user-agent', 'Not provided')
     await send_json_response(send, {'user-agent': user_agent})
 
 
-async def get_echo(scope: dict[str, Any], send: Send) -> None:
+async def get_echo(scope: dict[str, Any], _receive: Receive, send: Send) -> None:
     """Echo back GET request details similar to httpbin.org/get."""
     path = scope.get('path', '')
     query_string = scope.get('query_string', b'')
@@ -343,7 +337,7 @@ async def get_echo(scope: dict[str, Any], send: Send) -> None:
     await send_json_response(send, response)
 
 
-async def set_complex_cookies(send: Send) -> None:
+async def set_complex_cookies(_scope: dict[str, Any], _receive: Receive, send: Send) -> None:
     """Handle requests to set specific cookies with various attributes."""
 
     headers = [
@@ -366,7 +360,7 @@ async def set_complex_cookies(send: Send) -> None:
     await send({'type': 'http.response.body', 'body': b'Cookies have been set!'})
 
 
-async def dynamic_content(scope: dict[str, Any], send: Send) -> None:
+async def dynamic_content(scope: dict[str, Any], _receive: Receive, send: Send) -> None:
     """Handle requests to serve HTML-page with dynamic content received in the request."""
     query_params = get_query_params(scope.get('query_string', b''))
 
@@ -375,9 +369,30 @@ async def dynamic_content(scope: dict[str, Any], send: Send) -> None:
     await send_html_response(send, html_content=content.encode())
 
 
-async def robots_txt(send: Send) -> None:
+async def robots_txt(_scope: dict[str, Any], _receive: Receive, send: Send) -> None:
     """Handle requests for the robots.txt file."""
     await send_html_response(send, ROBOTS_TXT)
+
+
+async def get_sitemap_endpoint(scope: dict[str, Any], _receive: Receive, send: Send) -> None:
+    """Handle requests to serve XML sitemap content received in the request."""
+    query_params = get_query_params(scope.get('query_string', b''))
+
+    in_content = query_params.get('content', '')
+    in_base64 = query_params.get('base64', '')
+    c_type = query_params.get('c_type', 'application/xml; charset=utf-8')
+
+    out_content = base64.b64decode(in_base64) if in_base64 else in_content.encode()
+
+    await send(
+        {
+            'type': 'http.response.start',
+            'status': 200,
+            'headers': [[b'content-type', c_type.encode()]],
+        }
+    )
+
+    await send({'type': 'http.response.body', 'body': out_content})
 
 
 class TestServer(Server):
