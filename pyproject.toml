@@ -96,7 +96,7 @@ crawlee = "crawlee._cli:cli"
 dev = [
     "apify_client",  # For e2e tests.
     "build~=1.2.2",  # For e2e tests.
-    "mypy~=1.15.0",
+    "mypy~=1.16.0",
     "pre-commit~=4.2.0",
     "proxy-py~=2.4.0",
     "pydoc-markdown~=4.8.0",
