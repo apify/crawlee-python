@@ -935,7 +935,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         return enqueue_links
 
-    def _filter_enqueue_links_iterator(
+    def _enqueue_links_filter_iterator(
         self, request_iterator: Iterator[TRequestIterator], origin_url: str, **kwargs: Unpack[EnqueueLinksKwargs]
     ) -> Iterator[TRequestIterator]:
         limit = kwargs.get('limit')
@@ -1199,7 +1199,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
             enqueue_links_kwargs: EnqueueLinksKwargs = {k: v for k, v in add_requests_call.items() if k != 'requests'}  # type: ignore[assignment]
 
-            filter_requests_iterator = self._filter_enqueue_links_iterator(
+            filter_requests_iterator = self._enqueue_links_filter_iterator(
                 requests_iterator, context.request.url, **enqueue_links_kwargs
             )
 

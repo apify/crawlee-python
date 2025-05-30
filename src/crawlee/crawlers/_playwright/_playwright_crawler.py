@@ -364,7 +364,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             else:
                 skipped = iter([])
 
-            for url in self._filter_enqueue_links_iterator(links_iterator, context.request.url, **kwargs):
+            for url in self._enqueue_links_filter_iterator(links_iterator, context.request.url, **kwargs):
                 request_option = RequestOptions({'url': url, 'user_data': {**base_user_data}, 'label': label})
 
                 if transform_request_function:
