@@ -100,9 +100,9 @@ def get_memory_info() -> MemoryInfo:
 def _get_used_memory(memory_full_info: Any) -> int:
     """Get the most suitable available used memory metric.
 
-    `Proportional Set Size (PSS)`, is the amount of own memory and memory shared with other processes, accounted in a way
-    that the shared amount is divided evenly between the processes that share it. Available on Linux. Suitable for avoiding
-    overestimation by counting the same shared memory used by children processes multiple times.
+    `Proportional Set Size (PSS)`, is the amount of own memory and memory shared with other processes, accounted in a
+    way that the shared amount is divided evenly between the processes that share it. Available on Linux. Suitable for
+    avoiding overestimation by counting the same shared memory used by children processes multiple times.
 
     `Resident Set Size (RSS)` is the non-swapped physical memory a process has used; it includes shared memory. It
     should be available everywhere.
