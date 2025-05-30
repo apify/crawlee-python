@@ -938,6 +938,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     def _enqueue_links_filter_iterator(
         self, request_iterator: Iterator[TRequestIterator], origin_url: str, **kwargs: Unpack[EnqueueLinksKwargs]
     ) -> Iterator[TRequestIterator]:
+        """Filter requests based on the enqueue strategy and URL patterns."""
         limit = kwargs.get('limit')
         parsed_origin_url = urlparse(origin_url)
 
