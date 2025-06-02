@@ -1286,9 +1286,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
                 context.session.retire()
 
-                if context.request.session_rotation_count is None:
-                    context.request.session_rotation_count = 0
-                context.request.session_rotation_count += 1
+                # Increment session rotation count.
+                context.request.session_rotation_count = (context.request.session_rotation_count or 0) + 1
 
                 await request_manager.reclaim_request(request)
                 await self._statistics.error_tracker_retry.add(error=session_error, context=context)
