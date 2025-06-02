@@ -9,7 +9,7 @@ import pytest
 
 from crawlee import service_locator
 from crawlee._autoscaling import Snapshotter
-from crawlee._autoscaling._types import CpuSnapshot, EventLoopSnapshot, Snapshot
+from crawlee._autoscaling._types import ClientSnapshot, CpuSnapshot, EventLoopSnapshot, Snapshot
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.system import CpuInfo, MemoryInfo
 from crawlee.configuration import Configuration
@@ -66,6 +66,13 @@ def test_snapshot_event_loop(snapshotter: Snapshotter) -> None:
 def test_snapshot_client(snapshotter: Snapshotter) -> None:
     snapshotter._snapshot_client()
     assert len(snapshotter._client_snapshots) == 1
+
+
+def test_snapshot_client_overloaded() -> None:
+    assert not ClientSnapshot(error_count=1, new_error_count=1, max_error_count=2).is_overloaded
+    assert not ClientSnapshot(error_count=2, new_error_count=1, max_error_count=2).is_overloaded
+    assert not ClientSnapshot(error_count=4, new_error_count=2, max_error_count=2).is_overloaded
+    assert ClientSnapshot(error_count=7, new_error_count=3, max_error_count=2).is_overloaded
 
 
 async def test_get_cpu_sample(snapshotter: Snapshotter) -> None:
