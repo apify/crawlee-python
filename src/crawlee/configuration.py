@@ -202,7 +202,7 @@ class Configuration(BaseSettings):
                 'crawlee_max_client_errors',
             )
         ),
-    ] = 1
+    ] = 0
     """The maximum number of client errors (HTTP 429) allowed before the system is considered overloaded.
     This option is used by the `Snapshotter`."""
 

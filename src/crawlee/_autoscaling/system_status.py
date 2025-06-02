@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from more_itertools import pairwise
 
-from crawlee._autoscaling._types import LoadRatioInfo, Snapshot, SystemInfo
+from crawlee._autoscaling._types import LoadRatioInfo, Snapshot, SystemInfo, ClientSnapshot
 from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
@@ -189,6 +189,10 @@ class SystemStatus:
             if time < 0:
                 raise ValueError('Negative time. Code assumptions are not valid. Expected time sorted samples.')
             if current.is_overloaded:
+                if isinstance(current, ClientSnapshot):
+                    logger.warning("SNAPSHOTS")
+                    for snapshot in sample:
+                        logger.warning(snapshot)
                 overloaded_time += time
             else:
                 non_overloaded_time += time

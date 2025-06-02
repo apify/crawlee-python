@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from logging import getLogger
 from typing import TYPE_CHECKING, Union
+
+logger = getLogger(__name__)
 
 if TYPE_CHECKING:
     from crawlee._utils.byte_size import ByteSize
@@ -149,6 +152,9 @@ class ClientSnapshot:
     @property
     def is_overloaded(self) -> bool:
         """Indicate whether the client is considered as overloaded."""
+        if self.new_error_count > self.max_error_count:
+            logger.warning(f"Client overloaded: {self}")
+            return True
         return self.new_error_count > self.max_error_count
 
 
