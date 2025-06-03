@@ -47,7 +47,7 @@ class ParseSitemapOptions(TypedDict, total=False):
     timeout: float | None
 
 
-class _SitemapSource(TypedDict):
+class SitemapSource(TypedDict):
     type: Literal['url', 'raw']
     url: NotRequired[str]
     content: NotRequired[str]
@@ -200,7 +200,7 @@ def _get_parser(content_type: str = '', url: str | None = None) -> _XmlSitemapPa
     return _XmlSitemapParser()
 
 
-def _get_origin_url(source: _SitemapSource) -> str:
+def _get_origin_url(source: SitemapSource) -> str:
     """Determine the origin URL for a sitemap source."""
     if source['type'] == 'url' and 'url' in source:
         return source['url']
@@ -212,10 +212,10 @@ def _get_origin_url(source: _SitemapSource) -> str:
 
 async def _process_sitemap_item(
     item: _SitemapItem,
-    source: _SitemapSource,
+    source: SitemapSource,
     depth: int,
     visited_sitemap_urls: set[str],
-    sources: list[_SitemapSource],
+    sources: list[SitemapSource],
     *,
     emit_nested_sitemaps: bool,
 ) -> AsyncGenerator[SitemapUrl | NestedSitemap | None, None]:
@@ -232,7 +232,7 @@ async def _process_sitemap_item(
         sitemap_url = item_copy['url']
         if sitemap_url and sitemap_url not in visited_sitemap_urls:
             # Add to processing queue
-            sources.append(_SitemapSource(type='url', url=sitemap_url, depth=depth + 1))
+            sources.append(SitemapSource(type='url', url=sitemap_url, depth=depth + 1))
 
             # Output the nested sitemap reference if requested
             if emit_nested_sitemaps:
@@ -254,10 +254,10 @@ async def _process_sitemap_item(
 
 
 async def _process_raw_source(
-    source: _SitemapSource,
+    source: SitemapSource,
     depth: int,
     visited_sitemap_urls: set[str],
-    sources: list[_SitemapSource],
+    sources: list[SitemapSource],
     *,
     emit_nested_sitemaps: bool,
 ) -> AsyncGenerator[SitemapUrl | NestedSitemap, None]:
@@ -293,10 +293,10 @@ async def _process_raw_source(
 
 async def _fetch_and_process_sitemap(
     client: httpx.AsyncClient,
-    source: _SitemapSource,
+    source: SitemapSource,
     depth: int,
     visited_sitemap_urls: set[str],
-    sources: list[_SitemapSource],
+    sources: list[SitemapSource],
     retries_left: int,
     *,
     emit_nested_sitemaps: bool,
@@ -387,16 +387,16 @@ class Sitemap:
     ) -> Sitemap:
         if isinstance(urls, str):
             urls = [urls]
-        return await cls.parse([_SitemapSource(type='url', url=url) for url in urls], proxy_url, parse_sitemap_options)
+        return await cls.parse([SitemapSource(type='url', url=url) for url in urls], proxy_url, parse_sitemap_options)
 
     @classmethod
     async def from_xml_string(cls, content: str, proxy_url: str | None = None) -> Sitemap:
-        return await cls.parse([_SitemapSource(type='raw', content=content)], proxy_url)
+        return await cls.parse([SitemapSource(type='raw', content=content)], proxy_url)
 
     @classmethod
     async def parse(
         cls,
-        sources: list[_SitemapSource],
+        sources: list[SitemapSource],
         proxy_url: str | None = None,
         parse_sitemap_options: ParseSitemapOptions | None = None,
     ) -> Sitemap:
@@ -405,7 +405,7 @@ class Sitemap:
 
 
 async def parse_sitemap(
-    initial_sources: list[_SitemapSource],
+    initial_sources: list[SitemapSource],
     proxy_url: str | None = None,
     options: ParseSitemapOptions | None = None,
 ) -> AsyncGenerator[SitemapUrl | NestedSitemap, None]:
