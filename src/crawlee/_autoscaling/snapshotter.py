@@ -316,7 +316,6 @@ class Snapshotter:
             new_error_count=error_count - previous_error_count,
             max_error_count=self._max_client_errors,
         )
-        logger.warning(f"Snapshot: {snapshot}")
 
         snapshots = cast('list[Snapshot]', self._client_snapshots)
         self._prune_snapshots(snapshots, snapshot.created_at)
