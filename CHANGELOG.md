@@ -3,7 +3,11 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 0.6.10 - **not yet released**
+## 0.6.11 - **not yet released**
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.6.10](https://github.com/apify/crawlee-python/releases/tag/v0.6.10) (2025-06-02)
 
 ### 🐛 Bug Fixes
 
@@ -15,7 +19,6 @@ All notable changes to this project will be documented in this file.
 - Respect `EnqueueLinksKwargs` for `extract_links` function ([#1213](https://github.com/apify/crawlee-python/pull/1213)) ([c9907d6](https://github.com/apify/crawlee-python/commit/c9907d6ff4c3a4a719b279cea77694c00a5a963d)) by [@Mantisus](https://github.com/Mantisus), closes [#1212](https://github.com/apify/crawlee-python/issues/1212)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.6.9](https://github.com/apify/crawlee-python/releases/tag/v0.6.9) (2025-05-02)
 
 ### 🚀 Features

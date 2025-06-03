@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "crawlee"
-version = "0.6.10"
+version = "0.6.11"
 description = "Crawlee for Python"
 authors = [{ name = "Apify Technologies s.r.o.", email = "support@apify.com" }]
 license = { file = "LICENSE" }
@@ -96,7 +96,7 @@ crawlee = "crawlee._cli:cli"
 dev = [
     "apify_client",  # For e2e tests.
     "build~=1.2.2",  # For e2e tests.
-    "mypy~=1.15.0",
+    "mypy~=1.16.0",
     "pre-commit~=4.2.0",
     "proxy-py~=2.4.0",
     "pydoc-markdown~=4.8.0",
@@ -104,7 +104,7 @@ dev = [
     "pytest-cov~=6.1.0",
     "pytest-only~=2.1.0",
     "pytest-xdist~=3.7.0",
-    "pytest~=8.3.0",
+    "pytest~=8.4.0",
     "ruff~=0.11.0",
     "setuptools",  # setuptools are used by pytest, but not explicitly required
     "sortedcontainers-stubs~=2.4.0",

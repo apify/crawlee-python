@@ -38,6 +38,7 @@ module.exports = {
     githubHost: 'github.com',
     future: {
         experimental_faster: true,
+        v4: true,
     },
     headTags: [
         // Intercom messenger
