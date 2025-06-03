@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
 from crawlee import Request
@@ -14,6 +15,9 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from crawlee.storage_clients.models import ProcessedRequest
+
+
+logger = getLogger(__name__)
 
 
 @docs_group('Classes')
@@ -59,9 +63,8 @@ class SitemapRequestLoader(RequestLoader):
         self._processed_urls: set[str] = set()
 
         # Loading state
-        self._loading_task: asyncio.Task[None] | None = None
+        self._loading_task = asyncio.create_task(self._load_sitemaps())
         self._loading_finished = False
-        self._loading_error: Exception | None = None
 
     def _check_url_patterns(
         self,
@@ -96,7 +99,6 @@ class SitemapRequestLoader(RequestLoader):
     async def _load_sitemaps(self) -> None:
         """Load URLs from sitemaps in the background."""
         try:
-            # Parse all sitemaps
             async for item in parse_sitemap(
                 [SitemapSource(type='url', url=url) for url in self._sitemap_urls],
                 proxy_url=self._proxy_url,
@@ -114,13 +116,12 @@ class SitemapRequestLoader(RequestLoader):
                     if not self._check_url_patterns(url, self._include, self._exclude):
                         continue
 
-                    # Add to queue (will block if full)
                     await self._url_queue.put(url)
                     self._processed_urls.add(url)
                     self._total_count += 1
 
-        except Exception as e:
-            self._loading_error = e
+        except Exception:
+            logger.exception('Error loading sitemaps')
             raise
         finally:
             self._loading_finished = True
@@ -139,12 +140,9 @@ class SitemapRequestLoader(RequestLoader):
 
     async def fetch_next_request(self) -> Request | None:
         """Fetch the next request to process."""
-        if not self._loading_task:
-            self._loading_task = asyncio.create_task(self._load_sitemaps())
-
         while not (self._loading_finished and self._url_queue.empty()):
             if self._url_queue.empty():
-                await asyncio.sleep(0)
+                await asyncio.sleep(0.5)
                 continue
 
             url = await self._url_queue.get()
@@ -166,19 +164,6 @@ class SitemapRequestLoader(RequestLoader):
         """Return the number of handled requests."""
         return self._handled_count
 
-    def is_loading_finished(self) -> bool:
-        """Check if sitemap loading has finished."""
-        return self._loading_finished
-
-    def get_queue_size(self) -> int:
-        """Get the current number of URLs in the queue."""
-        return self._url_queue.qsize()
-
-    async def wait_for_loading(self) -> None:
-        """Wait for sitemap loading to complete."""
-        if self._loading_task:
-            await self._loading_task
-
     async def abort_loading(self) -> None:
         """Abort the sitemap loading process."""
         if self._loading_task and not self._loading_task.done():
@@ -189,14 +174,3 @@ class SitemapRequestLoader(RequestLoader):
                 pass
             finally:
                 self._loading_finished = True
-
-    async def __aiter__(self) -> SitemapRequestLoader:
-        """Make the loader async iterable."""
-        return self
-
-    async def __anext__(self) -> Request:
-        """Get the next request from the iterator."""
-        request = await self.fetch_next_request()
-        if request is None:
-            raise StopAsyncIteration
-        return request
