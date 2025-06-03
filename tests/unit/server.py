@@ -117,8 +117,7 @@ async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
         'xml': hello_world_xml,
         'robots.txt': robots_txt,
     }
-    path_parts = URL(scope['path']).parts
-    path = path_parts[1] if len(path_parts) > 1 else path_parts[0]
+    path = URL(scope['path']).parts[1]
     # Route requests to appropriate handlers
     if path in paths:
         path_func = paths[path]
