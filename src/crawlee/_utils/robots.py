@@ -87,12 +87,12 @@ class RobotsTxtFile:
         return int(crawl_delay) if crawl_delay is not None else None
 
     async def parse_sitemaps(self) -> Sitemap:
-        """Parse the sitemaps from the robots.txt file and return a list of `Sitemap` instances."""
+        """Parse the sitemaps from the robots.txt file and return a `Sitemap` instance."""
         sitemaps = self.get_sitemaps()
         proxy_url = self._proxy_info.url if self._proxy_info else None
         return await Sitemap.load(sitemaps, proxy_url)
 
     async def parse_urls_from_sitemaps(self) -> list[str]:
-        """Parse the URLs from the sitemaps in the robots.txt file and return a list of `Sitemap` instances."""
+        """Parse the sitemaps in the robots.txt file and return a list URLs."""
         sitemap = await self.parse_sitemaps()
         return sitemap.urls
