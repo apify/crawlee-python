@@ -137,6 +137,9 @@ class ClientSnapshot:
     error_count: int
     """The number of errors (HTTP 429) that occurred."""
 
+    new_error_count: int
+    """The number of new errors (HTTP 429) that occurred since the last snapshot."""
+
     max_error_count: int
     """The maximum number of errors that is considered acceptable."""
 
@@ -146,7 +149,7 @@ class ClientSnapshot:
     @property
     def is_overloaded(self) -> bool:
         """Indicate whether the client is considered as overloaded."""
-        return self.error_count > self.max_error_count
+        return self.new_error_count > self.max_error_count
 
 
 Snapshot = Union[MemorySnapshot, CpuSnapshot, EventLoopSnapshot, ClientSnapshot]

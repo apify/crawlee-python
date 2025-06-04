@@ -310,7 +310,12 @@ class Snapshotter:
         rate_limit_errors: dict[int, int] = client.get_rate_limit_errors()
 
         error_count = rate_limit_errors.get(self._CLIENT_RATE_LIMIT_ERROR_RETRY_COUNT, 0)
-        snapshot = ClientSnapshot(error_count=error_count, max_error_count=self._max_client_errors)
+        previous_error_count = self._client_snapshots[-1].error_count if self._client_snapshots else 0
+        snapshot = ClientSnapshot(
+            error_count=error_count,
+            new_error_count=error_count - previous_error_count,
+            max_error_count=self._max_client_errors,
+        )
 
         snapshots = cast('list[Snapshot]', self._client_snapshots)
         self._prune_snapshots(snapshots, snapshot.created_at)
