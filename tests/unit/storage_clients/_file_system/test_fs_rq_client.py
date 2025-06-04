@@ -179,7 +179,7 @@ async def test_add_requests(rq_client: FileSystemRequestQueueClient) -> None:
             assert 'url' in content
             assert content['url'].startswith('https://example.com/')
             assert 'id' in content
-            assert 'handled_at' not in content  # Not yet handled
+            assert content['handled_at'] is None
 
 
 async def test_add_duplicate_request(rq_client: FileSystemRequestQueueClient) -> None:
@@ -335,9 +335,6 @@ async def test_reclaim_request_with_forefront(rq_client: FileSystemRequestQueueC
 
     # Reclaim it with forefront priority
     await rq_client.reclaim_request(first_request, forefront=True)
-
-    # Verify it's in the forefront set
-    assert first_request.id in rq_client._forefront_requests
 
     # It should be returned before the second request
     reclaimed_request = await rq_client.fetch_next_request()
