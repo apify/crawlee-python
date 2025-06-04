@@ -214,10 +214,15 @@ class MemoryRequestQueueClient(RequestQueueClient):
         """
         # Find the first request that's not handled or in progress
         for request in self._records:
-            if request.handled_at is None and request.id not in self._in_progress:
-                # Mark as in progress
-                self._in_progress[request.id] = request
-                return request
+            if request.was_already_handled:
+                continue
+
+            if request.id in self._in_progress:
+                continue
+
+            # Mark as in progress
+            self._in_progress[request.id] = request
+            return request
 
         return None
 
@@ -259,7 +264,7 @@ class MemoryRequestQueueClient(RequestQueueClient):
             return None
 
         # Set handled_at timestamp if not already set
-        if request.handled_at is None:
+        if not request.was_already_handled:
             request.handled_at = datetime.now(timezone.utc)
 
         # Update the request in records
@@ -341,7 +346,7 @@ class MemoryRequestQueueClient(RequestQueueClient):
         await self._update_metadata(update_accessed_at=True)
 
         # Queue is empty if there are no pending requests
-        pending_requests = [r for r in self._records if r.handled_at is None]
+        pending_requests = [request for request in self._records if not request.was_already_handled]
         return len(pending_requests) == 0
 
     async def _update_metadata(
