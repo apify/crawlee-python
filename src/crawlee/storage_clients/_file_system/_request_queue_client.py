@@ -303,22 +303,23 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             processed_requests = list[ProcessedRequest]()
             unprocessed_requests = list[UnprocessedRequest]()
 
+            # Prepare a dictionary to track existing requests by their unique keys.
+            existing_unique_keys: dict[str, Path] = {}
+            existing_request_files = await self._get_request_files(self.path_to_rq)
+
+            for request_file in existing_request_files:
+                existing_request = await self._parse_request_file(request_file)
+                if existing_request is not None:
+                    existing_unique_keys[existing_request.unique_key] = request_file
+
+            # Process each request in the batch.
             for request in requests:
-                existing_request_files = await self._get_request_files(self.path_to_rq)
+                existing_request_file = existing_unique_keys.get(request.unique_key)
                 existing_request = None
 
-                # Go through existing requests to find if the request already exists in the queue.
-                for existing_request_file in existing_request_files:
+                # Only load the full request from disk if we found a duplicate
+                if existing_request_file is not None:
                     existing_request = await self._parse_request_file(existing_request_file)
-
-                    if existing_request is None:
-                        continue
-
-                    # If the unique key matches, we found an existing request
-                    if existing_request.unique_key == request.unique_key:
-                        break
-
-                    existing_request = None
 
                 # If there is no existing request with the same unique key, add the new request.
                 if existing_request is None:
@@ -343,6 +344,9 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     new_total_request_count += 1
                     new_pending_request_count += 1
 
+                    # Add to our index for subsequent requests in this batch
+                    existing_unique_keys[request.unique_key] = self._get_request_path(request.id)
+
                     processed_requests.append(
                         ProcessedRequest(
                             id=request.id,
@@ -352,7 +356,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                         )
                     )
 
-                # If the request already exists, we need to update it.
+                # If the request already exists in the RQ, just update it if needed.
                 else:
                     # Set the processed request flags.
                     was_already_present = existing_request is not None
@@ -371,10 +375,10 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
                     # If the request is already in the RQ but not handled yet, update it.
                     elif was_already_present and not was_already_handled:
-                        request_path = self._get_request_path(request.id)
+                        request_path = self._get_request_path(existing_request.id)
                         request_dict = existing_request.model_dump()
                         request_dict['__forefront'] = forefront
-                        request_data = await json_dumps(existing_request.model_dump())
+                        request_data = await json_dumps(request_dict)
                         await atomic_write(request_path, request_data)
 
                         processed_requests.append(
