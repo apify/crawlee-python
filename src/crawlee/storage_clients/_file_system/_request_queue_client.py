@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import shutil
+from collections import deque
 from datetime import datetime, timezone
 from logging import getLogger
 from pathlib import Path
@@ -94,16 +95,31 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         """The base directory where the request queue is stored."""
 
         self._sequence_counter = sequence_counter
-        """A counter to track the order of (normal) requests added to the queue."""
+        """A counter to track the order of (normal) requests added to the queue.
+
+        This number is going to be used as a sequence number for next request.
+        """
 
         self._forefront_sequence_counter = forefront_sequence_counter
-        """A counter to track the order of forefront requests added to the queue."""
+        """A counter to track the order of forefront requests added to the queue.
+
+        This number is going to be used as a sequence number for next forefront request.
+        """
 
         self._lock = asyncio.Lock()
         """A lock to ensure that only one operation is performed at a time."""
 
         self._in_progress = set[str]()
         """A set of request IDs that are currently being processed."""
+
+        self._cache_size = 50
+        """Maximum number of requests to keep in cache."""
+
+        self._request_cache = deque[Request]()
+        """Cache for requests: forefront requests at the beginning, regular requests at the end."""
+
+        self._cache_needs_refresh = True
+        """Flag indicating whether the cache needs to be refreshed from filesystem."""
 
     @property
     @override
@@ -237,10 +253,14 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
     @override
     async def drop(self) -> None:
-        # If the client directory exists, remove it recursively.
-        if self.path_to_rq.exists():
-            async with self._lock:
+        async with self._lock:
+            # Remove the RQ dir recursively if it exists.
+            if self.path_to_rq.exists():
                 await asyncio.to_thread(shutil.rmtree, self.path_to_rq)
+
+            self._in_progress.clear()
+            self._request_cache.clear()
+            self._cache_needs_refresh = True
 
     @override
     async def purge(self) -> None:
@@ -250,13 +270,15 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             for file_path in request_files:
                 await asyncio.to_thread(file_path.unlink)
 
+            self._in_progress.clear()
+            self._request_cache.clear()
+            self._cache_needs_refresh = True
+
             # Update metadata counts
             await self._update_metadata(
                 update_modified_at=True,
                 update_accessed_at=True,
-                new_handled_request_count=0,
                 new_pending_request_count=0,
-                new_total_request_count=0,
             )
 
     @override
@@ -381,6 +403,10 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 new_pending_request_count=new_pending_request_count,
             )
 
+            # Invalidate the cache if we added forefront requests.
+            if forefront:
+                self._cache_needs_refresh = True
+
             return AddRequestsResponse(
                 processed_requests=processed_requests,
                 unprocessed_requests=unprocessed_requests,
@@ -401,7 +427,9 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
         if request is None:
             logger.warning(f'Request with ID "{request_id}" not found in the queue.')
+            return None
 
+        self._in_progress.add(request.id)
         return request
 
     @override
@@ -417,72 +445,26 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             The request or `None` if there are no more pending requests.
         """
         async with self._lock:
-            request_files = await self._get_request_files(self.path_to_rq)
-
-            requests = list[Request]()
-            forefront_requests = list[Request]()
-
-            for request_file in request_files:
-                request = await self._parse_request_file(request_file)
-
-                if request is None:
-                    continue
-
-                if request.was_already_handled:
-                    # If the request was already handled, skip it.
-                    continue
-
-                if request.model_extra is None:
-                    raise ValueError(f'Request file "{request_file}" does not contain "model_extra" data.')
-
-                forefront = request.model_extra.get('__forefront')
-
-                if forefront is None:
-                    raise ValueError(f'Request file "{request_file}" does not contain the __forefront flag.')
-
-                if forefront is True:
-                    forefront_requests.append(request)
-                else:
-                    requests.append(request)
-
-            # Sort requests by their sequence numbers.
-            forefront_requests.sort(
-                key=lambda r: r.model_extra.get('__sequence', 0) if r.model_extra else 0,
-                reverse=True,
-            )
-            requests.sort(
-                key=lambda r: r.model_extra.get('__sequence', 0) if r.model_extra else 0,
-                reverse=False,
-            )
+            # Refresh cache if needed or if it's empty.
+            if self._cache_needs_refresh or not self._request_cache:
+                await self._refresh_cache()
 
             next_request: Request | None = None
 
-            while next_request is None:
-                if forefront_requests:
-                    next_request = forefront_requests.pop(0)
+            # Fetch from the front of the deque (forefront requests are at the beginning).
+            while self._request_cache and next_request is None:
+                candidate = self._request_cache.popleft()
 
-                    if next_request.id in self._in_progress:
-                        # If the request is already in progress, skip it.
-                        next_request = None
-                        continue
+                # Skip requests that are already in progress, however this should not happen.
+                if candidate.id not in self._in_progress:
+                    next_request = candidate
 
-                    # Mark the request as in progress
-                    self._in_progress.add(next_request.id)
+            # If cache is getting low, mark for refresh on next call.
+            if len(self._request_cache) < self._cache_size // 4:
+                self._cache_needs_refresh = True
 
-                elif requests:
-                    next_request = requests.pop(0)
-
-                    if next_request.id in self._in_progress:
-                        # If the request is already in progress, skip it
-                        next_request = None
-                        continue
-
-                    # Mark the request as in progress
-                    self._in_progress.add(next_request.id)
-
-                else:
-                    # No more requests available, break out of the loop
-                    break
+            if next_request is not None:
+                self._in_progress.add(next_request.id)
 
             return next_request
 
@@ -499,27 +481,29 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             Information about the queue operation. `None` if the given request was not in progress.
         """
         async with self._lock:
-            # Check if the request is in progress
+            # Check if the request is in progress.
             if request.id not in self._in_progress:
+                logger.warning(f'Marking request {request.id} as handled that is not in progress.')
                 return None
 
-            # Remove from in-progress set
-            self._in_progress.discard(request.id)
-
-            # Update the request object - set handled_at timestamp
+            # Update the request's handled_at timestamp.
             if request.handled_at is None:
                 request.handled_at = datetime.now(timezone.utc)
 
-            # Write the updated request back to the requests directory
+            # Dump the updated request to the file.
             request_path = self._get_request_path(request.id)
 
             if not await asyncio.to_thread(request_path.exists):
+                logger.warning(f'Request file for {request.id} does not exist, cannot mark as handled.')
                 return None
 
             request_data = await json_dumps(request.model_dump())
             await atomic_write(request_path, request_data)
 
-            # Update RQ metadata
+            # Remove from in-progress.
+            self._in_progress.discard(request.id)
+
+            # Update RQ metadata.
             await self._update_metadata(
                 update_modified_at=True,
                 update_accessed_at=True,
@@ -558,16 +542,11 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 logger.info(f'Reclaiming request {request.id} that is not in progress.')
                 return None
 
-            self._in_progress.discard(request.id)
-
             request_path = self._get_request_path(request.id)
 
             if not await asyncio.to_thread(request_path.exists):
+                logger.warning(f'Request file for {request.id} does not exist, cannot reclaim.')
                 return None
-
-            # Update the request file with the new forefront status and sequence number
-            request_dict = request.model_dump()
-            request_dict['__forefront'] = forefront
 
             # Update sequence number to ensure proper ordering.
             if forefront:
@@ -577,12 +556,27 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 sequence_number = self._sequence_counter
                 self._sequence_counter += 1
 
+            # Dump the updated request to the file.
+            request_dict = request.model_dump()
+            request_dict['__forefront'] = forefront
             request_dict['__sequence'] = sequence_number
             request_data = await json_dumps(request_dict)
             await atomic_write(request_path, request_data)
 
-            # Update metadata timestamps
-            await self._update_metadata(update_modified_at=True, update_accessed_at=True)
+            # Remove from in-progress.
+            self._in_progress.discard(request.id)
+
+            # Update RQ metadata.
+            await self._update_metadata(
+                update_modified_at=True,
+                update_accessed_at=True,
+            )
+
+            # Add the request back to the cache.
+            if forefront:
+                self._request_cache.appendleft(request)
+            else:
+                self._request_cache.append(request)
 
             return ProcessedRequest(
                 id=request.id,
@@ -677,6 +671,69 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         data = await json_dumps(self._metadata.model_dump())
         await atomic_write(self.path_to_metadata, data)
 
+    async def _refresh_cache(self) -> None:
+        """Refresh the request cache from filesystem.
+
+        This method loads up to _cache_size requests from the filesystem,
+        prioritizing forefront requests and maintaining proper ordering.
+        """
+        self._request_cache.clear()
+
+        request_files = await self._get_request_files(self.path_to_rq)
+
+        forefront_requests = []
+        regular_requests = []
+
+        for request_file in request_files:
+            request = await self._parse_request_file(request_file)
+
+            if request is None or request.was_already_handled:
+                continue
+
+            if request.id in self._in_progress:
+                continue
+
+            if request.model_extra is None:
+                logger.warning(f'Request file "{request_file}" does not contain model_extra field.')
+                continue
+
+            forefront = request.model_extra.get('__forefront')
+            if forefront is None:
+                logger.warning(f'Request file "{request_file}" does not contain "__forefront" field.')
+                continue
+
+            if forefront:
+                forefront_requests.append(request)
+            else:
+                regular_requests.append(request)
+
+        # Sort forefront requests by sequence (newest first for LIFO behavior).
+        forefront_requests.sort(
+            key=lambda request: request.model_extra.get('__sequence', 0) if request.model_extra else 0,
+            reverse=True,
+        )
+
+        # Sort regular requests by sequence (oldest first for FIFO behavior).
+        regular_requests.sort(
+            key=lambda request: request.model_extra.get('__sequence', 0) if request.model_extra else 0,
+            reverse=False,
+        )
+
+        # Add forefront requests to the beginning of the cache (left side). Since forefront_requests are sorted
+        # by sequence (newest first), we need to add them in reverse order to maintain correct priority.
+        for request in reversed(forefront_requests):
+            if len(self._request_cache) >= self._cache_size:
+                break
+            self._request_cache.appendleft(request)
+
+        # Add regular requests to the end of the cache (right side).
+        for request in regular_requests:
+            if len(self._request_cache) >= self._cache_size:
+                break
+            self._request_cache.append(request)
+
+        self._cache_needs_refresh = False
+
     @classmethod
     async def _get_request_files(cls, path_to_rq: Path) -> list[Path]:
         """Get all request files from the RQ.
@@ -747,7 +804,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         max_sequence = -1
         max_forefront_sequence = -1
 
-        # Get all request files
+        # Get all request files.
         request_files = await cls._get_request_files(path_to_rq)
 
         for request_file in request_files:
@@ -755,7 +812,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             if request is None:
                 continue
 
-            # Extract sequence number and forefront flag from model_extra
+            # Extract sequence number and forefront flag from model_extra.
             if request.model_extra:
                 sequence = request.model_extra.get('__sequence')
                 is_forefront = request.model_extra.get('__forefront')

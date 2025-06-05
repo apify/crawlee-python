@@ -126,9 +126,7 @@ class MemoryRequestQueueClient(RequestQueueClient):
         await self._update_metadata(
             update_modified_at=True,
             update_accessed_at=True,
-            new_handled_request_count=0,
             new_pending_request_count=0,
-            new_total_request_count=0,
         )
 
     @override
