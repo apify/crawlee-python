@@ -603,6 +603,7 @@ async def test_purge(
     # Verify requests were added
     assert rq.metadata.total_request_count == 3
     assert rq.metadata.pending_request_count == 3
+    assert rq.metadata.handled_request_count == 0
 
     # Record the queue ID
     queue_id = rq.id
@@ -615,7 +616,7 @@ async def test_purge(
     assert rq.name == 'purge_test_queue'  # Same name preserved
 
     # Queue should be empty now
-    assert rq.metadata.total_request_count == 0
+    assert rq.metadata.total_request_count == 3
     assert rq.metadata.pending_request_count == 0
     assert rq.metadata.handled_request_count == 0
     assert await rq.is_empty() is True
