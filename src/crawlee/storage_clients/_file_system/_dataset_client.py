@@ -160,11 +160,7 @@ class FileSystemDatasetClient(DatasetClient):
             metadata_path = dataset_path / METADATA_FILENAME
 
             # If the dataset directory exists, reconstruct the client from the metadata file.
-            if dataset_path.exists():
-                # If metadata file is missing, raise an error.
-                if not metadata_path.exists():
-                    raise ValueError(f'Metadata file not found for dataset "{name}"')
-
+            if dataset_path.exists() and metadata_path.exists():
                 file = await asyncio.to_thread(open, metadata_path)
                 try:
                     file_content = json.load(file)
