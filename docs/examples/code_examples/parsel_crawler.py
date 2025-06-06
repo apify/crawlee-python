@@ -40,7 +40,7 @@ async def main() -> None:
     await crawler.run(['https://github.com'])
 
     # Export the entire dataset to a JSON file.
-    await crawler.export_data_json(path='results.json')
+    await crawler.export_data(path='results.json')
 
 
 if __name__ == '__main__':
