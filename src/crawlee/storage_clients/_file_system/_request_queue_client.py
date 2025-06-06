@@ -57,6 +57,9 @@ class FileSystemRequestQueueClient(RequestQueueClient):
     _STORAGE_SUBSUBDIR_DEFAULT = 'default'
     """The name of the subdirectory for the default request queue."""
 
+    _MAX_REQUESTS_IN_CACHE = 100_000
+    """Maximum number of requests to keep in cache for faster access."""
+
     def __init__(
         self,
         *,
@@ -111,9 +114,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
         self._in_progress = set[str]()
         """A set of request IDs that are currently being processed."""
-
-        self._cache_size = 50
-        """Maximum number of requests to keep in cache."""
 
         self._request_cache = deque[Request]()
         """Cache for requests: forefront requests at the beginning, regular requests at the end."""
@@ -463,10 +463,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 if candidate.id not in self._in_progress:
                     next_request = candidate
 
-            # If cache is getting low, mark for refresh on next call.
-            if len(self._request_cache) < self._cache_size // 4:
-                self._cache_needs_refresh = True
-
             if next_request is not None:
                 self._in_progress.add(next_request.id)
 
@@ -678,15 +674,15 @@ class FileSystemRequestQueueClient(RequestQueueClient):
     async def _refresh_cache(self) -> None:
         """Refresh the request cache from filesystem.
 
-        This method loads up to _cache_size requests from the filesystem,
+        This method loads up to _MAX_REQUESTS_IN_CACHE requests from the filesystem,
         prioritizing forefront requests and maintaining proper ordering.
         """
         self._request_cache.clear()
 
-        request_files = await self._get_request_files(self.path_to_rq)
+        forefront_requests = list[Request]()
+        regular_requests = list[Request]()
 
-        forefront_requests = []
-        regular_requests = []
+        request_files = await self._get_request_files(self.path_to_rq)
 
         for request_file in request_files:
             request = await self._parse_request_file(request_file)
@@ -726,13 +722,13 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         # Add forefront requests to the beginning of the cache (left side). Since forefront_requests are sorted
         # by sequence (newest first), we need to add them in reverse order to maintain correct priority.
         for request in reversed(forefront_requests):
-            if len(self._request_cache) >= self._cache_size:
+            if len(self._request_cache) >= self._MAX_REQUESTS_IN_CACHE:
                 break
             self._request_cache.appendleft(request)
 
         # Add regular requests to the end of the cache (right side).
         for request in regular_requests:
-            if len(self._request_cache) >= self._cache_size:
+            if len(self._request_cache) >= self._MAX_REQUESTS_IN_CACHE:
                 break
             self._request_cache.append(request)
 
