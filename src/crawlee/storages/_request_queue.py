@@ -13,6 +13,7 @@ from crawlee._utils.wait import wait_for_all_tasks_for_finish
 from crawlee.request_loaders import RequestManager
 
 from ._base import Storage
+from ._utils import open_storage_instance
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -127,40 +128,18 @@ class RequestQueue(Storage, RequestManager):
         configuration: Configuration | None = None,
         storage_client: StorageClient | None = None,
     ) -> RequestQueue:
-        if id and name:
-            raise ValueError('Only one of "id" or "name" can be specified, not both.')
-
-        # Check for default instance if no id or name provided
-        if id is None and name is None and cls._default_instance is not None:
-            return cls._default_instance
-
-        # Check if the request queue is already cached
-        if id is not None and id in cls._cache_by_id:
-            return cls._cache_by_id[id]
-        if name is not None and name in cls._cache_by_name:
-            return cls._cache_by_name[name]
-
         configuration = service_locator.get_configuration() if configuration is None else configuration
         storage_client = service_locator.get_storage_client() if storage_client is None else storage_client
-
-        client = await storage_client.open_request_queue_client(
+        return await open_storage_instance(
+            cls,
             id=id,
             name=name,
             configuration=configuration,
+            cache_by_id=cls._cache_by_id,
+            cache_by_name=cls._cache_by_name,
+            default_instance_attr='_default_instance',
+            client_opener=storage_client.open_request_queue_client,
         )
-
-        request_queue = cls(client)
-
-        # Cache the request queue instance by ID and name
-        cls._cache_by_id[request_queue.id] = request_queue
-        if request_queue.name is not None:
-            cls._cache_by_name[request_queue.name] = request_queue
-
-        # Store as default instance if neither id nor name was provided
-        if id is None and name is None:
-            cls._default_instance = request_queue
-
-        return request_queue
 
     @override
     async def drop(self) -> None:
