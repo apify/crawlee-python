@@ -154,11 +154,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             metadata_path = kvs_path / METADATA_FILENAME
 
             # If the key-value store directory exists, reconstruct the client from the metadata file.
-            if kvs_path.exists():
-                # If metadata file is missing, raise an error.
-                if not metadata_path.exists():
-                    raise ValueError(f'Metadata file not found for key-value store "{name}"')
-
+            if kvs_path.exists() and metadata_path.exists():
                 file = await asyncio.to_thread(open, metadata_path)
                 try:
                     file_content = json.load(file)

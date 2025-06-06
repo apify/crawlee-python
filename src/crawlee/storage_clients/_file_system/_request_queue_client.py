@@ -118,8 +118,11 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         self._request_cache = deque[Request]()
         """Cache for requests: forefront requests at the beginning, regular requests at the end."""
 
-        self._cache_needs_refresh = True
+        self._request_cache_needs_refresh = True
         """Flag indicating whether the cache needs to be refreshed from filesystem."""
+
+        self._is_empty_cache: bool | None = None
+        """Cache for is_empty result: None means unknown, True/False is cached state."""
 
     @property
     @override
@@ -202,11 +205,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             metadata_path = rq_path / METADATA_FILENAME
 
             # If the RQ directory exists, reconstruct the client from the metadata file.
-            if rq_path.exists():
-                # If metadata file is missing, raise an error.
-                if not metadata_path.exists():
-                    raise ValueError(f'Metadata file not found for request queue "{name}"')
-
+            if rq_path.exists() and metadata_path.exists():
                 file = await asyncio.to_thread(open, metadata_path)
                 try:
                     file_content = json.load(file)
@@ -260,7 +259,10 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
             self._in_progress.clear()
             self._request_cache.clear()
-            self._cache_needs_refresh = True
+            self._request_cache_needs_refresh = True
+
+            # Invalidate is_empty cache.
+            self._is_empty_cache = None
 
     @override
     async def purge(self) -> None:
@@ -272,14 +274,16 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
             self._in_progress.clear()
             self._request_cache.clear()
-            self._cache_needs_refresh = True
+            self._request_cache_needs_refresh = True
 
-            # Update metadata counts
             await self._update_metadata(
                 update_modified_at=True,
                 update_accessed_at=True,
                 new_pending_request_count=0,
             )
+
+            # Invalidate is_empty cache.
+            self._is_empty_cache = None
 
     @override
     async def add_batch_of_requests(
@@ -298,6 +302,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             Response containing information about the added requests.
         """
         async with self._lock:
+            self._is_empty_cache = None
             new_total_request_count = self._metadata.total_request_count
             new_pending_request_count = self._metadata.pending_request_count
             processed_requests = list[ProcessedRequest]()
@@ -409,7 +414,10 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
             # Invalidate the cache if we added forefront requests.
             if forefront:
-                self._cache_needs_refresh = True
+                self._request_cache_needs_refresh = True
+
+            # Invalidate is_empty cache.
+            self._is_empty_cache = None
 
             return AddRequestsResponse(
                 processed_requests=processed_requests,
@@ -450,7 +458,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         """
         async with self._lock:
             # Refresh cache if needed or if it's empty.
-            if self._cache_needs_refresh or not self._request_cache:
+            if self._request_cache_needs_refresh or not self._request_cache:
                 await self._refresh_cache()
 
             next_request: Request | None = None
@@ -481,6 +489,8 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             Information about the queue operation. `None` if the given request was not in progress.
         """
         async with self._lock:
+            self._is_empty_cache = None
+
             # Check if the request is in progress.
             if request.id not in self._in_progress:
                 logger.warning(f'Marking request {request.id} as handled that is not in progress.')
@@ -537,6 +547,8 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             Information about the queue operation. `None` if the given request was not in progress.
         """
         async with self._lock:
+            self._is_empty_cache = None
+
             # Check if the request is in progress.
             if request.id not in self._in_progress:
                 logger.info(f'Reclaiming request {request.id} that is not in progress.')
@@ -587,28 +599,35 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
     @override
     async def is_empty(self) -> bool:
-        """Check if the queue is empty.
-
-        Returns:
-            True if the queue is empty, False otherwise.
-        """
+        """Check if the queue is empty, using a cached value if available and valid."""
         async with self._lock:
+            # If we have a cached value, return it immediately.
+            if self._is_empty_cache is not None:
+                return self._is_empty_cache
+
+            # If we have a cached requests, check them first (fast path).
+            if self._request_cache:
+                for req in self._request_cache:
+                    if req.handled_at is None:
+                        self._is_empty_cache = False
+                        return False
+                self._is_empty_cache = True
+                return True
+
+            # Fallback: check files on disk (slow path).
             await self._update_metadata(update_accessed_at=True)
             request_files = await self._get_request_files(self.path_to_rq)
 
-            # Check each file to see if there are any unhandled requests.
             for request_file in request_files:
                 request = await self._parse_request_file(request_file)
-
                 if request is None:
                     continue
-
-                # If any request is not handled, the queue is not empty.
                 if request.handled_at is None:
+                    self._is_empty_cache = False
                     return False
 
-        # If we got here, all requests are handled or there are no requests.
-        return True
+            self._is_empty_cache = True
+            return True
 
     def _get_request_path(self, request_id: str) -> Path:
         """Get the path to a specific request file.
@@ -732,7 +751,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 break
             self._request_cache.append(request)
 
-        self._cache_needs_refresh = False
+        self._request_cache_needs_refresh = False
 
     @classmethod
     async def _get_request_files(cls, path_to_rq: Path) -> list[Path]:
