@@ -90,6 +90,7 @@ async def test_calls_consumers_and_middlewares() -> None:
 
     pipeline = ContextPipeline[BasicCrawlingContext]().compose(middleware_a).compose(middleware_b)
 
+
     context = BasicCrawlingContext(
         request=Request.from_url(url='https://test.io/'),
         send_request=AsyncMock(),
@@ -145,6 +146,7 @@ async def test_handles_exceptions_in_middleware_initialization() -> None:
         yield context  # type: ignore[unreachable]
 
     pipeline = ContextPipeline().compose(step_1).compose(step_2)
+
     context = BasicCrawlingContext(
         request=Request.from_url(url='https://test.io/'),
         send_request=AsyncMock(),
@@ -159,7 +161,6 @@ async def test_handles_exceptions_in_middleware_initialization() -> None:
 
     with pytest.raises(ContextPipelineInitializationError):
         await pipeline(context, consumer)
-
     assert not consumer.called
     assert cleanup.called
 

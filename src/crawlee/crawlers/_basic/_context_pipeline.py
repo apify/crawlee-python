@@ -2,17 +2,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Callable, Generic, cast
 
-from typing_extensions import TypeVar
+from typing_extensions import TypeVar, Self
 
 from crawlee._types import BasicCrawlingContext
 from crawlee._utils.docs import docs_group
-from crawlee.errors import (
-    ContextPipelineFinalizationError,
-    ContextPipelineInitializationError,
-    ContextPipelineInterruptedError,
-    RequestHandlerError,
-    SessionError,
-)
+from ._middleware import TInputContext, TOutputContext, Middleware
+from crawlee.errors import ContextPipelineInitializationError, ContextPipelineInterruptedError, SessionError, \
+    RequestHandlerError, ContextPipelineFinalizationError
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable, Generator
@@ -20,9 +16,14 @@ if TYPE_CHECKING:
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 TMiddlewareCrawlingContext = TypeVar('TMiddlewareCrawlingContext', bound=BasicCrawlingContext)
 
+TFinalContext = TypeVar("TFinalContext", bound=BasicCrawlingContext, default=BasicCrawlingContext)
+TChildInputContext = TypeVar('TChildInputContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
+TChildOutputContext = TypeVar('TChildOutputContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
+
+
 
 @docs_group('Classes')
-class ContextPipeline(Generic[TCrawlingContext]):
+class ContextPipeline(Generic[TFinalContext]):
     """Encapsulates the logic of gradually enhancing the crawling context with additional information and utilities.
 
     The enhancement is done by a chain of middlewares that are added to the pipeline after it's creation.
@@ -30,94 +31,70 @@ class ContextPipeline(Generic[TCrawlingContext]):
 
     def __init__(
         self,
-        *,
-        _middleware: Callable[
-            [TCrawlingContext],
-            AsyncGenerator[TMiddlewareCrawlingContext, Exception | None],
-        ]
-        | None = None,
-        _parent: ContextPipeline[BasicCrawlingContext] | None = None,
-    ) -> None:
-        self._middleware = _middleware
-        self._parent = _parent
+        middleware: Callable[[TInputContext], AsyncGenerator[TOutputContext, None]] | None = None
+    ):
+        if middleware is not None:
+            self._first_step = _ContextPipelineStep(Middleware(middleware))
+        else:
+            self._first_step = _ContextPipelineStep(Middleware.create_no_action_middleware())
 
-    def _middleware_chain(self) -> Generator[ContextPipeline[Any], None, None]:
-        yield self
-
-        if self._parent is not None:
-            yield from self._parent._middleware_chain()  # noqa: SLF001
+    def compose(self, middleware: Callable[[TInputContext], AsyncGenerator[TOutputContext, None]])->Self:
+        self._first_step.add_last_step(middleware=Middleware(middleware))
+        return self
 
     async def __call__(
         self,
         crawling_context: BasicCrawlingContext,
-        final_context_consumer: Callable[[TCrawlingContext], Awaitable[None]],
+        final_context_consumer: Callable[[TFinalContext], Awaitable[None]],
     ) -> None:
-        """Run a crawling context through the middleware chain and pipe it into a consumer function.
+        await self._first_step.execute_chain(crawling_context=crawling_context, final_context_consumer=final_context_consumer)
 
-        Exceptions from the consumer function are wrapped together with the final crawling context.
-        """
-        chain = list(self._middleware_chain())
-        cleanup_stack: list[AsyncGenerator[Any, Exception | None]] = []
-        final_consumer_exception: Exception | None = None
+class _ContextPipelineStep(Generic[TInputContext, TOutputContext]):
+    """A single step in the context pipeline.
 
+    It can hold reference to the next step in the pipeline, if not it is the last step in the pipeline.
+    """
+
+    def __init__(self, middleware: Middleware[TInputContext, TOutputContext]) -> None:
+        self._middleware =middleware
+        self.child: _ContextPipelineStep[TOutputContext, Any] | None= None
+
+    async def execute_chain(self, crawling_context: TInputContext, final_context_consumer: TFinalContext):
+        _exception: Exception | None = None
+        output_context = await self._middleware.action(crawling_context)
         try:
-            for member in reversed(chain):
-                if member._middleware:  # noqa: SLF001
-                    middleware_instance = member._middleware(crawling_context)  # noqa: SLF001
-                    try:
-                        result = await middleware_instance.__anext__()
-                    except SessionError:  # Session errors get special treatment
-                        raise
-                    except StopAsyncIteration as e:
-                        raise RuntimeError('The middleware did not yield') from e
-                    except ContextPipelineInterruptedError:
-                        raise
-                    except Exception as e:
-                        raise ContextPipelineInitializationError(e, crawling_context) from e
-
-                    crawling_context = result
-                    cleanup_stack.append(middleware_instance)
-
-            try:
-                await final_context_consumer(cast('TCrawlingContext', crawling_context))
-            except SessionError as e:  # Session errors get special treatment
-                final_consumer_exception = e
-                raise
-            except Exception as e:
-                final_consumer_exception = e
-                raise RequestHandlerError(e, crawling_context) from e
-        finally:
-            for middleware_instance in reversed(cleanup_stack):
+            if self.child:
+                await self.child.execute_chain(crawling_context=output_context,
+                                               final_context_consumer=final_context_consumer)
+            else:
                 try:
-                    result = await middleware_instance.asend(final_consumer_exception)
-                except StopAsyncIteration:  # noqa: PERF203
-                    pass
-                except ContextPipelineInterruptedError as e:
-                    raise RuntimeError('Invalid state - pipeline interrupted in the finalization step') from e
+                    await final_context_consumer(output_context)
+                except SessionError as e:  # Session errors get special treatment
+                    final_consumer_exception = e
+                    raise
                 except Exception as e:
-                    raise ContextPipelineFinalizationError(e, crawling_context) from e
-                else:
-                    raise RuntimeError('The middleware yielded more than once')
+                    final_consumer_exception = e
+                    raise RequestHandlerError(e, crawling_context) from e
 
-    def compose(
-        self,
-        middleware: Callable[
-            [TCrawlingContext],
-            AsyncGenerator[TMiddlewareCrawlingContext, None],
-        ],
-    ) -> ContextPipeline[TMiddlewareCrawlingContext]:
-        """Add a middleware to the pipeline.
+        except Exception as e:
+            _exception = e
+            raise
+        finally:
+            await self._middleware.cleanup(_exception)
 
-        The middleware should yield exactly once, and it should yield an (optionally) extended crawling context object.
-        The part before the yield can be used for initialization and the part after it for cleanup.
 
-        Returns:
-            The extended pipeline instance, providing a fluent interface
-        """
-        return ContextPipeline[TMiddlewareCrawlingContext](
-            _middleware=cast(
-                'Callable[[BasicCrawlingContext], AsyncGenerator[TMiddlewareCrawlingContext, Exception | None]]',
-                middleware,
-            ),
-            _parent=cast('ContextPipeline[BasicCrawlingContext]', self),
-        )
+    def _add_next_step(self, middleware: Middleware[TOutputContext, TChildOutputContext]
+                       )-> _ContextPipelineStep[TOutputContext, TChildOutputContext]:
+        """Add new step directly after this step."""
+        new_pipeline_step = _ContextPipelineStep[TOutputContext, TChildOutputContext](middleware=middleware)
+        self.child = new_pipeline_step
+        return new_pipeline_step
+
+    def add_last_step(self, middleware: Middleware[TChildInputContext, TChildOutputContext]) -> None:
+        """Add step to the last step in the pipeline."""
+        if not self.child:
+            self.child = self._add_next_step(middleware=middleware)
+        else:
+            self.child.add_last_step(middleware=middleware)
+        return self
+
