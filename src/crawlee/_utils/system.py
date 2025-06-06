@@ -4,7 +4,7 @@ import os
 from contextlib import suppress
 from datetime import datetime, timezone
 from logging import getLogger
-from typing import Annotated
+from typing import Annotated, Any
 
 import psutil
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidator
@@ -79,15 +79,15 @@ def get_memory_info() -> MemoryInfo:
     logger.debug('Calling get_memory_info()...')
     current_process = psutil.Process(os.getpid())
 
-    # Retrieve the Resident Set Size (RSS) of the current process. RSS is the portion of memory
-    # occupied by a process that is held in RAM.
-    current_size_bytes = int(current_process.memory_info().rss)
+    # Retrieve estimated memory usage of the current process.
+    current_size_bytes = int(_get_used_memory(current_process.memory_full_info()))
 
+    # Sum memory usage by all children processes, try to exclude shared memory from the sum if allowed by OS.
     for child in current_process.children(recursive=True):
         # Ignore any NoSuchProcess exception that might occur if a child process ends before we retrieve
         # its memory usage.
         with suppress(psutil.NoSuchProcess):
-            current_size_bytes += int(child.memory_info().rss)
+            current_size_bytes += _get_used_memory(child.memory_full_info())
 
     total_size_bytes = psutil.virtual_memory().total
 
@@ -95,3 +95,20 @@ def get_memory_info() -> MemoryInfo:
         total_size=ByteSize(total_size_bytes),
         current_size=ByteSize(current_size_bytes),
     )
+
+
+def _get_used_memory(memory_full_info: Any) -> int:
+    """Get the most suitable available used memory metric.
+
+    `Proportional Set Size (PSS)`, is the amount of own memory and memory shared with other processes, accounted in a
+    way that the shared amount is divided evenly between the processes that share it. Available on Linux. Suitable for
+    avoiding overestimation by counting the same shared memory used by children processes multiple times.
+
+    `Resident Set Size (RSS)` is the non-swapped physical memory a process has used; it includes shared memory. It
+    should be available everywhere.
+    """
+    try:
+        # Linux
+        return int(memory_full_info.pss)
+    except AttributeError:
+        return int(memory_full_info.rss)
