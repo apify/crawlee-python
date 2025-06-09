@@ -106,12 +106,12 @@ async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
         'status': echo_status,
         'headers': echo_headers,
         'user-agent': echo_user_agent,
-        'get_sitemap.txt': echo_content,
-        'get_sitemap.xml': echo_content,
-        'get_sitemap.xml.gz': echo_content,
+        'echo_content': echo_content,
+        'sitemap.txt': echo_content,
+        'sitemap.xml': echo_content,
+        'sitemap.xml.gz': echo_content,
         'get': get_echo,
         'post': post_echo,
-        'echo_content': echo_content,
         'redirect': redirect_to_url,
         'json': hello_world_json,
         'xml': hello_world_xml,
@@ -360,7 +360,7 @@ async def set_complex_cookies(_scope: dict[str, Any], _receive: Receive, send: S
 
 
 async def echo_content(scope: dict[str, Any], _receive: Receive, send: Send) -> None:
-    """Handle requests to serve HTML-page with dynamic content received in the request."""
+    """Echo back content (plain text or base64) with specified content-type."""
     query_params = get_query_params(scope.get('query_string', b''))
 
     content = query_params.get('content', '')
