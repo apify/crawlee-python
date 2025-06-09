@@ -57,7 +57,9 @@ def encode_base64(data: bytes) -> str:
 
 async def test_sitemap(server_url: URL) -> None:
     """Test loading a basic sitemap."""
-    sitemap_url = (server_url / 'get_sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
+    sitemap_url = (server_url / 'get_sitemap.xml').with_query(
+        base64=encode_base64(BASIC_SITEMAP.encode()), c_type='application/xml; charset=utf-8'
+    )
     sitemap = await Sitemap.load(str(sitemap_url))
 
     assert len(sitemap.urls) == 5
@@ -66,7 +68,9 @@ async def test_sitemap(server_url: URL) -> None:
 
 async def test_extract_metadata_sitemap(server_url: URL) -> None:
     """Test extracting item metadata from a sitemap."""
-    sitemap_url = (server_url / 'get_sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
+    sitemap_url = (server_url / 'get_sitemap.xml').with_query(
+        base64=encode_base64(BASIC_SITEMAP.encode()), c_type='application/xml; charset=utf-8'
+    )
 
     items = [item async for item in parse_sitemap([{'type': 'url', 'url': str(sitemap_url)}])]
     assert len(items) == 5
@@ -113,7 +117,9 @@ async def test_gz_sitemap_with_non_gzipped(server_url: URL) -> None:
 async def test_gzipped_sitemap_with_bad_type(server_url: URL) -> None:
     """Test loading a gzipped sitemap with bad type and .xml.gz url."""
     gzipped_data = encode_base64(compress_gzip(BASIC_SITEMAP))
-    sitemap_url = (server_url / 'get_sitemap.xml.gz').with_query(base64=gzipped_data)
+    sitemap_url = (server_url / 'get_sitemap.xml.gz').with_query(
+        base64=gzipped_data, c_type='application/xml; charset=utf-8'
+    )
     sitemap = await Sitemap.load(str(sitemap_url))
 
     assert len(sitemap.urls) == 5
@@ -175,7 +181,9 @@ async def test_cdata_sitemap(server_url: URL) -> None:
 </url>
 </urlset>
     """.strip()
-    sitemap_url = (server_url / 'get_sitemap.xml').with_query(base64=encode_base64(cdata_sitemap.encode()))
+    sitemap_url = (server_url / 'get_sitemap.xml').with_query(
+        base64=encode_base64(cdata_sitemap.encode()), c_type='application/xml; charset=utf-8'
+    )
     sitemap = await Sitemap.load(str(sitemap_url))
 
     assert len(sitemap.urls) == 1
@@ -222,7 +230,9 @@ async def test_sitemap_pretty(server_url: URL) -> None:
 </url>
 </urlset>
 """.strip()
-    sitemap_url = (server_url / 'get_sitemap.xml').with_query(base64=encode_base64(pretty_sitemap.encode()))
+    sitemap_url = (server_url / 'get_sitemap.xml').with_query(
+        base64=encode_base64(pretty_sitemap.encode()), c_type='application/xml; charset=utf-8'
+    )
     sitemap = await Sitemap.load(str(sitemap_url))
 
     assert len(sitemap.urls) == 1

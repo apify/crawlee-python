@@ -4,7 +4,7 @@ import asyncio
 import zlib
 from contextlib import suppress
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from hashlib import sha256
 from logging import getLogger
 from typing import TYPE_CHECKING, Literal, TypedDict
@@ -44,7 +44,7 @@ class ParseSitemapOptions(TypedDict, total=False):
     emit_nested_sitemaps: bool
     max_depth: int
     sitemap_retries: int
-    timeout: float | None
+    timeout: timedelta | None
 
 
 class SitemapSource(TypedDict):
@@ -420,7 +420,9 @@ async def parse_sitemap(
     emit_nested_sitemaps = options.get('emit_nested_sitemaps', False)
     max_depth = options.get('max_depth', float('inf'))
     sitemap_retries = options.get('sitemap_retries', 3)
-    timeout = options.get('timeout', 30)
+    timeout = options.get('timeout', timedelta(seconds=30))
+
+    httpx_timeout = httpx.Timeout(float(timeout.seconds)) if timeout else None
 
     # Setup working state
     sources = list(initial_sources)
@@ -447,7 +449,7 @@ async def parse_sitemap(
             # Add to visited set before processing to avoid duplicates
             visited_sitemap_urls.add(source['url'])
 
-            async with httpx.AsyncClient(timeout=httpx.Timeout(timeout), proxy=proxy_url) as client:
+            async with httpx.AsyncClient(timeout=httpx_timeout, proxy=proxy_url) as client:
                 async for result in _fetch_and_process_sitemap(
                     client,
                     source,
