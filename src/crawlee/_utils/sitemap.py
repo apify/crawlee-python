@@ -172,7 +172,7 @@ class _XmlSitemapParser:
             self._handler.items.clear()
 
         except Exception as e:
-            logger.warning(f'Failed to parse XML data chunk: {e}')
+            logger.warning(f'Failed to parse XML data chunk: {e}', exc_info=True)
 
     async def flush(self) -> AsyncGenerator[_SitemapItem, None]:
         """Process any remaining data in the buffer, yielding items one by one."""
@@ -422,7 +422,7 @@ async def parse_sitemap(
     sitemap_retries = options.get('sitemap_retries', 3)
     timeout = options.get('timeout', timedelta(seconds=30))
 
-    httpx_timeout = httpx.Timeout(float(timeout.seconds)) if timeout else None
+    httpx_timeout = httpx.Timeout(None, connect=timeout.total_seconds()) if timeout else None
 
     # Setup working state
     sources = list(initial_sources)

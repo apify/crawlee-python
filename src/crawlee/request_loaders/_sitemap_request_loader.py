@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import suppress
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
@@ -64,7 +65,6 @@ class SitemapRequestLoader(RequestLoader):
 
         # Loading state
         self._loading_task = asyncio.create_task(self._load_sitemaps())
-        self._loading_finished = False
 
     def _check_url_patterns(
         self,
@@ -123,8 +123,6 @@ class SitemapRequestLoader(RequestLoader):
         except Exception:
             logger.exception('Error loading sitemaps')
             raise
-        finally:
-            self._loading_finished = True
 
     async def get_total_count(self) -> int:
         """Return the total number of URLs found so far."""
@@ -132,15 +130,15 @@ class SitemapRequestLoader(RequestLoader):
 
     async def is_empty(self) -> bool:
         """Check if there are no more URLs to process."""
-        return self._url_queue.empty() and self._loading_finished
+        return self._url_queue.empty() and self._loading_task.done()
 
     async def is_finished(self) -> bool:
         """Check if all URLs have been processed."""
-        return self._url_queue.empty() and len(self._in_progress) == 0 and self._loading_finished
+        return self._url_queue.empty() and len(self._in_progress) == 0 and self._loading_task.done()
 
     async def fetch_next_request(self) -> Request | None:
         """Fetch the next request to process."""
-        while not (self._loading_finished and self._url_queue.empty()):
+        while not (self._loading_task.done() and self._url_queue.empty()):
             if self._url_queue.empty():
                 await asyncio.sleep(0.5)
                 continue
@@ -168,9 +166,5 @@ class SitemapRequestLoader(RequestLoader):
         """Abort the sitemap loading process."""
         if self._loading_task and not self._loading_task.done():
             self._loading_task.cancel()
-            try:
+            with suppress(asyncio.CancelledError):
                 await self._loading_task
-            except asyncio.CancelledError:
-                pass
-            finally:
-                self._loading_finished = True
