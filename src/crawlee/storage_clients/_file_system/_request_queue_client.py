@@ -270,7 +270,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             request_files = await self._get_request_files(self.path_to_rq)
 
             for file_path in request_files:
-                await asyncio.to_thread(file_path.unlink)
+                await asyncio.to_thread(file_path.unlink, missing_ok=True)
 
             self._in_progress.clear()
             self._request_cache.clear()

@@ -204,7 +204,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             for file_path in self.path_to_kvs.glob('*'):
                 if file_path.name == METADATA_FILENAME:
                     continue
-                await asyncio.to_thread(file_path.unlink)
+                await asyncio.to_thread(file_path.unlink, missing_ok=True)
 
             await self._update_metadata(
                 update_accessed_at=True,
@@ -338,11 +338,11 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         async with self._lock:
             # Delete the value file and its metadata if found
             if record_path.exists():
-                await asyncio.to_thread(record_path.unlink)
+                await asyncio.to_thread(record_path.unlink, missing_ok=True)
 
                 # Delete the metadata file if it exists
                 if metadata_path.exists():
-                    await asyncio.to_thread(metadata_path.unlink)
+                    await asyncio.to_thread(metadata_path.unlink, missing_ok=True)
                 else:
                     logger.warning(f'Found value file for key "{key}" but no metadata file when trying to delete it.')
 
