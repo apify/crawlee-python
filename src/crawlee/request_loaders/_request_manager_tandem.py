@@ -32,15 +32,13 @@ class RequestManagerTandem(RequestManager):
         self._read_only_loader = request_loader
         self._read_write_manager = request_manager
 
-    @property
     @override
-    async def handled_count(self) -> int:
-        return await self._read_write_manager.handled_count
+    async def get_handled_count(self) -> int:
+        return await self._read_write_manager.get_handled_count()
 
-    @property
     @override
-    async def total_count(self) -> int:
-        return (await self._read_only_loader.total_count) + (await self._read_write_manager.total_count)
+    async def get_total_count(self) -> int:
+        return (await self._read_only_loader.get_total_count()) + (await self._read_write_manager.get_total_count())
 
     @override
     async def is_empty(self) -> bool:
