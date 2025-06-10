@@ -11,7 +11,7 @@ from crawlee.storages import RequestQueue
 
 
 @dataclass
-class TestInput:
+class _TestInput:
     request_loader_items: list[str | Request | None]
     request_manager_items: list[str | Request]
     discovered_items: list[Request]
@@ -22,7 +22,7 @@ class TestInput:
     argnames='test_input',
     argvalues=[
         pytest.param(
-            TestInput(
+            _TestInput(
                 request_loader_items=['http://a.com', 'http://b.com'],
                 request_manager_items=[],
                 discovered_items=[Request.from_url('http://c.com')],
@@ -35,7 +35,7 @@ class TestInput:
             id='basic_usage',
         ),
         pytest.param(
-            TestInput(
+            _TestInput(
                 request_loader_items=[Request.from_url('http://a.com'), None, Request.from_url('http://c.com')],
                 request_manager_items=['http://b.com', 'http://d.com'],
                 discovered_items=[],
@@ -50,7 +50,7 @@ class TestInput:
         ),
     ],
 )
-async def test_basic_functionality(test_input: TestInput) -> None:
+async def test_basic_functionality(test_input: _TestInput) -> None:
     request_queue = await RequestQueue.open()
 
     if test_input.request_manager_items:
