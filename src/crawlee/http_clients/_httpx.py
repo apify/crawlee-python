@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, Optional, cast
 
@@ -14,6 +15,8 @@ from crawlee.fingerprint_suite import HeaderGenerator
 from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, AsyncIterator
+    from datetime import timedelta
     from ssl import SSLContext
 
     from crawlee import Request
@@ -45,6 +48,9 @@ class _HttpxResponse:
 
     def read(self) -> bytes:
         return self._response.read()
+
+    def iter_bytes(self) -> AsyncIterator[bytes]:
+        return self._response.aiter_bytes()
 
 
 class _HttpxTransport(httpx.AsyncHTTPTransport):
@@ -182,18 +188,15 @@ class HttpxHttpClient(HttpClient):
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> HttpResponse:
-        if isinstance(headers, dict) or headers is None:
-            headers = HttpHeaders(headers or {})
-
         client = self._get_client(proxy_info.url if proxy_info else None)
-        headers = self._combine_headers(headers)
 
-        http_request = client.build_request(
+        http_request = self._build_request(
+            client=client,
             url=url,
             method=method,
-            headers=dict(headers) if headers else None,
-            content=payload,
-            extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
+            headers=headers,
+            payload=payload,
+            session=session,
         )
 
         try:
@@ -204,6 +207,60 @@ class HttpxHttpClient(HttpClient):
             raise
 
         return _HttpxResponse(response)
+
+    @asynccontextmanager
+    @override
+    async def stream(
+        self,
+        url: str,
+        *,
+        method: HttpMethod = 'GET',
+        headers: HttpHeaders | dict[str, str] | None = None,
+        payload: HttpPayload | None = None,
+        session: Session | None = None,
+        proxy_info: ProxyInfo | None = None,
+        timeout: timedelta | None = None,
+    ) -> AsyncGenerator[HttpResponse]:
+        client = self._get_client(proxy_info.url if proxy_info else None)
+
+        http_request = self._build_request(
+            client=client,
+            url=url,
+            method=method,
+            headers=headers,
+            payload=payload,
+            session=session,
+        )
+
+        response = await client.send(http_request, stream=True)
+
+        try:
+            yield _HttpxResponse(response)
+        finally:
+            await response.aclose()
+
+    def _build_request(
+        self,
+        client: httpx.AsyncClient,
+        url: str,
+        method: HttpMethod,
+        headers: HttpHeaders | dict[str, str] | None,
+        payload: HttpPayload | None,
+        session: Session | None = None,
+    ) -> httpx.Request:
+        """Build an `httpx.Request` using the provided parameters."""
+        if isinstance(headers, dict) or headers is None:
+            headers = HttpHeaders(headers or {})
+
+        headers = self._combine_headers(headers)
+
+        return client.build_request(
+            url=url,
+            method=method,
+            headers=dict(headers) if headers else None,
+            content=payload,
+            extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
+        )
 
     def _get_client(self, proxy_url: str | None) -> httpx.AsyncClient:
         """Retrieve or create an HTTP client for the given proxy URL.
@@ -262,3 +319,9 @@ class HttpxHttpClient(HttpClient):
             return True
 
         return False
+
+    async def cleanup(self) -> None:
+        for client in self._client_by_proxy_url.values():
+            await client.aclose()
+        self._client_by_proxy_url.clear()
+        await self._transport.aclose()

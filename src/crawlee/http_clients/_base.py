@@ -7,6 +7,11 @@ from typing import TYPE_CHECKING, Protocol
 from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+    from contextlib import AbstractAsyncContextManager
+    from datetime import timedelta
+    from types import TracebackType
+
     from crawlee import Request
     from crawlee._types import HttpHeaders, HttpMethod, HttpPayload
     from crawlee.proxy_configuration import ProxyInfo
@@ -32,6 +37,9 @@ class HttpResponse(Protocol):
 
     def read(self) -> bytes:
         """Read the content of the response body."""
+
+    def iter_bytes(self) -> AsyncIterator[bytes]:
+        """Iterate over the content of the response body in chunks."""
 
 
 @dataclass(frozen=True)
@@ -63,6 +71,9 @@ class HttpClient(ABC):
             persist_cookies_per_session: Whether to persist cookies per HTTP session.
         """
         self._persist_cookies_per_session = persist_cookies_per_session
+
+        # Flag to indicate the context state.
+        self._active = False
 
     @abstractmethod
     async def crawl(
@@ -119,3 +130,51 @@ class HttpClient(ABC):
         Returns:
             The HTTP response received from the server.
         """
+
+    @abstractmethod
+    def stream(
+        self,
+        url: str,
+        *,
+        method: HttpMethod = 'GET',
+        headers: HttpHeaders | dict[str, str] | None = None,
+        payload: HttpPayload | None = None,
+        session: Session | None = None,
+        proxy_info: ProxyInfo | None = None,
+        timeout: timedelta | None = None,
+    ) -> AbstractAsyncContextManager[HttpResponse]:
+        """Stream an HTTP request via the client."""
+
+    @abstractmethod
+    async def cleanup(self) -> None:
+        """Clean up resources used by the client.
+
+        This method is called when the client is no longer needed.
+        It should be overridden in subclasses to perform any necessary cleanup.
+        """
+
+    async def __aenter__(self) -> HttpClient:
+        """Initialize the client when entering the context manager.
+
+        Raises:
+            RuntimeError: If the context manager is already active.
+        """
+        if self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is already active.')
+
+        self._active = True
+        return self
+
+    async def __aexit__(
+        self, exc_type: BaseException | None, exc_value: BaseException | None, traceback: TracebackType | None
+    ) -> None:
+        """Deinitialize the client and clean up resources when exiting the context manager.
+
+        Raises:
+            RuntimeError: If the context manager is already active.
+        """
+        if not self._active:
+            raise RuntimeError(f'The {self.__class__.__name__} is not active.')
+
+        await self.cleanup()
+        self._active = False
