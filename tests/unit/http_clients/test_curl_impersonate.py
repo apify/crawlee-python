@@ -116,3 +116,21 @@ async def test_send_request_allow_redirects_false(server_url: URL) -> None:
 
     assert response.status_code == 302
     assert response.headers['Location'] == target_url
+
+
+async def test_stream(http_client: CurlImpersonateHttpClient, server_url: URL) -> None:
+    check_body = b"""\
+<html><head>
+    <title>Hello, world!</title>
+</head>
+<body>
+</body></html>"""
+
+    content_body: bytes = b''
+
+    async with http_client.stream(str(server_url)) as response:
+        assert response.status_code == 200
+        async for chunk in response.iter_bytes():
+            content_body += chunk
+
+    assert content_body == check_body
