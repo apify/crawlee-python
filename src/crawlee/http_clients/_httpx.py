@@ -230,6 +230,7 @@ class HttpxHttpClient(HttpClient):
             headers=headers,
             payload=payload,
             session=session,
+            timeout=timeout,
         )
 
         response = await client.send(http_request, stream=True)
@@ -247,6 +248,7 @@ class HttpxHttpClient(HttpClient):
         headers: HttpHeaders | dict[str, str] | None,
         payload: HttpPayload | None,
         session: Session | None = None,
+        timeout: timedelta | None = None,
     ) -> httpx.Request:
         """Build an `httpx.Request` using the provided parameters."""
         if isinstance(headers, dict) or headers is None:
@@ -254,12 +256,15 @@ class HttpxHttpClient(HttpClient):
 
         headers = self._combine_headers(headers)
 
+        httpx_timeout = httpx.Timeout(None, connect=timeout.total_seconds()) if timeout else None
+
         return client.build_request(
             url=url,
             method=method,
             headers=dict(headers) if headers else None,
             content=payload,
             extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
+            timeout=httpx_timeout,
         )
 
     def _get_client(self, proxy_url: str | None) -> httpx.AsyncClient:

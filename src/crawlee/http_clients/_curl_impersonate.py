@@ -232,6 +232,7 @@ class CurlImpersonateHttpClient(HttpClient):
                 data=payload,
                 cookies=session.cookies.jar if session else None,
                 stream=True,
+                timeout=timeout.total_seconds() if timeout else None,
             )
         except CurlRequestError as exc:
             if self._is_proxy_error(exc):
