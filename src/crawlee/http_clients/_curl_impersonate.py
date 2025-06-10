@@ -88,8 +88,8 @@ class _CurlImpersonateResponse:
     def read(self) -> bytes:
         return self._response.content
 
-    async def iter_bytes(self) -> AsyncGenerator[bytes, None]:
-        async for chunk in self._response.aiter_content():  # type: ignore[no-untyped-call]
+    async def iter_bytes(self, chunk_size: int | None = None) -> AsyncGenerator[bytes, None]:
+        async for chunk in self._response.aiter_content(chunk_size=chunk_size):  # type: ignore[no-untyped-call]
             yield chunk
 
 

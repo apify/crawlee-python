@@ -49,8 +49,8 @@ class _HttpxResponse:
     def read(self) -> bytes:
         return self._response.read()
 
-    def iter_bytes(self) -> AsyncIterator[bytes]:
-        return self._response.aiter_bytes()
+    def iter_bytes(self, chunk_size: int | None = None) -> AsyncIterator[bytes]:
+        return self._response.aiter_bytes(chunk_size=chunk_size)
 
 
 class _HttpxTransport(httpx.AsyncHTTPTransport):

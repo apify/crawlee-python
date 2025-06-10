@@ -44,8 +44,7 @@ class PlaywrightHttpResponse:
     def read(self) -> bytes:
         return self._content
 
-    async def iter_bytes(self) -> AsyncGenerator[bytes, None]:
-        chunk_size = None
+    async def iter_bytes(self, chunk_size: int | None = None) -> AsyncGenerator[bytes, None]:
         chunk_size = len(self._content) if chunk_size is None else chunk_size
         for i in range(0, len(self._content), max(chunk_size, 1)):
             yield self._content[i : i + chunk_size]
