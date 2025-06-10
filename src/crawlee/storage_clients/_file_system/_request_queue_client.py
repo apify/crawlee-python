@@ -605,6 +605,11 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             if self._is_empty_cache is not None:
                 return self._is_empty_cache
 
+            # If there are in-progress requests, return False immediately.
+            if len(self._in_progress) > 0:
+                self._is_empty_cache = False
+                return False
+
             # If we have a cached requests, check them first (fast path).
             if self._request_cache:
                 for req in self._request_cache:
@@ -612,7 +617,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                         self._is_empty_cache = False
                         return False
                 self._is_empty_cache = True
-                return True
+                return len(self._in_progress) == 0
 
             # Fallback: check files on disk (slow path).
             await self._update_metadata(update_accessed_at=True)

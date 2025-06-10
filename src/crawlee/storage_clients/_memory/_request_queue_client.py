@@ -343,9 +343,9 @@ class MemoryRequestQueueClient(RequestQueueClient):
         """
         await self._update_metadata(update_accessed_at=True)
 
-        # Queue is empty if there are no pending requests
+        # Queue is empty if there are no pending requests and no requests in progress
         pending_requests = [request for request in self._records if not request.was_already_handled]
-        return len(pending_requests) == 0
+        return len(pending_requests) == 0 and len(self._in_progress) == 0
 
     async def _update_metadata(
         self,
