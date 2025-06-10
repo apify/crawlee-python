@@ -292,15 +292,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         *,
         forefront: bool = False,
     ) -> AddRequestsResponse:
-        """Add a batch of requests to the queue.
-
-        Args:
-            requests: The requests to add.
-            forefront: Whether to add the requests to the beginning of the queue.
-
-        Returns:
-            Response containing information about the added requests.
-        """
         async with self._lock:
             self._is_empty_cache = None
             new_total_request_count = self._metadata.total_request_count
@@ -426,36 +417,20 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
     @override
     async def get_request(self, request_id: str) -> Request | None:
-        """Retrieve a request from the queue.
+        async with self._lock:
+            request_path = self._get_request_path(request_id)
+            request = await self._parse_request_file(request_path)
 
-        Args:
-            request_id: ID of the request to retrieve.
+            if request is None:
+                logger.warning(f'Request with ID "{request_id}" not found in the queue.')
+                return None
 
-        Returns:
-            The retrieved request, or None, if it did not exist.
-        """
-        request_path = self._get_request_path(request_id)
-        request = await self._parse_request_file(request_path)
-
-        if request is None:
-            logger.warning(f'Request with ID "{request_id}" not found in the queue.')
-            return None
-
-        self._in_progress.add(request.id)
-        return request
+            self._in_progress.add(request.id)
+            await self._update_metadata(update_accessed_at=True)
+            return request
 
     @override
     async def fetch_next_request(self) -> Request | None:
-        """Return the next request in the queue to be processed.
-
-        Once you successfully finish processing of the request, you need to call `RequestQueue.mark_request_as_handled`
-        to mark the request as handled in the queue. If there was some error in processing the request, call
-        `RequestQueue.reclaim_request` instead, so that the queue will give the request to some other consumer
-        in another call to the `fetch_next_request` method.
-
-        Returns:
-            The request or `None` if there are no more pending requests.
-        """
         async with self._lock:
             # Refresh cache if needed or if it's empty.
             if self._request_cache_needs_refresh or not self._request_cache:
@@ -478,16 +453,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
     @override
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
-        """Mark a request as handled after successful processing.
-
-        Handled requests will never again be returned by the `fetch_next_request` method.
-
-        Args:
-            request: The request to mark as handled.
-
-        Returns:
-            Information about the queue operation. `None` if the given request was not in progress.
-        """
         async with self._lock:
             self._is_empty_cache = None
 
@@ -535,17 +500,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         *,
         forefront: bool = False,
     ) -> ProcessedRequest | None:
-        """Reclaim a failed request back to the queue.
-
-        The request will be returned for processing later again by another call to `fetch_next_request`.
-
-        Args:
-            request: The request to return to the queue.
-            forefront: Whether to add the request to the head or the end of the queue.
-
-        Returns:
-            Information about the queue operation. `None` if the given request was not in progress.
-        """
         async with self._lock:
             self._is_empty_cache = None
 
@@ -599,7 +553,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
     @override
     async def is_empty(self) -> bool:
-        """Check if the queue is empty, using a cached value if available and valid."""
         async with self._lock:
             # If we have a cached value, return it immediately.
             if self._is_empty_cache is not None:

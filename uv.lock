@@ -763,7 +763,7 @@ provides-extras = ["all", "adaptive-crawler", "beautifulsoup", "cli", "curl-impe
 dev = [
     { name = "apify-client" },
     { name = "build", specifier = "~=1.2.2" },
-    { name = "dycw-pytest-only", specifier = ">=2.1.1" },
+    { name = "dycw-pytest-only", specifier = "~=2.1.0" },
     { name = "mypy", specifier = "~=1.16.0" },
     { name = "pre-commit", specifier = "~=4.2.0" },
     { name = "proxy-py", specifier = "~=2.4.0" },
@@ -771,7 +771,7 @@ dev = [
     { name = "pytest", specifier = "~=8.4.0" },
     { name = "pytest-asyncio", specifier = "~=1.0.0" },
     { name = "pytest-cov", specifier = "~=6.1.0" },
-    { name = "pytest-timeout", specifier = ">=2.4.0" },
+    { name = "pytest-timeout", specifier = "~=2.4.0" },
     { name = "pytest-xdist", specifier = "~=3.7.0" },
     { name = "ruff", specifier = "~=0.11.0" },
     { name = "setuptools" },

@@ -86,10 +86,6 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
 
     @override
     async def purge(self) -> None:
-        """Delete all stored values from the key-value store, but keep the store itself.
-
-        This method clears all key-value pairs while preserving the store structure.
-        """
         self._records.clear()
         await self._update_metadata(update_accessed_at=True, update_modified_at=True)
 

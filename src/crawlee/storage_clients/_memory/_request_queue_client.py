@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import deque
+from contextlib import suppress
 from datetime import datetime, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING
@@ -22,10 +24,9 @@ logger = getLogger(__name__)
 class MemoryRequestQueueClient(RequestQueueClient):
     """Memory implementation of the request queue client.
 
-    This client stores requests in memory using a Python list and dictionary. No data is persisted between
-    process runs, which means all requests are lost when the program terminates. This implementation
-    is primarily useful for testing, development, and short-lived crawler runs where persistence
-    is not required.
+    No data is persisted between process runs, which means all requests are lost when
+    the program terminates. This implementation is primarily useful for testing,
+    development, and short-lived crawler runs where persistence is not required.
 
     This client provides fast access to request data but is limited by available memory and
     does not support data sharing across different processes.
@@ -62,11 +63,20 @@ class MemoryRequestQueueClient(RequestQueueClient):
             total_request_count=total_request_count,
         )
 
-        # List to hold RQ items
-        self._records = list[Request]()
+        self._pending_requests = deque[Request]()
+        """Pending requests are those that have been added to the queue but not yet fetched for processing."""
 
-        # Dictionary to track in-progress requests (fetched but not yet handled or reclaimed)
-        self._in_progress = dict[str, Request]()
+        self._handled_requests = dict[str, Request]()
+        """Handled requests are those that have been processed and marked as handled."""
+
+        self._in_progress_requests = dict[str, Request]()
+        """In-progress requests are those that have been fetched but not yet marked as handled or reclaimed."""
+
+        self._requests_by_id = dict[str, Request]()
+        """ID -> Request mapping for fast lookup by request ID."""
+
+        self._requests_by_unique_key = dict[str, Request]()
+        """Unique key -> Request mapping for fast lookup by unique key."""
 
     @property
     @override
@@ -101,9 +111,11 @@ class MemoryRequestQueueClient(RequestQueueClient):
 
     @override
     async def drop(self) -> None:
-        # Clear all data
-        self._records.clear()
-        self._in_progress.clear()
+        self._pending_requests.clear()
+        self._handled_requests.clear()
+        self._requests_by_id.clear()
+        self._requests_by_unique_key.clear()
+        self._in_progress_requests.clear()
 
         await self._update_metadata(
             update_modified_at=True,
@@ -115,13 +127,11 @@ class MemoryRequestQueueClient(RequestQueueClient):
 
     @override
     async def purge(self) -> None:
-        """Delete all requests from the queue, but keep the queue itself.
-
-        This method clears all requests including both pending and handled ones,
-        but preserves the queue structure.
-        """
-        self._records.clear()
-        self._in_progress.clear()
+        self._pending_requests.clear()
+        self._handled_requests.clear()
+        self._requests_by_id.clear()
+        self._requests_by_unique_key.clear()
+        self._in_progress_requests.clear()
 
         await self._update_metadata(
             update_modified_at=True,
@@ -136,28 +146,15 @@ class MemoryRequestQueueClient(RequestQueueClient):
         *,
         forefront: bool = False,
     ) -> AddRequestsResponse:
-        """Add a batch of requests to the queue.
-
-        Args:
-            requests: The requests to add.
-            forefront: Whether to add the requests to the beginning of the queue.
-
-        Returns:
-            Response containing information about the added requests.
-        """
         processed_requests = []
         for request in requests:
-            # Ensure the request has an ID
-            if not request.id:
-                request.id = crypto_random_object_id()
-
-            # Check if the request is already in the queue by unique_key
-            existing_request = next((r for r in self._records if r.unique_key == request.unique_key), None)
+            # Check if the request is already in the queue by unique_key.
+            existing_request = self._requests_by_unique_key.get(request.unique_key)
 
             was_already_present = existing_request is not None
             was_already_handled = was_already_present and existing_request and existing_request.handled_at is not None
 
-            # If the request is already in the queue and handled, don't add it again
+            # If the request is already in the queue and handled, don't add it again.
             if was_already_handled:
                 processed_requests.append(
                     ProcessedRequest(
@@ -169,23 +166,37 @@ class MemoryRequestQueueClient(RequestQueueClient):
                 )
                 continue
 
-            # If the request is already in the queue but not handled, update it
-            if was_already_present:
-                # Update the existing request with any new data
-                for idx, rec in enumerate(self._records):
-                    if rec.unique_key == request.unique_key:
-                        self._records[idx] = request
-                        break
-            else:
-                # Add the new request to the queue
-                if forefront:
-                    self._records.insert(0, request)
-                else:
-                    self._records.append(request)
+            # If the request is already in the queue but not handled, update it.
+            if was_already_present and existing_request:
+                # Update the existing request with any new data and
+                # remove old request from pending queue if it's there.
+                with suppress(ValueError):
+                    self._pending_requests.remove(existing_request)
 
-                # Update metadata counts
-                self._metadata.total_request_count += 1
-                self._metadata.pending_request_count += 1
+                # Update indexes.
+                self._requests_by_id[request.id] = request
+                self._requests_by_unique_key[request.unique_key] = request
+
+                # Add updated request back to queue.
+                if forefront:
+                    self._pending_requests.appendleft(request)
+                else:
+                    self._pending_requests.append(request)
+            # Add the new request to the queue.
+            else:
+                if forefront:
+                    self._pending_requests.appendleft(request)
+                else:
+                    self._pending_requests.append(request)
+
+                # Update indexes.
+                self._requests_by_id[request.id] = request
+                self._requests_by_unique_key[request.unique_key] = request
+
+                await self._update_metadata(
+                    new_total_request_count=self._metadata.total_request_count + 1,
+                    new_pending_request_count=self._metadata.pending_request_count + 1,
+                )
 
             processed_requests.append(
                 ProcessedRequest(
@@ -205,81 +216,55 @@ class MemoryRequestQueueClient(RequestQueueClient):
 
     @override
     async def fetch_next_request(self) -> Request | None:
-        """Return the next request in the queue to be processed.
+        while self._pending_requests:
+            request = self._pending_requests.popleft()
 
-        Returns:
-            The request or `None` if there are no more pending requests.
-        """
-        # Find the first request that's not handled or in progress
-        for request in self._records:
+            # Skip if already handled (shouldn't happen, but safety check).
             if request.was_already_handled:
                 continue
 
-            if request.id in self._in_progress:
-                continue
+            # Skip if already in progress (shouldn't happen, but safety check).
+            if request.id in self._in_progress_requests:
+                self._pending_requests.appendleft(request)
+                break
 
-            # Mark as in progress
-            self._in_progress[request.id] = request
+            # Mark as in progress.
+            self._in_progress_requests[request.id] = request
             return request
 
         return None
 
     @override
     async def get_request(self, request_id: str) -> Request | None:
-        """Retrieve a request from the queue.
-
-        Args:
-            request_id: ID of the request to retrieve.
-
-        Returns:
-            The retrieved request, or None, if it did not exist.
-        """
-        # Check in-progress requests first
-        if request_id in self._in_progress:
-            return self._in_progress[request_id]
-
-        # Otherwise search in the records
-        for request in self._records:
-            if request.id == request_id:
-                return request
-
-        return None
+        await self._update_metadata(update_accessed_at=True)
+        return self._requests_by_id.get(request_id)
 
     @override
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
-        """Mark a request as handled after successful processing.
-
-        Handled requests will never again be returned by the `fetch_next_request` method.
-
-        Args:
-            request: The request to mark as handled.
-
-        Returns:
-            Information about the queue operation. `None` if the given request was not in progress.
-        """
-        # Check if the request is in progress
-        if request.id not in self._in_progress:
+        # Check if the request is in progress.
+        if request.id not in self._in_progress_requests:
             return None
 
-        # Set handled_at timestamp if not already set
+        # Set handled_at timestamp if not already set.
         if not request.was_already_handled:
             request.handled_at = datetime.now(timezone.utc)
 
-        # Update the request in records
-        for idx, rec in enumerate(self._records):
-            if rec.id == request.id:
-                self._records[idx] = request
-                break
+        # Move request to handled storage.
+        self._handled_requests[request.id] = request
 
-        # Remove from in-progress
-        del self._in_progress[request.id]
+        # Update indexes (keep the request in indexes for get_request to work).
+        self._requests_by_id[request.id] = request
+        self._requests_by_unique_key[request.unique_key] = request
 
-        # Update metadata counts
-        self._metadata.handled_request_count += 1
-        self._metadata.pending_request_count -= 1
+        # Remove from in-progress.
+        del self._in_progress_requests[request.id]
 
-        # Update metadata timestamps
-        await self._update_metadata(update_modified_at=True)
+        # Update metadata.
+        await self._update_metadata(
+            new_handled_request_count=self._metadata.handled_request_count + 1,
+            new_pending_request_count=self._metadata.pending_request_count - 1,
+            update_modified_at=True,
+        )
 
         return ProcessedRequest(
             id=request.id,
@@ -295,36 +280,20 @@ class MemoryRequestQueueClient(RequestQueueClient):
         *,
         forefront: bool = False,
     ) -> ProcessedRequest | None:
-        """Reclaim a failed request back to the queue.
-
-        The request will be returned for processing later again by another call to `fetch_next_request`.
-
-        Args:
-            request: The request to return to the queue.
-            forefront: Whether to add the request to the head or the end of the queue.
-
-        Returns:
-            Information about the queue operation. `None` if the given request was not in progress.
-        """
-        # Check if the request is in progress
-        if request.id not in self._in_progress:
+        # Check if the request is in progress.
+        if request.id not in self._in_progress_requests:
             return None
 
-        # Remove from in-progress
-        del self._in_progress[request.id]
+        # Remove from in-progress.
+        del self._in_progress_requests[request.id]
 
-        # If forefront is true, move the request to the beginning of the queue
+        # Add request back to pending queue.
         if forefront:
-            # First remove the request from its current position
-            for idx, rec in enumerate(self._records):
-                if rec.id == request.id:
-                    self._records.pop(idx)
-                    break
+            self._pending_requests.appendleft(request)
+        else:
+            self._pending_requests.append(request)
 
-            # Then insert it at the beginning
-            self._records.insert(0, request)
-
-        # Update metadata timestamps
+        # Update metadata timestamps.
         await self._update_metadata(update_modified_at=True)
 
         return ProcessedRequest(
@@ -343,9 +312,8 @@ class MemoryRequestQueueClient(RequestQueueClient):
         """
         await self._update_metadata(update_accessed_at=True)
 
-        # Queue is empty if there are no pending requests and no requests in progress
-        pending_requests = [request for request in self._records if not request.was_already_handled]
-        return len(pending_requests) == 0 and len(self._in_progress) == 0
+        # Queue is empty if there are no pending requests and no requests in progress.
+        return len(self._pending_requests) == 0 and len(self._in_progress_requests) == 0
 
     async def _update_metadata(
         self,

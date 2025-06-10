@@ -95,10 +95,6 @@ class MemoryDatasetClient(DatasetClient):
 
     @override
     async def purge(self) -> None:
-        """Delete all records from the dataset, but keep the dataset itself.
-
-        This method clears all data items from the dataset while preserving the dataset structure.
-        """
         self._records.clear()
         await self._update_metadata(
             update_accessed_at=True,
