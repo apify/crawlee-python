@@ -94,7 +94,9 @@ class _SimpleRenderingTypePredictor(RenderingTypePredictor):
 
 
 @dataclass(frozen=True)
-class _TestInput:
+class TestInput:
+    __test__ = False
+
     expected_pw_count: int
     expected_static_count: int
     rendering_types: Iterator[RenderingType]
@@ -105,7 +107,7 @@ class _TestInput:
     'test_input',
     [
         pytest.param(
-            _TestInput(
+            TestInput(
                 expected_pw_count=0,
                 expected_static_count=2,
                 rendering_types=cycle(['static']),
@@ -114,7 +116,7 @@ class _TestInput:
             id='Static only',
         ),
         pytest.param(
-            _TestInput(
+            TestInput(
                 expected_pw_count=2,
                 expected_static_count=0,
                 rendering_types=cycle(['client only']),
@@ -123,7 +125,7 @@ class _TestInput:
             id='Client only',
         ),
         pytest.param(
-            _TestInput(
+            TestInput(
                 expected_pw_count=1,
                 expected_static_count=1,
                 rendering_types=cycle(['static', 'client only']),
@@ -132,7 +134,7 @@ class _TestInput:
             id='Mixed',
         ),
         pytest.param(
-            _TestInput(
+            TestInput(
                 expected_pw_count=2,
                 expected_static_count=2,
                 rendering_types=cycle(['static', 'client only']),
@@ -143,7 +145,7 @@ class _TestInput:
     ],
 )
 async def test_adaptive_crawling(
-    test_input: _TestInput,
+    test_input: TestInput,
     test_urls: list[str],
 ) -> None:
     """Tests correct routing to pre-nav hooks and correct handling through proper handler."""
