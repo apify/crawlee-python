@@ -691,6 +691,7 @@ playwright = [
 dev = [
     { name = "apify-client" },
     { name = "build" },
+    { name = "dycw-pytest-only" },
     { name = "mypy" },
     { name = "pre-commit" },
     { name = "proxy-py" },
@@ -698,7 +699,6 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
-    { name = "pytest-only" },
     { name = "pytest-timeout" },
     { name = "pytest-xdist" },
     { name = "ruff" },
@@ -763,6 +763,7 @@ provides-extras = ["all", "adaptive-crawler", "beautifulsoup", "cli", "curl-impe
 dev = [
     { name = "apify-client" },
     { name = "build", specifier = "~=1.2.2" },
+    { name = "dycw-pytest-only", specifier = ">=2.1.1" },
     { name = "mypy", specifier = "~=1.16.0" },
     { name = "pre-commit", specifier = "~=4.2.0" },
     { name = "proxy-py", specifier = "~=2.4.0" },
@@ -770,7 +771,6 @@ dev = [
     { name = "pytest", specifier = "~=8.4.0" },
     { name = "pytest-asyncio", specifier = "~=1.0.0" },
     { name = "pytest-cov", specifier = "~=6.1.0" },
-    { name = "pytest-only", specifier = "~=2.1.0" },
     { name = "pytest-timeout", specifier = ">=2.4.0" },
     { name = "pytest-xdist", specifier = "~=3.7.0" },
     { name = "ruff", specifier = "~=0.11.0" },
@@ -909,6 +909,18 @@ name = "docstring-parser"
 version = "0.11"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/a2/ce/5d6a3782b9f88097ce3e579265015db3372ae78d12f67629b863a9208c96/docstring_parser-0.11.tar.gz", hash = "sha256:93b3f8f481c7d24e37c5d9f30293c89e2933fa209421c8abd731dd3ef0715ecb", size = 22775, upload-time = "2021-09-30T07:44:10.288Z" }
+
+[[package]]
+name = "dycw-pytest-only"
+version = "2.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b9/71/0c544627c131eee64e41653bf35ebbf02a5aa2318b69c2f9d9415b8005f5/dycw_pytest_only-2.1.1.tar.gz", hash = "sha256:b3c7dce202ee3fac6c83a47d7b9b581737d83db89aab4c624102def18edd00d5", size = 5054, upload-time = "2025-06-03T01:04:47.751Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f8/1a/25272fafd13c92a2e3b8e351127410b9ea5557324bfea3552388d65797fc/dycw_pytest_only-2.1.1-py3-none-any.whl", hash = "sha256:ea8fe48878dd95ad0ca804e549225cf3b7a1928eb188c22a284c1d17b48a7b89", size = 2413, upload-time = "2025-06-03T01:04:46.585Z" },
+]
 
 [[package]]
 name = "editor"
@@ -2257,18 +2269,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/25/69/5f1e57f6c5a39f81411b550027bf72842c4567ff5fd572bed1edc9e4b5d9/pytest_cov-6.1.1.tar.gz", hash = "sha256:46935f7aaefba760e716c2ebfbe1c216240b9592966e7da99ea8292d4d3e2a0a", size = 66857, upload-time = "2025-04-05T14:07:51.592Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/28/d0/def53b4a790cfb21483016430ed828f64830dd981ebe1089971cd10cab25/pytest_cov-6.1.1-py3-none-any.whl", hash = "sha256:bddf29ed2d0ab6f4df17b4c55b0a657287db8684af9c42ea546b21b1041b3dde", size = 23841, upload-time = "2025-04-05T14:07:49.641Z" },
-]
-
-[[package]]
-name = "pytest-only"
-version = "2.1.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pytest" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/1f/2f/937d554943477a540aa2aae2b4c47ad41c2f089f47691288938c67e94143/pytest_only-2.1.2.tar.gz", hash = "sha256:e341acc083e3bb66debc660b7d5d71ae3b31da5edc2a737280d7304221ab0c29", size = 4863, upload-time = "2024-05-27T17:04:18.626Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/da/95/3cf1a035048ee224a5dc701a3f41a5ec8684b030d217517bdf7da2f545aa/pytest_only-2.1.2-py3-none-any.whl", hash = "sha256:04dffe2aed64a741145ce5ad25b5df3ae4212e01ff885a8821fd2318eb509e91", size = 6456, upload-time = "2024-05-27T17:04:16.936Z" },
 ]
 
 [[package]]

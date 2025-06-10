@@ -96,13 +96,13 @@ crawlee = "crawlee._cli:cli"
 dev = [
     "apify_client", # For e2e tests.
     "build~=1.2.2", # For e2e tests.
+    "dycw-pytest-only~=2.1.0",
     "mypy~=1.16.0",
     "pre-commit~=4.2.0",
     "proxy-py~=2.4.0",
     "pydoc-markdown~=4.8.0",
     "pytest-asyncio~=1.0.0",
     "pytest-cov~=6.1.0",
-    "pytest-only~=2.1.0",
     "pytest-timeout~=2.4.0",
     "pytest-xdist~=3.7.0",
     "pytest~=8.4.0",
