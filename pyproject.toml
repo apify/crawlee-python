@@ -103,6 +103,7 @@ dev = [
     "pydoc-markdown~=4.8.0",
     "pytest-asyncio~=1.0.0",
     "pytest-cov~=6.1.0",
+    "pytest-timeout~=2.4.0",
     "pytest-xdist~=3.7.0",
     "pytest~=8.4.0",
     "ruff~=0.11.0",
