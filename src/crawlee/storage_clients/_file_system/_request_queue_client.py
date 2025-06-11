@@ -658,16 +658,20 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         async with self._lock:
             # Check if the request is in progress
             if request.id not in self._in_progress:
+                logger.debug('request.id not in self._in_progress')
                 return None
 
             # Remove from in-progress set
+            logger.debug('remove from in self._in_progress')
             self._in_progress.discard(request.id)
 
             # If forefront is true, mark this request as priority
             if forefront:
+                logger.debug('add to forefront')
                 self._forefront_requests.insert(0, request.id)
             # Make sure it's not in the forefront list if it was previously added there
             elif request.id in self._forefront_requests:
+                logger.debug('remove from forefront')
                 self._forefront_requests.remove(request.id)
 
             # To simulate changing the file timestamp for FIFO ordering,
@@ -675,6 +679,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             request_path = self.path_to_rq / f'{request.id}.json'
 
             if not await asyncio.to_thread(request_path.exists):
+                logger.debug('if not await asyncio.to_thread(request_path.exists)')
                 return None
 
             request_data = await json_dumps(request.model_dump())
@@ -729,6 +734,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 # If any request is not handled, the queue is not empty
                 if file_content.get('handled_at') is None:
                     return False
+                logger.warning(f'{file_content.get('handled_at')=}')
 
         # If we got here, all requests are handled or there are no requests
         return True

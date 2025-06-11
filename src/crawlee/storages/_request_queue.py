@@ -302,6 +302,7 @@ class RequestQueue(Storage, RequestManager):
         Returns:
             Information about the queue operation.
         """
+        logger.debug(f'Calling reclaim_request for request: {request}')
         return await self._client.reclaim_request(request, forefront=forefront)
 
     async def is_empty(self) -> bool:

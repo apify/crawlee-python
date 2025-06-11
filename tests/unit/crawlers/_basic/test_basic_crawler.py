@@ -1056,6 +1056,10 @@ async def test_timeout_in_handler(sleep_type: str) -> None:
     This test creates situation where the request handler times out twice, on third retry it does not time out."""
     from asyncio import timeout  # type:ignore[attr-defined]  # Test is skipped in older Python versions.
 
+    logging.getLogger('crawlee.storages._request_queue').setLevel(logging.DEBUG)
+    logging.getLogger('crawlee.storage_clients._file_system._request_queue_client').setLevel(logging.DEBUG)
+
+
     handler_timeout = timedelta(seconds=1)
     max_request_retries = 3
     double_handler_timeout_s = handler_timeout.total_seconds() * 2
