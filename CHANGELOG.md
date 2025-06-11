@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.6.11 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Fix `ClientSnapshot` overload calculation ([#1228](https://github.com/apify/crawlee-python/pull/1228)) ([a4fc1b6](https://github.com/apify/crawlee-python/commit/a4fc1b6e83143650666108c289c084ea0463b80c)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1207](https://github.com/apify/crawlee-python/issues/1207)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.6.10](https://github.com/apify/crawlee-python/releases/tag/v0.6.10) (2025-06-02)
+
+### 🐛 Bug Fixes
+
+- Allow config change on `PlaywrightCrawler` ([#1186](https://github.com/apify/crawlee-python/pull/1186)) ([f17bf31](https://github.com/apify/crawlee-python/commit/f17bf31456b702631aa7e0c26d4f07fd5eb7d1bd)) by [@mylank](https://github.com/mylank), closes [#1185](https://github.com/apify/crawlee-python/issues/1185)
+- Add `payload` to `SendRequestFunction` to support `POST` request ([#1202](https://github.com/apify/crawlee-python/pull/1202)) ([e7449f2](https://github.com/apify/crawlee-python/commit/e7449f206c580cb8383a66e4c9ff5f67c5ce8409)) by [@Mantisus](https://github.com/Mantisus)
+- Fix match check for specified enqueue strategy for requests with redirect ([#1199](https://github.com/apify/crawlee-python/pull/1199)) ([d84c30c](https://github.com/apify/crawlee-python/commit/d84c30cbd7c94d6525d3b6e8e86b379050454c0e)) by [@Mantisus](https://github.com/Mantisus), closes [#1198](https://github.com/apify/crawlee-python/issues/1198)
+- Set `WindowsSelectorEventLoopPolicy` only for curl-impersonate template without `playwright` ([#1209](https://github.com/apify/crawlee-python/pull/1209)) ([f3b839f](https://github.com/apify/crawlee-python/commit/f3b839ffc2ccc1b889b6d5928f35f57b725e27f1)) by [@Mantisus](https://github.com/Mantisus), closes [#1204](https://github.com/apify/crawlee-python/issues/1204)
+- Add support non-GET requests for `PlaywrightCrawler` ([#1208](https://github.com/apify/crawlee-python/pull/1208)) ([dbb9f44](https://github.com/apify/crawlee-python/commit/dbb9f44c71af15e1f86766fa0ba68281dd85fd9e)) by [@Mantisus](https://github.com/Mantisus), closes [#1201](https://github.com/apify/crawlee-python/issues/1201)
+- Respect `EnqueueLinksKwargs` for `extract_links` function ([#1213](https://github.com/apify/crawlee-python/pull/1213)) ([c9907d6](https://github.com/apify/crawlee-python/commit/c9907d6ff4c3a4a719b279cea77694c00a5a963d)) by [@Mantisus](https://github.com/Mantisus), closes [#1212](https://github.com/apify/crawlee-python/issues/1212)
+
+
 ## [0.6.9](https://github.com/apify/crawlee-python/releases/tag/v0.6.9) (2025-05-02)
 
 ### 🚀 Features

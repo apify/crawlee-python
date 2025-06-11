@@ -500,6 +500,7 @@ class SendRequestFunction(Protocol):
         url: str,
         *,
         method: HttpMethod = 'GET',
+        payload: HttpPayload | None = None,
         headers: HttpHeaders | dict[str, str] | None = None,
     ) -> Coroutine[None, None, HttpResponse]:
         """Call send request function.
@@ -508,6 +509,7 @@ class SendRequestFunction(Protocol):
             url: The URL to send the request to.
             method: The HTTP method to use.
             headers: The headers to include in the request.
+            payload: The payload to include in the request.
 
         Returns:
             The HTTP response received from the server.
