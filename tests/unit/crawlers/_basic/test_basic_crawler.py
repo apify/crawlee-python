@@ -1133,7 +1133,7 @@ async def test_timeout_in_handler(sleep_type: str) -> None:
 
     handler_timeout = timedelta(seconds=1)
     max_request_retries = 3
-    double_handler_timeout_s = handler_timeout.total_seconds() * 2
+    double_handler_timeout_s = handler_timeout.total_seconds() * 5
     handler_sleep = iter([double_handler_timeout_s, double_handler_timeout_s, 0])
 
     crawler = BasicCrawler(request_handler_timeout=handler_timeout, max_request_retries=max_request_retries)
