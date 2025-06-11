@@ -1180,8 +1180,10 @@ async def test_timeout_in_handler(sleep_type: str) -> None:
 
     handler_timeout = timedelta(seconds=1)
     max_request_retries = 3
-    double_handler_timeout_s = handler_timeout.total_seconds() * 2
-    handler_sleep = iter([double_handler_timeout_s, double_handler_timeout_s, 0])
+    # In theory, it should be enough with any timeout larger than the handler_timeout,  but when running in CI the test
+    # can run in parallel with many other tests which can make CPU overloaded and the tests executes slower.
+    long_enough_timeout = handler_timeout.total_seconds() * 5
+    handler_sleep = iter([long_enough_timeout, long_enough_timeout, 0])
 
     crawler = BasicCrawler(request_handler_timeout=handler_timeout, max_request_retries=max_request_retries)
 
@@ -1202,7 +1204,7 @@ async def test_timeout_in_handler(sleep_type: str) -> None:
 
     # Timeout in pytest, because previous implementation would run crawler until following:
     # "The request queue seems to be stuck for 300.0s, resetting internal state."
-    async with timeout(max_request_retries * double_handler_timeout_s):
+    async with timeout(max_request_retries * long_enough_timeout):
         await crawler.run(['http://a.com/'])
 
     assert crawler.statistics.state.requests_finished == 1
