@@ -18,9 +18,10 @@ on configuration. In v1.0, we've split this into two dedicated classes:
 
 - `MemoryStorageClient` - stores all data in memory only.
 - `FileSystemStorageClient` - persists data on the file system, with in-memory caching for improved performance.
-  For details about the new interface, see the `BaseStorageClient` documentation. You can also check out
-  the [Storage clients guide](https://crawlee.dev/python/docs/guides/TODO) for more information on available
-  storage clients and instructions on writing your own.
+
+For details about the new interface, see the `BaseStorageClient` documentation. You can also check out
+the [Storage clients guide](https://crawlee.dev/python/docs/guides/) for more information on available
+storage clients and instructions on writing your own.
 
 ### Memory storage client
 
@@ -93,8 +94,8 @@ destination you choose.
 ## Dataset
 
 - There are two new methods:
-    - `purge`
-    - `list_items`
+  - `purge`
+  - `list_items`
 - The `from_storage_object` method has been removed - use the `open` method with `name` or `id` instead.
 - The `get_info` and `storage_object` properties have been replaced by the new `metadata` property.
 - The `set_metadata` method has been removed.
@@ -103,9 +104,9 @@ destination you choose.
 ## Key-value store
 
 - There are three new methods:
-    - `purge`
-    - `delete_value`
-    - `list_keys`
+  - `purge`
+  - `delete_value`
+  - `list_keys`
 - The `from_storage_object` method has been removed - use the `open` method with `name` or `id` instead.
 - The `get_info` and `storage_object` properties have been replaced by the new `metadata` property.
 - The `set_metadata` method has been removed.
@@ -113,8 +114,8 @@ destination you choose.
 ## Request queue
 
 - There are two new methods:
-    - `purge`
-    - `add_requests` (renamed from `add_requests_batched`)
+  - `purge`
+  - `add_requests` (renamed from `add_requests_batched`)
 - The `from_storage_object` method has been removed - use the `open` method with `name` or `id` instead.
 - The `get_info` and `storage_object` properties have been replaced by the new `metadata` property.
 - The `set_metadata` method has been removed.
