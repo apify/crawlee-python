@@ -15,6 +15,8 @@ if TYPE_CHECKING:
     import re
     from collections.abc import Sequence
 
+    from crawlee.http_clients import HttpClient
+    from crawlee.proxy_configuration import ProxyInfo
     from crawlee.storage_clients.models import ProcessedRequest
 
 
@@ -32,8 +34,9 @@ class SitemapRequestLoader(RequestLoader):
     def __init__(
         self,
         sitemap_urls: list[str],
+        http_client: HttpClient,
         *,
-        proxy_url: str | None = None,
+        proxy_info: ProxyInfo | None = None,
         include: list[re.Pattern[Any] | Glob] | None = None,
         exclude: list[re.Pattern[Any] | Glob] | None = None,
         max_buffer_size: int = 200,
@@ -43,16 +46,19 @@ class SitemapRequestLoader(RequestLoader):
 
         Args:
             sitemap_urls: Configuration options for the loader.
-            proxy_url: Optional proxy to use for fetching sitemaps.
+            proxy_info: Optional proxy to use for fetching sitemaps.
             include: List of glob or regex patterns to include URLs.
             exclude: List of glob or regex patterns to exclude URLs.
             max_buffer_size: Maximum number of URLs to buffer in memory.
             parse_sitemap_options: Options for parsing sitemaps, such as `SitemapSource` and `max_urls`.
+            http_client: the instance of `HttpClient` to use for fetching sitemaps.
         """
+        self._http_client = http_client
+
         self._sitemap_urls = sitemap_urls
         self._include = include
         self._exclude = exclude
-        self._proxy_url = proxy_url
+        self._proxy_info = proxy_info
         self._parse_sitemap_options = parse_sitemap_options or ParseSitemapOptions()
 
         self._handled_count = 0
@@ -101,7 +107,8 @@ class SitemapRequestLoader(RequestLoader):
         try:
             async for item in parse_sitemap(
                 [SitemapSource(type='url', url=url) for url in self._sitemap_urls],
-                proxy_url=self._proxy_url,
+                self._http_client,
+                proxy_info=self._proxy_info,
                 options=self._parse_sitemap_options,
             ):
                 # Only process URL items (not nested sitemaps)

@@ -16,9 +16,12 @@ if TYPE_CHECKING:
 
 
 class RobotsTxtFile:
-    def __init__(self, url: str, robots: Protego, proxy_info: ProxyInfo | None = None) -> None:
+    def __init__(
+        self, url: str, robots: Protego, http_client: HttpClient | None = None, proxy_info: ProxyInfo | None = None
+    ) -> None:
         self._robots = robots
         self._original_url = URL(url).origin()
+        self._http_client = http_client
         self._proxy_info = proxy_info
 
     @classmethod
@@ -58,7 +61,7 @@ class RobotsTxtFile:
 
         robots = Protego.parse(body.decode('utf-8'))
 
-        return cls(url, robots, proxy_info=proxy_info)
+        return cls(url, robots, http_client=http_client, proxy_info=proxy_info)
 
     def is_allowed(self, url: str, user_agent: str = '*') -> bool:
         """Check if the given URL is allowed for the given user agent.
@@ -89,8 +92,10 @@ class RobotsTxtFile:
     async def parse_sitemaps(self) -> Sitemap:
         """Parse the sitemaps from the robots.txt file and return a `Sitemap` instance."""
         sitemaps = self.get_sitemaps()
-        proxy_url = self._proxy_info.url if self._proxy_info else None
-        return await Sitemap.load(sitemaps, proxy_url)
+        if not self._http_client:
+            raise ValueError('HTTP client is required to parse sitemaps.')
+
+        return await Sitemap.load(sitemaps, self._http_client, self._proxy_info)
 
     async def parse_urls_from_sitemaps(self) -> list[str]:
         """Parse the sitemaps in the robots.txt file and return a list URLs."""
