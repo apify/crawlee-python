@@ -1195,13 +1195,17 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         if self._abort_on_error and self._failed:
             self._failed = False
+            self._logger.info('Shut down due to self._abort_on_error and self._failed')
             return True
 
         if self._keep_alive:
             return False
 
         request_manager = await self.get_request_manager()
-        return await request_manager.is_finished()
+        is_finished = await request_manager.is_finished()
+        if is_finished:
+            self._logger.info('Shut down due to is_finished')
+        return is_finished
 
     async def __is_task_ready_function(self) -> bool:
         self._stop_if_max_requests_count_exceeded()

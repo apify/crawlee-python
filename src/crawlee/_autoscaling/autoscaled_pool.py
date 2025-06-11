@@ -224,7 +224,7 @@ class AutoscaledPool:
 
                 current_status = self._system_status.get_current_system_info()
                 if not current_status.is_system_idle:
-                    logger.debug('Not scheduling new tasks - system is overloaded')
+                    logger.debug(f'Not scheduling new tasks - system is overloaded: {current_status}')
                 elif self._is_paused:
                     logger.debug('Not scheduling new tasks - the autoscaled pool is paused')
                 elif self.current_concurrency >= self.desired_concurrency:
