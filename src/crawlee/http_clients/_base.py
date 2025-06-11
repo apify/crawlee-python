@@ -36,10 +36,22 @@ class HttpResponse(Protocol):
         """The HTTP headers received in the response."""
 
     def read(self) -> bytes:
-        """Read the content of the response body."""
+        """Read the entire content of the response body.
 
-    def iter_bytes(self) -> AsyncIterator[bytes]:
-        """Iterate over the content of the response body in chunks."""
+        This method loads the complete response body into memory at once. It should be used
+        for responses received from regular HTTP requests (via `send_request` or `crawl` methods).
+
+        Raises:
+            RuntimeError: If called on a response received from the `stream` method.
+        """
+
+    def read_stream(self) -> AsyncIterator[bytes]:
+        """Iterate over the content of the response body in chunks.
+
+        This method should be used for responses received from the `stream` method to process
+        large response bodies without loading them entirely into memory. It allows for efficient
+        processing of potentially large data by yielding chunks sequentially.
+        """
 
 
 @dataclass(frozen=True)

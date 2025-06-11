@@ -44,7 +44,7 @@ class PlaywrightHttpResponse:
     def read(self) -> bytes:
         return self._content
 
-    async def iter_bytes(self) -> AsyncGenerator[bytes, None]:
+    async def read_stream(self) -> AsyncGenerator[bytes, None]:
         # Playwright not support `streaming` responses.
         # This is a workaround to make it compatible with `HttpResponse` protocol.
         yield self._content

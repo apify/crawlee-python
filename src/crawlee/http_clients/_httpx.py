@@ -47,10 +47,16 @@ class _HttpxResponse:
         return HttpHeaders(dict(self._response.headers))
 
     def read(self) -> bytes:
+        if not self._response.is_closed:
+            raise RuntimeError('Use `read_stream` to read the body of the Response received from the `stream` method')
         return self._response.read()
 
-    def iter_bytes(self) -> AsyncIterator[bytes]:
-        return self._response.aiter_bytes()
+    async def read_stream(self) -> AsyncIterator[bytes]:
+        if self._response.is_stream_consumed:
+            yield b''
+        else:
+            async for chunk in self._response.aiter_bytes():
+                yield chunk
 
 
 class _HttpxTransport(httpx.AsyncHTTPTransport):
