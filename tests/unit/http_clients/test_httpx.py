@@ -128,3 +128,65 @@ async def test_crawl_follow_redirects_false(server_url: URL) -> None:
     assert crawling_result.http_response.status_code == 302
     assert crawling_result.http_response.headers['Location'] == target_url
     assert request.loaded_url == redirect_url
+
+
+async def test_stream(http_client: HttpxHttpClient, server_url: URL) -> None:
+    check_body = b"""\
+<html><head>
+    <title>Hello, world!</title>
+</head>
+<body>
+</body></html>"""
+    content_body: bytes = b''
+
+    async with http_client.stream(str(server_url)) as response:
+        assert response.status_code == 200
+        async for chunk in response.read_stream():
+            content_body += chunk
+
+    assert content_body == check_body
+
+
+async def test_stream_double_read_stream(http_client: HttpxHttpClient, server_url: URL) -> None:
+    check_body = b"""\
+<html><head>
+    <title>Hello, world!</title>
+</head>
+<body>
+</body></html>"""
+
+    async with http_client.stream(str(server_url)) as response:
+        assert response.status_code == 200
+        content_body_first: bytes = b''
+        async for chunk in response.read_stream():
+            content_body_first += chunk
+
+        content_body_second: bytes = b''
+        async for chunk in response.read_stream():
+            content_body_second += chunk
+
+    assert content_body_first == check_body
+    assert content_body_second == b''
+
+
+async def test_stream_error_for_read(http_client: HttpxHttpClient, server_url: URL) -> None:
+    async with http_client.stream(str(server_url)) as response:
+        assert response.status_code == 200
+
+        with pytest.raises(RuntimeError):
+            response.read()
+
+
+async def test_send_request_error_for_read_stream(http_client: HttpxHttpClient, server_url: URL) -> None:
+    response = await http_client.send_request(str(server_url))
+
+    assert response.status_code == 200
+    assert b''.join([item async for item in response.read_stream()]) == b''
+
+
+async def test_send_crawl_error_for_read_stream(http_client: HttpxHttpClient, server_url: URL) -> None:
+    response = await http_client.crawl(Request.from_url(str(server_url)))
+    http_response = response.http_response
+
+    assert http_response.status_code == 200
+    assert b''.join([item async for item in http_response.read_stream()]) == b''

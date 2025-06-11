@@ -86,9 +86,17 @@ class _CurlImpersonateResponse:
         return HttpHeaders({key: value for key, value in self._response.headers.items() if value})
 
     def read(self) -> bytes:
+        if self._response.astream_task:
+            raise RuntimeError('Use `read_stream` to read the body of the Response received from the `stream` method')
         return self._response.content
 
-    async def iter_bytes(self) -> AsyncGenerator[bytes, None]:
+    async def read_stream(self) -> AsyncGenerator[bytes, None]:
+        # Calling `aiter_content` again after executing `astream_task` causes DeadLock
+        # this will prevent that from happening.
+        if not self._response.astream_task or self._response.astream_task.done():  # type: ignore[attr-defined]
+            yield b''
+            return
+
         async for chunk in self._response.aiter_content():  # type: ignore[no-untyped-call]
             yield chunk
 
@@ -232,6 +240,7 @@ class CurlImpersonateHttpClient(HttpClient):
                 data=payload,
                 cookies=session.cookies.jar if session else None,
                 stream=True,
+                timeout=timeout.total_seconds() if timeout else None,
             )
         except CurlRequestError as exc:
             if self._is_proxy_error(exc):

@@ -36,10 +36,22 @@ class HttpResponse(Protocol):
         """The HTTP headers received in the response."""
 
     def read(self) -> bytes:
-        """Read the content of the response body."""
+        """Read the entire content of the response body.
 
-    def iter_bytes(self) -> AsyncIterator[bytes]:
-        """Iterate over the content of the response body in chunks."""
+        This method loads the complete response body into memory at once. It should be used
+        for responses received from regular HTTP requests (via `send_request` or `crawl` methods).
+
+        Raises:
+            RuntimeError: If called on a response received from the `stream` method.
+        """
+
+    def read_stream(self) -> AsyncIterator[bytes]:
+        """Iterate over the content of the response body in chunks.
+
+        This method should be used for responses received from the `stream` method to process
+        large response bodies without loading them entirely into memory. It allows for efficient
+        processing of potentially large data by yielding chunks sequentially.
+        """
 
 
 @dataclass(frozen=True)
@@ -143,14 +155,34 @@ class HttpClient(ABC):
         proxy_info: ProxyInfo | None = None,
         timeout: timedelta | None = None,
     ) -> AbstractAsyncContextManager[HttpResponse]:
-        """Stream an HTTP request via the client."""
+        """Stream an HTTP request via the client.
+
+        This method should be used for downloading potentially large data where you need to process
+        the response body in chunks rather than loading it entirely into memory.
+
+        Args:
+            url: The URL to send the request to.
+            method: The HTTP method to use.
+            headers: The headers to include in the request.
+            payload: The data to be sent as the request body.
+            session: The session associated with the request.
+            proxy_info: The information about the proxy to be used.
+            timeout: The maximum time to wait for establishing the connection.
+
+        Raises:
+            ProxyError: Raised if a proxy-related error occurs.
+
+        Returns:
+            An async context manager yielding the HTTP response with streaming capabilities.
+        """
 
     @abstractmethod
     async def cleanup(self) -> None:
         """Clean up resources used by the client.
 
-        This method is called when the client is no longer needed.
-        It should be overridden in subclasses to perform any necessary cleanup.
+        This method is called when the client is no longer needed and should be overridden
+        in subclasses to perform any necessary cleanup such as closing connections,
+        releasing file handles, or other resource deallocation.
         """
 
     async def __aenter__(self) -> HttpClient:
