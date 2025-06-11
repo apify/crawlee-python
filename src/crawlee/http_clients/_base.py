@@ -38,7 +38,7 @@ class HttpResponse(Protocol):
     def read(self) -> bytes:
         """Read the content of the response body."""
 
-    def iter_bytes(self, chunk_size: int | None = None) -> AsyncIterator[bytes]:
+    def iter_bytes(self) -> AsyncIterator[bytes]:
         """Iterate over the content of the response body in chunks."""
 
 
