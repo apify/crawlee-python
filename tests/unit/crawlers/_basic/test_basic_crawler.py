@@ -1181,7 +1181,7 @@ async def test_timeout_in_handler(sleep_type: str) -> None:
     handler_timeout = timedelta(seconds=1)
     max_request_retries = 3
     # In theory, it should be enough with any timeout larger than the handler_timeout,  but when running in CI the test
-    # can run in parallel with many other tests which can make CPU overloaded and the tests executes slower.
+    # can run in parallel with many other tests which can make CPU overloaded and the test executes slower.
     long_enough_timeout = handler_timeout.total_seconds() * 5
     handler_sleep = iter([long_enough_timeout, long_enough_timeout, 0])
 
