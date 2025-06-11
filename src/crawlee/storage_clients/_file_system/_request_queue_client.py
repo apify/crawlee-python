@@ -734,9 +734,10 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 # If any request is not handled, the queue is not empty
                 if file_content.get('handled_at') is None:
                     return False
-                logger.warning(f'{file_content.get('handled_at')=}')
+                logger.warning(f'R: {file_content}')
 
         # If we got here, all requests are handled or there are no requests
+        logger.warning(f'request_files: {request_files}')
         return True
 
     async def _update_metadata(
