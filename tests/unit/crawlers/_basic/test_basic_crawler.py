@@ -1129,6 +1129,7 @@ async def test_timeout_in_handler(sleep_type: str) -> None:
 
     logging.getLogger('crawlee.storages._request_queue').setLevel(logging.DEBUG)
     logging.getLogger('crawlee.storage_clients._file_system._request_queue_client').setLevel(logging.DEBUG)
+    logging.getLogger('crawlee._autoscaling.autoscaled_pool').setLevel(logging.DEBUG)
 
     handler_timeout = timedelta(seconds=1)
     max_request_retries = 3

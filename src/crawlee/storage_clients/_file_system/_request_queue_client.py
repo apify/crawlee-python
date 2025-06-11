@@ -687,13 +687,14 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
             # Update metadata timestamps
             await self._update_metadata(update_modified_at=True, update_accessed_at=True)
-
-            return ProcessedRequest(
+            r = ProcessedRequest(
                 id=request.id,
                 unique_key=request.unique_key,
                 was_already_present=True,
                 was_already_handled=False,
             )
+            logger.debug(f'Reclaimed: {r}')
+            return r
 
     @override
     async def is_empty(self) -> bool:
