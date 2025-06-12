@@ -51,6 +51,9 @@ class HttpResponse(Protocol):
         This method should be used for responses received from the `stream` method to process
         large response bodies without loading them entirely into memory. It allows for efficient
         processing of potentially large data by yielding chunks sequentially.
+
+        Raises:
+            RuntimeError: If called after the stream has been fully consumed.
         """
 
 

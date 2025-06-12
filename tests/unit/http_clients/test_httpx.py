@@ -147,7 +147,7 @@ async def test_stream(http_client: HttpxHttpClient, server_url: URL) -> None:
     assert content_body == check_body
 
 
-async def test_stream_double_read_stream(http_client: HttpxHttpClient, server_url: URL) -> None:
+async def test_stream_error_double_read_stream(http_client: HttpxHttpClient, server_url: URL) -> None:
     check_body = b"""\
 <html><head>
     <title>Hello, world!</title>
@@ -161,12 +161,10 @@ async def test_stream_double_read_stream(http_client: HttpxHttpClient, server_ur
         async for chunk in response.read_stream():
             content_body_first += chunk
 
-        content_body_second: bytes = b''
-        async for chunk in response.read_stream():
-            content_body_second += chunk
+        with pytest.raises(RuntimeError):
+            [chunk async for chunk in response.read_stream()]
 
     assert content_body_first == check_body
-    assert content_body_second == b''
 
 
 async def test_stream_error_for_read(http_client: HttpxHttpClient, server_url: URL) -> None:
@@ -181,7 +179,8 @@ async def test_send_request_error_for_read_stream(http_client: HttpxHttpClient, 
     response = await http_client.send_request(str(server_url))
 
     assert response.status_code == 200
-    assert b''.join([item async for item in response.read_stream()]) == b''
+    with pytest.raises(RuntimeError):
+        [item async for item in response.read_stream()]
 
 
 async def test_send_crawl_error_for_read_stream(http_client: HttpxHttpClient, server_url: URL) -> None:
@@ -189,4 +188,5 @@ async def test_send_crawl_error_for_read_stream(http_client: HttpxHttpClient, se
     http_response = response.http_response
 
     assert http_response.status_code == 200
-    assert b''.join([item async for item in http_response.read_stream()]) == b''
+    with pytest.raises(RuntimeError):
+        [item async for item in http_response.read_stream()]

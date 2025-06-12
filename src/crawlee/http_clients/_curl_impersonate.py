@@ -91,11 +91,8 @@ class _CurlImpersonateResponse:
         return self._response.content
 
     async def read_stream(self) -> AsyncGenerator[bytes, None]:
-        # Calling `aiter_content` again after executing `astream_task` causes DeadLock
-        # this will prevent that from happening.
         if not self._response.astream_task or self._response.astream_task.done():  # type: ignore[attr-defined]
-            yield b''
-            return
+            raise RuntimeError('Stream is already consumed.')
 
         async for chunk in self._response.aiter_content():  # type: ignore[no-untyped-call]
             yield chunk

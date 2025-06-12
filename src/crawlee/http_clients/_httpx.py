@@ -53,7 +53,7 @@ class _HttpxResponse:
 
     async def read_stream(self) -> AsyncIterator[bytes]:
         if self._response.is_stream_consumed:
-            yield b''
+            raise RuntimeError('Stream is already consumed.')
         else:
             async for chunk in self._response.aiter_bytes():
                 yield chunk
