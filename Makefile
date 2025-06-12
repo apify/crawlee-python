@@ -30,15 +30,15 @@ type-check:
 	uv run mypy
 
 unit-tests:
-	uv run pytest --numprocesses=auto --verbose tests/unit -m "not run_alone"
-	uv run pytest --numprocesses=1 --verbose tests/unit -m "run_alone"
+	uv run pytest --numprocesses=1 -vv tests/unit -m "run_alone"
+	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone"
 
 unit-tests-cov:
-	uv run pytest --numprocesses=auto --verbose --cov=src/crawlee tests/unit -m "not run_alone"
-	uv run pytest --numprocesses=1 --verbose --cov=src/crawlee --cov-append --cov-report=html tests/unit -m "run_alone"
+	uv run pytest --numprocesses=1 -vv --cov=src/crawlee tests/unit -m "run_alone"
+	uv run pytest --numprocesses=auto -vv --cov=src/crawlee --cov-append --cov-report=html tests/unit -m "not run_alone"
 
 e2e-templates-tests $(args):
-	uv run pytest --numprocesses=$(E2E_TESTS_CONCURRENCY) --verbose tests/e2e/project_template "$(args)"
+	uv run pytest --numprocesses=$(E2E_TESTS_CONCURRENCY) -vv tests/e2e/project_template "$(args)"
 
 format:
 	uv run ruff check --fix
