@@ -134,15 +134,7 @@ class HttpxHttpClient(HttpClient):
 
         self._ssl_context = httpx.create_ssl_context(verify=verify)
 
-        # Configure connection pool limits and keep-alive connections for transport
-        limits = async_client_kwargs.get('limits', httpx.Limits(max_connections=1000, max_keepalive_connections=200))
-
-        self._transport = _HttpxTransport(
-            http1=http1,
-            http2=http2,
-            verify=self._ssl_context,
-            limits=limits,
-        )
+        self._transport: _HttpxTransport | None = None
 
         self._client_by_proxy_url = dict[Optional[str], httpx.AsyncClient]()
 
@@ -278,6 +270,19 @@ class HttpxHttpClient(HttpClient):
 
         If a client for the specified proxy URL does not exist, create and store a new one.
         """
+        if not self._transport:
+            # Configure connection pool limits and keep-alive connections for transport
+            limits = self._async_client_kwargs.get(
+                'limits', httpx.Limits(max_connections=1000, max_keepalive_connections=200)
+            )
+
+            self._transport = _HttpxTransport(
+                http1=self._http1,
+                http2=self._http2,
+                verify=self._ssl_context,
+                limits=limits,
+            )
+
         if proxy_url not in self._client_by_proxy_url:
             # Prepare a default kwargs for the new client.
             kwargs: dict[str, Any] = {
@@ -335,4 +340,6 @@ class HttpxHttpClient(HttpClient):
         for client in self._client_by_proxy_url.values():
             await client.aclose()
         self._client_by_proxy_url.clear()
-        await self._transport.aclose()
+        if self._transport:
+            await self._transport.aclose()
+            self._transport = None

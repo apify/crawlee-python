@@ -178,3 +178,26 @@ async def test_send_crawl_error_for_read_stream(http_client: CurlImpersonateHttp
     assert http_response.status_code == 200
     with pytest.raises(RuntimeError):
         [item async for item in http_response.read_stream()]
+
+
+async def test_reuse_context_manager(http_client: CurlImpersonateHttpClient, server_url: URL) -> None:
+    async with http_client:
+        response = await http_client.send_request(str(server_url))
+        assert response.status_code == 200
+
+    # Reusing the context manager should not raise an error
+    async with http_client:
+        response = await http_client.send_request(str(server_url))
+        assert response.status_code == 200
+
+
+async def test_work_after_cleanup(http_client: CurlImpersonateHttpClient, server_url: URL) -> None:
+    response = await http_client.send_request(str(server_url))
+    assert response.status_code == 200
+
+    # Cleanup the client
+    await http_client.cleanup()
+
+    # After cleanup, the client should still work
+    response = await http_client.send_request(str(server_url))
+    assert response.status_code == 200
