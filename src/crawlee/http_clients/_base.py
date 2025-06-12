@@ -87,6 +87,11 @@ class HttpClient(ABC):
         # Flag to indicate the context state.
         self._active = False
 
+    @property
+    def active(self) -> bool:
+        """Indicate whether the context is active."""
+        return self._active
+
     @abstractmethod
     async def crawl(
         self,
