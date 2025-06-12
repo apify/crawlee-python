@@ -60,6 +60,7 @@ async def atomic_write(
     data: str,
     *,
     is_binary: bool = False,
+    retry_count: int = 0,
 ) -> None: ...
 
 
@@ -69,6 +70,7 @@ async def atomic_write(
     data: bytes,
     *,
     is_binary: bool = True,
+    retry_count: int = 0,
 ) -> None: ...
 
 
@@ -77,6 +79,7 @@ async def atomic_write(
     data: str | bytes,
     *,
     is_binary: bool = False,
+    retry_count: int = 0,
 ) -> None:
     """Write data to a file atomically to prevent data corruption or partial writes.
 
@@ -84,18 +87,17 @@ async def atomic_write(
     a temporary file and then atomically replacing the target file, which prevents data
     corruption if the process is interrupted during the write operation.
 
-    For example, if a process (crawler) is interrupted while writing a file, the file may end up in an
-    incomplete or corrupted state. This might be especially unwanted for metadata files.
-
     Args:
         path: The path to the destination file.
         data: The data to write to the file (string or bytes).
         is_binary: If True, write in binary mode. If False (default), write in text mode.
+        retry_count: Internal parameter to track the number of retry attempts (default: 0).
     """
+    max_retries = 3
     dir_path = path.parent
 
     def _sync_write() -> str:
-        # create a temp file in the target dir, return its name
+        # Create a tmp file in the target dir, return its name.
         fd, tmp_path = tempfile.mkstemp(
             suffix=f'{path.suffix}.tmp',
             prefix=f'{path.name}.',
@@ -108,21 +110,26 @@ async def atomic_write(
             else:
                 with os.fdopen(fd, 'w', encoding='utf-8') as tmp_file:
                     tmp_file.write(data)  # type: ignore[arg-type]
-        except Exception:  # broader exception handling
+        except Exception:
             Path(tmp_path).unlink(missing_ok=True)
             raise
         return tmp_path
 
-    tmp_path = await asyncio.to_thread(_sync_write)
-
     try:
+        tmp_path = await asyncio.to_thread(_sync_write)
         await asyncio.to_thread(os.replace, tmp_path, str(path))
     except (FileNotFoundError, PermissionError):
-        # fallback if tmp went missing
-        if is_binary:
-            await asyncio.to_thread(path.write_bytes, data)  # type: ignore[arg-type]
-        else:
-            await asyncio.to_thread(path.write_text, data, encoding='utf-8')  # type: ignore[arg-type]
+        if retry_count < max_retries:
+            await asyncio.to_thread(Path(tmp_path).unlink, missing_ok=True)
+            return await atomic_write(
+                path,
+                data,
+                is_binary=is_binary,
+                retry_count=retry_count + 1,
+            )
+        # If we reach the maximum number of retries, raise the exception.
+        raise
+
     finally:
         await asyncio.to_thread(Path(tmp_path).unlink, missing_ok=True)
 
