@@ -4,6 +4,7 @@ import asyncio
 import csv
 import json
 import os
+import sys
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, overload
@@ -95,14 +96,21 @@ async def atomic_write(
     """
     max_retries = 3
     dir_path = path.parent
+    tmp_path: str | None = None
 
-    def _sync_write() -> str:
-        # Create a tmp file in the target dir, return its name.
+    def _write_windows() -> None:
+        if is_binary:
+            path.write_bytes(data)  # type: ignore[arg-type]
+        else:
+            path.write_text(data, encoding='utf-8')  # type: ignore[arg-type]
+
+    def _write_linux() -> str:
         fd, tmp_path = tempfile.mkstemp(
             suffix=f'{path.suffix}.tmp',
             prefix=f'{path.name}.',
             dir=str(dir_path),
         )
+
         try:
             if is_binary:
                 with os.fdopen(fd, 'wb') as tmp_file:
@@ -116,11 +124,17 @@ async def atomic_write(
         return tmp_path
 
     try:
-        tmp_path = await asyncio.to_thread(_sync_write)
-        await asyncio.to_thread(os.replace, tmp_path, str(path))
+        # We have to differentiate between Windows and Linux due to the permissions errors
+        # in Windows when working with temporary files.
+        if sys.platform == 'win32':
+            await asyncio.to_thread(_write_windows)
+        else:
+            tmp_path = await asyncio.to_thread(_write_linux)
+            await asyncio.to_thread(os.replace, tmp_path, str(path))
     except (FileNotFoundError, PermissionError):
         if retry_count < max_retries:
-            await asyncio.to_thread(Path(tmp_path).unlink, missing_ok=True)
+            if tmp_path is not None:
+                await asyncio.to_thread(Path(tmp_path).unlink, missing_ok=True)
             return await atomic_write(
                 path,
                 data,
@@ -131,7 +145,8 @@ async def atomic_write(
         raise
 
     finally:
-        await asyncio.to_thread(Path(tmp_path).unlink, missing_ok=True)
+        if tmp_path is not None:
+            await asyncio.to_thread(Path(tmp_path).unlink, missing_ok=True)
 
 
 async def export_json_to_stream(
