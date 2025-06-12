@@ -53,7 +53,8 @@ class HttpResponse(Protocol):
         processing of potentially large data by yielding chunks sequentially.
 
         Raises:
-            RuntimeError: If called after the stream has been fully consumed.
+            RuntimeError: If the stream has already been consumed or if the response was not obtained from the `stream`
+                method.
         """
 
 

@@ -92,7 +92,9 @@ class _CurlImpersonateResponse:
 
     async def read_stream(self) -> AsyncGenerator[bytes, None]:
         if not self._response.astream_task or self._response.astream_task.done():  # type: ignore[attr-defined]
-            raise RuntimeError('Stream is already consumed.')
+            raise RuntimeError(
+                'Cannot read stream: either already consumed or Response not obtained from `stream` method'
+            )
 
         async for chunk in self._response.aiter_content():  # type: ignore[no-untyped-call]
             yield chunk
