@@ -34,14 +34,14 @@
         "typescript": "5.8.3"
     },
     "dependencies": {
-        "@apify/docusaurus-plugin-typedoc-api": "^4.4.2",
+        "@apify/docusaurus-plugin-typedoc-api": "^4.4.5",
         "@apify/utilities": "^2.8.0",
-        "@docusaurus/core": "^3.8.0",
-        "@docusaurus/faster": "^3.8.0",
-        "@docusaurus/mdx-loader": "^3.8.0",
-        "@docusaurus/plugin-client-redirects": "^3.8.0",
-        "@docusaurus/preset-classic": "^3.8.0",
-        "@docusaurus/theme-mermaid": "^3.8.0",
+        "@docusaurus/core": "3.8.1",
+        "@docusaurus/faster": "3.8.1",
+        "@docusaurus/mdx-loader": "3.8.1",
+        "@docusaurus/plugin-client-redirects": "3.8.1",
+        "@docusaurus/preset-classic": "3.8.1",
+        "@docusaurus/theme-mermaid": "3.8.1",
         "@giscus/react": "^3.0.0",
         "@mdx-js/react": "^3.0.1",
         "axios": "^1.5.0",
@@ -60,5 +60,5 @@
         "stream-browserify": "^3.0.0",
         "unist-util-visit": "^5.0.0"
     },
-    "packageManager": "yarn@4.9.1"
+    "packageManager": "yarn@4.9.2"
 }
