@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, Optional, cast
 
@@ -14,6 +15,8 @@ from crawlee.fingerprint_suite import HeaderGenerator
 from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, AsyncIterator
+    from datetime import timedelta
     from ssl import SSLContext
 
     from crawlee import Request
@@ -44,7 +47,16 @@ class _HttpxResponse:
         return HttpHeaders(dict(self._response.headers))
 
     def read(self) -> bytes:
+        if not self._response.is_closed:
+            raise RuntimeError('Use `read_stream` to read the body of the Response received from the `stream` method')
         return self._response.read()
+
+    async def read_stream(self) -> AsyncIterator[bytes]:
+        if self._response.is_stream_consumed:
+            raise RuntimeError('Stream is already consumed.')
+        else:
+            async for chunk in self._response.aiter_bytes():
+                yield chunk
 
 
 class _HttpxTransport(httpx.AsyncHTTPTransport):
@@ -122,15 +134,7 @@ class HttpxHttpClient(HttpClient):
 
         self._ssl_context = httpx.create_ssl_context(verify=verify)
 
-        # Configure connection pool limits and keep-alive connections for transport
-        limits = async_client_kwargs.get('limits', httpx.Limits(max_connections=1000, max_keepalive_connections=200))
-
-        self._transport = _HttpxTransport(
-            http1=http1,
-            http2=http2,
-            verify=self._ssl_context,
-            limits=limits,
-        )
+        self._transport: _HttpxTransport | None = None
 
         self._client_by_proxy_url = dict[Optional[str], httpx.AsyncClient]()
 
@@ -182,18 +186,15 @@ class HttpxHttpClient(HttpClient):
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> HttpResponse:
-        if isinstance(headers, dict) or headers is None:
-            headers = HttpHeaders(headers or {})
-
         client = self._get_client(proxy_info.url if proxy_info else None)
-        headers = self._combine_headers(headers)
 
-        http_request = client.build_request(
+        http_request = self._build_request(
+            client=client,
             url=url,
             method=method,
-            headers=dict(headers) if headers else None,
-            content=payload,
-            extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
+            headers=headers,
+            payload=payload,
+            session=session,
         )
 
         try:
@@ -205,11 +206,83 @@ class HttpxHttpClient(HttpClient):
 
         return _HttpxResponse(response)
 
+    @asynccontextmanager
+    @override
+    async def stream(
+        self,
+        url: str,
+        *,
+        method: HttpMethod = 'GET',
+        headers: HttpHeaders | dict[str, str] | None = None,
+        payload: HttpPayload | None = None,
+        session: Session | None = None,
+        proxy_info: ProxyInfo | None = None,
+        timeout: timedelta | None = None,
+    ) -> AsyncGenerator[HttpResponse]:
+        client = self._get_client(proxy_info.url if proxy_info else None)
+
+        http_request = self._build_request(
+            client=client,
+            url=url,
+            method=method,
+            headers=headers,
+            payload=payload,
+            session=session,
+            timeout=timeout,
+        )
+
+        response = await client.send(http_request, stream=True)
+
+        try:
+            yield _HttpxResponse(response)
+        finally:
+            await response.aclose()
+
+    def _build_request(
+        self,
+        client: httpx.AsyncClient,
+        url: str,
+        method: HttpMethod,
+        headers: HttpHeaders | dict[str, str] | None,
+        payload: HttpPayload | None,
+        session: Session | None = None,
+        timeout: timedelta | None = None,
+    ) -> httpx.Request:
+        """Build an `httpx.Request` using the provided parameters."""
+        if isinstance(headers, dict) or headers is None:
+            headers = HttpHeaders(headers or {})
+
+        headers = self._combine_headers(headers)
+
+        httpx_timeout = httpx.Timeout(None, connect=timeout.total_seconds()) if timeout else None
+
+        return client.build_request(
+            url=url,
+            method=method,
+            headers=dict(headers) if headers else None,
+            content=payload,
+            extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
+            timeout=httpx_timeout,
+        )
+
     def _get_client(self, proxy_url: str | None) -> httpx.AsyncClient:
         """Retrieve or create an HTTP client for the given proxy URL.
 
         If a client for the specified proxy URL does not exist, create and store a new one.
         """
+        if not self._transport:
+            # Configure connection pool limits and keep-alive connections for transport
+            limits = self._async_client_kwargs.get(
+                'limits', httpx.Limits(max_connections=1000, max_keepalive_connections=200)
+            )
+
+            self._transport = _HttpxTransport(
+                http1=self._http1,
+                http2=self._http2,
+                verify=self._ssl_context,
+                limits=limits,
+            )
+
         if proxy_url not in self._client_by_proxy_url:
             # Prepare a default kwargs for the new client.
             kwargs: dict[str, Any] = {
@@ -262,3 +335,11 @@ class HttpxHttpClient(HttpClient):
             return True
 
         return False
+
+    async def cleanup(self) -> None:
+        for client in self._client_by_proxy_url.values():
+            await client.aclose()
+        self._client_by_proxy_url.clear()
+        if self._transport:
+            await self._transport.aclose()
+            self._transport = None

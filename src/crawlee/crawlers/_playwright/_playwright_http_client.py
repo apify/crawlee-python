@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import contextvars
-from contextlib import asynccontextmanager
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import TYPE_CHECKING
 
 from typing_extensions import override
@@ -12,6 +12,7 @@ from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+    from datetime import timedelta
 
     from playwright.async_api import Page
 
@@ -48,6 +49,7 @@ class PlaywrightHttpClient(HttpClient):
 
     def __init__(self) -> None:
         """Initialize a new instance."""
+        self._active = False
 
     @override
     async def crawl(
@@ -89,3 +91,21 @@ class PlaywrightHttpClient(HttpClient):
         )
 
         return await PlaywrightHttpResponse.from_playwright_response(response, protocol='')
+
+    @override
+    def stream(
+        self,
+        url: str,
+        *,
+        method: HttpMethod = 'GET',
+        headers: HttpHeaders | dict[str, str] | None = None,
+        payload: HttpPayload | None = None,
+        session: Session | None = None,
+        proxy_info: ProxyInfo | None = None,
+        timeout: timedelta | None = None,
+    ) -> AbstractAsyncContextManager[HttpResponse]:
+        raise NotImplementedError('The `stream` method should not be used for `PlaywrightHttpClient`')
+
+    async def cleanup(self) -> None:
+        # The `browser_page_context` is responsible for resource cleanup
+        return

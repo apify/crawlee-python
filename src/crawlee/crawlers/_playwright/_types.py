@@ -7,6 +7,8 @@ from crawlee import HttpHeaders
 from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
     from playwright.async_api import APIResponse, Response
     from typing_extensions import Self
 
@@ -41,6 +43,11 @@ class PlaywrightHttpResponse:
 
     def read(self) -> bytes:
         return self._content
+
+    async def read_stream(self) -> AsyncGenerator[bytes, None]:
+        # Playwright does not support `streaming` responses.
+        # This is a workaround to make it compatible with `HttpResponse` protocol.
+        yield self._content
 
     @classmethod
     async def from_playwright_response(cls, response: Response | APIResponse, protocol: str) -> Self:

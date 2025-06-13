@@ -670,6 +670,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 self._snapshotter,
                 self._statistics,
                 self._session_pool if self._use_session_pool else None,
+                self._http_client,
                 *self._additional_context_managers,
             )
             if cm and getattr(cm, 'active', False) is False
