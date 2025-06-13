@@ -61,8 +61,8 @@ _PAGE_CONTENT_STATIC = f"""
 def test_urls(server_url: URL) -> list[str]:
     """Example pages used in the test are mocked for static requests."""
     return [
-        str(server_url.with_path('dynamic_content').with_query(content=_PAGE_CONTENT_STATIC)),
-        str(server_url.with_path('dynamic_content').with_query(id='test2', content=_PAGE_CONTENT_STATIC)),
+        str(server_url.with_path('echo_content').with_query(content=_PAGE_CONTENT_STATIC)),
+        str(server_url.with_path('echo_content').with_query(id='test2', content=_PAGE_CONTENT_STATIC)),
     ]
 
 
