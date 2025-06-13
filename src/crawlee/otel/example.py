@@ -9,11 +9,13 @@ from opentelemetry.trace import set_tracer_provider
 
 from crawlee._types import BasicCrawlingContext
 from crawlee.crawlers import ParselCrawler
-from crawlee.otel.instrumentor import CrawlerInstrumentor
+from crawlee.otel.instrumentors.crawler import CrawlerInstrumentor
 
 """
-docker run -d --name jaeger \
+docker run -d --name jaeger2 \
   -e COLLECTOR_OTLP_ENABLED=true \
+  -e COLLECTOR_OTLP_METRICS_ENABLED=true \
+  -e METRICS_STORAGE_TYPE=prometheus \
   -p 16686:16686 \
   -p 4317:4317 \
   -p 4318:4318 \
@@ -24,6 +26,7 @@ def instrument_crawler():
     resource = Resource.create({'service.name': 'ParselCrawler',     'service.version': '1.0.0',
     'environment': 'development'})
 
+    # Traces
     provider = TracerProvider(resource=resource)
     exporter = ConsoleSpanExporter()
     otlp_exporter = OTLPSpanExporter(endpoint='localhost:4317', insecure=True)
