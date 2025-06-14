@@ -17,6 +17,52 @@ if TYPE_CHECKING:
 
     from crawlee._types import ExportDataCsvKwargs, ExportDataJsonKwargs
 
+if sys.platform == 'win32':
+
+    def _write_file(
+        path: Path,
+        data: str | bytes,
+        *,
+        is_binary: bool,
+    ) -> str | None:
+        """Windows-specific file write implementation.
+
+        This implementation writes directly to the file without using a temporary file, because
+        they are problematic due to permissions issues on Windows.
+        """
+        if is_binary:
+            path.write_bytes(data)  # type: ignore[arg-type]
+        else:
+            path.write_text(data, encoding='utf-8')  # type: ignore[arg-type]
+        return None
+else:
+
+    def _write_file(
+        path: Path,
+        data: str | bytes,
+        *,
+        is_binary: bool,
+    ) -> str | None:
+        """Linux/Unix-specific file write implementation using temporary files."""
+        dir_path = path.parent
+        fd, tmp_path = tempfile.mkstemp(
+            suffix=f'{path.suffix}.tmp',
+            prefix=f'{path.name}.',
+            dir=str(dir_path),
+        )
+
+        try:
+            if is_binary:
+                with os.fdopen(fd, 'wb') as tmp_file:
+                    tmp_file.write(data)  # type: ignore[arg-type]
+            else:
+                with os.fdopen(fd, 'w', encoding='utf-8') as tmp_file:
+                    tmp_file.write(data)  # type: ignore[arg-type]
+        except Exception:
+            Path(tmp_path).unlink(missing_ok=True)
+            raise
+        return tmp_path
+
 
 def infer_mime_type(value: Any) -> str:
     """Infer the MIME content type from the value.
@@ -95,41 +141,14 @@ async def atomic_write(
         retry_count: Internal parameter to track the number of retry attempts (default: 0).
     """
     max_retries = 3
-    dir_path = path.parent
     tmp_path: str | None = None
 
-    def _write_windows() -> None:
-        if is_binary:
-            path.write_bytes(data)  # type: ignore[arg-type]
-        else:
-            path.write_text(data, encoding='utf-8')  # type: ignore[arg-type]
-
-    def _write_linux() -> str:
-        fd, tmp_path = tempfile.mkstemp(
-            suffix=f'{path.suffix}.tmp',
-            prefix=f'{path.name}.',
-            dir=str(dir_path),
-        )
-
-        try:
-            if is_binary:
-                with os.fdopen(fd, 'wb') as tmp_file:
-                    tmp_file.write(data)  # type: ignore[arg-type]
-            else:
-                with os.fdopen(fd, 'w', encoding='utf-8') as tmp_file:
-                    tmp_file.write(data)  # type: ignore[arg-type]
-        except Exception:
-            Path(tmp_path).unlink(missing_ok=True)
-            raise
-        return tmp_path
-
     try:
-        # We have to differentiate between Windows and Linux due to the permissions errors
-        # in Windows when working with temporary files.
-        if sys.platform == 'win32':
-            await asyncio.to_thread(_write_windows)
-        else:
-            tmp_path = await asyncio.to_thread(_write_linux)
+        # Use the platform-specific write function resolved at import time.
+        tmp_path = await asyncio.to_thread(_write_file, path, data, is_binary=is_binary)
+
+        # On Linux/Unix, replace the destination file with tmp file.
+        if tmp_path is not None:
             await asyncio.to_thread(os.replace, tmp_path, str(path))
     except (FileNotFoundError, PermissionError):
         if retry_count < max_retries:
