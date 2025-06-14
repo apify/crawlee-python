@@ -30,12 +30,13 @@ type-check:
 	uv run mypy
 
 unit-tests:
-	uv run pytest -m "run_alone" -vv tests/unit
-	uv run pytest -m "not run_alone" --numprocesses=auto -vv --cov=src/crawlee tests/unit
+	uv run pytest --numprocesses=1 -vv tests/unit -m "run_alone"
+	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone"
 
 unit-tests-cov:
-	uv run pytest -m "not run_alone" --numprocesses=auto -vv --cov=src/crawlee --cov-report=html tests/unit
-	
+	uv run pytest --numprocesses=1 -vv --cov=src/crawlee tests/unit -m "run_alone"
+	uv run pytest --numprocesses=auto -vv --cov=src/crawlee --cov-append --cov-report=html tests/unit -m "not run_alone"
+
 e2e-templates-tests $(args):
 	uv run pytest --numprocesses=$(E2E_TESTS_CONCURRENCY) -vv tests/e2e/project_template "$(args)"
 
