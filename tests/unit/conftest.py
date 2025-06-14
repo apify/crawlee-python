@@ -13,12 +13,10 @@ from proxy import Proxy
 from uvicorn.config import Config
 
 from crawlee import service_locator
-from crawlee.configuration import Configuration
 from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_network
 from crawlee.http_clients import CurlImpersonateHttpClient, HttpxHttpClient
 from crawlee.proxy_configuration import ProxyInfo
-from crawlee.storage_clients import MemoryStorageClient
-from crawlee.storages import KeyValueStore, _creation_management
+from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 from tests.unit.server import TestServer, app, serve_in_thread
 
 if TYPE_CHECKING:
@@ -64,19 +62,23 @@ def prepare_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callabl
         service_locator._event_manager = None
         service_locator._storage_client = None
 
-        # Clear creation-related caches to ensure no state is carried over between tests.
-        monkeypatch.setattr(_creation_management, '_cache_dataset_by_id', {})
-        monkeypatch.setattr(_creation_management, '_cache_dataset_by_name', {})
-        monkeypatch.setattr(_creation_management, '_cache_kvs_by_id', {})
-        monkeypatch.setattr(_creation_management, '_cache_kvs_by_name', {})
-        monkeypatch.setattr(_creation_management, '_cache_rq_by_id', {})
-        monkeypatch.setattr(_creation_management, '_cache_rq_by_name', {})
-
         # Verify that the test environment was set up correctly.
         assert os.environ.get('CRAWLEE_STORAGE_DIR') == str(tmp_path)
         assert service_locator._configuration_was_retrieved is False
         assert service_locator._storage_client_was_retrieved is False
         assert service_locator._event_manager_was_retrieved is False
+
+        Dataset._cache_by_id.clear()
+        Dataset._cache_by_name.clear()
+        Dataset._default_instance = None
+
+        KeyValueStore._cache_by_id.clear()
+        KeyValueStore._cache_by_name.clear()
+        KeyValueStore._default_instance = None
+
+        RequestQueue._cache_by_id.clear()
+        RequestQueue._cache_by_name.clear()
+        RequestQueue._default_instance = None
 
     return _prepare_test_env
 
@@ -147,18 +149,6 @@ async def disabled_proxy(proxy_info: ProxyInfo) -> AsyncGenerator[ProxyInfo, Non
         ]
     ):
         yield proxy_info
-
-
-@pytest.fixture
-def memory_storage_client(tmp_path: Path) -> MemoryStorageClient:
-    """A fixture for testing the memory storage client and its resource clients."""
-    config = Configuration(
-        persist_storage=True,
-        write_metadata=True,
-        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
-    )
-
-    return MemoryStorageClient.from_config(config)
 
 
 @pytest.fixture(scope='session')

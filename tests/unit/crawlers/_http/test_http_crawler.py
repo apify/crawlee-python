@@ -544,7 +544,8 @@ async def test_get_snapshot(server_url: URL) -> None:
 
 
 async def test_error_snapshot_through_statistics(server_url: URL) -> None:
-    crawler = HttpCrawler(statistics=Statistics.with_default_state(save_error_snapshots=True))
+    statistics = Statistics.with_default_state(save_error_snapshots=True)
+    crawler = HttpCrawler(statistics=statistics)
 
     @crawler.router.default_handler
     async def request_handler(context: HttpCrawlingContext) -> None:
