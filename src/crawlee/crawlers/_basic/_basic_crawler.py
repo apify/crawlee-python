@@ -967,7 +967,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         if strategy == 'same-domain':
             if origin_url.hostname is None or target_url.hostname is None:
-                raise ValueError('Both origin and target URLs must have a hostname')
+                return False
 
             origin_domain = self._tld_extractor.extract_str(origin_url.hostname).domain
             target_domain = self._tld_extractor.extract_str(target_url.hostname).domain
