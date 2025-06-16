@@ -962,13 +962,20 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         origin_url: ParseResult,
     ) -> bool:
         """Check if a URL matches the enqueue_strategy."""
+        if strategy == 'all':
+            return True
+
+        if origin_url.hostname is None or target_url.hostname is None:
+            self.log.debug(
+                f'Skipping enqueue: Missing hostname in origin_url = {origin_url.geturl()} or '
+                f'target_url = {target_url.geturl()}'
+            )
+            return False
+
         if strategy == 'same-hostname':
             return target_url.hostname == origin_url.hostname
 
         if strategy == 'same-domain':
-            if origin_url.hostname is None or target_url.hostname is None:
-                return False
-
             origin_domain = self._tld_extractor.extract_str(origin_url.hostname).domain
             target_domain = self._tld_extractor.extract_str(target_url.hostname).domain
             return origin_domain == target_domain
@@ -979,9 +986,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 and target_url.scheme == origin_url.scheme
                 and target_url.port == origin_url.port
             )
-
-        if strategy == 'all':
-            return True
 
         assert_never(strategy)
 
