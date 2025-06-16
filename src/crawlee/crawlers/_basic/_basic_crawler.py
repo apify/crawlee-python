@@ -941,12 +941,25 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         """Filter requests based on the enqueue strategy and URL patterns."""
         limit = kwargs.get('limit')
         parsed_origin_url = urlparse(origin_url)
+        strategy = kwargs.get('strategy', 'all')
+
+        if strategy == 'all' and not parsed_origin_url.hostname:
+            self.log.warning(f'Skipping enqueue: Missing hostname in origin_url = {origin_url}.')
+            return
+
+        # Emit a `warning` message to the log, only once per call
+        warning_flag = True
 
         for request in request_iterator:
             target_url = request.url if isinstance(request, Request) else request
+            parsed_target_url = urlparse(target_url)
+
+            if warning_flag and strategy != 'all' and not parsed_target_url.hostname:
+                self.log.warning(f'Skipping enqueue url: Missing hostname in target_url = {target_url}.')
+                warning_flag = False
 
             if self._check_enqueue_strategy(
-                kwargs.get('strategy', 'all'), target_url=urlparse(target_url), origin_url=parsed_origin_url
+                strategy, target_url=parsed_target_url, origin_url=parsed_origin_url
             ) and self._check_url_patterns(target_url, kwargs.get('include'), kwargs.get('exclude')):
                 yield request
 
