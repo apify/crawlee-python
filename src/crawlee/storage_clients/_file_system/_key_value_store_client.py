@@ -321,7 +321,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             await asyncio.to_thread(self.path_to_kvs.mkdir, parents=True, exist_ok=True)
 
             # Write the value to the file.
-            await atomic_write(record_path, value_bytes, is_binary=True)
+            await atomic_write(record_path, value_bytes)
 
             # Write the record metadata to the file.
             await atomic_write(record_metadata_filepath, record_metadata_content)

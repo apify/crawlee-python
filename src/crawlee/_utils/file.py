@@ -19,30 +19,21 @@ if TYPE_CHECKING:
 
 if sys.platform == 'win32':
 
-    def _write_file(
-        path: Path,
-        data: str | bytes,
-        *,
-        is_binary: bool,
-    ) -> str | None:
+    def _write_file(path: Path, data: str | bytes) -> None:
         """Windows-specific file write implementation.
 
         This implementation writes directly to the file without using a temporary file, because
         they are problematic due to permissions issues on Windows.
         """
-        if is_binary:
-            path.write_bytes(data)  # type: ignore[arg-type]
+        if isinstance(data, bytes):
+            path.write_bytes(data)
+        elif isinstance(data, str):
+            path.write_text(data, encoding='utf-8')
         else:
-            path.write_text(data, encoding='utf-8')  # type: ignore[arg-type]
-        return None
+            raise TypeError(f'Unsupported data type: {type(data)}. Expected str or bytes.')
 else:
 
-    def _write_file(
-        path: Path,
-        data: str | bytes,
-        *,
-        is_binary: bool,
-    ) -> str | None:
+    def _write_file(path: Path, data: str | bytes) -> None:
         """Linux/Unix-specific file write implementation using temporary files."""
         dir_path = path.parent
         fd, tmp_path = tempfile.mkstemp(
@@ -51,17 +42,22 @@ else:
             dir=str(dir_path),
         )
 
+        if not isinstance(data, (str, bytes)):
+            raise TypeError(f'Unsupported data type: {type(data)}. Expected str or bytes.')
+
         try:
-            if is_binary:
+            if isinstance(data, bytes):
                 with os.fdopen(fd, 'wb') as tmp_file:
-                    tmp_file.write(data)  # type: ignore[arg-type]
+                    tmp_file.write(data)
             else:
                 with os.fdopen(fd, 'w', encoding='utf-8') as tmp_file:
-                    tmp_file.write(data)  # type: ignore[arg-type]
+                    tmp_file.write(data)
+
+            # Atomically replace the destination file with the temporary file
+            Path(tmp_path).replace(path)
         except Exception:
             Path(tmp_path).unlink(missing_ok=True)
             raise
-        return tmp_path
 
 
 def infer_mime_type(value: Any) -> str:
@@ -106,7 +102,6 @@ async def atomic_write(
     path: Path,
     data: str,
     *,
-    is_binary: bool = False,
     retry_count: int = 0,
 ) -> None: ...
 
@@ -116,7 +111,6 @@ async def atomic_write(
     path: Path,
     data: bytes,
     *,
-    is_binary: bool = True,
     retry_count: int = 0,
 ) -> None: ...
 
@@ -125,47 +119,34 @@ async def atomic_write(
     path: Path,
     data: str | bytes,
     *,
-    is_binary: bool = False,
     retry_count: int = 0,
 ) -> None:
     """Write data to a file atomically to prevent data corruption or partial writes.
 
-    This function handles both text and binary data. It ensures atomic writing by creating
-    a temporary file and then atomically replacing the target file, which prevents data
-    corruption if the process is interrupted during the write operation.
+    This function handles both text and binary data. The binary mode is automatically
+    detected based on the data type (bytes = binary, str = text). It ensures atomic
+    writing by creating a temporary file and then atomically replacing the target file,
+    which prevents data corruption if the process is interrupted during the write operation.
 
     Args:
         path: The path to the destination file.
         data: The data to write to the file (string or bytes).
-        is_binary: If True, write in binary mode. If False (default), write in text mode.
         retry_count: Internal parameter to track the number of retry attempts (default: 0).
     """
     max_retries = 3
-    tmp_path: str | None = None
 
     try:
         # Use the platform-specific write function resolved at import time.
-        tmp_path = await asyncio.to_thread(_write_file, path, data, is_binary=is_binary)
-
-        # On Linux/Unix, replace the destination file with tmp file.
-        if tmp_path is not None:
-            await asyncio.to_thread(os.replace, tmp_path, str(path))
+        await asyncio.to_thread(_write_file, path, data)
     except (FileNotFoundError, PermissionError):
         if retry_count < max_retries:
-            if tmp_path is not None:
-                await asyncio.to_thread(Path(tmp_path).unlink, missing_ok=True)
             return await atomic_write(
                 path,
                 data,
-                is_binary=is_binary,
                 retry_count=retry_count + 1,
             )
         # If we reach the maximum number of retries, raise the exception.
         raise
-
-    finally:
-        if tmp_path is not None:
-            await asyncio.to_thread(Path(tmp_path).unlink, missing_ok=True)
 
 
 async def export_json_to_stream(
