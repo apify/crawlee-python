@@ -20,30 +20,38 @@ if TYPE_CHECKING:
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 TMiddlewareCrawlingContext = TypeVar('TMiddlewareCrawlingContext', bound=BasicCrawlingContext)
 
-class _Middleware(Generic[TMiddlewareCrawlingContext, TCrawlingContext]):
-    """This is a helper wrapper class to make the middleware easily observable by open telemetry instrumentation."""
 
-    def __init__(self, middleware: Callable[
+class _Middleware(Generic[TMiddlewareCrawlingContext, TCrawlingContext]):
+    """Helper wrapper class to make the middleware easily observable by open telemetry instrumentation."""
+
+    def __init__(
+        self,
+        middleware: Callable[
             [TCrawlingContext],
             AsyncGenerator[TMiddlewareCrawlingContext, Exception | None],
-        ], input_context: TCrawlingContext) -> None:
-        self._generator = middleware(input_context)
-        self._context = input_context
+        ],
+        input_context: TCrawlingContext,
+    ) -> None:
+        self.generator = middleware(input_context)
+        self.input_context = input_context
+        self.output_context: TMiddlewareCrawlingContext | None = None
 
     async def action(self) -> TMiddlewareCrawlingContext:
-        return await self._generator.__anext__()
+        self.output_context = await self.generator.__anext__()
+        return self.output_context
 
     async def cleanup(self, final_consumer_exception: Exception | None) -> None:
         try:
-            await self._generator.asend(final_consumer_exception)
+            await self.generator.asend(final_consumer_exception)
         except StopAsyncIteration:
             pass
         except ContextPipelineInterruptedError as e:
             raise RuntimeError('Invalid state - pipeline interrupted in the finalization step') from e
         except Exception as e:
-            raise ContextPipelineFinalizationError(e, crawling_context) from e
+            raise ContextPipelineFinalizationError(e, self.output_context or self.input_context) from e
         else:
             raise RuntimeError('The middleware yielded more than once')
+
 
 @docs_group('Classes')
 class ContextPipeline(Generic[TCrawlingContext]):

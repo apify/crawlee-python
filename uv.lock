@@ -675,6 +675,7 @@ all = [
     { name = "scikit-learn", version = "1.5.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "scikit-learn", version = "1.6.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "typer" },
+    { name = "wrapt" },
 ]
 beautifulsoup = [
     { name = "beautifulsoup4", extra = ["lxml"] },
@@ -696,6 +697,7 @@ otel = [
     { name = "opentelemetry-instrumentation-httpx" },
     { name = "opentelemetry-sdk" },
     { name = "opentelemetry-semantic-conventions" },
+    { name = "wrapt" },
 ]
 parsel = [
     { name = "parsel" },
@@ -756,14 +758,14 @@ requires-dist = [
     { name = "opentelemetry-distro", extras = ["otlp"], marker = "extra == 'all'" },
     { name = "opentelemetry-distro", extras = ["otlp"], marker = "extra == 'otel'" },
     { name = "opentelemetry-instrumentation", specifier = ">=0.55b1" },
-    { name = "opentelemetry-instrumentation", marker = "extra == 'all'", specifier = ">=0.55b1" },
-    { name = "opentelemetry-instrumentation", marker = "extra == 'otel'", specifier = ">=0.55b1" },
+    { name = "opentelemetry-instrumentation", marker = "extra == 'all'" },
+    { name = "opentelemetry-instrumentation", marker = "extra == 'otel'" },
     { name = "opentelemetry-instrumentation-httpx", marker = "extra == 'all'" },
     { name = "opentelemetry-instrumentation-httpx", marker = "extra == 'otel'" },
     { name = "opentelemetry-sdk", marker = "extra == 'all'", specifier = ">=1.34.1" },
     { name = "opentelemetry-sdk", marker = "extra == 'otel'", specifier = ">=1.34.1" },
-    { name = "opentelemetry-semantic-conventions", marker = "extra == 'all'", specifier = ">=0.55b1" },
-    { name = "opentelemetry-semantic-conventions", marker = "extra == 'otel'", specifier = ">=0.55b1" },
+    { name = "opentelemetry-semantic-conventions", marker = "extra == 'all'" },
+    { name = "opentelemetry-semantic-conventions", marker = "extra == 'otel'" },
     { name = "parsel", marker = "extra == 'all'", specifier = ">=1.10.0" },
     { name = "parsel", marker = "extra == 'parsel'", specifier = ">=1.10.0" },
     { name = "playwright", marker = "extra == 'adaptive-crawler'", specifier = ">=1.27.0" },
@@ -785,6 +787,8 @@ requires-dist = [
     { name = "typer", marker = "extra == 'all'", specifier = ">=0.12.0" },
     { name = "typer", marker = "extra == 'cli'", specifier = ">=0.12.0" },
     { name = "typing-extensions", specifier = ">=4.1.0" },
+    { name = "wrapt", marker = "extra == 'all'" },
+    { name = "wrapt", marker = "extra == 'otel'" },
     { name = "yarl", specifier = ">=1.18.0" },
 ]
 provides-extras = ["all", "adaptive-crawler", "beautifulsoup", "cli", "curl-impersonate", "parsel", "playwright", "otel"]
