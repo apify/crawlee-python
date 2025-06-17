@@ -632,12 +632,10 @@ dependencies = [
     { name = "apify-fingerprint-datapoints" },
     { name = "browserforge" },
     { name = "cachetools" },
-    { name = "certifi" },
     { name = "colorama" },
     { name = "eval-type-backport" },
     { name = "httpx", extra = ["brotli", "http2", "zstd"] },
     { name = "more-itertools" },
-    { name = "opentelemetry-instrumentation" },
     { name = "protego" },
     { name = "psutil" },
     { name = "pydantic" },
@@ -738,7 +736,6 @@ requires-dist = [
     { name = "beautifulsoup4", extras = ["lxml"], marker = "extra == 'beautifulsoup'", specifier = ">=4.12.0" },
     { name = "browserforge", specifier = ">=1.2.3" },
     { name = "cachetools", specifier = ">=5.5.0" },
-    { name = "certifi", specifier = "<=2025.1.31" },
     { name = "colorama", specifier = ">=0.4.0" },
     { name = "cookiecutter", marker = "extra == 'all'", specifier = ">=2.6.0" },
     { name = "cookiecutter", marker = "extra == 'cli'", specifier = ">=2.6.0" },
@@ -757,7 +754,6 @@ requires-dist = [
     { name = "opentelemetry-api", marker = "extra == 'otel'", specifier = ">=1.34.1" },
     { name = "opentelemetry-distro", extras = ["otlp"], marker = "extra == 'all'" },
     { name = "opentelemetry-distro", extras = ["otlp"], marker = "extra == 'otel'" },
-    { name = "opentelemetry-instrumentation", specifier = ">=0.55b1" },
     { name = "opentelemetry-instrumentation", marker = "extra == 'all'" },
     { name = "opentelemetry-instrumentation", marker = "extra == 'otel'" },
     { name = "opentelemetry-instrumentation-httpx", marker = "extra == 'all'" },
@@ -804,7 +800,7 @@ dev = [
     { name = "pydoc-markdown", specifier = "~=4.8.0" },
     { name = "pytest", specifier = "~=8.4.0" },
     { name = "pytest-asyncio", specifier = "~=1.0.0" },
-    { name = "pytest-cov", specifier = "~=6.1.0" },
+    { name = "pytest-cov", specifier = "~=6.2.0" },
     { name = "pytest-timeout", specifier = "~=2.4.0" },
     { name = "pytest-xdist", specifier = "~=3.7.0" },
     { name = "ruff", specifier = "~=0.11.0" },
@@ -2553,15 +2549,16 @@ wheels = [
 
 [[package]]
 name = "pytest-cov"
-version = "6.1.1"
+version = "6.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "coverage", extra = ["toml"] },
+    { name = "pluggy" },
     { name = "pytest" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/25/69/5f1e57f6c5a39f81411b550027bf72842c4567ff5fd572bed1edc9e4b5d9/pytest_cov-6.1.1.tar.gz", hash = "sha256:46935f7aaefba760e716c2ebfbe1c216240b9592966e7da99ea8292d4d3e2a0a", size = 66857, upload-time = "2025-04-05T14:07:51.592Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/18/99/668cade231f434aaa59bbfbf49469068d2ddd945000621d3d165d2e7dd7b/pytest_cov-6.2.1.tar.gz", hash = "sha256:25cc6cc0a5358204b8108ecedc51a9b57b34cc6b8c967cc2c01a4e00d8a67da2", size = 69432, upload-time = "2025-06-12T10:47:47.684Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/28/d0/def53b4a790cfb21483016430ed828f64830dd981ebe1089971cd10cab25/pytest_cov-6.1.1-py3-none-any.whl", hash = "sha256:bddf29ed2d0ab6f4df17b4c55b0a657287db8684af9c42ea546b21b1041b3dde", size = 23841, upload-time = "2025-04-05T14:07:49.641Z" },
+    { url = "https://files.pythonhosted.org/packages/bc/16/4ea354101abb1287856baa4af2732be351c7bee728065aed451b678153fd/pytest_cov-6.2.1-py3-none-any.whl", hash = "sha256:f5bc4c23f42f1cdd23c70b1dab1bbaef4fc505ba950d53e0081d0730dd7e86d5", size = 24644, upload-time = "2025-06-12T10:47:45.932Z" },
 ]
 
 [[package]]
