@@ -8,23 +8,18 @@ from opentelemetry.trace import set_tracer_provider
 
 from crawlee._types import BasicCrawlingContext
 from crawlee.crawlers import ParselCrawler, ParselCrawlingContext
-from crawlee.otel.instrumentors.crawler import CrawlerInstrumentor
+from crawlee.otel.crawler_instrumentor import CrawlerInstrumentor
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
-
-"""
-docker run -d --name jaeger2 \
-  -e COLLECTOR_OTLP_ENABLED=true \
-  -p 16686:16686 \
-  -p 4317:4317 \
-  -p 4318:4318 \
-  jaegertracing/all-in-one:latest
-"""
 
 
 def instrument_crawler() -> None:
     """Add instrumentation to the crawler."""
     resource = Resource.create(
-        {'service.name': 'ExampleCrawler', 'service.version': '1.0.0', 'environment': 'development'}
+        {
+            'service.name': 'ExampleCrawler',
+            'service.version': '1.0.0',
+            'environment': 'development',
+        }
     )
 
     # Set up the OpenTelemetry tracer provider and exporter
@@ -33,14 +28,16 @@ def instrument_crawler() -> None:
     provider.add_span_processor(SimpleSpanProcessor(otlp_exporter))
     set_tracer_provider(provider)
     # Instrument the crawler with OpenTelemetry
-    CrawlerInstrumentor(instrument_classes=[RequestQueue, KeyValueStore, Dataset]).instrument()
+    CrawlerInstrumentor(
+        instrument_classes=[RequestQueue, KeyValueStore, Dataset]
+    ).instrument()
 
 
 async def main() -> None:
     """Run the crawler."""
     instrument_crawler()
 
-    crawler = ParselCrawler(max_requests_per_crawl=10)
+    crawler = ParselCrawler(max_requests_per_crawl=100)
     kvs = await KeyValueStore.open()
 
     @crawler.pre_navigation_hook

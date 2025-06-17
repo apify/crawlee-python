@@ -13,6 +13,7 @@ from opentelemetry.semconv.attributes.url_attributes import URL_FULL
 from opentelemetry.trace import get_tracer
 from wrapt import wrap_function_wrapper
 
+from crawlee._utils.docs import docs_group
 from crawlee.crawlers import BasicCrawler, ContextPipeline
 from crawlee.crawlers._basic._context_pipeline import _Middleware
 
@@ -20,6 +21,7 @@ if TYPE_CHECKING:
     from crawlee._types import BasicCrawlingContext
 
 
+@docs_group('Classes')
 class CrawlerInstrumentor(BaseInstrumentor):
     """Helper class for instrumenting crawlers with OpenTelemetry."""
 
@@ -99,7 +101,7 @@ class CrawlerInstrumentor(BaseInstrumentor):
             ) -> Any:
                 context = args[0]
                 with self._tracer.start_as_current_span(
-                    name=f'Commit results:{context.request.unique_key}',
+                    name='Commit results',
                     attributes={URL_FULL: context.request.url, HTTP_REQUEST_METHOD: context.request.method},
                 ):
                     return await wrapped(*args, **kwargs)
