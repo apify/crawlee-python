@@ -9,7 +9,7 @@ import sys
 import time
 from collections import Counter
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
 from unittest.mock import AsyncMock, Mock, call, patch
@@ -1417,3 +1417,11 @@ async def test_reduced_logs_from_timed_out_request_handler(
             break
     else:
         raise AssertionError('Expected log message about request handler error was not found.')
+
+
+@pytest.mark.parametrize('_', range(100))
+def test_clock_resolution(_: int) -> None:
+    t1 = datetime.now(tz=timezone.utc)
+    time.sleep(0.001)
+    t2 = datetime.now(tz=timezone.utc)
+    assert t2 > t1
