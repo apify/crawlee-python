@@ -26,10 +26,11 @@ logger = getLogger(__name__)
 class RequestProcessingRecord:
     """Tracks information about the processing of a request."""
 
-    def __init__(self) -> None:
+    def __init__(self, id: str = 'NotSet') -> None:
         self._last_run_at: datetime | None = None
         self._runs = 0
         self.duration: timedelta | None = None
+        self.id: str = id
 
     def run(self) -> int:
         """Mark the job as started."""
@@ -42,7 +43,12 @@ class RequestProcessingRecord:
         if self._last_run_at is None:
             raise RuntimeError('Invalid state')
 
-        self.duration = datetime.now(timezone.utc) - self._last_run_at
+        now = datetime.now(timezone.utc)
+        self.duration = now - self._last_run_at
+        if self.duration == timedelta(seconds=0):
+            raise RuntimeError(
+                f'Impossible state. The duration of a request cannot be zero. {now=}, {self._last_run_at=}, {self.id=}'
+            )
         return self.duration
 
     @property
@@ -203,7 +209,7 @@ class Statistics(Generic[TStatisticsState]):
     @ensure_context
     def record_request_processing_start(self, request_id_or_key: str) -> None:
         """Mark a request as started."""
-        record = self._requests_in_progress.get(request_id_or_key, RequestProcessingRecord())
+        record = self._requests_in_progress.get(request_id_or_key, RequestProcessingRecord(id=request_id_or_key))
         record.run()
         self._requests_in_progress[request_id_or_key] = record
 
@@ -212,7 +218,9 @@ class Statistics(Generic[TStatisticsState]):
         """Mark a request as finished."""
         record = self._requests_in_progress.get(request_id_or_key)
         if record is None:
-            return
+            raise RuntimeError(
+                f'Attempted to finish a request that was not started or has already been finished: {request_id_or_key}'
+            )
 
         state = self._state.current_value
         duration = record.finish()
