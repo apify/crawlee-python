@@ -14,14 +14,18 @@ from crawlee.http_clients import HttpxHttpClient
 from crawlee.statistics import Statistics
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
     from yarl import URL
 
+    from crawlee.http_clients import HttpClient
     from crawlee.proxy_configuration import ProxyInfo
 
 
 @pytest.fixture
-def http_client() -> HttpxHttpClient:
-    return HttpxHttpClient(http2=False)
+async def http_client() -> AsyncGenerator[HttpClient]:
+    async with HttpxHttpClient(http2=False) as client:
+        yield client
 
 
 async def test_http_1(server_url: URL) -> None:
@@ -192,7 +196,8 @@ async def test_send_crawl_error_for_read_stream(http_client: HttpxHttpClient, se
         [item async for item in http_response.read_stream()]
 
 
-async def test_reuse_context_manager(http_client: HttpxHttpClient, server_url: URL) -> None:
+async def test_reuse_context_manager(server_url: URL) -> None:
+    http_client = HttpxHttpClient()
     async with http_client:
         response = await http_client.send_request(str(server_url))
         assert response.status_code == 200
