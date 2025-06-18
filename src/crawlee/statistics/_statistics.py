@@ -37,7 +37,7 @@ class RequestProcessingRecord:
     def run(self) -> int:
         """Mark the job as started."""
         self._last_run_at = datetime.now(timezone.utc)
-        self._last_run_at2 = time.time()
+        self._last_run_at2 = time.perf_counter()
         self._runs += 1
         return self._runs
 
@@ -47,7 +47,7 @@ class RequestProcessingRecord:
             raise RuntimeError('Invalid state')
 
         now = datetime.now(timezone.utc)
-        now2 = time.time()
+        now2 = time.perf_counter()
         self.duration = now - self._last_run_at
         if self.duration == timedelta(seconds=0):
             raise RuntimeError(
