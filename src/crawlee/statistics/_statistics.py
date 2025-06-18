@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+import time
 from datetime import datetime, timedelta, timezone
 from logging import Logger, getLogger
 from typing import TYPE_CHECKING, Generic, Literal
@@ -28,6 +29,7 @@ class RequestProcessingRecord:
 
     def __init__(self, id: str = 'NotSet') -> None:
         self._last_run_at: datetime | None = None
+        self._last_run_at2: float | None = None
         self._runs = 0
         self.duration: timedelta | None = None
         self.id: str = id
@@ -35,6 +37,7 @@ class RequestProcessingRecord:
     def run(self) -> int:
         """Mark the job as started."""
         self._last_run_at = datetime.now(timezone.utc)
+        self._last_run_at2 = time.time()
         self._runs += 1
         return self._runs
 
@@ -44,10 +47,12 @@ class RequestProcessingRecord:
             raise RuntimeError('Invalid state')
 
         now = datetime.now(timezone.utc)
+        now2 = time.time()
         self.duration = now - self._last_run_at
         if self.duration == timedelta(seconds=0):
             raise RuntimeError(
-                f'Impossible state. The duration of a request cannot be zero. {now=}, {self._last_run_at=}, {self.id=}'
+                f'Impossible state. The duration of a request cannot be zero. {now=}, {self._last_run_at=}, {now2=},'
+                f' {self._last_run_at2=} {self.id=}'
             )
         return self.duration
 
