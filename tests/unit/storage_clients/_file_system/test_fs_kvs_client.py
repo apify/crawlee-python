@@ -28,7 +28,7 @@ def configuration(tmp_path: Path) -> Configuration:
 @pytest.fixture
 async def kvs_client(configuration: Configuration) -> AsyncGenerator[FileSystemKeyValueStoreClient, None]:
     """A fixture for a file system key-value store client."""
-    client = await FileSystemStorageClient().open_key_value_store_client(
+    client = await FileSystemStorageClient().create_kvs_client(
         name='test_kvs',
         configuration=configuration,
     )
@@ -38,7 +38,7 @@ async def kvs_client(configuration: Configuration) -> AsyncGenerator[FileSystemK
 
 async def test_open_creates_new_kvs(configuration: Configuration) -> None:
     """Test that open() creates a new key-value store with proper metadata and files on disk."""
-    client = await FileSystemStorageClient().open_key_value_store_client(
+    client = await FileSystemStorageClient().create_kvs_client(
         name='new_kvs',
         configuration=configuration,
     )
@@ -67,7 +67,7 @@ async def test_open_kvs_by_id(configuration: Configuration) -> None:
     storage_client = FileSystemStorageClient()
 
     # First create a key-value store by name
-    original_client = await storage_client.open_key_value_store_client(
+    original_client = await storage_client.create_kvs_client(
         name='open-by-id-test',
         configuration=configuration,
     )
@@ -79,7 +79,7 @@ async def test_open_kvs_by_id(configuration: Configuration) -> None:
     await original_client.set_value(key='test-key', value='test-value')
 
     # Now try to open the same key-value store using just the ID
-    reopened_client = await storage_client.open_key_value_store_client(
+    reopened_client = await storage_client.create_kvs_client(
         id=kvs_id,
         configuration=configuration,
     )
@@ -102,7 +102,7 @@ async def test_kvs_client_purge_on_start(configuration: Configuration) -> None:
     configuration.purge_on_start = True
 
     # Create KVS and add data
-    kvs_client1 = await FileSystemStorageClient().open_key_value_store_client(
+    kvs_client1 = await FileSystemStorageClient().create_kvs_client(
         configuration=configuration,
     )
     await kvs_client1.set_value(key='test-key', value='initial value')
@@ -113,7 +113,7 @@ async def test_kvs_client_purge_on_start(configuration: Configuration) -> None:
     assert record.value == 'initial value'
 
     # Reopen
-    kvs_client2 = await FileSystemStorageClient().open_key_value_store_client(
+    kvs_client2 = await FileSystemStorageClient().create_kvs_client(
         configuration=configuration,
     )
 
@@ -127,14 +127,14 @@ async def test_kvs_client_no_purge_on_start(configuration: Configuration) -> Non
     configuration.purge_on_start = False
 
     # Create KVS and add data
-    kvs_client1 = await FileSystemStorageClient().open_key_value_store_client(
+    kvs_client1 = await FileSystemStorageClient().create_kvs_client(
         name='test-no-purge-kvs',
         configuration=configuration,
     )
     await kvs_client1.set_value(key='test-key', value='preserved value')
 
     # Reopen
-    kvs_client2 = await FileSystemStorageClient().open_key_value_store_client(
+    kvs_client2 = await FileSystemStorageClient().create_kvs_client(
         name='test-no-purge-kvs',
         configuration=configuration,
     )

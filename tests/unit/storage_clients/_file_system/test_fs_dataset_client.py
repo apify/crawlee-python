@@ -28,7 +28,7 @@ def configuration(tmp_path: Path) -> Configuration:
 @pytest.fixture
 async def dataset_client(configuration: Configuration) -> AsyncGenerator[FileSystemDatasetClient, None]:
     """A fixture for a file system dataset client."""
-    client = await FileSystemStorageClient().open_dataset_client(
+    client = await FileSystemStorageClient().create_dataset_client(
         name='test_dataset',
         configuration=configuration,
     )
@@ -38,7 +38,7 @@ async def dataset_client(configuration: Configuration) -> AsyncGenerator[FileSys
 
 async def test_open_creates_new_dataset(configuration: Configuration) -> None:
     """Test that open() creates a new dataset with proper metadata when it doesn't exist."""
-    client = await FileSystemStorageClient().open_dataset_client(
+    client = await FileSystemStorageClient().create_dataset_client(
         name='new_dataset',
         configuration=configuration,
     )
@@ -69,7 +69,7 @@ async def test_open_dataset_by_id(configuration: Configuration) -> None:
     storage_client = FileSystemStorageClient()
 
     # First create a dataset by name
-    original_client = await storage_client.open_dataset_client(
+    original_client = await storage_client.create_dataset_client(
         name='open-by-id-test',
         configuration=configuration,
     )
@@ -81,7 +81,7 @@ async def test_open_dataset_by_id(configuration: Configuration) -> None:
     await original_client.push_data({'test_item': 'test_value'})
 
     # Now try to open the same dataset using just the ID
-    reopened_client = await storage_client.open_dataset_client(
+    reopened_client = await storage_client.create_dataset_client(
         id=dataset_id,
         configuration=configuration,
     )
@@ -104,7 +104,7 @@ async def test_dataset_client_purge_on_start(configuration: Configuration) -> No
     configuration.purge_on_start = True
 
     # Create dataset and add data
-    dataset_client1 = await FileSystemStorageClient().open_dataset_client(
+    dataset_client1 = await FileSystemStorageClient().create_dataset_client(
         configuration=configuration,
     )
     await dataset_client1.push_data({'item': 'initial data'})
@@ -114,7 +114,7 @@ async def test_dataset_client_purge_on_start(configuration: Configuration) -> No
     assert len(items.items) == 1
 
     # Reopen
-    dataset_client2 = await FileSystemStorageClient().open_dataset_client(
+    dataset_client2 = await FileSystemStorageClient().create_dataset_client(
         configuration=configuration,
     )
 
@@ -128,14 +128,14 @@ async def test_dataset_client_no_purge_on_start(configuration: Configuration) ->
     configuration.purge_on_start = False
 
     # Create dataset and add data
-    dataset_client1 = await FileSystemStorageClient().open_dataset_client(
+    dataset_client1 = await FileSystemStorageClient().create_dataset_client(
         name='test-no-purge-dataset',
         configuration=configuration,
     )
     await dataset_client1.push_data({'item': 'preserved data'})
 
     # Reopen
-    dataset_client2 = await FileSystemStorageClient().open_dataset_client(
+    dataset_client2 = await FileSystemStorageClient().create_dataset_client(
         name='test-no-purge-dataset',
         configuration=configuration,
     )

@@ -29,34 +29,34 @@ class StorageClient(ABC):
     """
 
     @abstractmethod
-    async def open_dataset_client(
+    async def create_dataset_client(
         self,
         *,
         id: str | None = None,
         name: str | None = None,
         configuration: Configuration | None = None,
     ) -> DatasetClient:
-        """Open a dataset client."""
+        """Create a dataset client."""
 
     @abstractmethod
-    async def open_key_value_store_client(
+    async def create_kvs_client(
         self,
         *,
         id: str | None = None,
         name: str | None = None,
         configuration: Configuration | None = None,
     ) -> KeyValueStoreClient:
-        """Open a key-value store client."""
+        """Create a key-value store client."""
 
     @abstractmethod
-    async def open_request_queue_client(
+    async def create_rq_client(
         self,
         *,
         id: str | None = None,
         name: str | None = None,
         configuration: Configuration | None = None,
     ) -> RequestQueueClient:
-        """Open a request queue client."""
+        """Create a request queue client."""
 
     def get_rate_limit_errors(self) -> dict[int, int]:
         """Return statistics about rate limit errors encountered by the HTTP client in storage client."""

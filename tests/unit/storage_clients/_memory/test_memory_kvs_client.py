@@ -18,14 +18,14 @@ if TYPE_CHECKING:
 @pytest.fixture
 async def kvs_client() -> AsyncGenerator[MemoryKeyValueStoreClient, None]:
     """Fixture that provides a fresh memory key-value store client for each test."""
-    client = await MemoryStorageClient().open_key_value_store_client(name='test_kvs')
+    client = await MemoryStorageClient().create_kvs_client(name='test_kvs')
     yield client
     await client.drop()
 
 
 async def test_open_creates_new_kvs() -> None:
     """Test that open() creates a new key-value store with proper metadata and adds it to the cache."""
-    client = await MemoryStorageClient().open_key_value_store_client(name='new_kvs')
+    client = await MemoryStorageClient().create_kvs_client(name='new_kvs')
 
     # Verify correct client type and properties
     assert isinstance(client, MemoryKeyValueStoreClient)
@@ -41,7 +41,7 @@ async def test_kvs_client_purge_on_start() -> None:
     configuration = Configuration(purge_on_start=True)
 
     # Create KVS and add data
-    kvs_client1 = await MemoryStorageClient().open_key_value_store_client(
+    kvs_client1 = await MemoryStorageClient().create_kvs_client(
         name='test_purge_kvs',
         configuration=configuration,
     )
@@ -53,7 +53,7 @@ async def test_kvs_client_purge_on_start() -> None:
     assert record.value == 'initial value'
 
     # Reopen
-    kvs_client2 = await MemoryStorageClient().open_key_value_store_client(
+    kvs_client2 = await MemoryStorageClient().create_kvs_client(
         name='test_purge_kvs',
         configuration=configuration,
     )
@@ -65,7 +65,7 @@ async def test_kvs_client_purge_on_start() -> None:
 
 async def test_open_with_id_and_name() -> None:
     """Test that open() can be used with both id and name parameters."""
-    client = await MemoryStorageClient().open_key_value_store_client(
+    client = await MemoryStorageClient().create_kvs_client(
         id='some-id',
         name='some-name',
     )

@@ -136,7 +136,7 @@ class RequestQueue(Storage, RequestManager):
             cache_by_id=cls._cache_by_id,
             cache_by_name=cls._cache_by_name,
             default_instance_attr='_default_instance',
-            client_opener=storage_client.open_request_queue_client,
+            client_opener=storage_client.create_rq_client,
         )
 
     @override

@@ -18,14 +18,14 @@ if TYPE_CHECKING:
 @pytest.fixture
 async def rq_client() -> AsyncGenerator[MemoryRequestQueueClient, None]:
     """Fixture that provides a fresh memory request queue client for each test."""
-    client = await MemoryStorageClient().open_request_queue_client(name='test_rq')
+    client = await MemoryStorageClient().create_rq_client(name='test_rq')
     yield client
     await client.drop()
 
 
 async def test_open_creates_new_rq() -> None:
     """Test that open() creates a new request queue with proper metadata and adds it to the cache."""
-    client = await MemoryStorageClient().open_request_queue_client(name='new_rq')
+    client = await MemoryStorageClient().create_rq_client(name='new_rq')
 
     # Verify correct client type and properties
     assert isinstance(client, MemoryRequestQueueClient)
@@ -45,7 +45,7 @@ async def test_rq_client_purge_on_start() -> None:
     configuration = Configuration(purge_on_start=True)
 
     # Create RQ and add data
-    rq_client1 = await MemoryStorageClient().open_request_queue_client(
+    rq_client1 = await MemoryStorageClient().create_rq_client(
         name='test_purge_rq',
         configuration=configuration,
     )
@@ -56,7 +56,7 @@ async def test_rq_client_purge_on_start() -> None:
     assert await rq_client1.is_empty() is False
 
     # Reopen
-    rq_client2 = await MemoryStorageClient().open_request_queue_client(
+    rq_client2 = await MemoryStorageClient().create_rq_client(
         name='test_purge_rq',
         configuration=configuration,
     )
@@ -67,7 +67,7 @@ async def test_rq_client_purge_on_start() -> None:
 
 async def test_open_with_id_and_name() -> None:
     """Test that open() can be used with both id and name parameters."""
-    client = await MemoryStorageClient().open_request_queue_client(
+    client = await MemoryStorageClient().create_rq_client(
         id='some-id',
         name='some-name',
     )

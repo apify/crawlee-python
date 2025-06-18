@@ -84,6 +84,18 @@ crawler = ParselCrawler(storage_client=storage_client)
 The `persist_storage` and `persist_metadata` fields have been removed from the `Configuration` class.
 Persistence is now determined solely by the storage client class you use.
 
+### Storage client instance behavior
+
+Instance caching is implemented for the storage open methods: `Dataset.open()`, `KeyValueStore.open()`,
+and `RequestQueue.open()`. This means that when you call these methods with the same arguments,
+the same instance is returned each time.
+
+In contrast, when using client methods such as `StorageClient.open_dataset_client()`, each call creates
+a new `DatasetClient` instance, even if the arguments are identical. These methods do not use instance caching.
+
+This usage pattern is not common, and it is generally recommended to open storages using the standard storage
+open methods rather than the storage client methods.
+
 ### Writing custom storage clients
 
 The storage client interface has been fully reworked. Collection storage clients have been removed - now there is

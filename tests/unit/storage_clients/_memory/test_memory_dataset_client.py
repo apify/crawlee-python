@@ -18,14 +18,14 @@ if TYPE_CHECKING:
 @pytest.fixture
 async def dataset_client() -> AsyncGenerator[MemoryDatasetClient, None]:
     """Fixture that provides a fresh memory dataset client for each test."""
-    client = await MemoryStorageClient().open_dataset_client(name='test_dataset')
+    client = await MemoryStorageClient().create_dataset_client(name='test_dataset')
     yield client
     await client.drop()
 
 
 async def test_open_creates_new_dataset() -> None:
     """Test that open() creates a new dataset with proper metadata and adds it to the cache."""
-    client = await MemoryStorageClient().open_dataset_client(name='new_dataset')
+    client = await MemoryStorageClient().create_dataset_client(name='new_dataset')
 
     # Verify correct client type and properties
     assert isinstance(client, MemoryDatasetClient)
@@ -42,7 +42,7 @@ async def test_dataset_client_purge_on_start() -> None:
     configuration = Configuration(purge_on_start=True)
 
     # Create dataset and add data
-    dataset_client1 = await MemoryStorageClient().open_dataset_client(
+    dataset_client1 = await MemoryStorageClient().create_dataset_client(
         name='test_purge_dataset',
         configuration=configuration,
     )
@@ -53,7 +53,7 @@ async def test_dataset_client_purge_on_start() -> None:
     assert len(items.items) == 1
 
     # Reopen
-    dataset_client2 = await MemoryStorageClient().open_dataset_client(
+    dataset_client2 = await MemoryStorageClient().create_dataset_client(
         name='test_purge_dataset',
         configuration=configuration,
     )
@@ -65,7 +65,7 @@ async def test_dataset_client_purge_on_start() -> None:
 
 async def test_open_with_id_and_name() -> None:
     """Test that open() can be used with both id and name parameters."""
-    client = await MemoryStorageClient().open_dataset_client(
+    client = await MemoryStorageClient().create_dataset_client(
         id='some-id',
         name='some-name',
     )

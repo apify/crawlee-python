@@ -24,10 +24,13 @@ class FileSystemStorageClient(StorageClient):
 
     All data persists between program runs but is limited to access from the local machine
     where the files are stored.
+
+    Warning: This storage client is not safe for concurrent access from multiple crawler processes.
+    Use it only when running a single crawler process at a time.
     """
 
     @override
-    async def open_dataset_client(
+    async def create_dataset_client(
         self,
         *,
         id: str | None = None,
@@ -40,7 +43,7 @@ class FileSystemStorageClient(StorageClient):
         return client
 
     @override
-    async def open_key_value_store_client(
+    async def create_kvs_client(
         self,
         *,
         id: str | None = None,
@@ -53,7 +56,7 @@ class FileSystemStorageClient(StorageClient):
         return client
 
     @override
-    async def open_request_queue_client(
+    async def create_rq_client(
         self,
         *,
         id: str | None = None,

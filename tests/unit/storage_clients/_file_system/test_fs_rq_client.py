@@ -28,7 +28,7 @@ def configuration(tmp_path: Path) -> Configuration:
 @pytest.fixture
 async def rq_client(configuration: Configuration) -> AsyncGenerator[FileSystemRequestQueueClient, None]:
     """A fixture for a file system request queue client."""
-    client = await FileSystemStorageClient().open_request_queue_client(
+    client = await FileSystemStorageClient().create_rq_client(
         name='test_request_queue',
         configuration=configuration,
     )
@@ -41,7 +41,7 @@ async def test_open_request_queue_by_id(configuration: Configuration) -> None:
     storage_client = FileSystemStorageClient()
 
     # First create a request queue by name
-    original_client = await storage_client.open_request_queue_client(
+    original_client = await storage_client.create_rq_client(
         name='open-by-id-test',
         configuration=configuration,
     )
@@ -53,7 +53,7 @@ async def test_open_request_queue_by_id(configuration: Configuration) -> None:
     await original_client.add_batch_of_requests([Request.from_url('https://example.com/test')])
 
     # Now try to open the same request queue using just the ID
-    reopened_client = await storage_client.open_request_queue_client(
+    reopened_client = await storage_client.create_rq_client(
         id=rq_id,
         configuration=configuration,
     )
@@ -73,7 +73,7 @@ async def test_open_request_queue_by_id(configuration: Configuration) -> None:
 
 async def test_open_creates_new_rq(configuration: Configuration) -> None:
     """Test that open() creates a new request queue with proper metadata and files on disk."""
-    client = await FileSystemStorageClient().open_request_queue_client(
+    client = await FileSystemStorageClient().create_rq_client(
         name='new_request_queue',
         configuration=configuration,
     )
@@ -105,7 +105,7 @@ async def test_rq_client_purge_on_start(configuration: Configuration) -> None:
     configuration.purge_on_start = True
 
     # Create request queue and add data
-    rq_client1 = await FileSystemStorageClient().open_request_queue_client(configuration=configuration)
+    rq_client1 = await FileSystemStorageClient().create_rq_client(configuration=configuration)
     await rq_client1.add_batch_of_requests([Request.from_url('https://example.com')])
 
     # Verify request was added
@@ -114,7 +114,7 @@ async def test_rq_client_purge_on_start(configuration: Configuration) -> None:
     assert rq_client1.metadata.handled_request_count == 0
 
     # Reopen
-    rq_client2 = await FileSystemStorageClient().open_request_queue_client(configuration=configuration)
+    rq_client2 = await FileSystemStorageClient().create_rq_client(configuration=configuration)
 
     # Verify data was purged
     assert rq_client2.metadata.pending_request_count == 0
@@ -127,14 +127,14 @@ async def test_rq_client_no_purge_on_start(configuration: Configuration) -> None
     configuration.purge_on_start = False
 
     # Create request queue and add data
-    rq_client1 = await FileSystemStorageClient().open_request_queue_client(
+    rq_client1 = await FileSystemStorageClient().create_rq_client(
         name='test-no-purge-rq',
         configuration=configuration,
     )
     await rq_client1.add_batch_of_requests([Request.from_url('https://example.com')])
 
     # Reopen
-    rq_client2 = await FileSystemStorageClient().open_request_queue_client(
+    rq_client2 = await FileSystemStorageClient().create_rq_client(
         name='test-no-purge-rq',
         configuration=configuration,
     )
@@ -383,7 +383,7 @@ async def test_get_request(rq_client: FileSystemRequestQueueClient) -> None:
 
 async def test_drop(configuration: Configuration) -> None:
     """Test dropping the queue removes files from the filesystem."""
-    client = await FileSystemStorageClient().open_request_queue_client(
+    client = await FileSystemStorageClient().create_rq_client(
         name='drop_test',
         configuration=configuration,
     )
@@ -413,7 +413,7 @@ async def test_file_persistence(configuration: Configuration) -> None:
     configuration.purge_on_start = False
 
     # Create a client and add requests
-    client1 = await FileSystemStorageClient().open_request_queue_client(
+    client1 = await FileSystemStorageClient().create_rq_client(
         name='persistence_test',
         configuration=configuration,
     )
@@ -439,7 +439,7 @@ async def test_file_persistence(configuration: Configuration) -> None:
     assert len(request_files) > 0, 'Request files should exist'
 
     # Create a new client with same name (which will load from files)
-    client2 = await FileSystemStorageClient().open_request_queue_client(
+    client2 = await FileSystemStorageClient().create_rq_client(
         name='persistence_test',
         configuration=configuration,
     )

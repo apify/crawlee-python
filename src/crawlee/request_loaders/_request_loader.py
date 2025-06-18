@@ -31,11 +31,11 @@ class RequestLoader(ABC):
 
     @abstractmethod
     async def get_total_count(self) -> int:
-        """Get the total number of requests in the loader (i.e. pending + handled)."""
+        """Get an offline approximation of the total number of requests in the loader (i.e. pending + handled)."""
 
     @abstractmethod
     async def is_empty(self) -> bool:
-        """Return True if there are no more requests in the source (there might still be unfinished requests)."""
+        """Return True if there are no more requests in the loader (there might still be unfinished requests)."""
 
     @abstractmethod
     async def is_finished(self) -> bool:

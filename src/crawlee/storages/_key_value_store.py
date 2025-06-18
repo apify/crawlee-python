@@ -128,7 +128,7 @@ class KeyValueStore(Storage):
             cache_by_id=cls._cache_by_id,
             cache_by_name=cls._cache_by_name,
             default_instance_attr='_default_instance',
-            client_opener=storage_client.open_key_value_store_client,
+            client_opener=storage_client.create_kvs_client,
         )
 
     @override
