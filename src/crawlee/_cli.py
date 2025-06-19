@@ -3,14 +3,15 @@ from __future__ import annotations
 
 import importlib.resources
 import json
+import sys
 from pathlib import Path
 from typing import Annotated, Optional, cast
 
 try:
-    import inquirer  # type: ignore[import-untyped]
+    import inquirer
     import typer
-    from cookiecutter.main import cookiecutter  # type: ignore[import-untyped]
-    from inquirer.render.console import ConsoleRender  # type: ignore[import-untyped]
+    from cookiecutter.main import cookiecutter
+    from inquirer.render.console import ConsoleRender
     from rich.progress import Progress, SpinnerColumn, TextColumn
 except ModuleNotFoundError as exc:
     raise ImportError(
@@ -21,7 +22,8 @@ except ModuleNotFoundError as exc:
 cli = typer.Typer(no_args_is_help=True)
 
 template_directory = importlib.resources.files('crawlee') / 'project_template'
-cookiecutter_json = json.load((template_directory / 'cookiecutter.json').open())
+with open(str(template_directory / 'cookiecutter.json')) as f:
+    cookiecutter_json = json.load(f)
 
 crawler_choices = cookiecutter_json['crawler_type']
 http_client_choices = cookiecutter_json['http_client']
@@ -36,7 +38,6 @@ def callback(
         typer.Option(
             '-V',
             '--version',
-            is_flag=True,
             help='Print Crawlee version',
         ),
     ] = False,
@@ -78,7 +79,7 @@ def _prompt_for_project_name(initial_project_name: str | None) -> str:
 
 def _prompt_text(message: str, default: str) -> str:
     return cast(
-        str,
+        'str',
         ConsoleRender().render(
             inquirer.Text(
                 name='text',
@@ -93,7 +94,7 @@ def _prompt_text(message: str, default: str) -> str:
 def _prompt_choice(message: str, choices: list[str]) -> str:
     """Prompt the user to pick one from a list of choices."""
     return cast(
-        str,
+        'str',
         ConsoleRender().render(
             inquirer.List(
                 name='choice',
@@ -106,7 +107,7 @@ def _prompt_choice(message: str, choices: list[str]) -> str:
 
 def _prompt_bool(message: str, *, default: bool) -> bool:
     return cast(
-        bool,
+        'bool',
         ConsoleRender().render(
             inquirer.Confirm(
                 name='confirm',
@@ -198,19 +199,32 @@ def create(
                 TextColumn('[progress.description]{task.description}'),
                 transient=True,
             ) as progress:
-                progress.add_task(description='Bootstrapping...', total=None)
-                cookiecutter(
-                    template=str(template_directory),
-                    no_input=True,
-                    extra_context={
-                        'project_name': project_name,
-                        'package_manager': package_manager,
-                        'crawler_type': crawler_type,
-                        'http_client': http_client,
-                        'enable_apify_integration': enable_apify_integration,
-                        'start_url': start_url,
-                    },
-                )
+                bootstrap_task = progress.add_task(description='Bootstrapping...', total=None)
+
+                try:
+                    cookiecutter(
+                        template=str(template_directory),
+                        no_input=True,
+                        extra_context={
+                            'project_name': project_name,
+                            'package_manager': package_manager,
+                            'crawler_type': crawler_type,
+                            'http_client': http_client,
+                            'enable_apify_integration': enable_apify_integration,
+                            'start_url': start_url,
+                        },
+                    )
+                except Exception as exc:
+                    progress.update(bootstrap_task, visible=False)
+                    progress.refresh()
+
+                    # Print just the last line of the error message (the actual error without traceback)
+                    if 'Hook script failed' in str(exc):
+                        typer.echo('Project creation failed. Check the error message above.', err=True)
+                    else:
+                        typer.echo(f'Project creation failed: {exc!s}', err=True)
+
+                    sys.exit(1)
 
             typer.echo(f'Your project "{project_name}" was created.')
 

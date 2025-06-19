@@ -40,7 +40,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Set up uv package manager
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -52,6 +52,8 @@ jobs:
 
       - name: Build Docusaurus docs
         run: make build-docs
+        env:
+          APIFY_SIGNING_TOKEN: ${{ secrets.APIFY_SIGNING_TOKEN }}
 
       - name: Set up GitHub Pages
         uses: actions/configure-pages@v5

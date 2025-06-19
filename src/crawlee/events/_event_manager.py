@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import inspect
 from collections import defaultdict
-from collections.abc import Awaitable, Callable
 from datetime import timedelta
 from functools import wraps
 from logging import getLogger
@@ -28,6 +27,7 @@ from crawlee.events._types import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
     from types import TracebackType
 
     from typing_extensions import NotRequired
@@ -65,7 +65,7 @@ class EventManager:
         persist_state_interval: timedelta = timedelta(minutes=1),
         close_timeout: timedelta | None = None,
     ) -> None:
-        """A default constructor.
+        """Initialize a new instance.
 
         Args:
             persist_state_interval: Interval between emitted `PersistState` events to maintain state persistence.
@@ -101,7 +101,7 @@ class EventManager:
         return self._active
 
     async def __aenter__(self) -> EventManager:
-        """Initializes the event manager upon entering the async context.
+        """Initialize the event manager upon entering the async context.
 
         Raises:
             RuntimeError: If the context manager is already active.
@@ -119,7 +119,7 @@ class EventManager:
         exc_value: BaseException | None,
         exc_traceback: TracebackType | None,
     ) -> None:
-        """Closes the local event manager upon exiting the async context.
+        """Close the local event manager upon exiting the async context.
 
         This will stop listening for the events, and it will wait for all the event listeners to finish.
 
@@ -158,7 +158,7 @@ class EventManager:
         """
         signature = inspect.signature(listener)
 
-        @wraps(cast(Callable[..., Union[None, Awaitable[None]]], listener))
+        @wraps(cast('Callable[..., Union[None, Awaitable[None]]]', listener))
         async def listener_wrapper(event_data: EventData) -> None:
             try:
                 bound_args = signature.bind(event_data)
@@ -170,7 +170,7 @@ class EventManager:
             coro = (
                 listener(*bound_args.args, **bound_args.kwargs)
                 if asyncio.iscoroutinefunction(listener)
-                else asyncio.to_thread(cast(Callable[..., None], listener), *bound_args.args, **bound_args.kwargs)
+                else asyncio.to_thread(cast('Callable[..., None]', listener), *bound_args.args, **bound_args.kwargs)
             )
             # Note: use `asyncio.iscoroutinefunction` rather then `inspect.iscoroutinefunction` since it works with
             # unittests.mock.AsyncMock. See https://github.com/python/cpython/issues/84753.
@@ -255,5 +255,5 @@ class EventManager:
         await wait_for_all_tasks_for_finish(tasks=tasks, logger=logger, timeout=timeout)
 
     async def _emit_persist_state_event(self) -> None:
-        """Emits a persist state event with the given migration status."""
+        """Emit a persist state event with the given migration status."""
         self.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False))

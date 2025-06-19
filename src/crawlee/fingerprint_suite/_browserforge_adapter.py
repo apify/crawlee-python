@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os.path
 import random
 from collections.abc import Iterable
 from copy import deepcopy
@@ -30,7 +31,7 @@ class PatchedHeaderGenerator(bf_HeaderGenerator):
     """Browserforge `HeaderGenerator` that contains patches specific for our usage of the generator."""
 
     def _get_accept_language_header(self, locales: tuple[str, ...]) -> str:
-        """Generates the Accept-Language header based on the given locales.
+        """Generate the Accept-Language header based on the given locales.
 
         Patched version due to PR of upstream repo not being merged: https://github.com/daijro/browserforge/pull/24
 
@@ -62,8 +63,8 @@ class PatchedHeaderGenerator(bf_HeaderGenerator):
         This patched version of the method adds additional quality checks on the output of the original method. It tries
         to generate headers several times until they match the requirements.
 
-        The `browser` parameter accepts `chrome` as a general category, which includes not only Google Chrome
-        but also other Chromium-based browsers. As a result, a Safari-like user agent may be generated for a `chrome`
+        The `browser` parameter accepts `chromium` as a general category, which includes not only Google Chrome
+        but also other Chromium-based browsers. As a result, a Safari-like user agent may be generated for a `chromium`
         input, such as:
         ```
         Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko)
@@ -159,7 +160,7 @@ class PatchedFingerprintGenerator(bf_FingerprintGenerator):
         slim: bool = False,
         **header_kwargs,  # noqa:ANN003 # Upstream repo types missing.
     ) -> None:
-        """A default constructor.
+        """Initialize a new instance.
 
         Args:
             screen: Screen constraints for the generated fingerprint.
@@ -188,7 +189,7 @@ class BrowserforgeFingerprintGenerator(FingerprintGenerator):
         mock_web_rtc: bool | None = None,
         slim: bool | None = None,
     ) -> None:
-        """A default constructor.
+        """Initialize a new instance.
 
         All generator options are optional. If any value is not specified, then `None` is set in the options.
         Default values for options set to `None` are implementation detail of used fingerprint generator.
@@ -248,7 +249,11 @@ class BrowserforgeHeaderGenerator:
 
 def get_available_header_network() -> dict:
     """Get header network that contains possible header values."""
-    return extract_json(DATA_DIR / 'header-network.zip')
+    if os.path.isfile(DATA_DIR / 'header-network.zip'):
+        return extract_json(DATA_DIR / 'header-network.zip')
+    if os.path.isfile(DATA_DIR / 'header-network-definition.zip'):
+        return extract_json(DATA_DIR / 'header-network-definition.zip')
+    raise FileNotFoundError('Missing header-network file.')
 
 
 def get_available_header_values(header_network: dict, node_name: str | set[str]) -> set[str]:

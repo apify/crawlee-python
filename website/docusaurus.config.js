@@ -38,6 +38,10 @@ module.exports = {
     githubHost: 'github.com',
     future: {
         experimental_faster: true,
+        v4: {
+            removeLegacyPostBuildHeadAttribute: true,
+            useCssCascadeLayers: false, // this breaks styles on homepage and link colors everywhere
+        },
     },
     headTags: [
         // Intercom messenger
@@ -170,6 +174,43 @@ module.exports = {
                 },
             };
         },
+        // skipping svgo for animated crawlee logo
+        async function doNotUseSVGO() {
+            return {
+                name: 'docusaurus-svgo',
+                configureWebpack(config) {
+                    // find the svg rule
+                    const svgRule = config.module.rules.find((r) => typeof r === 'object' && r.test.toString() === '/\\.svg$/i');
+
+                    // find the svgr loader
+                    const svgrLoader = svgRule?.oneOf?.[0];
+
+                    // make copy of svgr loader and disable svgo
+                    const svgrLoaderCopy = JSON.parse(JSON.stringify(svgrLoader));
+
+                    // include only animated logo
+                    svgrLoaderCopy.include = /animated-crawlee-logo/;
+
+                    // turn off svgo
+                    svgrLoaderCopy.use[0].options.svgo = false;
+
+                    // insert the copy after the original svgr loader
+                    svgRule.oneOf.splice(1, 0, svgrLoaderCopy);
+
+                    // exclude animated logo from the first svgr loader (with svgo enabled)
+                    svgrLoader.exclude = /animated-crawlee-logo/;
+
+                    return {
+                        mergeStrategy: {
+                            'module.rules': 'replace',
+                        },
+                        module: {
+                            rules: config.module.rules,
+                        },
+                    };
+                },
+            };
+        },
     ],
     themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */ ({
@@ -179,17 +220,13 @@ module.exports = {
                 hideable: true,
             },
         },
-        announcementBar: {
-            id: 'announcement-bar-',
-            content: `🎉️ <b>If you like Crawlee for Python, <a href="https://github.com/apify/crawlee-python/">star us on GitHub!</a></b> 🥳️`,
-        },
         navbar: {
             hideOnScroll: true,
-            title: 'Crawlee for Python',
             logo: {
-                src: 'img/crawlee-light-new.svg',
-                srcDark: 'img/crawlee-dark-new.svg',
+                src: 'img/crawlee-python-light.svg',
+                srcDark: 'img/crawlee-python-dark.svg',
             },
+            title: 'Crawlee for Python',
             items: [
                 {
                     type: 'doc',
@@ -209,14 +246,6 @@ module.exports = {
                     position: 'left',
                     activeBaseRegex: 'api/(?!.*/changelog)',
                 },
-                // {
-                //     type: 'custom-api',
-                //     to: 'core/changelog',
-                //     label: 'Changelog',
-                //     position: 'left',
-                //     className: 'changelog',
-                //     activeBaseRegex: 'changelog',
-                // },
                 {
                     type: 'doc',
                     label: 'Changelog',
@@ -229,53 +258,6 @@ module.exports = {
                     rel: 'dofollow',
                     label: 'Blog',
                     position: 'left',
-                },
-                {
-                    type: 'dropdown',
-                    label: 'Python',
-                    position: 'left',
-                    items: [
-                        {
-                            label: 'Node.js',
-                            href: 'https://crawlee.dev',
-                            target: '_self',
-                            rel: 'dofollow',
-                        },
-                        {
-                            label: 'Python',
-                            href: '#',
-                            target: '_self',
-                            rel: 'dofollow',
-                        },
-                    ],
-                },
-                // {
-                //     type: 'docsVersionDropdown',
-                //     position: 'left',
-                //     dropdownItemsAfter: [
-                //         {
-                //             href: 'https://sdk.apify.com/docs/guides/getting-started',
-                //             label: '2.2',
-                //         },
-                //         {
-                //             href: 'https://sdk.apify.com/docs/1.3.1/guides/getting-started',
-                //             label: '1.3',
-                //         },
-                //     ],
-                // },
-                {
-                    href: 'https://github.com/apify/crawlee-python',
-                    label: 'GitHub',
-                    title: 'View on GitHub',
-                    position: 'right',
-                    className: 'icon',
-                },
-                {
-                    href: 'https://discord.com/invite/jyEM2PRvMU',
-                    label: 'Discord',
-                    title: 'Chat on Discord',
-                    position: 'right',
-                    className: 'icon',
                 },
             ],
         },
@@ -296,16 +278,16 @@ module.exports = {
             // eslint-disable-next-line max-len
             { name: 'og:description', content: `Crawlee helps you build and maintain your Python crawlers. It's open source and modern, with type hints for Python to help you catch bugs early.` },
         ],
-        image: 'img/crawlee-og.png',
+        image: 'img/crawlee-python-og.png',
         footer: {
             links: [
                 {
                     title: 'Docs',
                     items: [
-                        // {
-                        //     label: 'Guides',
-                        //     to: 'docs/guides',
-                        // },
+                        {
+                            label: 'Guides',
+                            to: 'docs/guides',
+                        },
                         {
                             label: 'Examples',
                             to: 'docs/examples',
@@ -314,20 +296,15 @@ module.exports = {
                             label: 'API reference',
                             to: 'api',
                         },
-                        // {
-                        //     label: 'Upgrading to v3',
-                        //     to: 'docs/upgrading/upgrading-to-v3',
-                        // },
+                        {
+                            label: 'Changelog',
+                            to: 'docs/changelog',
+                        },
                     ],
                 },
                 {
-                    title: 'Community',
+                    title: 'Product',
                     items: [
-                        {
-                            label: 'Blog',
-                            href: 'https://crawlee.dev/blog',
-                            // to: 'blog',
-                        },
                         {
                             label: 'Discord',
                             href: 'https://discord.com/invite/jyEM2PRvMU',
@@ -339,6 +316,10 @@ module.exports = {
                         {
                             label: 'Twitter',
                             href: 'https://twitter.com/apify',
+                        },
+                        {
+                            label: 'YouTube',
+                            href: 'https://www.youtube.com/apify',
                         },
                     ],
                 },
@@ -360,19 +341,19 @@ module.exports = {
                     ],
                 },
             ],
-            logo: {
-                src: 'img/apify_logo.svg',
-                href: '/',
-                width: '60px',
-                height: '60px',
-            },
         },
         algolia: {
             appId: '5JC94MPMLY',
             apiKey: '878493fcd7001e3c179b6db6796a999b', // search only (public) API key
             indexName: 'crawlee_python',
+            placeholder: 'Search documentation',
             algoliaOptions: {
                 facetFilters: ['version:VERSION'],
+            },
+            translations: {
+                button: {
+                    buttonText: 'Search documentation...',
+                },
             },
         },
     }),

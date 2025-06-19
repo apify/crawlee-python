@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 
 def html_to_text(source: str | Tag) -> str:
-    """Converts markup string or `BeautifulSoup` to newline separated plain text without tags using BeautifulSoup.
+    """Convert markup string or `BeautifulSoup` to newline separated plain text without tags using BeautifulSoup.
 
     Args:
         source: Input markup string or `BeautifulSoup` object.
@@ -27,7 +27,7 @@ def html_to_text(source: str | Tag) -> str:
         Newline separated plain text without tags.
     """
     if isinstance(source, str):
-        soup = BeautifulSoup(source)
+        soup = BeautifulSoup(source, features='lxml')
     elif isinstance(source, BeautifulSoup):
         soup = source
     else:
@@ -36,7 +36,11 @@ def html_to_text(source: str | Tag) -> str:
     text = ''
 
     def _page_element_to_text(page_elements: Iterable[PageElement]) -> None:
-        """Custom html parsing that performs as implementation from Javascript version of Crawlee."""
+        """Extract and process text content from a collection of HTML elements.
+
+        Convert page elements into plain text while preserving structure. Handle whitespace compression,
+        skip unwanted elements, and format block elements correctly.
+        """
         nonlocal text
         for page_element in page_elements:
             if isinstance(page_element, (Tag, NavigableString)):

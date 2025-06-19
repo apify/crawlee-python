@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "crawlee"
-version = "0.6.3"
+version = "0.6.11"
 description = "Crawlee for Python"
 authors = [{ name = "Apify Technologies s.r.o.", email = "support@apify.com" }]
 license = { file = "LICENSE" }
@@ -33,19 +33,20 @@ keywords = [
     "scraping",
 ]
 dependencies = [
+    "apify_fingerprint_datapoints>=0.0.2",
     "browserforge>=1.2.3",
     "cachetools>=5.5.0",
     "colorama>=0.4.0",
-    "docutils>=0.21.0",
     "eval-type-backport>=0.2.0",
     "httpx[brotli,http2,zstd]>=0.27.0",
     "more-itertools>=10.2.0",
+    "protego>=0.4.0",
     "psutil>=6.0.0",
     "pydantic-settings>=2.2.0,<2.7.0",
     "pydantic>=2.8.0,!=2.10.0,!=2.10.1,!=2.10.2",
     "pyee>=9.0.0",
-    "rich>=13.9.0",
     "sortedcollections>=2.1.0",
+    "sortedcontainers>=2.4.0",
     "tldextract>=5.1.0",
     "typing-extensions>=4.1.0",
     "yarl>=1.18.0",
@@ -65,7 +66,7 @@ all = [
     "playwright>=1.27.0",
     "scikit-learn==1.5.2; python_version == '3.9'",
     "scikit-learn>=1.6.0; python_version >= '3.10'",
-    'typer>=0.12.0'
+    'typer>=0.12.0',
 ]
 adaptive-crawler = [
     "jaro-winkler>=2.0.3",
@@ -74,7 +75,7 @@ adaptive-crawler = [
     "scikit-learn>=1.6.0; python_version >= '3.10'",
 ]
 beautifulsoup = ["beautifulsoup4[lxml]>=4.12.0", "html5lib>=1.0"]
-cli = ["cookiecutter>=2.6.0", "inquirer>=3.3.0", "typer>=0.12.0"]
+cli = ["cookiecutter>=2.6.0", "inquirer>=3.3.0", "rich>=13.9.0", "typer>=0.12.0"]
 curl-impersonate = ["curl-cffi>=0.9.0"]
 parsel = ["parsel>=1.10.0"]
 playwright = ["playwright>=1.27.0"]
@@ -92,28 +93,27 @@ crawlee = "crawlee._cli:cli"
 
 [dependency-groups]
 dev = [
-    "build~=1.2.0",
-    "filelock~=3.17.0",
-    "ipdb~=0.13.0",
-    "mypy~=1.15.0",
-    "pre-commit~=4.1.0",
+    "apify_client", # For e2e tests.
+    "build~=1.2.2", # For e2e tests.
+    "dycw-pytest-only~=2.1.0",
+    "mypy~=1.16.0",
+    "pre-commit~=4.2.0",
     "proxy-py~=2.4.0",
     "pydoc-markdown~=4.8.0",
-    "pytest-asyncio~=0.25.0",
-    "pytest-cov~=6.0.0",
-    "pytest-only~=2.1.0",
-    "pytest-timeout~=2.3.0",
-    "pytest-xdist~=3.6.0",
-    "pytest~=8.3.0",
-    "respx~=0.22.0",
-    "ruff~=0.9.0",
-    "setuptools~=76.0.0",                    # setuptools are used by pytest, but not explicitly required
+    "pytest-asyncio~=1.0.0",
+    "pytest-cov~=6.2.0",
+    "pytest-timeout~=2.4.0",
+    "pytest-xdist~=3.7.0",
+    "pytest~=8.4.0",
+    "ruff~=0.11.0",
+    "setuptools", # setuptools are used by pytest, but not explicitly required
     "sortedcontainers-stubs~=2.4.0",
     "types-beautifulsoup4~=4.12.0.20240229",
-    "types-cachetools~=5.5.0.20240820",
+    "types-cachetools~=6.0.0.20250525",
     "types-colorama~=0.4.15.20240106",
     "types-psutil~=7.0.0.20250218",
     "types-python-dateutil~=2.9.0.20240316",
+    "uvicorn[standard]~=0.34.0",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -122,7 +122,7 @@ packages = ["src/crawlee"]
 [tool.ruff]
 line-length = 120
 include = ["src/**/*.py", "tests/**/*.py", "docs/**/*.py", "website/**/*.py"]
-extend-exclude = ["project_template"]
+extend-exclude = ["src/crawlee/project_template"]
 
 [tool.ruff.lint]
 select = ["ALL"]
@@ -135,6 +135,9 @@ ignore = [
     "D100",     # Missing docstring in public module
     "D104",     # Missing docstring in public package
     "D107",     # Missing docstring in `__init__`
+    "D203",     # One blank line required before class docstring
+    "D213",     # Multi-line docstring summary should start at the second line
+    "D413",     # Missing blank line after last section
     "EM",       # flake8-errmsg
     "G004",     # Logging statement uses f-string
     "ISC001",   # This rule may cause conflicts when used with the formatter
@@ -178,6 +181,12 @@ indent-style = "space"
     "F841",   # Local variable {variable} is assigned to but never used
     "N999",   # Invalid module name
 ]
+"**/docs/examples/code_examples/*crawler_with_error_snapshotter.py" = [
+    "PLR2004", # Magic value used in comparison. Ignored for simplicity and readability of example code.
+]
+"**/docs/guides/code_examples/running_in_web_server/server.py" = [
+    "TC002", # ruff false positive. Import actually needed during runtime.
+]
 
 [tool.ruff.lint.flake8-quotes]
 docstring-quotes = "double"
@@ -192,9 +201,6 @@ runtime-evaluated-base-classes = [
 [tool.ruff.lint.flake8-builtins]
 builtins-ignorelist = ["id"]
 
-[tool.ruff.lint.pydocstyle]
-convention = "google"
-
 [tool.ruff.lint.isort]
 known-first-party = ["crawlee"]
 
@@ -206,11 +212,14 @@ addopts = "-ra"
 asyncio_default_fixture_loop_scope = "function"
 asyncio_mode = "auto"
 timeout = 1200
+markers = [
+    "run_alone: marks tests that must run in isolation",
+]
 
 [tool.mypy]
 python_version = "3.9"
 plugins = ["pydantic.mypy"]
-exclude = ["project_template"]
+exclude = ["src/crawlee/project_template"]
 files = ["src", "tests", "docs", "website"]
 check_untyped_defs = true
 disallow_incomplete_defs = true
@@ -226,12 +235,29 @@ warn_unused_ignores = true
 [[tool.mypy.overrides]]
 # Example codes are sometimes showing integration of crawlee with external tool, which is not dependency of crawlee.
 module = [
-    "apify",                # Example code shows integration of apify and crawlee.
-    "camoufox",             # Example code shows integration of camoufox and crawlee.
-    "jaro",                 # Untyped and stubs not available
-    "sklearn.linear_model", # Untyped and stubs not available
+    "apify",                        # Example code shows integration of apify and crawlee.
+    "apify_fingerprint_datapoints", # Untyped and stubs not available
+    "camoufox",                     # Example code shows integration of camoufox and crawlee.
+    "fastapi",                      # Example code shows running in webserver.
+    "starlette.*",                  # Example code shows running in webserver.
+    "flask",                        # Example code shows deploy on Google Cloud.
+    "functions_framework",          # Example code shows deploy on Google Cloud.
+    "jaro",                         # Untyped and stubs not available
+    "litestar",                     # Example code shows deploy on Google Cloud Run.
+    "loguru",                       # Example code shows integration of loguru and crawlee for JSON logging.
+    "protego",                      # Untyped and stubs not available
+    "sklearn.linear_model",         # Untyped and stubs not available
+    "sortedcollections",            # Untyped and stubs not available
+    "cookiecutter.*",               # Untyped and stubs not available
+    "inquirer.*",                   # Untyped and stubs not available
 ]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "running_in_web_server.*"  # False positive when fastapi not available
+]
+disable_error_code = ["misc"]
 
 [tool.basedpyright]
 pythonVersion = "3.9"

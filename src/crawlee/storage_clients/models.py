@@ -141,6 +141,7 @@ class RequestQueueHeadWithLocks(RequestQueueHead):
     """Model for request queue head with locks."""
 
     lock_secs: Annotated[int, Field(alias='lockSecs')]
+    queue_has_locked_requests: Annotated[bool | None, Field(alias='queueHasLockedRequests')] = None
 
 
 class _ListPage(BaseModel):
@@ -223,7 +224,7 @@ class UnprocessedRequest(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
-    unique_key: Annotated[str, Field(alias='requestUniqueKey')]
+    unique_key: Annotated[str, Field(alias='uniqueKey')]
     url: Annotated[str, BeforeValidator(validate_http_url), Field()]
     method: Annotated[HttpMethod | None, Field()] = None
 

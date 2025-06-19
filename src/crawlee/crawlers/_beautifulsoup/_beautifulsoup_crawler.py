@@ -60,7 +60,7 @@ class BeautifulSoupCrawler(AbstractHttpCrawler[BeautifulSoupCrawlingContext, Bea
         parser: BeautifulSoupParserType = 'lxml',
         **kwargs: Unpack[BasicCrawlerOptions[BeautifulSoupCrawlingContext]],
     ) -> None:
-        """A default constructor.
+        """Initialize a new instance.
 
         Args:
             parser: The type of parser that should be used by `BeautifulSoup`.

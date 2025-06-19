@@ -1,8 +1,10 @@
+import asyncio
+
 from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 
 
 async def main() -> None:
-    crawler = BeautifulSoupCrawler(max_requests_per_crawl=50)
+    crawler = BeautifulSoupCrawler(max_requests_per_crawl=10)
 
     @crawler.router.default_handler
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
@@ -17,3 +19,7 @@ async def main() -> None:
         )
 
     await crawler.run(['https://crawlee.dev/'])
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

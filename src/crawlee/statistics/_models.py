@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta
-from typing import Annotated, Any
+from datetime import datetime, timedelta, timezone
+from typing import Annotated, Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
-from rich.console import Console
-from rich.table import Table
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidator, computed_field
 from typing_extensions import override
 
+from crawlee._utils.console import make_table
 from crawlee._utils.docs import docs_group
 from crawlee._utils.models import timedelta_ms
 
@@ -32,20 +31,12 @@ class FinalStatistics:
 
     def to_table(self) -> str:
         """Print out the Final Statistics data as a table."""
-        table = Table(show_header=False)
-        table.add_column()
-        table.add_column()
-
         str_dict = {k: v.total_seconds() if isinstance(v, timedelta) else v for k, v in asdict(self).items()}
 
-        for k, v in str_dict.items():
-            table.add_row(str(k), str(v))
+        return make_table([(str(k), str(v)) for k, v in str_dict.items()], width=60)
 
-        console = Console(width=60)
-        with console.capture() as capture:
-            console.print(table, end='\n')
-
-        return capture.get().strip('\n')
+    def to_dict(self) -> dict[str, float | int | list[int]]:
+        return {k: v.total_seconds() if isinstance(v, timedelta) else v for k, v in asdict(self).items()}
 
     @override
     def __str__(self) -> str:
@@ -59,6 +50,7 @@ class StatisticsState(BaseModel):
     """Statistic data about a crawler run."""
 
     model_config = ConfigDict(populate_by_name=True, ser_json_inf_nan='constants')
+    stats_id: Annotated[int | None, Field(alias='statsId')] = None
 
     requests_finished: Annotated[int, Field(alias='requestsFinished')] = 0
     requests_failed: Annotated[int, Field(alias='requestsFailed')] = 0
@@ -80,20 +72,35 @@ class StatisticsState(BaseModel):
     errors: dict[str, Any] = Field(default_factory=dict)
     retry_errors: dict[str, Any] = Field(alias='retryErrors', default_factory=dict)
     requests_with_status_code: dict[str, int] = Field(alias='requestsWithStatusCode', default_factory=dict)
-    stats_persisted_at: Annotated[datetime | None, Field(alias='statsPersistedAt')] = None
+    stats_persisted_at: Annotated[
+        datetime | None, Field(alias='statsPersistedAt'), PlainSerializer(lambda _: datetime.now(timezone.utc))
+    ] = None
+    request_retry_histogram: Annotated[
+        dict[int, int],
+        Field(alias='requestRetryHistogram'),
+        PlainValidator(lambda value: dict(enumerate(value)), json_schema_input_type=list[int]),
+        PlainSerializer(
+            lambda value: [value.get(i, 0) for i in range(max(value.keys(), default=0) + 1)],
+            return_type=list[int],
+        ),
+    ] = {}
 
+    @computed_field(alias='requestTotalDurationMillis', return_type=timedelta_ms)  # type: ignore[prop-decorator]
+    @property
+    def request_total_duration(self) -> timedelta:
+        return self.request_total_finished_duration + self.request_total_failed_duration
 
-@docs_group('Data structures')
-class StatisticsPersistedState(BaseModel):
-    """Additional statistic data to be stored in the persisted state."""
+    @computed_field(alias='requestAvgFailedDurationMillis', return_type=Optional[timedelta_ms])  # type: ignore[prop-decorator]
+    @property
+    def request_avg_failed_duration(self) -> timedelta | None:
+        return (self.request_total_failed_duration / self.requests_failed) if self.requests_failed else None
 
-    model_config = ConfigDict(populate_by_name=True)
+    @computed_field(alias='requestAvgFinishedDurationMillis', return_type=Optional[timedelta_ms])  # type: ignore[prop-decorator]
+    @property
+    def request_avg_finished_duration(self) -> timedelta | None:
+        return (self.request_total_finished_duration / self.requests_finished) if self.requests_finished else None
 
-    request_retry_histogram: Annotated[list[int], Field(alias='requestRetryHistogram')]
-    stats_id: Annotated[int, Field(alias='statsId')]
-    request_avg_failed_duration: Annotated[timedelta_ms | None, Field(alias='requestAvgFailedDurationMillis')]
-    request_avg_finished_duration: Annotated[timedelta_ms | None, Field(alias='requestAvgFinishedDurationMillis')]
-    request_total_duration: Annotated[timedelta_ms, Field(alias='requestTotalDurationMillis')]
-    requests_total: Annotated[int, Field(alias='requestsTotal')]
-    crawler_last_started_at: Annotated[datetime, Field(alias='crawlerLastStartTimestamp')]
-    stats_persisted_at: Annotated[datetime, Field(alias='statsPersistedAt')]
+    @computed_field(alias='requestsTotal')  # type: ignore[prop-decorator]
+    @property
+    def requests_total(self) -> int:
+        return self.requests_failed + self.requests_finished

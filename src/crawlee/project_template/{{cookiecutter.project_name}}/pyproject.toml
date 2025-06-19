@@ -1,0 +1,36 @@
+# % if cookiecutter.crawler_type == 'playwright-camoufox'
+# % set extras = ['playwright']
+# % else
+# % set extras = [cookiecutter.crawler_type]
+# % endif
+# % if cookiecutter.http_client == 'curl-impersonate'
+# % do extras.append('curl-impersonate')
+# % endif
+
+[project]
+name = "{{cookiecutter.project_name}}"
+version = "0.0.1"
+description = ""
+authors = [
+    {name = "Your Name",email = "you@example.com"}
+]
+readme = "README.md"
+requires-python = ">=3.9,<4.0"
+dependencies = [
+    "crawlee[{{ extras|join(',') }}]",
+    # % if cookiecutter.crawler_type == 'playwright-camoufox'
+    "camoufox[geoip]~=0.4.5",
+    # % endif
+    # % if cookiecutter.enable_apify_integration
+    "apify",
+    # % endif
+]
+
+# % if cookiecutter.package_manager == 'poetry'
+[tool.poetry]
+package-mode = false
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+# % endif

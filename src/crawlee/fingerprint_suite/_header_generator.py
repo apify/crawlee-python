@@ -24,7 +24,7 @@ def fingerprint_browser_type_from_playwright_browser_type(
 
 @docs_group('Classes')
 class HeaderGenerator:
-    """Generates realistic looking or browser-like HTTP headers."""
+    """Generate realistic looking or browser-like HTTP headers."""
 
     def __init__(self) -> None:
         self._generator = BrowserforgeHeaderGenerator()

@@ -82,8 +82,8 @@ def test_predictor_new_label_increased_detection_probability_recommendation() ->
 def test_unreliable_prediction() -> None:
     """Test that detection_probability_recommendation for unreliable predictions is 1.
 
-     Creates situation where no learning data of new label is available for the predictor.
-     It's first prediction is not reliable as both options have 50% chance, so it should set maximum
+    Create situation where no learning data of new label is available for the predictor.
+    It's first prediction is not reliable as both options have 50% chance, so it should set maximum
     detection_probability_recommendation."""
     learnt_label = 'some label'
     predictor = DefaultRenderingTypePredictor()

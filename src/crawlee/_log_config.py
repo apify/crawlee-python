@@ -68,6 +68,9 @@ def configure_logger(logger: logging.Logger, *, remove_old_handlers: bool = Fals
     logger.addHandler(handler)
     logger.setLevel(get_configured_log_level())
 
+    # Do not propagate the log messages to the parent logger to prevent duplicate log messages.
+    logger.propagate = False
+
 
 class CrawleeLogFormatter(logging.Formatter):
     """Log formatter that prints out the log message nicely formatted, with colored level and stringified extra fields.
@@ -91,7 +94,7 @@ class CrawleeLogFormatter(logging.Formatter):
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        """A default constructor.
+        """Initialize a new instance.
 
         Args:
             include_logger_name: Include logger name at the beginning of the log line.

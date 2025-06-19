@@ -4,10 +4,10 @@ title: Crawling
 ---
 
 import ApiLink from '@site/src/components/ApiLink';
-import CodeBlock from '@theme/CodeBlock';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
-import CrawlingListingExample from '!!raw-loader!./code_examples/05_crawling_listing.py';
-import CrawlingDetailExample from '!!raw-loader!./code_examples/05_crawling_detail.py';
+import CrawlingListingExample from '!!raw-loader!roa-loader!./code_examples/05_crawling_listing.py';
+import CrawlingDetailExample from '!!raw-loader!roa-loader!./code_examples/05_crawling_detail.py';
 
 To crawl the whole [Warehouse store example](https://warehouse-theme-metal.myshopify.com/collections) and find all the data, you first need to visit all the pages with products - going through all categories available and also all the product detail pages.
 
@@ -21,9 +21,9 @@ await enqueue_links()
 
 While useful in that scenario, you need something different now. Instead of finding all the `<a href="..">` elements with links to the same hostname, you need to find only the specific ones that will take your crawler to the next page of results. Otherwise, the crawler will visit a lot of other pages that you're not interested in. Using the power of DevTools and yet another <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> parameter, this becomes fairly easy.
 
-<CodeBlock className="language-python">
+<RunnableCodeBlock className="language-python" language="python">
     {CrawlingListingExample}
-</CodeBlock>
+</RunnableCodeBlock>
 
 The code should look pretty familiar to you. It's a very simple request handler where we log the currently processed URL to the console and enqueue more links. But there are also a few new, interesting additions. Let's break it down.
 
@@ -39,9 +39,9 @@ You will see `label` used often throughout Crawlee, as it's a convenient way of 
 
 In a similar fashion, you need to collect all the URLs to the product detail pages, because only from there you can scrape all the data you need. The following code only repeats the concepts you already know for another set of links.
 
-<CodeBlock className="language-python">
+<RunnableCodeBlock className="language-python" language="python">
     {CrawlingDetailExample}
-</CodeBlock>
+</RunnableCodeBlock>
 
 The crawling code is now complete. When you run the code, you'll see the crawler visit all the listing URLs and all the detail URLs.
 

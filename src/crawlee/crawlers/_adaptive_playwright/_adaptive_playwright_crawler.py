@@ -67,10 +67,11 @@ class _NonPersistentStatistics(Statistics):
 
     def __init__(self) -> None:
         super().__init__(state_model=StatisticsState)
-        self._active = True
 
     async def __aenter__(self) -> Self:
         self._active = True
+        await self._state.initialize()
+        self._after_initialize()
         return self
 
     async def __aexit__(
@@ -131,7 +132,7 @@ class AdaptivePlaywrightCrawler(
         statistics: Statistics[AdaptivePlaywrightCrawlerStatisticState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> None:
-        """A default constructor. Recommended way to create instance is to call factory methods.
+        """Initialize a new instance. Recommended way to create instance is to call factory methods.
 
         Recommended factory methods: `with_beautifulsoup_static_parser`, `with_parsel_static_parser`.
 
@@ -201,7 +202,12 @@ class AdaptivePlaywrightCrawler(
         static_crawler.pre_navigation_hook(adaptive_pre_navigation_hook_static)
         playwright_crawler.pre_navigation_hook(adaptive_pre_navigation_hook_pw)
 
-        self._additional_context_managers = [*self._additional_context_managers, playwright_crawler._browser_pool]  # noqa: SLF001 # Intentional access to private member.
+        self._additional_context_managers = [
+            *self._additional_context_managers,
+            static_crawler.statistics,
+            playwright_crawler.statistics,
+            playwright_crawler._browser_pool,  # noqa: SLF001 # Intentional access to private member.
+        ]
 
         # Sub crawler pipeline related
         self._pw_context_pipeline = playwright_crawler._context_pipeline  # noqa:SLF001  # Intentional access to private member.
@@ -219,7 +225,7 @@ class AdaptivePlaywrightCrawler(
         statistics: Statistics[StatisticsState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[BeautifulSoup], BeautifulSoup, Tag]:
-        """Creates `AdaptivePlaywrightCrawler` that uses `BeautifulSoup` for parsing static content."""
+        """Create `AdaptivePlaywrightCrawler` that uses `BeautifulSoup` for parsing static content."""
         if statistics is not None:
             adaptive_statistics = statistics.replace_state_model(AdaptivePlaywrightCrawlerStatisticState)
         else:
@@ -244,7 +250,7 @@ class AdaptivePlaywrightCrawler(
         statistics: Statistics[StatisticsState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[Selector], Selector, Selector]:
-        """Creates `AdaptivePlaywrightCrawler` that uses `Parcel` for parsing static content."""
+        """Create `AdaptivePlaywrightCrawler` that uses `Parcel` for parsing static content."""
         if statistics is not None:
             adaptive_statistics = statistics.replace_state_model(AdaptivePlaywrightCrawlerStatisticState)
         else:
@@ -375,6 +381,8 @@ class AdaptivePlaywrightCrawler(
                     self.track_rendering_type_mispredictions()
 
         context.log.debug(f'Running browser request handler for {context.request.url}')
+
+        old_state_copy = None
 
         if should_detect_rendering_type:
             # Save copy of global state from `use_state` before it can be mutated by browser crawl.

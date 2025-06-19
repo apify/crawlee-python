@@ -194,12 +194,12 @@ async def test_get_auto_saved_value_auto_save_race_conditions(key_value_store: K
 
     sleep_time_iterator = chain(iter([0.5]), repeat(0))
 
-    async def delayed_get_value(key: str, default_value: None) -> None:
+    async def delayed_get_value(key: str, default_value: None = None) -> None:
         await asyncio.sleep(next(sleep_time_iterator))
         return await KeyValueStore.get_value(key_value_store, key=key, default_value=default_value)
 
     async def increment_counter() -> None:
-        state = cast(dict[str, int], await key_value_store.get_auto_saved_value('state'))
+        state = cast('dict[str, int]', await key_value_store.get_auto_saved_value('state'))
         state['counter'] += 1
 
     with patch.object(key_value_store, 'get_value', delayed_get_value):

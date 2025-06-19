@@ -65,7 +65,7 @@ class Snapshotter:
         max_client_errors: int,
         max_memory_size: ByteSize,
     ) -> None:
-        """A default constructor.
+        """Initialize a new instance.
 
         In most cases, you should use the `from_config` constructor to create a new instance based on
         the provided configuration.
@@ -102,7 +102,7 @@ class Snapshotter:
 
     @classmethod
     def from_config(cls, config: Configuration | None = None) -> Snapshotter:
-        """Create a new instance based on the provided `Configuration`.
+        """Initialize a new instance based on the provided `Configuration`.
 
         Args:
             config: The `Configuration` instance. Uses the global (default) one if not provided.
@@ -136,7 +136,7 @@ class Snapshotter:
         return self._active
 
     async def __aenter__(self) -> Snapshotter:
-        """Starts capturing snapshots at configured intervals.
+        """Start capturing snapshots at configured intervals.
 
         Raises:
             RuntimeError: If the context manager is already active.
@@ -158,7 +158,7 @@ class Snapshotter:
         exc_value: BaseException | None,
         exc_traceback: TracebackType | None,
     ) -> None:
-        """Stops all resource capturing.
+        """Stop all resource capturing.
 
         This method stops capturing snapshots of system resources (CPU, memory, event loop, and client information).
         It should be called to terminate resource capturing when it is no longer needed.
@@ -186,7 +186,7 @@ class Snapshotter:
         Returns:
             A sample of memory snapshots.
         """
-        snapshots = cast(list[Snapshot], self._memory_snapshots)
+        snapshots = cast('list[Snapshot]', self._memory_snapshots)
         return self._get_sample(snapshots, duration)
 
     @ensure_context
@@ -199,7 +199,7 @@ class Snapshotter:
         Returns:
             A sample of event loop snapshots.
         """
-        snapshots = cast(list[Snapshot], self._event_loop_snapshots)
+        snapshots = cast('list[Snapshot]', self._event_loop_snapshots)
         return self._get_sample(snapshots, duration)
 
     @ensure_context
@@ -212,7 +212,7 @@ class Snapshotter:
         Returns:
             A sample of CPU snapshots.
         """
-        snapshots = cast(list[Snapshot], self._cpu_snapshots)
+        snapshots = cast('list[Snapshot]', self._cpu_snapshots)
         return self._get_sample(snapshots, duration)
 
     @ensure_context
@@ -225,7 +225,7 @@ class Snapshotter:
         Returns:
             A sample of client snapshots.
         """
-        snapshots = cast(list[Snapshot], self._client_snapshots)
+        snapshots = cast('list[Snapshot]', self._client_snapshots)
         return self._get_sample(snapshots, duration)
 
     @staticmethod
@@ -241,7 +241,7 @@ class Snapshotter:
         return [snapshot for snapshot in snapshots if latest_time - snapshot.created_at <= duration]
 
     def _snapshot_cpu(self, event_data: EventSystemInfoData) -> None:
-        """Captures a snapshot of the current CPU usage.
+        """Capture a snapshot of the current CPU usage.
 
         This method does not perform CPU usage measurement. Instead, it just reads the data received through
         the `event_data` parameter, which is expected to be supplied by the event manager.
@@ -255,12 +255,12 @@ class Snapshotter:
             created_at=event_data.cpu_info.created_at,
         )
 
-        snapshots = cast(list[Snapshot], self._cpu_snapshots)
+        snapshots = cast('list[Snapshot]', self._cpu_snapshots)
         self._prune_snapshots(snapshots, event_data.cpu_info.created_at)
         self._cpu_snapshots.add(snapshot)
 
     def _snapshot_memory(self, event_data: EventSystemInfoData) -> None:
-        """Captures a snapshot of the current memory usage.
+        """Capture a snapshot of the current memory usage.
 
         This method does not perform memory usage measurement. Instead, it just reads the data received through
         the `event_data` parameter, which is expected to be supplied by the event manager.
@@ -275,13 +275,13 @@ class Snapshotter:
             created_at=event_data.memory_info.created_at,
         )
 
-        snapshots = cast(list[Snapshot], self._memory_snapshots)
+        snapshots = cast('list[Snapshot]', self._memory_snapshots)
         self._prune_snapshots(snapshots, snapshot.created_at)
         self._memory_snapshots.add(snapshot)
         self._evaluate_memory_load(event_data.memory_info.current_size, event_data.memory_info.created_at)
 
     def _snapshot_event_loop(self) -> None:
-        """Captures a snapshot of the current event loop usage.
+        """Capture a snapshot of the current event loop usage.
 
         This method evaluates the event loop's latency by comparing the expected time between snapshots to the actual
         time elapsed since the last snapshot. The delay in the snapshot reflects the time deviation due to event loop
@@ -295,12 +295,12 @@ class Snapshotter:
             event_loop_delay = snapshot.created_at - previous_snapshot.created_at - self._EVENT_LOOP_SNAPSHOT_INTERVAL
             snapshot.delay = event_loop_delay
 
-        snapshots = cast(list[Snapshot], self._event_loop_snapshots)
+        snapshots = cast('list[Snapshot]', self._event_loop_snapshots)
         self._prune_snapshots(snapshots, snapshot.created_at)
         self._event_loop_snapshots.add(snapshot)
 
     def _snapshot_client(self) -> None:
-        """Captures a snapshot of the current API state by checking for rate limit errors (HTTP 429).
+        """Capture a snapshot of the current API state by checking for rate limit errors (HTTP 429).
 
         Only errors produced by a 2nd retry of the API call are considered for snapshotting since earlier errors may
         just be caused by a random spike in the number of requests and do not necessarily signify API overloading.
@@ -310,14 +310,19 @@ class Snapshotter:
         rate_limit_errors: dict[int, int] = client.get_rate_limit_errors()
 
         error_count = rate_limit_errors.get(self._CLIENT_RATE_LIMIT_ERROR_RETRY_COUNT, 0)
-        snapshot = ClientSnapshot(error_count=error_count, max_error_count=self._max_client_errors)
+        previous_error_count = self._client_snapshots[-1].error_count if self._client_snapshots else 0
+        snapshot = ClientSnapshot(
+            error_count=error_count,
+            new_error_count=error_count - previous_error_count,
+            max_error_count=self._max_client_errors,
+        )
 
-        snapshots = cast(list[Snapshot], self._client_snapshots)
+        snapshots = cast('list[Snapshot]', self._client_snapshots)
         self._prune_snapshots(snapshots, snapshot.created_at)
         self._client_snapshots.add(snapshot)
 
     def _prune_snapshots(self, snapshots: list[Snapshot], now: datetime) -> None:
-        """Removes snapshots that are older than the `self._snapshot_history`.
+        """Remove snapshots that are older than the `self._snapshot_history`.
 
         This method modifies the list of snapshots in place, removing all snapshots that are older than the defined
         snapshot history relative to the `now` parameter.
@@ -342,7 +347,7 @@ class Snapshotter:
             snapshots.clear()
 
     def _evaluate_memory_load(self, current_memory_usage_size: ByteSize, snapshot_timestamp: datetime) -> None:
-        """Evaluates and logs critical memory load conditions based on the system information.
+        """Evaluate and logs critical memory load conditions based on the system information.
 
         Args:
             current_memory_usage_size: The current memory usage.

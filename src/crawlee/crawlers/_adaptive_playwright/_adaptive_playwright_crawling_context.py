@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
-from crawlee import HttpHeaders
 from crawlee._types import BasicCrawlingContext
 from crawlee._utils.docs import docs_group
 from crawlee.crawlers import AbstractHttpParser, ParsedHttpCrawlingContext, PlaywrightCrawlingContext
+from crawlee.crawlers._playwright._types import PlaywrightHttpResponse
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Sequence
@@ -169,14 +169,16 @@ class AdaptivePlaywrightCrawlingContext(
         context: ParsedHttpCrawlingContext[TStaticParseResult],
         parser: AbstractHttpParser[TStaticParseResult, TStaticSelectResult],
     ) -> AdaptivePlaywrightCrawlingContext[TStaticParseResult, TStaticSelectResult]:
-        """Convenience constructor that creates new context from existing `ParsedHttpCrawlingContext`."""
+        """Initialize a new instance from an existing `ParsedHttpCrawlingContext`."""
         return cls(_static_parser=parser, **{field.name: getattr(context, field.name) for field in fields(context)})
 
     @classmethod
     async def from_playwright_crawling_context(
-        cls, context: PlaywrightCrawlingContext, parser: AbstractHttpParser[TStaticParseResult, TStaticSelectResult]
+        cls,
+        context: PlaywrightCrawlingContext,
+        parser: AbstractHttpParser[TStaticParseResult, TStaticSelectResult],
     ) -> AdaptivePlaywrightCrawlingContext[TStaticParseResult, TStaticSelectResult]:
-        """Convenience constructor that creates new context from existing `PlaywrightCrawlingContext`."""
+        """Initialize a new instance from an existing `PlaywrightCrawlingContext`."""
         context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
         # Remove playwright specific attributes and pass them as private instead to be available as property.
         context_kwargs['_response'] = context_kwargs.pop('response')
@@ -184,7 +186,7 @@ class AdaptivePlaywrightCrawlingContext(
         context_kwargs['_infinite_scroll'] = context_kwargs.pop('infinite_scroll')
         # This might not be always available.
         protocol_guess = await context_kwargs['_page'].evaluate('() => performance.getEntries()[0].nextHopProtocol')
-        http_response = await _PlaywrightHttpResponse.from_playwright_response(
+        http_response = await PlaywrightHttpResponse.from_playwright_response(
             response=context.response, protocol=protocol_guess or ''
         )
         # block_requests is useful only on pre-navigation contexts. It is useless here.
@@ -200,7 +202,7 @@ class AdaptivePlaywrightCrawlingContext(
 @dataclass(frozen=True)
 @docs_group('Data structures')
 class AdaptivePlaywrightPreNavCrawlingContext(BasicCrawlingContext):
-    """This is just wrapper around BasicCrawlingContext or AdaptivePlaywrightCrawlingContext.
+    """A wrapper around BasicCrawlingContext or AdaptivePlaywrightCrawlingContext.
 
     Trying to access `page` on this context will raise AdaptiveContextError if wrapped context is BasicCrawlingContext.
     """
@@ -225,7 +227,7 @@ class AdaptivePlaywrightPreNavCrawlingContext(BasicCrawlingContext):
 
     @classmethod
     def from_pre_navigation_context(cls, context: BasicCrawlingContext) -> Self:
-        """Convenience constructor that creates new context from existing pre navigation contexts."""
+        """Initialize a new instance from an existing pre-navigation `BasicCrawlingContext`."""
         context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
         context_kwargs['_page'] = context_kwargs.pop('page', None)
 
@@ -238,26 +240,3 @@ class AdaptivePlaywrightPreNavCrawlingContext(BasicCrawlingContext):
 
         context_kwargs['block_requests'] = context_kwargs.pop('block_requests', dummy_block_requests)
         return cls(**context_kwargs)
-
-
-@dataclass(frozen=True)
-class _PlaywrightHttpResponse:
-    """Wrapper class for playwright `Response` object to implement `HttpResponse` protocol."""
-
-    http_version: str
-    status_code: int
-    headers: HttpHeaders
-    _content: bytes
-
-    def read(self) -> bytes:
-        return self._content
-
-    @classmethod
-    async def from_playwright_response(cls, response: Response, protocol: str) -> Self:
-        headers = HttpHeaders(response.headers)
-        status_code = response.status
-        # Used http protocol version cannot be obtained from `Response` and has to be passed as additional argument.
-        http_version = protocol
-        _content = await response.body()
-
-        return cls(http_version=http_version, status_code=status_code, headers=headers, _content=_content)

@@ -4,19 +4,19 @@ title: Adding more URLs
 ---
 
 import ApiLink from '@site/src/components/ApiLink';
-import CodeBlock from '@theme/CodeBlock';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
-import OriginalCodeExample from '!!raw-loader!./code_examples/03_original_code.py';
-import FindingNewLinksExample from '!!raw-loader!./code_examples/03_finding_new_links.py';
-import EnqueueStrategyExample from '!!raw-loader!./code_examples/03_enqueue_strategy.py';
-import GlobsExample from '!!raw-loader!./code_examples/03_globs.py';
-import TransformExample from '!!raw-loader!./code_examples/03_transform_request.py';
+import OriginalCodeExample from '!!raw-loader!roa-loader!./code_examples/03_original_code.py';
+import FindingNewLinksExample from '!!raw-loader!roa-loader!./code_examples/03_finding_new_links.py';
+import EnqueueStrategyExample from '!!raw-loader!roa-loader!./code_examples/03_enqueue_strategy.py';
+import GlobsExample from '!!raw-loader!roa-loader!./code_examples/03_globs.py';
+import TransformExample from '!!raw-loader!roa-loader!./code_examples/03_transform_request.py';
 
 Previously you've built a very simple crawler that downloads HTML of a single page, reads its title and prints it to the console. This is the original source code:
 
-<CodeBlock className="language-python">
+<RunnableCodeBlock className="language-python" language="python">
     {OriginalCodeExample}
-</CodeBlock>
+</RunnableCodeBlock>
 
 Now you'll use the example from the previous section and improve on it. You'll add more URLs to the queue and thanks to that the crawler will keep going, finding new links, enqueuing them into the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> and then scraping them.
 
@@ -58,9 +58,9 @@ There are numerous approaches to finding links to follow when crawling the web. 
 
 Since this is the most common case, it is also the <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> default.
 
-<CodeBlock className="language-python">
+<RunnableCodeBlock className="language-python" language="python">
     {FindingNewLinksExample}
-</CodeBlock>
+</RunnableCodeBlock>
 
 If you need to override the default selection of elements in <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink>, you can use the `selector` argument.
 
@@ -80,9 +80,9 @@ await context.enqueue_links()
 
 The default behavior of <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> is to stay on the same hostname. This **does not include subdomains**. To include subdomains in your crawl, use the `strategy` argument. The `strategy` argument is an instance of the `EnqueueStrategy` type alias.
 
-<CodeBlock className="language-python">
+<RunnableCodeBlock className="language-python" language="python">
     {EnqueueStrategyExample}
-</CodeBlock>
+</RunnableCodeBlock>
 
 When you run the code, you will see the crawler log the **title** of the first page, then the **enqueueing** message showing number of URLs, followed by the **title** of the first enqueued page and so on and so on.
 
@@ -103,17 +103,17 @@ await context.enqueue_links(strategy='all')
 
 For even more control, you can use the `include` or `exclude` parameters, either as glob patterns or regular expressions, to filter the URLs. Refer to the API documentation for <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> for detailed information on these and other available options.
 
-<CodeBlock className="language-python">
+<RunnableCodeBlock className="language-python" language="python">
     {GlobsExample}
-</CodeBlock>
+</RunnableCodeBlock>
 
 ### Transform requests before enqueuing
 
 For cases where you need to modify or filter requests before they are enqueued, you can use the `transform_request_function` parameter. This function takes a <ApiLink to="class/Request">`Request`</ApiLink> object as input and should return either a modified <ApiLink to="class/Request">`Request`</ApiLink>` object or `None`. If the function returns `None`, the request will be skipped.
 
-<CodeBlock className="language-python">
+<RunnableCodeBlock className="language-python" language="python">
     {TransformExample}
-</CodeBlock>
+</RunnableCodeBlock>
 
 ## Next steps
 

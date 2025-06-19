@@ -69,7 +69,7 @@ class DatasetClient(ABC):
         flatten: list[str] | None = None,
         view: str | None = None,
     ) -> DatasetItemsListPage:
-        """Retrieves a paginated list of items from a dataset based on various filtering parameters.
+        """Retrieve a paginated list of items from a dataset based on various filtering parameters.
 
         This method provides the flexibility to filter, sort, and modify the appearance of dataset items
         when listed. Each parameter modifies the result set according to its purpose. The method also
@@ -106,7 +106,7 @@ class DatasetClient(ABC):
         skip_empty: bool = False,
         skip_hidden: bool = False,
     ) -> AsyncIterator[dict]:
-        """Iterates over items in the dataset according to specified filters and sorting.
+        """Iterate over items in the dataset according to specified filters and sorting.
 
         This method allows for asynchronously iterating through dataset items while applying various filters such as
         skipping empty items, hiding specific fields, and sorting. It supports pagination via `offset` and `limit`
@@ -155,7 +155,7 @@ class DatasetClient(ABC):
         xml_row: str | None = None,
         flatten: list[str] | None = None,
     ) -> bytes:
-        """Retrieves dataset items as bytes.
+        """Retrieve dataset items as bytes.
 
         Args:
             item_format: Output format (e.g., 'json', 'csv'); default is 'json'.
@@ -199,7 +199,7 @@ class DatasetClient(ABC):
         xml_root: str | None = None,
         xml_row: str | None = None,
     ) -> AbstractAsyncContextManager[Response | None]:
-        """Retrieves dataset items as a streaming response.
+        """Retrieve dataset items as a streaming response.
 
         Args:
             item_format: Output format, options include json, jsonl, csv, html, xlsx, xml, rss; default is json.

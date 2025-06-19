@@ -11,33 +11,32 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
-from unittest.mock import AsyncMock, Mock, call
+from typing import TYPE_CHECKING, Any, Literal, cast
+from unittest.mock import AsyncMock, Mock, call, patch
 
-import httpx
 import pytest
 
 from crawlee import ConcurrencySettings, Glob, service_locator
 from crawlee._request import Request
-from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpHeaders
+from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpHeaders, HttpMethod
+from crawlee._utils.robots import RobotsTxtFile
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
-from crawlee.errors import SessionError, UserDefinedErrorHandlerError
+from crawlee.errors import RequestCollisionError, SessionError, UserDefinedErrorHandlerError
 from crawlee.events._local_event_manager import LocalEventManager
 from crawlee.request_loaders import RequestList, RequestManagerTandem
-from crawlee.sessions import SessionPool
+from crawlee.sessions import Session, SessionPool
 from crawlee.statistics import FinalStatistics
 from crawlee.storage_clients import MemoryStorageClient
-from crawlee.storage_clients._memory import DatasetClient
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
-    import respx
     from yarl import URL
 
     from crawlee._types import JsonSerializable
+    from crawlee.storage_clients._memory import DatasetClient
 
 
 async def test_processes_requests_from_explicit_queue() -> None:
@@ -301,40 +300,42 @@ async def test_handles_error_in_failed_request_handler() -> None:
         await crawler.run(['http://a.com/', 'http://b.com/', 'http://c.com/'])
 
 
-async def test_send_request_works(respx_mock: respx.MockRouter) -> None:
-    respx_mock.get('http://b.com/', name='test_endpoint').return_value = httpx.Response(
-        status_code=200, json={'hello': 'world'}
-    )
+@pytest.mark.parametrize(
+    ('method', 'path', 'payload'),
+    [
+        pytest.param('GET', 'get', None, id='get send_request'),
+        pytest.param('POST', 'post', b'Hello, world!', id='post send_request'),
+    ],
+)
+async def test_send_request_works(server_url: URL, method: HttpMethod, path: str, payload: None | bytes) -> None:
+    response_data: dict[str, Any] = {}
 
-    response_body: Any = None
-    response_headers: HttpHeaders | None = None
-
-    crawler = BasicCrawler(
-        max_request_retries=3,
-    )
+    crawler = BasicCrawler(max_request_retries=3)
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        nonlocal response_body, response_headers
+        response = await context.send_request(str(server_url / path), method=method, payload=payload)
 
-        response = await context.send_request('http://b.com/')
-        response_body = response.read()
-        response_headers = response.headers
+        response_data['body'] = json.loads(response.read())
+        response_data['headers'] = response.headers
 
     await crawler.run(['http://a.com/', 'http://b.com/', 'http://c.com/'])
-    assert respx_mock['test_endpoint'].called
 
-    assert json.loads(response_body) == {'hello': 'world'}
+    response_body = response_data.get('body')
+    assert response_body is not None
+    assert response_body.get('data') == (payload.decode() if payload else None)
 
+    response_headers = response_data.get('headers')
     assert response_headers is not None
     content_type = response_headers.get('content-type')
     assert content_type is not None
-    assert content_type.endswith('/json')
+    assert content_type == 'application/json'
 
 
 @dataclass
 class AddRequestsTestInput:
     start_url: str
+    loaded_url: str
     requests: Sequence[str | Request]
     expected_urls: Sequence[str]
     kwargs: EnqueueLinksKwargs
@@ -344,6 +345,7 @@ STRATEGY_TEST_URLS = (
     'https://someplace.com/',
     'http://someplace.com/index.html',
     'https://blog.someplace.com/index.html',
+    'https://redirect.someplace.com',
     'https://other.place.com/index.html',
 )
 
@@ -363,6 +365,7 @@ INCLUDE_TEST_URLS = (
         pytest.param(
             AddRequestsTestInput(
                 start_url='https://a.com/',
+                loaded_url='https://a.com/',
                 requests=[
                     'https://a.com/',
                     Request.from_url('http://b.com/'),
@@ -377,52 +380,109 @@ INCLUDE_TEST_URLS = (
         pytest.param(
             AddRequestsTestInput(
                 start_url=STRATEGY_TEST_URLS[0],
+                loaded_url=STRATEGY_TEST_URLS[0],
                 requests=STRATEGY_TEST_URLS,
                 kwargs=EnqueueLinksKwargs(),
                 expected_urls=STRATEGY_TEST_URLS[1:],
             ),
-            id='enqueue_strategy_1',
+            id='enqueue_strategy_default',
         ),
         pytest.param(
             AddRequestsTestInput(
                 start_url=STRATEGY_TEST_URLS[0],
+                loaded_url=STRATEGY_TEST_URLS[0],
                 requests=STRATEGY_TEST_URLS,
                 kwargs=EnqueueLinksKwargs(strategy='all'),
                 expected_urls=STRATEGY_TEST_URLS[1:],
             ),
-            id='enqueue_strategy_2',
+            id='enqueue_strategy_all',
         ),
         pytest.param(
             AddRequestsTestInput(
                 start_url=STRATEGY_TEST_URLS[0],
-                requests=STRATEGY_TEST_URLS,
+                loaded_url=STRATEGY_TEST_URLS[0],
+                requests=STRATEGY_TEST_URLS[:4],
                 kwargs=EnqueueLinksKwargs(strategy='same-domain'),
-                expected_urls=STRATEGY_TEST_URLS[1:3],
+                expected_urls=STRATEGY_TEST_URLS[1:4],
             ),
-            id='enqueue_strategy_3',
+            id='enqueue_strategy_same_domain',
         ),
         pytest.param(
             AddRequestsTestInput(
                 start_url=STRATEGY_TEST_URLS[0],
-                requests=STRATEGY_TEST_URLS,
+                loaded_url=STRATEGY_TEST_URLS[0],
+                requests=STRATEGY_TEST_URLS[:4],
                 kwargs=EnqueueLinksKwargs(strategy='same-hostname'),
                 expected_urls=[STRATEGY_TEST_URLS[1]],
             ),
-            id='enqueue_strategy_4',
+            id='enqueue_strategy_same_hostname',
         ),
         pytest.param(
             AddRequestsTestInput(
                 start_url=STRATEGY_TEST_URLS[0],
+                loaded_url=STRATEGY_TEST_URLS[0],
+                requests=STRATEGY_TEST_URLS[:4],
+                kwargs=EnqueueLinksKwargs(strategy='same-origin'),
+                expected_urls=[],
+            ),
+            id='enqueue_strategy_same_origin',
+        ),
+        # Enqueue strategy with redirect
+        pytest.param(
+            AddRequestsTestInput(
+                start_url=STRATEGY_TEST_URLS[3],
+                loaded_url=STRATEGY_TEST_URLS[0],
+                requests=STRATEGY_TEST_URLS,
+                kwargs=EnqueueLinksKwargs(),
+                expected_urls=STRATEGY_TEST_URLS[:3] + STRATEGY_TEST_URLS[4:],
+            ),
+            id='redirect_enqueue_strategy_default',
+        ),
+        pytest.param(
+            AddRequestsTestInput(
+                start_url=STRATEGY_TEST_URLS[3],
+                loaded_url=STRATEGY_TEST_URLS[0],
+                requests=STRATEGY_TEST_URLS,
+                kwargs=EnqueueLinksKwargs(strategy='all'),
+                expected_urls=STRATEGY_TEST_URLS[:3] + STRATEGY_TEST_URLS[4:],
+            ),
+            id='redirect_enqueue_strategy_all',
+        ),
+        pytest.param(
+            AddRequestsTestInput(
+                start_url=STRATEGY_TEST_URLS[3],
+                loaded_url=STRATEGY_TEST_URLS[0],
+                requests=STRATEGY_TEST_URLS,
+                kwargs=EnqueueLinksKwargs(strategy='same-domain'),
+                expected_urls=STRATEGY_TEST_URLS[:3],
+            ),
+            id='redirect_enqueue_strategy_same_domain',
+        ),
+        pytest.param(
+            AddRequestsTestInput(
+                start_url=STRATEGY_TEST_URLS[3],
+                loaded_url=STRATEGY_TEST_URLS[0],
+                requests=STRATEGY_TEST_URLS,
+                kwargs=EnqueueLinksKwargs(strategy='same-hostname'),
+                expected_urls=[],
+            ),
+            id='redirect_enqueue_strategy_same_hostname',
+        ),
+        pytest.param(
+            AddRequestsTestInput(
+                start_url=STRATEGY_TEST_URLS[3],
+                loaded_url=STRATEGY_TEST_URLS[0],
                 requests=STRATEGY_TEST_URLS,
                 kwargs=EnqueueLinksKwargs(strategy='same-origin'),
                 expected_urls=[],
             ),
-            id='enqueue_strategy_5',
+            id='redirect_enqueue_strategy_same_origin',
         ),
         # Include/exclude
         pytest.param(
             AddRequestsTestInput(
                 start_url=INCLUDE_TEST_URLS[0],
+                loaded_url=INCLUDE_TEST_URLS[0],
                 requests=INCLUDE_TEST_URLS,
                 kwargs=EnqueueLinksKwargs(include=[Glob('https://someplace.com/**/cats')]),
                 expected_urls=[INCLUDE_TEST_URLS[1], INCLUDE_TEST_URLS[4]],
@@ -432,6 +492,7 @@ INCLUDE_TEST_URLS = (
         pytest.param(
             AddRequestsTestInput(
                 start_url=INCLUDE_TEST_URLS[0],
+                loaded_url=INCLUDE_TEST_URLS[0],
                 requests=INCLUDE_TEST_URLS,
                 kwargs=EnqueueLinksKwargs(exclude=[Glob('https://someplace.com/**/cats')]),
                 expected_urls=[INCLUDE_TEST_URLS[2], INCLUDE_TEST_URLS[3]],
@@ -441,6 +502,7 @@ INCLUDE_TEST_URLS = (
         pytest.param(
             AddRequestsTestInput(
                 start_url=INCLUDE_TEST_URLS[0],
+                loaded_url=INCLUDE_TEST_URLS[0],
                 requests=INCLUDE_TEST_URLS,
                 kwargs=EnqueueLinksKwargs(
                     include=[Glob('https://someplace.com/**/cats')], exclude=[Glob('https://**/archive/**')]
@@ -458,6 +520,8 @@ async def test_enqueue_strategy(test_input: AddRequestsTestInput) -> None:
 
     @crawler.router.handler('start')
     async def start_handler(context: BasicCrawlingContext) -> None:
+        # Assign test value to loaded_url - BasicCrawler does not do any navigation by itself
+        context.request.loaded_url = test_input.loaded_url
         await context.add_requests(
             test_input.requests,
             **test_input.kwargs,
@@ -551,7 +615,7 @@ async def test_crawler_get_storages() -> None:
     assert isinstance(kvs, KeyValueStore)
 
 
-async def test_crawler_run_requests(httpbin: URL) -> None:
+async def test_crawler_run_requests() -> None:
     crawler = BasicCrawler()
     seen_urls = list[str]()
 
@@ -560,9 +624,9 @@ async def test_crawler_run_requests(httpbin: URL) -> None:
         seen_urls.append(context.request.url)
 
     start_urls = [
-        str(httpbin / '1'),
-        str(httpbin / '2'),
-        str(httpbin / '3'),
+        'http://test.io/1',
+        'http://test.io/2',
+        'http://test.io/3',
     ]
     stats = await crawler.run(start_urls)
 
@@ -571,7 +635,7 @@ async def test_crawler_run_requests(httpbin: URL) -> None:
     assert stats.requests_finished == 3
 
 
-async def test_context_push_and_get_data(httpbin: URL) -> None:
+async def test_context_push_and_get_data() -> None:
     crawler = BasicCrawler()
     dataset = await Dataset.open()
 
@@ -585,7 +649,7 @@ async def test_context_push_and_get_data(httpbin: URL) -> None:
     await dataset.push_data('{"c": 3}')
     assert (await crawler.get_data()).items == [{'a': 1}, {'c': 3}]
 
-    stats = await crawler.run([str(httpbin / '1')])
+    stats = await crawler.run(['http://test.io/1'])
 
     assert (await crawler.get_data()).items == [{'a': 1}, {'c': 3}, {'b': 2}]
     assert stats.requests_total == 1
@@ -626,7 +690,7 @@ async def test_crawler_push_and_export_data(tmp_path: Path) -> None:
     assert (tmp_path / 'dataset.csv').read_bytes() == b'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
 
 
-async def test_context_push_and_export_data(httpbin: URL, tmp_path: Path) -> None:
+async def test_context_push_and_export_data(tmp_path: Path) -> None:
     crawler = BasicCrawler()
 
     @crawler.router.default_handler
@@ -634,7 +698,7 @@ async def test_context_push_and_export_data(httpbin: URL, tmp_path: Path) -> Non
         await context.push_data([{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}])
         await context.push_data({'id': 2, 'test': 'test'})
 
-    await crawler.run([str(httpbin / '1')])
+    await crawler.run(['http://test.io/1'])
 
     await crawler.export_data_json(path=tmp_path / 'dataset.json')
     await crawler.export_data_csv(path=tmp_path / 'dataset.csv')
@@ -648,7 +712,7 @@ async def test_context_push_and_export_data(httpbin: URL, tmp_path: Path) -> Non
     assert (tmp_path / 'dataset.csv').read_bytes() == b'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
 
 
-async def test_crawler_push_and_export_data_and_json_dump_parameter(httpbin: URL, tmp_path: Path) -> None:
+async def test_crawler_push_and_export_data_and_json_dump_parameter(tmp_path: Path) -> None:
     crawler = BasicCrawler()
 
     @crawler.router.default_handler
@@ -656,7 +720,7 @@ async def test_crawler_push_and_export_data_and_json_dump_parameter(httpbin: URL
         await context.push_data([{'id': 0, 'test': 'test'}, {'id': 1, 'test': 'test'}])
         await context.push_data({'id': 2, 'test': 'test'})
 
-    await crawler.run([str(httpbin / '1')])
+    await crawler.run(['http://test.io/1'])
 
     await crawler.export_data_json(path=tmp_path / 'dataset.json', indent=3)
 
@@ -758,13 +822,13 @@ async def test_context_handlers_use_state(key_value_store: KeyValueStore) -> Non
     assert (await store.get_value(BasicCrawler._CRAWLEE_STATE_KEY)) == {'hello': 'last_world'}
 
 
-async def test_max_requests_per_crawl(httpbin: URL) -> None:
+async def test_max_requests_per_crawl() -> None:
     start_urls = [
-        str(httpbin / '1'),
-        str(httpbin / '2'),
-        str(httpbin / '3'),
-        str(httpbin / '4'),
-        str(httpbin / '5'),
+        'http://test.io/1',
+        'http://test.io/2',
+        'http://test.io/3',
+        'http://test.io/4',
+        'http://test.io/5',
     ]
     processed_urls = []
 
@@ -786,7 +850,7 @@ async def test_max_requests_per_crawl(httpbin: URL) -> None:
     assert stats.requests_finished == 3
 
 
-async def test_max_crawl_depth(httpbin: URL) -> None:
+async def test_max_crawl_depth() -> None:
     processed_urls = []
 
     # Set max_concurrency to 1 to ensure testing max_requests_per_crawl accurately
@@ -889,11 +953,20 @@ async def test_respects_no_persist_storage() -> None:
 
 
 @pytest.mark.skipif(os.name == 'nt' and 'CI' in os.environ, reason='Skipped in Windows CI')
-async def test_logs_final_statistics(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+@pytest.mark.parametrize(
+    ('statistics_log_format'),
+    [
+        pytest.param('table', id='With table for logs'),
+        pytest.param('inline', id='With inline logs'),
+    ],
+)
+async def test_logs_final_statistics(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, statistics_log_format: Literal['table', 'inline']
+) -> None:
     # Set the log level to INFO to capture the final statistics log.
     caplog.set_level(logging.INFO)
 
-    crawler = BasicCrawler(configure_logging=False)
+    crawler = BasicCrawler(configure_logging=False, statistics_log_format=statistics_log_format)
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
@@ -923,29 +996,44 @@ async def test_logs_final_statistics(monkeypatch: pytest.MonkeyPatch, caplog: py
     )
 
     assert final_statistics is not None
-    assert final_statistics.msg.splitlines() == [
-        'Final request statistics:',
-        '┌───────────────────────────────┬───────────┐',
-        '│ requests_finished             │ 4         │',
-        '│ requests_failed               │ 33        │',
-        '│ retry_histogram               │ [1, 4, 8] │',
-        '│ request_avg_failed_duration   │ 99.0      │',
-        '│ request_avg_finished_duration │ 0.483     │',
-        '│ requests_finished_per_minute  │ 0.33      │',
-        '│ requests_failed_per_minute    │ 0.1       │',
-        '│ request_total_duration        │ 720.0     │',
-        '│ requests_total                │ 37        │',
-        '│ crawler_runtime               │ 300.0     │',
-        '└───────────────────────────────┴───────────┘',
-    ]
+    if statistics_log_format == 'table':
+        assert final_statistics.msg.splitlines() == [
+            'Final request statistics:',
+            '┌───────────────────────────────┬───────────┐',
+            '│ requests_finished             │ 4         │',
+            '│ requests_failed               │ 33        │',
+            '│ retry_histogram               │ [1, 4, 8] │',
+            '│ request_avg_failed_duration   │ 99.0      │',
+            '│ request_avg_finished_duration │ 0.483     │',
+            '│ requests_finished_per_minute  │ 0.33      │',
+            '│ requests_failed_per_minute    │ 0.1       │',
+            '│ request_total_duration        │ 720.0     │',
+            '│ requests_total                │ 37        │',
+            '│ crawler_runtime               │ 300.0     │',
+            '└───────────────────────────────┴───────────┘',
+        ]
+    else:
+        assert final_statistics.msg == 'Final request statistics:'
+
+        # ignore[attr-defined] since `extra` parameters are not defined for `LogRecord`
+        assert final_statistics.requests_finished == 4  # type: ignore[attr-defined]
+        assert final_statistics.requests_failed == 33  # type: ignore[attr-defined]
+        assert final_statistics.retry_histogram == [1, 4, 8]  # type: ignore[attr-defined]
+        assert final_statistics.request_avg_failed_duration == 99.0  # type: ignore[attr-defined]
+        assert final_statistics.request_avg_finished_duration == 0.483  # type: ignore[attr-defined]
+        assert final_statistics.requests_finished_per_minute == 0.33  # type: ignore[attr-defined]
+        assert final_statistics.requests_failed_per_minute == 0.1  # type: ignore[attr-defined]
+        assert final_statistics.request_total_duration == 720.0  # type: ignore[attr-defined]
+        assert final_statistics.requests_total == 37  # type: ignore[attr-defined]
+        assert final_statistics.crawler_runtime == 300.0  # type: ignore[attr-defined]
 
 
-async def test_crawler_manual_stop(httpbin: URL) -> None:
+async def test_crawler_manual_stop() -> None:
     """Test that no new requests are handled after crawler.stop() is called."""
     start_urls = [
-        str(httpbin / '1'),
-        str(httpbin / '2'),
-        str(httpbin / '3'),
+        'http://test.io/1',
+        'http://test.io/2',
+        'http://test.io/3',
     ]
     processed_urls = []
 
@@ -967,13 +1055,13 @@ async def test_crawler_manual_stop(httpbin: URL) -> None:
 
 
 @pytest.mark.skipif(sys.version_info[:3] < (3, 11), reason='asyncio.Barrier was introduced in Python 3.11.')
-async def test_crawler_multiple_stops_in_parallel(httpbin: URL) -> None:
+async def test_crawler_multiple_stops_in_parallel() -> None:
     """Test that no new requests are handled after crawler.stop() is called, but ongoing requests can still finish."""
 
     start_urls = [
-        str(httpbin / '1'),
-        str(httpbin / '2'),
-        str(httpbin / '3'),
+        'http://test.io/1',
+        'http://test.io/2',
+        'http://test.io/3',
     ]
     processed_urls = []
 
@@ -1016,7 +1104,7 @@ async def test_sets_services() -> None:
     assert service_locator.get_storage_client() is custom_storage_client
 
     dataset = await crawler.get_dataset(name='test')
-    assert cast(DatasetClient, dataset._resource_client)._memory_storage_client is custom_storage_client
+    assert cast('DatasetClient', dataset._resource_client)._memory_storage_client is custom_storage_client
 
 
 async def test_allows_storage_client_overwrite_before_run(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1040,7 +1128,7 @@ async def test_allows_storage_client_overwrite_before_run(monkeypatch: pytest.Mo
         assert spy.call_count >= 1
 
     dataset = await crawler.get_dataset()
-    assert cast(DatasetClient, dataset._resource_client)._memory_storage_client is other_storage_client
+    assert cast('DatasetClient', dataset._resource_client)._memory_storage_client is other_storage_client
 
     data = await dataset.get_data()
     assert data.items == [{'foo': 'bar'}]
@@ -1061,7 +1149,7 @@ async def test_context_use_state_race_condition_in_handlers(key_value_store: Key
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        state = cast(dict[str, int], await context.use_state())
+        state = cast('dict[str, int]', await context.use_state())
         await handler_barrier.wait()  # Block until both handlers get the state.
         state['counter'] += 1
         await handler_barrier.wait()  # Block until both handlers increment the state.
@@ -1074,6 +1162,7 @@ async def test_context_use_state_race_condition_in_handlers(key_value_store: Key
     assert (await store.get_value(BasicCrawler._CRAWLEE_STATE_KEY))['counter'] == 2
 
 
+@pytest.mark.run_alone
 @pytest.mark.skipif(sys.version_info[:3] < (3, 11), reason='asyncio.timeout was introduced in Python 3.11.')
 @pytest.mark.parametrize(
     'sleep_type',
@@ -1194,3 +1283,137 @@ async def test_session_retire_in_user_handler(*, retire: bool) -> None:
         assert sessions[1] != sessions[0]
     else:
         assert sessions[1] == sessions[0]
+
+
+async def test_bound_session_to_request() -> None:
+    async with SessionPool() as session_pool:
+        check_session: Session = await session_pool.get_session()
+        used_sessions = list[str]()
+        crawler = BasicCrawler(session_pool=session_pool)
+
+        @crawler.router.default_handler
+        async def handler(context: BasicCrawlingContext) -> None:
+            if context.session:
+                used_sessions.append(context.session.id)
+
+        requests = [
+            Request.from_url('http://a.com/', session_id=check_session.id, always_enqueue=True) for _ in range(10)
+        ]
+
+        await crawler.run(requests)
+
+        assert len(used_sessions) == 10
+        assert set(used_sessions) == {check_session.id}
+
+
+async def test_bound_sessions_to_same_request() -> None:
+    # Use a custom function to avoid errors due to random Session retrieval
+    def create_session_function() -> Callable[[], Session]:
+        counter = -1
+
+        def create_session() -> Session:
+            nonlocal counter
+            counter += 1
+            return Session(id=str(counter))
+
+        return create_session
+
+    check_sessions = [str(session_id) for session_id in range(10)]
+    used_sessions = list[str]()
+    crawler = BasicCrawler(session_pool=SessionPool(create_session_function=create_session_function()))
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        if context.session:
+            used_sessions.append(context.session.id)
+
+    requests = [
+        Request.from_url('http://a.com/', session_id=str(session_id), use_extended_unique_key=True)
+        for session_id in range(10)
+    ]
+
+    await crawler.run(requests)
+
+    assert len(used_sessions) == 10
+    assert set(used_sessions) == set(check_sessions)
+
+
+async def test_error_bound_session_to_request() -> None:
+    crawler = BasicCrawler(request_handler=AsyncMock())
+
+    requests = [Request.from_url('http://a.com/', session_id='1', always_enqueue=True) for _ in range(10)]
+
+    stats = await crawler.run(requests)
+
+    assert stats.requests_total == 10
+    assert stats.requests_failed == 10
+    assert stats.retry_histogram == [10]
+
+
+async def test_handle_error_bound_session_to_request() -> None:
+    error_handler_mock = AsyncMock()
+    crawler = BasicCrawler(request_handler=AsyncMock())
+
+    @crawler.failed_request_handler
+    async def error_req_hook(context: BasicCrawlingContext, error: Exception) -> None:
+        if isinstance(error, RequestCollisionError):
+            await error_handler_mock(context, error)
+
+    requests = [Request.from_url('http://a.com/', session_id='1')]
+
+    await crawler.run(requests)
+
+    assert error_handler_mock.call_count == 1
+
+
+async def test_handles_session_error_in_failed_request_handler() -> None:
+    crawler = BasicCrawler(max_session_rotations=1)
+    handler_requests = set()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        raise SessionError('blocked')
+
+    @crawler.failed_request_handler
+    async def failed_request_handler(context: BasicCrawlingContext, error: Exception) -> None:
+        handler_requests.add(context.request.url)
+
+    requests = ['http://a.com/', 'http://b.com/', 'http://c.com/']
+
+    await crawler.run(requests)
+
+    assert set(requests) == handler_requests
+
+
+async def test_lock_with_get_robots_txt_file_for_url(server_url: URL) -> None:
+    crawler = BasicCrawler(respect_robots_txt_file=True)
+
+    with patch('crawlee.crawlers._basic._basic_crawler.RobotsTxtFile.find', wraps=RobotsTxtFile.find) as spy:
+        await asyncio.gather(
+            *[asyncio.create_task(crawler._get_robots_txt_file_for_url(str(server_url))) for _ in range(10)]
+        )
+
+        # Check that the lock was acquired only once
+        assert spy.call_count == 1
+
+
+async def test_reduced_logs_from_timed_out_request_handler(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO)
+    crawler = BasicCrawler(configure_logging=False, request_handler_timeout=timedelta(seconds=1))
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        await asyncio.sleep(10)  # INJECTED DELAY
+
+    await crawler.run([Request.from_url('http://a.com/')])
+
+    for record in caplog.records:
+        if record.funcName == '_handle_failed_request':
+            full_message = (record.message or '') + (record.exc_text or '')
+            assert Counter(full_message)['\n'] < 10
+            assert '# INJECTED DELAY' in full_message
+            break
+    else:
+        raise AssertionError('Expected log message about request handler error was not found.')

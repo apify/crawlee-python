@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from abc import ABC
 from typing import TYPE_CHECKING, Any, Callable, Generic
 
+from more_itertools import partition
 from pydantic import ValidationError
 from typing_extensions import TypeVar
 
 from crawlee._request import Request, RequestOptions
 from crawlee._utils.docs import docs_group
-from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
+from crawlee._utils.urls import to_absolute_url_iterator
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
 from crawlee.statistics import StatisticsState
@@ -17,12 +19,12 @@ from crawlee.statistics import StatisticsState
 from ._http_crawling_context import HttpCrawlingContext, ParsedHttpCrawlingContext, TParseResult, TSelectResult
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Awaitable
+    from collections.abc import AsyncGenerator, Awaitable, Iterator
 
     from typing_extensions import Unpack
 
     from crawlee import RequestTransformAction
-    from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, EnqueueLinksKwargs
+    from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, ExtractLinksFunction
 
     from ._abstract_http_parser import AbstractHttpParser
 
@@ -71,11 +73,11 @@ class AbstractHttpCrawler(
         cls,
         static_parser: AbstractHttpParser[TParseResult, TSelectResult],
     ) -> type[AbstractHttpCrawler[ParsedHttpCrawlingContext[TParseResult], TParseResult, TSelectResult]]:
-        """Convenience class factory that creates specific version of `AbstractHttpCrawler` class.
+        """Create a specific version of `AbstractHttpCrawler` class.
 
-        In general typing sense two generic types of `AbstractHttpCrawler` do not have to be dependent on each other.
-        This is convenience constructor for specific cases when `TParseResult` is used to specify both generic
-        parameters in `AbstractHttpCrawler`.
+        This is a convenience factory method for creating a specific `AbstractHttpCrawler` subclass.
+        While `AbstractHttpCrawler` allows its two generic parameters to be independent,
+        this method simplifies cases where `TParseResult` is used for both generic parameters.
         """
 
         class _ParsedHttpCrawler(
@@ -124,26 +126,28 @@ class AbstractHttpCrawler(
             The original crawling context enhanced by the parsing result and enqueue links function.
         """
         parsed_content = await self._parser.parse(context.http_response)
+        extract_links = self._create_extract_links_function(context, parsed_content)
         yield ParsedHttpCrawlingContext.from_http_crawling_context(
             context=context,
             parsed_content=parsed_content,
-            enqueue_links=self._create_enqueue_links_function(context, parsed_content),
+            enqueue_links=self._create_enqueue_links_function(context, extract_links),
+            extract_links=extract_links,
         )
 
-    def _create_enqueue_links_function(
+    def _create_extract_links_function(
         self, context: HttpCrawlingContext, parsed_content: TParseResult
-    ) -> EnqueueLinksFunction:
-        """Create a callback function for extracting links from parsed content and enqueuing them to the crawl.
+    ) -> ExtractLinksFunction:
+        """Create a callback function for extracting links from parsed content.
 
         Args:
             context: The current crawling context.
             parsed_content: The parsed http response.
 
         Returns:
-            Awaitable that is used for extracting links from parsed content and enqueuing them to the crawl.
+            Awaitable that is used for extracting links from parsed content.
         """
 
-        async def enqueue_links(
+        async def extract_links(
             *,
             selector: str = 'a',
             label: str | None = None,
@@ -151,18 +155,24 @@ class AbstractHttpCrawler(
             transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
             | None = None,
             **kwargs: Unpack[EnqueueLinksKwargs],
-        ) -> None:
-            kwargs.setdefault('strategy', 'same-hostname')
-
+        ) -> list[Request]:
             requests = list[Request]()
+
             base_user_data = user_data or {}
 
-            for link in self._parser.find_links(parsed_content, selector=selector):
-                url = link
-                if not is_url_absolute(url):
-                    base_url = context.request.loaded_url or context.request.url
-                    url = convert_to_absolute_url(base_url, url)
+            robots_txt_file = await self._get_robots_txt_file_for_url(context.request.url)
 
+            kwargs.setdefault('strategy', 'same-hostname')
+
+            links_iterator: Iterator[str] = iter(self._parser.find_links(parsed_content, selector=selector))
+            links_iterator = to_absolute_url_iterator(context.request.loaded_url or context.request.url, links_iterator)
+
+            if robots_txt_file:
+                skipped, links_iterator = partition(lambda url: robots_txt_file.is_allowed(url), links_iterator)
+            else:
+                skipped = iter([])
+
+            for url in self._enqueue_links_filter_iterator(links_iterator, context.request.url, **kwargs):
                 request_options = RequestOptions(url=url, user_data={**base_user_data}, label=label)
 
                 if transform_request_function:
@@ -184,9 +194,14 @@ class AbstractHttpCrawler(
 
                 requests.append(request)
 
-            await context.add_requests(requests, **kwargs)
+            skipped_tasks = [
+                asyncio.create_task(self._handle_skipped_request(request, 'robots_txt')) for request in skipped
+            ]
+            await asyncio.gather(*skipped_tasks)
 
-        return enqueue_links
+            return requests
+
+        return extract_links
 
     async def _make_http_request(self, context: BasicCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
         """Make http request and create context enhanced by HTTP response.

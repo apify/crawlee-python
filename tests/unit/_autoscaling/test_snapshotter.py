@@ -9,7 +9,7 @@ import pytest
 
 from crawlee import service_locator
 from crawlee._autoscaling import Snapshotter
-from crawlee._autoscaling._types import CpuSnapshot, EventLoopSnapshot, Snapshot
+from crawlee._autoscaling._types import ClientSnapshot, CpuSnapshot, EventLoopSnapshot, Snapshot
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.system import CpuInfo, MemoryInfo
 from crawlee.configuration import Configuration
@@ -66,6 +66,13 @@ def test_snapshot_event_loop(snapshotter: Snapshotter) -> None:
 def test_snapshot_client(snapshotter: Snapshotter) -> None:
     snapshotter._snapshot_client()
     assert len(snapshotter._client_snapshots) == 1
+
+
+def test_snapshot_client_overloaded() -> None:
+    assert not ClientSnapshot(error_count=1, new_error_count=1, max_error_count=2).is_overloaded
+    assert not ClientSnapshot(error_count=2, new_error_count=1, max_error_count=2).is_overloaded
+    assert not ClientSnapshot(error_count=4, new_error_count=2, max_error_count=2).is_overloaded
+    assert ClientSnapshot(error_count=7, new_error_count=3, max_error_count=2).is_overloaded
 
 
 async def test_get_cpu_sample(snapshotter: Snapshotter) -> None:
@@ -148,7 +155,7 @@ def test_snapshot_pruning_removes_outdated_records(snapshotter: Snapshotter) -> 
     snapshotter._cpu_snapshots = snapshots
 
     # Prune snapshots older than 2 hours
-    snapshots_casted = cast(list[Snapshot], snapshotter._cpu_snapshots)
+    snapshots_casted = cast('list[Snapshot]', snapshotter._cpu_snapshots)
     snapshotter._prune_snapshots(snapshots_casted, now)
 
     # Check that only the last two snapshots remain
@@ -160,7 +167,7 @@ def test_snapshot_pruning_removes_outdated_records(snapshotter: Snapshotter) -> 
 def test_pruning_empty_snapshot_list_remains_empty(snapshotter: Snapshotter) -> None:
     now = datetime.now(timezone.utc)
     snapshotter._cpu_snapshots = Snapshotter._get_sorted_list_by_created_at(list[CpuSnapshot]())
-    snapshots_casted = cast(list[Snapshot], snapshotter._cpu_snapshots)
+    snapshots_casted = cast('list[Snapshot]', snapshotter._cpu_snapshots)
     snapshotter._prune_snapshots(snapshots_casted, now)
     assert snapshotter._cpu_snapshots == []
 
@@ -184,7 +191,7 @@ def test_snapshot_pruning_keeps_recent_records_unaffected(snapshotter: Snapshott
     snapshotter._cpu_snapshots = snapshots
 
     # Prune snapshots older than 2 hours
-    snapshots_casted = cast(list[Snapshot], snapshotter._cpu_snapshots)
+    snapshots_casted = cast('list[Snapshot]', snapshotter._cpu_snapshots)
     snapshotter._prune_snapshots(snapshots_casted, now)
 
     # Check that only the last two snapshots remain

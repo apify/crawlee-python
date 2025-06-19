@@ -58,6 +58,9 @@ class CrawleeRequestData(BaseModel):
     crawl_depth: Annotated[int, Field(alias='crawlDepth')] = 0
     """The depth of the request in the crawl tree."""
 
+    session_id: Annotated[str | None, Field()] = None
+    """ID of a session to which the request is bound."""
+
 
 class UserData(BaseModel, MutableMapping[str, JsonSerializable]):
     """Represents the `user_data` part of a Request.
@@ -84,6 +87,7 @@ class UserData(BaseModel, MutableMapping[str, JsonSerializable]):
                 raise ValueError('`label` must be str or None')
 
             self.label = value
+
         self.__pydantic_extra__[key] = value
 
     def __delitem__(self, key: str) -> None:
@@ -119,6 +123,7 @@ class RequestOptions(TypedDict):
     headers: NotRequired[HttpHeaders | dict[str, str] | None]
     payload: NotRequired[HttpPayload | str | None]
     label: NotRequired[str | None]
+    session_id: NotRequired[str | None]
     unique_key: NotRequired[str | None]
     id: NotRequired[str | None]
     keep_url_fragment: NotRequired[bool]
@@ -227,6 +232,7 @@ class Request(BaseModel):
         headers: HttpHeaders | dict[str, str] | None = None,
         payload: HttpPayload | str | None = None,
         label: str | None = None,
+        session_id: str | None = None,
         unique_key: str | None = None,
         id: str | None = None,
         keep_url_fragment: bool = False,
@@ -248,14 +254,17 @@ class Request(BaseModel):
             payload: The data to be sent as the request body. Typically used with 'POST' or 'PUT' requests.
             label: A custom label to differentiate between request types. This is stored in `user_data`, and it is
                 used for request routing (different requests go to different handlers).
+            session_id: ID of a specific `Session` to which the request will be strictly bound.
+                If the session becomes unavailable when the request is processed, a `RequestCollisionError` will be
+                raised.
             unique_key: A unique key identifying the request. If not provided, it is automatically computed based on
                 the URL and other parameters. Requests with the same `unique_key` are treated as identical.
             id: A unique identifier for the request. If not provided, it is automatically generated from the
                 `unique_key`.
             keep_url_fragment: Determines whether the URL fragment (e.g., `#section`) should be included in
                 the `unique_key` computation. This is only relevant when `unique_key` is not provided.
-            use_extended_unique_key: Determines whether to include the HTTP method and payload in the `unique_key`
-                computation. This is only relevant when `unique_key` is not provided.
+            use_extended_unique_key: Determines whether to include the HTTP method, ID Session and payload in the
+                `unique_key` computation. This is only relevant when `unique_key` is not provided.
             always_enqueue: If set to `True`, the request will be enqueued even if it is already present in the queue.
                 Using this is not allowed when a custom `unique_key` is also provided and will result in a `ValueError`.
             **kwargs: Additional request properties.
@@ -274,6 +283,7 @@ class Request(BaseModel):
             method=method,
             headers=headers,
             payload=payload,
+            session_id=session_id,
             keep_url_fragment=keep_url_fragment,
             use_extended_unique_key=use_extended_unique_key,
         )
@@ -296,6 +306,9 @@ class Request(BaseModel):
         if label is not None:
             request.user_data['label'] = label
 
+        if session_id is not None:
+            request.crawlee_data.session_id = session_id
+
         return request
 
     def get_query_param_from_url(self, param: str, *, default: str | None = None) -> str | None:
@@ -306,12 +319,17 @@ class Request(BaseModel):
     @property
     def label(self) -> str | None:
         """A string used to differentiate between arbitrary request types."""
-        return cast(UserData, self.user_data).label
+        return cast('UserData', self.user_data).label
+
+    @property
+    def session_id(self) -> str | None:
+        """The ID of the bound session, if there is any."""
+        return self.crawlee_data.session_id
 
     @property
     def crawlee_data(self) -> CrawleeRequestData:
         """Crawlee-specific configuration stored in the `user_data`."""
-        user_data = cast(UserData, self.user_data)
+        user_data = cast('UserData', self.user_data)
         if user_data.crawlee_data is None:
             user_data.crawlee_data = CrawleeRequestData()
 
