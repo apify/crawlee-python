@@ -43,7 +43,7 @@ class RequestProcessingRecord:
         if self._last_run_at_ns is None:
             raise RuntimeError('Invalid state')
 
-        self.duration = timedelta(microseconds=(time.perf_counter_ns() - self._last_run_at_ns) / 1000)
+        self.duration = timedelta(microseconds=math.ceil((time.perf_counter_ns() - self._last_run_at_ns) / 1000))
         return self.duration
 
     @property
