@@ -6,10 +6,11 @@ from pydantic import BaseModel
 
 from crawlee import service_locator
 from crawlee.events._types import Event, EventPersistStateData
-from crawlee.storages._key_value_store import KeyValueStore
 
 if TYPE_CHECKING:
     import logging
+
+    from crawlee.storages._key_value_store import KeyValueStore
 
 TStateModel = TypeVar('TStateModel', bound=BaseModel)
 
@@ -59,7 +60,7 @@ class RecoverableState(Generic[TStateModel]):
         self._persist_state_key = persist_state_key
         self._persist_state_kvs_name = persist_state_kvs_name
         self._persist_state_kvs_id = persist_state_kvs_id
-        self._key_value_store: KeyValueStore | None = None
+        self._key_value_store: 'KeyValueStore | None' = None  # noqa: UP037
         self._log = logger
 
     async def initialize(self) -> TStateModel:
@@ -74,6 +75,9 @@ class RecoverableState(Generic[TStateModel]):
         if not self._persistence_enabled:
             self._state = self._default_state.model_copy(deep=True)
             return self.current_value
+
+        # Import here to avoid circular imports
+        from crawlee.storages._key_value_store import KeyValueStore
 
         self._key_value_store = await KeyValueStore.open(
             name=self._persist_state_kvs_name, id=self._persist_state_kvs_id

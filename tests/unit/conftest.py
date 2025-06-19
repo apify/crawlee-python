@@ -16,7 +16,7 @@ from crawlee import service_locator
 from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_network
 from crawlee.http_clients import CurlImpersonateHttpClient, HttpxHttpClient
 from crawlee.proxy_configuration import ProxyInfo
-from crawlee.storages import Dataset, KeyValueStore, RequestQueue
+from crawlee.storages import KeyValueStore
 from tests.unit.server import TestServer, app, serve_in_thread
 
 if TYPE_CHECKING:
@@ -61,24 +61,18 @@ def prepare_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callabl
         service_locator._configuration = None
         service_locator._event_manager = None
         service_locator._storage_client = None
+        service_locator._storage_instance_manager = None
+
+        # Reset the retrieval flags
+        service_locator._configuration_was_retrieved = False
+        service_locator._event_manager_was_retrieved = False
+        service_locator._storage_client_was_retrieved = False
 
         # Verify that the test environment was set up correctly.
         assert os.environ.get('CRAWLEE_STORAGE_DIR') == str(tmp_path)
         assert service_locator._configuration_was_retrieved is False
         assert service_locator._storage_client_was_retrieved is False
         assert service_locator._event_manager_was_retrieved is False
-
-        Dataset._cache_by_id.clear()
-        Dataset._cache_by_name.clear()
-        Dataset._default_instance = None
-
-        KeyValueStore._cache_by_id.clear()
-        KeyValueStore._cache_by_name.clear()
-        KeyValueStore._default_instance = None
-
-        RequestQueue._cache_by_id.clear()
-        RequestQueue._cache_by_name.clear()
-        RequestQueue._default_instance = None
 
     return _prepare_test_env
 

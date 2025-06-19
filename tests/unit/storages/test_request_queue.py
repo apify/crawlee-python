@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from crawlee import Request
+from crawlee import Request, service_locator
 from crawlee.configuration import Configuration
 from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient, StorageClient
 from crawlee.storages import RequestQueue
@@ -16,6 +16,8 @@ from crawlee.storages import RequestQueue
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
     from pathlib import Path
+
+    from crawlee.storage_clients import StorageClient
 
 
 @pytest.fixture(params=['memory', 'file_system'])
@@ -526,10 +528,9 @@ async def test_reopen_default(
     configuration: Configuration,
 ) -> None:
     """Test reopening the default request queue."""
-    # First clean up any class-level caches
-    RequestQueue._cache_by_id.clear()
-    RequestQueue._cache_by_name.clear()
-    RequestQueue._default_instance = None
+    # First clean up any storage instance caches
+    storage_instance_manager = service_locator.storage_instance_manager
+    storage_instance_manager.clear_cache()
 
     # Open the default request queue
     rq1 = await RequestQueue.open(

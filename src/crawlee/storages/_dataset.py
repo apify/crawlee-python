@@ -12,11 +12,10 @@ from crawlee._utils.file import export_csv_to_stream, export_json_to_stream
 
 from ._base import Storage
 from ._key_value_store import KeyValueStore
-from ._utils import open_storage_instance
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
-    from typing import Any, ClassVar, Literal
+    from typing import Any, Literal
 
     from typing_extensions import Unpack
 
@@ -66,15 +65,6 @@ class Dataset(Storage):
     ```
     """
 
-    _cache_by_id: ClassVar[dict[str, Dataset]] = {}
-    """A dictionary to cache datasets by ID."""
-
-    _cache_by_name: ClassVar[dict[str, Dataset]] = {}
-    """A dictionary to cache datasets by name."""
-
-    _default_instance: ClassVar[Dataset | None] = None
-    """Cache for the default dataset instance."""
-
     def __init__(self, client: DatasetClient) -> None:
         """Initialize a new instance.
 
@@ -112,25 +102,19 @@ class Dataset(Storage):
     ) -> Dataset:
         configuration = service_locator.get_configuration() if configuration is None else configuration
         storage_client = service_locator.get_storage_client() if storage_client is None else storage_client
-        return await open_storage_instance(
+
+        return await service_locator.storage_instance_manager.open_storage_instance(
             cls,
             id=id,
             name=name,
             configuration=configuration,
-            cache_by_id=cls._cache_by_id,
-            cache_by_name=cls._cache_by_name,
-            default_instance_attr='_default_instance',
             client_opener=storage_client.create_dataset_client,
         )
 
     @override
     async def drop(self) -> None:
-        if self.id in self._cache_by_id:
-            del self._cache_by_id[self.id]
-
-        if self.name in self._cache_by_name:
-            del self._cache_by_name[self.name]
-
+        storage_instance_manager = service_locator.storage_instance_manager
+        storage_instance_manager.remove_from_cache(self)
         await self._client.drop()
 
     @override

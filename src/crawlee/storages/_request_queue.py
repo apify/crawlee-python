@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from datetime import timedelta
 from logging import getLogger
-from typing import TYPE_CHECKING, ClassVar, TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 from typing_extensions import override
 
@@ -13,7 +13,6 @@ from crawlee._utils.wait import wait_for_all_tasks_for_finish
 from crawlee.request_loaders import RequestManager
 
 from ._base import Storage
-from ._utils import open_storage_instance
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -71,15 +70,6 @@ class RequestQueue(Storage, RequestManager):
     ```
     """
 
-    _cache_by_id: ClassVar[dict[str, RequestQueue]] = {}
-    """A dictionary to cache request queues by ID."""
-
-    _cache_by_name: ClassVar[dict[str, RequestQueue]] = {}
-    """A dictionary to cache request queues by name."""
-
-    _default_instance: ClassVar[RequestQueue | None] = None
-    """Cache for the default request queue instance."""
-
     def __init__(self, client: RequestQueueClient) -> None:
         """Initialize a new instance.
 
@@ -128,25 +118,20 @@ class RequestQueue(Storage, RequestManager):
     ) -> RequestQueue:
         configuration = service_locator.get_configuration() if configuration is None else configuration
         storage_client = service_locator.get_storage_client() if storage_client is None else storage_client
-        return await open_storage_instance(
+
+        return await service_locator.storage_instance_manager.open_storage_instance(
             cls,
             id=id,
             name=name,
             configuration=configuration,
-            cache_by_id=cls._cache_by_id,
-            cache_by_name=cls._cache_by_name,
-            default_instance_attr='_default_instance',
             client_opener=storage_client.create_rq_client,
         )
 
     @override
     async def drop(self) -> None:
         # Remove from cache before dropping
-        if self.id in self._cache_by_id:
-            del self._cache_by_id[self.id]
-
-        if self.name is not None and self.name in self._cache_by_name:
-            del self._cache_by_name[self.name]
+        storage_instance_manager = service_locator.storage_instance_manager
+        storage_instance_manager.remove_from_cache(self)
 
         await self._client.drop()
 

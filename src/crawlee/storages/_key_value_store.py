@@ -11,19 +11,20 @@ from typing_extensions import override
 from crawlee import service_locator
 from crawlee._types import JsonSerializable  # noqa: TC001
 from crawlee._utils.docs import docs_group
+from crawlee._utils.recoverable_state import RecoverableState
 from crawlee.storage_clients.models import KeyValueStoreMetadata
 
 from ._base import Storage
-from ._utils import open_storage_instance
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
-    from crawlee._utils.recoverable_state import RecoverableState
     from crawlee.configuration import Configuration
     from crawlee.storage_clients import StorageClient
     from crawlee.storage_clients._base import KeyValueStoreClient
     from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecordMetadata
+else:
+    from crawlee._utils.recoverable_state import RecoverableState
 
 T = TypeVar('T')
 
@@ -64,15 +65,6 @@ class KeyValueStore(Storage):
     product = await kvs.get_value('product-1234')
     ```
     """
-
-    _cache_by_id: ClassVar[dict[str, KeyValueStore]] = {}
-    """A dictionary to cache key-value stores by ID."""
-
-    _cache_by_name: ClassVar[dict[str, KeyValueStore]] = {}
-    """A dictionary to cache key-value stores by name."""
-
-    _default_instance: ClassVar[KeyValueStore | None] = None
-    """Cache for the default key-value store instance."""
 
     _autosaved_values: ClassVar[
         dict[
@@ -120,23 +112,19 @@ class KeyValueStore(Storage):
     ) -> KeyValueStore:
         configuration = service_locator.get_configuration() if configuration is None else configuration
         storage_client = service_locator.get_storage_client() if storage_client is None else storage_client
-        return await open_storage_instance(
+
+        return await service_locator.storage_instance_manager.open_storage_instance(
             cls,
             id=id,
             name=name,
             configuration=configuration,
-            cache_by_id=cls._cache_by_id,
-            cache_by_name=cls._cache_by_name,
-            default_instance_attr='_default_instance',
             client_opener=storage_client.create_kvs_client,
         )
 
     @override
     async def drop(self) -> None:
-        if self.id in self._cache_by_id:
-            del self._cache_by_id[self.id]
-        if self.name is not None and self.name in self._cache_by_name:
-            del self._cache_by_name[self.name]
+        storage_instance_manager = service_locator.storage_instance_manager
+        storage_instance_manager.remove_from_cache(self)
 
         await self._clear_cache()  # Clear cache with persistent values.
         await self._client.drop()
@@ -259,8 +247,6 @@ class KeyValueStore(Storage):
         Returns:
             Return the value of the key.
         """
-        from crawlee._utils.recoverable_state import RecoverableState
-
         default_value = {} if default_value is None else default_value
 
         async with self._autosave_lock:
