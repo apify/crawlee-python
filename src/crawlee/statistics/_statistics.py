@@ -27,32 +27,26 @@ logger = getLogger(__name__)
 class RequestProcessingRecord:
     """Tracks information about the processing of a request."""
 
-    def __init__(self, id: str = 'NotSet') -> None:
-        self._last_run_at: datetime | None = None
-        self._last_run_at2: float | None = None
+    def __init__(self) -> None:
+        self._last_run_at_ns: int | None = None
         self._runs = 0
         self.duration: timedelta | None = None
-        self.id: str = id
 
     def run(self) -> int:
         """Mark the job as started."""
-        self._last_run_at = datetime.now(timezone.utc)
-        self._last_run_at2 = time.perf_counter()
+        self._last_run_at_ns = time.perf_counter_ns()
         self._runs += 1
         return self._runs
 
     def finish(self) -> timedelta:
         """Mark the job as finished."""
-        if self._last_run_at is None:
+        if self._last_run_at_ns is None:
             raise RuntimeError('Invalid state')
 
-        now = datetime.now(timezone.utc)
-        now2 = time.perf_counter()
-        self.duration = now - self._last_run_at
+        self.duration = timedelta(microseconds=(time.perf_counter_ns() - self._last_run_at_ns) / 1000)
         if self.duration == timedelta(seconds=0):
             raise RuntimeError(
-                f'Impossible state. The duration of a request cannot be zero. {now=}, {self._last_run_at=}, {now2=},'
-                f' {self._last_run_at2=} {self.id=}'
+                f'Impossible state. The duration of a request cannot be zero.'
             )
         return self.duration
 
@@ -214,7 +208,7 @@ class Statistics(Generic[TStatisticsState]):
     @ensure_context
     def record_request_processing_start(self, request_id_or_key: str) -> None:
         """Mark a request as started."""
-        record = self._requests_in_progress.get(request_id_or_key, RequestProcessingRecord(id=request_id_or_key))
+        record = self._requests_in_progress.get(request_id_or_key, RequestProcessingRecord())
         record.run()
         self._requests_in_progress[request_id_or_key] = record
 
