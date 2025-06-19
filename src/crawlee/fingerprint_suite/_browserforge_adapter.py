@@ -63,15 +63,6 @@ class PatchedHeaderGenerator(bf_HeaderGenerator):
         This patched version of the method adds additional quality checks on the output of the original method. It tries
         to generate headers several times until they match the requirements.
 
-        The `browser` parameter accepts `chromium` as a general category, which includes not only Google Chrome
-        but also other Chromium-based browsers. As a result, a Safari-like user agent may be generated for a `chromium`
-        input, such as:
-        ```
-        Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko)
-         CriOS/130.0.6723.90 Mobile/15E148 Safari/604.1
-        ```
-        To maintain consistency with previous implementations, only a subset of Chromium headers will be allowed.
-
         Returns:
             A generated headers.
         """
@@ -136,15 +127,18 @@ class PatchedHeaderGenerator(bf_HeaderGenerator):
         Handling the original multitype would be pointlessly complex.
         """
         # In our case we never pass more than one browser type. In general case more browsers are just bigger pool to
-        # select from, so narrowing it to any of them is still a valid action.
+        # select from, so narrowing it to any of them is still a valid action as we are going to pick just one anyway.
 
         if isinstance(browser, Iterable):
-            return random.choice(
+            choice = random.choice(
                 [
                     single_browser if isinstance(single_browser, str) else single_browser.name
                     for single_browser in browser
                 ]
             )
+            if choice in {'chrome', 'firefox', 'safari', 'edge'}:
+                return choice
+            raise ValueError('Invalid browser type.')
         return None
 
 
