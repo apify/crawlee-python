@@ -36,7 +36,6 @@ dependencies = [
     "apify_fingerprint_datapoints>=0.0.2",
     "browserforge>=1.2.3",
     "cachetools>=5.5.0",
-    "certifi<=2025.1.31",  # Not a direct dependency. Temporarily pinned. Dependency can be removed after: https://github.com/apify/crawlee-python/issues/1182
     "colorama>=0.4.0",
     "eval-type-backport>=0.2.0",
     "httpx[brotli,http2,zstd]>=0.27.0",
@@ -94,19 +93,20 @@ crawlee = "crawlee._cli:cli"
 
 [dependency-groups]
 dev = [
-    "apify_client",  # For e2e tests.
-    "build~=1.2.2",  # For e2e tests.
+    "apify_client", # For e2e tests.
+    "build~=1.2.2", # For e2e tests.
+    "dycw-pytest-only~=2.1.0",
     "mypy~=1.16.0",
     "pre-commit~=4.2.0",
     "proxy-py~=2.4.0",
     "pydoc-markdown~=4.8.0",
     "pytest-asyncio~=1.0.0",
-    "pytest-cov~=6.1.0",
-    "pytest-only~=2.1.0",
+    "pytest-cov~=6.2.0",
+    "pytest-timeout~=2.4.0",
     "pytest-xdist~=3.7.0",
     "pytest~=8.4.0",
     "ruff~=0.11.0",
-    "setuptools",  # setuptools are used by pytest, but not explicitly required
+    "setuptools", # setuptools are used by pytest, but not explicitly required
     "sortedcontainers-stubs~=2.4.0",
     "types-beautifulsoup4~=4.12.0.20240229",
     "types-cachetools~=6.0.0.20250525",
@@ -212,6 +212,9 @@ addopts = "-ra"
 asyncio_default_fixture_loop_scope = "function"
 asyncio_mode = "auto"
 timeout = 1200
+markers = [
+    "run_alone: marks tests that must run in isolation",
+]
 
 [tool.mypy]
 python_version = "3.9"

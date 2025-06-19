@@ -670,6 +670,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 self._snapshotter,
                 self._statistics,
                 self._session_pool if self._use_session_pool else None,
+                self._http_client,
                 *self._additional_context_managers,
             )
             if cm and getattr(cm, 'active', False) is False
@@ -941,12 +942,25 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         """Filter requests based on the enqueue strategy and URL patterns."""
         limit = kwargs.get('limit')
         parsed_origin_url = urlparse(origin_url)
+        strategy = kwargs.get('strategy', 'all')
+
+        if strategy == 'all' and not parsed_origin_url.hostname:
+            self.log.warning(f'Skipping enqueue: Missing hostname in origin_url = {origin_url}.')
+            return
+
+        # Emit a `warning` message to the log, only once per call
+        warning_flag = True
 
         for request in request_iterator:
             target_url = request.url if isinstance(request, Request) else request
+            parsed_target_url = urlparse(target_url)
+
+            if warning_flag and strategy != 'all' and not parsed_target_url.hostname:
+                self.log.warning(f'Skipping enqueue url: Missing hostname in target_url = {target_url}.')
+                warning_flag = False
 
             if self._check_enqueue_strategy(
-                kwargs.get('strategy', 'all'), target_url=urlparse(target_url), origin_url=parsed_origin_url
+                strategy, target_url=parsed_target_url, origin_url=parsed_origin_url
             ) and self._check_url_patterns(target_url, kwargs.get('include'), kwargs.get('exclude')):
                 yield request
 
@@ -962,13 +976,20 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         origin_url: ParseResult,
     ) -> bool:
         """Check if a URL matches the enqueue_strategy."""
+        if strategy == 'all':
+            return True
+
+        if origin_url.hostname is None or target_url.hostname is None:
+            self.log.debug(
+                f'Skipping enqueue: Missing hostname in origin_url = {origin_url.geturl()} or '
+                f'target_url = {target_url.geturl()}'
+            )
+            return False
+
         if strategy == 'same-hostname':
             return target_url.hostname == origin_url.hostname
 
         if strategy == 'same-domain':
-            if origin_url.hostname is None or target_url.hostname is None:
-                raise ValueError('Both origin and target URLs must have a hostname')
-
             origin_domain = self._tld_extractor.extract_str(origin_url.hostname).domain
             target_domain = self._tld_extractor.extract_str(target_url.hostname).domain
             return origin_domain == target_domain
@@ -979,9 +1000,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 and target_url.scheme == origin_url.scheme
                 and target_url.port == origin_url.port
             )
-
-        if strategy == 'all':
-            return True
 
         assert_never(strategy)
 

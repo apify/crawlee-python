@@ -1162,6 +1162,7 @@ async def test_context_use_state_race_condition_in_handlers(key_value_store: Key
     assert (await store.get_value(BasicCrawler._CRAWLEE_STATE_KEY))['counter'] == 2
 
 
+@pytest.mark.run_alone
 @pytest.mark.skipif(sys.version_info[:3] < (3, 11), reason='asyncio.timeout was introduced in Python 3.11.')
 @pytest.mark.parametrize(
     'sleep_type',
