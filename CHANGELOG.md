@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 
 - Fix `ClientSnapshot` overload calculation ([#1228](https://github.com/apify/crawlee-python/pull/1228)) ([a4fc1b6](https://github.com/apify/crawlee-python/commit/a4fc1b6e83143650666108c289c084ea0463b80c)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1207](https://github.com/apify/crawlee-python/issues/1207)
 - Use `PSS` instead of `RSS` to estimate children process memory usage on Linux ([#1210](https://github.com/apify/crawlee-python/pull/1210)) ([436032f](https://github.com/apify/crawlee-python/commit/436032f2de5f7d7fa1016033f1bb224159a8e6bf)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1206](https://github.com/apify/crawlee-python/issues/1206)
+- Do not raise an error to check &#x27;same-domain&#x27; if there is no hostname in the url ([#1251](https://github.com/apify/crawlee-python/pull/1251)) ([a6c3aab](https://github.com/apify/crawlee-python/commit/a6c3aabf5f8341f215275077b6768a56118bc656)) by [@Mantisus](https://github.com/Mantisus)
 
 
 <!-- git-cliff-unreleased-end -->
