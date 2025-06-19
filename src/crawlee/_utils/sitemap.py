@@ -11,13 +11,15 @@ from typing import TYPE_CHECKING, Literal, TypedDict
 from xml.sax.expatreader import ExpatParser
 from xml.sax.handler import ContentHandler
 
-import httpx
 from typing_extensions import NotRequired, override
 from yarl import URL
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
     from xml.sax.xmlreader import AttributesImpl
+
+    from crawlee.http_clients import HttpClient
+    from crawlee.proxy_configuration import ProxyInfo
 
 logger = getLogger(__name__)
 
@@ -292,13 +294,15 @@ async def _process_raw_source(
 
 
 async def _fetch_and_process_sitemap(
-    client: httpx.AsyncClient,
+    http_client: HttpClient,
     source: SitemapSource,
     depth: int,
     visited_sitemap_urls: set[str],
     sources: list[SitemapSource],
     retries_left: int,
     *,
+    proxy_info: ProxyInfo | None = None,
+    timeout: timedelta | None = None,
     emit_nested_sitemaps: bool,
 ) -> AsyncGenerator[SitemapUrl | NestedSitemap, None]:
     """Fetch a sitemap from a URL and process its content."""
@@ -310,9 +314,9 @@ async def _fetch_and_process_sitemap(
     try:
         while retries_left > 0:
             retries_left -= 1
-            async with client.stream('GET', sitemap_url, headers=SITEMAP_HEADERS) as response:
-                response.raise_for_status()
-
+            async with http_client.stream(
+                sitemap_url, method='GET', headers=SITEMAP_HEADERS, proxy_info=proxy_info, timeout=timeout
+            ) as response:
                 # Determine content type and compression
                 content_type = response.headers.get('content-type', '')
 
@@ -322,7 +326,7 @@ async def _fetch_and_process_sitemap(
                 try:
                     # Process chunks as they arrive
                     first_chunk = True
-                    async for raw_chunk in response.aiter_bytes(chunk_size=8192):
+                    async for raw_chunk in response.read_stream():
                         # Check if the first chunk is a valid gzip header
                         if first_chunk and raw_chunk.startswith(b'\x1f\x8b'):
                             decompressor = zlib.decompressobj(zlib.MAX_WBITS | 16)
@@ -373,40 +377,45 @@ class Sitemap:
         return self._urls
 
     @classmethod
-    async def try_common_names(cls, url: str, proxy_url: str | None = None) -> Sitemap:
+    async def try_common_names(cls, url: str, http_client: HttpClient, proxy_info: ProxyInfo | None = None) -> Sitemap:
         base_url = URL(url)
         sitemap_urls = [str(base_url.with_path('/sitemap.xml')), str(base_url.with_path('/sitemap.txt'))]
-        return await cls.load(sitemap_urls, proxy_url)
+        return await cls.load(sitemap_urls, http_client, proxy_info)
 
     @classmethod
     async def load(
         cls,
         urls: str | list[str],
-        proxy_url: str | None = None,
+        http_client: HttpClient,
+        proxy_info: ProxyInfo | None = None,
         parse_sitemap_options: ParseSitemapOptions | None = None,
     ) -> Sitemap:
         if isinstance(urls, str):
             urls = [urls]
-        return await cls.parse([SitemapSource(type='url', url=url) for url in urls], proxy_url, parse_sitemap_options)
+        return await cls.parse(
+            [SitemapSource(type='url', url=url) for url in urls], http_client, proxy_info, parse_sitemap_options
+        )
 
     @classmethod
-    async def from_xml_string(cls, content: str, proxy_url: str | None = None) -> Sitemap:
-        return await cls.parse([SitemapSource(type='raw', content=content)], proxy_url)
+    async def from_xml_string(cls, content: str) -> Sitemap:
+        return await cls.parse([SitemapSource(type='raw', content=content)])
 
     @classmethod
     async def parse(
         cls,
         sources: list[SitemapSource],
-        proxy_url: str | None = None,
+        http_client: HttpClient | None = None,
+        proxy_info: ProxyInfo | None = None,
         parse_sitemap_options: ParseSitemapOptions | None = None,
     ) -> Sitemap:
-        urls = [item.loc async for item in parse_sitemap(sources, proxy_url, parse_sitemap_options)]
+        urls = [item.loc async for item in parse_sitemap(sources, http_client, proxy_info, parse_sitemap_options)]
         return cls(urls)
 
 
 async def parse_sitemap(
     initial_sources: list[SitemapSource],
-    proxy_url: str | None = None,
+    http_client: HttpClient | None = None,
+    proxy_info: ProxyInfo | None = None,
     options: ParseSitemapOptions | None = None,
 ) -> AsyncGenerator[SitemapUrl | NestedSitemap, None]:
     """Parse sitemap(s) and yield URLs found in them.
@@ -420,9 +429,6 @@ async def parse_sitemap(
     emit_nested_sitemaps = options.get('emit_nested_sitemaps', False)
     max_depth = options.get('max_depth', float('inf'))
     sitemap_retries = options.get('sitemap_retries', 3)
-    timeout = options.get('timeout', timedelta(seconds=30))
-
-    httpx_timeout = httpx.Timeout(None, connect=timeout.total_seconds()) if timeout else None
 
     # Setup working state
     sources = list(initial_sources)
@@ -447,18 +453,22 @@ async def parse_sitemap(
 
         elif source['type'] == 'url' and 'url' in source:
             # Add to visited set before processing to avoid duplicates
+            if http_client is None:
+                raise RuntimeError('HttpClient must be provided for URL-based sitemap sources.')
+
             visited_sitemap_urls.add(source['url'])
 
-            async with httpx.AsyncClient(timeout=httpx_timeout, proxy=proxy_url) as client:
-                async for result in _fetch_and_process_sitemap(
-                    client,
-                    source,
-                    depth,
-                    visited_sitemap_urls,
-                    sources,
-                    sitemap_retries,
-                    emit_nested_sitemaps=emit_nested_sitemaps,
-                ):
-                    yield result
+            async for result in _fetch_and_process_sitemap(
+                http_client,
+                source,
+                depth,
+                visited_sitemap_urls,
+                sources,
+                sitemap_retries,
+                emit_nested_sitemaps=emit_nested_sitemaps,
+                proxy_info=proxy_info,
+                timeout=options.get('timeout', timedelta(seconds=30)),
+            ):
+                yield result
         else:
             logger.warning(f'Invalid source configuration: {source}')

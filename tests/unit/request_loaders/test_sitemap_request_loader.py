@@ -3,6 +3,7 @@ import gzip
 
 from yarl import URL
 
+from crawlee.http_clients._base import HttpClient
 from crawlee.request_loaders._sitemap_request_loader import SitemapRequestLoader
 
 BASIC_SITEMAP = """
@@ -46,9 +47,9 @@ def encode_base64(data: bytes) -> str:
     return base64.b64encode(data).decode('utf-8')
 
 
-async def test_sitemap_traversal(server_url: URL) -> None:
+async def test_sitemap_traversal(server_url: URL, http_client: HttpClient) -> None:
     sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
-    sitemap_loader = SitemapRequestLoader([str(sitemap_url)])
+    sitemap_loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client)
 
     while not await sitemap_loader.is_finished():
         item = await sitemap_loader.fetch_next_request()
@@ -62,9 +63,9 @@ async def test_sitemap_traversal(server_url: URL) -> None:
     assert await sitemap_loader.get_handled_count() == 5
 
 
-async def test_is_empty_does_not_depend_on_fetch_next_request(server_url: URL) -> None:
+async def test_is_empty_does_not_depend_on_fetch_next_request(server_url: URL, http_client: HttpClient) -> None:
     sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
-    sitemap_loader = SitemapRequestLoader([str(sitemap_url)])
+    sitemap_loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client)
 
     items = []
 
@@ -84,9 +85,9 @@ async def test_is_empty_does_not_depend_on_fetch_next_request(server_url: URL) -
     assert await sitemap_loader.is_finished()
 
 
-async def test_abort_sitemap_loading(server_url: URL) -> None:
+async def test_abort_sitemap_loading(server_url: URL, http_client: HttpClient) -> None:
     sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
-    sitemap_loader = SitemapRequestLoader([str(sitemap_url)], max_buffer_size=2)
+    sitemap_loader = SitemapRequestLoader([str(sitemap_url)], max_buffer_size=2, http_client=http_client)
 
     item = await sitemap_loader.fetch_next_request()
     assert item is not None
