@@ -5,24 +5,23 @@ import os
 import uvicorn
 from litestar import Litestar, get
 
-from crawlee import service_locator
 from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext
-
-# highlight-start
-# Disable writing storage data to the file system
-configuration = service_locator.get_configuration()
-configuration.persist_storage = False
-configuration.write_metadata = False
-# highlight-end
+from crawlee.storage_clients import MemoryStorageClient
 
 
 @get('/')
 async def main() -> str:
     """The crawler entry point that will be called when the HTTP endpoint is accessed."""
+    # highlight-start
+    # Disable writing storage data to the file system
+    storage_client = MemoryStorageClient()
+    # highlight-end
+
     crawler = PlaywrightCrawler(
         headless=True,
         max_requests_per_crawl=10,
         browser_type='firefox',
+        storage_client=storage_client,
     )
 
     @crawler.router.default_handler

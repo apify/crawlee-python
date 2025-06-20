@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from crawlee._utils.docs import docs_group
 from crawlee.configuration import Configuration
 from crawlee.errors import ServiceConflictError
-from crawlee.events import EventManager
-from crawlee.storage_clients import StorageClient
+from crawlee.events import EventManager, LocalEventManager
+from crawlee.storage_clients import FileSystemStorageClient, StorageClient
+
+if TYPE_CHECKING:
+    from crawlee.storages._storage_instance_manager import StorageInstanceManager
 
 
 @docs_group('Classes')
@@ -18,6 +23,7 @@ class ServiceLocator:
         self._configuration: Configuration | None = None
         self._event_manager: EventManager | None = None
         self._storage_client: StorageClient | None = None
+        self._storage_instance_manager: StorageInstanceManager | None = None
 
         # Flags to check if the services were already set.
         self._configuration_was_retrieved = False
@@ -49,8 +55,6 @@ class ServiceLocator:
     def get_event_manager(self) -> EventManager:
         """Get the event manager."""
         if self._event_manager is None:
-            from crawlee.events import LocalEventManager
-
             self._event_manager = (
                 LocalEventManager().from_config(config=self._configuration)
                 if self._configuration
@@ -77,13 +81,7 @@ class ServiceLocator:
     def get_storage_client(self) -> StorageClient:
         """Get the storage client."""
         if self._storage_client is None:
-            from crawlee.storage_clients import MemoryStorageClient
-
-            self._storage_client = (
-                MemoryStorageClient.from_config(config=self._configuration)
-                if self._configuration
-                else MemoryStorageClient.from_config()
-            )
+            self._storage_client = FileSystemStorageClient()
 
         self._storage_client_was_retrieved = True
         return self._storage_client
@@ -101,6 +99,17 @@ class ServiceLocator:
             raise ServiceConflictError(StorageClient, storage_client, self._storage_client)
 
         self._storage_client = storage_client
+
+    @property
+    def storage_instance_manager(self) -> StorageInstanceManager:
+        """Get the storage instance manager."""
+        if self._storage_instance_manager is None:
+            # Import here to avoid circular imports.
+            from crawlee.storages._storage_instance_manager import StorageInstanceManager
+
+            self._storage_instance_manager = StorageInstanceManager()
+
+        return self._storage_instance_manager
 
 
 service_locator = ServiceLocator()

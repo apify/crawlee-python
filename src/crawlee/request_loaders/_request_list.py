@@ -55,6 +55,10 @@ class RequestList(RequestLoader):
         return self._name
 
     @override
+    async def get_handled_count(self) -> int:
+        return self._handled_count
+
+    @override
     async def get_total_count(self) -> int:
         return self._assumed_total_count
 
@@ -86,10 +90,6 @@ class RequestList(RequestLoader):
     async def mark_request_as_handled(self, request: Request) -> None:
         self._handled_count += 1
         self._in_progress.remove(request.id)
-
-    @override
-    async def get_handled_count(self) -> int:
-        return self._handled_count
 
     async def _ensure_next_request(self) -> None:
         if self._requests_lock is None:

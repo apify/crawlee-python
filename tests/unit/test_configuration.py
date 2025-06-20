@@ -9,6 +9,7 @@ from crawlee import service_locator
 from crawlee.configuration import Configuration
 from crawlee.crawlers import HttpCrawler, HttpCrawlingContext
 from crawlee.storage_clients import MemoryStorageClient
+from crawlee.storage_clients._file_system._storage_client import FileSystemStorageClient
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -35,14 +36,15 @@ def test_global_configuration_works_reversed() -> None:
 
 
 async def test_storage_not_persisted_when_disabled(tmp_path: Path, server_url: URL) -> None:
-    config = Configuration(
-        persist_storage=False,
-        write_metadata=False,
+    configuration = Configuration(
         crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
     )
-    storage_client = MemoryStorageClient.from_config(config)
+    storage_client = MemoryStorageClient()
 
-    crawler = HttpCrawler(storage_client=storage_client)
+    crawler = HttpCrawler(
+        configuration=configuration,
+        storage_client=storage_client,
+    )
 
     @crawler.router.default_handler
     async def default_handler(context: HttpCrawlingContext) -> None:
@@ -56,14 +58,16 @@ async def test_storage_not_persisted_when_disabled(tmp_path: Path, server_url: U
 
 
 async def test_storage_persisted_when_enabled(tmp_path: Path, server_url: URL) -> None:
-    config = Configuration(
-        persist_storage=True,
-        write_metadata=True,
+    configuration = Configuration(
         crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
     )
-    storage_client = MemoryStorageClient.from_config(config)
 
-    crawler = HttpCrawler(storage_client=storage_client)
+    storage_client = FileSystemStorageClient()
+
+    crawler = HttpCrawler(
+        configuration=configuration,
+        storage_client=storage_client,
+    )
 
     @crawler.router.default_handler
     async def default_handler(context: HttpCrawlingContext) -> None:

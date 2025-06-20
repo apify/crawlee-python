@@ -3,27 +3,41 @@ from __future__ import annotations
 import dataclasses
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
-from enum import Enum
-from typing import TYPE_CHECKING, Annotated, Any, Callable, Literal, Optional, Protocol, TypeVar, Union, cast, overload
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Callable,
+    Literal,
+    Optional,
+    Protocol,
+    TypedDict,
+    TypeVar,
+    Union,
+    cast,
+    overload,
+)
 
 from pydantic import ConfigDict, Field, PlainValidator, RootModel
-from typing_extensions import NotRequired, TypeAlias, TypedDict, Unpack
 
 from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
+    import json
     import logging
     import re
-    from collections.abc import Coroutine, Sequence
+    from collections.abc import Callable, Coroutine, Sequence
+
+    from typing_extensions import NotRequired, Required, TypeAlias, Unpack
 
     from crawlee import Glob, Request
     from crawlee._request import RequestOptions
+    from crawlee.configuration import Configuration
     from crawlee.http_clients import HttpResponse
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions import Session
-    from crawlee.storage_clients.models import DatasetItemsListPage
+    from crawlee.storage_clients import StorageClient
     from crawlee.storages import KeyValueStore
-    from crawlee.storages._dataset import ExportToKwargs, GetDataKwargs
 
     # Workaround for https://github.com/pydantic/pydantic/issues/9445
     J = TypeVar('J', bound='JsonSerializable')
@@ -138,15 +152,6 @@ class ConcurrencySettings:
         self.max_tasks_per_minute = max_tasks_per_minute
 
 
-@docs_group('Data structures')
-class StorageTypes(str, Enum):
-    """Possible Crawlee storage types."""
-
-    DATASET = 'Dataset'
-    KEY_VALUE_STORE = 'Key-value store'
-    REQUEST_QUEUE = 'Request queue'
-
-
 class EnqueueLinksKwargs(TypedDict):
     """Keyword arguments for the `enqueue_links` methods."""
 
@@ -190,7 +195,7 @@ class PushDataKwargs(TypedDict):
 
 
 class PushDataFunctionCall(PushDataKwargs):
-    data: JsonSerializable
+    data: list[dict[str, Any]] | dict[str, Any]
     dataset_id: str | None
     dataset_name: str | None
 
@@ -271,16 +276,12 @@ class RequestHandlerRunResult:
 
     async def push_data(
         self,
-        data: JsonSerializable,
+        data: list[dict[str, Any]] | dict[str, Any],
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         **kwargs: Unpack[PushDataKwargs],
     ) -> None:
         """Track a call to the `push_data` context helper."""
-        from crawlee.storages._dataset import Dataset
-
-        await Dataset.check_and_serialize(data)
-
         self.push_data_calls.append(
             PushDataFunctionCall(
                 data=data,
@@ -421,55 +422,6 @@ class ExtractLinksFunction(Protocol):
 
 
 @docs_group('Functions')
-class ExportToFunction(Protocol):
-    """A function for exporting data from a `Dataset`.
-
-    It simplifies the process of exporting data from a `Dataset`. It opens the specified one and exports
-    its content to a `KeyValueStore`.
-    """
-
-    def __call__(
-        self,
-        dataset_id: str | None = None,
-        dataset_name: str | None = None,
-        **kwargs: Unpack[ExportToKwargs],
-    ) -> Coroutine[None, None, None]:
-        """Call dunder method.
-
-        Args:
-            dataset_id: The ID of the `Dataset` to export data from.
-            dataset_name: The name of the `Dataset` to export data from.
-            **kwargs: Additional keyword arguments.
-        """
-
-
-@docs_group('Functions')
-class GetDataFunction(Protocol):
-    """A function for retrieving data from a `Dataset`.
-
-    It simplifies the process of accessing data from a `Dataset`. It opens the specified one and retrieves
-    data based on the provided parameters. It allows filtering and pagination.
-    """
-
-    def __call__(
-        self,
-        dataset_id: str | None = None,
-        dataset_name: str | None = None,
-        **kwargs: Unpack[GetDataKwargs],
-    ) -> Coroutine[None, None, DatasetItemsListPage]:
-        """Call dunder method.
-
-        Args:
-            dataset_id: ID of the `Dataset` to get data from.
-            dataset_name: Name of the `Dataset` to get data from.
-            **kwargs: Additional keyword arguments.
-
-        Returns:
-            A page of retrieved items.
-        """
-
-
-@docs_group('Functions')
 class GetKeyValueStoreFunction(Protocol):
     """A function for accessing a `KeyValueStore`.
 
@@ -520,7 +472,7 @@ class PushDataFunction(Protocol):
 
     def __call__(
         self,
-        data: JsonSerializable,
+        data: list[dict[str, Any]] | dict[str, Any],
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         **kwargs: Unpack[PushDataKwargs],
@@ -577,18 +529,6 @@ class PageSnapshot:
 
     def __bool__(self) -> bool:
         return bool(self.screenshot or self.html)
-
-
-@docs_group('Functions')
-class GetPageSnapshot(Protocol):
-    """A function for getting snapshot of a page."""
-
-    def __call__(self) -> Coroutine[None, None, PageSnapshot]:
-        """Get page snapshot.
-
-        Returns:
-            Snapshot of a page.
-        """
 
 
 @docs_group('Functions')
@@ -658,3 +598,133 @@ class BasicCrawlingContext:
     def __hash__(self) -> int:
         """Return hash of the context. Each context is considered unique."""
         return id(self)
+
+
+class GetDataKwargs(TypedDict):
+    """Keyword arguments for dataset's `get_data` method."""
+
+    offset: NotRequired[int]
+    """Skips the specified number of items at the start."""
+
+    limit: NotRequired[int | None]
+    """The maximum number of items to retrieve. Unlimited if None."""
+
+    clean: NotRequired[bool]
+    """Return only non-empty items and excludes hidden fields. Shortcut for `skip_hidden` and `skip_empty`."""
+
+    desc: NotRequired[bool]
+    """Set to True to sort results in descending order."""
+
+    fields: NotRequired[list[str]]
+    """Fields to include in each item. Sorts fields as specified if provided."""
+
+    omit: NotRequired[list[str]]
+    """Fields to exclude from each item."""
+
+    unwind: NotRequired[str]
+    """Unwinds items by a specified array field, turning each element into a separate item."""
+
+    skip_empty: NotRequired[bool]
+    """Excludes empty items from the results if True."""
+
+    skip_hidden: NotRequired[bool]
+    """Excludes fields starting with '#' if True."""
+
+    flatten: NotRequired[list[str]]
+    """Fields to be flattened in returned items."""
+
+    view: NotRequired[str]
+    """Specifies the dataset view to be used."""
+
+
+class ExportToKwargs(TypedDict):
+    """Keyword arguments for dataset's `export_to` method."""
+
+    key: Required[str]
+    """The key under which to save the data."""
+
+    content_type: NotRequired[Literal['json', 'csv']]
+    """The format in which to export the data. Either 'json' or 'csv'."""
+
+    to_kvs_id: NotRequired[str]
+    """ID of the key-value store to save the exported file."""
+
+    to_kvs_name: NotRequired[str]
+    """Name of the key-value store to save the exported file."""
+
+    to_kvs_storage_client: NotRequired[StorageClient]
+    """The storage client to use for saving the exported file."""
+
+    to_kvs_configuration: NotRequired[Configuration]
+    """The configuration to use for saving the exported file."""
+
+
+class ExportDataJsonKwargs(TypedDict):
+    """Keyword arguments for dataset's `export_data_json` method."""
+
+    skipkeys: NotRequired[bool]
+    """If True (default: False), dict keys that are not of a basic type (str, int, float, bool, None) will be skipped
+    instead of raising a `TypeError`."""
+
+    ensure_ascii: NotRequired[bool]
+    """Determines if non-ASCII characters should be escaped in the output JSON string."""
+
+    check_circular: NotRequired[bool]
+    """If False (default: True), skips the circular reference check for container types. A circular reference will
+    result in a `RecursionError` or worse if unchecked."""
+
+    allow_nan: NotRequired[bool]
+    """If False (default: True), raises a ValueError for out-of-range float values (nan, inf, -inf) to strictly comply
+    with the JSON specification. If True, uses their JavaScript equivalents (NaN, Infinity, -Infinity)."""
+
+    cls: NotRequired[type[json.JSONEncoder]]
+    """Allows specifying a custom JSON encoder."""
+
+    indent: NotRequired[int]
+    """Specifies the number of spaces for indentation in the pretty-printed JSON output."""
+
+    separators: NotRequired[tuple[str, str]]
+    """A tuple of (item_separator, key_separator). The default is (', ', ': ') if indent is None and (',', ': ')
+    otherwise."""
+
+    default: NotRequired[Callable]
+    """A function called for objects that can't be serialized otherwise. It should return a JSON-encodable version
+    of the object or raise a `TypeError`."""
+
+    sort_keys: NotRequired[bool]
+    """Specifies whether the output JSON object should have keys sorted alphabetically."""
+
+
+class ExportDataCsvKwargs(TypedDict):
+    """Keyword arguments for dataset's `export_data_csv` method."""
+
+    dialect: NotRequired[str]
+    """Specifies a dialect to be used in CSV parsing and writing."""
+
+    delimiter: NotRequired[str]
+    """A one-character string used to separate fields. Defaults to ','."""
+
+    doublequote: NotRequired[bool]
+    """Controls how instances of `quotechar` inside a field should be quoted. When True, the character is doubled;
+    when False, the `escapechar` is used as a prefix. Defaults to True."""
+
+    escapechar: NotRequired[str]
+    """A one-character string used to escape the delimiter if `quoting` is set to `QUOTE_NONE` and the `quotechar`
+    if `doublequote` is False. Defaults to None, disabling escaping."""
+
+    lineterminator: NotRequired[str]
+    """The string used to terminate lines produced by the writer. Defaults to '\\r\\n'."""
+
+    quotechar: NotRequired[str]
+    """A one-character string used to quote fields containing special characters, like the delimiter or quotechar,
+    or fields containing new-line characters. Defaults to '\"'."""
+
+    quoting: NotRequired[int]
+    """Controls when quotes should be generated by the writer and recognized by the reader. Can take any of
+    the `QUOTE_*` constants, with a default of `QUOTE_MINIMAL`."""
+
+    skipinitialspace: NotRequired[bool]
+    """When True, spaces immediately following the delimiter are ignored. Defaults to False."""
+
+    strict: NotRequired[bool]
+    """When True, raises an exception on bad CSV input. Defaults to False."""
