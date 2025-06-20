@@ -158,7 +158,7 @@ class Request(BaseModel):
     ```
     """
 
-    model_config = ConfigDict(populate_by_name=True, extra='allow')
+    model_config = ConfigDict(populate_by_name=True)
 
     id: str
     """A unique identifier for the request. Note that this is not used for deduplication, and should not be confused

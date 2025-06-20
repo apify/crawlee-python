@@ -79,14 +79,12 @@ class StorageInstanceManager:
         instance_name = getattr(instance, 'name', None)
 
         # Cache the instance
-        if cls not in self._cache_by_id:
-            self._cache_by_id[cls] = {}
-        if cls not in self._cache_by_name:
-            self._cache_by_name[cls] = {}
+        type_cache_by_id = self._cache_by_id.setdefault(cls, {})
+        type_cache_by_name = self._cache_by_name.setdefault(cls, {})
 
-        self._cache_by_id[cls][instance.id] = instance
+        type_cache_by_id[instance.id] = instance
         if instance_name is not None:
-            self._cache_by_name[cls][instance_name] = instance
+            type_cache_by_name[instance_name] = instance
 
         # Set as default if no id/name specified
         if id is None and name is None:
