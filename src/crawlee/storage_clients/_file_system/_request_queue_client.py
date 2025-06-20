@@ -9,13 +9,14 @@ from logging import getLogger
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 from typing_extensions import override
 
 from crawlee import Request
 from crawlee._consts import METADATA_FILENAME
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.file import atomic_write, json_dumps
+from crawlee._utils.recoverable_state import RecoverableState
 from crawlee.storage_clients._base import RequestQueueClient
 from crawlee.storage_clients.models import (
     AddRequestsResponse,
@@ -32,6 +33,28 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
+class RequestQueueState(BaseModel):
+    """State model for the `FileSystemRequestQueueClient`."""
+
+    sequence_counter: int = 0
+    """Counter for regular request ordering."""
+
+    forefront_sequence_counter: int = 0
+    """Counter for forefront request ordering."""
+
+    forefront_requests: dict[str, int] = {}
+    """Mapping of forefront request IDs to their sequence numbers."""
+
+    regular_requests: dict[str, int] = {}
+    """Mapping of regular request IDs to their sequence numbers."""
+
+    in_progress_requests: set[str] = set()
+    """Set of request IDs currently being processed."""
+
+    handled_requests: set[str] = set()
+    """Set of request IDs that have been handled."""
+
+
 class FileSystemRequestQueueClient(RequestQueueClient):
     """A file system implementation of the request queue client.
 
@@ -43,9 +66,10 @@ class FileSystemRequestQueueClient(RequestQueueClient):
     {STORAGE_DIR}/request_queues/{QUEUE_ID}/{REQUEST_ID}.json
     ```
 
-    The implementation uses sequence numbers embedded in request files for FIFO ordering of regular requests.
-    It maintains in-memory data structures for tracking in-progress requests and prioritizing forefront requests.
-    File system storage provides durability at the cost of slower I/O operations compared to memory-based storage.
+    The implementation uses `RecoverableState` to maintain ordering information, in-progress status, and
+    request handling status. This allows for proper state recovery across process restarts without
+    embedding metadata in individual request files. File system storage provides durability at the cost of
+    slower I/O operations compared to memory only-based storage.
 
     This implementation is ideal for long-running crawlers where persistence is important and for situations
     where you need to resume crawling after process termination.
@@ -74,8 +98,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         stats: dict,
         total_request_count: int,
         storage_dir: Path,
-        sequence_counter: int,
-        forefront_sequence_counter: int,
     ) -> None:
         """Initialize a new instance.
 
@@ -97,23 +119,8 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         self._storage_dir = storage_dir
         """The base directory where the request queue is stored."""
 
-        self._sequence_counter = sequence_counter
-        """A counter to track the order of (normal) requests added to the queue.
-
-        This number is going to be used as a sequence number for next request.
-        """
-
-        self._forefront_sequence_counter = forefront_sequence_counter
-        """A counter to track the order of forefront requests added to the queue.
-
-        This number is going to be used as a sequence number for next forefront request.
-        """
-
         self._lock = asyncio.Lock()
         """A lock to ensure that only one operation is performed at a time."""
-
-        self._in_progress = set[str]()
-        """A set of request IDs that are currently being processed."""
 
         self._request_cache = deque[Request]()
         """Cache for requests: forefront requests at the beginning, regular requests at the end."""
@@ -123,6 +130,15 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
         self._is_empty_cache: bool | None = None
         """Cache for is_empty result: None means unknown, True/False is cached state."""
+
+        self._state = RecoverableState[RequestQueueState](
+            default_state=RequestQueueState(),
+            persist_state_key='request_queue_state',
+            persistence_enabled=True,
+            persist_state_kvs_name=f'__RQ_STATE_{self._metadata.id}',
+            logger=logger,
+        )
+        """Recoverable state to maintain request ordering, in-progress status, and handled status."""
 
     @property
     @override
@@ -174,20 +190,13 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                         file_content = json.load(file)
                         metadata = RequestQueueMetadata(**file_content)
 
-                        rq_path = (
-                            rq_base_path / cls._STORAGE_SUBSUBDIR_DEFAULT
-                            if metadata.name is None
-                            else rq_base_path / metadata.name
-                        )
-                        sequence_counter, forefront_sequence_counter = await cls._get_sequence_counters(rq_path)
-
                         if metadata.id == id:
                             client = cls(
                                 **metadata.model_dump(),
                                 storage_dir=storage_dir,
-                                sequence_counter=sequence_counter,
-                                forefront_sequence_counter=forefront_sequence_counter,
                             )
+                            await client._state.initialize()
+                            await client._discover_existing_requests()
                             await client._update_metadata(update_accessed_at=True)
                             found = True
                             break
@@ -217,15 +226,14 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     raise ValueError(f'Invalid metadata file for request queue "{name}"') from exc
 
                 metadata.name = name
-                sequence_counter, forefront_sequence_counter = await cls._get_sequence_counters(rq_path)
 
                 client = cls(
                     **metadata.model_dump(),
                     storage_dir=storage_dir,
-                    sequence_counter=sequence_counter,
-                    forefront_sequence_counter=forefront_sequence_counter,
                 )
 
+                await client._state.initialize()
+                await client._discover_existing_requests()
                 await client._update_metadata(update_accessed_at=True)
 
             # Otherwise, create a new dataset client.
@@ -243,9 +251,8 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     stats={},
                     total_request_count=0,
                     storage_dir=storage_dir,
-                    sequence_counter=0,
-                    forefront_sequence_counter=0,
                 )
+                await client._state.initialize()
                 await client._update_metadata()
 
         return client
@@ -257,7 +264,9 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             if self.path_to_rq.exists():
                 await asyncio.to_thread(shutil.rmtree, self.path_to_rq)
 
-            self._in_progress.clear()
+            # Clear recoverable state
+            await self._state.reset()
+            await self._state.teardown()
             self._request_cache.clear()
             self._request_cache_needs_refresh = True
 
@@ -272,7 +281,8 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             for file_path in request_files:
                 await asyncio.to_thread(file_path.unlink, missing_ok=True)
 
-            self._in_progress.clear()
+            # Clear recoverable state
+            await self._state.reset()
             self._request_cache.clear()
             self._request_cache_needs_refresh = True
 
@@ -298,6 +308,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             new_pending_request_count = self._metadata.pending_request_count
             processed_requests = list[ProcessedRequest]()
             unprocessed_requests = list[UnprocessedRequest]()
+            state = self._state.current_value
 
             # Prepare a dictionary to track existing requests by their unique keys.
             existing_unique_keys: dict[str, Path] = {}
@@ -321,19 +332,18 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 if existing_request is None:
                     request_path = self._get_request_path(request.id)
 
-                    # Add sequence number to ensure FIFO ordering.
+                    # Add sequence number to ensure FIFO ordering using state.
                     if forefront:
-                        sequence_number = self._forefront_sequence_counter
-                        self._forefront_sequence_counter += 1
+                        sequence_number = state.forefront_sequence_counter
+                        state.forefront_sequence_counter += 1
+                        state.forefront_requests[request.id] = sequence_number
                     else:
-                        sequence_number = self._sequence_counter
-                        self._sequence_counter += 1
+                        sequence_number = state.sequence_counter
+                        state.sequence_counter += 1
+                        state.regular_requests[request.id] = sequence_number
 
-                    # Update the request data and dump it to the file.
-                    request_dict = request.model_dump()
-                    request_dict['__sequence'] = sequence_number
-                    request_dict['__forefront'] = forefront
-                    request_data = await json_dumps(request_dict)
+                    # Save the clean request without extra fields
+                    request_data = await json_dumps(request.model_dump())
                     await atomic_write(request_path, request_data)
 
                     # Update the metadata counts.
@@ -356,7 +366,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 else:
                     # Set the processed request flags.
                     was_already_present = existing_request is not None
-                    was_already_handled = existing_request.was_already_handled if existing_request else False
+                    was_already_handled = existing_request.id in state.handled_requests
 
                     # If the request is already in the RQ and handled, just continue with the next one.
                     if was_already_present and was_already_handled:
@@ -371,11 +381,21 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
                     # If the request is already in the RQ but not handled yet, update it.
                     elif was_already_present and not was_already_handled:
-                        request_path = self._get_request_path(existing_request.id)
-                        request_dict = existing_request.model_dump()
-                        request_dict['__forefront'] = forefront
-                        request_data = await json_dumps(request_dict)
-                        await atomic_write(request_path, request_data)
+                        # Update request type (forefront vs regular) in state
+                        if forefront:
+                            # Move from regular to forefront if needed
+                            if existing_request.id in state.regular_requests:
+                                state.regular_requests.pop(existing_request.id)
+                            if existing_request.id not in state.forefront_requests:
+                                state.forefront_requests[existing_request.id] = state.forefront_sequence_counter
+                                state.forefront_sequence_counter += 1
+                        elif (
+                            existing_request.id not in state.forefront_requests
+                            and existing_request.id not in state.regular_requests
+                        ):
+                            # Keep as regular if not already forefront
+                            state.regular_requests[existing_request.id] = state.sequence_counter
+                            state.sequence_counter += 1
 
                         processed_requests.append(
                             ProcessedRequest(
@@ -425,7 +445,8 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 logger.warning(f'Request with ID "{request_id}" not found in the queue.')
                 return None
 
-            self._in_progress.add(request.id)
+            state = self._state.current_value
+            state.in_progress_requests.add(request.id)
             await self._update_metadata(update_accessed_at=True)
             return request
 
@@ -437,17 +458,18 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 await self._refresh_cache()
 
             next_request: Request | None = None
+            state = self._state.current_value
 
             # Fetch from the front of the deque (forefront requests are at the beginning).
             while self._request_cache and next_request is None:
                 candidate = self._request_cache.popleft()
 
                 # Skip requests that are already in progress, however this should not happen.
-                if candidate.id not in self._in_progress:
+                if candidate.id not in state.in_progress_requests:
                     next_request = candidate
 
             if next_request is not None:
-                self._in_progress.add(next_request.id)
+                state.in_progress_requests.add(next_request.id)
 
             return next_request
 
@@ -455,9 +477,10 @@ class FileSystemRequestQueueClient(RequestQueueClient):
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
         async with self._lock:
             self._is_empty_cache = None
+            state = self._state.current_value
 
             # Check if the request is in progress.
-            if request.id not in self._in_progress:
+            if request.id not in state.in_progress_requests:
                 logger.warning(f'Marking request {request.id} as handled that is not in progress.')
                 return None
 
@@ -475,8 +498,9 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             request_data = await json_dumps(request.model_dump())
             await atomic_write(request_path, request_data)
 
-            # Remove from in-progress.
-            self._in_progress.discard(request.id)
+            # Update state: remove from in-progress and add to handled.
+            state.in_progress_requests.discard(request.id)
+            state.handled_requests.add(request.id)
 
             # Update RQ metadata.
             await self._update_metadata(
@@ -502,9 +526,10 @@ class FileSystemRequestQueueClient(RequestQueueClient):
     ) -> ProcessedRequest | None:
         async with self._lock:
             self._is_empty_cache = None
+            state = self._state.current_value
 
             # Check if the request is in progress.
-            if request.id not in self._in_progress:
+            if request.id not in state.in_progress_requests:
                 logger.info(f'Reclaiming request {request.id} that is not in progress.')
                 return None
 
@@ -514,23 +539,26 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 logger.warning(f'Request file for {request.id} does not exist, cannot reclaim.')
                 return None
 
-            # Update sequence number to ensure proper ordering.
+            # Update sequence number and state to ensure proper ordering.
             if forefront:
-                sequence_number = self._forefront_sequence_counter
-                self._forefront_sequence_counter += 1
+                # Remove from regular requests if it was there
+                state.regular_requests.pop(request.id, None)
+                sequence_number = state.forefront_sequence_counter
+                state.forefront_sequence_counter += 1
+                state.forefront_requests[request.id] = sequence_number
             else:
-                sequence_number = self._sequence_counter
-                self._sequence_counter += 1
+                # Remove from forefront requests if it was there
+                state.forefront_requests.pop(request.id, None)
+                sequence_number = state.sequence_counter
+                state.sequence_counter += 1
+                state.regular_requests[request.id] = sequence_number
 
-            # Dump the updated request to the file.
-            request_dict = request.model_dump()
-            request_dict['__forefront'] = forefront
-            request_dict['__sequence'] = sequence_number
-            request_data = await json_dumps(request_dict)
+            # Save the clean request without extra fields
+            request_data = await json_dumps(request.model_dump())
             await atomic_write(request_path, request_data)
 
             # Remove from in-progress.
-            self._in_progress.discard(request.id)
+            state.in_progress_requests.discard(request.id)
 
             # Update RQ metadata.
             await self._update_metadata(
@@ -558,31 +586,32 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             if self._is_empty_cache is not None:
                 return self._is_empty_cache
 
+            state = self._state.current_value
+
             # If there are in-progress requests, return False immediately.
-            if len(self._in_progress) > 0:
+            if len(state.in_progress_requests) > 0:
                 self._is_empty_cache = False
                 return False
 
             # If we have a cached requests, check them first (fast path).
             if self._request_cache:
                 for req in self._request_cache:
-                    if req.handled_at is None:
+                    if req.id not in state.handled_requests:
                         self._is_empty_cache = False
                         return False
                 self._is_empty_cache = True
-                return len(self._in_progress) == 0
+                return len(state.in_progress_requests) == 0
 
-            # Fallback: check files on disk (slow path).
+            # Fallback: check state for unhandled requests.
             await self._update_metadata(update_accessed_at=True)
-            request_files = await self._get_request_files(self.path_to_rq)
 
-            for request_file in request_files:
-                request = await self._parse_request_file(request_file)
-                if request is None:
-                    continue
-                if request.handled_at is None:
-                    self._is_empty_cache = False
-                    return False
+            # Check if there are any requests that are not handled
+            all_requests = set(state.forefront_requests.keys()) | set(state.regular_requests.keys())
+            unhandled_requests = all_requests - state.handled_requests
+
+            if unhandled_requests:
+                self._is_empty_cache = False
+                return False
 
             self._is_empty_cache = True
             return True
@@ -655,56 +684,54 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         prioritizing forefront requests and maintaining proper ordering.
         """
         self._request_cache.clear()
+        state = self._state.current_value
 
-        forefront_requests = list[Request]()
-        regular_requests = list[Request]()
+        forefront_requests = list[tuple[Request, int]]()  # (request, sequence)
+        regular_requests = list[tuple[Request, int]]()  # (request, sequence)
 
         request_files = await self._get_request_files(self.path_to_rq)
 
         for request_file in request_files:
             request = await self._parse_request_file(request_file)
 
-            if request is None or request.was_already_handled:
+            if request is None:
                 continue
 
-            if request.id in self._in_progress:
+            # Skip handled requests
+            if request.id in state.handled_requests:
                 continue
 
-            if request.model_extra is None:
-                logger.warning(f'Request file "{request_file}" does not contain model_extra field.')
+            # Skip in-progress requests
+            if request.id in state.in_progress_requests:
                 continue
 
-            forefront = request.model_extra.get('__forefront')
-            if forefront is None:
-                logger.warning(f'Request file "{request_file}" does not contain "__forefront" field.')
-                continue
-
-            if forefront:
-                forefront_requests.append(request)
+            # Determine if request is forefront or regular based on state
+            if request.id in state.forefront_requests:
+                sequence = state.forefront_requests[request.id]
+                forefront_requests.append((request, sequence))
+            elif request.id in state.regular_requests:
+                sequence = state.regular_requests[request.id]
+                regular_requests.append((request, sequence))
             else:
-                regular_requests.append(request)
+                # Request not in state, skip it (might be orphaned)
+                logger.warning(f'Request {request.id} not found in state, skipping.')
+                continue
 
         # Sort forefront requests by sequence (newest first for LIFO behavior).
-        forefront_requests.sort(
-            key=lambda request: request.model_extra.get('__sequence', 0) if request.model_extra else 0,
-            reverse=True,
-        )
+        forefront_requests.sort(key=lambda item: item[1], reverse=True)
 
         # Sort regular requests by sequence (oldest first for FIFO behavior).
-        regular_requests.sort(
-            key=lambda request: request.model_extra.get('__sequence', 0) if request.model_extra else 0,
-            reverse=False,
-        )
+        regular_requests.sort(key=lambda item: item[1], reverse=False)
 
         # Add forefront requests to the beginning of the cache (left side). Since forefront_requests are sorted
         # by sequence (newest first), we need to add them in reverse order to maintain correct priority.
-        for request in reversed(forefront_requests):
+        for request, _ in reversed(forefront_requests):
             if len(self._request_cache) >= self._MAX_REQUESTS_IN_CACHE:
                 break
             self._request_cache.appendleft(request)
 
         # Add regular requests to the end of the cache (right side).
-        for request in regular_requests:
+        for request, _ in regular_requests:
             if len(self._request_cache) >= self._MAX_REQUESTS_IN_CACHE:
                 break
             self._request_cache.append(request)
@@ -768,43 +795,22 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             logger.warning(f'Failed to validate request file {file_path}: {exc!s}')
             return None
 
-    @classmethod
-    async def _get_sequence_counters(cls, path_to_rq: Path) -> tuple[int, int]:
-        """Get the current sequence counters for the request queue.
-
-        Args:
-            path_to_rq: The path to the request queue directory.
-
-        Returns:
-            A tuple containing the current sequence counter for regular requests and for forefront requests.
-        """
-        max_sequence = -1
-        max_forefront_sequence = -1
-
-        # Get all request files.
-        request_files = await cls._get_request_files(path_to_rq)
+    async def _discover_existing_requests(self) -> None:
+        """Discover and load existing requests into the state when opening an existing request queue."""
+        request_files = await self._get_request_files(self.path_to_rq)
+        state = self._state.current_value
 
         for request_file in request_files:
-            request = await cls._parse_request_file(request_file)
+            request = await self._parse_request_file(request_file)
             if request is None:
                 continue
 
-            # Extract sequence number and forefront flag from model_extra.
-            if request.model_extra:
-                sequence = request.model_extra.get('__sequence')
-                is_forefront = request.model_extra.get('__forefront')
+            # Add request to state as regular request (assign sequence numbers)
+            if request.id not in state.regular_requests and request.id not in state.forefront_requests:
+                # Assign as regular request with current sequence counter
+                state.regular_requests[request.id] = state.sequence_counter
+                state.sequence_counter += 1
 
-                if sequence is None:
-                    logger.warning(f'Request file "{request_file}" does not contain "__sequence" field.')
-                    continue
-
-                if is_forefront is None:
-                    logger.warning(f'Request file "{request_file}" does not contain "__forefront" field.')
-                    continue
-
-                if is_forefront:
-                    max_forefront_sequence = max(max_forefront_sequence, sequence)
-                else:
-                    max_sequence = max(max_sequence, sequence)
-
-        return max_sequence, max_forefront_sequence
+                # Check if request was already handled
+                if request.handled_at is not None:
+                    state.handled_requests.add(request.id)

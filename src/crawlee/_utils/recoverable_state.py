@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 
 from pydantic import BaseModel
 
-from crawlee import service_locator
 from crawlee.events._types import Event, EventPersistStateData
 
 if TYPE_CHECKING:
@@ -76,7 +75,7 @@ class RecoverableState(Generic[TStateModel]):
             self._state = self._default_state.model_copy(deep=True)
             return self.current_value
 
-        # Import here to avoid circular imports
+        # Import here to avoid circular imports.
         from crawlee.storages._key_value_store import KeyValueStore
 
         self._key_value_store = await KeyValueStore.open(
@@ -84,6 +83,9 @@ class RecoverableState(Generic[TStateModel]):
         )
 
         await self._load_saved_state()
+
+        # Import here to avoid circular imports.
+        from crawlee import service_locator
 
         event_manager = service_locator.get_event_manager()
         event_manager.on(event=Event.PERSIST_STATE, listener=self.persist_state)
@@ -98,6 +100,9 @@ class RecoverableState(Generic[TStateModel]):
         """
         if not self._persistence_enabled:
             return
+
+        # Import here to avoid circular imports.
+        from crawlee import service_locator
 
         event_manager = service_locator.get_event_manager()
         event_manager.off(event=Event.PERSIST_STATE, listener=self.persist_state)

@@ -104,7 +104,7 @@ class ServiceLocator:
     def storage_instance_manager(self) -> StorageInstanceManager:
         """Get the storage instance manager."""
         if self._storage_instance_manager is None:
-            # Import here to avoid circular imports
+            # Import here to avoid circular imports.
             from crawlee.storages._storage_instance_manager import StorageInstanceManager
 
             self._storage_instance_manager = StorageInstanceManager()

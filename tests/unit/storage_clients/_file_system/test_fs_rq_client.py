@@ -222,9 +222,6 @@ async def test_fetch_next_request(rq_client: FileSystemRequestQueueClient) -> No
     assert first_request is not None
     assert first_request.url == 'https://example.com/1'
 
-    # Check that it's marked as in-progress
-    assert first_request.id in rq_client._in_progress
-
     # Fetch the second request
     second_request = await rq_client.fetch_next_request()
     assert second_request is not None
@@ -284,9 +281,6 @@ async def test_mark_request_as_handled(rq_client: FileSystemRequestQueueClient) 
     assert result is not None
     assert result.was_already_handled is True
 
-    # Verify it's no longer in-progress
-    assert request.id not in rq_client._in_progress
-
     # Verify metadata was updated
     assert rq_client.metadata.handled_request_count == 1
     assert rq_client.metadata.pending_request_count == 0
@@ -312,9 +306,6 @@ async def test_reclaim_request(rq_client: FileSystemRequestQueueClient) -> None:
     result = await rq_client.reclaim_request(request)
     assert result is not None
     assert result.was_already_handled is False
-
-    # Verify it's no longer in-progress
-    assert request.id not in rq_client._in_progress
 
     # Should be able to fetch it again
     reclaimed_request = await rq_client.fetch_next_request()
