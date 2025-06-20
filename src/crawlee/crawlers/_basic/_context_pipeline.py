@@ -21,6 +21,38 @@ TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, defau
 TMiddlewareCrawlingContext = TypeVar('TMiddlewareCrawlingContext', bound=BasicCrawlingContext)
 
 
+class _Middleware(Generic[TMiddlewareCrawlingContext, TCrawlingContext]):
+    """Helper wrapper class to make the middleware easily observable by open telemetry instrumentation."""
+
+    def __init__(
+        self,
+        middleware: Callable[
+            [TCrawlingContext],
+            AsyncGenerator[TMiddlewareCrawlingContext, Exception | None],
+        ],
+        input_context: TCrawlingContext,
+    ) -> None:
+        self.generator = middleware(input_context)
+        self.input_context = input_context
+        self.output_context: TMiddlewareCrawlingContext | None = None
+
+    async def action(self) -> TMiddlewareCrawlingContext:
+        self.output_context = await self.generator.__anext__()
+        return self.output_context
+
+    async def cleanup(self, final_consumer_exception: Exception | None) -> None:
+        try:
+            await self.generator.asend(final_consumer_exception)
+        except StopAsyncIteration:
+            pass
+        except ContextPipelineInterruptedError as e:
+            raise RuntimeError('Invalid state - pipeline interrupted in the finalization step') from e
+        except Exception as e:
+            raise ContextPipelineFinalizationError(e, self.output_context or self.input_context) from e
+        else:
+            raise RuntimeError('The middleware yielded more than once')
+
+
 @docs_group('Classes')
 class ContextPipeline(Generic[TCrawlingContext]):
     """Encapsulates the logic of gradually enhancing the crawling context with additional information and utilities.
@@ -57,15 +89,15 @@ class ContextPipeline(Generic[TCrawlingContext]):
         Exceptions from the consumer function are wrapped together with the final crawling context.
         """
         chain = list(self._middleware_chain())
-        cleanup_stack: list[AsyncGenerator[Any, Exception | None]] = []
+        cleanup_stack: list[_Middleware[Any]] = []
         final_consumer_exception: Exception | None = None
 
         try:
             for member in reversed(chain):
                 if member._middleware:  # noqa: SLF001
-                    middleware_instance = member._middleware(crawling_context)  # noqa: SLF001
+                    middleware_instance = _Middleware(middleware=member._middleware, input_context=crawling_context)  # noqa: SLF001
                     try:
-                        result = await middleware_instance.__anext__()
+                        result = await middleware_instance.action()
                     except SessionError:  # Session errors get special treatment
                         raise
                     except StopAsyncIteration as e:
@@ -88,16 +120,7 @@ class ContextPipeline(Generic[TCrawlingContext]):
                 raise RequestHandlerError(e, crawling_context) from e
         finally:
             for middleware_instance in reversed(cleanup_stack):
-                try:
-                    result = await middleware_instance.asend(final_consumer_exception)
-                except StopAsyncIteration:  # noqa: PERF203
-                    pass
-                except ContextPipelineInterruptedError as e:
-                    raise RuntimeError('Invalid state - pipeline interrupted in the finalization step') from e
-                except Exception as e:
-                    raise ContextPipelineFinalizationError(e, crawling_context) from e
-                else:
-                    raise RuntimeError('The middleware yielded more than once')
+                await middleware_instance.cleanup(final_consumer_exception)
 
     def compose(
         self,
