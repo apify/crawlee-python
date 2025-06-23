@@ -42,7 +42,7 @@ classDiagram
 %% Abstract classes
 %% ========================
 
-class BaseStorage {
+class Storage {
     <<abstract>>
     + id
     + name
@@ -92,7 +92,7 @@ class RequestManagerTandem {
 %% Inheritance arrows
 %% ========================
 
-BaseStorage <|-- RequestQueue
+Storage <|-- RequestQueue
 RequestManager <|-- RequestQueue
 
 RequestLoader <|-- RequestManager

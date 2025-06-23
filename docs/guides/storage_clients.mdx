@@ -1,0 +1,197 @@
+---
+id: storage-clients
+title: Storage clients
+description: How to work with storage clients in Crawlee, including the built-in clients and how to create your own.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+Storage clients in Crawlee are subclasses of <ApiLink to="class/StorageClient">`StorageClient`</ApiLink>. They handle interactions with different storage backends. For instance:
+
+- <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink>: Stores data purely in memory with no persistence.
+- <ApiLink to="class/FileSystemStorageClient">`FileSystemStorageClient`</ApiLink>: Provides persistent file system storage with in-memory caching for better performance.
+- [`ApifyStorageClient`](https://docs.apify.com/sdk/python/reference/class/ApifyStorageClient): Manages storage on the [Apify platform](https://apify.com). Apify storage client is implemented in the [Apify SDK](https://github.com/apify/apify-sdk-python).
+
+Each storage client is responsible for maintaining the storages in a specific environment. This abstraction makes it easier to switch between different environments, e.g. between local development and cloud production setup.
+
+Storage clients provide a unified interface for interacting with <ApiLink to="class/Dataset">`Dataset`</ApiLink>, <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, and <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, regardless of the underlying storage implementation. They handle operations like creating, reading, updating, and deleting storage instances, as well as managing data persistence and cleanup.
+
+## Built-in storage clients
+
+Crawlee Python currently provides two main storage client implementations:
+
+### Memory storage client
+
+The <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink> stores all data in memory using Python data structures. It provides fast access but does not persist data between runs, meaning all data is lost when the program terminates.
+
+```python
+from crawlee.storage_clients import MemoryStorageClient
+from crawlee.crawlers import ParselCrawler
+
+# Create memory storage client.
+storage_client = MemoryStorageClient()
+
+# Or pass it directly to the crawler.
+crawler = ParselCrawler(storage_client=storage_client)
+```
+
+The `MemoryStorageClient` is a good choice for testing, development, or short-lived operations where speed is more important than data persistence. It is not suitable for production use or long-running crawls, as all data will be lost when the program exits.
+
+### File system storage client
+
+The <ApiLink to="class/FileSystemStorageClient">`FileSystemStorageClient`</ApiLink> provides persistent storage by writing data directly to the file system. It uses smart caching and batch processing for better performance while storing data in human-readable JSON format.
+
+This storage client is ideal for large datasets, and long-running operations where data persistence is required. Data can be easily inspected and shared with other tools.
+
+```python
+from crawlee.storage_clients import FileSystemStorageClient
+from crawlee.crawlers import ParselCrawler
+
+# Create file system storage client.
+storage_client = FileSystemStorageClient()
+
+# Or pass it directly to the crawler.
+crawler = ParselCrawler(storage_client=storage_client)
+```
+
+Configuration options for the <ApiLink to="class/FileSystemStorageClient">`FileSystemStorageClient`</ApiLink> can be set through environment variables or the <ApiLink to="class/Configuration">`Configuration`</ApiLink> class.
+  - **`storage_dir`** (env: `CRAWLEE_STORAGE_DIR`, default: `'./storage'`): The root directory for all storage data.
+  - **`purge_on_start`** (env: `CRAWLEE_PURGE_ON_START`, default: `True`): Whether to purge default storages on start.
+
+Data are stored using the following directory structure:
+
+```text
+{CRAWLEE_STORAGE_DIR}/
+├── datasets/
+│   └── {DATASET_NAME}/
+│       ├── __metadata__.json
+│       ├── 000000001.json
+│       └── 000000002.json
+├── key_value_stores/
+│   └── {KVS_NAME}/
+│       ├── __metadata__.json
+│       ├── key1.json
+│       ├── key2.txt
+│       └── key3.json
+└── request_queues/
+    └── {RQ_NAME}/
+        ├── __metadata__.json
+        ├── {REQUEST_ID_1}.json
+        └── {REQUEST_ID_2}.json
+```
+
+Where:
+- `{CRAWLEE_STORAGE_DIR}`: The root directory for local storage
+- `{DATASET_NAME}`, `{KVS_NAME}`, `{RQ_NAME}`: The unique names for each storage instance (defaults to `"default"`)
+- Files are stored directly without additional metadata files for simpler structure
+
+```python
+from crawlee.configuration import Configuration
+from crawlee.storage_clients import FileSystemStorageClient
+from crawlee.crawlers import ParselCrawler
+
+configuration = Configuration(
+    storage_dir='./my_storage',
+    purge_on_start=False,
+)
+storage_client = FileSystemStorageClient(configuration=configuration)
+crawler = ParselCrawler(storage_client=storage_client)
+```
+
+:::warning Concurrency limitation
+The `FileSystemStorageClient` is not safe for concurrent access from multiple crawler processes. Use it only when running a single crawler process at a time.
+:::
+
+## Creating a custom storage client
+
+A custom storage client consists of two parts: the storage client factory and individual storage type clients. The <ApiLink to="class/StorageClient">`StorageClient`</ApiLink> acts as a factory that creates specific clients (<ApiLink to="class/DatasetClient">`DatasetClient`</ApiLink>, <ApiLink to="class/KeyValueStoreClient">`KeyValueStoreClient`</ApiLink>, <ApiLink to="class/RequestQueueClient">`RequestQueueClient`</ApiLink>) where the actual storage logic is implemented.
+
+```python
+# First, implement the specific storage clients by subclassing the abstract base classes:
+
+from crawlee.storage_clients._base import DatasetClient, KeyValueStoreClient, RequestQueueClient
+
+class CustomDatasetClient(DatasetClient):
+    # Implement all abstract methods for dataset operations.
+    pass
+
+class CustomKeyValueStoreClient(KeyValueStoreClient):
+    # Implement all abstract methods for key-value store operations.
+    pass
+
+class CustomRequestQueueClient(RequestQueueClient):
+    # Implement all abstract methods for request queue operations.
+    pass
+
+# Then implement the storage client that provides these specific clients:
+
+from crawlee.storage_clients import StorageClient
+from crawlee.configuration import Configuration
+
+class CustomStorageClient(StorageClient):
+    async def create_dataset_client(
+        self,
+        *,
+        id: str | None = None,
+        name: str | None = None,
+        configuration: Configuration | None = None,
+    ) -> CustomDatasetClient:
+        # Create an instance of custom dataset client and return it.
+        pass
+
+    async def create_kvs_client(
+        self,
+        *,
+        id: str | None = None,
+        name: str | None = None,
+        configuration: Configuration | None = None,
+    ) -> CustomKeyValueStoreClient:
+        # Create an instance of custom key-value store client and return it.
+        pass
+
+    async def create_rq_client(
+        self,
+        *,
+        id: str | None = None,
+        name: str | None = None,
+        configuration: Configuration | None = None,
+    ) -> CustomRequestQueueClient:
+        # Create an instance of custom request queue client and return it.
+        pass
+```
+
+Custom storage clients can implement any storage logic, such as connecting to a database, using a cloud storage service, or integrating with other systems. They must implement the required methods for creating, reading, updating, and deleting data in the respective storages.
+
+## Registering storage clients
+
+Custom storage clients can be registered with the <ApiLink to="class/ServiceLocator">`ServiceLocator`</ApiLink> or passed directly to the crawler or specific storage. This allows you to use your custom storage implementation seamlessly with Crawlee's abstractions.
+
+```python
+from crawlee.storage_clients import CustomStorageClient
+from crawlee.service_locator import service_locator
+from crawlee.crawlers import ParselCrawler
+from crawlee.storages import Dataset
+
+# Create custom storage client.
+storage_client = CustomStorageClient()
+storage_client = CustomStorageClient()
+
+# Register it either with the service locator.
+service_locator.set_storage_client(storage_client)
+
+# Or pass it directly to the crawler.
+crawler = ParselCrawler(storage_client=storage_client)
+
+# Or just provide it when opening a storage (e.g. dataset).
+dataset = await Dataset.open(
+    name='my_dataset',
+    storage_client=storage_client,
+)
+```
+
+## Conclusion
+
+Storage clients in Crawlee provide different backends for storages. Use <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink> for testing and fast operations without persistence, or <ApiLink to="class/FileSystemStorageClient">`FileSystemStorageClient`</ApiLink> for environments where data needs to persist. You can also create custom storage clients for specialized backends by implementing the <ApiLink to="class/StorageClient">`StorageClient`</ApiLink> interface. If you have questions or need assistance, feel free to reach out on our [GitHub](https://github.com/apify/crawlee-python) or join our [Discord community](https://discord.com/invite/jyEM2PRvMU). Happy scraping!

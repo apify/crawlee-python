@@ -6,7 +6,7 @@ from crawlee.storages import Dataset
 async def main() -> None:
     # Open the dataset, if it does not exist, it will be created.
     # Leave name empty to use the default dataset.
-    dataset = await Dataset.open()
+    dataset = await Dataset.open(name='my-dataset')
 
     # Push a single row of data.
     await dataset.push_data({'foo': 'bar'})
