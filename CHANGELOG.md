@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.6.11 - **not yet released**
+## [0.6.11](https://github.com/apify/crawlee-python/releases/tag/v0.6.11) (2025-06-23)
 
 ### 🚀 Features
 
@@ -16,7 +15,6 @@ All notable changes to this project will be documented in this file.
 - Do not raise an error to check &#x27;same-domain&#x27; if there is no hostname in the url ([#1251](https://github.com/apify/crawlee-python/pull/1251)) ([a6c3aab](https://github.com/apify/crawlee-python/commit/a6c3aabf5f8341f215275077b6768a56118bc656)) by [@Mantisus](https://github.com/Mantisus)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.6.10](https://github.com/apify/crawlee-python/releases/tag/v0.6.10) (2025-06-02)
 
 ### 🐛 Bug Fixes
