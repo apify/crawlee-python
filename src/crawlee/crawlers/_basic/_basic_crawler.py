@@ -1459,7 +1459,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if self._status_message_callback:
             self._status_message_callback(current_state, self._previous_crawler_state, message)
         else:
-            self.set_status_message(message)
+            self.set_status_message(message, level='INFO')
 
         event_manager.emit(event=Event.CRAWLER_STATUS, event_data=EventCrawlerStatusData(message=message))
 
