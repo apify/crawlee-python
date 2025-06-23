@@ -23,6 +23,7 @@ from crawlee._utils.robots import RobotsTxtFile
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
 from crawlee.errors import RequestCollisionError, SessionError, UserDefinedErrorHandlerError
+from crawlee.events import Event, EventCrawlerStatusData
 from crawlee.events._local_event_manager import LocalEventManager
 from crawlee.request_loaders import RequestList, RequestManagerTandem
 from crawlee.sessions import Session, SessionPool
@@ -36,6 +37,7 @@ if TYPE_CHECKING:
     from yarl import URL
 
     from crawlee._types import JsonSerializable
+    from crawlee.statistics import StatisticsState
     from crawlee.storage_clients._memory import DatasetClient
 
 
@@ -1345,3 +1347,58 @@ async def test_reduced_logs_from_timed_out_request_handler(
             break
     else:
         raise AssertionError('Expected log message about request handler error was not found.')
+
+
+async def test_status_message_callback() -> None:
+    """Test that status message callback is called with the correct message."""
+    status_message_callback = AsyncMock()
+    states: list[dict[str, StatisticsState | None]] = []
+
+    def status_callback(state: StatisticsState, previous_state: StatisticsState | None, message: str) -> None:
+        status_message_callback(message)
+        states.append({'state': state, 'previous_state': previous_state})
+
+    crawler = BasicCrawler(
+        status_message_callback=status_callback, status_message_logging_interval=timedelta(seconds=0.01)
+    )
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        await asyncio.sleep(0.1)  # Simulate some processing time
+
+    await crawler.run(['http://a.com/'])
+
+    assert status_message_callback.called
+
+    assert len(states) > 1
+
+    first_call = states[0]
+    second_call = states[1]
+
+    # For the first call, `previous_state` is None
+    assert first_call['state'] is not None
+    assert first_call['previous_state'] is None
+
+    # For second call, `previous_state` is the first state
+    assert second_call['state'] is not None
+    assert second_call['previous_state'] is not None
+    assert second_call['previous_state'] == first_call['state']
+
+
+async def test_status_message_emit() -> None:
+    event_manager = service_locator.get_event_manager()
+
+    status_message_listener = Mock()
+
+    def listener(event_data: EventCrawlerStatusData) -> None:
+        status_message_listener(event_data)
+
+    event_manager.on(event=Event.CRAWLER_STATUS, listener=listener)
+
+    crawler = BasicCrawler(request_handler=AsyncMock())
+
+    await crawler.run(['http://a.com/'])
+
+    event_manager.off(event=Event.CRAWLER_STATUS, listener=listener)
+
+    assert status_message_listener.called

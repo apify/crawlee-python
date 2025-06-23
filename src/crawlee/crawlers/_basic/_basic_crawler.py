@@ -25,7 +25,7 @@ from yarl import URL
 
 from crawlee import EnqueueStrategy, Glob, service_locator
 from crawlee._autoscaling import AutoscaledPool, Snapshotter, SystemStatus
-from crawlee._log_config import configure_logger, get_configured_log_level
+from crawlee._log_config import configure_logger, get_configured_log_level, string_to_log_level
 from crawlee._request import Request, RequestState
 from crawlee._types import (
     BasicCrawlingContext,
@@ -50,7 +50,7 @@ from crawlee.errors import (
     SessionError,
     UserDefinedErrorHandlerError,
 )
-from crawlee.events._types import Event
+from crawlee.events._types import Event, EventCrawlerStatusData
 from crawlee.http_clients import HttpxHttpClient
 from crawlee.router import Router
 from crawlee.sessions import SessionPool
@@ -172,6 +172,13 @@ class _BasicCrawlerOptions(TypedDict):
     """If set to `True`, the crawler will automatically try to fetch the robots.txt file for each domain,
     and skip those that are not allowed. This also prevents disallowed URLs to be added via `EnqueueLinksFunction`."""
 
+    status_message_logging_interval: NotRequired[timedelta]
+    """Interval for logging the crawler status messages."""
+
+    status_message_callback: NotRequired[Callable[[StatisticsState, StatisticsState | None, str], None]]
+    """Allows overriding the default status message. The callback needs to call `crawler.setStatusMessage()` explicitly.
+    The default status message is provided in the parameters."""
+
 
 class _BasicCrawlerOptionsGeneric(Generic[TCrawlingContext, TStatisticsState], TypedDict):
     """Generic options the `BasicCrawler` constructor."""
@@ -254,6 +261,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         configure_logging: bool = True,
         statistics_log_format: Literal['table', 'inline'] = 'table',
         respect_robots_txt_file: bool = False,
+        status_message_logging_interval: timedelta = timedelta(seconds=10),
+        status_message_callback: Callable[[StatisticsState, StatisticsState | None, str], None] | None = None,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         _additional_context_managers: Sequence[AbstractAsyncContextManager] | None = None,
         _logger: logging.Logger | None = None,
@@ -299,6 +308,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             respect_robots_txt_file: If set to `True`, the crawler will automatically try to fetch the robots.txt file
                 for each domain, and skip those that are not allowed. This also prevents disallowed URLs to be added
                 via `EnqueueLinksFunction`
+            status_message_logging_interval:  Interval for logging the crawler status messages
+            status_message_callback: A callback function for customizing crawler status messages. When provided,
+                this function will be called instead of the default status message logging. The function receives
+                the current statistics state, the previous state (if available), and the default status message
+                as parameters.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
             _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
@@ -341,6 +355,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._error_handler: ErrorHandler[TCrawlingContext | BasicCrawlingContext] | None = None
         self._failed_request_handler: FailedRequestHandler[TCrawlingContext | BasicCrawlingContext] | None = None
         self._abort_on_error = abort_on_error
+
+        # Crawler callbacks
+        self._status_message_callback = status_message_callback
 
         # Context of each request with matching result of request handler.
         # Inheritors can use this to override the result of individual request handler runs in `_run_request_handler`.
@@ -402,7 +419,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             is_task_ready_function=self.__is_task_ready_function,
             run_task_function=self.__run_task_function,
         )
-        self._crawler_state_rec_task = RecurringTask(func=self._crawler_state_task, delay=timedelta(seconds=5))
+        self._crawler_state_rec_task = RecurringTask(
+            func=self._crawler_state_task, delay=status_message_logging_interval
+        )
+        self._previous_crawler_state: TStatisticsState | None = None
 
         # State flags
         self._keep_alive = keep_alive
@@ -599,6 +619,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         except CancelledError:
             pass
         finally:
+            await self._crawler_state_rec_task.stop()
             if threading.current_thread() is threading.main_thread():
                 with suppress(NotImplementedError):
                     asyncio.get_running_loop().remove_signal_handler(signal.SIGINT)
@@ -629,6 +650,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     async def _run_crawler(self) -> None:
         event_manager = service_locator.get_event_manager()
+
+        self._crawler_state_rec_task.start()
 
         # Collect the context managers to be entered. Context managers that are already active are excluded,
         # as they were likely entered by the caller, who will also be responsible for exiting them.
@@ -1395,7 +1418,49 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         """
         return await RobotsTxtFile.find(url, self._http_client)
 
+    def set_status_message(
+        self, message: str, level: Literal['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] = 'DEBUG'
+    ) -> None:
+        """Set a status message for the crawler.
+
+        Args:
+            message: The status message to log.
+            level: The logging level for the message.
+        """
+        log_level = string_to_log_level(level)
+        self.log.log(log_level, message)
+
     async def _crawler_state_task(self) -> None:
         """Emit a persist state event with the given migration status."""
         event_manager = service_locator.get_event_manager()
-        event_manager.emit(event=Event.CRAWLER_STATUS, event_data=None)
+
+        current_state = self.statistics.state
+
+        if (
+            failed_requests := (
+                current_state.requests_failed - (self._previous_crawler_state or current_state).requests_failed
+            )
+            > 0
+        ):
+            message = f'Experiencing problems, {failed_requests} failed requests since last status update.'
+        else:
+            request_manager = await self.get_request_manager()
+            total_count = await request_manager.get_total_count()
+            if total_count is not None and total_count > 0:
+                pages_info = f'{self._statistics.state.requests_finished}/{total_count}'
+            else:
+                pages_info = str(self._statistics.state.requests_finished)
+
+            message = (
+                f'Crawled {pages_info} pages, {self._statistics.state.requests_failed} failed requests, '
+                f'desired concurrency {self._autoscaled_pool.desired_concurrency}.'
+            )
+
+        if self._status_message_callback:
+            self._status_message_callback(current_state, self._previous_crawler_state, message)
+        else:
+            self.set_status_message(message)
+
+        event_manager.emit(event=Event.CRAWLER_STATUS, event_data=EventCrawlerStatusData(message=message))
+
+        self._previous_crawler_state = current_state

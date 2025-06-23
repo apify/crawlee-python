@@ -82,7 +82,23 @@ class EventExitData(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
-EventData = Union[EventPersistStateData, EventSystemInfoData, EventMigratingData, EventAbortingData, EventExitData]
+@docs_group('Event payloads')
+class EventCrawlerStatusData(BaseModel):
+    """Data for the crawler status event."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    message: str
+
+
+EventData = Union[
+    EventPersistStateData,
+    EventSystemInfoData,
+    EventMigratingData,
+    EventAbortingData,
+    EventExitData,
+    EventCrawlerStatusData,
+]
 """A helper type for all possible event payloads"""
 
 WrappedListener = Callable[..., Coroutine[Any, Any, None]]
