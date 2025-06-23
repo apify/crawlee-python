@@ -41,20 +41,18 @@ Each storage client is responsible for maintaining the storages in a specific en
 The <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink> is the default and currently the only one storage client in Crawlee. It stores data in memory and persists it to the local file system. The data are stored in the following directory structure:
 
 ```text
-{CRAWLEE_STORAGE_DIR}/{storage_type}/{STORAGE_ID}/
+{CRAWLEE_STORAGE_DIR}/{storage_type}/{STORAGE_NAME}/
 ```
 
 where:
 
 - `{CRAWLEE_STORAGE_DIR}`: The root directory for local storage, specified by the `CRAWLEE_STORAGE_DIR` environment variable (default: `./storage`).
 - `{storage_type}`: The type of storage (e.g., `datasets`, `key_value_stores`, `request_queues`).
-- `{STORAGE_ID}`: The ID of the specific storage instance (default: `default`).
+- `{STORAGE_NAME}`: The name of the specific storage instance (default: `default`).
 
 :::info NOTE
 The current <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink> and its interface is quite old and not great. We plan to refactor it, together with the whole <ApiLink to="class/StorageClient">`StorageClient`</ApiLink> interface in the near future and it better and and easier to use. We also plan to introduce new storage clients for different storage backends - e.g. for [SQLite](https://sqlite.org/).
 :::
-
-You can override default storage IDs using these environment variables: `CRAWLEE_DEFAULT_DATASET_ID`, `CRAWLEE_DEFAULT_KEY_VALUE_STORE_ID`, or `CRAWLEE_DEFAULT_REQUEST_QUEUE_ID`.
 
 ## Request queue
 
