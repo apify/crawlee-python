@@ -194,9 +194,11 @@ class _BasicCrawlerOptions(TypedDict):
     status_message_logging_interval: NotRequired[timedelta]
     """Interval for logging the crawler status messages."""
 
-    status_message_callback: NotRequired[Callable[[StatisticsState, StatisticsState | None, str], None]]
-    """Allows overriding the default status message. The callback needs to call `crawler.setStatusMessage()` explicitly.
-    The default status message is provided in the parameters."""
+    status_message_callback: NotRequired[
+        Callable[[BasicCrawler[TCrawlingContext, TStatisticsState], StatisticsState, StatisticsState | None, str], None]
+    ]
+    """Allows overriding the default status message. The callback needs to call `crawler.set_status_message()`
+    explicitly. The default status message is provided in the parameters."""
 
 
 class _BasicCrawlerOptionsGeneric(Generic[TCrawlingContext, TStatisticsState], TypedDict):
@@ -281,7 +283,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         statistics_log_format: Literal['table', 'inline'] = 'table',
         respect_robots_txt_file: bool = False,
         status_message_logging_interval: timedelta = timedelta(seconds=10),
-        status_message_callback: Callable[[StatisticsState, StatisticsState | None, str], None] | None = None,
+        status_message_callback: Callable[
+            [BasicCrawler[TCrawlingContext, TStatisticsState], StatisticsState, StatisticsState | None, str], None
+        ]
+        | None = None,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         _additional_context_managers: Sequence[AbstractAsyncContextManager] | None = None,
         _logger: logging.Logger | None = None,
@@ -309,7 +314,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 `max_requests_per_crawl` is achieved.
             max_session_rotations: Maximum number of session rotations per request. The crawler rotates the session
                 if a proxy error occurs or if the website blocks the request.
-
                 The session rotations are not counted towards the `max_request_retries` limit.
             max_crawl_depth: Specifies the maximum crawl depth. If set, the crawler will stop processing links beyond
                 this depth. The crawl depth starts at 0 for initial requests and increases with each subsequent level
@@ -1588,7 +1592,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             )
 
         if self._status_message_callback:
-            self._status_message_callback(current_state, self._previous_crawler_state, message)
+            self._status_message_callback(self, current_state, self._previous_crawler_state, message)
         else:
             self.set_status_message(message, level='INFO')
 

@@ -1426,7 +1426,9 @@ async def test_status_message_callback() -> None:
     status_message_callback = AsyncMock()
     states: list[dict[str, StatisticsState | None]] = []
 
-    def status_callback(state: StatisticsState, previous_state: StatisticsState | None, message: str) -> None:
+    def status_callback(
+        crawler: BasicCrawler, state: StatisticsState, previous_state: StatisticsState | None, message: str
+    ) -> None:
         status_message_callback(message)
         states.append({'state': state, 'previous_state': previous_state})
 
