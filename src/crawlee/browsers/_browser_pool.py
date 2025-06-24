@@ -53,6 +53,7 @@ class BrowserPool:
         browser_inactive_threshold: timedelta = timedelta(seconds=10),
         identify_inactive_browsers_interval: timedelta = timedelta(seconds=20),
         close_inactive_browsers_interval: timedelta = timedelta(seconds=30),
+        retire_browser_after_page_count: int = 100,
     ) -> None:
         """Initialize a new instance.
 
@@ -67,7 +68,10 @@ class BrowserPool:
                 as retired.
             close_inactive_browsers_interval: The interval at which the pool checks for inactive browsers
                 and closes them. The browser is considered as inactive if it has no active pages and has been idle
-                for the specified period.
+                for the specified period. The browser is considered as retired if it has no active pages and has total
+                pages count greater than or equal to `retire_browser_after_page_count`.
+            retire_browser_after_page_count: The maximum number of processed pages after which the browser is considered
+                as retired.
         """
         self._plugins = plugins or [PlaywrightBrowserPlugin()]
         self._operation_timeout = operation_timeout
@@ -91,6 +95,7 @@ class BrowserPool:
         )
 
         self._total_pages_count = 0
+        self._retire_browser_after_page_count = retire_browser_after_page_count
         self._pages = WeakValueDictionary[str, CrawleePage]()  # Track the pages in the pool
         self._plugins_cycle = itertools.cycle(self._plugins)  # Cycle through the plugins
 
@@ -305,6 +310,9 @@ class BrowserPool:
         except RuntimeError as exc:
             raise RuntimeError('Browser pool is not initialized.') from exc
 
+        if browser_controller.total_pages >= self._retire_browser_after_page_count:
+            self._retire_browser(browser_controller)
+
         crawlee_page = CrawleePage(id=page_id, page=page, browser_type=plugin.browser_type)
         self._pages[page_id] = crawlee_page
         self._total_pages_count += 1
@@ -320,6 +328,12 @@ class BrowserPool:
                 return browser
 
         return None
+
+    def _retire_browser(self, browser: BrowserController) -> None:
+        """Retire a browser by moving it to the inactive list."""
+        if browser in self._active_browsers:
+            self._active_browsers.remove(browser)
+            self._inactive_browsers.append(browser)
 
     async def _launch_new_browser(self, plugin: BrowserPlugin) -> BrowserController:
         """Launch a new browser instance using the specified plugin."""
