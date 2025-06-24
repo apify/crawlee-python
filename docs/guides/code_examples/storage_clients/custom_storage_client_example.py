@@ -1,7 +1,4 @@
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
-
+from crawlee.configuration import Configuration
 from crawlee.storage_clients import StorageClient
 from crawlee.storage_clients._base import (
     DatasetClient,
@@ -9,26 +6,22 @@ from crawlee.storage_clients._base import (
     RequestQueueClient,
 )
 
-if TYPE_CHECKING:
-    from crawlee.configuration import Configuration
-
-
 # Implement the storage type clients with your backend logic.
 
 
 class CustomDatasetClient(DatasetClient):
-    # Implement abstract methods like get_items, add_item, drop, purge, etc.
-    ...
+    # Implement methods like push_data, get_data, iterate_items, etc.
+    pass
 
 
 class CustomKeyValueStoreClient(KeyValueStoreClient):
-    # Implement abstract methods like get_value, set_value, delete, etc.
-    ...
+    # Implement methods like get_value, set_value, delete, etc.
+    pass
 
 
 class CustomRequestQueueClient(RequestQueueClient):
-    # Implement abstract methods like add_request, fetch_next_request, etc.
-    ...
+    # Implement methods like add_request, fetch_next_request, etc.
+    pass
 
 
 # Implement the storage client factory.
@@ -43,7 +36,7 @@ class CustomStorageClient(StorageClient):
         configuration: Configuration | None = None,
     ) -> CustomDatasetClient:
         # Create and return your custom dataset client.
-        ...
+        pass
 
     async def create_kvs_client(
         self,
@@ -53,7 +46,7 @@ class CustomStorageClient(StorageClient):
         configuration: Configuration | None = None,
     ) -> CustomKeyValueStoreClient:
         # Create and return your custom key-value store client.
-        ...
+        pass
 
     async def create_rq_client(
         self,
@@ -63,4 +56,4 @@ class CustomStorageClient(StorageClient):
         configuration: Configuration | None = None,
     ) -> CustomRequestQueueClient:
         # Create and return your custom request queue client.
-        ...
+        pass
