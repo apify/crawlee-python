@@ -218,7 +218,10 @@ markers = [
 [tool.mypy]
 python_version = "3.9"
 plugins = ["pydantic.mypy"]
-exclude = ["src/crawlee/project_template"]
+exclude = [
+    "src/crawlee/project_template",
+    "docs/guides/code_examples/storage_clients/custom_storage_client_example.py",
+]
 files = ["src", "tests", "docs", "website"]
 check_untyped_defs = true
 disallow_incomplete_defs = true
@@ -254,7 +257,7 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = [
-    "running_in_web_server.*"  # False positive when fastapi not available
+    "running_in_web_server.*", # False positive when fastapi not available
 ]
 disable_error_code = ["misc"]
 

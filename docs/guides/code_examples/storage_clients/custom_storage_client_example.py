@@ -1,10 +1,16 @@
-from crawlee.configuration import Configuration
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from crawlee.storage_clients import StorageClient
 from crawlee.storage_clients._base import (
     DatasetClient,
     KeyValueStoreClient,
     RequestQueueClient,
 )
+
+if TYPE_CHECKING:
+    from crawlee.configuration import Configuration
 
 # Implement the storage type clients with your backend logic.
 
