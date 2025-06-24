@@ -163,14 +163,16 @@ async def test_with_plugin_contains_page_options(server_url: URL) -> None:
 
 
 @pytest.mark.parametrize(
-    ('page_count', 'equal_browsers'),
+    ('retire_after_page_count', 'expect_equal_browsers'),
     [
-        pytest.param(2, True, id='two pages create same browser'),
-        pytest.param(1, False, id='each page creates new browser'),
+        pytest.param(2, True, id='Two pages opened in the same browser'),
+        pytest.param(1, False, id='Each page opened in a new browser.'),
     ],
 )
-async def test_browser_pool_retire_browser_after_page_count(page_count: int, *, equal_browsers: bool) -> None:
-    async with BrowserPool(retire_browser_after_page_count=page_count) as browser_pool:
+async def test_browser_pool_retire_browser_after_page_count(
+    retire_after_page_count: int, *, expect_equal_browsers: bool
+) -> None:
+    async with BrowserPool(retire_browser_after_page_count=retire_after_page_count) as browser_pool:
         test_page = await browser_pool.new_page()
         first_browser = test_page.page.context
         await test_page.page.close()
@@ -180,7 +182,7 @@ async def test_browser_pool_retire_browser_after_page_count(page_count: int, *, 
 
         await test_page.page.close()
 
-        if equal_browsers:
-            assert first_browser == second_browser
+        if expect_equal_browsers:
+            assert first_browser is second_browser
         else:
-            assert first_browser != second_browser
+            assert first_browser is not second_browser
