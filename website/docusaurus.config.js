@@ -38,6 +38,10 @@ module.exports = {
     githubHost: 'github.com',
     future: {
         experimental_faster: true,
+        v4: {
+            removeLegacyPostBuildHeadAttribute: true,
+            useCssCascadeLayers: false, // this breaks styles on homepage and link colors everywhere
+        },
     },
     headTags: [
         // Intercom messenger
@@ -274,7 +278,7 @@ module.exports = {
             // eslint-disable-next-line max-len
             { name: 'og:description', content: `Crawlee helps you build and maintain your Python crawlers. It's open source and modern, with type hints for Python to help you catch bugs early.` },
         ],
-        image: 'img/crawlee-og.png',
+        image: 'img/crawlee-python-og.png',
         footer: {
             links: [
                 {

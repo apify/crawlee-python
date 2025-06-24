@@ -4,18 +4,16 @@ from __future__ import annotations
 import math
 from datetime import datetime, timedelta, timezone
 from logging import Logger, getLogger
-from typing import TYPE_CHECKING, Any, Generic, Literal, cast
+from typing import TYPE_CHECKING, Generic, Literal
 
 from typing_extensions import Self, TypeVar
 
-from crawlee import service_locator
 from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
+from crawlee._utils.recoverable_state import RecoverableState
 from crawlee._utils.recurring_task import RecurringTask
-from crawlee.events._types import Event, EventPersistStateData
-from crawlee.statistics import FinalStatistics, StatisticsPersistedState, StatisticsState
+from crawlee.statistics import FinalStatistics, StatisticsState
 from crawlee.statistics._error_tracker import ErrorTracker
-from crawlee.storages import KeyValueStore
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -71,7 +69,6 @@ class Statistics(Generic[TStatisticsState]):
         persistence_enabled: bool = False,
         persist_state_kvs_name: str | None = None,
         persist_state_key: str | None = None,
-        key_value_store: KeyValueStore | None = None,
         log_message: str = 'Statistics',
         periodic_message_logger: Logger | None = None,
         log_interval: timedelta = timedelta(minutes=1),
@@ -82,23 +79,23 @@ class Statistics(Generic[TStatisticsState]):
         self._id = Statistics.__next_id
         Statistics.__next_id += 1
 
-        self._state_model = state_model
-        self.state = self._state_model()
         self._instance_start: datetime | None = None
-        self._retry_histogram = dict[int, int]()
 
-        self.error_tracker = ErrorTracker(save_error_snapshots=save_error_snapshots)
+        self.error_tracker = ErrorTracker(
+            save_error_snapshots=save_error_snapshots,
+            snapshot_kvs_name=persist_state_kvs_name,
+        )
         self.error_tracker_retry = ErrorTracker(save_error_snapshots=False)
 
         self._requests_in_progress = dict[str, RequestProcessingRecord]()
 
-        if persist_state_key is None:
-            persist_state_key = f'SDK_CRAWLER_STATISTICS_{self._id}'
-
-        self._persistence_enabled = persistence_enabled
-        self._persist_state_key = persist_state_key
-        self._persist_state_kvs_name = persist_state_kvs_name
-        self._key_value_store: KeyValueStore | None = key_value_store
+        self._state = RecoverableState(
+            default_state=state_model(stats_id=self._id),
+            persist_state_key=persist_state_key or f'SDK_CRAWLER_STATISTICS_{self._id}',
+            persistence_enabled=persistence_enabled,
+            persist_state_kvs_name=persist_state_kvs_name,
+            logger=logger,
+        )
 
         self._log_message = log_message
         self._statistics_log_format = statistics_log_format
@@ -111,10 +108,9 @@ class Statistics(Generic[TStatisticsState]):
     def replace_state_model(self, state_model: type[TNewStatisticsState]) -> Statistics[TNewStatisticsState]:
         """Create near copy of the `Statistics` with replaced `state_model`."""
         new_statistics: Statistics[TNewStatisticsState] = Statistics(
-            persistence_enabled=self._persistence_enabled,
-            persist_state_kvs_name=self._persist_state_kvs_name,
-            persist_state_key=self._persist_state_key,
-            key_value_store=self._key_value_store,
+            persistence_enabled=self._state._persistence_enabled,  # noqa: SLF001
+            persist_state_kvs_name=self._state._persist_state_kvs_name,  # noqa: SLF001
+            persist_state_key=self._state._persist_state_key,  # noqa: SLF001
             log_message=self._log_message,
             periodic_message_logger=self._periodic_message_logger,
             state_model=state_model,
@@ -128,7 +124,6 @@ class Statistics(Generic[TStatisticsState]):
         persistence_enabled: bool = False,
         persist_state_kvs_name: str | None = None,
         persist_state_key: str | None = None,
-        key_value_store: KeyValueStore | None = None,
         log_message: str = 'Statistics',
         periodic_message_logger: Logger | None = None,
         log_interval: timedelta = timedelta(minutes=1),
@@ -140,7 +135,6 @@ class Statistics(Generic[TStatisticsState]):
             persistence_enabled=persistence_enabled,
             persist_state_kvs_name=persist_state_kvs_name,
             persist_state_key=persist_state_key,
-            key_value_store=key_value_store,
             log_message=log_message,
             periodic_message_logger=periodic_message_logger,
             log_interval=log_interval,
@@ -166,18 +160,9 @@ class Statistics(Generic[TStatisticsState]):
         self._active = True
         self._instance_start = datetime.now(timezone.utc)
 
-        if self.state.crawler_started_at is None:
-            self.state.crawler_started_at = datetime.now(timezone.utc)
+        await self._state.initialize()
+        self._after_initialize()
 
-        if self._key_value_store is None:
-            self._key_value_store = await KeyValueStore.open(name=self._persist_state_kvs_name)
-
-        if self.error_tracker.error_snapshotter:
-            self.error_tracker.error_snapshotter.kvs = self._key_value_store
-
-        await self._maybe_load_statistics()
-        event_manager = service_locator.get_event_manager()
-        event_manager.on(event=Event.PERSIST_STATE, listener=self._persist_state)
         self._periodic_logger.start()
 
         return self
@@ -196,18 +181,24 @@ class Statistics(Generic[TStatisticsState]):
         if not self._active:
             raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
-        self.state.crawler_finished_at = datetime.now(timezone.utc)
-        event_manager = service_locator.get_event_manager()
-        event_manager.off(event=Event.PERSIST_STATE, listener=self._persist_state)
+        self._state.current_value.crawler_finished_at = datetime.now(timezone.utc)
+
+        await self._state.teardown()
+
         await self._periodic_logger.stop()
-        await self._persist_state(event_data=EventPersistStateData(is_migrating=False))
+
         self._active = False
+
+    @property
+    def state(self) -> TStatisticsState:
+        return self._state.current_value
 
     @ensure_context
     def register_status_code(self, code: int) -> None:
         """Increment the number of times a status code has been received."""
-        self.state.requests_with_status_code.setdefault(str(code), 0)
-        self.state.requests_with_status_code[str(code)] += 1
+        state = self._state.current_value
+        state.requests_with_status_code.setdefault(str(code), 0)
+        state.requests_with_status_code[str(code)] += 1
 
     @ensure_context
     def record_request_processing_start(self, request_id_or_key: str) -> None:
@@ -223,15 +214,17 @@ class Statistics(Generic[TStatisticsState]):
         if record is None:
             return
 
+        state = self._state.current_value
         duration = record.finish()
-        self.state.requests_finished += 1
-        self.state.request_total_finished_duration += duration
+
+        state.requests_finished += 1
+        state.request_total_finished_duration += duration
         self._save_retry_count_for_request(record)
-        self.state.request_min_duration = min(
-            self.state.request_min_duration if self.state.request_min_duration is not None else timedelta.max, duration
+        state.request_min_duration = min(
+            state.request_min_duration if state.request_min_duration is not None else timedelta.max, duration
         )
-        self.state.request_max_duration = min(
-            self.state.request_max_duration if self.state.request_max_duration is not None else timedelta(), duration
+        state.request_max_duration = min(
+            state.request_max_duration if state.request_max_duration is not None else timedelta(), duration
         )
 
         del self._requests_in_progress[request_id_or_key]
@@ -243,8 +236,10 @@ class Statistics(Generic[TStatisticsState]):
         if record is None:
             return
 
-        self.state.request_total_failed_duration += record.finish()
-        self.state.requests_failed += 1
+        state = self._state.current_value
+
+        state.request_total_failed_duration += record.finish()
+        state.requests_failed += 1
         self._save_retry_count_for_request(record)
 
         del self._requests_in_progress[request_id_or_key]
@@ -256,38 +251,28 @@ class Statistics(Generic[TStatisticsState]):
 
         crawler_runtime = datetime.now(timezone.utc) - self._instance_start
         total_minutes = crawler_runtime.total_seconds() / 60
+        state = self._state.current_value
+        serialized_state = state.model_dump(by_alias=False)
 
         return FinalStatistics(
-            request_avg_failed_duration=(self.state.request_total_failed_duration / self.state.requests_failed)
-            if self.state.requests_failed
-            else None,
-            request_avg_finished_duration=(self.state.request_total_finished_duration / self.state.requests_finished)
-            if self.state.requests_finished
-            else None,
-            requests_finished_per_minute=round(self.state.requests_finished / total_minutes) if total_minutes else 0,
-            requests_failed_per_minute=math.floor(self.state.requests_failed / total_minutes) if total_minutes else 0,
-            request_total_duration=self.state.request_total_finished_duration
-            + self.state.request_total_failed_duration,
-            requests_total=self.state.requests_failed + self.state.requests_finished,
+            request_avg_failed_duration=state.request_avg_failed_duration,
+            request_avg_finished_duration=state.request_avg_finished_duration,
+            requests_finished_per_minute=round(state.requests_finished / total_minutes) if total_minutes else 0,
+            requests_failed_per_minute=math.floor(state.requests_failed / total_minutes) if total_minutes else 0,
+            request_total_duration=state.request_total_finished_duration + state.request_total_failed_duration,
+            requests_total=state.requests_failed + state.requests_finished,
             crawler_runtime=crawler_runtime,
-            requests_finished=self.state.requests_finished,
-            requests_failed=self.state.requests_failed,
-            retry_histogram=[
-                self._retry_histogram.get(retry_count, 0)
-                for retry_count in range(max(self._retry_histogram.keys(), default=0) + 1)
-            ],
+            requests_finished=state.requests_finished,
+            requests_failed=state.requests_failed,
+            retry_histogram=serialized_state['request_retry_histogram'],
         )
 
     async def reset(self) -> None:
         """Reset the statistics to their defaults and remove any persistent state."""
-        self.state = self._state_model()
+        await self._state.reset()
         self.error_tracker = ErrorTracker()
         self.error_tracker_retry = ErrorTracker()
-        self._retry_histogram.clear()
         self._requests_in_progress.clear()
-
-        if self._persistence_enabled and self._key_value_store:
-            await self._key_value_store.set_value(self._persist_state_key, None)
 
     def _log(self) -> None:
         stats = self.calculate()
@@ -296,62 +281,27 @@ class Statistics(Generic[TStatisticsState]):
         else:
             self._periodic_message_logger.info(self._log_message, extra=stats.to_dict())
 
-    async def _maybe_load_statistics(self) -> None:
-        if not self._persistence_enabled:
-            return
+    def _after_initialize(self) -> None:
+        state = self._state.current_value
 
-        if not self._key_value_store:
-            return
+        if state.crawler_started_at is None:
+            state.crawler_started_at = datetime.now(timezone.utc)
 
-        stored_state = await self._key_value_store.get_value(self._persist_state_key, cast('Any', {}))
-
-        saved_state = self.state.__class__.model_validate(stored_state)
-        self.state = saved_state
-
-        if saved_state.stats_persisted_at is not None and saved_state.crawler_last_started_at:
+        if state.stats_persisted_at is not None and state.crawler_last_started_at:
             self._instance_start = datetime.now(timezone.utc) - (
-                saved_state.stats_persisted_at - saved_state.crawler_last_started_at
+                state.stats_persisted_at - state.crawler_last_started_at
             )
-        elif saved_state.crawler_last_started_at:
-            self._instance_start = saved_state.crawler_last_started_at
+        elif state.crawler_last_started_at:
+            self._instance_start = state.crawler_last_started_at
 
-    async def _persist_state(self, event_data: EventPersistStateData) -> None:
-        logger.debug(f'Persisting state of the Statistics (event_data={event_data}).')
-
-        if not self._persistence_enabled:
-            return
-
-        if not self._key_value_store:
-            return
-
-        if not self._instance_start:
-            return
-
-        final_statistics = self.calculate()
-        persisted_state = StatisticsPersistedState(
-            stats_id=self._id,
-            stats_persisted_at=datetime.now(timezone.utc),
-            crawler_last_started_at=self._instance_start,
-            request_total_duration=final_statistics.request_total_duration,
-            request_avg_failed_duration=final_statistics.request_avg_failed_duration,
-            request_avg_finished_duration=final_statistics.request_avg_finished_duration,
-            requests_total=final_statistics.requests_total,
-            request_retry_histogram=final_statistics.retry_histogram,
-        )
-
-        logger.debug('Persisting state')
-
-        await self._key_value_store.set_value(
-            self._persist_state_key,
-            self.state.model_dump(mode='json', by_alias=True) | persisted_state.model_dump(mode='json', by_alias=True),
-            'application/json',
-        )
+        state.crawler_last_started_at = self._instance_start
 
     def _save_retry_count_for_request(self, record: RequestProcessingRecord) -> None:
         retry_count = record.retry_count
+        state = self._state.current_value
 
         if retry_count:
-            self.state.requests_retries += 1
+            state.requests_retries += 1
 
-        self._retry_histogram.setdefault(retry_count, 0)
-        self._retry_histogram[retry_count] += 1
+        state.request_retry_histogram.setdefault(retry_count, 0)
+        state.request_retry_histogram[retry_count] += 1

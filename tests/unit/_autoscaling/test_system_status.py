@@ -153,10 +153,10 @@ def test_get_system_info(snapshotter: Snapshotter, now: datetime) -> None:
     # Add client snapshots
     system_status._snapshotter._client_snapshots = Snapshotter._get_sorted_list_by_created_at(
         [
-            ClientSnapshot(error_count=1, max_error_count=2, created_at=now - timedelta(minutes=3)),
-            ClientSnapshot(error_count=1, max_error_count=2, created_at=now - timedelta(minutes=2)),
-            ClientSnapshot(error_count=2, max_error_count=2, created_at=now - timedelta(minutes=1)),
-            ClientSnapshot(error_count=0, max_error_count=2, created_at=now),
+            ClientSnapshot(error_count=1, new_error_count=1, max_error_count=2, created_at=now - timedelta(minutes=3)),
+            ClientSnapshot(error_count=2, new_error_count=1, max_error_count=2, created_at=now - timedelta(minutes=2)),
+            ClientSnapshot(error_count=4, new_error_count=2, max_error_count=2, created_at=now - timedelta(minutes=1)),
+            ClientSnapshot(error_count=4, new_error_count=0, max_error_count=2, created_at=now),
         ]
     )
 
@@ -181,3 +181,26 @@ def test_get_system_info(snapshotter: Snapshotter, now: datetime) -> None:
         created_at=historical_system_info.created_at,
     )
     assert historical_system_info.is_system_idle is False
+
+
+@pytest.mark.parametrize(('client_overload_threshold', 'is_overloaded'), [(0.66, True), (0.67, False)])
+def test_client_overloaded(
+    *, snapshotter: Snapshotter, now: datetime, client_overload_threshold: float, is_overloaded: bool
+) -> None:
+    system_status = SystemStatus(
+        snapshotter,
+        max_snapshot_age=timedelta(minutes=1),
+        client_overload_threshold=client_overload_threshold,
+    )
+
+    system_status._snapshotter._client_snapshots = Snapshotter._get_sorted_list_by_created_at(
+        [
+            ClientSnapshot(error_count=1, new_error_count=1, max_error_count=0, created_at=now - timedelta(minutes=3)),
+            ClientSnapshot(error_count=2, new_error_count=1, max_error_count=0, created_at=now - timedelta(minutes=2)),
+            ClientSnapshot(error_count=3, new_error_count=1, max_error_count=0, created_at=now - timedelta(minutes=1)),
+            ClientSnapshot(error_count=3, new_error_count=0, max_error_count=0, created_at=now),
+        ]
+    )
+
+    # Ratio of overloaded snapshots is 2/3 (2 minutes out of 3)
+    assert system_status._is_client_overloaded().is_overloaded == is_overloaded

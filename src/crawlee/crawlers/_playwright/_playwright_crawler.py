@@ -1,24 +1,31 @@
 from __future__ import annotations
 
+import asyncio
 import logging
+import warnings
 from functools import partial
-from typing import TYPE_CHECKING, Any, Callable, Generic, Literal, Union
+from typing import TYPE_CHECKING, Any, Callable, Generic, Literal
 
+from more_itertools import partition
 from pydantic import ValidationError
 from typing_extensions import NotRequired, TypedDict, TypeVar
 
+from crawlee import service_locator
 from crawlee._request import Request, RequestOptions
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.docs import docs_group
-from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
+from crawlee._utils.robots import RobotsTxtFile
+from crawlee._utils.urls import to_absolute_url_iterator
 from crawlee.browsers import BrowserPool
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
 from crawlee.fingerprint_suite import DefaultFingerprintGenerator, FingerprintGenerator, HeaderGeneratorOptions
+from crawlee.http_clients import HttpxHttpClient
 from crawlee.sessions._cookies import PlaywrightCookieParam
 from crawlee.statistics import StatisticsState
 
 from ._playwright_crawling_context import PlaywrightCrawlingContext
+from ._playwright_http_client import PlaywrightHttpClient, browser_page_context
 from ._playwright_pre_nav_crawling_context import PlaywrightPreNavCrawlingContext
 from ._utils import block_requests, infinite_scroll
 
@@ -26,14 +33,22 @@ TCrawlingContext = TypeVar('TCrawlingContext', bound=PlaywrightCrawlingContext)
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Awaitable, Mapping, Sequence
+    from collections.abc import AsyncGenerator, Awaitable, Iterator, Mapping
     from pathlib import Path
 
-    from playwright.async_api import Page
+    from playwright.async_api import Page, Route
+    from playwright.async_api import Request as PlaywrightRequest
     from typing_extensions import Unpack
 
     from crawlee import RequestTransformAction
-    from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, EnqueueLinksKwargs, ExtractLinksFunction
+    from crawlee._types import (
+        BasicCrawlingContext,
+        EnqueueLinksKwargs,
+        ExtractLinksFunction,
+        HttpHeaders,
+        HttpMethod,
+        HttpPayload,
+    )
     from crawlee.browsers._types import BrowserType
 
 
@@ -116,6 +131,10 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 This option should not be used if `browser_pool` is provided.
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
         """
+        configuration = kwargs.pop('configuration', None)
+        if configuration is not None:
+            service_locator.set_configuration(configuration)
+
         if browser_pool:
             # Raise an exception if browser_pool is provided together with other browser-related arguments.
             if any(
@@ -168,6 +187,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         kwargs.setdefault('_logger', logging.getLogger(__name__))
         self._pre_navigation_hooks: list[Callable[[PlaywrightPreNavCrawlingContext], Awaitable[None]]] = []
 
+        kwargs['http_client'] = PlaywrightHttpClient() if not kwargs.get('http_client') else kwargs['http_client']
+
         super().__init__(**kwargs)
 
     async def _open_page(
@@ -194,10 +215,31 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             block_requests=partial(block_requests, page=crawlee_page.page),
         )
 
-        for hook in self._pre_navigation_hooks:
-            await hook(pre_navigation_context)
-
+        async with browser_page_context(crawlee_page.page):
+            for hook in self._pre_navigation_hooks:
+                await hook(pre_navigation_context)
         yield pre_navigation_context
+
+    def _prepare_request_interceptor(
+        self,
+        method: HttpMethod = 'GET',
+        headers: HttpHeaders | dict[str, str] | None = None,
+        payload: HttpPayload | None = None,
+    ) -> Callable:
+        """Create a request interceptor for Playwright to support non-GET methods with custom parameters.
+
+        The interceptor modifies requests by adding custom headers and payload before they are sent.
+
+        Args:
+            method: HTTP method to use for the request.
+            headers: Custom HTTP headers to send with the request.
+            payload: Request body data for POST/PUT requests.
+        """
+
+        async def route_handler(route: Route, _: PlaywrightRequest) -> None:
+            await route.continue_(method=method, headers=dict(headers) if headers else None, post_data=payload)
+
+        return route_handler
 
     async def _navigate(
         self,
@@ -224,6 +266,24 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             if context.request.headers:
                 await context.page.set_extra_http_headers(context.request.headers.model_dump())
             # Navigate to the URL and get response.
+            if context.request.method != 'GET':
+                # Call the notification only once
+                warnings.warn(
+                    'Using other request methods than GET or adding payloads has a high impact on performance'
+                    ' in recent versions of Playwright. Use only when necessary.',
+                    category=UserWarning,
+                    stacklevel=2,
+                )
+
+                route_handler = self._prepare_request_interceptor(
+                    method=context.request.method,
+                    headers=context.request.headers,
+                    payload=context.request.payload,
+                )
+
+                # Set route_handler only for current request
+                await context.page.route(context.request.url, route_handler)
+
             response = await context.page.goto(context.request.url)
 
             if response is None:
@@ -232,29 +292,30 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             # Set the loaded URL to the actual URL after redirection.
             context.request.loaded_url = context.page.url
 
+            extract_links = self._create_extract_links_function(context)
+
+            async with browser_page_context(context.page):
+                error = yield PlaywrightCrawlingContext(
+                    request=context.request,
+                    session=context.session,
+                    add_requests=context.add_requests,
+                    send_request=context.send_request,
+                    push_data=context.push_data,
+                    use_state=context.use_state,
+                    proxy_info=context.proxy_info,
+                    get_key_value_store=context.get_key_value_store,
+                    log=context.log,
+                    page=context.page,
+                    infinite_scroll=lambda: infinite_scroll(context.page),
+                    response=response,
+                    extract_links=extract_links,
+                    enqueue_links=self._create_enqueue_links_function(context, extract_links),
+                    block_requests=partial(block_requests, page=context.page),
+                )
+
             if context.session:
                 pw_cookies = await self._get_cookies(context.page)
                 context.session.cookies.set_cookies_from_playwright_format(pw_cookies)
-
-            extract_links = self._create_extract_links_function(context)
-
-            error = yield PlaywrightCrawlingContext(
-                request=context.request,
-                session=context.session,
-                add_requests=context.add_requests,
-                send_request=context.send_request,
-                push_data=context.push_data,
-                use_state=context.use_state,
-                proxy_info=context.proxy_info,
-                get_key_value_store=context.get_key_value_store,
-                log=context.log,
-                page=context.page,
-                infinite_scroll=lambda: infinite_scroll(context.page),
-                response=response,
-                extract_links=extract_links,
-                enqueue_links=self._create_enqueue_links_function(context, extract_links),
-                block_requests=partial(block_requests, page=context.page),
-            )
 
             # Collect data in case of errors, before the page object is closed.
             if error:
@@ -283,88 +344,55 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
             The `PlaywrightCrawler` implementation of the `ExtractLinksFunction` function.
             """
-            kwargs.setdefault('strategy', 'same-hostname')
-
             requests = list[Request]()
+
             base_user_data = user_data or {}
 
+            robots_txt_file = await self._get_robots_txt_file_for_url(context.request.url)
+
+            kwargs.setdefault('strategy', 'same-hostname')
+
             elements = await context.page.query_selector_all(selector)
+            links_iterator: Iterator[str] = iter(
+                [url for element in elements if (url := await element.get_attribute('href')) is not None]
+            )
+            links_iterator = to_absolute_url_iterator(context.request.loaded_url or context.request.url, links_iterator)
 
-            for element in elements:
-                url = await element.get_attribute('href')
+            if robots_txt_file:
+                skipped, links_iterator = partition(lambda url: robots_txt_file.is_allowed(url), links_iterator)
+            else:
+                skipped = iter([])
 
-                if url:
-                    url = url.strip()
+            for url in self._enqueue_links_filter_iterator(links_iterator, context.request.url, **kwargs):
+                request_option = RequestOptions({'url': url, 'user_data': {**base_user_data}, 'label': label})
 
-                    if not is_url_absolute(url):
-                        base_url = context.request.loaded_url or context.request.url
-                        url = convert_to_absolute_url(base_url, url)
-
-                    request_option = RequestOptions({'url': url, 'user_data': {**base_user_data}, 'label': label})
-
-                    if transform_request_function:
-                        transform_request_option = transform_request_function(request_option)
-                        if transform_request_option == 'skip':
-                            continue
-                        if transform_request_option != 'unchanged':
-                            request_option = transform_request_option
-
-                    try:
-                        request = Request.from_url(**request_option)
-                    except ValidationError as exc:
-                        context.log.debug(
-                            f'Skipping URL "{url}" due to invalid format: {exc}. '
-                            'This may be caused by a malformed URL or unsupported URL scheme. '
-                            'Please ensure the URL is correct and retry.'
-                        )
+                if transform_request_function:
+                    transform_request_option = transform_request_function(request_option)
+                    if transform_request_option == 'skip':
                         continue
+                    if transform_request_option != 'unchanged':
+                        request_option = transform_request_option
 
-                    requests.append(request)
+                try:
+                    request = Request.from_url(**request_option)
+                except ValidationError as exc:
+                    context.log.debug(
+                        f'Skipping URL "{url}" due to invalid format: {exc}. '
+                        'This may be caused by a malformed URL or unsupported URL scheme. '
+                        'Please ensure the URL is correct and retry.'
+                    )
+                    continue
+
+                requests.append(request)
+
+            skipped_tasks = [
+                asyncio.create_task(self._handle_skipped_request(request, 'robots_txt')) for request in skipped
+            ]
+            await asyncio.gather(*skipped_tasks)
 
             return requests
 
         return extract_links
-
-    def _create_enqueue_links_function(
-        self, context: PlaywrightPreNavCrawlingContext, extract_links: ExtractLinksFunction
-    ) -> EnqueueLinksFunction:
-        async def enqueue_links(
-            *,
-            selector: str | None = None,
-            label: str | None = None,
-            user_data: dict | None = None,
-            transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
-            | None = None,
-            requests: Sequence[str | Request] | None = None,
-            **kwargs: Unpack[EnqueueLinksKwargs],
-        ) -> None:
-            """Extract and enqueue links from the current page.
-
-            The `PlaywrightCrawler` implementation of the `EnqueueLinksFunction` function.
-            """
-            kwargs.setdefault('strategy', 'same-hostname')
-
-            if requests:
-                if any((selector, label, user_data, transform_request_function)):
-                    raise ValueError(
-                        'You cannot provide `selector`, `label`, `user_data` or `transform_request_function` '
-                        'arguments when `requests` is provided.'
-                    )
-                # Add directly passed requests.
-                await context.add_requests(requests or list[Union[str, Request]](), **kwargs)
-            else:
-                # Add requests from extracted links.
-                await context.add_requests(
-                    await extract_links(
-                        selector=selector or 'a',
-                        label=label,
-                        user_data=user_data,
-                        transform_request_function=transform_request_function,
-                    ),
-                    **kwargs,
-                )
-
-        return enqueue_links
 
     async def _handle_status_code_response(
         self, context: PlaywrightCrawlingContext
@@ -433,6 +461,16 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
     async def _update_cookies(self, page: Page, cookies: list[PlaywrightCookieParam]) -> None:
         """Update the cookies in the page context."""
         await page.context.add_cookies([{**cookie} for cookie in cookies])
+
+    async def _find_txt_file_for_url(self, url: str) -> RobotsTxtFile:
+        """Find the robots.txt file for a given URL.
+
+        Args:
+            url: The URL whose domain will be used to locate and fetch the corresponding robots.txt file.
+        """
+        http_client = HttpxHttpClient() if isinstance(self._http_client, PlaywrightHttpClient) else self._http_client
+
+        return await RobotsTxtFile.find(url, http_client=http_client)
 
 
 class _PlaywrightCrawlerAdditionalOptions(TypedDict):

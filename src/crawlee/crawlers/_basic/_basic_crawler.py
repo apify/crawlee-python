@@ -7,6 +7,7 @@ import signal
 import sys
 import tempfile
 import threading
+import traceback
 from asyncio import CancelledError
 from collections.abc import AsyncGenerator, Awaitable, Iterable, Sequence
 from contextlib import AsyncExitStack, suppress
@@ -17,21 +18,27 @@ from typing import TYPE_CHECKING, Any, Callable, Generic, Literal, Union, cast
 from urllib.parse import ParseResult, urlparse
 from weakref import WeakKeyDictionary
 
+from cachetools import LRUCache
 from tldextract import TLDExtract
 from typing_extensions import NotRequired, TypedDict, TypeVar, Unpack, assert_never
+from yarl import URL
 
-from crawlee import EnqueueStrategy, Glob, service_locator
+from crawlee import EnqueueStrategy, Glob, RequestTransformAction, service_locator
 from crawlee._autoscaling import AutoscaledPool, Snapshotter, SystemStatus
 from crawlee._log_config import configure_logger, get_configured_log_level
-from crawlee._request import Request, RequestState
+from crawlee._request import Request, RequestOptions, RequestState
 from crawlee._types import (
     BasicCrawlingContext,
+    EnqueueLinksKwargs,
     GetKeyValueStoreFromRequestHandlerFunction,
     HttpHeaders,
+    HttpPayload,
     RequestHandlerRunResult,
     SendRequestFunction,
+    SkippedReason,
 )
 from crawlee._utils.docs import docs_group
+from crawlee._utils.robots import RobotsTxtFile
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
 from crawlee._utils.web import is_status_code_client_error, is_status_code_server_error
@@ -52,12 +59,23 @@ from crawlee.statistics import Statistics, StatisticsState
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 from ._context_pipeline import ContextPipeline
+from ._logging_utils import (
+    get_one_line_error_summary_if_possible,
+    reduce_asyncio_timeout_error_to_relevant_traceback_parts,
+)
 
 if TYPE_CHECKING:
     import re
+    from collections.abc import Iterator
     from contextlib import AbstractAsyncContextManager
 
-    from crawlee._types import ConcurrencySettings, HttpMethod, JsonSerializable
+    from crawlee._types import (
+        ConcurrencySettings,
+        EnqueueLinksFunction,
+        ExtractLinksFunction,
+        HttpMethod,
+        JsonSerializable,
+    )
     from crawlee.configuration import Configuration
     from crawlee.events import EventManager
     from crawlee.http_clients import HttpClient, HttpResponse
@@ -71,8 +89,10 @@ if TYPE_CHECKING:
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
+TRequestIterator = TypeVar('TRequestIterator', str, Request)
 ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Union[Request, None]]]
 FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
+SkippedRequestCallback = Callable[[str, SkippedReason], Awaitable[None]]
 
 
 class _BasicCrawlerOptions(TypedDict):
@@ -100,7 +120,11 @@ class _BasicCrawlerOptions(TypedDict):
     """HTTP client used by `BasicCrawlingContext.send_request` method."""
 
     max_request_retries: NotRequired[int]
-    """Maximum number of attempts to process a single request."""
+    """Specifies the maximum number of retries allowed for a request if its processing fails.
+    This includes retries due to navigation errors or errors thrown from user-supplied functions
+    (`request_handler`, `pre_navigation_hooks` etc.).
+
+    This limit does not apply to retries triggered by session rotation (see `max_session_rotations`)."""
 
     max_requests_per_crawl: NotRequired[int | None]
     """Maximum number of pages to open during a crawl. The crawl stops upon reaching this limit.
@@ -109,7 +133,10 @@ class _BasicCrawlerOptions(TypedDict):
 
     max_session_rotations: NotRequired[int]
     """Maximum number of session rotations per request. The crawler rotates the session if a proxy error occurs
-    or if the website blocks the request."""
+    or if the website blocks the request.
+
+    The session rotations are not counted towards the `max_request_retries` limit.
+    """
 
     max_crawl_depth: NotRequired[int | None]
     """Specifies the maximum crawl depth. If set, the crawler will stop processing links beyond this depth.
@@ -157,6 +184,10 @@ class _BasicCrawlerOptions(TypedDict):
     _logger: NotRequired[logging.Logger]
     """A logger instance, typically provided by a subclass, for consistent logging labels. Intended for use by
     subclasses rather than direct instantiation of `BasicCrawler`."""
+
+    respect_robots_txt_file: NotRequired[bool]
+    """If set to `True`, the crawler will automatically try to fetch the robots.txt file for each domain,
+    and skip those that are not allowed. This also prevents disallowed URLs to be added via `EnqueueLinksFunction`."""
 
 
 class _BasicCrawlerOptionsGeneric(Generic[TCrawlingContext, TStatisticsState], TypedDict):
@@ -211,6 +242,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     """
 
     _CRAWLEE_STATE_KEY = 'CRAWLEE_STATE'
+    _request_handler_timeout_text = 'Request handler timed out after'
 
     def __init__(
         self,
@@ -238,6 +270,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         keep_alive: bool = False,
         configure_logging: bool = True,
         statistics_log_format: Literal['table', 'inline'] = 'table',
+        respect_robots_txt_file: bool = False,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         _additional_context_managers: Sequence[AbstractAsyncContextManager] | None = None,
         _logger: logging.Logger | None = None,
@@ -253,7 +286,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             proxy_configuration: HTTP proxy configuration used when making requests.
             http_client: HTTP client used by `BasicCrawlingContext.send_request` method.
             request_handler: A callable responsible for handling requests.
-            max_request_retries: Maximum number of attempts to process a single request.
+            max_request_retries: Specifies the maximum number of retries allowed for a request if its processing fails.
+                This includes retries due to navigation errors or errors thrown from user-supplied functions
+                (`request_handler`, `pre_navigation_hooks` etc.).
+
+                This limit does not apply to retries triggered by session rotation (see `max_session_rotations`).
             max_requests_per_crawl: Maximum number of pages to open during a crawl. The crawl stops upon reaching
                 this limit. Setting this value can help avoid infinite loops in misconfigured crawlers. `None` means
                 no limit. Due to concurrency settings, the actual number of pages visited may slightly exceed
@@ -261,6 +298,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 `max_requests_per_crawl` is achieved.
             max_session_rotations: Maximum number of session rotations per request. The crawler rotates the session
                 if a proxy error occurs or if the website blocks the request.
+
+                The session rotations are not counted towards the `max_request_retries` limit.
             max_crawl_depth: Specifies the maximum crawl depth. If set, the crawler will stop processing links beyond
                 this depth. The crawl depth starts at 0 for initial requests and increases with each subsequent level
                 of links. Requests at the maximum depth will still be processed, but no new links will be enqueued
@@ -280,6 +319,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             configure_logging: If True, the crawler will set up logging infrastructure automatically.
             statistics_log_format: If 'table', displays crawler statistics as formatted tables in logs. If 'inline',
                 outputs statistics as plain text log messages.
+            respect_robots_txt_file: If set to `True`, the crawler will automatically try to fetch the robots.txt file
+                for each domain, and skip those that are not allowed. This also prevents disallowed URLs to be added
+                via `EnqueueLinksFunction`
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
             _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
@@ -318,9 +360,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             self._router = None
             self.router.default_handler(request_handler)
 
-        # Error & failed request handlers
+        # Error, failed & skipped request handlers
         self._error_handler: ErrorHandler[TCrawlingContext | BasicCrawlingContext] | None = None
         self._failed_request_handler: FailedRequestHandler[TCrawlingContext | BasicCrawlingContext] | None = None
+        self._on_skipped_request: SkippedRequestCallback | None = None
         self._abort_on_error = abort_on_error
 
         # Context of each request with matching result of request handler.
@@ -335,6 +378,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._max_requests_per_crawl = max_requests_per_crawl
         self._max_session_rotations = max_session_rotations
         self._max_crawl_depth = max_crawl_depth
+        self._respect_robots_txt_file = respect_robots_txt_file
 
         # Timeouts
         self._request_handler_timeout = request_handler_timeout
@@ -371,6 +415,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._additional_context_managers = _additional_context_managers or []
 
         # Internal, not explicitly configurable components
+        self._robots_txt_file_cache: LRUCache[str, RobotsTxtFile] = LRUCache(maxsize=1000)
+        self._robots_txt_lock = asyncio.Lock()
         self._tld_extractor = TLDExtract(cache_dir=tempfile.TemporaryDirectory().name)
         self._snapshotter = Snapshotter.from_config(config)
         self._autoscaled_pool = AutoscaledPool(
@@ -520,6 +566,14 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._failed_request_handler = handler
         return handler
 
+    def on_skipped_request(self, callback: SkippedRequestCallback) -> SkippedRequestCallback:
+        """Register a function to handle skipped requests.
+
+        The skipped request handler is invoked when a request is skipped due to a collision or other reasons.
+        """
+        self._on_skipped_request = callback
+        return callback
+
     async def run(
         self,
         requests: Sequence[str | Request] | None = None,
@@ -616,6 +670,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 self._snapshotter,
                 self._statistics,
                 self._session_pool if self._use_session_pool else None,
+                self._http_client,
                 *self._additional_context_managers,
             )
             if cm and getattr(cm, 'active', False) is False
@@ -645,10 +700,27 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             wait_for_all_requests_to_be_added: If True, wait for all requests to be added before returning.
             wait_for_all_requests_to_be_added_timeout: Timeout for waiting for all requests to be added.
         """
+        allowed_requests = []
+        skipped = []
+
+        for request in requests:
+            check_url = request.url if isinstance(request, Request) else request
+            if await self._is_allowed_based_on_robots_txt_file(check_url):
+                allowed_requests.append(request)
+            else:
+                skipped.append(request)
+
+        if skipped:
+            skipped_tasks = [
+                asyncio.create_task(self._handle_skipped_request(request, 'robots_txt')) for request in skipped
+            ]
+            await asyncio.gather(*skipped_tasks)
+            self._logger.warning('Some requests were skipped because they were disallowed based on the robots.txt file')
+
         request_manager = await self.get_request_manager()
 
         await request_manager.add_requests_batched(
-            requests=requests,
+            requests=allowed_requests,
             batch_size=batch_size,
             wait_time_between_batches=wait_time_between_batches,
             wait_for_all_requests_to_be_added=wait_for_all_requests_to_be_added,
@@ -817,6 +889,85 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         yield context
 
+    def _create_enqueue_links_function(
+        self, context: BasicCrawlingContext, extract_links: ExtractLinksFunction
+    ) -> EnqueueLinksFunction:
+        """Create a callback function for extracting links from parsed content and enqueuing them to the crawl.
+
+        Args:
+            context: The current crawling context.
+            extract_links: Function used to extract links from the page.
+
+        Returns:
+            Awaitable that is used for extracting links from parsed content and enqueuing them to the crawl.
+        """
+
+        async def enqueue_links(
+            *,
+            selector: str | None = None,
+            label: str | None = None,
+            user_data: dict[str, Any] | None = None,
+            transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
+            | None = None,
+            requests: Sequence[str | Request] | None = None,
+            **kwargs: Unpack[EnqueueLinksKwargs],
+        ) -> None:
+            kwargs.setdefault('strategy', 'same-hostname')
+
+            if requests:
+                if any((selector, label, user_data, transform_request_function)):
+                    raise ValueError(
+                        'You cannot provide `selector`, `label`, `user_data` or '
+                        '`transform_request_function` arguments when `requests` is provided.'
+                    )
+                # Add directly passed requests.
+                await context.add_requests(requests or list[Union[str, Request]](), **kwargs)
+            else:
+                # Add requests from extracted links.
+                await context.add_requests(
+                    await extract_links(
+                        selector=selector or 'a',
+                        label=label,
+                        user_data=user_data,
+                        transform_request_function=transform_request_function,
+                    ),
+                    **kwargs,
+                )
+
+        return enqueue_links
+
+    def _enqueue_links_filter_iterator(
+        self, request_iterator: Iterator[TRequestIterator], origin_url: str, **kwargs: Unpack[EnqueueLinksKwargs]
+    ) -> Iterator[TRequestIterator]:
+        """Filter requests based on the enqueue strategy and URL patterns."""
+        limit = kwargs.get('limit')
+        parsed_origin_url = urlparse(origin_url)
+        strategy = kwargs.get('strategy', 'all')
+
+        if strategy == 'all' and not parsed_origin_url.hostname:
+            self.log.warning(f'Skipping enqueue: Missing hostname in origin_url = {origin_url}.')
+            return
+
+        # Emit a `warning` message to the log, only once per call
+        warning_flag = True
+
+        for request in request_iterator:
+            target_url = request.url if isinstance(request, Request) else request
+            parsed_target_url = urlparse(target_url)
+
+            if warning_flag and strategy != 'all' and not parsed_target_url.hostname:
+                self.log.warning(f'Skipping enqueue url: Missing hostname in target_url = {target_url}.')
+                warning_flag = False
+
+            if self._check_enqueue_strategy(
+                strategy, target_url=parsed_target_url, origin_url=parsed_origin_url
+            ) and self._check_url_patterns(target_url, kwargs.get('include'), kwargs.get('exclude')):
+                yield request
+
+                limit = limit - 1 if limit is not None else None
+                if limit and limit <= 0:
+                    break
+
     def _check_enqueue_strategy(
         self,
         strategy: EnqueueStrategy,
@@ -825,13 +976,20 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         origin_url: ParseResult,
     ) -> bool:
         """Check if a URL matches the enqueue_strategy."""
+        if strategy == 'all':
+            return True
+
+        if origin_url.hostname is None or target_url.hostname is None:
+            self.log.debug(
+                f'Skipping enqueue: Missing hostname in origin_url = {origin_url.geturl()} or '
+                f'target_url = {target_url.geturl()}'
+            )
+            return False
+
         if strategy == 'same-hostname':
             return target_url.hostname == origin_url.hostname
 
         if strategy == 'same-domain':
-            if origin_url.hostname is None or target_url.hostname is None:
-                raise ValueError('Both origin and target URLs must have a hostname')
-
             origin_domain = self._tld_extractor.extract_str(origin_url.hostname).domain
             target_domain = self._tld_extractor.extract_str(target_url.hostname).domain
             return origin_domain == target_domain
@@ -842,9 +1000,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 and target_url.scheme == origin_url.scheme
                 and target_url.port == origin_url.port
             )
-
-        if strategy == 'all':
-            return True
 
         assert_never(strategy)
 
@@ -892,6 +1047,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         if self._should_retry_request(context, error):
             request.retry_count += 1
+            self.log.warning(
+                f'Retrying request to {context.request.url} due to: {error} \n'
+                f'{get_one_line_error_summary_if_possible(error)}'
+            )
             await self._statistics.error_tracker.add(error=error, context=context)
 
             if self._error_handler:
@@ -945,7 +1104,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             context.session.mark_bad()
 
     async def _handle_failed_request(self, context: TCrawlingContext | BasicCrawlingContext, error: Exception) -> None:
-        self._logger.exception('Request failed and reached maximum retries', exc_info=error)
+        self._logger.error(
+            f'Request to {context.request.url} failed and reached maximum retries\n '
+            f'{self._get_message_from_error(error)}'
+        )
         await self._statistics.error_tracker.add(error=error, context=context)
 
         if self._failed_request_handler:
@@ -953,6 +1115,56 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 await self._failed_request_handler(context, error)
             except Exception as e:
                 raise UserDefinedErrorHandlerError('Exception thrown in user-defined failed request handler') from e
+
+    async def _handle_skipped_request(
+        self, request: Request | str, reason: SkippedReason, *, need_mark: bool = False
+    ) -> None:
+        if need_mark and isinstance(request, Request):
+            request_manager = await self.get_request_manager()
+
+            await wait_for(
+                lambda: request_manager.mark_request_as_handled(request),
+                timeout=self._internal_timeout,
+                timeout_message='Marking request as handled timed out after '
+                f'{self._internal_timeout.total_seconds()} seconds',
+                logger=self._logger,
+                max_retries=3,
+            )
+            request.state = RequestState.SKIPPED
+
+        url = request.url if isinstance(request, Request) else request
+
+        if self._on_skipped_request:
+            try:
+                await self._on_skipped_request(url, reason)
+            except Exception as e:
+                raise UserDefinedErrorHandlerError('Exception thrown in user-defined skipped request callback') from e
+
+    def _get_message_from_error(self, error: Exception) -> str:
+        """Get error message summary from exception.
+
+        Custom processing to reduce the irrelevant traceback clutter in some cases.
+        """
+        traceback_parts = traceback.format_exception(type(error), value=error, tb=error.__traceback__, chain=True)
+        used_traceback_parts = traceback_parts
+
+        if (
+            isinstance(error, asyncio.exceptions.TimeoutError)
+            and self._request_handler_timeout_text in traceback_parts[-1]
+        ):
+            used_traceback_parts = reduce_asyncio_timeout_error_to_relevant_traceback_parts(error)
+            used_traceback_parts.append(traceback_parts[-1])
+
+        return ''.join(used_traceback_parts).strip('\n')
+
+    def _get_only_inner_most_exception(self, error: BaseException) -> BaseException:
+        """Get innermost exception by following __cause__ and __context__ attributes of exception."""
+        if error.__cause__:
+            return self._get_only_inner_most_exception(error.__cause__)
+        if error.__context__:
+            return self._get_only_inner_most_exception(error.__context__)
+        # No __cause__ and no __context__, this is as deep as it can get.
+        return error
 
     def _prepare_send_request_function(
         self,
@@ -963,17 +1175,32 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             url: str,
             *,
             method: HttpMethod = 'GET',
+            payload: HttpPayload | None = None,
             headers: HttpHeaders | dict[str, str] | None = None,
         ) -> HttpResponse:
             return await self._http_client.send_request(
                 url=url,
                 method=method,
+                payload=payload,
                 headers=headers,
                 session=session,
                 proxy_info=proxy_info,
             )
 
         return send_request
+
+    def _convert_url_to_request_iterator(self, urls: Sequence[str | Request], base_url: str) -> Iterator[Request]:
+        """Convert a sequence of URLs or Request objects to an iterator of Request objects."""
+        for url in urls:
+            # If the request is a Request object, keep it as it is
+            if isinstance(url, Request):
+                yield url
+            # If the request is a string, convert it to Request object with absolute_url.
+            elif isinstance(url, str) and not is_url_absolute(url):
+                absolute_url = convert_to_absolute_url(base_url, url)
+                yield Request.from_url(absolute_url)
+            else:
+                yield Request.from_url(url)
 
     async def _commit_request_handler_result(self, context: BasicCrawlingContext) -> None:
         """Commit request handler result for the input `context`. Result is taken from `_context_result_map`."""
@@ -985,40 +1212,21 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         for add_requests_call in result.add_requests_calls:
             requests = list[Request]()
 
-            for request in add_requests_call['requests']:
-                if (limit := add_requests_call.get('limit')) is not None and len(requests) >= limit:
-                    break
+            base_url = url if (url := add_requests_call.get('base_url')) else origin
 
-                # If the request is a Request object, keep it as it is
-                if isinstance(request, Request):
-                    dst_request = request
-                # If the request is a string, convert it to Request object.
-                if isinstance(request, str):
-                    if is_url_absolute(request):
-                        dst_request = Request.from_url(request)
+            requests_iterator = self._convert_url_to_request_iterator(add_requests_call['requests'], base_url)
 
-                    # If the request URL is relative, make it absolute using the origin URL.
-                    else:
-                        base_url = url if (url := add_requests_call.get('base_url')) else origin
-                        absolute_url = convert_to_absolute_url(base_url, request)
-                        dst_request = Request.from_url(absolute_url)
+            enqueue_links_kwargs: EnqueueLinksKwargs = {k: v for k, v in add_requests_call.items() if k != 'requests'}  # type: ignore[assignment]
 
+            filter_requests_iterator = self._enqueue_links_filter_iterator(
+                requests_iterator, context.request.url, **enqueue_links_kwargs
+            )
+
+            for dst_request in filter_requests_iterator:
                 # Update the crawl depth of the request.
                 dst_request.crawl_depth = context.request.crawl_depth + 1
 
-                if (
-                    (self._max_crawl_depth is None or dst_request.crawl_depth <= self._max_crawl_depth)
-                    and self._check_enqueue_strategy(
-                        add_requests_call.get('strategy', 'all'),
-                        target_url=urlparse(dst_request.url),
-                        origin_url=urlparse(origin),
-                    )
-                    and self._check_url_patterns(
-                        dst_request.url,
-                        add_requests_call.get('include', None),
-                        add_requests_call.get('exclude', None),
-                    )
-                ):
+                if self._max_crawl_depth is None or dst_request.crawl_depth <= self._max_crawl_depth:
                     requests.append(dst_request)
 
             await request_manager.add_requests_batched(requests)
@@ -1078,6 +1286,14 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         )
 
         if request is None:
+            return
+
+        if not (await self._is_allowed_based_on_robots_txt_file(request.url)):
+            self._logger.warning(
+                f'Skipping request {request.url} ({request.id}) because it is disallowed based on robots.txt'
+            )
+
+            await self._handle_skipped_request(request, 'robots_txt', need_mark=True)
             return
 
         if request.session_id:
@@ -1157,15 +1373,12 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
                 context.session.retire()
 
-                if context.request.session_rotation_count is None:
-                    context.request.session_rotation_count = 0
-                context.request.session_rotation_count += 1
+                # Increment session rotation count.
+                context.request.session_rotation_count = (context.request.session_rotation_count or 0) + 1
 
                 await request_manager.reclaim_request(request)
                 await self._statistics.error_tracker_retry.add(error=session_error, context=context)
             else:
-                self._logger.exception('Request failed and reached maximum retries', exc_info=session_error)
-
                 await wait_for(
                     lambda: request_manager.mark_request_as_handled(context.request),
                     timeout=self._internal_timeout,
@@ -1175,8 +1388,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                     max_retries=3,
                 )
 
+                await self._handle_failed_request(context, session_error)
                 self._statistics.record_request_processing_failure(statistics_id)
-                await self._statistics.error_tracker.add(error=session_error, context=context)
 
         except ContextPipelineInterruptedError as interrupted_error:
             self._logger.debug('The context pipeline was interrupted', exc_info=interrupted_error)
@@ -1209,7 +1422,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         await wait_for(
             lambda: self._context_pipeline(context, self.router),
             timeout=self._request_handler_timeout,
-            timeout_message=f'Request handler timed out after {self._request_handler_timeout.total_seconds()} seconds',
+            timeout_message=f'{self._request_handler_timeout_text}'
+            f' {self._request_handler_timeout.total_seconds()} seconds',
             logger=self._logger,
         )
 
@@ -1265,3 +1479,46 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             raise RequestCollisionError(
                 f'The Session (id: {request.session_id}) bound to the Request is no longer available in SessionPool'
             )
+
+    async def _is_allowed_based_on_robots_txt_file(self, url: str) -> bool:
+        """Check if the URL is allowed based on the robots.txt file.
+
+        Args:
+            url: The URL to verify against robots.txt rules. Returns True if crawling this URL is permitted.
+        """
+        if not self._respect_robots_txt_file:
+            return True
+        robots_txt_file = await self._get_robots_txt_file_for_url(url)
+        return not robots_txt_file or robots_txt_file.is_allowed(url)
+
+    async def _get_robots_txt_file_for_url(self, url: str) -> RobotsTxtFile | None:
+        """Get the RobotsTxtFile for a given URL.
+
+        Args:
+            url: The URL whose domain will be used to locate and fetch the corresponding robots.txt file.
+        """
+        if not self._respect_robots_txt_file:
+            return None
+        origin_url = str(URL(url).origin())
+        robots_txt_file = self._robots_txt_file_cache.get(origin_url)
+        if robots_txt_file:
+            return robots_txt_file
+
+        async with self._robots_txt_lock:
+            # Check again if the robots.txt file is already cached after acquiring the lock
+            robots_txt_file = self._robots_txt_file_cache.get(origin_url)
+            if robots_txt_file:
+                return robots_txt_file
+
+            # If not cached, fetch the robots.txt file
+            robots_txt_file = await self._find_txt_file_for_url(url)
+            self._robots_txt_file_cache[origin_url] = robots_txt_file
+            return robots_txt_file
+
+    async def _find_txt_file_for_url(self, url: str) -> RobotsTxtFile:
+        """Find the robots.txt file for a given URL.
+
+        Args:
+            url: The URL whose domain will be used to locate and fetch the corresponding robots.txt file.
+        """
+        return await RobotsTxtFile.find(url, self._http_client)

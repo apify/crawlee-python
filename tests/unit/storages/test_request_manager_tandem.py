@@ -12,6 +12,8 @@ from crawlee.storages import RequestQueue
 
 @dataclass
 class TestInput:
+    __test__ = False
+
     request_loader_items: list[str | Request | None]
     request_manager_items: list[str | Request]
     discovered_items: list[Request]

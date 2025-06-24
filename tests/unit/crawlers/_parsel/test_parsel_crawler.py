@@ -6,7 +6,7 @@ from unittest import mock
 
 import pytest
 
-from crawlee import ConcurrencySettings, HttpHeaders, Request, RequestTransformAction
+from crawlee import ConcurrencySettings, Glob, HttpHeaders, Request, RequestTransformAction, SkippedReason
 from crawlee.crawlers import ParselCrawler
 
 if TYPE_CHECKING:
@@ -65,7 +65,6 @@ async def test_enqueue_links(redirect_server_url: URL, server_url: URL, http_cli
 
 async def test_enqueue_links_with_incompatible_kwargs_raises_error(server_url: URL) -> None:
     """Call `enqueue_links` with arguments that can't be used together."""
-    requests = ['https://www.test.io/']
     crawler = ParselCrawler(max_request_retries=1)
     exceptions = []
 
@@ -76,7 +75,7 @@ async def test_enqueue_links_with_incompatible_kwargs_raises_error(server_url: U
         except Exception as e:
             exceptions.append(e)
 
-    await crawler.run(requests)
+    await crawler.run([str(server_url)])
 
     assert len(exceptions) == 1
     assert type(exceptions[0]) is ValueError
@@ -239,3 +238,59 @@ async def test_xml(server_url: URL, http_client: HttpClient) -> None:
 
 def test_default_logger() -> None:
     assert ParselCrawler().log.name == 'ParselCrawler'
+
+
+async def test_respect_robots_txt(server_url: URL, http_client: HttpClient) -> None:
+    crawler = ParselCrawler(http_client=http_client, respect_robots_txt_file=True)
+    visit = mock.Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        visit(context.request.url)
+        await context.enqueue_links()
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+    visited = {call[0][0] for call in visit.call_args_list}
+
+    assert visited == {
+        str(server_url / 'start_enqueue'),
+        str(server_url / 'sub_index'),
+    }
+
+
+async def test_on_skipped_request(server_url: URL, http_client: HttpClient) -> None:
+    crawler = ParselCrawler(http_client=http_client, respect_robots_txt_file=True)
+    skip = mock.Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        await context.enqueue_links()
+
+    @crawler.on_skipped_request
+    async def skipped_hook(url: str, _reason: SkippedReason) -> None:
+        skip(url)
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+    skipped = {call[0][0] for call in skip.call_args_list}
+
+    assert skipped == {
+        str(server_url / 'page_1'),
+        str(server_url / 'page_2'),
+        str(server_url / 'page_3'),
+    }
+
+
+async def test_extract_links(server_url: URL, http_client: HttpClient) -> None:
+    crawler = ParselCrawler(http_client=http_client)
+    extracted_links: list[str] = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        links = await context.extract_links(exclude=[Glob(f'{server_url}sub_index')])
+        extracted_links.extend(request.url for request in links)
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+    assert len(extracted_links) == 1
+    assert extracted_links[0] == str(server_url / 'page_1')

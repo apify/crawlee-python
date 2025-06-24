@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from abc import ABC
-from typing import TYPE_CHECKING, Any, Callable, Generic, Union
+from typing import TYPE_CHECKING, Any, Callable, Generic
 
+from more_itertools import partition
 from pydantic import ValidationError
 from typing_extensions import TypeVar
 
 from crawlee._request import Request, RequestOptions
 from crawlee._utils.docs import docs_group
-from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
+from crawlee._utils.urls import to_absolute_url_iterator
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
 from crawlee.statistics import StatisticsState
@@ -17,12 +19,12 @@ from crawlee.statistics import StatisticsState
 from ._http_crawling_context import HttpCrawlingContext, ParsedHttpCrawlingContext, TParseResult, TSelectResult
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Awaitable, Sequence
+    from collections.abc import AsyncGenerator, Awaitable, Iterator
 
     from typing_extensions import Unpack
 
     from crawlee import RequestTransformAction
-    from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, EnqueueLinksKwargs, ExtractLinksFunction
+    from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, ExtractLinksFunction
 
     from ._abstract_http_parser import AbstractHttpParser
 
@@ -154,17 +156,23 @@ class AbstractHttpCrawler(
             | None = None,
             **kwargs: Unpack[EnqueueLinksKwargs],
         ) -> list[Request]:
-            kwargs.setdefault('strategy', 'same-hostname')
-
             requests = list[Request]()
+
             base_user_data = user_data or {}
 
-            for link in self._parser.find_links(parsed_content, selector=selector):
-                url = link
-                if not is_url_absolute(url):
-                    base_url = context.request.loaded_url or context.request.url
-                    url = convert_to_absolute_url(base_url, url)
+            robots_txt_file = await self._get_robots_txt_file_for_url(context.request.url)
 
+            kwargs.setdefault('strategy', 'same-hostname')
+
+            links_iterator: Iterator[str] = iter(self._parser.find_links(parsed_content, selector=selector))
+            links_iterator = to_absolute_url_iterator(context.request.loaded_url or context.request.url, links_iterator)
+
+            if robots_txt_file:
+                skipped, links_iterator = partition(lambda url: robots_txt_file.is_allowed(url), links_iterator)
+            else:
+                skipped = iter([])
+
+            for url in self._enqueue_links_filter_iterator(links_iterator, context.request.url, **kwargs):
                 request_options = RequestOptions(url=url, user_data={**base_user_data}, label=label)
 
                 if transform_request_function:
@@ -185,56 +193,15 @@ class AbstractHttpCrawler(
                     continue
 
                 requests.append(request)
+
+            skipped_tasks = [
+                asyncio.create_task(self._handle_skipped_request(request, 'robots_txt')) for request in skipped
+            ]
+            await asyncio.gather(*skipped_tasks)
+
             return requests
 
         return extract_links
-
-    def _create_enqueue_links_function(
-        self, context: HttpCrawlingContext, extract_links: ExtractLinksFunction
-    ) -> EnqueueLinksFunction:
-        """Create a callback function for extracting links from parsed content and enqueuing them to the crawl.
-
-        Args:
-            context: The current crawling context.
-            extract_links: Function used to extract links from the page.
-
-        Returns:
-            Awaitable that is used for extracting links from parsed content and enqueuing them to the crawl.
-        """
-
-        async def enqueue_links(
-            *,
-            selector: str | None = None,
-            label: str | None = None,
-            user_data: dict[str, Any] | None = None,
-            transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
-            | None = None,
-            requests: Sequence[str | Request] | None = None,
-            **kwargs: Unpack[EnqueueLinksKwargs],
-        ) -> None:
-            kwargs.setdefault('strategy', 'same-hostname')
-
-            if requests:
-                if any((selector, label, user_data, transform_request_function)):
-                    raise ValueError(
-                        'You cannot provide `selector`, `label`, `user_data` or '
-                        '`transform_request_function` arguments when `requests` is provided.'
-                    )
-                # Add directly passed requests.
-                await context.add_requests(requests or list[Union[str, Request]](), **kwargs)
-            else:
-                # Add requests from extracted links.
-                await context.add_requests(
-                    await extract_links(
-                        selector=selector or 'a',
-                        label=label,
-                        user_data=user_data,
-                        transform_request_function=transform_request_function,
-                    ),
-                    **kwargs,
-                )
-
-        return enqueue_links
 
     async def _make_http_request(self, context: BasicCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
         """Make http request and create context enhanced by HTTP response.
