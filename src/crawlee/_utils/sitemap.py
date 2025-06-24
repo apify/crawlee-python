@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import zlib
+from codecs import getincrementaldecoder
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -320,6 +321,8 @@ async def _fetch_and_process_sitemap(
                 # Determine content type and compression
                 content_type = response.headers.get('content-type', '')
 
+                decoder = getincrementaldecoder('utf-8')(errors='replace')
+
                 # Create appropriate parser
                 parser = _get_parser(content_type, sitemap_url)
                 decompressor = None
@@ -333,7 +336,7 @@ async def _fetch_and_process_sitemap(
                             first_chunk = False
 
                         chunk = decompressor.decompress(raw_chunk) if decompressor else raw_chunk
-                        text_chunk = chunk.decode('utf-8', errors='replace')
+                        text_chunk = decoder.decode(chunk)
                         async for item in parser.process_chunk(text_chunk):
                             async for result in _process_sitemap_item(
                                 item,
