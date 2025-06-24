@@ -33,6 +33,7 @@ from crawlee._types import (
     GetKeyValueStoreFromRequestHandlerFunction,
     HttpHeaders,
     HttpPayload,
+    LogLevel,
     RequestHandlerRunResult,
     SendRequestFunction,
     SkippedReason,
@@ -195,10 +196,10 @@ class _BasicCrawlerOptions(TypedDict):
     """Interval for logging the crawler status messages."""
 
     status_message_callback: NotRequired[
-        Callable[[BasicCrawler[TCrawlingContext, TStatisticsState], StatisticsState, StatisticsState | None, str], None]
+        Callable[[StatisticsState, StatisticsState | None, str], Awaitable[str | None]]
     ]
-    """Allows overriding the default status message. The callback needs to call `crawler.set_status_message()`
-    explicitly. The default status message is provided in the parameters."""
+    """Allows overriding the default status message. The default status message is provided in the parameters.
+    Returning `None` suppresses the status message."""
 
 
 class _BasicCrawlerOptionsGeneric(Generic[TCrawlingContext, TStatisticsState], TypedDict):
@@ -283,9 +284,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         statistics_log_format: Literal['table', 'inline'] = 'table',
         respect_robots_txt_file: bool = False,
         status_message_logging_interval: timedelta = timedelta(seconds=10),
-        status_message_callback: Callable[
-            [BasicCrawler[TCrawlingContext, TStatisticsState], StatisticsState, StatisticsState | None, str], None
-        ]
+        status_message_callback: Callable[[StatisticsState, StatisticsState | None, str], Awaitable[str | None]]
         | None = None,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         _additional_context_managers: Sequence[AbstractAsyncContextManager] | None = None,
@@ -305,7 +304,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             max_request_retries: Specifies the maximum number of retries allowed for a request if its processing fails.
                 This includes retries due to navigation errors or errors thrown from user-supplied functions
                 (`request_handler`, `pre_navigation_hooks` etc.).
-
                 This limit does not apply to retries triggered by session rotation (see `max_session_rotations`).
             max_requests_per_crawl: Maximum number of pages to open during a crawl. The crawl stops upon reaching
                 this limit. Setting this value can help avoid infinite loops in misconfigured crawlers. `None` means
@@ -338,10 +336,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 for each domain, and skip those that are not allowed. This also prevents disallowed URLs to be added
                 via `EnqueueLinksFunction`
             status_message_logging_interval:  Interval for logging the crawler status messages
-            status_message_callback: A callback function for customizing crawler status messages. When provided,
-                this function will be called instead of the default status message logging. The function receives
-                the current statistics state, the previous state (if available), and the default status message
-                as parameters.
+            status_message_callback: Allows overriding the default status message. The default status message is
+                provided in the parameters. Returning `None` suppresses the status message.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
             _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
@@ -1553,9 +1549,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         """
         return await RobotsTxtFile.find(url, self._http_client)
 
-    def set_status_message(
-        self, message: str, level: Literal['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] = 'DEBUG'
-    ) -> None:
+    def set_status_message(self, message: str, level: LogLevel = 'DEBUG') -> None:
         """Set a status message for the crawler.
 
         Args:
@@ -1592,10 +1586,15 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             )
 
         if self._status_message_callback:
-            self._status_message_callback(self, current_state, self._previous_crawler_state, message)
+            new_message = await self._status_message_callback(current_state, self._previous_crawler_state, message)
+            if new_message:
+                message = new_message
+                self.set_status_message(message, level='INFO')
         else:
             self.set_status_message(message, level='INFO')
 
-        event_manager.emit(event=Event.CRAWLER_STATUS, event_data=EventCrawlerStatusData(message=message))
+        event_manager.emit(
+            event=Event.CRAWLER_STATUS, event_data=EventCrawlerStatusData(message=message, crawler_id=id(self))
+        )
 
         self._previous_crawler_state = current_state

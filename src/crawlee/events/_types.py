@@ -90,6 +90,8 @@ class EventCrawlerStatusData(BaseModel):
 
     message: str
 
+    crawler_id: int
+
 
 EventData = Union[
     EventPersistStateData,
