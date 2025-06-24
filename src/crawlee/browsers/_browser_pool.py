@@ -310,7 +310,7 @@ class BrowserPool:
         except RuntimeError as exc:
             raise RuntimeError('Browser pool is not initialized.') from exc
 
-        if browser_controller.total_pages >= self._retire_browser_after_page_count:
+        if browser_controller.total_opened_pages >= self._retire_browser_after_page_count:
             self._retire_browser(browser_controller)
 
         crawlee_page = CrawleePage(id=page_id, page=page, browser_type=plugin.browser_type)

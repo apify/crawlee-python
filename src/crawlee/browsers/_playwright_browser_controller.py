@@ -74,7 +74,7 @@ class PlaywrightBrowserController(BrowserController):
         self._pages = list[Page]()
         self._last_page_opened_at = datetime.now(timezone.utc)
 
-        self._total_pages = 0
+        self._total_opened_pages = 0
 
     @property
     @override
@@ -83,8 +83,8 @@ class PlaywrightBrowserController(BrowserController):
 
     @property
     @override
-    def total_pages(self) -> int:
-        return self._total_pages
+    def total_opened_pages(self) -> int:
+        return self._total_opened_pages
 
     @property
     @override
@@ -167,7 +167,7 @@ class PlaywrightBrowserController(BrowserController):
         self._pages.append(page)
         self._last_page_opened_at = datetime.now(timezone.utc)
 
-        self._total_pages += 1
+        self._total_opened_pages += 1
 
         return page
 
