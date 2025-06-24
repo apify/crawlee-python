@@ -36,7 +36,7 @@ The <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink> stor
 {MemoryStorageClientBasicExample}
 </RunnableCodeBlock>
 
-The `MemoryStorageClient` is a good choice for testing, development, or short-lived operations where speed is more important than data persistence. It is not suitable for production use or long-running crawls, as all data will be lost when the program exits.
+The <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink> is a good choice for testing, development, short-lived operations where speed is more important than data persistence, or HTTP APIs where each request should be handled with a fresh storage. It is not suitable for production use or long-running crawls, as all data will be lost when the program exits.
 
 :::warning Persistence limitation
 The `MemoryStorageClient` does not persist data between runs. All data is lost when the program terminates.
