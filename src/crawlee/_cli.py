@@ -38,7 +38,6 @@ def callback(
         typer.Option(
             '-V',
             '--version',
-            is_flag=True,
             help='Print Crawlee version',
         ),
     ] = False,

@@ -2,16 +2,45 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.6.9 - **not yet released**
+## [0.6.11](https://github.com/apify/crawlee-python/releases/tag/v0.6.11) (2025-06-23)
+
+### 🚀 Features
+
+- Add `stream` method for `HttpClient` ([#1241](https://github.com/apify/crawlee-python/pull/1241)) ([95c68b0](https://github.com/apify/crawlee-python/commit/95c68b0b2d0bf9e093c1d0ee1002625172f7a868)) by [@Mantisus](https://github.com/Mantisus)
+
+### 🐛 Bug Fixes
+
+- Fix `ClientSnapshot` overload calculation ([#1228](https://github.com/apify/crawlee-python/pull/1228)) ([a4fc1b6](https://github.com/apify/crawlee-python/commit/a4fc1b6e83143650666108c289c084ea0463b80c)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1207](https://github.com/apify/crawlee-python/issues/1207)
+- Use `PSS` instead of `RSS` to estimate children process memory usage on Linux ([#1210](https://github.com/apify/crawlee-python/pull/1210)) ([436032f](https://github.com/apify/crawlee-python/commit/436032f2de5f7d7fa1016033f1bb224159a8e6bf)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1206](https://github.com/apify/crawlee-python/issues/1206)
+- Do not raise an error to check &#x27;same-domain&#x27; if there is no hostname in the url ([#1251](https://github.com/apify/crawlee-python/pull/1251)) ([a6c3aab](https://github.com/apify/crawlee-python/commit/a6c3aabf5f8341f215275077b6768a56118bc656)) by [@Mantisus](https://github.com/Mantisus)
+
+
+## [0.6.10](https://github.com/apify/crawlee-python/releases/tag/v0.6.10) (2025-06-02)
+
+### 🐛 Bug Fixes
+
+- Allow config change on `PlaywrightCrawler` ([#1186](https://github.com/apify/crawlee-python/pull/1186)) ([f17bf31](https://github.com/apify/crawlee-python/commit/f17bf31456b702631aa7e0c26d4f07fd5eb7d1bd)) by [@mylank](https://github.com/mylank), closes [#1185](https://github.com/apify/crawlee-python/issues/1185)
+- Add `payload` to `SendRequestFunction` to support `POST` request ([#1202](https://github.com/apify/crawlee-python/pull/1202)) ([e7449f2](https://github.com/apify/crawlee-python/commit/e7449f206c580cb8383a66e4c9ff5f67c5ce8409)) by [@Mantisus](https://github.com/Mantisus)
+- Fix match check for specified enqueue strategy for requests with redirect ([#1199](https://github.com/apify/crawlee-python/pull/1199)) ([d84c30c](https://github.com/apify/crawlee-python/commit/d84c30cbd7c94d6525d3b6e8e86b379050454c0e)) by [@Mantisus](https://github.com/Mantisus), closes [#1198](https://github.com/apify/crawlee-python/issues/1198)
+- Set `WindowsSelectorEventLoopPolicy` only for curl-impersonate template without `playwright` ([#1209](https://github.com/apify/crawlee-python/pull/1209)) ([f3b839f](https://github.com/apify/crawlee-python/commit/f3b839ffc2ccc1b889b6d5928f35f57b725e27f1)) by [@Mantisus](https://github.com/Mantisus), closes [#1204](https://github.com/apify/crawlee-python/issues/1204)
+- Add support non-GET requests for `PlaywrightCrawler` ([#1208](https://github.com/apify/crawlee-python/pull/1208)) ([dbb9f44](https://github.com/apify/crawlee-python/commit/dbb9f44c71af15e1f86766fa0ba68281dd85fd9e)) by [@Mantisus](https://github.com/Mantisus), closes [#1201](https://github.com/apify/crawlee-python/issues/1201)
+- Respect `EnqueueLinksKwargs` for `extract_links` function ([#1213](https://github.com/apify/crawlee-python/pull/1213)) ([c9907d6](https://github.com/apify/crawlee-python/commit/c9907d6ff4c3a4a719b279cea77694c00a5a963d)) by [@Mantisus](https://github.com/Mantisus), closes [#1212](https://github.com/apify/crawlee-python/issues/1212)
+
+
+## [0.6.9](https://github.com/apify/crawlee-python/releases/tag/v0.6.9) (2025-05-02)
 
 ### 🚀 Features
 
 - Add an internal `HttpClient` to be used in `send_request` for `PlaywrightCrawler` using `APIRequestContext` bound to the browser context ([#1134](https://github.com/apify/crawlee-python/pull/1134)) ([e794f49](https://github.com/apify/crawlee-python/commit/e794f4985d3a018ee76d634fe2b2c735fb450272)) by [@Mantisus](https://github.com/Mantisus), closes [#928](https://github.com/apify/crawlee-python/issues/928)
 - Make timeout error log cleaner ([#1170](https://github.com/apify/crawlee-python/pull/1170)) ([78ea9d2](https://github.com/apify/crawlee-python/commit/78ea9d23e0b2d73286043b68393e462f636625c9)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1158](https://github.com/apify/crawlee-python/issues/1158)
+- Add `on_skipped_request` decorator, to process links skipped according to `robots.txt` rules ([#1166](https://github.com/apify/crawlee-python/pull/1166)) ([bd16f14](https://github.com/apify/crawlee-python/commit/bd16f14a834eebf485aea6b6a83f2b18bf16b504)) by [@Mantisus](https://github.com/Mantisus), closes [#1160](https://github.com/apify/crawlee-python/issues/1160)
+
+### 🐛 Bug Fixes
+
+- Fix handle error without `args` in `_get_error_message`  for `ErrorTracker` ([#1181](https://github.com/apify/crawlee-python/pull/1181)) ([21944d9](https://github.com/apify/crawlee-python/commit/21944d908b8404d2ad6c182104e7a8c27be12a6e)) by [@Mantisus](https://github.com/Mantisus), closes [#1179](https://github.com/apify/crawlee-python/issues/1179)
+- Temporarily add `certifi&lt;=2025.1.31` dependency ([#1183](https://github.com/apify/crawlee-python/pull/1183)) ([25ff961](https://github.com/apify/crawlee-python/commit/25ff961990f9abc9d0673ba6573dfcf46dd6e53f)) by [@Pijukatel](https://github.com/Pijukatel)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.6.8](https://github.com/apify/crawlee-python/releases/tag/v0.6.8) (2025-04-25)
 
 ### 🚀 Features

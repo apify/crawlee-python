@@ -11,7 +11,16 @@ from unittest.mock import Mock
 
 import pytest
 
-from crawlee import ConcurrencySettings, HttpHeaders, Request, RequestTransformAction
+from crawlee import (
+    ConcurrencySettings,
+    Glob,
+    HttpHeaders,
+    Request,
+    RequestTransformAction,
+    SkippedReason,
+    service_locator,
+)
+from crawlee.configuration import Configuration
 from crawlee.crawlers import PlaywrightCrawler
 from crawlee.fingerprint_suite import (
     DefaultFingerprintGenerator,
@@ -34,12 +43,21 @@ if TYPE_CHECKING:
     from yarl import URL
 
     from crawlee._request import RequestOptions
+    from crawlee._types import HttpMethod, HttpPayload
     from crawlee.browsers._types import BrowserType
     from crawlee.crawlers import PlaywrightCrawlingContext, PlaywrightPreNavCrawlingContext
 
 
-async def test_basic_request(server_url: URL) -> None:
-    requests = [str(server_url)]
+@pytest.mark.parametrize(
+    ('method', 'path', 'payload'),
+    [
+        pytest.param('GET', 'get', None, id='get request'),
+        pytest.param('POST', 'post', None, id='post request'),
+        pytest.param('POST', 'post', b'Hello, world!', id='post request with payload'),
+    ],
+)
+async def test_basic_request(method: HttpMethod, path: str, payload: HttpPayload, server_url: URL) -> None:
+    requests = [Request.from_url(str(server_url / path), method=method, payload=payload)]
     crawler = PlaywrightCrawler()
     result: dict = {}
 
@@ -48,14 +66,11 @@ async def test_basic_request(server_url: URL) -> None:
         assert context.page is not None
         result['request_url'] = context.request.url
         result['page_url'] = context.page.url
-        result['page_title'] = await context.page.title()
         result['page_content'] = await context.page.content()
 
     await crawler.run(requests)
-
-    assert result.get('request_url') == result.get('page_url') == requests[0]
-    assert 'Hello, world!' in result.get('page_title', '')
-    assert '<html' in result.get('page_content', '')  # there is some HTML content
+    assert result.get('request_url') == result.get('page_url') == requests[0].url
+    assert (payload.decode() if payload else '') in result.get('page_content', '')
 
 
 async def test_enqueue_links(redirect_server_url: URL, server_url: URL) -> None:
@@ -597,7 +612,7 @@ async def test_error_snapshot_through_statistics(server_url: URL) -> None:
     # Three errors twice retried errors, but only 2 unique -> 4 (2 x (html and jpg)) artifacts expected.
     assert crawler.statistics.error_tracker.total == 3 * max_retries
     assert crawler.statistics.error_tracker.unique_error_count == 2
-    assert len(kvs_content) == 4
+    assert len(list(kvs_content.keys())) == 4
 
 
 async def test_respect_robots_txt(server_url: URL) -> None:
@@ -615,6 +630,29 @@ async def test_respect_robots_txt(server_url: URL) -> None:
     assert visited == {
         str(server_url / 'start_enqueue'),
         str(server_url / 'sub_index'),
+    }
+
+
+async def test_on_skipped_request(server_url: URL) -> None:
+    crawler = PlaywrightCrawler(respect_robots_txt_file=True)
+    skip = mock.Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        await context.enqueue_links()
+
+    @crawler.on_skipped_request
+    async def skipped_hook(url: str, _reason: SkippedReason) -> None:
+        skip(url)
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+    skipped = {call[0][0] for call in skip.call_args_list}
+
+    assert skipped == {
+        str(server_url / 'page_1'),
+        str(server_url / 'page_2'),
+        str(server_url / 'page_3'),
     }
 
 
@@ -666,3 +704,26 @@ async def test_send_request_with_client(server_url: URL) -> None:
     assert check_data['send_request']['user-agent'] == 'My User-Agent'
 
     assert check_data['default'] != check_data['send_request']
+
+
+async def test_overwrite_configuration() -> None:
+    """Check that the configuration is allowed to be passed to the Playwrightcrawler."""
+    configuration = Configuration(default_dataset_id='my_dataset_id')
+    PlaywrightCrawler(configuration=configuration)
+    used_configuration = service_locator.get_configuration()
+    assert used_configuration is configuration
+
+
+async def test_extract_links(server_url: URL) -> None:
+    crawler = PlaywrightCrawler()
+    extracted_links: list[str] = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        links = await context.extract_links(exclude=[Glob(f'{server_url}sub_index')])
+        extracted_links.extend(request.url for request in links)
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+    assert len(extracted_links) == 1
+    assert extracted_links[0] == str(server_url / 'page_1')

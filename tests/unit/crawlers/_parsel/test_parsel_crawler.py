@@ -6,7 +6,7 @@ from unittest import mock
 
 import pytest
 
-from crawlee import ConcurrencySettings, HttpHeaders, Request, RequestTransformAction
+from crawlee import ConcurrencySettings, Glob, HttpHeaders, Request, RequestTransformAction, SkippedReason
 from crawlee.crawlers import ParselCrawler
 
 if TYPE_CHECKING:
@@ -256,3 +256,41 @@ async def test_respect_robots_txt(server_url: URL, http_client: HttpClient) -> N
         str(server_url / 'start_enqueue'),
         str(server_url / 'sub_index'),
     }
+
+
+async def test_on_skipped_request(server_url: URL, http_client: HttpClient) -> None:
+    crawler = ParselCrawler(http_client=http_client, respect_robots_txt_file=True)
+    skip = mock.Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        await context.enqueue_links()
+
+    @crawler.on_skipped_request
+    async def skipped_hook(url: str, _reason: SkippedReason) -> None:
+        skip(url)
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+    skipped = {call[0][0] for call in skip.call_args_list}
+
+    assert skipped == {
+        str(server_url / 'page_1'),
+        str(server_url / 'page_2'),
+        str(server_url / 'page_3'),
+    }
+
+
+async def test_extract_links(server_url: URL, http_client: HttpClient) -> None:
+    crawler = ParselCrawler(http_client=http_client)
+    extracted_links: list[str] = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        links = await context.extract_links(exclude=[Glob(f'{server_url}sub_index')])
+        extracted_links.extend(request.url for request in links)
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+    assert len(extracted_links) == 1
+    assert extracted_links[0] == str(server_url / 'page_1')

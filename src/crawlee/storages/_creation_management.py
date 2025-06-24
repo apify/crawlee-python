@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from typing import TYPE_CHECKING, TypeVar
+from weakref import WeakKeyDictionary
 
 from crawlee.storage_clients import MemoryStorageClient
 
@@ -16,8 +17,8 @@ if TYPE_CHECKING:
 TResource = TypeVar('TResource', Dataset, KeyValueStore, RequestQueue)
 
 
-_creation_lock = asyncio.Lock()
-"""Lock for storage creation."""
+_creation_locks = WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Lock]()
+"""Locks for storage creation (we need a separate lock for every event loop so that tests work as expected)."""
 
 _cache_dataset_by_id: dict[str, Dataset] = {}
 _cache_dataset_by_name: dict[str, Dataset] = {}
@@ -154,7 +155,11 @@ async def open_storage(
         await storage_client.purge_on_start()
 
     # Lock and create new storage
-    async with _creation_lock:
+    loop = asyncio.get_running_loop()
+    if loop not in _creation_locks:
+        _creation_locks[loop] = asyncio.Lock()
+
+    async with _creation_locks[loop]:
         if id and not is_default_on_memory:
             resource_client = _get_resource_client(storage_class, storage_client, id)
             storage_object = await resource_client.get()
