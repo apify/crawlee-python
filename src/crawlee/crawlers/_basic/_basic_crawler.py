@@ -1549,8 +1549,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         """
         return await RobotsTxtFile.find(url, self._http_client)
 
-    def set_status_message(self, message: str, level: LogLevel = 'DEBUG') -> None:
-        """Set a status message for the crawler.
+    def _log_status_message(self, message: str, level: LogLevel = 'DEBUG') -> None:
+        """Log a status message for the crawler.
 
         Args:
             message: The status message to log.
@@ -1589,9 +1589,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             new_message = await self._status_message_callback(current_state, self._previous_crawler_state, message)
             if new_message:
                 message = new_message
-                self.set_status_message(message, level='INFO')
+                self._log_status_message(message, level='INFO')
         else:
-            self.set_status_message(message, level='INFO')
+            self._log_status_message(message, level='INFO')
 
         event_manager.emit(
             event=Event.CRAWLER_STATUS, event_data=EventCrawlerStatusData(message=message, crawler_id=id(self))
