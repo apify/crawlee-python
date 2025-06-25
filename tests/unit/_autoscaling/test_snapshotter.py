@@ -29,6 +29,7 @@ def event_system_data_info() -> EventSystemInfoData:
         memory_info=MemoryInfo(
             total_size=ByteSize.from_gb(8),
             current_size=ByteSize.from_gb(4),
+            system_wide_used_size=ByteSize.from_gb(5),
         ),
     )
 
@@ -254,7 +255,10 @@ async def test_snapshots_time_ordered(snapshotter: Snapshotter) -> None:
         return EventSystemInfoData(
             cpu_info=CpuInfo(used_ratio=0.5, created_at=creation_time),
             memory_info=MemoryInfo(
-                current_size=ByteSize(bytes=1), created_at=creation_time, total_size=ByteSize(bytes=2)
+                current_size=ByteSize(bytes=1),
+                created_at=creation_time,
+                total_size=ByteSize(bytes=2),
+                system_wide_used_size=ByteSize.from_gb(5),
             ),
         )
 
