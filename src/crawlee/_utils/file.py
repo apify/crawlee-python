@@ -77,8 +77,8 @@ def infer_mime_type(value: Any) -> str:
     if isinstance(value, (dict, list)):
         return 'application/json; charset=utf-8'
 
-    # If the value is a string, assume plain text.
-    if isinstance(value, str):
+    # If the value is a string, number or boolean, assume plain text.
+    if isinstance(value, (str, int, float, bool)):
         return 'text/plain; charset=utf-8'
 
     # Default fallback.

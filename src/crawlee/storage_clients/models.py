@@ -95,7 +95,7 @@ class KeyValueStoreRecordMetadata(BaseModel):
     Describe the format and type of data stored in the record, following the MIME specification.
     """
 
-    size: Annotated[int, Field(alias='size')]
+    size: Annotated[int | None, Field(alias='size', default=None)] = None
     """The size of the record in bytes."""
 
 
