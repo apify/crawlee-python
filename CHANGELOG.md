@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.6.12 - **not yet released**
 
+### 🚀 Features
+
+- Add `retire_browser_after_page_count` parameter for `BrowserPool` ([#1266](https://github.com/apify/crawlee-python/pull/1266)) ([603aa2b](https://github.com/apify/crawlee-python/commit/603aa2b192ef4bc42d88244bd009fffdb0614c06)) by [@Mantisus](https://github.com/Mantisus)
+
 ### 🐛 Bug Fixes
 
 - Use `perf_counter_ns` for request duration tracking ([#1260](https://github.com/apify/crawlee-python/pull/1260)) ([9e92f6b](https://github.com/apify/crawlee-python/commit/9e92f6b54400ce5004fbab770e2e4ac42f73148f)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1256](https://github.com/apify/crawlee-python/issues/1256)
