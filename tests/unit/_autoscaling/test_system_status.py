@@ -102,24 +102,32 @@ def test_get_system_info(snapshotter: Snapshotter, now: datetime) -> None:
                 max_memory_size=ByteSize.from_gb(12),
                 max_used_memory_ratio=0.8,
                 created_at=now - timedelta(seconds=90),
+                system_wide_used_size=None,
+                system_wide_memory_size=None,
             ),
             MemorySnapshot(
                 current_size=ByteSize.from_gb(7),
                 max_memory_size=ByteSize.from_gb(8),
                 max_used_memory_ratio=0.8,
                 created_at=now - timedelta(seconds=60),
+                system_wide_used_size=None,
+                system_wide_memory_size=None,
             ),
             MemorySnapshot(
                 current_size=ByteSize.from_gb(28),
                 max_memory_size=ByteSize.from_gb(30),
                 max_used_memory_ratio=0.8,
                 created_at=now - timedelta(seconds=30),
+                system_wide_used_size=None,
+                system_wide_memory_size=None,
             ),
             MemorySnapshot(
                 current_size=ByteSize.from_gb(48),
                 max_memory_size=ByteSize.from_gb(60),
                 max_used_memory_ratio=0.8,
                 created_at=now,
+                system_wide_used_size=None,
+                system_wide_memory_size=None,
             ),
         ]
     )
