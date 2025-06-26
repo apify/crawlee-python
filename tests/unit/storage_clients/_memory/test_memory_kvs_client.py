@@ -1,18 +1,17 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import pytest
 
 from crawlee.configuration import Configuration
 from crawlee.storage_clients import MemoryStorageClient
-from crawlee.storage_clients._memory import MemoryKeyValueStoreClient
-from crawlee.storage_clients.models import KeyValueStoreRecordMetadata
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+
+    from crawlee.storage_clients._memory import MemoryKeyValueStoreClient
 
 
 @pytest.fixture
@@ -23,21 +22,8 @@ async def kvs_client() -> AsyncGenerator[MemoryKeyValueStoreClient, None]:
     await client.drop()
 
 
-async def test_open_creates_new_kvs() -> None:
-    """Test that open() creates a new key-value store with proper metadata and adds it to the cache."""
-    client = await MemoryStorageClient().create_kvs_client(name='new_kvs')
-
-    # Verify correct client type and properties
-    assert isinstance(client, MemoryKeyValueStoreClient)
-    assert client.metadata.id is not None
-    assert client.metadata.name == 'new_kvs'
-    assert isinstance(client.metadata.created_at, datetime)
-    assert isinstance(client.metadata.accessed_at, datetime)
-    assert isinstance(client.metadata.modified_at, datetime)
-
-
-async def test_kvs_client_purge_on_start() -> None:
-    """Test that purge_on_start=True clears existing data in the KVS."""
+async def test_memory_specific_purge_behavior() -> None:
+    """Test memory-specific purge behavior and in-memory storage characteristics."""
     configuration = Configuration(purge_on_start=True)
 
     # Create KVS and add data
@@ -52,167 +38,19 @@ async def test_kvs_client_purge_on_start() -> None:
     assert record is not None
     assert record.value == 'initial value'
 
-    # Reopen
+    # Reopen with same storage client instance
     kvs_client2 = await MemoryStorageClient().create_kvs_client(
         name='test_purge_kvs',
         configuration=configuration,
     )
 
-    # Verify value was purged
+    # Verify value was purged (memory storage specific behavior)
     record = await kvs_client2.get_value(key='test-key')
     assert record is None
 
 
-async def test_open_with_id_and_name() -> None:
-    """Test that open() can be used with both id and name parameters."""
-    client = await MemoryStorageClient().create_kvs_client(
-        id='some-id',
-        name='some-name',
-    )
-    assert client.metadata.id == 'some-id'
-    assert client.metadata.name == 'some-name'
-
-
-@pytest.mark.parametrize(
-    ('key', 'value', 'expected_content_type'),
-    [
-        pytest.param('string_key', 'string value', 'text/plain; charset=utf-8', id='string'),
-        pytest.param('dict_key', {'name': 'test', 'value': 42}, 'application/json; charset=utf-8', id='dictionary'),
-        pytest.param('list_key', [1, 2, 3], 'application/json; charset=utf-8', id='list'),
-        pytest.param('bytes_key', b'binary data', 'application/octet-stream', id='bytes'),
-    ],
-)
-async def test_set_get_value(
-    kvs_client: MemoryKeyValueStoreClient,
-    key: str,
-    value: Any,
-    expected_content_type: str,
-) -> None:
-    """Test storing and retrieving different types of values with correct content types."""
-    # Set value
-    await kvs_client.set_value(key=key, value=value)
-
-    # Get and verify value
-    record = await kvs_client.get_value(key=key)
-    assert record is not None
-    assert record.key == key
-    assert record.value == value
-    assert record.content_type == expected_content_type
-
-
-async def test_get_nonexistent_value(kvs_client: MemoryKeyValueStoreClient) -> None:
-    """Test that attempting to get a non-existent key returns None."""
-    record = await kvs_client.get_value(key='nonexistent')
-    assert record is None
-
-
-async def test_set_value_with_explicit_content_type(kvs_client: MemoryKeyValueStoreClient) -> None:
-    """Test that an explicitly provided content type overrides the automatically inferred one."""
-    value = 'This could be XML'
-    content_type = 'application/xml'
-
-    await kvs_client.set_value(key='xml_key', value=value, content_type=content_type)
-
-    record = await kvs_client.get_value(key='xml_key')
-    assert record is not None
-    assert record.value == value
-    assert record.content_type == content_type
-
-
-async def test_delete_value(kvs_client: MemoryKeyValueStoreClient) -> None:
-    """Test that a stored value can be deleted and is no longer retrievable after deletion."""
-    # Set a value
-    await kvs_client.set_value(key='delete_me', value='to be deleted')
-
-    # Verify it exists
-    record = await kvs_client.get_value(key='delete_me')
-    assert record is not None
-
-    # Delete it
-    await kvs_client.delete_value(key='delete_me')
-
-    # Verify it's gone
-    record = await kvs_client.get_value(key='delete_me')
-    assert record is None
-
-
-async def test_delete_nonexistent_value(kvs_client: MemoryKeyValueStoreClient) -> None:
-    """Test that attempting to delete a non-existent key is a no-op and doesn't raise errors."""
-    # Should not raise an error
-    await kvs_client.delete_value(key='nonexistent')
-
-
-async def test_iterate_keys(kvs_client: MemoryKeyValueStoreClient) -> None:
-    """Test that all keys can be iterated over and are returned in sorted order with correct metadata."""
-    # Set some values
-    items = {
-        'a_key': 'value A',
-        'b_key': 'value B',
-        'c_key': 'value C',
-        'd_key': 'value D',
-    }
-
-    for key, value in items.items():
-        await kvs_client.set_value(key=key, value=value)
-
-    # Get all keys
-    metadata_list = [metadata async for metadata in kvs_client.iterate_keys()]
-
-    # Verify keys are returned in sorted order
-    assert len(metadata_list) == 4
-    assert [m.key for m in metadata_list] == sorted(items.keys())
-    assert all(isinstance(m, KeyValueStoreRecordMetadata) for m in metadata_list)
-
-
-async def test_iterate_keys_with_exclusive_start_key(kvs_client: MemoryKeyValueStoreClient) -> None:
-    """Test that exclusive_start_key parameter returns only keys after it alphabetically."""
-    # Set some values
-    for key in ['b_key', 'c_key', 'a_key', 'e_key', 'd_key']:
-        await kvs_client.set_value(key=key, value=f'value for {key}')
-
-    # Get keys starting after 'b_key'
-    metadata_list = [metadata async for metadata in kvs_client.iterate_keys(exclusive_start_key='b_key')]
-
-    # Verify only keys after 'b_key' are returned
-    assert len(metadata_list) == 3
-    assert [m.key for m in metadata_list] == ['c_key', 'd_key', 'e_key']
-
-
-async def test_iterate_keys_with_limit(kvs_client: MemoryKeyValueStoreClient) -> None:
-    """Test that the limit parameter returns only the specified number of keys."""
-    # Set some values
-    for key in ['a_key', 'e_key', 'c_key', 'b_key', 'd_key']:
-        await kvs_client.set_value(key=key, value=f'value for {key}')
-
-    # Get first 3 keys
-    metadata_list = [metadata async for metadata in kvs_client.iterate_keys(limit=3)]
-
-    # Verify only the first 3 keys are returned
-    assert len(metadata_list) == 3
-    assert [m.key for m in metadata_list] == ['a_key', 'b_key', 'c_key']
-
-
-async def test_drop(kvs_client: MemoryKeyValueStoreClient) -> None:
-    """Test that drop removes the store from cache and clears all data."""
-    # Add some values to the store
-    await kvs_client.set_value(key='test', value='data')
-
-    # Drop the store
-    await kvs_client.drop()
-
-    # Verify the store is empty
-    record = await kvs_client.get_value(key='test')
-    assert record is None
-
-
-async def test_get_public_url(kvs_client: MemoryKeyValueStoreClient) -> None:
-    """Test that get_public_url raises NotImplementedError for the memory implementation."""
-    with pytest.raises(NotImplementedError):
-        await kvs_client.get_public_url(key='any-key')
-
-
-async def test_metadata_updates(kvs_client: MemoryKeyValueStoreClient) -> None:
-    """Test that read/write operations properly update accessed_at and modified_at timestamps."""
+async def test_memory_metadata_updates(kvs_client: MemoryKeyValueStoreClient) -> None:
+    """Test that metadata timestamps are updated correctly in memory storage."""
     # Record initial timestamps
     initial_created = kvs_client.metadata.created_at
     initial_accessed = kvs_client.metadata.accessed_at
@@ -221,93 +59,23 @@ async def test_metadata_updates(kvs_client: MemoryKeyValueStoreClient) -> None:
     # Wait a moment to ensure timestamps can change
     await asyncio.sleep(0.01)
 
-    # Perform an operation that updates accessed_at
+    # Perform a read operation
     await kvs_client.get_value(key='nonexistent')
 
-    # Verify timestamps
+    # Verify timestamps (memory-specific behavior)
     assert kvs_client.metadata.created_at == initial_created
     assert kvs_client.metadata.accessed_at > initial_accessed
     assert kvs_client.metadata.modified_at == initial_modified
 
-    accessed_after_get = kvs_client.metadata.accessed_at
+    accessed_after_read = kvs_client.metadata.accessed_at
 
     # Wait a moment to ensure timestamps can change
     await asyncio.sleep(0.01)
 
-    # Perform an operation that updates modified_at and accessed_at
-    await kvs_client.set_value(key='new_key', value='new value')
+    # Perform a write operation
+    await kvs_client.set_value(key='test', value='test-value')
 
-    # Verify timestamps again
+    # Verify timestamps were updated
     assert kvs_client.metadata.created_at == initial_created
     assert kvs_client.metadata.modified_at > initial_modified
-    assert kvs_client.metadata.accessed_at > accessed_after_get
-
-
-async def test_record_exists_nonexistent(kvs_client: MemoryKeyValueStoreClient) -> None:
-    """Test that record_exists returns False for a nonexistent key."""
-    result = await kvs_client.record_exists(key='nonexistent-key')
-    assert result is False
-
-
-async def test_record_exists_after_set(kvs_client: MemoryKeyValueStoreClient) -> None:
-    """Test that record_exists returns True after setting a value."""
-    test_key = 'exists-key'
-    test_value = {'data': 'test'}
-
-    # Initially should not exist
-    assert await kvs_client.record_exists(key=test_key) is False
-
-    # Set the value
-    await kvs_client.set_value(key=test_key, value=test_value)
-
-    # Now should exist
-    assert await kvs_client.record_exists(key=test_key) is True
-
-
-async def test_record_exists_after_delete(kvs_client: MemoryKeyValueStoreClient) -> None:
-    """Test that record_exists returns False after deleting a value."""
-    test_key = 'exists-then-delete-key'
-    test_value = 'will be deleted'
-
-    # Set a value
-    await kvs_client.set_value(key=test_key, value=test_value)
-    assert await kvs_client.record_exists(key=test_key) is True
-
-    # Delete the value
-    await kvs_client.delete_value(key=test_key)
-
-    # Should no longer exist
-    assert await kvs_client.record_exists(key=test_key) is False
-
-
-async def test_record_exists_with_none_value(kvs_client: MemoryKeyValueStoreClient) -> None:
-    """Test that record_exists returns True even when value is None."""
-    test_key = 'none-value-key'
-
-    # Set None as value
-    await kvs_client.set_value(key=test_key, value=None)
-
-    # Should still exist even though value is None
-    assert await kvs_client.record_exists(key=test_key) is True
-
-    # Verify we can distinguish between None value and nonexistent key
-    record = await kvs_client.get_value(key=test_key)
-    assert record is not None
-    assert record.value is None
-    assert await kvs_client.record_exists(key=test_key) is True
-    assert await kvs_client.record_exists(key='truly-nonexistent') is False
-
-
-async def test_record_exists_updates_metadata(kvs_client: MemoryKeyValueStoreClient) -> None:
-    """Test that record_exists updates the accessed_at timestamp."""
-    # Record initial timestamp
-    initial_accessed = kvs_client.metadata.accessed_at
-
-    # Wait a moment to ensure timestamps can change
-    await asyncio.sleep(0.01)
-
-    # Check if record exists (should update accessed_at)
-    await kvs_client.record_exists(key='any-key')
-
-    # Verify timestamp was updated
-    assert kvs_client.metadata.accessed_at > initial_accessed
+    assert kvs_client.metadata.accessed_at > accessed_after_read
