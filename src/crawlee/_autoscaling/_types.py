@@ -8,6 +8,9 @@ if TYPE_CHECKING:
     from crawlee._utils.byte_size import ByteSize
 
 
+SYSTEM_WIDE_MEMORY_OVERLOAD_THRESHOLD = 0.97
+
+
 @dataclass
 class LoadRatioInfo:
     """Represent the load ratio of a resource."""
@@ -111,7 +114,7 @@ class MemorySnapshot:
         """Indicate whether the memory is considered as overloaded."""
         if self.system_wide_memory_size is not None and self.system_wide_used_size is not None:
             system_wide_utilization = self.system_wide_used_size / self.system_wide_memory_size
-            if system_wide_utilization > 0.97:
+            if system_wide_utilization > SYSTEM_WIDE_MEMORY_OVERLOAD_THRESHOLD:
                 return True
 
         return (self.current_size / self.max_memory_size) > self.max_used_memory_ratio
