@@ -152,6 +152,11 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
     async def get_public_url(self, *, key: str) -> str:
         raise NotImplementedError('Public URLs are not supported for memory key-value stores.')
 
+    @override
+    async def record_exists(self, *, key: str) -> bool:
+        await self._update_metadata(update_accessed_at=True)
+        return key in self._records
+
     async def _update_metadata(
         self,
         *,

@@ -414,3 +414,196 @@ async def test_concurrent_operations(kvs_client: FileSystemKeyValueStoreClient) 
         record = await kvs_client.get_value(key=key)
         assert record is not None
         assert record.value == f'value-{i}'
+
+
+async def test_record_exists_nonexistent_key(kvs_client: FileSystemKeyValueStoreClient) -> None:
+    """Test that record_exists returns False for nonexistent key."""
+    assert await kvs_client.record_exists(key='nonexistent-key') is False
+
+
+async def test_record_exists_after_set_dict(kvs_client: FileSystemKeyValueStoreClient) -> None:
+    """Test record_exists returns True after setting a dict value."""
+    key = 'dict-key'
+    value = {'data': 'test'}
+
+    # Initially should not exist
+    assert await kvs_client.record_exists(key=key) is False
+
+    # Set the value and check existence
+    await kvs_client.set_value(key=key, value=value)
+    assert await kvs_client.record_exists(key=key) is True
+
+    # Also verify we can retrieve the value
+    record = await kvs_client.get_value(key=key)
+    assert record is not None
+    assert record.value == value
+
+    # Verify the actual files exist on disk
+    encoded_key = urllib.parse.quote(key, safe='')
+    record_path = kvs_client.path_to_kvs / encoded_key
+    metadata_path = record_path.with_name(f'{record_path.name}.{METADATA_FILENAME}')
+    assert record_path.exists()
+    assert metadata_path.exists()
+
+
+async def test_record_exists_after_set_string(kvs_client: FileSystemKeyValueStoreClient) -> None:
+    """Test record_exists returns True after setting a string value."""
+    key = 'string-key'
+    value = 'test string'
+
+    # Initially should not exist
+    assert await kvs_client.record_exists(key=key) is False
+
+    # Set the value and check existence
+    await kvs_client.set_value(key=key, value=value)
+    assert await kvs_client.record_exists(key=key) is True
+
+    # Also verify we can retrieve the value
+    record = await kvs_client.get_value(key=key)
+    assert record is not None
+    assert record.value == value
+
+    # Verify the actual files exist on disk
+    encoded_key = urllib.parse.quote(key, safe='')
+    record_path = kvs_client.path_to_kvs / encoded_key
+    metadata_path = record_path.with_name(f'{record_path.name}.{METADATA_FILENAME}')
+    assert record_path.exists()
+    assert metadata_path.exists()
+
+
+async def test_record_exists_after_set_none(kvs_client: FileSystemKeyValueStoreClient) -> None:
+    """Test record_exists returns True after setting None value."""
+    key = 'none-key'
+    value = None
+
+    # Initially should not exist
+    assert await kvs_client.record_exists(key=key) is False
+
+    # Set the value and check existence
+    await kvs_client.set_value(key=key, value=value)
+    assert await kvs_client.record_exists(key=key) is True
+
+    # Also verify we can retrieve the value
+    record = await kvs_client.get_value(key=key)
+    assert record is not None
+    assert record.value == value
+
+    # Verify the actual files exist on disk
+    encoded_key = urllib.parse.quote(key, safe='')
+    record_path = kvs_client.path_to_kvs / encoded_key
+    metadata_path = record_path.with_name(f'{record_path.name}.{METADATA_FILENAME}')
+    assert record_path.exists()
+    assert metadata_path.exists()
+
+
+async def test_record_exists_after_set_int(kvs_client: FileSystemKeyValueStoreClient) -> None:
+    """Test record_exists returns True after setting an int value."""
+    key = 'int-key'
+    value = 42
+
+    # Initially should not exist
+    assert await kvs_client.record_exists(key=key) is False
+
+    # Set the value and check existence
+    await kvs_client.set_value(key=key, value=value)
+    assert await kvs_client.record_exists(key=key) is True
+
+    # Also verify we can retrieve the value
+    record = await kvs_client.get_value(key=key)
+    assert record is not None
+    # For file system storage, non-JSON scalar values get converted to strings
+    assert record.value == str(value)
+
+    # Verify the actual files exist on disk
+    encoded_key = urllib.parse.quote(key, safe='')
+    record_path = kvs_client.path_to_kvs / encoded_key
+    metadata_path = record_path.with_name(f'{record_path.name}.{METADATA_FILENAME}')
+    assert record_path.exists()
+    assert metadata_path.exists()
+
+
+async def test_record_exists_after_delete(kvs_client: FileSystemKeyValueStoreClient) -> None:
+    """Test record_exists returns False after deleting a value."""
+    key = 'delete-key'
+    value = 'will be deleted'
+
+    # Initially should not exist
+    assert await kvs_client.record_exists(key=key) is False
+
+    # Set the value first
+    await kvs_client.set_value(key=key, value=value)
+    assert await kvs_client.record_exists(key=key) is True
+
+    # Then delete it
+    await kvs_client.delete_value(key=key)
+    assert await kvs_client.record_exists(key=key) is False
+
+    # Verify the actual files are gone from disk
+    encoded_key = urllib.parse.quote(key, safe='')
+    record_path = kvs_client.path_to_kvs / encoded_key
+    metadata_path = record_path.with_name(f'{record_path.name}.{METADATA_FILENAME}')
+    assert not record_path.exists()
+    assert not metadata_path.exists()
+
+
+async def test_record_exists_none_value_distinction(kvs_client: FileSystemKeyValueStoreClient) -> None:
+    """Test that record_exists can distinguish between None value and nonexistent key."""
+    test_key = 'none-value-key'
+
+    # Set None as value
+    await kvs_client.set_value(key=test_key, value=None)
+
+    # Should still exist even though value is None
+    assert await kvs_client.record_exists(key=test_key) is True
+
+    # Verify we can distinguish between None value and nonexistent key
+    record = await kvs_client.get_value(key=test_key)
+    assert record is not None
+    assert record.value is None
+    assert await kvs_client.record_exists(key=test_key) is True
+    assert await kvs_client.record_exists(key='truly-nonexistent') is False
+
+
+async def test_record_exists_only_value_file(kvs_client: FileSystemKeyValueStoreClient) -> None:
+    """Test that record_exists returns False if only value file exists without metadata."""
+    test_key = 'only-value-file-key'
+
+    # Manually create only the value file without metadata
+    encoded_key = urllib.parse.quote(test_key, safe='')
+    record_path = kvs_client.path_to_kvs / encoded_key
+    record_path.parent.mkdir(parents=True, exist_ok=True)
+    record_path.write_text('orphaned value')
+
+    # Should return False because metadata file is missing
+    assert await kvs_client.record_exists(key=test_key) is False
+
+
+async def test_record_exists_only_metadata_file(kvs_client: FileSystemKeyValueStoreClient) -> None:
+    """Test that record_exists returns False if only metadata file exists without value."""
+    test_key = 'only-metadata-file-key'
+
+    # Manually create only the metadata file without value
+    encoded_key = urllib.parse.quote(test_key, safe='')
+    record_path = kvs_client.path_to_kvs / encoded_key
+    metadata_path = record_path.with_name(f'{record_path.name}.{METADATA_FILENAME}')
+
+    record_path.parent.mkdir(parents=True, exist_ok=True)
+    metadata_path.write_text('{"key":"test","content_type":"text/plain","size":10}')
+
+    # Should return False because value file is missing
+    assert await kvs_client.record_exists(key=test_key) is False
+
+
+async def test_record_exists_updates_metadata(kvs_client: FileSystemKeyValueStoreClient) -> None:
+    """Test that record_exists updates the accessed_at timestamp."""
+    # Record initial timestamp
+    initial_accessed = kvs_client.metadata.accessed_at
+
+    # Wait a moment to ensure timestamps can change
+    await asyncio.sleep(0.01)
+
+    # Check if record exists (should update accessed_at)
+    await kvs_client.record_exists(key='any-key')
+
+    # Verify timestamp was updated
+    assert kvs_client.metadata.accessed_at > initial_accessed

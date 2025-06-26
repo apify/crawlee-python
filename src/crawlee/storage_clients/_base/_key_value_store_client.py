@@ -115,3 +115,16 @@ class KeyValueStoreClient(ABC):
 
         The backend method for the `KeyValueStore.get_public_url` call.
         """
+
+    @abstractmethod
+    async def record_exists(self, *, key: str) -> bool:
+        """Check if a record with the given key exists in the key-value store.
+
+        The backend method for the `KeyValueStore.record_exists` call.
+
+        Args:
+            key: The key to check for existence.
+
+        Returns:
+            True if a record with the given key exists, False otherwise.
+        """

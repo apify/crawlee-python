@@ -241,3 +241,73 @@ async def test_metadata_updates(kvs_client: MemoryKeyValueStoreClient) -> None:
     assert kvs_client.metadata.created_at == initial_created
     assert kvs_client.metadata.modified_at > initial_modified
     assert kvs_client.metadata.accessed_at > accessed_after_get
+
+
+async def test_record_exists_nonexistent(kvs_client: MemoryKeyValueStoreClient) -> None:
+    """Test that record_exists returns False for a nonexistent key."""
+    result = await kvs_client.record_exists(key='nonexistent-key')
+    assert result is False
+
+
+async def test_record_exists_after_set(kvs_client: MemoryKeyValueStoreClient) -> None:
+    """Test that record_exists returns True after setting a value."""
+    test_key = 'exists-key'
+    test_value = {'data': 'test'}
+
+    # Initially should not exist
+    assert await kvs_client.record_exists(key=test_key) is False
+
+    # Set the value
+    await kvs_client.set_value(key=test_key, value=test_value)
+
+    # Now should exist
+    assert await kvs_client.record_exists(key=test_key) is True
+
+
+async def test_record_exists_after_delete(kvs_client: MemoryKeyValueStoreClient) -> None:
+    """Test that record_exists returns False after deleting a value."""
+    test_key = 'exists-then-delete-key'
+    test_value = 'will be deleted'
+
+    # Set a value
+    await kvs_client.set_value(key=test_key, value=test_value)
+    assert await kvs_client.record_exists(key=test_key) is True
+
+    # Delete the value
+    await kvs_client.delete_value(key=test_key)
+
+    # Should no longer exist
+    assert await kvs_client.record_exists(key=test_key) is False
+
+
+async def test_record_exists_with_none_value(kvs_client: MemoryKeyValueStoreClient) -> None:
+    """Test that record_exists returns True even when value is None."""
+    test_key = 'none-value-key'
+
+    # Set None as value
+    await kvs_client.set_value(key=test_key, value=None)
+
+    # Should still exist even though value is None
+    assert await kvs_client.record_exists(key=test_key) is True
+
+    # Verify we can distinguish between None value and nonexistent key
+    record = await kvs_client.get_value(key=test_key)
+    assert record is not None
+    assert record.value is None
+    assert await kvs_client.record_exists(key=test_key) is True
+    assert await kvs_client.record_exists(key='truly-nonexistent') is False
+
+
+async def test_record_exists_updates_metadata(kvs_client: MemoryKeyValueStoreClient) -> None:
+    """Test that record_exists updates the accessed_at timestamp."""
+    # Record initial timestamp
+    initial_accessed = kvs_client.metadata.accessed_at
+
+    # Wait a moment to ensure timestamps can change
+    await asyncio.sleep(0.01)
+
+    # Check if record exists (should update accessed_at)
+    await kvs_client.record_exists(key='any-key')
+
+    # Verify timestamp was updated
+    assert kvs_client.metadata.accessed_at > initial_accessed

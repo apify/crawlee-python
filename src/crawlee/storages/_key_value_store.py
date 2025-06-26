@@ -222,6 +222,17 @@ class KeyValueStore(Storage):
             )
         ]
 
+    async def record_exists(self, key: str) -> bool:
+        """Check if a record with the given key exists in the key-value store.
+
+        Args:
+            key: Key of the record to check for existence.
+
+        Returns:
+            True if a record with the given key exists, False otherwise.
+        """
+        return await self._client.record_exists(key=key)
+
     async def get_public_url(self, key: str) -> str:
         """Get the public URL for the given key.
 

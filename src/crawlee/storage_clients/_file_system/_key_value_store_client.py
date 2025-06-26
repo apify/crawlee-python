@@ -427,6 +427,26 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         absolute_path = record_path.absolute()
         return absolute_path.as_uri()
 
+    @override
+    async def record_exists(self, *, key: str) -> bool:
+        """Check if a record with the given key exists in the key-value store.
+
+        Args:
+            key: The key to check for existence.
+
+        Returns:
+            True if a record with the given key exists, False otherwise.
+        """
+        # Update the metadata to record access
+        async with self._lock:
+            await self._update_metadata(update_accessed_at=True)
+
+        record_path = self.path_to_kvs / self._encode_key(key)
+        record_metadata_filepath = record_path.with_name(f'{record_path.name}.{METADATA_FILENAME}')
+
+        # Both the value file and metadata file must exist for a record to be considered existing
+        return record_path.exists() and record_metadata_filepath.exists()
+
     async def _update_metadata(
         self,
         *,

@@ -485,3 +485,116 @@ async def test_purge(
 
     # Clean up
     await kvs.drop()
+
+
+async def test_record_exists_nonexistent(kvs: KeyValueStore) -> None:
+    """Test that record_exists returns False for a nonexistent key."""
+    result = await kvs.record_exists('nonexistent-key')
+    assert result is False
+
+
+async def test_record_exists_after_set(kvs: KeyValueStore) -> None:
+    """Test that record_exists returns True after setting a value."""
+    test_key = 'exists-key'
+    test_value = {'data': 'test'}
+
+    # Initially should not exist
+    assert await kvs.record_exists(test_key) is False
+
+    # Set the value
+    await kvs.set_value(test_key, test_value)
+
+    # Now should exist
+    assert await kvs.record_exists(test_key) is True
+
+
+async def test_record_exists_after_delete(kvs: KeyValueStore) -> None:
+    """Test that record_exists returns False after deleting a value."""
+    test_key = 'exists-then-delete-key'
+    test_value = 'will be deleted'
+
+    # Set a value
+    await kvs.set_value(test_key, test_value)
+    assert await kvs.record_exists(test_key) is True
+
+    # Delete the value
+    await kvs.delete_value(test_key)
+
+    # Should no longer exist
+    assert await kvs.record_exists(test_key) is False
+
+
+async def test_record_exists_with_none_value(kvs: KeyValueStore) -> None:
+    """Test that record_exists returns True even when value is None."""
+    test_key = 'none-value-key'
+
+    # Set None as value
+    await kvs.set_value(test_key, None)
+
+    # Should still exist even though value is None
+    assert await kvs.record_exists(test_key) is True
+
+    # Verify we can distinguish between None value and nonexistent key
+    assert await kvs.get_value(test_key) is None
+    assert await kvs.record_exists(test_key) is True
+    assert await kvs.record_exists('truly-nonexistent') is False
+
+
+async def test_record_exists_different_content_types(kvs: KeyValueStore) -> None:
+    """Test record_exists with different content types."""
+    test_cases = [
+        ('json-key', {'data': 'json'}, 'application/json'),
+        ('text-key', 'plain text', 'text/plain'),
+        ('binary-key', b'binary data', 'application/octet-stream'),
+    ]
+
+    for key, value, content_type in test_cases:
+        # Set value with specific content type
+        await kvs.set_value(key, value, content_type=content_type)
+
+        # Should exist regardless of content type
+        assert await kvs.record_exists(key) is True
+
+
+async def test_record_exists_multiple_keys(kvs: KeyValueStore) -> None:
+    """Test record_exists with multiple keys and batch operations."""
+    keys_and_values = [
+        ('key1', 'value1'),
+        ('key2', {'nested': 'object'}),
+        ('key3', [1, 2, 3]),
+        ('key4', None),
+    ]
+
+    # Initially, none should exist
+    for key, _ in keys_and_values:
+        assert await kvs.record_exists(key) is False
+
+    # Set all values
+    for key, value in keys_and_values:
+        await kvs.set_value(key, value)
+
+    # All should exist now
+    for key, _ in keys_and_values:
+        assert await kvs.record_exists(key) is True
+
+    # Test some non-existent keys
+    assert await kvs.record_exists('nonexistent1') is False
+    assert await kvs.record_exists('nonexistent2') is False
+
+
+async def test_record_exists_after_purge(kvs: KeyValueStore) -> None:
+    """Test that record_exists returns False after purging the store."""
+    # Set some values
+    await kvs.set_value('key1', 'value1')
+    await kvs.set_value('key2', 'value2')
+
+    # Verify they exist
+    assert await kvs.record_exists('key1') is True
+    assert await kvs.record_exists('key2') is True
+
+    # Purge the store
+    await kvs.purge()
+
+    # Should no longer exist
+    assert await kvs.record_exists('key1') is False
+    assert await kvs.record_exists('key2') is False
