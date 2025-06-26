@@ -1,0 +1,81 @@
+import asyncio
+import io
+import logging
+from functools import partial
+
+from playwright.async_api import Response
+from warcio.statusandheaders import StatusAndHeaders
+from warcio.warcwriter import WARCWriter
+
+from crawlee.crawlers import (
+    PlaywrightCrawler,
+    PlaywrightCrawlingContext,
+    PlaywrightPreNavCrawlingContext,
+)
+
+
+async def archive_response(
+    response: Response, writer: WARCWriter, logger: logging.Logger
+) -> None:
+    """Helper function for archiving response in WARC format."""
+    await response.finished()
+    try:
+        response_body = await response.body()
+    except Exception as e:
+        logger.warning(f'Could not get response body for {response.url}: {e}')
+        return
+    logger.info(f'Archiving resource {response.url}')
+    response_payload_stream = io.BytesIO(response_body)
+    response_headers = StatusAndHeaders(
+        str(response.status), response.headers, protocol='HTTP/1.1'
+    )
+    response_record = writer.create_warc_record(
+        response.url,
+        'response',
+        payload=response_payload_stream,
+        length=len(response_body),
+        http_headers=response_headers,
+    )
+    logger.info(f'Content type {response_record.content_type}')
+    writer.write_record(response_record)
+
+
+async def main() -> None:
+    crawler = PlaywrightCrawler(
+        max_requests_per_crawl=1,
+        headless=False,
+    )
+
+    # Create a WARC archive file a prepare the writer.
+    archive = 'example2.warc.gz'
+    with open(archive, 'wb') as output:
+        writer = WARCWriter(output, gzip=True)
+
+        # Create a WARC info record to store metadata about the archive.
+        warcinfo_payload = {
+            'software': 'Crawlee',
+            'format': 'WARC/1.1',
+            'description': 'Example archive created with PlaywrightCrawler',
+        }
+        writer.write_record(writer.create_warcinfo_record(archive, warcinfo_payload))
+
+        @crawler.pre_navigation_hook
+        async def archiving_hook(context: PlaywrightPreNavCrawlingContext) -> None:
+            # Ensure that all responses with additional resources are archived
+            context.page.on(
+                'response', partial(archive_response, logger=context.log, writer=writer)
+            )
+
+        @crawler.router.default_handler
+        async def request_handler(context: PlaywrightCrawlingContext) -> None:
+            # For some sites, where the content loads dynamically,
+            # it is needed to scroll the page to load all content.
+            # It slows down the crawling, but ensures that all content is loaded.
+            await context.infinite_scroll()
+            await context.enqueue_links()
+
+        await crawler.run(['https://crawlee.dev/'])
+
+
+if __name__ == '__main__':
+    asyncio.run(main())
