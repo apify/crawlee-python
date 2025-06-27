@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, Literal, TypeVar
 
 from pydantic import BaseModel
 
@@ -34,7 +34,7 @@ class RecoverableState(Generic[TStateModel]):
         *,
         default_state: TStateModel,
         persist_state_key: str,
-        persistence_enabled: bool = False,
+        persistence_enabled: Literal[True, False, 'explicit_only'] = False,
         persist_state_kvs_name: str | None = None,
         persist_state_kvs_id: str | None = None,
         logger: logging.Logger,
@@ -71,7 +71,7 @@ class RecoverableState(Generic[TStateModel]):
         Returns:
             The loaded state model
         """
-        if not self._persistence_enabled:
+        if self._persistence_enabled is False:
             self._state = self._default_state.model_copy(deep=True)
             return self.current_value
 
@@ -81,8 +81,9 @@ class RecoverableState(Generic[TStateModel]):
 
         await self._load_saved_state()
 
-        event_manager = service_locator.get_event_manager()
-        event_manager.on(event=Event.PERSIST_STATE, listener=self.persist_state)
+        if self._persistence_enabled is True:
+            event_manager = service_locator.get_event_manager()
+            event_manager.on(event=Event.PERSIST_STATE, listener=self.persist_state)
 
         return self.current_value
 
@@ -95,9 +96,10 @@ class RecoverableState(Generic[TStateModel]):
         if not self._persistence_enabled:
             return
 
-        event_manager = service_locator.get_event_manager()
-        event_manager.off(event=Event.PERSIST_STATE, listener=self.persist_state)
-        await self.persist_state()
+        if self._persistence_enabled is True:
+            event_manager = service_locator.get_event_manager()
+            event_manager.off(event=Event.PERSIST_STATE, listener=self.persist_state)
+            await self.persist_state()
 
     @property
     def current_value(self) -> TStateModel:
@@ -106,6 +108,23 @@ class RecoverableState(Generic[TStateModel]):
             raise RuntimeError('Recoverable state has not yet been loaded')
 
         return self._state
+
+    @property
+    def is_initialized(self) -> bool:
+        """Check if the state has already been initialized."""
+        return self._state is not None
+
+    async def has_persisted_state(self) -> bool:
+        """Check if there is any persisted state in the key-value store."""
+        if not self._persistence_enabled:
+            return False
+
+        if self._key_value_store is None:
+            raise RuntimeError('Recoverable state has not yet been initialized')
+
+        return (
+            await self._key_value_store.get_value(self._persist_state_key) is not None
+        )  # TODO do not fetch the whole record
 
     async def reset(self) -> None:
         """Reset the state to the default values and clear any persisted state.
@@ -130,17 +149,21 @@ class RecoverableState(Generic[TStateModel]):
         Args:
             event_data: Optional data associated with a PERSIST_STATE event
         """
-        self._log.debug(f'Persisting state of the Statistics (event_data={event_data}).')
+        self._log.debug(
+            f'Persisting RecoverableState (model={self._default_state.__class__.__name__}, event_data={event_data}).'
+        )
 
         if self._key_value_store is None or self._state is None:
             raise RuntimeError('Recoverable state has not yet been initialized')
 
-        if self._persistence_enabled:
+        if self._persistence_enabled is True or self._persistence_enabled == 'explicit_only':
             await self._key_value_store.set_value(
                 self._persist_state_key,
                 self._state.model_dump(mode='json', by_alias=True),
                 'application/json',
             )
+        else:
+            self._log.debug('Persistence is not enabled - not doing anything')
 
     async def _load_saved_state(self) -> None:
         if self._key_value_store is None:
