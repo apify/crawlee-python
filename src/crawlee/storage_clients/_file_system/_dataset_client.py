@@ -62,6 +62,7 @@ class FileSystemDatasetClient(DatasetClient):
         modified_at: datetime,
         item_count: int,
         storage_dir: Path,
+        lock: asyncio.Lock,
     ) -> None:
         """Initialize a new instance.
 
@@ -78,8 +79,7 @@ class FileSystemDatasetClient(DatasetClient):
 
         self._storage_dir = storage_dir
 
-        # Internal attributes
-        self._lock = asyncio.Lock()
+        self._lock = lock
         """A lock to ensure that only one operation is performed at a time."""
 
     @property
@@ -140,6 +140,7 @@ class FileSystemDatasetClient(DatasetClient):
                                 modified_at=metadata.modified_at,
                                 item_count=metadata.item_count,
                                 storage_dir=storage_dir,
+                                lock=asyncio.Lock(),
                             )
                             await client._update_metadata(update_accessed_at=True)
                             found = True
@@ -179,6 +180,7 @@ class FileSystemDatasetClient(DatasetClient):
                     modified_at=metadata.modified_at,
                     item_count=metadata.item_count,
                     storage_dir=storage_dir,
+                    lock=asyncio.Lock(),
                 )
 
                 await client._update_metadata(update_accessed_at=True)
@@ -194,6 +196,7 @@ class FileSystemDatasetClient(DatasetClient):
                     modified_at=now,
                     item_count=0,
                     storage_dir=storage_dir,
+                    lock=asyncio.Lock(),
                 )
                 await client._update_metadata()
 

@@ -50,8 +50,8 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
             modified_at=modified_at,
         )
 
-        # Dictionary to hold key-value records with metadata
         self._records = dict[str, KeyValueStoreRecord]()
+        """Dictionary to hold key-value records."""
 
     @property
     @override

@@ -54,8 +54,8 @@ class MemoryDatasetClient(DatasetClient):
             item_count=item_count,
         )
 
-        # List to hold dataset items
         self._records = list[dict[str, Any]]()
+        """List to hold dataset items. Each item is a dictionary representing a record."""
 
     @property
     @override

@@ -98,6 +98,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         stats: dict,
         total_request_count: int,
         storage_dir: Path,
+        lock: asyncio.Lock,
     ) -> None:
         """Initialize a new instance.
 
@@ -119,7 +120,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         self._storage_dir = storage_dir
         """The base directory where the request queue is stored."""
 
-        self._lock = asyncio.Lock()
+        self._lock = lock
         """A lock to ensure that only one operation is performed at a time."""
 
         self._request_cache = deque[Request]()
@@ -194,6 +195,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                             client = cls(
                                 **metadata.model_dump(),
                                 storage_dir=storage_dir,
+                                lock=asyncio.Lock(),
                             )
                             await client._state.initialize()
                             await client._discover_existing_requests()
@@ -230,6 +232,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 client = cls(
                     **metadata.model_dump(),
                     storage_dir=storage_dir,
+                    lock=asyncio.Lock(),
                 )
 
                 await client._state.initialize()
@@ -251,6 +254,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     stats={},
                     total_request_count=0,
                     storage_dir=storage_dir,
+                    lock=asyncio.Lock(),
                 )
                 await client._state.initialize()
                 await client._update_metadata()

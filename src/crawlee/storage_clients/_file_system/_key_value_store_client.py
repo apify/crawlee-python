@@ -60,6 +60,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         accessed_at: datetime,
         modified_at: datetime,
         storage_dir: Path,
+        lock: asyncio.Lock,
     ) -> None:
         """Initialize a new instance.
 
@@ -75,8 +76,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
         self._storage_dir = storage_dir
 
-        # Internal attributes
-        self._lock = asyncio.Lock()
+        self._lock = lock
         """A lock to ensure that only one operation is performed at a time."""
 
     @property
@@ -136,6 +136,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
                                 accessed_at=metadata.accessed_at,
                                 modified_at=metadata.modified_at,
                                 storage_dir=storage_dir,
+                                lock=asyncio.Lock(),
                             )
                             await client._update_metadata(update_accessed_at=True)
                             found = True
@@ -172,6 +173,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
                     accessed_at=metadata.accessed_at,
                     modified_at=metadata.modified_at,
                     storage_dir=storage_dir,
+                    lock=asyncio.Lock(),
                 )
 
                 await client._update_metadata(update_accessed_at=True)
@@ -186,6 +188,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
                     accessed_at=now,
                     modified_at=now,
                     storage_dir=storage_dir,
+                    lock=asyncio.Lock(),
                 )
                 await client._update_metadata()
 
