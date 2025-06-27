@@ -1,229 +1,600 @@
+# TODO: Update crawlee_storage_dir args once the Pydantic bug is fixed
+# https://github.com/apify/crawlee-python/issues/146
+
 from __future__ import annotations
 
-import asyncio
-from datetime import datetime, timedelta, timezone
-from itertools import chain, repeat
-from typing import TYPE_CHECKING, cast
-from unittest.mock import patch
-from urllib.parse import urlparse
+import json
+from typing import TYPE_CHECKING
 
 import pytest
 
-from crawlee import service_locator
-from crawlee.events import EventManager
-from crawlee.storage_clients.models import StorageMetadata
+from crawlee.configuration import Configuration
+from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
 from crawlee.storages import KeyValueStore
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+    from pathlib import Path
 
-    from crawlee._types import JsonSerializable
+    from crawlee.storage_clients import StorageClient
+
+
+@pytest.fixture(params=['memory', 'file_system'])
+def storage_client(request: pytest.FixtureRequest) -> StorageClient:
+    """Parameterized fixture to test with different storage clients."""
+    if request.param == 'memory':
+        return MemoryStorageClient()
+
+    return FileSystemStorageClient()
 
 
 @pytest.fixture
-async def mock_event_manager() -> AsyncGenerator[EventManager, None]:
-    async with EventManager(persist_state_interval=timedelta(milliseconds=50)) as event_manager:
-        with patch('crawlee.service_locator.get_event_manager', return_value=event_manager):
-            yield event_manager
-
-
-async def test_open() -> None:
-    default_key_value_store = await KeyValueStore.open()
-    default_key_value_store_by_id = await KeyValueStore.open(id=default_key_value_store.id)
-
-    assert default_key_value_store is default_key_value_store_by_id
-
-    key_value_store_name = 'dummy-name'
-    named_key_value_store = await KeyValueStore.open(name=key_value_store_name)
-    assert default_key_value_store is not named_key_value_store
-
-    with pytest.raises(RuntimeError, match='KeyValueStore with id "nonexistent-id" does not exist!'):
-        await KeyValueStore.open(id='nonexistent-id')
-
-    # Test that when you try to open a key-value store by ID and you use a name of an existing key-value store,
-    # it doesn't work
-    with pytest.raises(RuntimeError, match='KeyValueStore with id "dummy-name" does not exist!'):
-        await KeyValueStore.open(id='dummy-name')
-
-
-async def test_open_save_storage_object() -> None:
-    default_key_value_store = await KeyValueStore.open()
-
-    assert default_key_value_store.storage_object is not None
-    assert default_key_value_store.storage_object.id == default_key_value_store.id
-
-
-async def test_consistency_accross_two_clients() -> None:
-    kvs = await KeyValueStore.open(name='my-kvs')
-    await kvs.set_value('key', 'value')
-
-    kvs_by_id = await KeyValueStore.open(id=kvs.id)
-    await kvs_by_id.set_value('key2', 'value2')
-
-    assert (await kvs.get_value('key')) == 'value'
-    assert (await kvs.get_value('key2')) == 'value2'
-
-    assert (await kvs_by_id.get_value('key')) == 'value'
-    assert (await kvs_by_id.get_value('key2')) == 'value2'
-
-    await kvs.drop()
-    with pytest.raises(RuntimeError, match='Storage with provided ID was not found'):
-        await kvs_by_id.drop()
-
-
-async def test_same_references() -> None:
-    kvs1 = await KeyValueStore.open()
-    kvs2 = await KeyValueStore.open()
-    assert kvs1 is kvs2
-
-    kvs_name = 'non-default'
-    kvs_named1 = await KeyValueStore.open(name=kvs_name)
-    kvs_named2 = await KeyValueStore.open(name=kvs_name)
-    assert kvs_named1 is kvs_named2
-
-
-async def test_drop() -> None:
-    kvs1 = await KeyValueStore.open()
-    await kvs1.drop()
-    kvs2 = await KeyValueStore.open()
-    assert kvs1 is not kvs2
-
-
-async def test_get_set_value(key_value_store: KeyValueStore) -> None:
-    await key_value_store.set_value('test-str', 'string')
-    await key_value_store.set_value('test-int', 123)
-    await key_value_store.set_value('test-dict', {'abc': '123'})
-    str_value = await key_value_store.get_value('test-str')
-    int_value = await key_value_store.get_value('test-int')
-    dict_value = await key_value_store.get_value('test-dict')
-    non_existent_value = await key_value_store.get_value('test-non-existent')
-    assert str_value == 'string'
-    assert int_value == 123
-    assert dict_value['abc'] == '123'
-    assert non_existent_value is None
-
-
-async def test_for_each_key(key_value_store: KeyValueStore) -> None:
-    keys = [item.key async for item in key_value_store.iterate_keys()]
-    assert len(keys) == 0
-
-    for i in range(2001):
-        await key_value_store.set_value(str(i).zfill(4), i)
-    index = 0
-    async for item in key_value_store.iterate_keys():
-        assert item.key == str(index).zfill(4)
-        index += 1
-    assert index == 2001
-
-
-async def test_static_get_set_value(key_value_store: KeyValueStore) -> None:
-    await key_value_store.set_value('test-static', 'static')
-    value = await key_value_store.get_value('test-static')
-    assert value == 'static'
-
-
-async def test_get_public_url_raises_for_non_existing_key(key_value_store: KeyValueStore) -> None:
-    with pytest.raises(ValueError, match='was not found'):
-        await key_value_store.get_public_url('i-do-not-exist')
-
-
-async def test_get_public_url(key_value_store: KeyValueStore) -> None:
-    await key_value_store.set_value('test-static', 'static')
-    public_url = await key_value_store.get_public_url('test-static')
-
-    url = urlparse(public_url)
-    path = url.netloc if url.netloc else url.path
-
-    with open(path) as f:  # noqa: ASYNC230
-        content = await asyncio.to_thread(f.read)
-        assert content == 'static'
-
-
-async def test_get_auto_saved_value_default_value(key_value_store: KeyValueStore) -> None:
-    default_value: dict[str, JsonSerializable] = {'hello': 'world'}
-    value = await key_value_store.get_auto_saved_value('state', default_value)
-    assert value == default_value
-
-
-async def test_get_auto_saved_value_cache_value(key_value_store: KeyValueStore) -> None:
-    default_value: dict[str, JsonSerializable] = {'hello': 'world'}
-    key_name = 'state'
-
-    value = await key_value_store.get_auto_saved_value(key_name, default_value)
-    value['hello'] = 'new_world'
-    value_one = await key_value_store.get_auto_saved_value(key_name)
-    assert value_one == {'hello': 'new_world'}
-
-    value_one['hello'] = ['new_world']
-    value_two = await key_value_store.get_auto_saved_value(key_name)
-    assert value_two == {'hello': ['new_world']}
-
-
-async def test_get_auto_saved_value_auto_save(key_value_store: KeyValueStore, mock_event_manager: EventManager) -> None:  # noqa: ARG001
-    # This is not a realtime system and timing constrains can be hard to enforce.
-    # For the test to avoid flakiness it needs some time tolerance.
-    autosave_deadline_time = 1
-    autosave_check_period = 0.01
-
-    async def autosaved_within_deadline(key: str, expected_value: dict[str, str]) -> bool:
-        """Check if the `key_value_store` of `key` has expected value within `autosave_deadline_time` seconds."""
-        deadline = datetime.now(tz=timezone.utc) + timedelta(seconds=autosave_deadline_time)
-        while datetime.now(tz=timezone.utc) < deadline:
-            await asyncio.sleep(autosave_check_period)
-            if await key_value_store.get_value(key) == expected_value:
-                return True
-        return False
-
-    default_value: dict[str, JsonSerializable] = {'hello': 'world'}
-    key_name = 'state'
-    value = await key_value_store.get_auto_saved_value(key_name, default_value)
-    assert await autosaved_within_deadline(key=key_name, expected_value={'hello': 'world'})
-
-    value['hello'] = 'new_world'
-    assert await autosaved_within_deadline(key=key_name, expected_value={'hello': 'new_world'})
-
-
-async def test_get_auto_saved_value_auto_save_race_conditions(key_value_store: KeyValueStore) -> None:
-    """Two parallel functions increment global variable obtained by `get_auto_saved_value`.
-
-    Result should be incremented by 2.
-    Method `get_auto_saved_value` must be implemented in a way that prevents race conditions in such scenario.
-    Test creates situation where first `get_auto_saved_value` call to kvs gets delayed. Such situation can happen
-    and unless handled, it can cause race condition in getting the state value."""
-    await key_value_store.set_value('state', {'counter': 0})
-
-    sleep_time_iterator = chain(iter([0.5]), repeat(0))
-
-    async def delayed_get_value(key: str, default_value: None = None) -> None:
-        await asyncio.sleep(next(sleep_time_iterator))
-        return await KeyValueStore.get_value(key_value_store, key=key, default_value=default_value)
-
-    async def increment_counter() -> None:
-        state = cast('dict[str, int]', await key_value_store.get_auto_saved_value('state'))
-        state['counter'] += 1
-
-    with patch.object(key_value_store, 'get_value', delayed_get_value):
-        tasks = [asyncio.create_task(increment_counter()), asyncio.create_task(increment_counter())]
-        await asyncio.gather(*tasks)
-
-    assert (await key_value_store.get_auto_saved_value('state'))['counter'] == 2
-
-
-async def test_from_storage_object() -> None:
-    storage_client = service_locator.get_storage_client()
-
-    storage_object = StorageMetadata(
-        id='dummy-id',
-        name='dummy-name',
-        accessed_at=datetime.now(timezone.utc),
-        created_at=datetime.now(timezone.utc),
-        modified_at=datetime.now(timezone.utc),
-        extra_attribute='extra',
+def configuration(tmp_path: Path) -> Configuration:
+    """Provide a configuration with a temporary storage directory."""
+    return Configuration(
+        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
+        purge_on_start=True,
     )
 
-    key_value_store = KeyValueStore.from_storage_object(storage_client, storage_object)
 
-    assert key_value_store.id == storage_object.id
-    assert key_value_store.name == storage_object.name
-    assert key_value_store.storage_object == storage_object
-    assert storage_object.model_extra.get('extra_attribute') == 'extra'  # type: ignore[union-attr]
+@pytest.fixture
+async def kvs(
+    storage_client: StorageClient,
+    configuration: Configuration,
+) -> AsyncGenerator[KeyValueStore, None]:
+    """Fixture that provides a key-value store instance for each test."""
+    kvs = await KeyValueStore.open(
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    yield kvs
+    await kvs.drop()
+
+
+async def test_open_creates_new_kvs(
+    storage_client: StorageClient,
+    configuration: Configuration,
+) -> None:
+    """Test that open() creates a new key-value store with proper metadata."""
+    kvs = await KeyValueStore.open(
+        name='new_kvs',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Verify key-value store properties
+    assert kvs.id is not None
+    assert kvs.name == 'new_kvs'
+
+    await kvs.drop()
+
+
+async def test_open_existing_kvs(
+    kvs: KeyValueStore,
+    storage_client: StorageClient,
+) -> None:
+    """Test that open() loads an existing key-value store correctly."""
+    # Open the same key-value store again
+    reopened_kvs = await KeyValueStore.open(
+        name=kvs.name,
+        storage_client=storage_client,
+    )
+
+    # Verify key-value store properties
+    assert kvs.id == reopened_kvs.id
+    assert kvs.name == reopened_kvs.name
+
+    # Verify they are the same object (from cache)
+    assert id(kvs) == id(reopened_kvs)
+
+
+async def test_open_with_id_and_name(
+    storage_client: StorageClient,
+    configuration: Configuration,
+) -> None:
+    """Test that open() raises an error when both id and name are provided."""
+    with pytest.raises(ValueError, match='Only one of "id" or "name" can be specified'):
+        await KeyValueStore.open(
+            id='some-id',
+            name='some-name',
+            storage_client=storage_client,
+            configuration=configuration,
+        )
+
+
+async def test_open_by_id(
+    storage_client: StorageClient,
+    configuration: Configuration,
+) -> None:
+    """Test opening a key-value store by its ID."""
+    # First create a key-value store by name
+    kvs1 = await KeyValueStore.open(
+        name='kvs_by_id_test',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Add some data to identify it
+    await kvs1.set_value('test_key', {'test': 'opening_by_id', 'timestamp': 12345})
+
+    # Open the key-value store by ID
+    kvs2 = await KeyValueStore.open(
+        id=kvs1.id,
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Verify it's the same key-value store
+    assert kvs2.id == kvs1.id
+    assert kvs2.name == 'kvs_by_id_test'
+
+    # Verify the data is still there
+    value = await kvs2.get_value('test_key')
+    assert value is not None
+    assert value['test'] == 'opening_by_id'
+    assert value['timestamp'] == 12345
+
+    # Clean up
+    await kvs2.drop()
+
+
+async def test_set_get_value(kvs: KeyValueStore) -> None:
+    """Test setting and getting a value from the key-value store."""
+    # Set a value
+    test_key = 'test-key'
+    test_value = {'data': 'value', 'number': 42}
+    await kvs.set_value(test_key, test_value)
+
+    # Get the value
+    result = await kvs.get_value(test_key)
+    assert result == test_value
+
+
+async def test_set_get_none(kvs: KeyValueStore) -> None:
+    """Test setting and getting None as a value."""
+    test_key = 'none-key'
+    await kvs.set_value(test_key, None)
+    result = await kvs.get_value(test_key)
+    assert result is None
+
+
+async def test_get_value_nonexistent(kvs: KeyValueStore) -> None:
+    """Test getting a nonexistent value returns None."""
+    result = await kvs.get_value('nonexistent-key')
+    assert result is None
+
+
+async def test_get_value_with_default(kvs: KeyValueStore) -> None:
+    """Test getting a nonexistent value with a default value."""
+    default_value = {'default': True}
+    result = await kvs.get_value('nonexistent-key', default_value=default_value)
+    assert result == default_value
+
+
+async def test_set_value_with_content_type(kvs: KeyValueStore) -> None:
+    """Test setting a value with a specific content type."""
+    test_key = 'test-json'
+    test_value = {'data': 'value', 'items': [1, 2, 3]}
+    await kvs.set_value(test_key, test_value, content_type='application/json')
+
+    # Verify the value is retrievable
+    result = await kvs.get_value(test_key)
+    assert result == test_value
+
+
+async def test_delete_value(kvs: KeyValueStore) -> None:
+    """Test deleting a value from the key-value store."""
+    # Set a value first
+    test_key = 'delete-me'
+    test_value = 'value to delete'
+    await kvs.set_value(test_key, test_value)
+
+    # Verify value exists
+    assert await kvs.get_value(test_key) == test_value
+
+    # Delete the value
+    await kvs.delete_value(test_key)
+
+    # Verify value is gone
+    assert await kvs.get_value(test_key) is None
+
+
+async def test_list_keys_empty_kvs(kvs: KeyValueStore) -> None:
+    """Test listing keys from an empty key-value store."""
+    keys = await kvs.list_keys()
+    assert len(keys) == 0
+
+
+async def test_list_keys(kvs: KeyValueStore) -> None:
+    """Test listing keys from a key-value store with items."""
+    # Add some items
+    await kvs.set_value('key1', 'value1')
+    await kvs.set_value('key2', 'value2')
+    await kvs.set_value('key3', 'value3')
+
+    # List keys
+    keys = await kvs.list_keys()
+
+    # Verify keys
+    assert len(keys) == 3
+    key_names = [k.key for k in keys]
+    assert 'key1' in key_names
+    assert 'key2' in key_names
+    assert 'key3' in key_names
+
+
+async def test_list_keys_with_limit(kvs: KeyValueStore) -> None:
+    """Test listing keys with a limit parameter."""
+    # Add some items
+    for i in range(10):
+        await kvs.set_value(f'key{i}', f'value{i}')
+
+    # List with limit
+    keys = await kvs.list_keys(limit=5)
+    assert len(keys) == 5
+
+
+async def test_list_keys_with_exclusive_start_key(kvs: KeyValueStore) -> None:
+    """Test listing keys with an exclusive start key."""
+    # Add some items in a known order
+    await kvs.set_value('key1', 'value1')
+    await kvs.set_value('key2', 'value2')
+    await kvs.set_value('key3', 'value3')
+    await kvs.set_value('key4', 'value4')
+    await kvs.set_value('key5', 'value5')
+
+    # Get all keys first to determine their order
+    all_keys = await kvs.list_keys()
+    all_key_names = [k.key for k in all_keys]
+
+    if len(all_key_names) >= 3:
+        # Start from the second key
+        start_key = all_key_names[1]
+        keys = await kvs.list_keys(exclusive_start_key=start_key)
+
+        # We should get all keys after the start key
+        expected_count = len(all_key_names) - all_key_names.index(start_key) - 1
+        assert len(keys) == expected_count
+
+        # First key should be the one after start_key
+        first_returned_key = keys[0].key
+        assert first_returned_key != start_key
+        assert all_key_names.index(first_returned_key) > all_key_names.index(start_key)
+
+
+async def test_iterate_keys(kvs: KeyValueStore) -> None:
+    """Test iterating over keys in the key-value store."""
+    # Add some items
+    await kvs.set_value('key1', 'value1')
+    await kvs.set_value('key2', 'value2')
+    await kvs.set_value('key3', 'value3')
+
+    collected_keys = [key async for key in kvs.iterate_keys()]
+
+    # Verify iteration result
+    assert len(collected_keys) == 3
+    key_names = [k.key for k in collected_keys]
+    assert 'key1' in key_names
+    assert 'key2' in key_names
+    assert 'key3' in key_names
+
+
+async def test_iterate_keys_with_limit(kvs: KeyValueStore) -> None:
+    """Test iterating over keys with a limit parameter."""
+    # Add some items
+    for i in range(10):
+        await kvs.set_value(f'key{i}', f'value{i}')
+
+    collected_keys = [key async for key in kvs.iterate_keys(limit=5)]
+
+    # Verify iteration result
+    assert len(collected_keys) == 5
+
+
+async def test_drop(
+    storage_client: StorageClient,
+    configuration: Configuration,
+) -> None:
+    """Test dropping a key-value store removes it from cache and clears its data."""
+    kvs = await KeyValueStore.open(
+        name='drop_test',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Add some data
+    await kvs.set_value('test', 'data')
+
+    # Drop the key-value store
+    await kvs.drop()
+
+    # Verify key-value store is empty (by creating a new one with the same name)
+    new_kvs = await KeyValueStore.open(
+        name='drop_test',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Attempt to get a previously stored value
+    result = await new_kvs.get_value('test')
+    assert result is None
+    await new_kvs.drop()
+
+
+async def test_reopen_default(
+    storage_client: StorageClient,
+    configuration: Configuration,
+) -> None:
+    """Test reopening the default key-value store."""
+    # Open the default key-value store
+    kvs1 = await KeyValueStore.open(
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Set a value
+    await kvs1.set_value('test_key', 'test_value')
+
+    # Open the default key-value store again
+    kvs2 = await KeyValueStore.open(
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Verify they are the same store
+    assert kvs1.id == kvs2.id
+    assert kvs1.name == kvs2.name
+
+    # Verify the value is accessible
+    value1 = await kvs1.get_value('test_key')
+    value2 = await kvs2.get_value('test_key')
+    assert value1 == value2 == 'test_value'
+
+    # Verify they are the same object
+    assert id(kvs1) == id(kvs2)
+
+
+async def test_complex_data_types(kvs: KeyValueStore) -> None:
+    """Test storing and retrieving complex data types."""
+    # Test nested dictionaries
+    nested_dict = {
+        'level1': {
+            'level2': {
+                'level3': 'deep value',
+                'numbers': [1, 2, 3],
+            },
+        },
+        'array': [{'a': 1}, {'b': 2}],
+    }
+    await kvs.set_value('nested', nested_dict)
+    result = await kvs.get_value('nested')
+    assert result == nested_dict
+
+    # Test lists
+    test_list = [1, 'string', True, None, {'key': 'value'}]
+    await kvs.set_value('list', test_list)
+    result = await kvs.get_value('list')
+    assert result == test_list
+
+
+async def test_string_data(kvs: KeyValueStore) -> None:
+    """Test storing and retrieving string data."""
+    # Plain string
+    await kvs.set_value('string', 'simple string')
+    result = await kvs.get_value('string')
+    assert result == 'simple string'
+
+    # JSON string
+    json_string = json.dumps({'key': 'value'})
+    await kvs.set_value('json_string', json_string)
+    result = await kvs.get_value('json_string')
+    assert result == json_string
+
+
+async def test_key_with_special_characters(kvs: KeyValueStore) -> None:
+    """Test storing and retrieving values with keys containing special characters."""
+    # Key with spaces, slashes, and special characters
+    special_key = 'key with spaces/and/slashes!@#$%^&*()'
+    test_value = 'Special key value'
+
+    # Store the value with the special key
+    await kvs.set_value(key=special_key, value=test_value)
+
+    # Retrieve the value and verify it matches
+    result = await kvs.get_value(key=special_key)
+    assert result is not None
+    assert result == test_value
+
+    # Make sure the key is properly listed
+    keys = await kvs.list_keys()
+    key_names = [k.key for k in keys]
+    assert special_key in key_names
+
+    # Test key deletion
+    await kvs.delete_value(key=special_key)
+    assert await kvs.get_value(key=special_key) is None
+
+
+async def test_data_persistence_on_reopen(configuration: Configuration) -> None:
+    """Test that data persists when reopening a KeyValueStore."""
+    kvs1 = await KeyValueStore.open(configuration=configuration)
+
+    await kvs1.set_value('key_123', 'value_123')
+
+    result1 = await kvs1.get_value('key_123')
+    assert result1 == 'value_123'
+
+    kvs2 = await KeyValueStore.open(configuration=configuration)
+
+    result2 = await kvs2.get_value('key_123')
+    assert result2 == 'value_123'
+    assert await kvs1.list_keys() == await kvs2.list_keys()
+
+    await kvs2.set_value('key_456', 'value_456')
+
+    result1 = await kvs1.get_value('key_456')
+    assert result1 == 'value_456'
+
+
+async def test_purge(
+    storage_client: StorageClient,
+    configuration: Configuration,
+) -> None:
+    """Test purging a key-value store removes all values but keeps the store itself."""
+    # First create a key-value store
+    kvs = await KeyValueStore.open(
+        name='purge_test_kvs',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Add some values
+    await kvs.set_value('key1', 'value1')
+    await kvs.set_value('key2', 'value2')
+    await kvs.set_value('key3', {'complex': 'value', 'number': 42})
+
+    # Verify values were added
+    keys = await kvs.list_keys()
+    assert len(keys) == 3
+
+    # Record the store ID
+    kvs_id = kvs.id
+
+    # Purge the key-value store
+    await kvs.purge()
+
+    # Verify the store still exists but is empty
+    assert kvs.id == kvs_id  # Same ID preserved
+    assert kvs.name == 'purge_test_kvs'  # Same name preserved
+
+    # Store should be empty now
+    keys = await kvs.list_keys()
+    assert len(keys) == 0
+
+    # Values should no longer be accessible
+    assert await kvs.get_value('key1') is None
+    assert await kvs.get_value('key2') is None
+    assert await kvs.get_value('key3') is None
+
+    # Verify we can add new values after purging
+    await kvs.set_value('new_key', 'new value after purge')
+
+    value = await kvs.get_value('new_key')
+    assert value == 'new value after purge'
+
+    # Clean up
+    await kvs.drop()
+
+
+async def test_record_exists_nonexistent(kvs: KeyValueStore) -> None:
+    """Test that record_exists returns False for a nonexistent key."""
+    result = await kvs.record_exists('nonexistent-key')
+    assert result is False
+
+
+async def test_record_exists_after_set(kvs: KeyValueStore) -> None:
+    """Test that record_exists returns True after setting a value."""
+    test_key = 'exists-key'
+    test_value = {'data': 'test'}
+
+    # Initially should not exist
+    assert await kvs.record_exists(test_key) is False
+
+    # Set the value
+    await kvs.set_value(test_key, test_value)
+
+    # Now should exist
+    assert await kvs.record_exists(test_key) is True
+
+
+async def test_record_exists_after_delete(kvs: KeyValueStore) -> None:
+    """Test that record_exists returns False after deleting a value."""
+    test_key = 'exists-then-delete-key'
+    test_value = 'will be deleted'
+
+    # Set a value
+    await kvs.set_value(test_key, test_value)
+    assert await kvs.record_exists(test_key) is True
+
+    # Delete the value
+    await kvs.delete_value(test_key)
+
+    # Should no longer exist
+    assert await kvs.record_exists(test_key) is False
+
+
+async def test_record_exists_with_none_value(kvs: KeyValueStore) -> None:
+    """Test that record_exists returns True even when value is None."""
+    test_key = 'none-value-key'
+
+    # Set None as value
+    await kvs.set_value(test_key, None)
+
+    # Should still exist even though value is None
+    assert await kvs.record_exists(test_key) is True
+
+    # Verify we can distinguish between None value and nonexistent key
+    assert await kvs.get_value(test_key) is None
+    assert await kvs.record_exists(test_key) is True
+    assert await kvs.record_exists('truly-nonexistent') is False
+
+
+async def test_record_exists_different_content_types(kvs: KeyValueStore) -> None:
+    """Test record_exists with different content types."""
+    test_cases = [
+        ('json-key', {'data': 'json'}, 'application/json'),
+        ('text-key', 'plain text', 'text/plain'),
+        ('binary-key', b'binary data', 'application/octet-stream'),
+    ]
+
+    for key, value, content_type in test_cases:
+        # Set value with specific content type
+        await kvs.set_value(key, value, content_type=content_type)
+
+        # Should exist regardless of content type
+        assert await kvs.record_exists(key) is True
+
+
+async def test_record_exists_multiple_keys(kvs: KeyValueStore) -> None:
+    """Test record_exists with multiple keys and batch operations."""
+    keys_and_values = [
+        ('key1', 'value1'),
+        ('key2', {'nested': 'object'}),
+        ('key3', [1, 2, 3]),
+        ('key4', None),
+    ]
+
+    # Initially, none should exist
+    for key, _ in keys_and_values:
+        assert await kvs.record_exists(key) is False
+
+    # Set all values
+    for key, value in keys_and_values:
+        await kvs.set_value(key, value)
+
+    # All should exist now
+    for key, _ in keys_and_values:
+        assert await kvs.record_exists(key) is True
+
+    # Test some non-existent keys
+    assert await kvs.record_exists('nonexistent1') is False
+    assert await kvs.record_exists('nonexistent2') is False
+
+
+async def test_record_exists_after_purge(kvs: KeyValueStore) -> None:
+    """Test that record_exists returns False after purging the store."""
+    # Set some values
+    await kvs.set_value('key1', 'value1')
+    await kvs.set_value('key2', 'value2')
+
+    # Verify they exist
+    assert await kvs.record_exists('key1') is True
+    assert await kvs.record_exists('key2') is True
+
+    # Purge the store
+    await kvs.purge()
+
+    # Should no longer exist
+    assert await kvs.record_exists('key1') is False
+    assert await kvs.record_exists('key2') is False

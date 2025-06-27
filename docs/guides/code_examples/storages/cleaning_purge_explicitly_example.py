@@ -1,20 +1,19 @@
 import asyncio
 
-from crawlee.crawlers import HttpCrawler
-from crawlee.storage_clients import MemoryStorageClient
+from crawlee.storages import Dataset
 
 
 async def main() -> None:
-    storage_client = MemoryStorageClient.from_config()
+    # Create storage client with configuration
+    dataset = await Dataset.open(name='my-dataset')
 
-    # Call the purge_on_start method to explicitly purge the storage.
-    # highlight-next-line
-    await storage_client.purge_on_start()
+    # Purge the dataset explicitly - purging will remove all items from the dataset.
+    # But keeps the dataset itself and its metadata.
+    await dataset.purge()
 
-    # Pass the storage client to the crawler.
-    crawler = HttpCrawler(storage_client=storage_client)
-
-    # ...
+    # Or you can drop the dataset completely, which will remove the dataset
+    # and all its items.
+    await dataset.drop()
 
 
 if __name__ == '__main__':

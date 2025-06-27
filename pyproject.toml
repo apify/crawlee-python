@@ -143,9 +143,9 @@ ignore = [
     "ISC001",   # This rule may cause conflicts when used with the formatter
     "FIX",      # flake8-fixme
     "PLR0911",  # Too many return statements
+    "PLR0912",  # Too many branches
     "PLR0913",  # Too many arguments in function definition
     "PLR0915",  # Too many statements
-    "PTH",      # flake8-use-pathlib
     "PYI034",   # `__aenter__` methods in classes like `{name}` usually return `self` at runtime
     "PYI036",   # The second argument in `__aexit__` should be annotated with `object` or `BaseException | None`
     "S102",     # Use of `exec` detected
@@ -167,6 +167,7 @@ indent-style = "space"
     "F401", # Unused imports
 ]
 "**/{tests}/*" = [
+    "ASYNC230", # Async functions should not open files with blocking methods like `open`
     "D",       # Everything from the pydocstyle
     "INP001",  # File {filename} is part of an implicit namespace package, add an __init__.py
     "PLR2004", # Magic value used in comparison, consider replacing {value} with a constant variable
@@ -204,9 +205,6 @@ builtins-ignorelist = ["id"]
 [tool.ruff.lint.isort]
 known-first-party = ["crawlee"]
 
-[tool.ruff.lint.pylint]
-max-branches = 18
-
 [tool.pytest.ini_options]
 addopts = "-ra"
 asyncio_default_fixture_loop_scope = "function"
@@ -219,7 +217,10 @@ markers = [
 [tool.mypy]
 python_version = "3.9"
 plugins = ["pydantic.mypy"]
-exclude = ["src/crawlee/project_template"]
+exclude = [
+    "src/crawlee/project_template",
+    "docs/guides/code_examples/storage_clients/custom_storage_client_example.py",
+]
 files = ["src", "tests", "docs", "website"]
 check_untyped_defs = true
 disallow_incomplete_defs = true
@@ -255,7 +256,7 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = [
-    "running_in_web_server.*"  # False positive when fastapi not available
+    "running_in_web_server.*", # False positive when fastapi not available
 ]
 disable_error_code = ["misc"]
 

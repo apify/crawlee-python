@@ -708,7 +708,7 @@ async def test_send_request_with_client(server_url: URL) -> None:
 
 async def test_overwrite_configuration() -> None:
     """Check that the configuration is allowed to be passed to the Playwrightcrawler."""
-    configuration = Configuration(default_dataset_id='my_dataset_id')
+    configuration = Configuration(log_level='WARNING')
     PlaywrightCrawler(configuration=configuration)
     used_configuration = service_locator.get_configuration()
     assert used_configuration is configuration

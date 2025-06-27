@@ -7,7 +7,7 @@ from crawlee.storages import KeyValueStore
 async def main() -> None:
     # Open the key-value store, if it does not exist, it will be created.
     # Leave name empty to use the default KVS.
-    kvs = await KeyValueStore.open()
+    kvs = await KeyValueStore.open(name='my-key-value-store')
 
     # Create a new Playwright crawler.
     crawler = PlaywrightCrawler()

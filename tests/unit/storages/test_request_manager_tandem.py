@@ -56,7 +56,7 @@ async def test_basic_functionality(test_input: TestInput) -> None:
     request_queue = await RequestQueue.open()
 
     if test_input.request_manager_items:
-        await request_queue.add_requests_batched(test_input.request_manager_items)
+        await request_queue.add_requests(test_input.request_manager_items)
 
     mock_request_loader = create_autospec(RequestLoader, instance=True, spec_set=True)
     mock_request_loader.fetch_next_request.side_effect = lambda: test_input.request_loader_items.pop(0)
