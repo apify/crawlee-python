@@ -9,7 +9,6 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator
     from typing import Any
 
-    from crawlee.configuration import Configuration
     from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
 
@@ -31,31 +30,6 @@ class DatasetClient(ABC):
     @abstractmethod
     def metadata(self) -> DatasetMetadata:
         """The metadata of the dataset."""
-
-    @classmethod
-    @abstractmethod
-    async def open(
-        cls,
-        *,
-        id: str | None,
-        name: str | None,
-        configuration: Configuration,
-    ) -> DatasetClient:
-        """Open existing or create a new dataset client.
-
-        If a dataset with the given name or ID already exists, the appropriate dataset client is returned.
-        Otherwise, a new dataset is created and client for it is returned.
-
-        The backend method for the `Dataset.open` call.
-
-        Args:
-            id: The ID of the dataset. If not provided, an ID may be generated.
-            name: The name of the dataset. If not provided a default name may be used.
-            configuration: The configuration object.
-
-        Returns:
-            A dataset client instance.
-        """
 
     @abstractmethod
     async def drop(self) -> None:

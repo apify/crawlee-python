@@ -9,7 +9,6 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from crawlee import Request
-    from crawlee.configuration import Configuration
     from crawlee.storage_clients.models import AddRequestsResponse, ProcessedRequest, RequestQueueMetadata
 
 
@@ -25,26 +24,6 @@ class RequestQueueClient(ABC):
     @abstractmethod
     def metadata(self) -> RequestQueueMetadata:
         """The metadata of the request queue."""
-
-    @classmethod
-    @abstractmethod
-    async def open(
-        cls,
-        *,
-        id: str | None,
-        name: str | None,
-        configuration: Configuration,
-    ) -> RequestQueueClient:
-        """Open a request queue client.
-
-        Args:
-            id: ID of the queue to open. If not provided, a new queue will be created with a random ID.
-            name: Name of the queue to open. If not provided, the queue will be unnamed.
-            configuration: The configuration object.
-
-        Returns:
-            A request queue client.
-        """
 
     @abstractmethod
     async def drop(self) -> None:

@@ -8,7 +8,6 @@ from crawlee._utils.docs import docs_group
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
-    from crawlee.configuration import Configuration
     from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
 
 
@@ -30,32 +29,6 @@ class KeyValueStoreClient(ABC):
     @abstractmethod
     def metadata(self) -> KeyValueStoreMetadata:
         """The metadata of the key-value store."""
-
-    @classmethod
-    @abstractmethod
-    async def open(
-        cls,
-        *,
-        id: str | None,
-        name: str | None,
-        configuration: Configuration,
-    ) -> KeyValueStoreClient:
-        """Open existing or create a new key-value store client.
-
-        If a key-value store with the given name or ID already exists, the appropriate
-        key-value store client is returned. Otherwise, a new key-value store is created
-        and a client for it is returned.
-
-        The backend method for the `KeyValueStoreClient.open` call.
-
-        Args:
-            id: The ID of the key-value store. If not provided, an ID may be generated.
-            name: The name of the key-value store. If not provided a default name may be used.
-            configuration: The configuration object.
-
-        Returns:
-            A key-value store client instance.
-        """
 
     @abstractmethod
     async def drop(self) -> None:

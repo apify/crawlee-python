@@ -16,20 +16,18 @@ from crawlee.storage_clients.models import AddRequestsResponse, ProcessedRequest
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from crawlee.configuration import Configuration
-
 logger = getLogger(__name__)
 
 
 class MemoryRequestQueueClient(RequestQueueClient):
     """Memory implementation of the request queue client.
 
-    No data is persisted between process runs, which means all requests are lost when
-    the program terminates. This implementation is primarily useful for testing,
-    development, and short-lived crawler runs where persistence is not required.
+    No data is persisted between process runs, which means all requests are lost when the program terminates.
+    This implementation is primarily useful for testing, development, and short-lived crawler runs where
+    persistence is not required.
 
-    This client provides fast access to request data but is limited by available memory and
-    does not support data sharing across different processes.
+    This client provides fast access to request data but is limited by available memory and does not support
+    data sharing across different processes.
     """
 
     def __init__(
@@ -83,15 +81,26 @@ class MemoryRequestQueueClient(RequestQueueClient):
     def metadata(self) -> RequestQueueMetadata:
         return self._metadata
 
-    @override
     @classmethod
     async def open(
         cls,
         *,
         id: str | None,
         name: str | None,
-        configuration: Configuration,
     ) -> MemoryRequestQueueClient:
+        """Open or create a new memory request queue client.
+
+        This method creates a new in-memory request queue instance. Unlike persistent storage implementations,
+        memory queues don't check for existing queues with the same name or ID since all data exists only
+        in memory and is lost when the process terminates.
+
+        Args:
+            id: The ID of the request queue. If not provided, a random ID will be generated.
+            name: The name of the request queue. If not provided, the queue will be unnamed.
+
+        Returns:
+            An instance for the opened or created storage client.
+        """
         # Otherwise create a new queue
         queue_id = id or crypto_random_object_id()
         now = datetime.now(timezone.utc)

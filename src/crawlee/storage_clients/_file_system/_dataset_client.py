@@ -100,7 +100,6 @@ class FileSystemDatasetClient(DatasetClient):
         """The full path to the dataset metadata file."""
         return self.path_to_dataset / METADATA_FILENAME
 
-    @override
     @classmethod
     async def open(
         cls,
@@ -109,6 +108,23 @@ class FileSystemDatasetClient(DatasetClient):
         name: str | None,
         configuration: Configuration,
     ) -> FileSystemDatasetClient:
+        """Open or create a file system dataset client.
+
+        This method attempts to open an existing dataset from the file system. If a dataset with the specified ID
+        or name exists, it loads the metadata from the stored files. If no existing dataset is found, a new one
+        is created.
+
+        Args:
+            id: The ID of the dataset to open. If provided, searches for existing dataset by ID.
+            name: The name of the dataset to open. If not provided, uses the default dataset.
+            configuration: The configuration object containing storage directory settings.
+
+        Returns:
+            An instance for the opened or created storage client.
+
+        Raises:
+            ValueError: If a dataset with the specified ID is not found, or if metadata is invalid.
+        """
         storage_dir = Path(configuration.storage_dir)
         dataset_base_path = storage_dir / cls._STORAGE_SUBDIR
 

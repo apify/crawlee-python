@@ -159,7 +159,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         """The full path to the request queue metadata file."""
         return self.path_to_rq / METADATA_FILENAME
 
-    @override
     @classmethod
     async def open(
         cls,
@@ -168,6 +167,23 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         name: str | None,
         configuration: Configuration,
     ) -> FileSystemRequestQueueClient:
+        """Open or create a file system request queue client.
+
+        This method attempts to open an existing request queue from the file system. If a queue with the specified
+        ID or name exists, it loads the metadata and state from the stored files. If no existing queue is found,
+        a new one is created.
+
+        Args:
+            id: The ID of the request queue to open. If provided, searches for existing queue by ID.
+            name: The name of the request queue to open. If not provided, uses the default queue.
+            configuration: The configuration object containing storage directory settings.
+
+        Returns:
+            An instance for the opened or created storage client.
+
+        Raises:
+            ValueError: If a queue with the specified ID is not found, or if metadata is invalid.
+        """
         storage_dir = Path(configuration.storage_dir)
         rq_base_path = storage_dir / cls._STORAGE_SUBDIR
 

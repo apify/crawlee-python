@@ -97,7 +97,6 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         """The full path to the key-value store metadata file."""
         return self.path_to_kvs / METADATA_FILENAME
 
-    @override
     @classmethod
     async def open(
         cls,
@@ -106,6 +105,23 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         name: str | None,
         configuration: Configuration,
     ) -> FileSystemKeyValueStoreClient:
+        """Open or create a file system key-value store client.
+
+        This method attempts to open an existing key-value store from the file system. If a KVS with the specified
+        ID or name exists, it loads the metadata from the stored files. If no existing store is found, a new one
+        is created.
+
+        Args:
+            id: The ID of the key-value store to open. If provided, searches for existing store by ID.
+            name: The name of the key-value store to open. If not provided, uses the default store.
+            configuration: The configuration object containing storage directory settings.
+
+        Returns:
+            An instance for the opened or created storage client.
+
+        Raises:
+            ValueError: If a store with the specified ID is not found, or if metadata is invalid.
+        """
         storage_dir = Path(configuration.storage_dir)
         kvs_base_path = storage_dir / cls._STORAGE_SUBDIR
 

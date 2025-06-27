@@ -13,8 +13,6 @@ from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
-    from crawlee.configuration import Configuration
-
 logger = getLogger(__name__)
 
 
@@ -62,15 +60,26 @@ class MemoryDatasetClient(DatasetClient):
     def metadata(self) -> DatasetMetadata:
         return self._metadata
 
-    @override
     @classmethod
     async def open(
         cls,
         *,
         id: str | None,
         name: str | None,
-        configuration: Configuration,
     ) -> MemoryDatasetClient:
+        """Open or create a new memory dataset client.
+
+        This method creates a new in-memory dataset instance. Unlike persistent storage implementations, memory
+        datasets don't check for existing datasets with the same name or ID since all data exists only in memory
+        and is lost when the process terminates.
+
+        Args:
+            id: The ID of the dataset. If not provided, a random ID will be generated.
+            name: The name of the dataset. If not provided, the dataset will be unnamed.
+
+        Returns:
+            An instance for the opened or created storage client.
+        """
         # Otherwise create a new dataset
         dataset_id = id or crypto_random_object_id()
         now = datetime.now(timezone.utc)

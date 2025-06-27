@@ -14,8 +14,6 @@ from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreR
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
-    from crawlee.configuration import Configuration
-
 
 class MemoryKeyValueStoreClient(KeyValueStoreClient):
     """Memory implementation of the key-value store client.
@@ -58,15 +56,26 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
     def metadata(self) -> KeyValueStoreMetadata:
         return self._metadata
 
-    @override
     @classmethod
     async def open(
         cls,
         *,
         id: str | None,
         name: str | None,
-        configuration: Configuration,
     ) -> MemoryKeyValueStoreClient:
+        """Open or create a new memory key-value store client.
+
+        This method creates a new in-memory key-value store instance. Unlike persistent storage implementations,
+        memory KVS don't check for existing stores with the same name or ID since all data exists only in memory
+        and is lost when the process terminates.
+
+        Args:
+            id: The ID of the key-value store. If not provided, a random ID will be generated.
+            name: The name of the key-value store. If not provided, the store will be unnamed.
+
+        Returns:
+            An instance for the opened or created storage client.
+        """
         # Otherwise create a new key-value store
         store_id = id or crypto_random_object_id()
         now = datetime.now(timezone.utc)
