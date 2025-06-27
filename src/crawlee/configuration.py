@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import TYPE_CHECKING, Annotated, Literal
+from typing import TYPE_CHECKING, Annotated
 
 from pydantic import AliasChoices, BeforeValidator, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from crawlee._types import LogLevel
 from crawlee._utils.docs import docs_group
 from crawlee._utils.models import timedelta_ms
 
@@ -62,7 +63,7 @@ class Configuration(BaseSettings):
     https://playwright.dev/docs/api/class-browsertype#browser-type-launch."""
 
     log_level: Annotated[
-        Literal['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+        LogLevel,
         Field(
             validation_alias=AliasChoices(
                 'apify_log_level',

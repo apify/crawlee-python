@@ -4,14 +4,18 @@ import json
 import logging
 import sys
 import textwrap
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from colorama import Fore, Style, just_fix_windows_console
 from typing_extensions import assert_never
 
 from crawlee import service_locator
 
+if TYPE_CHECKING:
+    from crawlee._types import LogLevel
+
 just_fix_windows_console()
+
 
 _LOG_NAME_COLOR = Fore.LIGHTBLACK_EX
 
@@ -34,22 +38,27 @@ _LOG_LEVEL_SHORT_ALIAS = {
 _LOG_MESSAGE_INDENT = ' ' * 6
 
 
+def string_to_log_level(level: LogLevel) -> int:
+    """Convert a string representation of a log level to an integer log level."""
+    if level == 'DEBUG':
+        return logging.DEBUG
+    if level == 'INFO':
+        return logging.INFO
+    if level == 'WARNING':
+        return logging.WARNING
+    if level == 'ERROR':
+        return logging.ERROR
+    if level == 'CRITICAL':
+        return logging.CRITICAL
+
+    assert_never(level)
+
+
 def get_configured_log_level() -> int:
     config = service_locator.get_configuration()
 
     if 'log_level' in config.model_fields_set:
-        if config.log_level == 'DEBUG':
-            return logging.DEBUG
-        if config.log_level == 'INFO':
-            return logging.INFO
-        if config.log_level == 'WARNING':
-            return logging.WARNING
-        if config.log_level == 'ERROR':
-            return logging.ERROR
-        if config.log_level == 'CRITICAL':
-            return logging.CRITICAL
-
-        assert_never(config.log_level)
+        return string_to_log_level(config.log_level)
 
     if sys.flags.dev_mode:
         return logging.DEBUG

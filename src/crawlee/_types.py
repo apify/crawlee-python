@@ -52,6 +52,8 @@ EnqueueStrategy: TypeAlias = Literal['all', 'same-domain', 'same-hostname', 'sam
 
 SkippedReason: TypeAlias = Literal['robots_txt']
 
+LogLevel: TypeAlias = Literal['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
+
 
 def _normalize_headers(headers: Mapping[str, str]) -> dict[str, str]:
     """Convert all header keys to lowercase, strips whitespace, and returns them sorted by key."""

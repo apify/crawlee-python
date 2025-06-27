@@ -19,6 +19,7 @@ from crawlee._utils.wait import wait_for_all_tasks_for_finish
 from crawlee.events._types import (
     Event,
     EventAbortingData,
+    EventCrawlerStatusData,
     EventExitData,
     EventListener,
     EventMigratingData,
@@ -147,6 +148,8 @@ class EventManager:
     @overload
     def on(self, *, event: Literal[Event.EXIT], listener: EventListener[EventExitData]) -> None: ...
     @overload
+    def on(self, *, event: Literal[Event.CRAWLER_STATUS], listener: EventListener[EventCrawlerStatusData]) -> None: ...
+    @overload
     def on(self, *, event: Event, listener: EventListener[None]) -> None: ...
 
     def on(self, *, event: Event, listener: EventListener[Any]) -> None:
@@ -221,6 +224,8 @@ class EventManager:
     def emit(self, *, event: Literal[Event.ABORTING], event_data: EventAbortingData) -> None: ...
     @overload
     def emit(self, *, event: Literal[Event.EXIT], event_data: EventExitData) -> None: ...
+    @overload
+    def emit(self, *, event: Literal[Event.CRAWLER_STATUS], event_data: EventCrawlerStatusData) -> None: ...
     @overload
     def emit(self, *, event: Event, event_data: Any) -> None: ...
 

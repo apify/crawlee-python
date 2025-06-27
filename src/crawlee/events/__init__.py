@@ -3,6 +3,7 @@ from ._local_event_manager import LocalEventManager
 from ._types import (
     Event,
     EventAbortingData,
+    EventCrawlerStatusData,
     EventData,
     EventExitData,
     EventListener,
@@ -14,6 +15,7 @@ from ._types import (
 __all__ = [
     'Event',
     'EventAbortingData',
+    'EventCrawlerStatusData',
     'EventData',
     'EventExitData',
     'EventListener',
