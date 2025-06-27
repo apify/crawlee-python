@@ -89,8 +89,10 @@ class EventCrawlerStatusData(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     message: str
+    """A message describing the current status of the crawler."""
 
     crawler_id: int
+    """The ID of the crawler that emitted the event."""
 
 
 EventData = Union[
