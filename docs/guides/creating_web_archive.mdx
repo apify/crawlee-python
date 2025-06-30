@@ -13,7 +13,7 @@ import PlaywrightCrawlerRecordManual from '!!raw-loader!./code_examples/creating
 
 
 
-Archiving webpages is one of the tasks that a web crawler can be used for. There are various use cases, such as archivation for future reference, speeding up web crawler development, creating top level regressions tests for web crawlers and so on.
+Archiving webpages is one of the tasks that a web crawler can be used for. There are various use cases, such as archiving for future reference, speeding up web crawler development, creating top-level regression tests for web crawlers and so on.
 
 There are various existing libraries of web archives with massive amount of data stored during their years of existence, for example [Wayback Machine](https://web.archive.org/) or [Common Crawl](https://commoncrawl.org/). There are also dedicated tools for archiving web pages, ranging from simple browser extensions such as [Archive Webpage](https://archiveweb.page/), open source tools such as [pywb](https://pypi.org/project/pywb/) or [warcio](https://pypi.org/project/warcio/), or even web crawlers specialized in archiving such as [Browsertrix](https://webrecorder.net/browsertrix/).
 
@@ -21,7 +21,7 @@ The common file format used for archiving is [WARC](https://www.iso.org/standard
 
 ## Crawling through proxy recording server
 
-This approach can be especially attractive as it does not require almost any code change to the crawler itself and the correct WARC creation is done by code from well maintained [pywb](https://pypi.org/project/pywb/) package. The trick is to run properly configured [wayback proxy server](https://pywb.readthedocs.io/en/latest/manual/usage.html#using-pywb-recorder), use it as a proxy for the crawler and record any traffic. Another advantage of this approach is, that it is language agnostic. This way you can record both your Python based crawler or your Javascript based crawler. This is very straight forward and good place to start.
+This approach can be especially attractive as it does not require almost any code change to the crawler itself and the correct WARC creation is done by code from well maintained [pywb](https://pypi.org/project/pywb/) package. The trick is to run a properly configured [wayback proxy server](https://pywb.readthedocs.io/en/latest/manual/usage.html#using-pywb-recorder), use it as a proxy for the crawler and record any traffic. Another advantage of this approach is that it is language agnostic. This way, you can record both your Python-based crawler and your JavaScript-based crawler. This is very straightforward and a good place to start.
 
 This approach expects that you have already created your crawler, and that you just want to archive all the pages it is visiting during its crawl.
 
@@ -38,7 +38,7 @@ Now you should use this locally hosted server as a proxy in your crawler. There 
  - Make the crawler use the proxy server.
  - Deal with the [pywb Certificate Authority](https://pywb.readthedocs.io/en/latest/manual/configuring.html#https-proxy-and-pywb-certificate-authority).
 
-For example in PlaywrightCrawler this is the simplest setup, that takes the shortcut and ignores the CA related errors:
+For example, in `PlaywrightCrawler`, this is the simplest setup, which takes the shortcut and ignores the CA-related errors:
 
 <CodeBlock className="language-python">
     {PlaywrightCrawlerRecordThroughProxy}
