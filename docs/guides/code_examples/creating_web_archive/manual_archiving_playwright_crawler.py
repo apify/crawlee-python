@@ -3,7 +3,7 @@ import io
 import logging
 from functools import partial
 
-from playwright.async_api import Response
+from playwright.async_api import Request
 from warcio.statusandheaders import StatusAndHeaders
 from warcio.warcwriter import WARCWriter
 
@@ -15,9 +15,13 @@ from crawlee.crawlers import (
 
 
 async def archive_response(
-    response: Response, writer: WARCWriter, logger: logging.Logger
+    request: Request, writer: WARCWriter, logger: logging.Logger
 ) -> None:
     """Helper function for archiving response in WARC format."""
+    response = await request.response()
+    if not response:
+        logger.warning(f'Could not get response {request.url}')
+        return
     try:
         response_body = await response.body()
     except Exception as e:
@@ -35,7 +39,6 @@ async def archive_response(
         length=len(response_body),
         http_headers=response_headers,
     )
-    logger.info(f'Content type {response_record.content_type}')
     writer.write_record(response_record)
 
 
