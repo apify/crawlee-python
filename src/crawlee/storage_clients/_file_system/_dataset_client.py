@@ -55,12 +55,7 @@ class FileSystemDatasetClient(DatasetClient):
     def __init__(
         self,
         *,
-        id: str,
-        name: str | None,
-        created_at: datetime,
-        accessed_at: datetime,
-        modified_at: datetime,
-        item_count: int,
+        metadata: DatasetMetadata,
         storage_dir: Path,
         lock: asyncio.Lock,
     ) -> None:
@@ -68,16 +63,10 @@ class FileSystemDatasetClient(DatasetClient):
 
         Preferably use the `FileSystemDatasetClient.open` class method to create a new instance.
         """
-        self._metadata = DatasetMetadata(
-            id=id,
-            name=name,
-            created_at=created_at,
-            accessed_at=accessed_at,
-            modified_at=modified_at,
-            item_count=item_count,
-        )
+        self._metadata = metadata
 
         self._storage_dir = storage_dir
+        """The base directory where the storage data are being persisted."""
 
         self._lock = lock
         """A lock to ensure that only one operation is performed at a time."""
@@ -149,12 +138,7 @@ class FileSystemDatasetClient(DatasetClient):
                         metadata = DatasetMetadata(**file_content)
                         if metadata.id == id:
                             client = cls(
-                                id=metadata.id,
-                                name=metadata.name,
-                                created_at=metadata.created_at,
-                                accessed_at=metadata.accessed_at,
-                                modified_at=metadata.modified_at,
-                                item_count=metadata.item_count,
+                                metadata=metadata,
                                 storage_dir=storage_dir,
                                 lock=asyncio.Lock(),
                             )
@@ -189,12 +173,7 @@ class FileSystemDatasetClient(DatasetClient):
                     raise ValueError(f'Invalid metadata file for dataset "{name}"') from exc
 
                 client = cls(
-                    id=metadata.id,
-                    name=name,
-                    created_at=metadata.created_at,
-                    accessed_at=metadata.accessed_at,
-                    modified_at=metadata.modified_at,
-                    item_count=metadata.item_count,
+                    metadata=metadata,
                     storage_dir=storage_dir,
                     lock=asyncio.Lock(),
                 )
@@ -204,13 +183,16 @@ class FileSystemDatasetClient(DatasetClient):
             # Otherwise, create a new dataset client.
             else:
                 now = datetime.now(timezone.utc)
-                client = cls(
+                metadata = DatasetMetadata(
                     id=crypto_random_object_id(),
                     name=name,
                     created_at=now,
                     accessed_at=now,
                     modified_at=now,
                     item_count=0,
+                )
+                client = cls(
+                    metadata=metadata,
                     storage_dir=storage_dir,
                     lock=asyncio.Lock(),
                 )

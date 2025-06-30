@@ -30,23 +30,13 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
     def __init__(
         self,
         *,
-        id: str,
-        name: str | None,
-        created_at: datetime,
-        accessed_at: datetime,
-        modified_at: datetime,
+        metadata: KeyValueStoreMetadata,
     ) -> None:
         """Initialize a new instance.
 
         Preferably use the `MemoryKeyValueStoreClient.open` class method to create a new instance.
         """
-        self._metadata = KeyValueStoreMetadata(
-            id=id,
-            name=name,
-            created_at=created_at,
-            accessed_at=accessed_at,
-            modified_at=modified_at,
-        )
+        self._metadata = metadata
 
         self._records = dict[str, KeyValueStoreRecord]()
         """Dictionary to hold key-value records."""
@@ -80,13 +70,15 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
         store_id = id or crypto_random_object_id()
         now = datetime.now(timezone.utc)
 
-        return cls(
+        metadata = KeyValueStoreMetadata(
             id=store_id,
             name=name,
             created_at=now,
             accessed_at=now,
             modified_at=now,
         )
+
+        return cls(metadata=metadata)
 
     @override
     async def drop(self) -> None:

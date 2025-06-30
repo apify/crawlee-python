@@ -54,11 +54,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
     def __init__(
         self,
         *,
-        id: str,
-        name: str | None,
-        created_at: datetime,
-        accessed_at: datetime,
-        modified_at: datetime,
+        metadata: KeyValueStoreMetadata,
         storage_dir: Path,
         lock: asyncio.Lock,
     ) -> None:
@@ -66,15 +62,10 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
         Preferably use the `FileSystemKeyValueStoreClient.open` class method to create a new instance.
         """
-        self._metadata = KeyValueStoreMetadata(
-            id=id,
-            name=name,
-            created_at=created_at,
-            accessed_at=accessed_at,
-            modified_at=modified_at,
-        )
+        self._metadata = metadata
 
         self._storage_dir = storage_dir
+        """The base directory where the storage data are being persisted."""
 
         self._lock = lock
         """A lock to ensure that only one operation is performed at a time."""
@@ -146,11 +137,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
                         metadata = KeyValueStoreMetadata(**file_content)
                         if metadata.id == id:
                             client = cls(
-                                id=metadata.id,
-                                name=metadata.name,
-                                created_at=metadata.created_at,
-                                accessed_at=metadata.accessed_at,
-                                modified_at=metadata.modified_at,
+                                metadata=metadata,
                                 storage_dir=storage_dir,
                                 lock=asyncio.Lock(),
                             )
@@ -183,11 +170,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
                     raise ValueError(f'Invalid metadata file for key-value store "{name}"') from exc
 
                 client = cls(
-                    id=metadata.id,
-                    name=name,
-                    created_at=metadata.created_at,
-                    accessed_at=metadata.accessed_at,
-                    modified_at=metadata.modified_at,
+                    metadata=metadata,
                     storage_dir=storage_dir,
                     lock=asyncio.Lock(),
                 )
@@ -197,12 +180,15 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             # Otherwise, create a new key-value store client.
             else:
                 now = datetime.now(timezone.utc)
-                client = cls(
+                metadata = KeyValueStoreMetadata(
                     id=crypto_random_object_id(),
                     name=name,
                     created_at=now,
                     accessed_at=now,
                     modified_at=now,
+                )
+                client = cls(
+                    metadata=metadata,
                     storage_dir=storage_dir,
                     lock=asyncio.Lock(),
                 )

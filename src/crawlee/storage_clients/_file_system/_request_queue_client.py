@@ -87,16 +87,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
     def __init__(
         self,
         *,
-        id: str,
-        name: str | None,
-        created_at: datetime,
-        accessed_at: datetime,
-        modified_at: datetime,
-        had_multiple_clients: bool,
-        handled_request_count: int,
-        pending_request_count: int,
-        stats: dict,
-        total_request_count: int,
+        metadata: RequestQueueMetadata,
         storage_dir: Path,
         lock: asyncio.Lock,
     ) -> None:
@@ -104,21 +95,10 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
         Preferably use the `FileSystemRequestQueueClient.open` class method to create a new instance.
         """
-        self._metadata = RequestQueueMetadata(
-            id=id,
-            name=name,
-            created_at=created_at,
-            accessed_at=accessed_at,
-            modified_at=modified_at,
-            had_multiple_clients=had_multiple_clients,
-            handled_request_count=handled_request_count,
-            pending_request_count=pending_request_count,
-            stats=stats,
-            total_request_count=total_request_count,
-        )
+        self._metadata = metadata
 
         self._storage_dir = storage_dir
-        """The base directory where the request queue is stored."""
+        """The base directory where the storage data are being persisted."""
 
         self._lock = lock
         """A lock to ensure that only one operation is performed at a time."""
@@ -209,7 +189,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
                         if metadata.id == id:
                             client = cls(
-                                **metadata.model_dump(),
+                                metadata=metadata,
                                 storage_dir=storage_dir,
                                 lock=asyncio.Lock(),
                             )
@@ -246,7 +226,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 metadata.name = name
 
                 client = cls(
-                    **metadata.model_dump(),
+                    metadata=metadata,
                     storage_dir=storage_dir,
                     lock=asyncio.Lock(),
                 )
@@ -258,7 +238,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             # Otherwise, create a new dataset client.
             else:
                 now = datetime.now(timezone.utc)
-                client = cls(
+                metadata = RequestQueueMetadata(
                     id=crypto_random_object_id(),
                     name=name,
                     created_at=now,
@@ -269,6 +249,9 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     pending_request_count=0,
                     stats={},
                     total_request_count=0,
+                )
+                client = cls(
+                    metadata=metadata,
                     storage_dir=storage_dir,
                     lock=asyncio.Lock(),
                 )

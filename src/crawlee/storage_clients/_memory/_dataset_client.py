@@ -32,25 +32,13 @@ class MemoryDatasetClient(DatasetClient):
     def __init__(
         self,
         *,
-        id: str,
-        name: str | None,
-        created_at: datetime,
-        accessed_at: datetime,
-        modified_at: datetime,
-        item_count: int,
+        metadata: DatasetMetadata,
     ) -> None:
         """Initialize a new instance.
 
         Preferably use the `MemoryDatasetClient.open` class method to create a new instance.
         """
-        self._metadata = DatasetMetadata(
-            id=id,
-            name=name,
-            created_at=created_at,
-            accessed_at=accessed_at,
-            modified_at=modified_at,
-            item_count=item_count,
-        )
+        self._metadata = metadata
 
         self._records = list[dict[str, Any]]()
         """List to hold dataset items. Each item is a dictionary representing a record."""
@@ -84,7 +72,7 @@ class MemoryDatasetClient(DatasetClient):
         dataset_id = id or crypto_random_object_id()
         now = datetime.now(timezone.utc)
 
-        return cls(
+        metadata = DatasetMetadata(
             id=dataset_id,
             name=name,
             created_at=now,
@@ -92,6 +80,8 @@ class MemoryDatasetClient(DatasetClient):
             modified_at=now,
             item_count=0,
         )
+
+        return cls(metadata=metadata)
 
     @override
     async def drop(self) -> None:

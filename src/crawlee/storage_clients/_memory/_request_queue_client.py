@@ -33,33 +33,13 @@ class MemoryRequestQueueClient(RequestQueueClient):
     def __init__(
         self,
         *,
-        id: str,
-        name: str | None,
-        created_at: datetime,
-        accessed_at: datetime,
-        modified_at: datetime,
-        had_multiple_clients: bool,
-        handled_request_count: int,
-        pending_request_count: int,
-        stats: dict,
-        total_request_count: int,
+        metadata: RequestQueueMetadata,
     ) -> None:
         """Initialize a new instance.
 
         Preferably use the `MemoryRequestQueueClient.open` class method to create a new instance.
         """
-        self._metadata = RequestQueueMetadata(
-            id=id,
-            name=name,
-            created_at=created_at,
-            accessed_at=accessed_at,
-            modified_at=modified_at,
-            had_multiple_clients=had_multiple_clients,
-            handled_request_count=handled_request_count,
-            pending_request_count=pending_request_count,
-            stats=stats,
-            total_request_count=total_request_count,
-        )
+        self._metadata = metadata
 
         self._pending_requests = deque[Request]()
         """Pending requests are those that have been added to the queue but not yet fetched for processing."""
@@ -105,7 +85,7 @@ class MemoryRequestQueueClient(RequestQueueClient):
         queue_id = id or crypto_random_object_id()
         now = datetime.now(timezone.utc)
 
-        return cls(
+        metadata = RequestQueueMetadata(
             id=queue_id,
             name=name,
             created_at=now,
@@ -117,6 +97,8 @@ class MemoryRequestQueueClient(RequestQueueClient):
             stats={},
             total_request_count=0,
         )
+
+        return cls(metadata=metadata)
 
     @override
     async def drop(self) -> None:
