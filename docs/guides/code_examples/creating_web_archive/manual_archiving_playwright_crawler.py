@@ -18,7 +18,6 @@ async def archive_response(
     response: Response, writer: WARCWriter, logger: logging.Logger
 ) -> None:
     """Helper function for archiving response in WARC format."""
-    await response.finished()
     try:
         response_body = await response.body()
     except Exception as e:
@@ -63,7 +62,8 @@ async def main() -> None:
         async def archiving_hook(context: PlaywrightPreNavCrawlingContext) -> None:
             # Ensure that all responses with additional resources are archived
             context.page.on(
-                'response', partial(archive_response, logger=context.log, writer=writer)
+                'requestfinished',
+                partial(archive_response, logger=context.log, writer=writer),
             )
 
         @crawler.router.default_handler
