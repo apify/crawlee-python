@@ -1,6 +1,6 @@
 import asyncio
 
-from crawlee._service_locator import service_locator
+from crawlee import service_locator
 from crawlee.crawlers import ParselCrawler
 from crawlee.storage_clients import MemoryStorageClient
 from crawlee.storages import Dataset

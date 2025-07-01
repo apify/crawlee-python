@@ -69,14 +69,24 @@ The way you register storage clients remains the same:
 from crawlee import service_locator
 from crawlee.crawlers import ParselCrawler
 from crawlee.storage_clients import MemoryStorageClient
+from crawlee.storages import Dataset
 
+# Create custom storage client, MemoryStorageClient for example.
 storage_client = MemoryStorageClient()
 
-# Either via the service locator:
+# Register it globally via the service locator.
 service_locator.set_storage_client(storage_client)
 
-# Or provide it directly to the crawler:
+# Or pass it directly to the crawler, it will be registered globally
+# to the service locator under the hood.
 crawler = ParselCrawler(storage_client=storage_client)
+
+# Or just provide it when opening a storage (e.g. dataset), it will be used
+# for this storage only, not globally.
+dataset = await Dataset.open(
+    name='my_dataset',
+    storage_client=storage_client,
+)
 ```
 
 ### Breaking changes
@@ -105,31 +115,34 @@ destination you choose.
 
 ## Dataset
 
-- There are two new methods:
+- There are a few new methods:
+  - `get_metadata`
   - `purge`
   - `list_items`
 - The `from_storage_object` method has been removed - use the `open` method with `name` or `id` instead.
-- The `get_info` and `storage_object` properties have been replaced by the new `metadata` property.
+- The `get_info` and `storage_object` properties have been replaced by the new `get_metadata` method.
 - The `set_metadata` method has been removed.
 - The `write_to_json` and `write_to_csv` methods have been removed - use `export_to` instead.
 
 ## Key-value store
 
-- There are three new methods:
+- There are a few new methods:
+  - `get_metadata`
   - `purge`
   - `delete_value`
   - `list_keys`
 - The `from_storage_object` method has been removed - use the `open` method with `name` or `id` instead.
-- The `get_info` and `storage_object` properties have been replaced by the new `metadata` property.
+- The `get_info` and `storage_object` properties have been replaced by the new `get_metadata` method.
 - The `set_metadata` method has been removed.
 
 ## Request queue
 
-- There are two new methods:
+- There are a few new methods:
+  - `get_metadata`
   - `purge`
   - `add_requests` (renamed from `add_requests_batched`)
 - The `from_storage_object` method has been removed - use the `open` method with `name` or `id` instead.
-- The `get_info` and `storage_object` properties have been replaced by the new `metadata` property.
+- The `get_info` and `storage_object` properties have been replaced by the new `get_metadata` method.
 - The `set_metadata` method has been removed.
 - `resource_directory` from `RequestQueueMetadata` removed – use `path_to_...` property.
 - `RequestQueueHead` model replaced with `RequestQueueHeadWithLocks`.
