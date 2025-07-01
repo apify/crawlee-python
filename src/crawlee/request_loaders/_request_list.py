@@ -1,45 +1,82 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from collections.abc import AsyncIterable, AsyncIterator, Iterable
-from typing import TYPE_CHECKING
+from logging import getLogger
+from typing import Annotated
 
+from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import override
 
+from crawlee._request import Request
 from crawlee._utils.docs import docs_group
 from crawlee.request_loaders._request_loader import RequestLoader
 
-if TYPE_CHECKING:
-    from crawlee._request import Request
+logger = getLogger(__name__)
+
+
+class RequestListState(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    next_index: Annotated[int, Field(alias='nextIndex')] = 0
+    next_unique_key: Annotated[str | None, Field(alias='nextUniqueKey')] = None
+    in_progress: Annotated[set[str], Field(alias='inProgress')] = set()
+
+
+class RequestListData(BaseModel):
+    requests: Annotated[Iterable[Request], Field()]
 
 
 @docs_group('Classes')
 class RequestList(RequestLoader):
-    """Represents a (potentially very large) list of URLs to crawl.
-
-    Disclaimer: The `RequestList` class is in its early version and is not fully implemented. It is currently
-        intended mainly for testing purposes and small-scale projects. The current implementation is only in-memory
-        storage and is very limited. It will be (re)implemented in the future. For more details, see the GitHub issue:
-        https://github.com/apify/crawlee-python/issues/99. For production usage we recommend to use the `RequestQueue`.
-    """
+    """Represents a (potentially very large) list of URLs to crawl."""
 
     def __init__(
         self,
         requests: Iterable[str | Request] | AsyncIterable[str | Request] | None = None,
         name: str | None = None,
+        persist_state_key: str | None = None,
+        persist_requests_key: str | None = None,
     ) -> None:
         """Initialize a new instance.
 
         Args:
             requests: The request objects (or their string representations) to be added to the provider.
             name: A name of the request list.
+            persist_state_key: A key for persisting the progress information of the RequestList.
+                If you do not pass a key but pass a `name`, a key will be derived using the name.
+                Otherwise, state will not be persisted.
+            persist_requests_key: A key for persisting the request data loaded from the `requests` iterator.
+                If specified, the request data will be stored in the KeyValueStore to make sure that they don't change
+                over time. This is useful if the `requests` iterator pulls the data dynamically.
         """
+        from crawlee._utils.recoverable_state import RecoverableState
+
         self._name = name
         self._handled_count = 0
         self._assumed_total_count = 0
 
-        self._in_progress = set[str]()
         self._next: Request | None = None
+
+        if persist_state_key is None and name is not None:
+            persist_state_key = f'SDK_REQUEST_LIST_STATE-{name}'
+
+        self._state = RecoverableState(
+            default_state=RequestListState(),
+            persistence_enabled=bool(persist_state_key),
+            persist_state_key=persist_state_key or '',
+            logger=logger,
+        )
+
+        self._persist_request_data = bool(persist_requests_key)
+
+        self._requests_data = RecoverableState(
+            default_state=RequestListData(requests=[]),
+            persistence_enabled='explicit_only' if self._persist_request_data else False,
+            persist_state_key=persist_requests_key or '',
+            logger=logger,
+        )
 
         if isinstance(requests, AsyncIterable):
             self._requests = requests.__aiter__()
@@ -49,6 +86,38 @@ class RequestList(RequestLoader):
             self._requests = self._iterate_in_threadpool(requests)
 
         self._requests_lock: asyncio.Lock | None = None
+
+    async def _get_state(self) -> RequestListState:
+        if self._state.is_initialized:
+            return self._state.current_value
+
+        await self._state.initialize()
+        await self._requests_data.initialize()
+
+        if self._persist_request_data:
+            if self._requests_lock is None:
+                self._requests_lock = asyncio.Lock()
+
+            async with self._requests_lock:
+                if not await self._requests_data.has_persisted_state():
+                    self._requests_data.current_value.requests = [
+                        request if isinstance(request, Request) else Request.from_url(request)
+                        async for request in self._requests
+                    ]
+                    await self._requests_data.persist_state()
+
+                self._requests = self._iterate_in_threadpool(self._requests_data.current_value.requests)
+
+        for _ in range(0, self._state.current_value.next_index):
+            with contextlib.suppress(StopAsyncIteration):
+                await self._requests.__anext__()
+
+        if (unique_key_to_check := self._state.current_value.next_unique_key) is not None:
+            await self._ensure_next_request()
+            if self._next is None or self._next.unique_key != unique_key_to_check:
+                raise RuntimeError()
+
+        return self._state.current_value
 
     @property
     def name(self) -> str | None:
@@ -65,7 +134,8 @@ class RequestList(RequestLoader):
 
     @override
     async def is_finished(self) -> bool:
-        return len(self._in_progress) == 0 and await self.is_empty()
+        state = await self._get_state()
+        return len(state.in_progress) == 0 and await self.is_empty()
 
     @override
     async def fetch_next_request(self) -> Request | None:
@@ -74,7 +144,8 @@ class RequestList(RequestLoader):
         if self._next is None:
             return None
 
-        self._in_progress.add(self._next.id)
+        state = await self._get_state()
+        state.in_progress.add(self._next.id)
         self._assumed_total_count += 1
 
         next_request = self._next
@@ -85,13 +156,16 @@ class RequestList(RequestLoader):
     @override
     async def mark_request_as_handled(self, request: Request) -> None:
         self._handled_count += 1
-        self._in_progress.remove(request.id)
+        state = await self._get_state()
+        state.in_progress.remove(request.id)
 
     @override
     async def get_handled_count(self) -> int:
         return self._handled_count
 
     async def _ensure_next_request(self) -> None:
+        state = await self._get_state()
+
         if self._requests_lock is None:
             self._requests_lock = asyncio.Lock()
 
@@ -101,6 +175,9 @@ class RequestList(RequestLoader):
                     self._next = self._transform_request(await self._requests.__anext__())
         except StopAsyncIteration:
             self._next = None
+        else:
+            state.next_index += 1
+            state.next_unique_key = self._next.unique_key
 
     async def _iterate_in_threadpool(self, iterable: Iterable[str | Request]) -> AsyncIterator[str | Request]:
         """Inspired by a function of the same name from encode/starlette."""
