@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import TYPE_CHECKING, Callable, Optional, cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 from curl_cffi import CurlHttpVersion
@@ -20,7 +20,7 @@ from crawlee.storages import KeyValueStore
 from tests.unit.server import TestServer, app, serve_in_thread
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Iterator
+    from collections.abc import AsyncGenerator, Callable, Iterator
     from pathlib import Path
 
     from yarl import URL
@@ -94,7 +94,7 @@ def _isolate_test_environment(prepare_test_env: Callable[[], None]) -> None:
 def _set_crawler_log_level(pytestconfig: pytest.Config, monkeypatch: pytest.MonkeyPatch) -> None:
     from crawlee import _log_config
 
-    loglevel = cast('Optional[str]', pytestconfig.getoption('--log-level'))
+    loglevel = cast('str | None', pytestconfig.getoption('--log-level'))
     if loglevel is not None:
         monkeypatch.setattr(_log_config, 'get_configured_log_level', lambda: getattr(logging, loglevel.upper()))
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Callable
+from typing import TYPE_CHECKING
 
 import pytest
 from bs4 import BeautifulSoup
@@ -8,6 +8,9 @@ from parsel import Selector
 
 from crawlee.crawlers._beautifulsoup._utils import html_to_text as html_to_text_beautifulsoup
 from crawlee.crawlers._parsel._utils import html_to_text as html_to_text_parsel
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 _EXPECTED_TEXT = (
     "Let's start with a simple text. \n"

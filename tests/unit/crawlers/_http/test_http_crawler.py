@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 from urllib.parse import parse_qs, urlencode
 
@@ -14,7 +14,7 @@ from crawlee.statistics import Statistics
 from tests.unit.server_endpoints import HELLO_WORLD
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable
+    from collections.abc import Awaitable, Callable
 
     from yarl import URL
 

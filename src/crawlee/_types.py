@@ -1,19 +1,16 @@
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
-    Callable,
     Literal,
-    Optional,
     Protocol,
     TypedDict,
     TypeVar,
-    Union,
     cast,
     overload,
 )
@@ -27,8 +24,9 @@ if TYPE_CHECKING:
     import logging
     import re
     from collections.abc import Callable, Coroutine, Sequence
+    from typing import TypeAlias
 
-    from typing_extensions import NotRequired, Required, TypeAlias, Unpack
+    from typing_extensions import NotRequired, Required, Unpack
 
     from crawlee import Glob, Request
     from crawlee._request import RequestOptions
@@ -41,15 +39,7 @@ if TYPE_CHECKING:
 
     # Workaround for https://github.com/pydantic/pydantic/issues/9445
     J = TypeVar('J', bound='JsonSerializable')
-    JsonSerializable: TypeAlias = Union[
-        list[J],
-        dict[str, J],
-        str,
-        bool,
-        int,
-        float,
-        None,
-    ]
+    JsonSerializable: TypeAlias = list[J] | dict[str, J] | str | bool | int | float | None
 else:
     from pydantic import JsonValue as JsonSerializable
 
@@ -264,7 +254,7 @@ class RequestHandlerRunResult:
         self._key_value_store_getter = key_value_store_getter
         self.add_requests_calls = list[AddRequestsKwargs]()
         self.push_data_calls = list[PushDataFunctionCall]()
-        self.key_value_store_changes = dict[tuple[Optional[str], Optional[str]], KeyValueStoreChangeRecords]()
+        self.key_value_store_changes = dict[tuple[str | None, str | None], KeyValueStoreChangeRecords]()
 
     async def add_requests(
         self,

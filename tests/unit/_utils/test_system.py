@@ -3,12 +3,15 @@ from __future__ import annotations
 import os
 from multiprocessing import Barrier, Process, Value, synchronize
 from multiprocessing.shared_memory import SharedMemory
-from typing import Callable
+from typing import TYPE_CHECKING
 
 import pytest
 
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.system import get_cpu_info, get_memory_info
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def test_get_memory_info_returns_valid_values() -> None:

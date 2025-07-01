@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Coroutine
 from enum import Enum
-from typing import Annotated, Any, TypeVar, Union
+from typing import Annotated, Any, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -79,20 +79,20 @@ class EventExitData(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
-EventData = Union[EventPersistStateData, EventSystemInfoData, EventMigratingData, EventAbortingData, EventExitData]
+EventData = EventPersistStateData | EventSystemInfoData | EventMigratingData | EventAbortingData | EventExitData
 """A helper type for all possible event payloads"""
 
 WrappedListener = Callable[..., Coroutine[Any, Any, None]]
 
 TEvent = TypeVar('TEvent')
-EventListener = Union[
+EventListener = (
     Callable[
         [TEvent],
-        Union[None, Coroutine[Any, Any, None]],
-    ],
-    Callable[
+        None | Coroutine[Any, Any, None],
+    ]
+    | Callable[
         [],
-        Union[None, Coroutine[Any, Any, None]],
-    ],
-]
+        None | Coroutine[Any, Any, None],
+    ]
+)
 """An event listener function - it can be both sync and async and may accept zero or one argument."""

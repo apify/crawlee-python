@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Awaitable
-from typing import TYPE_CHECKING, Callable, TypeVar, Union, cast
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING, TypeVar, cast
 
 from crawlee._utils.docs import docs_group
 from crawlee.storage_clients._base import DatasetClient, KeyValueStoreClient, RequestQueueClient
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 T = TypeVar('T', bound='Storage')
 
-StorageClientType = Union[DatasetClient, KeyValueStoreClient, RequestQueueClient]
+StorageClientType = DatasetClient | KeyValueStoreClient | RequestQueueClient
 """Type alias for the storage client types."""
 
 ClientOpener = Callable[..., Awaitable[StorageClientType]]

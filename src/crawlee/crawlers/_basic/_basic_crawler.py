@@ -9,12 +9,12 @@ import tempfile
 import threading
 import traceback
 from asyncio import CancelledError
-from collections.abc import AsyncGenerator, Awaitable, Iterable, Sequence
+from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable, Sequence
 from contextlib import AsyncExitStack, suppress
 from datetime import timedelta
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Generic, Literal, Union, cast
+from typing import TYPE_CHECKING, Any, Generic, Literal, cast
 from urllib.parse import ParseResult, urlparse
 from weakref import WeakKeyDictionary
 
@@ -92,7 +92,7 @@ if TYPE_CHECKING:
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
 TRequestIterator = TypeVar('TRequestIterator', str, Request)
-ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Union[Request, None]]]
+ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Request | None]]
 FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
 SkippedRequestCallback = Callable[[str, SkippedReason], Awaitable[None]]
 
@@ -880,7 +880,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                         '`transform_request_function` arguments when `requests` is provided.'
                     )
                 # Add directly passed requests.
-                await context.add_requests(requests or list[Union[str, Request]](), **kwargs)
+                await context.add_requests(requests or list[str | Request](), **kwargs)
             else:
                 # Add requests from extracted links.
                 await context.add_requests(
