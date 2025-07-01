@@ -9,13 +9,12 @@ description = "Crawlee for Python"
 authors = [{ name = "Apify Technologies s.r.o.", email = "support@apify.com" }]
 license = { file = "LICENSE" }
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -37,7 +36,6 @@ dependencies = [
     "browserforge>=1.2.3",
     "cachetools>=5.5.0",
     "colorama>=0.4.0",
-    "eval-type-backport>=0.2.0",
     "httpx[brotli,http2,zstd]>=0.27.0",
     "more-itertools>=10.2.0",
     "protego>=0.4.0",
@@ -64,15 +62,13 @@ all = [
     "jaro-winkler>=2.0.3",
     "parsel>=1.10.0",
     "playwright>=1.27.0",
-    "scikit-learn==1.5.2; python_version == '3.9'",
-    "scikit-learn>=1.6.0; python_version >= '3.10'",
-    'typer>=0.12.0',
+    "scikit-learn>=1.6.0",
+    "typer>=0.12.0",
 ]
 adaptive-crawler = [
     "jaro-winkler>=2.0.3",
     "playwright>=1.27.0",
-    "scikit-learn==1.5.2; python_version == '3.9'",
-    "scikit-learn>=1.6.0; python_version >= '3.10'",
+    "scikit-learn>=1.6.0",
 ]
 beautifulsoup = ["beautifulsoup4[lxml]>=4.12.0", "html5lib>=1.0"]
 cli = ["cookiecutter>=2.6.0", "inquirer>=3.3.0", "rich>=13.9.0", "typer>=0.12.0"]
@@ -215,7 +211,7 @@ markers = [
 ]
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 plugins = ["pydantic.mypy"]
 exclude = [
     "src/crawlee/project_template",
@@ -261,7 +257,7 @@ module = [
 disable_error_code = ["misc"]
 
 [tool.basedpyright]
-pythonVersion = "3.9"
+pythonVersion = "3.10"
 typeCheckingMode = "standard"
 include = ["src", "tests", "docs", "website"]
 
