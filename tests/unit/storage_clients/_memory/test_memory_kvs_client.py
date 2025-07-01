@@ -52,9 +52,10 @@ async def test_memory_specific_purge_behavior() -> None:
 async def test_memory_metadata_updates(kvs_client: MemoryKeyValueStoreClient) -> None:
     """Test that metadata timestamps are updated correctly in memory storage."""
     # Record initial timestamps
-    initial_created = kvs_client.metadata.created_at
-    initial_accessed = kvs_client.metadata.accessed_at
-    initial_modified = kvs_client.metadata.modified_at
+    metadata = await kvs_client.get_metadata()
+    initial_created = metadata.created_at
+    initial_accessed = metadata.accessed_at
+    initial_modified = metadata.modified_at
 
     # Wait a moment to ensure timestamps can change
     await asyncio.sleep(0.01)
@@ -63,11 +64,12 @@ async def test_memory_metadata_updates(kvs_client: MemoryKeyValueStoreClient) ->
     await kvs_client.get_value(key='nonexistent')
 
     # Verify timestamps (memory-specific behavior)
-    assert kvs_client.metadata.created_at == initial_created
-    assert kvs_client.metadata.accessed_at > initial_accessed
-    assert kvs_client.metadata.modified_at == initial_modified
+    metadata = await kvs_client.get_metadata()
+    assert metadata.created_at == initial_created
+    assert metadata.accessed_at > initial_accessed
+    assert metadata.modified_at == initial_modified
 
-    accessed_after_read = kvs_client.metadata.accessed_at
+    accessed_after_read = metadata.accessed_at
 
     # Wait a moment to ensure timestamps can change
     await asyncio.sleep(0.01)
@@ -76,6 +78,7 @@ async def test_memory_metadata_updates(kvs_client: MemoryKeyValueStoreClient) ->
     await kvs_client.set_value(key='test', value='test-value')
 
     # Verify timestamps were updated
-    assert kvs_client.metadata.created_at == initial_created
-    assert kvs_client.metadata.modified_at > initial_modified
-    assert kvs_client.metadata.accessed_at > accessed_after_read
+    metadata = await kvs_client.get_metadata()
+    assert metadata.created_at == initial_created
+    assert metadata.modified_at > initial_modified
+    assert metadata.accessed_at > accessed_after_read

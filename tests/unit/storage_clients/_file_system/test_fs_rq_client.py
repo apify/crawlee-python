@@ -49,7 +49,7 @@ async def test_file_and_directory_creation(configuration: Configuration) -> None
     # Verify metadata file structure
     with client.path_to_metadata.open() as f:
         metadata = json.load(f)
-        assert metadata['id'] == client.metadata.id
+        assert metadata['id'] == (await client.get_metadata()).id
         assert metadata['name'] == 'new_request_queue'
 
     await client.drop()
@@ -98,9 +98,10 @@ async def test_drop_removes_directory(rq_client: FileSystemRequestQueueClient) -
 async def test_metadata_file_updates(rq_client: FileSystemRequestQueueClient) -> None:
     """Test that metadata file is updated correctly after operations."""
     # Record initial timestamps
-    initial_created = rq_client.metadata.created_at
-    initial_accessed = rq_client.metadata.accessed_at
-    initial_modified = rq_client.metadata.modified_at
+    metadata = await rq_client.get_metadata()
+    initial_created = metadata.created_at
+    initial_accessed = metadata.accessed_at
+    initial_modified = metadata.modified_at
 
     # Wait a moment to ensure timestamps can change
     await asyncio.sleep(0.01)
@@ -109,11 +110,12 @@ async def test_metadata_file_updates(rq_client: FileSystemRequestQueueClient) ->
     await rq_client.is_empty()
 
     # Verify accessed timestamp was updated
-    assert rq_client.metadata.created_at == initial_created
-    assert rq_client.metadata.accessed_at > initial_accessed
-    assert rq_client.metadata.modified_at == initial_modified
+    metadata = await rq_client.get_metadata()
+    assert metadata.created_at == initial_created
+    assert metadata.accessed_at > initial_accessed
+    assert metadata.modified_at == initial_modified
 
-    accessed_after_read = rq_client.metadata.accessed_at
+    accessed_after_read = metadata.accessed_at
 
     # Wait a moment to ensure timestamps can change
     await asyncio.sleep(0.01)
@@ -122,14 +124,15 @@ async def test_metadata_file_updates(rq_client: FileSystemRequestQueueClient) ->
     await rq_client.add_batch_of_requests([Request.from_url('https://example.com')])
 
     # Verify modified timestamp was updated
-    assert rq_client.metadata.created_at == initial_created
-    assert rq_client.metadata.modified_at > initial_modified
-    assert rq_client.metadata.accessed_at > accessed_after_read
+    metadata = await rq_client.get_metadata()
+    assert metadata.created_at == initial_created
+    assert metadata.modified_at > initial_modified
+    assert metadata.accessed_at > accessed_after_read
 
     # Verify metadata file is updated on disk
     with rq_client.path_to_metadata.open() as f:
-        metadata = json.load(f)
-        assert metadata['total_request_count'] == 1
+        metadata_json = json.load(f)
+        assert metadata_json['total_request_count'] == 1
 
 
 async def test_data_persistence_across_reopens(configuration: Configuration) -> None:
@@ -148,7 +151,7 @@ async def test_data_persistence_across_reopens(configuration: Configuration) -> 
     ]
     await original_client.add_batch_of_requests(test_requests)
 
-    rq_id = original_client.metadata.id
+    rq_id = (await original_client.get_metadata()).id
 
     # Reopen by ID and verify requests persist
     reopened_client = await storage_client.create_rq_client(
@@ -156,7 +159,8 @@ async def test_data_persistence_across_reopens(configuration: Configuration) -> 
         configuration=configuration,
     )
 
-    assert reopened_client.metadata.total_request_count == 2
+    metadata = await reopened_client.get_metadata()
+    assert metadata.total_request_count == 2
 
     # Fetch requests to verify they're still there
     request1 = await reopened_client.fetch_next_request()

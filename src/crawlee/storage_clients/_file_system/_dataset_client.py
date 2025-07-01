@@ -71,18 +71,17 @@ class FileSystemDatasetClient(DatasetClient):
         self._lock = lock
         """A lock to ensure that only one operation is performed at a time."""
 
-    @property
     @override
-    def metadata(self) -> DatasetMetadata:
+    async def get_metadata(self) -> DatasetMetadata:
         return self._metadata
 
     @property
     def path_to_dataset(self) -> Path:
         """The full path to the dataset directory."""
-        if self.metadata.name is None:
+        if self._metadata.name is None:
             return self._storage_dir / self._STORAGE_SUBDIR / self._STORAGE_SUBSUBDIR_DEFAULT
 
-        return self._storage_dir / self._STORAGE_SUBDIR / self.metadata.name
+        return self._storage_dir / self._STORAGE_SUBDIR / self._metadata.name
 
     @property
     def path_to_metadata(self) -> Path:

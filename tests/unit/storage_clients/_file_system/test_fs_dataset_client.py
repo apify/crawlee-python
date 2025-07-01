@@ -49,7 +49,8 @@ async def test_file_and_directory_creation(configuration: Configuration) -> None
     # Verify metadata file structure
     with client.path_to_metadata.open() as f:
         metadata = json.load(f)
-        assert metadata['id'] == client.metadata.id
+        client_metadata = await client.get_metadata()
+        assert metadata['id'] == client_metadata.id
         assert metadata['name'] == 'new_dataset'
         assert metadata['item_count'] == 0
 
@@ -99,9 +100,10 @@ async def test_drop_removes_files_from_disk(dataset_client: FileSystemDatasetCli
 async def test_metadata_file_updates(dataset_client: FileSystemDatasetClient) -> None:
     """Test that metadata file is updated correctly after operations."""
     # Record initial timestamps
-    initial_created = dataset_client.metadata.created_at
-    initial_accessed = dataset_client.metadata.accessed_at
-    initial_modified = dataset_client.metadata.modified_at
+    metadata = await dataset_client.get_metadata()
+    initial_created = metadata.created_at
+    initial_accessed = metadata.accessed_at
+    initial_modified = metadata.modified_at
 
     # Wait a moment to ensure timestamps can change
     await asyncio.sleep(0.01)
@@ -110,11 +112,12 @@ async def test_metadata_file_updates(dataset_client: FileSystemDatasetClient) ->
     await dataset_client.get_data()
 
     # Verify timestamps
-    assert dataset_client.metadata.created_at == initial_created
-    assert dataset_client.metadata.accessed_at > initial_accessed
-    assert dataset_client.metadata.modified_at == initial_modified
+    metadata = await dataset_client.get_metadata()
+    assert metadata.created_at == initial_created
+    assert metadata.accessed_at > initial_accessed
+    assert metadata.modified_at == initial_modified
 
-    accessed_after_get = dataset_client.metadata.accessed_at
+    accessed_after_get = metadata.accessed_at
 
     # Wait a moment to ensure timestamps can change
     await asyncio.sleep(0.01)
@@ -123,14 +126,15 @@ async def test_metadata_file_updates(dataset_client: FileSystemDatasetClient) ->
     await dataset_client.push_data({'new': 'item'})
 
     # Verify timestamps again
-    assert dataset_client.metadata.created_at == initial_created
-    assert dataset_client.metadata.modified_at > initial_modified
-    assert dataset_client.metadata.accessed_at > accessed_after_get
+    metadata = await dataset_client.get_metadata()
+    assert metadata.created_at == initial_created
+    assert metadata.modified_at > initial_modified
+    assert metadata.accessed_at > accessed_after_get
 
     # Verify metadata file is updated on disk
     with dataset_client.path_to_metadata.open() as f:
-        metadata = json.load(f)
-        assert metadata['item_count'] == 1
+        metadata_json = json.load(f)
+        assert metadata_json['item_count'] == 1
 
 
 async def test_data_persistence_across_reopens(configuration: Configuration) -> None:
@@ -146,7 +150,7 @@ async def test_data_persistence_across_reopens(configuration: Configuration) -> 
     test_data = {'test_item': 'test_value', 'id': 123}
     await original_client.push_data(test_data)
 
-    dataset_id = original_client.metadata.id
+    dataset_id = (await original_client.get_metadata()).id
 
     # Reopen by ID and verify data persists
     reopened_client = await storage_client.create_dataset_client(

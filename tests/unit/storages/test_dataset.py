@@ -66,7 +66,9 @@ async def test_open_creates_new_dataset(
     # Verify dataset properties
     assert dataset.id is not None
     assert dataset.name == 'new_dataset'
-    assert dataset.metadata.item_count == 0
+
+    metadata = await dataset.get_metadata()
+    assert metadata.item_count == 0
 
     await dataset.drop()
 
@@ -84,11 +86,13 @@ async def test_reopen_default(
 
     # Verify default properties
     assert dataset_1.id is not None
-    assert dataset_1.metadata.item_count == 0
+    metadata_1 = await dataset_1.get_metadata()
+    assert metadata_1.item_count == 0
 
     # Add an item
     await dataset_1.push_data({'key': 'value'})
-    assert dataset_1.metadata.item_count == 1
+    metadata_1 = await dataset_1.get_metadata()
+    assert metadata_1.item_count == 1
 
     # Reopen the same dataset
     dataset_2 = await Dataset.open(
@@ -99,7 +103,9 @@ async def test_reopen_default(
     # Verify both instances reference the same dataset
     assert dataset_2.id == dataset_1.id
     assert dataset_2.name == dataset_1.name
-    assert dataset_2.metadata.item_count == dataset_1.metadata.item_count == 1
+    metadata_1 = await dataset_1.get_metadata()
+    metadata_2 = await dataset_2.get_metadata()
+    assert metadata_2.item_count == metadata_1.item_count == 1
 
     # Verify they are the same object (cached)
     assert id(dataset_1) == id(dataset_2)
@@ -159,7 +165,9 @@ async def test_open_existing_dataset(
     # Verify dataset properties
     assert dataset.id == reopened_dataset.id
     assert dataset.name == reopened_dataset.name
-    assert dataset.metadata.item_count == reopened_dataset.metadata.item_count
+    metadata = await dataset.get_metadata()
+    reopened_metadata = await reopened_dataset.get_metadata()
+    assert metadata.item_count == reopened_metadata.item_count
 
     # Verify they are the same object (from cache)
     assert id(dataset) == id(reopened_dataset)
@@ -544,7 +552,8 @@ async def test_purge(
     data = await dataset.get_data()
     assert data.count == 3
     assert data.total == 3
-    assert dataset.metadata.item_count == 3
+    metadata = await dataset.get_metadata()
+    assert metadata.item_count == 3
 
     # Record the dataset ID
     dataset_id = dataset.id
@@ -560,7 +569,8 @@ async def test_purge(
     data = await dataset.get_data()
     assert data.count == 0
     assert data.total == 0
-    assert dataset.metadata.item_count == 0
+    metadata = await dataset.get_metadata()
+    assert metadata.item_count == 0
 
     # Verify we can add new data after purging
     new_item = {'id': 4, 'name': 'New Item After Purge'}

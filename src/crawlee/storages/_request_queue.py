@@ -70,15 +70,19 @@ class RequestQueue(Storage, RequestManager):
     ```
     """
 
-    def __init__(self, client: RequestQueueClient) -> None:
+    def __init__(self, client: RequestQueueClient, id: str, name: str | None) -> None:
         """Initialize a new instance.
 
         Preferably use the `RequestQueue.open` constructor to create a new instance.
 
         Args:
-            client: An instance of a request queue client.
+            client: An instance of a storage client.
+            id: The unique identifier of the storage.
+            name: The name of the storage, if available.
         """
         self._client = client
+        self._id = id
+        self._name = name
 
         self._add_requests_tasks = list[asyncio.Task]()
         """A list of tasks for adding requests to the queue."""
@@ -86,25 +90,26 @@ class RequestQueue(Storage, RequestManager):
     @property
     @override
     def id(self) -> str:
-        return self._client.metadata.id
+        return self._id
 
     @property
     @override
     def name(self) -> str | None:
-        return self._client.metadata.name
+        return self._name
 
-    @property
     @override
-    def metadata(self) -> RequestQueueMetadata:
-        return self._client.metadata
+    async def get_metadata(self) -> RequestQueueMetadata:
+        return await self._client.get_metadata()
 
     @override
     async def get_handled_count(self) -> int:
-        return self._client.metadata.handled_request_count
+        metadata = await self._client.get_metadata()
+        return metadata.handled_request_count
 
     @override
     async def get_total_count(self) -> int:
-        return self._client.metadata.total_request_count
+        metadata = await self._client.get_metadata()
+        return metadata.total_request_count
 
     @override
     @classmethod

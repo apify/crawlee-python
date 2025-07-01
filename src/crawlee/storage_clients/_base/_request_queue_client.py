@@ -20,10 +20,9 @@ class RequestQueueClient(ABC):
     client, like a memory storage client.
     """
 
-    @property
     @abstractmethod
-    def metadata(self) -> RequestQueueMetadata:
-        """The metadata of the request queue."""
+    async def get_metadata(self) -> RequestQueueMetadata:
+        """Get the metadata of the request queue."""
 
     @abstractmethod
     async def drop(self) -> None:

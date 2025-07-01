@@ -77,5 +77,6 @@ class StorageClient(ABC):
             client: The storage client to potentially purge.
             configuration: Configuration that determines whether purging should occur.
         """
-        if configuration.purge_on_start and client.metadata.name is None:
+        metadata = await client.get_metadata()
+        if configuration.purge_on_start and metadata.name is None:
             await client.purge()

@@ -41,9 +41,8 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
         self._records = dict[str, KeyValueStoreRecord]()
         """Dictionary to hold key-value records."""
 
-    @property
     @override
-    def metadata(self) -> KeyValueStoreMetadata:
+    async def get_metadata(self) -> KeyValueStoreMetadata:
         return self._metadata
 
     @classmethod

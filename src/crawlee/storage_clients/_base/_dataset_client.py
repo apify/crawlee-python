@@ -26,10 +26,9 @@ class DatasetClient(ABC):
     This abstract class defines the interface that all specific dataset clients must implement.
     """
 
-    @property
     @abstractmethod
-    def metadata(self) -> DatasetMetadata:
-        """The metadata of the dataset."""
+    async def get_metadata(self) -> DatasetMetadata:
+        """Get the metadata of the dataset."""
 
     @abstractmethod
     async def drop(self) -> None:

@@ -22,9 +22,8 @@ class Storage(ABC):
     def name(self) -> str | None:
         """Get the storage name."""
 
-    @property
     @abstractmethod
-    def metadata(self) -> DatasetMetadata | KeyValueStoreMetadata | RequestQueueMetadata:
+    async def get_metadata(self) -> DatasetMetadata | KeyValueStoreMetadata | RequestQueueMetadata:
         """Get the storage metadata."""
 
     @classmethod

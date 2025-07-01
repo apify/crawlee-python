@@ -43,9 +43,8 @@ class MemoryDatasetClient(DatasetClient):
         self._records = list[dict[str, Any]]()
         """List to hold dataset items. Each item is a dictionary representing a record."""
 
-    @property
     @override
-    def metadata(self) -> DatasetMetadata:
+    async def get_metadata(self) -> DatasetMetadata:
         return self._metadata
 
     @classmethod
@@ -103,7 +102,8 @@ class MemoryDatasetClient(DatasetClient):
 
     @override
     async def push_data(self, data: list[dict[str, Any]] | dict[str, Any]) -> None:
-        new_item_count = self.metadata.item_count
+        metadata = await self.get_metadata()
+        new_item_count = metadata.item_count
 
         if isinstance(data, list):
             for item in data:

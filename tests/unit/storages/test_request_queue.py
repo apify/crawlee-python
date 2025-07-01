@@ -67,9 +67,10 @@ async def test_open_creates_new_rq(
     # Verify request queue properties
     assert rq.id is not None
     assert rq.name == 'new_request_queue'
-    assert rq.metadata.pending_request_count == 0
-    assert rq.metadata.handled_request_count == 0
-    assert rq.metadata.total_request_count == 0
+    metadata = await rq.get_metadata()
+    assert metadata.pending_request_count == 0
+    assert metadata.handled_request_count == 0
+    assert metadata.total_request_count == 0
 
     await rq.drop()
 
@@ -155,8 +156,9 @@ async def test_add_request_string_url(rq: RequestQueue) -> None:
     assert result.was_already_handled is False
 
     # Verify the queue stats were updated
-    assert rq.metadata.total_request_count == 1
-    assert rq.metadata.pending_request_count == 1
+    metadata = await rq.get_metadata()
+    assert metadata.total_request_count == 1
+    assert metadata.pending_request_count == 1
 
 
 async def test_add_request_object(rq: RequestQueue) -> None:
@@ -172,8 +174,9 @@ async def test_add_request_object(rq: RequestQueue) -> None:
     assert result.was_already_handled is False
 
     # Verify the queue stats were updated
-    assert rq.metadata.total_request_count == 1
-    assert rq.metadata.pending_request_count == 1
+    metadata = await rq.get_metadata()
+    assert metadata.total_request_count == 1
+    assert metadata.pending_request_count == 1
 
 
 async def test_add_duplicate_request(rq: RequestQueue) -> None:
@@ -190,8 +193,9 @@ async def test_add_duplicate_request(rq: RequestQueue) -> None:
     assert second_result.unique_key == first_result.unique_key
 
     # Verify the queue stats weren't incremented twice
-    assert rq.metadata.total_request_count == 1
-    assert rq.metadata.pending_request_count == 1
+    metadata = await rq.get_metadata()
+    assert metadata.total_request_count == 1
+    assert metadata.pending_request_count == 1
 
 
 async def test_add_requests_batch(rq: RequestQueue) -> None:
@@ -210,8 +214,9 @@ async def test_add_requests_batch(rq: RequestQueue) -> None:
     await asyncio.sleep(0.1)
 
     # Verify the queue stats
-    assert rq.metadata.total_request_count == 3
-    assert rq.metadata.pending_request_count == 3
+    metadata = await rq.get_metadata()
+    assert metadata.total_request_count == 3
+    assert metadata.pending_request_count == 3
 
 
 async def test_add_requests_batch_with_forefront(rq: RequestQueue) -> None:
@@ -352,9 +357,10 @@ async def test_fetch_next_request_and_mark_handled(rq: RequestQueue) -> None:
     await rq.mark_request_as_handled(request2)
 
     # Verify counts
-    assert rq.metadata.total_request_count == 2
-    assert rq.metadata.handled_request_count == 2
-    assert rq.metadata.pending_request_count == 0
+    metadata = await rq.get_metadata()
+    assert metadata.total_request_count == 2
+    assert metadata.handled_request_count == 2
+    assert metadata.pending_request_count == 0
 
     # Verify queue is empty
     empty_request = await rq.fetch_next_request()
@@ -518,8 +524,9 @@ async def test_drop(
 
     # Verify the queue is empty
     assert await new_rq.is_empty() is True
-    assert new_rq.metadata.total_request_count == 0
-    assert new_rq.metadata.pending_request_count == 0
+    metadata = await new_rq.get_metadata()
+    assert metadata.total_request_count == 0
+    assert metadata.pending_request_count == 0
     await new_rq.drop()
 
 
@@ -550,13 +557,15 @@ async def test_reopen_default(
         )
 
     # Verify we're starting fresh
-    assert rq1.metadata.pending_request_count == 0
+    metadata1 = await rq1.get_metadata()
+    assert metadata1.pending_request_count == 0
 
     # Add a request
     await rq1.add_request('https://example.com/')
 
     # Verify the request was added
-    assert rq1.metadata.pending_request_count == 1
+    metadata1 = await rq1.get_metadata()
+    assert metadata1.pending_request_count == 1
 
     # Open the default request queue again
     rq2 = await RequestQueue.open(
@@ -567,9 +576,11 @@ async def test_reopen_default(
     # Verify they are the same queue
     assert rq1.id == rq2.id
     assert rq1.name == rq2.name
-    assert rq1.metadata.total_request_count == rq2.metadata.total_request_count
-    assert rq1.metadata.pending_request_count == rq2.metadata.pending_request_count
-    assert rq1.metadata.handled_request_count == rq2.metadata.handled_request_count
+    metadata1 = await rq1.get_metadata()
+    metadata2 = await rq2.get_metadata()
+    assert metadata1.total_request_count == metadata2.total_request_count
+    assert metadata1.pending_request_count == metadata2.pending_request_count
+    assert metadata1.handled_request_count == metadata2.handled_request_count
 
     # Verify the request is accessible
     request = await rq2.fetch_next_request()
@@ -602,9 +613,10 @@ async def test_purge(
     )
 
     # Verify requests were added
-    assert rq.metadata.total_request_count == 3
-    assert rq.metadata.pending_request_count == 3
-    assert rq.metadata.handled_request_count == 0
+    metadata = await rq.get_metadata()
+    assert metadata.total_request_count == 3
+    assert metadata.pending_request_count == 3
+    assert metadata.handled_request_count == 0
 
     # Record the queue ID
     queue_id = rq.id
@@ -617,9 +629,10 @@ async def test_purge(
     assert rq.name == 'purge_test_queue'  # Same name preserved
 
     # Queue should be empty now
-    assert rq.metadata.total_request_count == 3
-    assert rq.metadata.pending_request_count == 0
-    assert rq.metadata.handled_request_count == 0
+    metadata = await rq.get_metadata()
+    assert metadata.total_request_count == 3
+    assert metadata.pending_request_count == 0
+    assert metadata.handled_request_count == 0
     assert await rq.is_empty() is True
 
     # Verify we can add new requests after purging

@@ -49,7 +49,7 @@ async def test_file_and_directory_creation(configuration: Configuration) -> None
     # Verify metadata file structure
     with client.path_to_metadata.open() as f:
         metadata = json.load(f)
-        assert metadata['id'] == client.metadata.id
+        assert metadata['id'] == (await client.get_metadata()).id
         assert metadata['name'] == 'new_kvs'
 
     await client.drop()
@@ -150,9 +150,10 @@ async def test_drop_removes_directory(kvs_client: FileSystemKeyValueStoreClient)
 async def test_metadata_file_updates(kvs_client: FileSystemKeyValueStoreClient) -> None:
     """Test that read/write operations properly update metadata file timestamps."""
     # Record initial timestamps
-    initial_created = kvs_client.metadata.created_at
-    initial_accessed = kvs_client.metadata.accessed_at
-    initial_modified = kvs_client.metadata.modified_at
+    metadata = await kvs_client.get_metadata()
+    initial_created = metadata.created_at
+    initial_accessed = metadata.accessed_at
+    initial_modified = metadata.modified_at
 
     # Wait a moment to ensure timestamps can change
     await asyncio.sleep(0.01)
@@ -161,11 +162,12 @@ async def test_metadata_file_updates(kvs_client: FileSystemKeyValueStoreClient) 
     await kvs_client.get_value(key='nonexistent')
 
     # Verify accessed timestamp was updated
-    assert kvs_client.metadata.created_at == initial_created
-    assert kvs_client.metadata.accessed_at > initial_accessed
-    assert kvs_client.metadata.modified_at == initial_modified
+    metadata = await kvs_client.get_metadata()
+    assert metadata.created_at == initial_created
+    assert metadata.accessed_at > initial_accessed
+    assert metadata.modified_at == initial_modified
 
-    accessed_after_read = kvs_client.metadata.accessed_at
+    accessed_after_read = metadata.accessed_at
 
     # Wait a moment to ensure timestamps can change
     await asyncio.sleep(0.01)
@@ -174,9 +176,10 @@ async def test_metadata_file_updates(kvs_client: FileSystemKeyValueStoreClient) 
     await kvs_client.set_value(key='test', value='test-value')
 
     # Verify modified timestamp was updated
-    assert kvs_client.metadata.created_at == initial_created
-    assert kvs_client.metadata.modified_at > initial_modified
-    assert kvs_client.metadata.accessed_at > accessed_after_read
+    metadata = await kvs_client.get_metadata()
+    assert metadata.created_at == initial_created
+    assert metadata.modified_at > initial_modified
+    assert metadata.accessed_at > accessed_after_read
 
 
 async def test_data_persistence_across_reopens(configuration: Configuration) -> None:
@@ -193,7 +196,7 @@ async def test_data_persistence_across_reopens(configuration: Configuration) -> 
     test_value = 'persistent-value'
     await original_client.set_value(key=test_key, value=test_value)
 
-    kvs_id = original_client.metadata.id
+    kvs_id = (await original_client.get_metadata()).id
 
     # Reopen by ID and verify data persists
     reopened_client = await storage_client.create_kvs_client(

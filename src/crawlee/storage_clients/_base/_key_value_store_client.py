@@ -25,10 +25,9 @@ class KeyValueStoreClient(ABC):
     This abstract class defines the interface that all specific KVS clients must implement.
     """
 
-    @property
     @abstractmethod
-    def metadata(self) -> KeyValueStoreMetadata:
-        """The metadata of the key-value store."""
+    async def get_metadata(self) -> KeyValueStoreMetadata:
+        """Get the metadata of the key-value store."""
 
     @abstractmethod
     async def drop(self) -> None:

@@ -75,7 +75,8 @@ class StorageInstanceManager:
 
         # Create new instance
         client = await client_opener(id=id, name=name, configuration=configuration)
-        instance = cls(client)  # type: ignore[call-arg]
+        metadata = await client.get_metadata()
+        instance = cls(client, metadata.id, metadata.name)  # type: ignore[call-arg]
         instance_name = getattr(instance, 'name', None)
 
         # Cache the instance

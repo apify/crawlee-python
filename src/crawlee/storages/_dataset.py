@@ -65,30 +65,33 @@ class Dataset(Storage):
     ```
     """
 
-    def __init__(self, client: DatasetClient) -> None:
+    def __init__(self, client: DatasetClient, id: str, name: str | None) -> None:
         """Initialize a new instance.
 
         Preferably use the `Dataset.open` constructor to create a new instance.
 
         Args:
-            client: An instance of a dataset client.
+            client: An instance of a storage client.
+            id: The unique identifier of the storage.
+            name: The name of the storage, if available.
         """
         self._client = client
+        self._id = id
+        self._name = name
 
     @property
     @override
     def id(self) -> str:
-        return self._client.metadata.id
+        return self._id
 
     @property
     @override
     def name(self) -> str | None:
-        return self._client.metadata.name
+        return self._name
 
-    @property
     @override
-    def metadata(self) -> DatasetMetadata:
-        return self._client.metadata
+    async def get_metadata(self) -> DatasetMetadata:
+        return await self._client.get_metadata()
 
     @override
     @classmethod

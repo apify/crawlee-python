@@ -51,9 +51,10 @@ async def test_memory_specific_purge_behavior() -> None:
 async def test_memory_metadata_updates(dataset_client: MemoryDatasetClient) -> None:
     """Test that metadata timestamps are updated correctly in memory storage."""
     # Record initial timestamps
-    initial_created = dataset_client.metadata.created_at
-    initial_accessed = dataset_client.metadata.accessed_at
-    initial_modified = dataset_client.metadata.modified_at
+    metadata = await dataset_client.get_metadata()
+    initial_created = metadata.created_at
+    initial_accessed = metadata.accessed_at
+    initial_modified = metadata.modified_at
 
     # Wait a moment to ensure timestamps can change
     await asyncio.sleep(0.01)
@@ -62,11 +63,12 @@ async def test_memory_metadata_updates(dataset_client: MemoryDatasetClient) -> N
     await dataset_client.get_data()
 
     # Verify timestamps (memory-specific behavior)
-    assert dataset_client.metadata.created_at == initial_created
-    assert dataset_client.metadata.accessed_at > initial_accessed
-    assert dataset_client.metadata.modified_at == initial_modified
+    metadata = await dataset_client.get_metadata()
+    assert metadata.created_at == initial_created
+    assert metadata.accessed_at > initial_accessed
+    assert metadata.modified_at == initial_modified
 
-    accessed_after_read = dataset_client.metadata.accessed_at
+    accessed_after_read = metadata.accessed_at
 
     # Wait a moment to ensure timestamps can change
     await asyncio.sleep(0.01)
@@ -75,6 +77,7 @@ async def test_memory_metadata_updates(dataset_client: MemoryDatasetClient) -> N
     await dataset_client.push_data({'new': 'item'})
 
     # Verify timestamps were updated
-    assert dataset_client.metadata.created_at == initial_created
-    assert dataset_client.metadata.modified_at > initial_modified
-    assert dataset_client.metadata.accessed_at > accessed_after_read
+    metadata = await dataset_client.get_metadata()
+    assert metadata.created_at == initial_created
+    assert metadata.modified_at > initial_modified
+    assert metadata.accessed_at > accessed_after_read

@@ -56,9 +56,8 @@ class MemoryRequestQueueClient(RequestQueueClient):
         self._requests_by_unique_key = dict[str, Request]()
         """Unique key -> Request mapping for fast lookup by unique key."""
 
-    @property
     @override
-    def metadata(self) -> RequestQueueMetadata:
+    async def get_metadata(self) -> RequestQueueMetadata:
         return self._metadata
 
     @classmethod

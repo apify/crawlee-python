@@ -51,9 +51,10 @@ async def test_memory_specific_purge_behavior() -> None:
 async def test_memory_metadata_updates(rq_client: MemoryRequestQueueClient) -> None:
     """Test that metadata timestamps are updated correctly in memory storage."""
     # Record initial timestamps
-    initial_created = rq_client.metadata.created_at
-    initial_accessed = rq_client.metadata.accessed_at
-    initial_modified = rq_client.metadata.modified_at
+    metadata = await rq_client.get_metadata()
+    initial_created = metadata.created_at
+    initial_accessed = metadata.accessed_at
+    initial_modified = metadata.modified_at
 
     # Wait a moment to ensure timestamps can change
     await asyncio.sleep(0.01)
@@ -62,11 +63,12 @@ async def test_memory_metadata_updates(rq_client: MemoryRequestQueueClient) -> N
     await rq_client.is_empty()
 
     # Verify timestamps (memory-specific behavior)
-    assert rq_client.metadata.created_at == initial_created
-    assert rq_client.metadata.accessed_at > initial_accessed
-    assert rq_client.metadata.modified_at == initial_modified
+    metadata = await rq_client.get_metadata()
+    assert metadata.created_at == initial_created
+    assert metadata.accessed_at > initial_accessed
+    assert metadata.modified_at == initial_modified
 
-    accessed_after_read = rq_client.metadata.accessed_at
+    accessed_after_read = metadata.accessed_at
 
     # Wait a moment to ensure timestamps can change
     await asyncio.sleep(0.01)
@@ -75,6 +77,7 @@ async def test_memory_metadata_updates(rq_client: MemoryRequestQueueClient) -> N
     await rq_client.add_batch_of_requests([Request.from_url('https://example.com')])
 
     # Verify timestamps were updated
-    assert rq_client.metadata.created_at == initial_created
-    assert rq_client.metadata.modified_at > initial_modified
-    assert rq_client.metadata.accessed_at > accessed_after_read
+    metadata = await rq_client.get_metadata()
+    assert metadata.created_at == initial_created
+    assert metadata.modified_at > initial_modified
+    assert metadata.accessed_at > accessed_after_read
