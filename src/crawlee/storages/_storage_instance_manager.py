@@ -1,12 +1,23 @@
 from __future__ import annotations
 
-from typing import Any, Callable, TypeVar, cast
+from collections.abc import Awaitable
+from typing import TYPE_CHECKING, Callable, TypeVar, Union, cast
 
 from crawlee._utils.docs import docs_group
+from crawlee.storage_clients._base import DatasetClient, KeyValueStoreClient, RequestQueueClient
 
 from ._base import Storage
 
+if TYPE_CHECKING:
+    from crawlee.configuration import Configuration
+
 T = TypeVar('T', bound='Storage')
+
+StorageClientType = Union[DatasetClient, KeyValueStoreClient, RequestQueueClient]
+"""Type alias for the storage client types."""
+
+ClientOpener = Callable[..., Awaitable[StorageClientType]]
+"""Type alias for the client opener function."""
 
 
 @docs_group('Classes')
@@ -33,8 +44,8 @@ class StorageInstanceManager:
         *,
         id: str | None,
         name: str | None,
-        configuration: Any,
-        client_opener: Callable[..., Any],
+        configuration: Configuration,
+        client_opener: ClientOpener,
     ) -> T:
         """Open a storage instance with caching support.
 
@@ -76,6 +87,7 @@ class StorageInstanceManager:
         # Create new instance
         client = await client_opener(id=id, name=name, configuration=configuration)
         metadata = await client.get_metadata()
+
         instance = cls(client, metadata.id, metadata.name)  # type: ignore[call-arg]
         instance_name = getattr(instance, 'name', None)
 
