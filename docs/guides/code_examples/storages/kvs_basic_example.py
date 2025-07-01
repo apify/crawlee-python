@@ -6,7 +6,7 @@ from crawlee.storages import KeyValueStore
 async def main() -> None:
     # Open the key-value store, if it does not exist, it will be created.
     # Leave name empty to use the default KVS.
-    kvs = await KeyValueStore.open()
+    kvs = await KeyValueStore.open(name='my-key-value-store')
 
     # Set a value associated with 'some-key'.
     await kvs.set_value(key='some-key', value={'foo': 'bar'})
