@@ -80,12 +80,13 @@ playwright = ["playwright>=1.27.0"]
 crawlee = "crawlee._cli:cli"
 
 [project.urls]
-"Homepage" = "https://crawlee.dev/python"
+homepage = "https://crawlee.dev/python"
+source = "https://github.com/apify/crawlee-python"
+changelog = "https://crawlee.dev/python/docs/changelog"
+releasenotes = "https://crawlee.dev/python/docs/upgrading"
+documentation = "https://crawlee.dev/python/docs"
+issues = "https://github.com/apify/crawlee-python/issues"
 "Apify homepage" = "https://apify.com"
-"Changelog" = "https://crawlee.dev/python/docs/changelog"
-"Documentation" = "https://crawlee.dev/python/docs/"
-"Issue tracker" = "https://github.com/apify/crawlee-python/issues"
-"Repository" = "https://github.com/apify/crawlee-python"
 
 [dependency-groups]
 dev = [
