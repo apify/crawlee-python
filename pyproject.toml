@@ -105,7 +105,7 @@ dev = [
     "pytest-timeout~=2.4.0",
     "pytest-xdist~=3.8.0",
     "pytest~=8.4.0",
-    "ruff~=0.11.0",
+    "ruff~=0.12.1",
     "setuptools", # setuptools are used by pytest, but not explicitly required
     "sortedcontainers-stubs~=2.4.0",
     "types-beautifulsoup4~=4.12.0.20240229",
