@@ -51,7 +51,7 @@ async def main() -> None:
         async def request_handler(context: ParselCrawlingContext) -> None:
             context.log.info(f'Archiving {context.request.url} ...')
             archive_response(context=context, writer=writer)
-            await context.enqueue_links()
+            await context.enqueue_links(strategy='same-domain')
 
         await crawler.run(['https://crawlee.dev/'])
 

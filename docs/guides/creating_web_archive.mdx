@@ -37,7 +37,7 @@ Now you should use this locally hosted server as a proxy in your crawler. There 
  - Make the crawler use the proxy server.
  - Deal with the [pywb Certificate Authority](https://pywb.readthedocs.io/en/latest/manual/configuring.html#https-proxy-and-pywb-certificate-authority).
 
-For example, in `PlaywrightCrawler`, this is the simplest setup, which takes the shortcut and ignores the CA-related errors:
+For example, in <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>, this is the simplest setup, which takes the shortcut and ignores the CA-related errors:
 
 <CodeBlock className="language-python">
     {PlaywrightCrawlerRecordThroughProxy}
@@ -85,3 +85,5 @@ wayback --proxy example-collection
 Previous commands start the wayback server that allows crawler requests to be served from the archived pages in the `example-collection` instead of sending requests to the real website. This is again [proxy mode of the wayback server](https://pywb.readthedocs.io/en/latest/manual/usage.html#http-s-proxy-mode-access), but without recording capability. Now you need to [configure your crawler](#configure-the-crawler) to use this proxy server, which was already described above. Once everything is finished, you can just run your crawler, and it will crawl the offline archived version of the website from your WARC file.
 
 You can also manually browse the archived pages in the wayback server by going to the locally hosted server and entering the collection and URL of the archived page, for example: `http://localhost:8080/example-collection/https:/crawlee.dev/`. The wayback server will serve the page from the WARC file if it exists, or it will return a 404 error if it does not. For more detail about the server please refer to the [pywb documentation](https://pywb.readthedocs.io/en/latest/manual/usage.html#getting-started).
+
+If you have questions or need assistance, feel free to reach out on our [GitHub](https://github.com/apify/crawlee-python) or join our [Discord](https://discord.com/invite/jyEM2PRvMU) community.

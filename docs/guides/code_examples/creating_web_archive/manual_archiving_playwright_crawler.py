@@ -75,7 +75,7 @@ async def main() -> None:
             # it is needed to scroll the page to load all content.
             # It slows down the crawling, but ensures that all content is loaded.
             await context.infinite_scroll()
-            await context.enqueue_links()
+            await context.enqueue_links(strategy='same-domain')
 
         await crawler.run(['https://crawlee.dev/'])
 
