@@ -1088,7 +1088,8 @@ async def test_context_use_state_race_condition_in_handlers(key_value_store: Key
 
     Result should be incremented by 2.
     Method `use_state` must be implemented in a way that prevents race conditions in such scenario."""
-    from asyncio import Barrier  # type:ignore[attr-defined]  # Test is skipped in older Python versions.
+    # Test is skipped in older Python versions.
+    from asyncio import Barrier  # type:ignore[attr-defined] # noqa: PLC0415
 
     crawler = BasicCrawler()
     store = await crawler.get_key_value_store()
@@ -1125,7 +1126,8 @@ async def test_timeout_in_handler(sleep_type: str) -> None:
     Handler should be able to time out even if the code causing the timeout is blocking sync code.
     Crawler should attempt to retry it.
     This test creates situation where the request handler times out twice, on third retry it does not time out."""
-    from asyncio import timeout  # type:ignore[attr-defined]  # Test is skipped in older Python versions.
+    # Test is skipped in older Python versions.
+    from asyncio import timeout  # type:ignore[attr-defined] # noqa: PLC0415
 
     handler_timeout = timedelta(seconds=1)
     max_request_retries = 3
