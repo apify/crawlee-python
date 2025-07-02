@@ -24,7 +24,6 @@ if TYPE_CHECKING:
     import logging
     import re
     from collections.abc import Callable, Coroutine, Sequence
-    from typing import TypeAlias
 
     from typing_extensions import NotRequired, Required, Unpack
 
@@ -39,22 +38,22 @@ if TYPE_CHECKING:
 
     # Workaround for https://github.com/pydantic/pydantic/issues/9445
     J = TypeVar('J', bound='JsonSerializable')
-    JsonSerializable: TypeAlias = list[J] | dict[str, J] | str | bool | int | float | None
+    JsonSerializable = list[J] | dict[str, J] | str | bool | int | float | None
 else:
     from pydantic import JsonValue as JsonSerializable
 
 T = TypeVar('T')
 
-HttpMethod: TypeAlias = Literal['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH']
+HttpMethod = Literal['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH']
 
-HttpPayload: TypeAlias = bytes
+HttpPayload = bytes
 
-RequestTransformAction: TypeAlias = Literal['skip', 'unchanged']
+RequestTransformAction = Literal['skip', 'unchanged']
 
-EnqueueStrategy: TypeAlias = Literal['all', 'same-domain', 'same-hostname', 'same-origin']
+EnqueueStrategy = Literal['all', 'same-domain', 'same-hostname', 'same-origin']
 """Enqueue strategy to be used for determining which links to extract and enqueue."""
 
-SkippedReason: TypeAlias = Literal['robots_txt']
+SkippedReason = Literal['robots_txt']
 
 
 def _normalize_headers(headers: Mapping[str, str]) -> dict[str, str]:
