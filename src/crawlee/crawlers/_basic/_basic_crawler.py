@@ -335,7 +335,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             respect_robots_txt_file: If set to `True`, the crawler will automatically try to fetch the robots.txt file
                 for each domain, and skip those that are not allowed. This also prevents disallowed URLs to be added
                 via `EnqueueLinksFunction`
-            status_message_logging_interval:  Interval for logging the crawler status messages
+            status_message_logging_interval: Interval for logging the crawler status messages.
             status_message_callback: Allows overriding the default status message. The default status message is
                 provided in the parameters. Returning `None` suppresses the status message.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
