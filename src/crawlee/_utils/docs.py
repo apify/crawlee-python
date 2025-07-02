@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Literal, TypeVar
+from collections.abc import Callable
+from typing import Any, Literal, TypeVar
 
 GroupName = Literal['Classes', 'Abstract classes', 'Data structures', 'Event payloads', 'Errors', 'Functions']
 

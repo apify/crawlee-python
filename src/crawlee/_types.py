@@ -1,19 +1,16 @@
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
-    Callable,
     Literal,
-    Optional,
     Protocol,
     TypedDict,
     TypeVar,
-    Union,
     cast,
     overload,
 )
@@ -28,7 +25,7 @@ if TYPE_CHECKING:
     import re
     from collections.abc import Callable, Coroutine, Sequence
 
-    from typing_extensions import NotRequired, Required, TypeAlias, Unpack
+    from typing_extensions import NotRequired, Required, Unpack
 
     from crawlee import Glob, Request
     from crawlee._request import RequestOptions
@@ -41,30 +38,22 @@ if TYPE_CHECKING:
 
     # Workaround for https://github.com/pydantic/pydantic/issues/9445
     J = TypeVar('J', bound='JsonSerializable')
-    JsonSerializable: TypeAlias = Union[
-        list[J],
-        dict[str, J],
-        str,
-        bool,
-        int,
-        float,
-        None,
-    ]
+    JsonSerializable = list[J] | dict[str, J] | str | bool | int | float | None
 else:
     from pydantic import JsonValue as JsonSerializable
 
 T = TypeVar('T')
 
-HttpMethod: TypeAlias = Literal['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH']
+HttpMethod = Literal['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH']
 
-HttpPayload: TypeAlias = bytes
+HttpPayload = bytes
 
-RequestTransformAction: TypeAlias = Literal['skip', 'unchanged']
+RequestTransformAction = Literal['skip', 'unchanged']
 
-EnqueueStrategy: TypeAlias = Literal['all', 'same-domain', 'same-hostname', 'same-origin']
+EnqueueStrategy = Literal['all', 'same-domain', 'same-hostname', 'same-origin']
 """Enqueue strategy to be used for determining which links to extract and enqueue."""
 
-SkippedReason: TypeAlias = Literal['robots_txt']
+SkippedReason = Literal['robots_txt']
 
 
 def _normalize_headers(headers: Mapping[str, str]) -> dict[str, str]:
@@ -264,7 +253,7 @@ class RequestHandlerRunResult:
         self._key_value_store_getter = key_value_store_getter
         self.add_requests_calls = list[AddRequestsKwargs]()
         self.push_data_calls = list[PushDataFunctionCall]()
-        self.key_value_store_changes = dict[tuple[Optional[str], Optional[str]], KeyValueStoreChangeRecords]()
+        self.key_value_store_changes = dict[tuple[str | None, str | None], KeyValueStoreChangeRecords]()
 
     async def add_requests(
         self,

@@ -5,8 +5,8 @@ import base64
 import json
 import threading
 import time
-from collections.abc import Awaitable, Coroutine, Iterator
-from typing import TYPE_CHECKING, Any, Callable
+from collections.abc import Awaitable, Callable, Coroutine, Iterator
+from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs
 
 from uvicorn.server import Server

@@ -1,7 +1,7 @@
 import asyncio
+from collections.abc import Callable
 from datetime import timedelta
 from itertools import count
-from typing import Callable
 
 from crawlee import ConcurrencySettings, Request
 from crawlee.crawlers import BasicCrawlingContext, HttpCrawler, HttpCrawlingContext

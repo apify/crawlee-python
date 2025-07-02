@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import asyncio
 from logging import getLogger
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from datetime import timedelta
 
 logger = getLogger(__name__)
