@@ -4,7 +4,7 @@ from crawlee.request_loaders._request_list import RequestList
 
 
 async def test_sync_traversal() -> None:
-    request_list = RequestList(['https://placeholder.com', 'https://placeholder.io', 'https://placeholder.dev'])
+    request_list = RequestList(['https://a.placeholder.com', 'https://b.placeholder.com', 'https://c.placeholder.com'])
 
     while not await request_list.is_finished():
         item = await request_list.fetch_next_request()
@@ -17,9 +17,9 @@ async def test_sync_traversal() -> None:
 
 async def test_async_traversal() -> None:
     async def generator() -> AsyncGenerator[str]:
-        yield 'https://placeholder.com'
-        yield 'https://placeholder.io'
-        yield 'https://placeholder.dev'
+        yield 'https://a.placeholder.com'
+        yield 'https://b.placeholder.com'
+        yield 'https://c.placeholder.com'
 
     request_list = RequestList(generator())
 
@@ -33,7 +33,7 @@ async def test_async_traversal() -> None:
 
 
 async def test_is_empty_does_not_depend_on_fetch_next_request() -> None:
-    request_list = RequestList(['https://placeholder.com', 'https://placeholder.io', 'https://placeholder.dev'])
+    request_list = RequestList(['https://a.placeholder.com', 'https://b.placeholder.com', 'https://c.placeholder.com'])
 
     item_1 = await request_list.fetch_next_request()
     assert item_1 is not None
