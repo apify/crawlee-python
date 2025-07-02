@@ -1,4 +1,4 @@
-# ruff: noqa: N802
+# ruff: noqa: N802, PLC0415
 
 
 def patch_browserforge() -> None:

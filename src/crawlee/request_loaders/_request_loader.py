@@ -56,8 +56,9 @@ class RequestLoader(ABC):
             request_manager: Request manager to combine the loader with.
                 If None is given, the default request queue is used.
         """
-        from crawlee.request_loaders import RequestManagerTandem
-        from crawlee.storages import RequestQueue
+        # Import here to avoid circular imports.
+        from crawlee.request_loaders import RequestManagerTandem  # noqa: PLC0415
+        from crawlee.storages import RequestQueue  # noqa: PLC0415
 
         if request_manager is None:
             request_manager = await RequestQueue.open()

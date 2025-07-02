@@ -76,7 +76,7 @@ class RecoverableState(Generic[TStateModel]):
             return self.current_value
 
         # Import here to avoid circular imports.
-        from crawlee.storages._key_value_store import KeyValueStore
+        from crawlee.storages._key_value_store import KeyValueStore  # noqa: PLC0415
 
         self._key_value_store = await KeyValueStore.open(
             name=self._persist_state_kvs_name, id=self._persist_state_kvs_id
@@ -85,7 +85,7 @@ class RecoverableState(Generic[TStateModel]):
         await self._load_saved_state()
 
         # Import here to avoid circular imports.
-        from crawlee import service_locator
+        from crawlee import service_locator  # noqa: PLC0415
 
         event_manager = service_locator.get_event_manager()
         event_manager.on(event=Event.PERSIST_STATE, listener=self.persist_state)
@@ -102,7 +102,7 @@ class RecoverableState(Generic[TStateModel]):
             return
 
         # Import here to avoid circular imports.
-        from crawlee import service_locator
+        from crawlee import service_locator  # noqa: PLC0415
 
         event_manager = service_locator.get_event_manager()
         event_manager.off(event=Event.PERSIST_STATE, listener=self.persist_state)
