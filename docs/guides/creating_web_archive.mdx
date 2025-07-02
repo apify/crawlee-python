@@ -11,8 +11,6 @@ import PlaywrightCrawlerRecordThroughProxy from '!!raw-loader!./code_examples/cr
 import ParselCrawlerRecordManual from '!!raw-loader!./code_examples/creating_web_archive/manual_archiving_parsel_crawler.py';
 import PlaywrightCrawlerRecordManual from '!!raw-loader!./code_examples/creating_web_archive/manual_archiving_playwright_crawler.py';
 
-
-
 Archiving webpages is one of the tasks that a web crawler can be used for. There are various use cases, such as archiving for future reference, speeding up web crawler development, creating top-level regression tests for web crawlers and so on.
 
 There are various existing libraries of web archives with massive amount of data stored during their years of existence, for example [Wayback Machine](https://web.archive.org/) or [Common Crawl](https://commoncrawl.org/). There are also dedicated tools for archiving web pages, to name some: simple browser extensions such as [Archive Webpage](https://archiveweb.page/), open source tools such as [pywb](https://pypi.org/project/pywb/) or [warcio](https://pypi.org/project/warcio/), or even web crawlers specialized in archiving such as [Browsertrix](https://webrecorder.net/browsertrix/).
@@ -31,9 +29,10 @@ Create a new collection that will be used for this archiving session and start t
 wb-manager init example-collection
 wayback --record --live -a --auto-interval 10 --proxy example-collection --proxy-record
 ```
-(Instead of passing many configuration  arguments to `wayback` command, you can configure the server by adding configuration options to `config.yaml`. See the details in the [documentation](https://pywb.readthedocs.io/en/latest/manual/configuring.html#configuring-the-web-archive).)
+Instead of passing many configuration  arguments to `wayback` command, you can configure the server by adding configuration options to `config.yaml`. See the details in the [documentation](https://pywb.readthedocs.io/en/latest/manual/configuring.html#configuring-the-web-archive).
 
 ### Configure the crawler
+
 Now you should use this locally hosted server as a proxy in your crawler. There are two more steps before starting the crawler:
  - Make the crawler use the proxy server.
  - Deal with the [pywb Certificate Authority](https://pywb.readthedocs.io/en/latest/manual/configuring.html#https-proxy-and-pywb-certificate-authority).
@@ -47,6 +46,7 @@ For example, in `PlaywrightCrawler`, this is the simplest setup, which takes the
 After you run the crawler you will be able to see the archived data in the wayback collection directory for example `.../collections/example-collection/archive`. You can then access the recorded pages directly in the proxy recording server or use it with any other WARC-compatible tool.
 
 ## Manual WARC creation
+
 A different approach is to create WARC files manually in the crawler, which gives you full control over the WARC files. This is way more complex and low-level approach as you have to ensure that all the relevant data is collected, and correctly stored and that the archiving functions are called at the right time. This is by no means a trivial task and the example archiving functions below are just the most simple examples that will be insufficient for many real-world use cases. You will need to extend and improve them to properly fit your specific needs.
 
 ### Simple crawlers

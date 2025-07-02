@@ -253,7 +253,7 @@ module = [
     "sortedcollections",            # Untyped and stubs not available
     "cookiecutter.*",               # Untyped and stubs not available
     "inquirer.*",                   # Untyped and stubs not available
-    "warcio.*",                       # Example code shows WARC files creation.
+    "warcio.*",                     # Example code shows WARC files creation.
 ]
 ignore_missing_imports = true
 
