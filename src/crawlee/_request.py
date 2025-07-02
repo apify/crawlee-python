@@ -108,6 +108,11 @@ class UserData(BaseModel, MutableMapping[str, JsonSerializable]):
 
         return NotImplemented
 
+    def __hash__(self) -> int:
+        """Return hash based on the model fields."""
+        data = self.model_dump()
+        return hash(tuple(sorted(data.items())))
+
 
 user_data_adapter = TypeAdapter(UserData)
 

@@ -214,7 +214,8 @@ class Configuration(BaseSettings):
         Mostly for the backwards compatibility. It is recommended to use the `service_locator.get_configuration()`
         instead.
         """
-        from crawlee import service_locator
+        # Import here to avoid circular imports.
+        from crawlee import service_locator  # noqa: PLC0415
 
         config = service_locator.get_configuration()
 

@@ -92,7 +92,7 @@ def _isolate_test_environment(prepare_test_env: Callable[[], None]) -> None:
 
 @pytest.fixture(autouse=True)
 def _set_crawler_log_level(pytestconfig: pytest.Config, monkeypatch: pytest.MonkeyPatch) -> None:
-    from crawlee import _log_config
+    from crawlee import _log_config  # noqa: PLC0415
 
     loglevel = cast('str | None', pytestconfig.getoption('--log-level'))
     if loglevel is not None:
