@@ -2,6 +2,7 @@ import asyncio
 import io
 import logging
 from functools import partial
+from pathlib import Path
 
 from playwright.async_api import Request
 from warcio.statusandheaders import StatusAndHeaders
@@ -49,8 +50,8 @@ async def main() -> None:
     )
 
     # Create a WARC archive file a prepare the writer.
-    archive = 'example2.warc.gz'
-    with open(archive, 'wb') as output:
+    archive = Path('example.warc.gz')
+    with archive.open('wb') as output:
         writer = WARCWriter(output, gzip=True)
 
         # Create a WARC info record to store metadata about the archive.
@@ -59,7 +60,7 @@ async def main() -> None:
             'format': 'WARC/1.1',
             'description': 'Example archive created with PlaywrightCrawler',
         }
-        writer.write_record(writer.create_warcinfo_record(archive, warcinfo_payload))
+        writer.write_record(writer.create_warcinfo_record(archive.name, warcinfo_payload))
 
         @crawler.pre_navigation_hook
         async def archiving_hook(context: PlaywrightPreNavCrawlingContext) -> None:

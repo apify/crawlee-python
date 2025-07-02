@@ -1,5 +1,6 @@
 import asyncio
 import io
+from pathlib import Path
 
 from warcio.statusandheaders import StatusAndHeaders
 from warcio.warcwriter import WARCWriter
@@ -34,8 +35,8 @@ async def main() -> None:
     )
 
     # Create a WARC archive file a prepare the writer.
-    archive = 'example.warc.gz'
-    with open(archive, 'wb') as output:
+    archive = Path('example.warc.gz')
+    with archive.open('wb') as output:
         writer = WARCWriter(output, gzip=True)
 
         # Create a WARC info record to store metadata about the archive.
@@ -44,7 +45,7 @@ async def main() -> None:
             'format': 'WARC/1.1',
             'description': 'Example archive created with ParselCrawler',
         }
-        writer.write_record(writer.create_warcinfo_record(archive, warcinfo_payload))
+        writer.write_record(writer.create_warcinfo_record(archive.name, warcinfo_payload))
 
         # Define the default request handler, which will be called for every request.
         @crawler.router.default_handler
