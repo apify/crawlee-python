@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from crawlee._utils.byte_size import ByteSize
@@ -152,4 +152,4 @@ class ClientSnapshot:
         return self.new_error_count > self.max_error_count
 
 
-Snapshot = Union[MemorySnapshot, CpuSnapshot, EventLoopSnapshot, ClientSnapshot]
+Snapshot = MemorySnapshot | CpuSnapshot | EventLoopSnapshot | ClientSnapshot

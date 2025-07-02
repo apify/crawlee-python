@@ -4,7 +4,7 @@ import asyncio
 import logging
 import warnings
 from functools import partial
-from typing import TYPE_CHECKING, Any, Callable, Generic, Literal
+from typing import TYPE_CHECKING, Any, Generic, Literal
 
 from more_itertools import partition
 from pydantic import ValidationError
@@ -33,7 +33,7 @@ TCrawlingContext = TypeVar('TCrawlingContext', bound=PlaywrightCrawlingContext)
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Awaitable, Iterator, Mapping
+    from collections.abc import AsyncGenerator, Awaitable, Callable, Iterator, Mapping
     from pathlib import Path
 
     from playwright.async_api import Page, Route

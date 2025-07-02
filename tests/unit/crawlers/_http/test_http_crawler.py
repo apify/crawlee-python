@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 from urllib.parse import parse_qs, urlencode
 
@@ -14,7 +14,7 @@ from crawlee.statistics import Statistics
 from tests.unit.server_endpoints import HELLO_WORLD
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable
+    from collections.abc import Awaitable, Callable
 
     from yarl import URL
 
@@ -544,7 +544,8 @@ async def test_get_snapshot(server_url: URL) -> None:
 
 
 async def test_error_snapshot_through_statistics(server_url: URL) -> None:
-    crawler = HttpCrawler(statistics=Statistics.with_default_state(save_error_snapshots=True))
+    statistics = Statistics.with_default_state(save_error_snapshots=True)
+    crawler = HttpCrawler(statistics=statistics)
 
     @crawler.router.default_handler
     async def request_handler(context: HttpCrawlingContext) -> None:

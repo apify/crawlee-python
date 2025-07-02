@@ -8,7 +8,7 @@ from collections import defaultdict
 from datetime import timedelta
 from functools import wraps
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, Literal, TypedDict, Union, cast, overload
+from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast, overload
 
 from pyee.asyncio import AsyncIOEventEmitter
 
@@ -161,7 +161,7 @@ class EventManager:
         """
         signature = inspect.signature(listener)
 
-        @wraps(cast('Callable[..., Union[None, Awaitable[None]]]', listener))
+        @wraps(cast('Callable[..., None | Awaitable[None]]', listener))
         async def listener_wrapper(event_data: EventData) -> None:
             try:
                 bound_args = signature.bind(event_data)
