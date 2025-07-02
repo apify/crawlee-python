@@ -25,26 +25,30 @@ class TestInput:
     argvalues=[
         pytest.param(
             TestInput(
-                request_loader_items=['http://a.com', 'http://b.com'],
+                request_loader_items=['https://placeholder.com', 'https://placeholder.io'],
                 request_manager_items=[],
-                discovered_items=[Request.from_url('http://c.com')],
+                discovered_items=[Request.from_url('https://placeholder.dev')],
                 expected_result={
-                    'http://a.com',
-                    'http://b.com',
-                    'http://c.com',
+                    'https://placeholder.com',
+                    'https://placeholder.io',
+                    'https://placeholder.dev',
                 },
             ),
             id='basic_usage',
         ),
         pytest.param(
             TestInput(
-                request_loader_items=[Request.from_url('http://a.com'), None, Request.from_url('http://c.com')],
-                request_manager_items=['http://b.com', 'http://d.com'],
+                request_loader_items=[
+                    Request.from_url('https://placeholder.com'),
+                    None,
+                    Request.from_url('https://placeholder.dev'),
+                ],
+                request_manager_items=['https://placeholder.io', 'http://d.com'],
                 discovered_items=[],
                 expected_result={
-                    'http://a.com',
-                    'http://b.com',
-                    'http://c.com',
+                    'https://placeholder.com',
+                    'https://placeholder.io',
+                    'https://placeholder.dev',
                     'http://d.com',
                 },
             ),
