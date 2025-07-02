@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 class PatchedHeaderGenerator(bf_HeaderGenerator):
     """Browserforge `HeaderGenerator` that contains patches specific for our usage of the generator."""
 
-    def _get_accept_language_header(self, locales: tuple[str, ...]) -> str:
+    def _get_accept_language_header(self, locales: tuple[str, ...] | list[str] | str) -> str:
         """Generate the Accept-Language header based on the given locales.
 
         Patched version due to PR of upstream repo not being merged: https://github.com/daijro/browserforge/pull/24
@@ -39,9 +39,17 @@ class PatchedHeaderGenerator(bf_HeaderGenerator):
         Returns:
             Accept-Language header string.
         """
+        # Convert to tuple if needed for consistent handling.
+        if isinstance(locales, str):
+            locales_tuple: tuple[str, ...] = (locales,)
+        elif isinstance(locales, list):
+            locales_tuple = tuple(locales)
+        else:
+            locales_tuple = locales
+
         # First locale does not include quality factor, q=1 is considered as implicit.
-        additional_locales = [f'{locale};q={0.9 - index * 0.1:.1f}' for index, locale in enumerate(locales[1:])]
-        return ','.join((locales[0], *additional_locales))
+        additional_locales = [f'{locale};q={0.9 - index * 0.1:.1f}' for index, locale in enumerate(locales_tuple[1:])]
+        return ','.join((locales_tuple[0], *additional_locales))
 
     def generate(
         self,
