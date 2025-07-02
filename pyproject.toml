@@ -12,6 +12,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
@@ -80,13 +81,14 @@ playwright = ["playwright>=1.27.0"]
 crawlee = "crawlee._cli:cli"
 
 [project.urls]
-homepage = "https://crawlee.dev/python"
-source = "https://github.com/apify/crawlee-python"
-changelog = "https://crawlee.dev/python/docs/changelog"
-releasenotes = "https://crawlee.dev/python/docs/upgrading"
-documentation = "https://crawlee.dev/python/docs"
-issues = "https://github.com/apify/crawlee-python/issues"
-"Apify homepage" = "https://apify.com"
+"Apify Homepage" = "https://apify.com"
+"Changelog" = "https://crawlee.dev/python/docs/changelog"
+"Discord" = "https://discord.com/invite/jyEM2PRvMU"
+"Documentation" = "https://crawlee.dev/python/docs/quick-start"
+"Homepage" = "https://crawlee.dev/python"
+"Issue Tracker" = "https://github.com/apify/crawlee-python/issues"
+"Release Notes" = "https://crawlee.dev/python/docs/upgrading"
+"Source Code" = "https://github.com/apify/crawlee-python"
 
 [dependency-groups]
 dev = [
