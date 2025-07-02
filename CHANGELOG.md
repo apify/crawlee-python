@@ -3,15 +3,37 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 0.6.11 - **not yet released**
+## 0.6.12 - **not yet released**
+
+### 🚀 Features
+
+- Add `retire_browser_after_page_count` parameter for `BrowserPool` ([#1266](https://github.com/apify/crawlee-python/pull/1266)) ([603aa2b](https://github.com/apify/crawlee-python/commit/603aa2b192ef4bc42d88244bd009fffdb0614c06)) by [@Mantisus](https://github.com/Mantisus)
+- Add utility for load and parse Sitemap and `SitemapRequestLoader` ([#1169](https://github.com/apify/crawlee-python/pull/1169)) ([66599f8](https://github.com/apify/crawlee-python/commit/66599f8d085f3a8622e130019b6fdce2325737de)) by [@Mantisus](https://github.com/Mantisus), closes [#1161](https://github.com/apify/crawlee-python/issues/1161)
+- Add periodic status logging and `status_message_callback` parameter for customization ([#1265](https://github.com/apify/crawlee-python/pull/1265)) ([b992fb2](https://github.com/apify/crawlee-python/commit/b992fb2a457dedd20fc3014d7a4a8afe14602342)) by [@Mantisus](https://github.com/Mantisus), closes [#96](https://github.com/apify/crawlee-python/issues/96)
+
+### 🐛 Bug Fixes
+
+- Use `perf_counter_ns` for request duration tracking ([#1260](https://github.com/apify/crawlee-python/pull/1260)) ([9e92f6b](https://github.com/apify/crawlee-python/commit/9e92f6b54400ce5004fbab770e2e4ac42f73148f)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1256](https://github.com/apify/crawlee-python/issues/1256)
+
+### Refactor
+
+- [**breaking**] Introduce new storage client system ([#1194](https://github.com/apify/crawlee-python/pull/1194)) ([de1c03f](https://github.com/apify/crawlee-python/commit/de1c03f70dbd4ae1773fd49c632b3cfcfab82c26)) by [@vdusek](https://github.com/vdusek), closes [#92](https://github.com/apify/crawlee-python/issues/92), [#147](https://github.com/apify/crawlee-python/issues/147), [#783](https://github.com/apify/crawlee-python/issues/783), [#1247](https://github.com/apify/crawlee-python/issues/1247)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.6.11](https://github.com/apify/crawlee-python/releases/tag/v0.6.11) (2025-06-23)
+
+### 🚀 Features
+
+- Add `stream` method for `HttpClient` ([#1241](https://github.com/apify/crawlee-python/pull/1241)) ([95c68b0](https://github.com/apify/crawlee-python/commit/95c68b0b2d0bf9e093c1d0ee1002625172f7a868)) by [@Mantisus](https://github.com/Mantisus)
 
 ### 🐛 Bug Fixes
 
 - Fix `ClientSnapshot` overload calculation ([#1228](https://github.com/apify/crawlee-python/pull/1228)) ([a4fc1b6](https://github.com/apify/crawlee-python/commit/a4fc1b6e83143650666108c289c084ea0463b80c)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1207](https://github.com/apify/crawlee-python/issues/1207)
 - Use `PSS` instead of `RSS` to estimate children process memory usage on Linux ([#1210](https://github.com/apify/crawlee-python/pull/1210)) ([436032f](https://github.com/apify/crawlee-python/commit/436032f2de5f7d7fa1016033f1bb224159a8e6bf)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1206](https://github.com/apify/crawlee-python/issues/1206)
+- Do not raise an error to check &#x27;same-domain&#x27; if there is no hostname in the url ([#1251](https://github.com/apify/crawlee-python/pull/1251)) ([a6c3aab](https://github.com/apify/crawlee-python/commit/a6c3aabf5f8341f215275077b6768a56118bc656)) by [@Mantisus](https://github.com/Mantisus)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.6.10](https://github.com/apify/crawlee-python/releases/tag/v0.6.10) (2025-06-02)
 
 ### 🐛 Bug Fixes

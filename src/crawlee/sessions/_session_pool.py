@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import random
+from collections.abc import Callable
 from logging import getLogger
-from typing import TYPE_CHECKING, Callable, Literal, overload
+from typing import TYPE_CHECKING, Literal, overload
 
 from crawlee import service_locator
 from crawlee._utils.context import ensure_context

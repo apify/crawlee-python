@@ -6,12 +6,12 @@ from typing import TYPE_CHECKING
 
 from crawlee._utils.docs import docs_group
 from crawlee.request_loaders._request_loader import RequestLoader
+from crawlee.storage_clients.models import ProcessedRequest
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from crawlee._request import Request
-    from crawlee.storage_clients.models import ProcessedRequest
 
 
 @docs_group('Abstract classes')
@@ -40,10 +40,11 @@ class RequestManager(RequestLoader, ABC):
             Information about the request addition to the manager.
         """
 
-    async def add_requests_batched(
+    async def add_requests(
         self,
         requests: Sequence[str | Request],
         *,
+        forefront: bool = False,
         batch_size: int = 1000,  # noqa: ARG002
         wait_time_between_batches: timedelta = timedelta(seconds=1),  # noqa: ARG002
         wait_for_all_requests_to_be_added: bool = False,  # noqa: ARG002
@@ -53,14 +54,17 @@ class RequestManager(RequestLoader, ABC):
 
         Args:
             requests: Requests to enqueue.
+            forefront: If True, add requests to the beginning of the queue.
             batch_size: The number of requests to add in one batch.
             wait_time_between_batches: Time to wait between adding batches.
             wait_for_all_requests_to_be_added: If True, wait for all requests to be added before returning.
             wait_for_all_requests_to_be_added_timeout: Timeout for waiting for all requests to be added.
         """
         # Default and dumb implementation.
+        processed_requests = list[ProcessedRequest]()
         for request in requests:
-            await self.add_request(request)
+            processed_request = await self.add_request(request, forefront=forefront)
+            processed_requests.append(processed_request)
 
     @abstractmethod
     async def reclaim_request(self, request: Request, *, forefront: bool = False) -> ProcessedRequest | None:

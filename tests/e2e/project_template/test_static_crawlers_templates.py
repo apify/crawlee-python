@@ -79,7 +79,7 @@ async def test_static_crawler_actor_at_apify(
     )
     subprocess.run(['apify', 'init', '-y', actor_name], capture_output=True, check=True, cwd=tmp_path / actor_name)  # noqa: ASYNC221, S603, S607
 
-    build_process = subprocess.run(['apify', 'push'], capture_output=True, check=False, cwd=tmp_path / actor_name)  # noqa: ASYNC221, S603, S607
+    build_process = subprocess.run(['apify', 'push'], capture_output=True, check=False, cwd=tmp_path / actor_name)  # noqa: ASYNC221, S607
     # Get actor ID from build log
     actor_id_regexp = re.compile(r'https:\/\/console\.apify\.com\/actors\/(.*)#\/builds\/\d*\.\d*\.\d*')
 

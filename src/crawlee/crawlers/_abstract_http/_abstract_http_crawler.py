@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from abc import ABC
-from typing import TYPE_CHECKING, Any, Callable, Generic
+from typing import TYPE_CHECKING, Any, Generic
 
 from more_itertools import partition
 from pydantic import ValidationError
@@ -19,7 +19,7 @@ from crawlee.statistics import StatisticsState
 from ._http_crawling_context import HttpCrawlingContext, ParsedHttpCrawlingContext, TParseResult, TSelectResult
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Awaitable, Iterator
+    from collections.abc import AsyncGenerator, Awaitable, Callable, Iterator
 
     from typing_extensions import Unpack
 

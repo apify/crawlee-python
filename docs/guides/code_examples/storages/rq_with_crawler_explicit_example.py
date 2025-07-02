@@ -10,12 +10,10 @@ async def main() -> None:
     request_queue = await RequestQueue.open(name='my-request-queue')
 
     # Interact with the request queue directly, e.g. add a batch of requests.
-    await request_queue.add_requests_batched(
-        ['https://apify.com/', 'https://crawlee.dev/']
-    )
+    await request_queue.add_requests(['https://apify.com/', 'https://crawlee.dev/'])
 
     # Create a new crawler (it can be any subclass of BasicCrawler) and pass the request
-    # list as request manager to it. It will be managed by the crawler.
+    # queue as request manager to it. It will be managed by the crawler.
     crawler = HttpCrawler(request_manager=request_queue)
 
     # Define the default request handler, which will be called for every request.

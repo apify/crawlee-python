@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib
 import inspect
 import json
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -55,5 +56,5 @@ for module_name in ['crawlee']:
 
 resolve_shortcuts(shortcuts)
 
-with open('module_shortcuts.json', 'w', encoding='utf-8') as shortcuts_file:
+with Path('module_shortcuts.json').open('w', encoding='utf-8') as shortcuts_file:
     json.dump(shortcuts, shortcuts_file, indent=4, sort_keys=True)

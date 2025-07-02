@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional
+from contextlib import asynccontextmanager
+from typing import TYPE_CHECKING, Any
 
 from curl_cffi import CurlInfo
 from curl_cffi.const import CurlHttpVersion
@@ -19,6 +20,8 @@ from crawlee.errors import ProxyError
 from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+    from datetime import timedelta
     from http.cookiejar import Cookie
 
     from curl_cffi import Curl
@@ -83,7 +86,18 @@ class _CurlImpersonateResponse:
         return HttpHeaders({key: value for key, value in self._response.headers.items() if value})
 
     def read(self) -> bytes:
+        if self._response.astream_task:
+            raise RuntimeError('Use `read_stream` to read the body of the Response received from the `stream` method')
         return self._response.content
+
+    async def read_stream(self) -> AsyncGenerator[bytes, None]:
+        if not self._response.astream_task or self._response.astream_task.done():  # type: ignore[attr-defined]
+            raise RuntimeError(
+                'Cannot read stream: either already consumed or Response not obtained from `stream` method'
+            )
+
+        async for chunk in self._response.aiter_content():  # type: ignore[no-untyped-call]
+            yield chunk
 
 
 @docs_group('Classes')
@@ -123,7 +137,7 @@ class CurlImpersonateHttpClient(HttpClient):
         )
         self._async_session_kwargs = async_session_kwargs
 
-        self._client_by_proxy_url = dict[Optional[str], AsyncSession]()
+        self._client_by_proxy_url = dict[str | None, AsyncSession]()
 
     @override
     async def crawl(
@@ -198,6 +212,49 @@ class CurlImpersonateHttpClient(HttpClient):
 
         return _CurlImpersonateResponse(response)
 
+    @asynccontextmanager
+    @override
+    async def stream(
+        self,
+        url: str,
+        *,
+        method: HttpMethod = 'GET',
+        headers: HttpHeaders | dict[str, str] | None = None,
+        payload: HttpPayload | None = None,
+        session: Session | None = None,
+        proxy_info: ProxyInfo | None = None,
+        timeout: timedelta | None = None,
+    ) -> AsyncGenerator[HttpResponse]:
+        if isinstance(headers, dict) or headers is None:
+            headers = HttpHeaders(headers or {})
+
+        proxy_url = proxy_info.url if proxy_info else None
+        client = self._get_client(proxy_url)
+
+        try:
+            response = await client.request(
+                url=url,
+                method=method.upper(),  # type: ignore[arg-type] # curl-cffi requires uppercase method
+                headers=dict(headers) if headers else None,
+                data=payload,
+                cookies=session.cookies.jar if session else None,
+                stream=True,
+                timeout=timeout.total_seconds() if timeout else None,
+            )
+        except CurlRequestError as exc:
+            if self._is_proxy_error(exc):
+                raise ProxyError from exc
+            raise
+
+        if self._persist_cookies_per_session and session and response.curl:
+            response_cookies = self._get_cookies(response.curl)
+            session.cookies.store_cookies(response_cookies)
+
+        try:
+            yield _CurlImpersonateResponse(response)
+        finally:
+            await response.aclose()
+
     def _get_client(self, proxy_url: str | None) -> AsyncSession:
         """Retrieve or create an asynchronous HTTP session for the given proxy URL.
 
@@ -245,3 +302,8 @@ class CurlImpersonateHttpClient(HttpClient):
             cookie = curl_morsel.to_cookiejar_cookie()
             cookies.append(cookie)
         return cookies
+
+    async def cleanup(self) -> None:
+        for client in self._client_by_proxy_url.values():
+            await client.close()
+        self._client_by_proxy_url.clear()
