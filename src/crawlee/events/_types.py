@@ -31,6 +31,9 @@ class Event(str, Enum):
     PAGE_CREATED = 'pageCreated'
     PAGE_CLOSED = 'pageClosed'
 
+    # State events
+    CRAWLER_STATUS = 'crawlerStatus'
+
 
 @docs_group('Event payloads')
 class EventPersistStateData(BaseModel):
@@ -79,7 +82,27 @@ class EventExitData(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
-EventData = EventPersistStateData | EventSystemInfoData | EventMigratingData | EventAbortingData | EventExitData
+@docs_group('Event payloads')
+class EventCrawlerStatusData(BaseModel):
+    """Data for the crawler status event."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    message: str
+    """A message describing the current status of the crawler."""
+
+    crawler_id: int
+    """The ID of the crawler that emitted the event."""
+
+
+EventData = (
+    EventPersistStateData
+    | EventSystemInfoData
+    | EventMigratingData
+    | EventAbortingData
+    | EventExitData
+    | EventCrawlerStatusData
+)
 """A helper type for all possible event payloads"""
 
 WrappedListener = Callable[..., Coroutine[Any, Any, None]]

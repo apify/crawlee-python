@@ -55,6 +55,8 @@ EnqueueStrategy = Literal['all', 'same-domain', 'same-hostname', 'same-origin']
 
 SkippedReason = Literal['robots_txt']
 
+LogLevel = Literal['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
+
 
 def _normalize_headers(headers: Mapping[str, str]) -> dict[str, str]:
     """Convert all header keys to lowercase, strips whitespace, and returns them sorted by key."""

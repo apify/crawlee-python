@@ -49,7 +49,7 @@ async def main() -> None:
         if context.session:
             context.log.info(f'Init session {context.session.id}')
             next_request = Request.from_url(
-                'https://placeholder.dev', session_id=context.session.id
+                'https://a.placeholder.com', session_id=context.session.id
             )
             next_requests.append(next_request)
 
