@@ -187,6 +187,9 @@ indent-style = "space"
 "**/docs/guides/code_examples/running_in_web_server/server.py" = [
     "TC002", # ruff false positive. Import actually needed during runtime.
 ]
+"**/docs/guides/code_examples/creating_web_archive/*.*" = [
+    "ASYNC230", # Ignore for simplicity of the example.
+]
 
 [tool.ruff.lint.flake8-quotes]
 docstring-quotes = "double"
@@ -250,6 +253,7 @@ module = [
     "sortedcollections",            # Untyped and stubs not available
     "cookiecutter.*",               # Untyped and stubs not available
     "inquirer.*",                   # Untyped and stubs not available
+    "warcio.*",                     # Example code shows WARC files creation.
 ]
 ignore_missing_imports = true
 
