@@ -5,6 +5,10 @@ on:
   schedule:
     - cron: '0 6 * * *'
 
+env:
+  NODE_VERSION: 22
+  PYTHON_VERSION: 3.13
+
 jobs:
   end_to_end_tests:
     name: End-to-end tests
@@ -17,9 +21,6 @@ jobs:
         package-manager: ["pip", "uv", "poetry"]
 
     runs-on: "ubuntu-latest"
-    env:
-      python-version: "3.13"
-      node-version: "22"
 
     steps:
       - name: Checkout repository
@@ -28,15 +29,15 @@ jobs:
       - name: Setup node
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.node-version }}
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Install dependencies
         run: npm install -g apify-cli
 
-      - name: Set up Python ${{ env.python-version }}
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.python-version }}
+          python-version: ${{ env.PYTHON_VERSION }}
 
       # installed to be able to patch crawlee in the poetry.lock with custom wheel file for poetry based templates
       - name: Install poetry
@@ -45,7 +46,7 @@ jobs:
       - name: Set up uv package manager
         uses: astral-sh/setup-uv@v6
         with:
-          python-version: ${{ env.python-version }}
+          python-version: ${{ env.PYTHON_VERSION }}
 
       # Sync the project, but no need to install the browsers into the test runner environment.
       - name: Install Python dependencies
