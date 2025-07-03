@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file.
 ### Refactor
 
 - [**breaking**] Introduce new storage client system ([#1194](https://github.com/apify/crawlee-python/pull/1194)) ([de1c03f](https://github.com/apify/crawlee-python/commit/de1c03f70dbd4ae1773fd49c632b3cfcfab82c26)) by [@vdusek](https://github.com/vdusek), closes [#92](https://github.com/apify/crawlee-python/issues/92), [#147](https://github.com/apify/crawlee-python/issues/147), [#783](https://github.com/apify/crawlee-python/issues/783), [#1247](https://github.com/apify/crawlee-python/issues/1247)
+- [**breaking**] Split `BrowserType` literal into two different literals based on context ([#1070](https://github.com/apify/crawlee-python/pull/1070)) ([72b5698](https://github.com/apify/crawlee-python/commit/72b5698fa0647ea02b08da5651736cc37c4c0f6a)) by [@Pijukatel](https://github.com/Pijukatel)
 
 
 <!-- git-cliff-unreleased-end -->
