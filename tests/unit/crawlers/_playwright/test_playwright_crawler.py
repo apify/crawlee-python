@@ -30,6 +30,7 @@ from crawlee.fingerprint_suite import (
 )
 from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_values
 from crawlee.fingerprint_suite._consts import BROWSER_TYPE_HEADER_KEYWORD
+from crawlee.fingerprint_suite._header_generator import fingerprint_browser_type_from_playwright_browser_type
 from crawlee.http_clients import HttpxHttpClient
 from crawlee.proxy_configuration import ProxyConfiguration
 from crawlee.sessions import Session, SessionPool
@@ -215,7 +216,10 @@ async def test_chromium_headless_headers(
 
     user_agent = headers.get('user-agent')
     assert user_agent in get_available_header_values(header_network, {'user-agent', 'User-Agent'}), user_agent
-    assert any(keyword in user_agent for keyword in BROWSER_TYPE_HEADER_KEYWORD['chrome']), user_agent
+    assert any(
+        keyword in user_agent
+        for keyword in BROWSER_TYPE_HEADER_KEYWORD[fingerprint_browser_type_from_playwright_browser_type(browser_type)]
+    ), user_agent
 
     assert headers.get('sec-ch-ua') in get_available_header_values(header_network, 'sec-ch-ua')
     assert headers.get('sec-ch-ua-mobile') in get_available_header_values(header_network, 'sec-ch-ua-mobile')
@@ -249,7 +253,10 @@ async def test_firefox_headless_headers(header_network: dict, server_url: URL) -
 
     user_agent = headers.get('user-agent')
     assert user_agent in get_available_header_values(header_network, {'user-agent', 'User-Agent'})
-    assert any(keyword in user_agent for keyword in BROWSER_TYPE_HEADER_KEYWORD[browser_type])
+    assert any(
+        keyword in user_agent
+        for keyword in BROWSER_TYPE_HEADER_KEYWORD[fingerprint_browser_type_from_playwright_browser_type(browser_type)]
+    )
 
 
 async def test_custom_headers(server_url: URL) -> None:

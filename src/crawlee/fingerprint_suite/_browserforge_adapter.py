@@ -136,7 +136,8 @@ class PatchedHeaderGenerator(bf_HeaderGenerator):
         """
         # In our case we never pass more than one browser type. In general case more browsers are just bigger pool to
         # select from, so narrowing it to any of them is still a valid action as we are going to pick just one anyway.
-
+        if isinstance(browser, str):
+            return browser
         if isinstance(browser, Iterable):
             choice = random.choice(
                 [

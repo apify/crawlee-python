@@ -1,8 +1,15 @@
+from collections.abc import Iterable
+
+import pytest
+from browserforge.headers import Browser
+
 from crawlee.fingerprint_suite import (
     DefaultFingerprintGenerator,
     HeaderGeneratorOptions,
     ScreenOptions,
 )
+from crawlee.fingerprint_suite._browserforge_adapter import PatchedHeaderGenerator
+from crawlee.fingerprint_suite._consts import BROWSER_TYPE_HEADER_KEYWORD
 
 
 def test_fingerprint_generator_has_default() -> None:
@@ -64,3 +71,17 @@ def test_fingerprint_generator_all_options() -> None:
     assert 'Firefox' in fingerprint.navigator.userAgent
     assert 'Win' in fingerprint.navigator.oscpu
     assert 'en-US' in fingerprint.navigator.languages
+
+
+@pytest.mark.parametrize(
+    'browser',
+    [
+        'firefox',
+        ['firefox'],
+        [Browser(name='firefox')],
+    ],
+)
+def test_patched_header_generator_generate(browser: Iterable[str | Browser]) -> None:
+    """Test that PatchedHeaderGenerator works with all the possible types correctly."""
+    header = PatchedHeaderGenerator().generate(browser=browser)
+    assert any(keyword in header['User-Agent'] for keyword in BROWSER_TYPE_HEADER_KEYWORD['firefox'])
