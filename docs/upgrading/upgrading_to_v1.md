@@ -5,6 +5,33 @@ title: Upgrading to v1
 
 This page summarizes the breaking changes between Crawlee for Python v0.6 and v1.0.
 
+## Distinct use of word `browser` in similar contexts
+
+Two different contexts:
+- Playwright related browser
+- fingerprinting related browser
+
+Type of `HeaderGeneratorOptions.browsers` changed from `Literal['chromium', 'firefox', 'webkit', 'edge']` to `Literal['chrome', 'firefox', 'safari', 'edge']` as it is related to the fingerprinting context and not to the Playwright context.
+
+Before:
+
+```python
+from crawlee.fingerprint_suite import HeaderGeneratorOptions
+
+HeaderGeneratorOptions(browsers=['chromium'])
+HeaderGeneratorOptions(browsers=['webkit'])
+```
+
+Now:
+
+```python
+from crawlee.fingerprint_suite import HeaderGeneratorOptions
+
+HeaderGeneratorOptions(browsers=['chrome'])
+HeaderGeneratorOptions(browsers=['safari'])
+```
+
+
 ## Storage clients
 
 In v1.0, we are introducing a new storage clients system. We have completely reworked their interface,
