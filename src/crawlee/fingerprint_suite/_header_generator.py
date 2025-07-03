@@ -19,7 +19,7 @@ def fingerprint_browser_type_from_playwright_browser_type(
         return 'firefox'
     if playwright_browser_type == 'webkit':
         return 'safari'
-    raise ValueError('Unsupported browser type')
+    raise ValueError(f'Unsupported browser type: {playwright_browser_type}')
 
 
 @docs_group('Classes')
