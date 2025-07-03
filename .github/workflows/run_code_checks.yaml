@@ -17,20 +17,22 @@ on:
   workflow_dispatch:
 
 env:
-  PYTHON_VERSIONS: '["3.10", "3.11", "3.12", "3.13"]'
+  # Use YAML anchors to specify the workflow's Python versions, since env variables
+  # aren't available inside a "uses" job's "with".
+  PYTHON_VERSIONS: &python_versions '["3.10", "3.11", "3.12", "3.13"]'
 
 jobs:
   lint_check:
     name: Lint check
     uses: apify/workflows/.github/workflows/python_lint_check.yaml@main
     with:
-      python-version: ${{ env.PYTHON_VERSIONS }}
+      python-version: *python_versions
 
   type_check:
     name: Type check
     uses: apify/workflows/.github/workflows/python_type_check.yaml@main
     with:
-      python-version: ${{ env.PYTHON_VERSIONS }}
+      python-version: *python_versions
 
   unit_tests:
     name: Unit tests
@@ -38,7 +40,7 @@ jobs:
     secrets:
       httpbin_url: ${{ secrets.APIFY_HTTPBIN_TOKEN && format('https://httpbin.apify.actor?token={0}', secrets.APIFY_HTTPBIN_TOKEN) || 'https://httpbin.org'}}
     with:
-      python-version: ${{ env.PYTHON_VERSIONS }}
+      python-version: *python_versions
 
   docs_check:
     name: Docs check
