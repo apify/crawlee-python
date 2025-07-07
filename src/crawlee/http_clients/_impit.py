@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from http.cookiejar import CookieJar
 from logging import getLogger
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from cachetools import LRUCache
 from impit import AsyncClient, Browser, HTTPError, Response, TransportError
@@ -19,6 +18,7 @@ from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, AsyncIterator
     from datetime import timedelta
+    from http.cookiejar import CookieJar
 
     from crawlee import Request
     from crawlee._types import HttpMethod, HttpPayload
@@ -27,6 +27,13 @@ if TYPE_CHECKING:
     from crawlee.statistics import Statistics
 
 logger = getLogger(__name__)
+
+
+class _ClientCacheEntry(TypedDict):
+    """Type definition for client cache entries."""
+
+    client: AsyncClient
+    cookie_jar: CookieJar | None
 
 
 class _ImpitResponse:
@@ -108,7 +115,7 @@ class ImpitHttpClient(HttpClient):
 
         self._async_client_kwargs = async_client_kwargs
 
-        self._client_by_proxy_url = LRUCache[str | None, dict[str, AsyncClient | CookieJar | None]](maxsize=10)
+        self._client_by_proxy_url = LRUCache[str | None, _ClientCacheEntry](maxsize=10)
 
     @override
     async def crawl(
@@ -128,7 +135,7 @@ class ImpitHttpClient(HttpClient):
                 content=request.payload,
                 headers=dict(request.headers) if request.headers else None,
             )
-        except (TransportError, HTTPError) as exc:
+        except (TransportError, HTTPError) as exc:  # type: ignore[misc] # waiting for merge https://github.com/apify/impit/pull/207
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
             raise
@@ -160,7 +167,7 @@ class ImpitHttpClient(HttpClient):
             response = await client.request(
                 method=method, url=url, content=payload, headers=dict(headers) if headers else None
             )
-        except (TransportError, HTTPError) as exc:
+        except (TransportError, HTTPError) as exc:  # type: ignore[misc] # waiting for merge https://github.com/apify/impit/pull/207
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
             raise
@@ -187,7 +194,7 @@ class ImpitHttpClient(HttpClient):
             url=url,
             content=payload,
             headers=dict(headers) if headers else None,
-            stream=True,
+            stream=True,  # type: ignore[call-arg] # waiting for merge https://github.com/apify/impit/pull/207
         )
         try:
             yield _ImpitResponse(response)
@@ -199,8 +206,8 @@ class ImpitHttpClient(HttpClient):
 
         If a client for the specified proxy URL does not exist, create and store a new one.
         """
-        if proxy_url in self._client_by_proxy_url:
-            cached_data = self._client_by_proxy_url.get(proxy_url)
+        cached_data = self._client_by_proxy_url.get(proxy_url)
+        if cached_data:
             client = cached_data['client']
             client_cookie_jar = cached_data['cookie_jar']
             if client_cookie_jar is cookie_jar:
@@ -221,7 +228,7 @@ class ImpitHttpClient(HttpClient):
 
         client = AsyncClient(**kwargs, cookie_jar=cookie_jar)
 
-        self._client_by_proxy_url[proxy_url] = {'client': client, 'cookie_jar': cookie_jar}
+        self._client_by_proxy_url[proxy_url] = _ClientCacheEntry(client=client, cookie_jar=cookie_jar)
 
         return client
 
