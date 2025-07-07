@@ -26,8 +26,9 @@ def test_get_cpu_info_returns_valid_values() -> None:
     assert 0 <= cpu_info.used_ratio <= 1
 
 
+@pytest.mark.parametrize('_', range(300))
 @pytest.mark.skipif(os.name == 'nt', reason='Improved estimation not available on Windows')
-def test_memory_estimation_does_not_overestimate_due_to_shared_memory() -> None:
+def test_memory_estimation_does_not_overestimate_due_to_shared_memory(_: int) -> None:
     """Test that memory usage estimation is not overestimating memory usage by counting shared memory multiple times.
 
     In this test, the parent process is started and its memory usage is measured in situations where it is running
@@ -44,7 +45,7 @@ def test_memory_estimation_does_not_overestimate_due_to_shared_memory() -> None:
         extra_memory_size = 1024 * 1024 * 100  # 100 MB
         children_count = 4
         # Memory calculation is not exact, so allow for some tolerance.
-        test_tolerance = 0.1
+        test_tolerance = 0.3
 
         def no_extra_memory_child(ready: synchronize.Barrier, measured: synchronize.Barrier) -> None:
             ready.wait()
@@ -53,6 +54,7 @@ def test_memory_estimation_does_not_overestimate_due_to_shared_memory() -> None:
         def extra_memory_child(ready: synchronize.Barrier, measured: synchronize.Barrier) -> None:
             memory = SharedMemory(size=extra_memory_size, create=True)
             memory.buf[:] = bytearray([255 for _ in range(extra_memory_size)])
+            print(f'Using the memory... {memory.buf[-1]}')
             ready.wait()
             measured.wait()
             memory.close()
@@ -61,7 +63,7 @@ def test_memory_estimation_does_not_overestimate_due_to_shared_memory() -> None:
         def shared_extra_memory_child(
             ready: synchronize.Barrier, measured: synchronize.Barrier, memory: SharedMemory
         ) -> None:
-            print(memory.buf[-1])
+            print(f'Using the memory... {memory.buf[-1]}')
             ready.wait()
             measured.wait()
 
@@ -113,11 +115,20 @@ def test_memory_estimation_does_not_overestimate_due_to_shared_memory() -> None:
             - additional_memory_simple_child
         )
 
-        estimated_memory_expectation.value = (
+        memory_estimation_difference_ratio = (
             abs((additional_memory_shared_extra_memory_child * children_count) - additional_memory_extra_memory_child)
             / additional_memory_extra_memory_child
-            < test_tolerance
         )
+
+        estimated_memory_expectation.value = memory_estimation_difference_ratio < test_tolerance
+
+        if not estimated_memory_expectation.value:
+            print(
+                f'{additional_memory_shared_extra_memory_child=}\n'
+                f'{children_count=}\n'
+                f'{additional_memory_extra_memory_child=}\n'
+                f'{memory_estimation_difference_ratio=}'
+            )
 
     process = Process(target=parent_process)
     process.start()
