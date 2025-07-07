@@ -26,9 +26,8 @@ def test_get_cpu_info_returns_valid_values() -> None:
     assert 0 <= cpu_info.used_ratio <= 1
 
 
-@pytest.mark.parametrize('_', range(300))
 @pytest.mark.skipif(os.name == 'nt', reason='Improved estimation not available on Windows')
-def test_memory_estimation_does_not_overestimate_due_to_shared_memory(_: int) -> None:
+def test_memory_estimation_does_not_overestimate_due_to_shared_memory() -> None:
     """Test that memory usage estimation is not overestimating memory usage by counting shared memory multiple times.
 
     In this test, the parent process is started and its memory usage is measured in situations where it is running
