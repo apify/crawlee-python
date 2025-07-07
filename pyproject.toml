@@ -88,12 +88,12 @@ parsel = ["parsel>=1.10.0"]
 playwright = ["playwright>=1.27.0"]
 otel = [
     "opentelemetry-api>=1.34.1",
-    "opentelemetry-distro[otlp]",
-    "opentelemetry-instrumentation",
-    "opentelemetry-instrumentation-httpx",
+    "opentelemetry-distro[otlp]>=0.54",
+    "opentelemetry-instrumentation>=0.54",
+    "opentelemetry-instrumentation-httpx>=0.54",
     "opentelemetry-sdk>=1.34.1",
-    "opentelemetry-semantic-conventions",
-    "wrapt",
+    "opentelemetry-semantic-conventions>=0.54",
+    "wrapt>=1.17.0",
 ]
 
 [project.scripts]

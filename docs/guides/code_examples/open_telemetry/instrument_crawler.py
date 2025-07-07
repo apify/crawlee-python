@@ -6,8 +6,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.trace import set_tracer_provider
 
-from crawlee._types import BasicCrawlingContext
-from crawlee.crawlers import ParselCrawler, ParselCrawlingContext
+from crawlee.crawlers import BasicCrawlingContext, ParselCrawler, ParselCrawlingContext
 from crawlee.otel import CrawlerInstrumentor
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
