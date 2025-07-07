@@ -4,7 +4,7 @@ import asyncio
 import logging
 import warnings
 from functools import partial
-from typing import TYPE_CHECKING, Any, Callable, Generic, Literal
+from typing import TYPE_CHECKING, Any, Generic, Literal
 
 from more_itertools import partition
 from pydantic import ValidationError
@@ -20,6 +20,7 @@ from crawlee.browsers import BrowserPool
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
 from crawlee.fingerprint_suite import DefaultFingerprintGenerator, FingerprintGenerator, HeaderGeneratorOptions
+from crawlee.fingerprint_suite._header_generator import fingerprint_browser_type_from_playwright_browser_type
 from crawlee.http_clients import HttpxHttpClient
 from crawlee.sessions._cookies import PlaywrightCookieParam
 from crawlee.statistics import StatisticsState
@@ -33,7 +34,7 @@ TCrawlingContext = TypeVar('TCrawlingContext', bound=PlaywrightCrawlingContext)
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Awaitable, Iterator, Mapping
+    from collections.abc import AsyncGenerator, Awaitable, Callable, Iterator, Mapping
     from pathlib import Path
 
     from playwright.async_api import Page, Route
@@ -158,7 +159,11 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         # If browser_pool is not provided, create a new instance of BrowserPool with specified arguments.
         else:
             if fingerprint_generator == 'default':
-                generator_browser_type = None if browser_type is None else [browser_type]
+                if not browser_type:
+                    generator_browser_type = None
+                else:
+                    generator_browser_type = [fingerprint_browser_type_from_playwright_browser_type(browser_type)]
+
                 fingerprint_generator = DefaultFingerprintGenerator(
                     header_options=HeaderGeneratorOptions(browsers=generator_browser_type)
                 )

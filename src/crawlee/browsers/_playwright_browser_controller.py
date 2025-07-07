@@ -12,6 +12,7 @@ from typing_extensions import override
 from crawlee._utils.docs import docs_group
 from crawlee.browsers._browser_controller import BrowserController
 from crawlee.fingerprint_suite import HeaderGenerator
+from crawlee.fingerprint_suite._header_generator import fingerprint_browser_type_from_playwright_browser_type
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -74,10 +75,17 @@ class PlaywrightBrowserController(BrowserController):
         self._pages = list[Page]()
         self._last_page_opened_at = datetime.now(timezone.utc)
 
+        self._total_opened_pages = 0
+
     @property
     @override
     def pages(self) -> list[Page]:
         return self._pages
+
+    @property
+    @override
+    def total_opened_pages(self) -> int:
+        return self._total_opened_pages
 
     @property
     @override
@@ -160,6 +168,8 @@ class PlaywrightBrowserController(BrowserController):
         self._pages.append(page)
         self._last_page_opened_at = datetime.now(timezone.utc)
 
+        self._total_opened_pages += 1
+
         return page
 
     @override
@@ -225,7 +235,7 @@ class PlaywrightBrowserController(BrowserController):
                         'sec-ch-ua-mobile',
                         'sec-ch-ua-platform',
                     },
-                    browser_type=self.browser_type,
+                    browser_type=fingerprint_browser_type_from_playwright_browser_type(self.browser_type),
                 )
             )
         else:

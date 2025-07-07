@@ -4,18 +4,18 @@ build-backend = "hatchling.build"
 
 [project]
 name = "crawlee"
-version = "0.6.11"
+version = "0.6.12"
 description = "Crawlee for Python"
 authors = [{ name = "Apify Technologies s.r.o.", email = "support@apify.com" }]
 license = { file = "LICENSE" }
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -37,7 +37,6 @@ dependencies = [
     "browserforge>=1.2.3",
     "cachetools>=5.5.0",
     "colorama>=0.4.0",
-    "eval-type-backport>=0.2.0",
     "httpx[brotli,http2,zstd]>=0.27.0",
     "more-itertools>=10.2.0",
     "protego>=0.4.0",
@@ -65,15 +64,13 @@ all = [
     "jaro-winkler>=2.0.3",
     "parsel>=1.10.0",
     "playwright>=1.27.0",
-    "scikit-learn==1.5.2; python_version == '3.9'",
-    "scikit-learn>=1.6.0; python_version >= '3.10'",
-    'typer>=0.12.0',
+    "scikit-learn>=1.6.0",
+    "typer>=0.12.0",
 ]
 adaptive-crawler = [
     "jaro-winkler>=2.0.3",
     "playwright>=1.27.0",
-    "scikit-learn==1.5.2; python_version == '3.9'",
-    "scikit-learn>=1.6.0; python_version >= '3.10'",
+    "scikit-learn>=1.6.0",
 ]
 beautifulsoup = ["beautifulsoup4[lxml]>=4.12.0", "html5lib>=1.0"]
 cli = ["cookiecutter>=2.6.0", "inquirer>=3.3.0", "rich>=13.9.0", "typer>=0.12.0"]
@@ -86,12 +83,14 @@ playwright = ["playwright>=1.27.0"]
 crawlee = "crawlee._cli:cli"
 
 [project.urls]
-"Homepage" = "https://crawlee.dev/python"
-"Apify homepage" = "https://apify.com"
+"Apify Homepage" = "https://apify.com"
 "Changelog" = "https://crawlee.dev/python/docs/changelog"
-"Documentation" = "https://crawlee.dev/python/docs/"
-"Issue tracker" = "https://github.com/apify/crawlee-python/issues"
-"Repository" = "https://github.com/apify/crawlee-python"
+"Discord" = "https://discord.com/invite/jyEM2PRvMU"
+"Documentation" = "https://crawlee.dev/python/docs/quick-start"
+"Homepage" = "https://crawlee.dev/python"
+"Issue Tracker" = "https://github.com/apify/crawlee-python/issues"
+"Release Notes" = "https://crawlee.dev/python/docs/upgrading"
+"Source Code" = "https://github.com/apify/crawlee-python"
 
 [dependency-groups]
 dev = [
@@ -105,9 +104,9 @@ dev = [
     "pytest-asyncio~=1.0.0",
     "pytest-cov~=6.2.0",
     "pytest-timeout~=2.4.0",
-    "pytest-xdist~=3.7.0",
+    "pytest-xdist~=3.8.0",
     "pytest~=8.4.0",
-    "ruff~=0.11.0",
+    "ruff~=0.12.0",
     "setuptools", # setuptools are used by pytest, but not explicitly required
     "sortedcontainers-stubs~=2.4.0",
     "types-beautifulsoup4~=4.12.0.20240229",
@@ -115,7 +114,7 @@ dev = [
     "types-colorama~=0.4.15.20240106",
     "types-psutil~=7.0.0.20250218",
     "types-python-dateutil~=2.9.0.20240316",
-    "uvicorn[standard]~=0.34.0",
+    "uvicorn[standard]~=0.35.0",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -145,9 +144,9 @@ ignore = [
     "ISC001",   # This rule may cause conflicts when used with the formatter
     "FIX",      # flake8-fixme
     "PLR0911",  # Too many return statements
+    "PLR0912",  # Too many branches
     "PLR0913",  # Too many arguments in function definition
     "PLR0915",  # Too many statements
-    "PTH",      # flake8-use-pathlib
     "PYI034",   # `__aenter__` methods in classes like `{name}` usually return `self` at runtime
     "PYI036",   # The second argument in `__aexit__` should be annotated with `object` or `BaseException | None`
     "S102",     # Use of `exec` detected
@@ -169,6 +168,7 @@ indent-style = "space"
     "F401", # Unused imports
 ]
 "**/{tests}/*" = [
+    "ASYNC230", # Async functions should not open files with blocking methods like `open`
     "D",       # Everything from the pydocstyle
     "INP001",  # File {filename} is part of an implicit namespace package, add an __init__.py
     "PLR2004", # Magic value used in comparison, consider replacing {value} with a constant variable
@@ -189,6 +189,9 @@ indent-style = "space"
 "**/docs/guides/code_examples/running_in_web_server/server.py" = [
     "TC002", # ruff false positive. Import actually needed during runtime.
 ]
+"**/docs/guides/code_examples/creating_web_archive/*.*" = [
+    "ASYNC230", # Ignore for simplicity of the example.
+]
 
 [tool.ruff.lint.flake8-quotes]
 docstring-quotes = "double"
@@ -206,9 +209,6 @@ builtins-ignorelist = ["id"]
 [tool.ruff.lint.isort]
 known-first-party = ["crawlee"]
 
-[tool.ruff.lint.pylint]
-max-branches = 18
-
 [tool.pytest.ini_options]
 addopts = "-ra"
 asyncio_default_fixture_loop_scope = "function"
@@ -219,9 +219,12 @@ markers = [
 ]
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 plugins = ["pydantic.mypy"]
-exclude = ["src/crawlee/project_template"]
+exclude = [
+    "src/crawlee/project_template",
+    "docs/guides/code_examples/storage_clients/custom_storage_client_example.py",
+]
 files = ["src", "tests", "docs", "website"]
 check_untyped_defs = true
 disallow_incomplete_defs = true
@@ -252,17 +255,18 @@ module = [
     "sortedcollections",            # Untyped and stubs not available
     "cookiecutter.*",               # Untyped and stubs not available
     "inquirer.*",                   # Untyped and stubs not available
+    "warcio.*",                     # Example code shows WARC files creation.
 ]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = [
-    "running_in_web_server.*"  # False positive when fastapi not available
+    "running_in_web_server.*", # False positive when fastapi not available
 ]
 disable_error_code = ["misc"]
 
 [tool.basedpyright]
-pythonVersion = "3.9"
+pythonVersion = "3.10"
 typeCheckingMode = "standard"
 include = ["src", "tests", "docs", "website"]
 

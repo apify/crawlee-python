@@ -4,7 +4,7 @@ Here you'll find a contributing guide to get started with development.
 
 ## Environment
 
-For local development, it is required to have Python 3.9 (or a later version) installed.
+For local development, it is required to have Python 3.10 (or a later version) installed.
 
 We use [uv](https://docs.astral.sh/uv/) for project management. Install it and set up your IDE accordingly.
 

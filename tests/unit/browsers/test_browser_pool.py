@@ -160,3 +160,29 @@ async def test_with_plugin_contains_page_options(server_url: URL) -> None:
         await test_page.page.goto(str(server_url / 'user-agent'))
         assert 'My Best User-Agent' in await test_page.page.content()
         await test_page.page.close()
+
+
+@pytest.mark.parametrize(
+    ('retire_after_page_count', 'expect_equal_browsers'),
+    [
+        pytest.param(2, True, id='Two pages opened in the same browser'),
+        pytest.param(1, False, id='Each page opened in a new browser.'),
+    ],
+)
+async def test_browser_pool_retire_browser_after_page_count(
+    retire_after_page_count: int, *, expect_equal_browsers: bool
+) -> None:
+    async with BrowserPool(retire_browser_after_page_count=retire_after_page_count) as browser_pool:
+        test_page = await browser_pool.new_page()
+        first_browser = test_page.page.context
+        await test_page.page.close()
+
+        test_page = await browser_pool.new_page()
+        second_browser = test_page.page.context
+
+        await test_page.page.close()
+
+        if expect_equal_browsers:
+            assert first_browser is second_browser
+        else:
+            assert first_browser is not second_browser

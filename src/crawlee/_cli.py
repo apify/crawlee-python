@@ -1,11 +1,11 @@
-# ruff: noqa: TRY301, FBT002, UP007
+# ruff: noqa: FBT002
 from __future__ import annotations
 
 import importlib.resources
 import json
 import sys
 from pathlib import Path
-from typing import Annotated, Optional, cast
+from typing import Annotated, cast
 
 try:
     import inquirer
@@ -22,7 +22,7 @@ except ModuleNotFoundError as exc:
 cli = typer.Typer(no_args_is_help=True)
 
 template_directory = importlib.resources.files('crawlee') / 'project_template'
-with open(str(template_directory / 'cookiecutter.json')) as f:
+with (template_directory / 'cookiecutter.json').open() as f:
     cookiecutter_json = json.load(f)
 
 crawler_choices = cookiecutter_json['crawler_type']
@@ -44,7 +44,7 @@ def callback(
 ) -> None:
     """Crawlee is a web scraping and browser automation library."""
     if version:
-        from crawlee import __version__
+        from crawlee import __version__  # noqa: PLC0415
 
         typer.echo(__version__)
 
@@ -120,36 +120,37 @@ def _prompt_bool(message: str, *, default: bool) -> bool:
 
 @cli.command()
 def create(
-    project_name: Optional[str] = typer.Argument(
+    project_name: str | None = typer.Argument(
         default=None,
         show_default=False,
         help='The name of the project and the directory that will be created to contain it. '
         'If none is given, you will be prompted.',
     ),
-    crawler_type: Optional[str] = typer.Option(
+    crawler_type: str | None = typer.Option(
         None,
         '--crawler-type',
         '--template',
         show_default=False,
         help='The library that will be used for crawling in your crawler. If none is given, you will be prompted.',
     ),
-    http_client: Optional[str] = typer.Option(
+    http_client: str | None = typer.Option(
         None,
         show_default=False,
         help='The library that will be used to make HTTP requests in your crawler. '
         'If none is given, you will be prompted.',
     ),
-    package_manager: Optional[str] = typer.Option(
+    package_manager: str | None = typer.Option(
         default=None,
         show_default=False,
         help='Package manager to be used in the new project. If none is given, you will be prompted.',
     ),
-    start_url: Optional[str] = typer.Option(
+    start_url: str | None = typer.Option(
         default=None,
         show_default=False,
         help='The URL where crawling should start. If none is given, you will be prompted.',
     ),
-    enable_apify_integration: Optional[bool] = typer.Option(
+    *,
+    enable_apify_integration: bool | None = typer.Option(
         None,
         '--apify/--no-apify',
         show_default=False,

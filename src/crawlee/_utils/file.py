@@ -1,101 +1,88 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
-import io
+import csv
 import json
-import mimetypes
 import os
-import re
-import shutil
-from enum import Enum
-from typing import TYPE_CHECKING
+import sys
+import tempfile
+from pathlib import Path
+from typing import TYPE_CHECKING, overload
 
 if TYPE_CHECKING:
-    from pathlib import Path
-    from typing import Any
+    from collections.abc import AsyncIterator
+    from typing import Any, TextIO
+
+    from typing_extensions import Unpack
+
+    from crawlee._types import ExportDataCsvKwargs, ExportDataJsonKwargs
+
+if sys.platform == 'win32':
+
+    def _write_file(path: Path, data: str | bytes) -> None:
+        """Windows-specific file write implementation.
+
+        This implementation writes directly to the file without using a temporary file, because
+        they are problematic due to permissions issues on Windows.
+        """
+        if isinstance(data, bytes):
+            path.write_bytes(data)
+        elif isinstance(data, str):
+            path.write_text(data, encoding='utf-8')
+        else:
+            raise TypeError(f'Unsupported data type: {type(data)}. Expected str or bytes.')
+else:
+
+    def _write_file(path: Path, data: str | bytes) -> None:
+        """Linux/Unix-specific file write implementation using temporary files."""
+        dir_path = path.parent
+        fd, tmp_path = tempfile.mkstemp(
+            suffix=f'{path.suffix}.tmp',
+            prefix=f'{path.name}.',
+            dir=str(dir_path),
+        )
+
+        if not isinstance(data, (str, bytes)):
+            raise TypeError(f'Unsupported data type: {type(data)}. Expected str or bytes.')
+
+        try:
+            if isinstance(data, bytes):
+                with os.fdopen(fd, 'wb') as tmp_file:
+                    tmp_file.write(data)
+            else:
+                with os.fdopen(fd, 'w', encoding='utf-8') as tmp_file:
+                    tmp_file.write(data)
+
+            # Atomically replace the destination file with the temporary file
+            Path(tmp_path).replace(path)
+        except Exception:
+            Path(tmp_path).unlink(missing_ok=True)
+            raise
 
 
-class ContentType(Enum):
-    JSON = r'^application/json'
-    TEXT = r'^text/'
-    XML = r'^application/.*xml$'
-
-    def matches(self, content_type: str) -> bool:
-        """Check if the content type matches the enum's pattern."""
-        return bool(re.search(self.value, content_type, re.IGNORECASE))
-
-
-def is_content_type(content_type_enum: ContentType, content_type: str) -> bool:
-    """Check if the provided content type string matches the specified ContentType."""
-    return content_type_enum.matches(content_type)
-
-
-async def force_remove(filename: str | Path) -> None:
-    """Remove a file, suppressing the FileNotFoundError if it does not exist.
-
-    JS-like rm(filename, { force: true }).
+def infer_mime_type(value: Any) -> str:
+    """Infer the MIME content type from the value.
 
     Args:
-        filename: The path to the file to be removed.
-    """
-    with contextlib.suppress(FileNotFoundError):
-        await asyncio.to_thread(os.remove, filename)
-
-
-async def force_rename(src_dir: str | Path, dst_dir: str | Path) -> None:
-    """Rename a directory, ensuring that the destination directory is removed if it exists.
-
-    Args:
-        src_dir: The source directory path.
-        dst_dir: The destination directory path.
-    """
-    # Make sure source directory exists
-    if await asyncio.to_thread(os.path.exists, src_dir):
-        # Remove destination directory if it exists
-        if await asyncio.to_thread(os.path.exists, dst_dir):
-            await asyncio.to_thread(shutil.rmtree, dst_dir, ignore_errors=True)
-        await asyncio.to_thread(os.rename, src_dir, dst_dir)
-
-
-def determine_file_extension(content_type: str) -> str | None:
-    """Determine the file extension for a given MIME content type.
-
-    Args:
-        content_type: The MIME content type string.
+        value: The value to infer the content type from.
 
     Returns:
-        A string representing the determined file extension without a leading dot,
-            or None if no extension could be determined.
+        The inferred MIME content type.
     """
-    # e.g. mimetypes.guess_extension('application/json ') does not work...
-    actual_content_type = content_type.split(';')[0].strip()
+    # If the value is bytes (or bytearray), return binary content type.
+    if isinstance(value, (bytes, bytearray)):
+        return 'application/octet-stream'
 
-    # mimetypes.guess_extension returns 'xsl' in this case, because 'application/xxx' is "structured"
-    # ('text/xml' would be "unstructured" and return 'xml') we have to explicitly override it here
-    if actual_content_type == 'application/xml':
-        return 'xml'
+    # If the value is a dict or list, assume JSON.
+    if isinstance(value, (dict, list)):
+        return 'application/json; charset=utf-8'
 
-    # Determine the extension from the mime type
-    ext = mimetypes.guess_extension(actual_content_type)
+    # If the value is a string, number or boolean, assume plain text.
+    if isinstance(value, (str, int, float, bool)):
+        return 'text/plain; charset=utf-8'
 
-    # Remove the leading dot if extension successfully parsed
-    return ext[1:] if ext is not None else ext
-
-
-def is_file_or_bytes(value: Any) -> bool:
-    """Determine if the input value is a file-like object or bytes.
-
-    This function checks whether the provided value is an instance of bytes, bytearray, or io.IOBase (file-like).
-    The method is simplified for common use cases and may not cover all edge cases.
-
-    Args:
-        value: The value to be checked.
-
-    Returns:
-        True if the value is either a file-like object or bytes, False otherwise.
-    """
-    return isinstance(value, (bytes, bytearray, io.IOBase))
+    # Default fallback.
+    return 'application/octet-stream'
 
 
 async def json_dumps(obj: Any) -> str:
@@ -108,3 +95,84 @@ async def json_dumps(obj: Any) -> str:
         A string containing the JSON representation of the input object.
     """
     return await asyncio.to_thread(json.dumps, obj, ensure_ascii=False, indent=2, default=str)
+
+
+@overload
+async def atomic_write(
+    path: Path,
+    data: str,
+    *,
+    retry_count: int = 0,
+) -> None: ...
+
+
+@overload
+async def atomic_write(
+    path: Path,
+    data: bytes,
+    *,
+    retry_count: int = 0,
+) -> None: ...
+
+
+async def atomic_write(
+    path: Path,
+    data: str | bytes,
+    *,
+    retry_count: int = 0,
+) -> None:
+    """Write data to a file atomically to prevent data corruption or partial writes.
+
+    This function handles both text and binary data. The binary mode is automatically
+    detected based on the data type (bytes = binary, str = text). It ensures atomic
+    writing by creating a temporary file and then atomically replacing the target file,
+    which prevents data corruption if the process is interrupted during the write operation.
+
+    Args:
+        path: The path to the destination file.
+        data: The data to write to the file (string or bytes).
+        retry_count: Internal parameter to track the number of retry attempts (default: 0).
+    """
+    max_retries = 3
+
+    try:
+        # Use the platform-specific write function resolved at import time.
+        await asyncio.to_thread(_write_file, path, data)
+    except (FileNotFoundError, PermissionError):
+        if retry_count < max_retries:
+            return await atomic_write(
+                path,
+                data,
+                retry_count=retry_count + 1,
+            )
+        # If we reach the maximum number of retries, raise the exception.
+        raise
+
+
+async def export_json_to_stream(
+    iterator: AsyncIterator[dict[str, Any]],
+    dst: TextIO,
+    **kwargs: Unpack[ExportDataJsonKwargs],
+) -> None:
+    items = [item async for item in iterator]
+    json.dump(items, dst, **kwargs)
+
+
+async def export_csv_to_stream(
+    iterator: AsyncIterator[dict[str, Any]],
+    dst: TextIO,
+    **kwargs: Unpack[ExportDataCsvKwargs],
+) -> None:
+    writer = csv.writer(dst, **kwargs)
+    write_header = True
+
+    # Iterate over the dataset and write to CSV.
+    async for item in iterator:
+        if not item:
+            continue
+
+        if write_header:
+            writer.writerow(item.keys())
+            write_header = False
+
+        writer.writerow(item.values())

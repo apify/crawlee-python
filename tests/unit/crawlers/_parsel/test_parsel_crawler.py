@@ -195,7 +195,7 @@ def test_import_error_handled() -> None:
         sys.modules.pop('crawlee.crawlers', None)
         sys.modules.pop('crawlee.crawlers._parsel', None)
         with pytest.raises(ImportError) as import_error:
-            from crawlee.crawlers import ParselCrawler  # noqa: F401
+            from crawlee.crawlers import ParselCrawler  # noqa: F401 PLC0415
 
     # Check if the raised ImportError contains the expected message
     assert str(import_error.value) == (

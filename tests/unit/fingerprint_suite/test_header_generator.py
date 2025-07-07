@@ -32,7 +32,7 @@ def test_get_random_user_agent_header() -> None:
     assert headers['User-Agent']
 
 
-@pytest.mark.parametrize('browser_type', ['chromium', 'firefox', 'edge', 'webkit'])
+@pytest.mark.parametrize('browser_type', ['chrome', 'firefox', 'edge', 'safari'])
 def test_get_user_agent_header_stress_test(browser_type: SupportedBrowserType, header_network: dict) -> None:
     """Test that the User-Agent header is consistently generated correctly.
 
@@ -55,9 +55,9 @@ def test_get_user_agent_header_invalid_browser_type() -> None:
 
 
 def test_get_sec_ch_ua_headers_chromium(header_network: dict) -> None:
-    """Test that Sec-Ch-Ua headers are generated correctly for Chromium."""
+    """Test that Sec-Ch-Ua headers are generated correctly for Chrome."""
     header_generator = HeaderGenerator()
-    headers = header_generator.get_sec_ch_ua_headers(browser_type='chromium')
+    headers = header_generator.get_sec_ch_ua_headers(browser_type='chrome')
 
     assert headers.get('sec-ch-ua') in get_available_header_values(header_network, 'sec-ch-ua')
     assert headers.get('sec-ch-ua-mobile') in get_available_header_values(header_network, 'sec-ch-ua-mobile')

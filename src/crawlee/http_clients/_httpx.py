@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, Optional, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import httpx
 from typing_extensions import override
@@ -136,7 +136,7 @@ class HttpxHttpClient(HttpClient):
 
         self._transport: _HttpxTransport | None = None
 
-        self._client_by_proxy_url = dict[Optional[str], httpx.AsyncClient]()
+        self._client_by_proxy_url = dict[str | None, httpx.AsyncClient]()
 
     @override
     async def crawl(
