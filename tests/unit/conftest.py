@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import TYPE_CHECKING, Callable, Optional, cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 from curl_cffi import CurlHttpVersion
@@ -13,16 +13,14 @@ from proxy import Proxy
 from uvicorn.config import Config
 
 from crawlee import service_locator
-from crawlee.configuration import Configuration
 from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_network
 from crawlee.http_clients import CurlImpersonateHttpClient, HttpxHttpClient
 from crawlee.proxy_configuration import ProxyInfo
-from crawlee.storage_clients import MemoryStorageClient
-from crawlee.storages import KeyValueStore, _creation_management
+from crawlee.storages import KeyValueStore
 from tests.unit.server import TestServer, app, serve_in_thread
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Iterator
+    from collections.abc import AsyncGenerator, Callable, Iterator
     from pathlib import Path
 
     from yarl import URL
@@ -63,14 +61,12 @@ def prepare_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callabl
         service_locator._configuration = None
         service_locator._event_manager = None
         service_locator._storage_client = None
+        service_locator._storage_instance_manager = None
 
-        # Clear creation-related caches to ensure no state is carried over between tests.
-        monkeypatch.setattr(_creation_management, '_cache_dataset_by_id', {})
-        monkeypatch.setattr(_creation_management, '_cache_dataset_by_name', {})
-        monkeypatch.setattr(_creation_management, '_cache_kvs_by_id', {})
-        monkeypatch.setattr(_creation_management, '_cache_kvs_by_name', {})
-        monkeypatch.setattr(_creation_management, '_cache_rq_by_id', {})
-        monkeypatch.setattr(_creation_management, '_cache_rq_by_name', {})
+        # Reset the retrieval flags
+        service_locator._configuration_was_retrieved = False
+        service_locator._event_manager_was_retrieved = False
+        service_locator._storage_client_was_retrieved = False
 
         # Verify that the test environment was set up correctly.
         assert os.environ.get('CRAWLEE_STORAGE_DIR') == str(tmp_path)
@@ -96,9 +92,9 @@ def _isolate_test_environment(prepare_test_env: Callable[[], None]) -> None:
 
 @pytest.fixture(autouse=True)
 def _set_crawler_log_level(pytestconfig: pytest.Config, monkeypatch: pytest.MonkeyPatch) -> None:
-    from crawlee import _log_config
+    from crawlee import _log_config  # noqa: PLC0415
 
-    loglevel = cast('Optional[str]', pytestconfig.getoption('--log-level'))
+    loglevel = cast('str | None', pytestconfig.getoption('--log-level'))
     if loglevel is not None:
         monkeypatch.setattr(_log_config, 'get_configured_log_level', lambda: getattr(logging, loglevel.upper()))
 
@@ -147,18 +143,6 @@ async def disabled_proxy(proxy_info: ProxyInfo) -> AsyncGenerator[ProxyInfo, Non
         ]
     ):
         yield proxy_info
-
-
-@pytest.fixture
-def memory_storage_client(tmp_path: Path) -> MemoryStorageClient:
-    """A fixture for testing the memory storage client and its resource clients."""
-    config = Configuration(
-        persist_storage=True,
-        write_metadata=True,
-        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
-    )
-
-    return MemoryStorageClient.from_config(config)
 
 
 @pytest.fixture(scope='session')

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import inspect
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from opentelemetry.instrumentation.instrumentor import (  # type:ignore[attr-defined]  # Mypy has troubles with OTEL
     BaseInstrumentor,
@@ -18,7 +18,9 @@ from crawlee.crawlers import BasicCrawler, ContextPipeline
 from crawlee.crawlers._basic._context_pipeline import _Middleware
 
 if TYPE_CHECKING:
-    from crawlee._types import BasicCrawlingContext
+    from collections.abc import Callable
+
+    from crawlee.crawlers import BasicCrawlingContext
 
 
 @docs_group('Classes')

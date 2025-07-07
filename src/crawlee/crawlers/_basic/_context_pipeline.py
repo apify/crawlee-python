@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Generic, cast
+from typing import TYPE_CHECKING, Any, Generic, cast
 
 from typing_extensions import TypeVar
 
@@ -15,7 +15,7 @@ from crawlee.errors import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Awaitable, Generator
+    from collections.abc import AsyncGenerator, Awaitable, Callable, Generator
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 TMiddlewareCrawlingContext = TypeVar('TMiddlewareCrawlingContext', bound=BasicCrawlingContext)

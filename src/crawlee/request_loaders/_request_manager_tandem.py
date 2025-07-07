@@ -33,6 +33,10 @@ class RequestManagerTandem(RequestManager):
         self._read_write_manager = request_manager
 
     @override
+    async def get_handled_count(self) -> int:
+        return await self._read_write_manager.get_handled_count()
+
+    @override
     async def get_total_count(self) -> int:
         return (await self._read_only_loader.get_total_count()) + (await self._read_write_manager.get_total_count())
 
@@ -49,17 +53,19 @@ class RequestManagerTandem(RequestManager):
         return await self._read_write_manager.add_request(request, forefront=forefront)
 
     @override
-    async def add_requests_batched(
+    async def add_requests(
         self,
         requests: Sequence[str | Request],
         *,
+        forefront: bool = False,
         batch_size: int = 1000,
         wait_time_between_batches: timedelta = timedelta(seconds=1),
         wait_for_all_requests_to_be_added: bool = False,
         wait_for_all_requests_to_be_added_timeout: timedelta | None = None,
     ) -> None:
-        return await self._read_write_manager.add_requests_batched(
+        return await self._read_write_manager.add_requests(
             requests,
+            forefront=forefront,
             batch_size=batch_size,
             wait_time_between_batches=wait_time_between_batches,
             wait_for_all_requests_to_be_added=wait_for_all_requests_to_be_added,
@@ -96,10 +102,6 @@ class RequestManagerTandem(RequestManager):
     @override
     async def mark_request_as_handled(self, request: Request) -> None:
         await self._read_write_manager.mark_request_as_handled(request)
-
-    @override
-    async def get_handled_count(self) -> int:
-        return await self._read_write_manager.get_handled_count()
 
     @override
     async def drop(self) -> None:

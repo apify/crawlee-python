@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 from more_itertools import flatten
 from pydantic import AnyHttpUrl, TypeAdapter
@@ -85,7 +85,7 @@ class ProxyConfiguration:
                 the proxy selection mechanism.
         """
         self._next_custom_url_index = 0
-        self._used_proxy_urls = dict[str, Union[URL, None]]()
+        self._used_proxy_urls = dict[str, URL | None]()
         self._url_validator = TypeAdapter(AnyHttpUrl)
 
         # Validation
