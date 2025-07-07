@@ -9,13 +9,13 @@ import CodeBlock from '@theme/CodeBlock';
 
 import InstrumentCrawler from '!!raw-loader!./code_examples/open_telemetry/instrument_crawler.py';
 
-
 [OpenTelemtery](https://opentelemetry.io/) is a collection of APIs, SDKs, and tools to instrument, generate, collect, and export telemetry data (metrics, logs, and traces) to help you analyze your software’s performance and behavior. In context of crawler development it can be used to better understand how the crawler internally works, identify bottlenecks, debug, log metrics, and more.
 
 In this guide it will be shown how to set up OpenTelemetry and instrument specific crawler to see traces of individual requests that are being processed by the crawler. OpenTelemetry on its own does not provide out of the box tool for convenient visualisation of the exported data (apart from printing to the console), but there are several good available tools to do that. In this guide we will use [Jaeger](https://www.jaegertracing.io/) to visualise the telemetry data.
 
 
 ## Set up the Jaeger
+
 This guide will show how to set up the environment locally to run the example code and visualize the telemetry data in Jaeger that will be running locally in a [docker](https://www.docker.com/) container.
 
 To start the preconfigured docker container you can use following command:
@@ -27,6 +27,7 @@ For more details about the Jaeger setup see [getting started](https://www.jaeger
 You can see the Jaeger UI in your browser by navigating to the http://localhost:16686
 
 ## Instrument the Crawler
+
 Now you can proceed with instrumenting the crawler to send the telemetry data to the Jaeger and running it. To have the Python environment ready, you should install either **crawlee[all]** or **crawlee[otel]**, this will ensure that OpenTelemetry dependencies are installed, and you can run the example code snippet.
 In the following example you can see the function `instrument_crawler` that contains the instrumentation setup and is called before the crawler is started. If you have already set up the Jaeger, then you can just run following code snippet.
 
@@ -34,13 +35,14 @@ In the following example you can see the function `instrument_crawler` that cont
     {InstrumentCrawler}
 </CodeBlock>
 
-
 ## Analyze the results
+
 In the Jaeger UI you can search for different traces, apply filtering, compare traces, view their detailed attributes, view timing details and more.
 ![Jaeger search view](/img/guides/jaeger_otel_search_view_example.png 'Example visualisation of search view in Jaeger')
 ![Jaeger trace view](/img/guides/jaeger_otel_trace_example.png 'Example visualisation of crawler request trace in Jaeger')
 
 ## Customize the instrumentation
+
 You can customize the <ApiLink to="class/CrawlerInstrumentor">`CrawlerInstrumentor`</ApiLink>. Depending on the arguments used during its initialization the instrumentation will be applied to different parts ot the crawlee code. By default, it instruments some functions that can give quite a good picture of each individual request handling. To turn this default instrumentation off, you can pass `request_handling_instrumentation=False` during initialization. You can also extend instrumentation by passing `instrument_classes=[...]` initialization argument that contains classes you want to be auto-instrumented. All their public methods will be automatically instrumented. Bear in mind, that instrumentation has some runtime costs as well. The more instrumentation is used tho more overhead it will add to the crawler execution.
 
 

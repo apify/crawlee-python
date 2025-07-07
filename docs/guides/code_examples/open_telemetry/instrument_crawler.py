@@ -8,7 +8,7 @@ from opentelemetry.trace import set_tracer_provider
 
 from crawlee._types import BasicCrawlingContext
 from crawlee.crawlers import ParselCrawler, ParselCrawlingContext
-from crawlee.otel.crawler_instrumentor import CrawlerInstrumentor
+from crawlee.otel import CrawlerInstrumentor
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 
@@ -54,4 +54,5 @@ async def main() -> None:
     await crawler.run(['https://crawlee.dev/'])
 
 
-asyncio.run(main())
+if __name__ == '__main__':
+    asyncio.run(main())
