@@ -85,6 +85,7 @@ async def test_send_request_with_proxy_disabled(
         await http_client.send_request(url, proxy_info=disabled_proxy)
 
 
+@pytest.mark.run_alone
 async def test_crawl_follow_redirects_by_default(http_client: ImpitHttpClient, server_url: URL) -> None:
     target_url = str(server_url / 'status/200')
     redirect_url = str((server_url / 'redirect').update_query(url=target_url))
