@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import gzip
 import json
 import threading
 import time
@@ -116,6 +117,7 @@ async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
         'json': hello_world_json,
         'xml': hello_world_xml,
         'robots.txt': robots_txt,
+        'get_compressed': get_compressed,
     }
     path = URL(scope['path']).parts[1]
     # Route requests to appropriate handlers
@@ -383,6 +385,19 @@ async def echo_content(scope: dict[str, Any], _receive: Receive, send: Send) -> 
 async def robots_txt(_scope: dict[str, Any], _receive: Receive, send: Send) -> None:
     """Handle requests for the robots.txt file."""
     await send_html_response(send, ROBOTS_TXT)
+
+
+async def get_compressed(_scope: dict[str, Any], _receive: Receive, send: Send) -> None:
+    """Return large gzip compressed content."""
+
+    await send(
+        {
+            'type': 'http.response.start',
+            'status': 200,
+            'headers': [[b'content-encoding', b'gzip']],
+        }
+    )
+    await send({'type': 'http.response.body', 'body': gzip.compress(HELLO_WORLD * 1000)})
 
 
 class TestServer(Server):

@@ -10,6 +10,7 @@ from crawlee import Request
 from crawlee.errors import ProxyError
 from crawlee.http_clients import CurlImpersonateHttpClient
 from crawlee.statistics import Statistics
+from tests.unit.server_endpoints import HELLO_WORLD
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -121,12 +122,6 @@ async def test_send_request_allow_redirects_false(server_url: URL) -> None:
 
 
 async def test_stream(http_client: CurlImpersonateHttpClient, server_url: URL) -> None:
-    check_body = b"""\
-<html><head>
-    <title>Hello, world!</title>
-</head>
-<body>
-</body></html>"""
     content_body: bytes = b''
 
     async with http_client.stream(str(server_url)) as response:
@@ -134,17 +129,10 @@ async def test_stream(http_client: CurlImpersonateHttpClient, server_url: URL) -
         async for chunk in response.read_stream():
             content_body += chunk
 
-    assert content_body == check_body
+    assert content_body == HELLO_WORLD
 
 
 async def test_stream_error_double_read_stream(http_client: CurlImpersonateHttpClient, server_url: URL) -> None:
-    check_body = b"""\
-<html><head>
-    <title>Hello, world!</title>
-</head>
-<body>
-</body></html>"""
-
     async with http_client.stream(str(server_url)) as response:
         assert response.status_code == 200
         content_body_first: bytes = b''
@@ -154,7 +142,7 @@ async def test_stream_error_double_read_stream(http_client: CurlImpersonateHttpC
         with pytest.raises(RuntimeError):
             [chunk async for chunk in response.read_stream()]
 
-    assert content_body_first == check_body
+    assert content_body_first == HELLO_WORLD
 
 
 async def test_stream_error_for_read(http_client: CurlImpersonateHttpClient, server_url: URL) -> None:
@@ -204,3 +192,15 @@ async def test_work_after_cleanup(http_client: CurlImpersonateHttpClient, server
     # After cleanup, the client should still work
     response = await http_client.send_request(str(server_url))
     assert response.status_code == 200
+
+
+async def test_compressed_chunked_stream(http_client: CurlImpersonateHttpClient, server_url: URL) -> None:
+    content_body: bytes = b''
+
+    async with http_client.stream(str(server_url / 'get_compressed')) as response:
+        assert response.status_code == 200
+        async for chunk in response.read_stream():
+            print(chunk)
+            content_body += chunk
+
+    assert content_body == HELLO_WORLD * 1000
