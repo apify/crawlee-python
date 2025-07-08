@@ -103,7 +103,7 @@ class ImpitHttpClient(HttpClient):
             http3: Whether to enable HTTP/3 support.
             verify: SSL certificates used to verify the identity of requested hosts.
             header_generator: Header generator instance to use for generating common headers.
-            browser: Browser to impersonate ("chrome" or "firefox")
+            browser: Browser to impersonate.
             async_client_kwargs: Additional keyword arguments for `impit.AsyncClient`.
         """
         super().__init__(
